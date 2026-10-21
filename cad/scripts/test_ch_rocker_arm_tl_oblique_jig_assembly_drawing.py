@@ -4,7 +4,7 @@ The sheet text comes from the jig spec, the BOM prints every family made and
 bought with its registry number, numbered as the steps cite it, every BOM row
 carries a balloon, and each sheet's budgeted regions stay inside the border,
 out of the title block and clear of one another. Actual view creation and the
-shared finalizer must leave all ten physical sheets linked to the live source.
+shared finalizer must leave every physical sheet linked to the live source.
 """
 
 from __future__ import annotations
@@ -250,9 +250,12 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:] == (
+    assert drawing.SHEET_NAMES[7:10] == (
         drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
     )
+    assert drawing.SHEET_NAMES[:10] == drawing.BASE_SHEET_NAMES
+    assert drawing.SHEET_NAMES[10:] == drawing.TOOLING_SHEETS
+    assert drawing.TOOLING_SHEETS
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -261,6 +264,10 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.TOP_CAPTURE_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert all(
+        drawing.SHEET_SCALES[sheet] == drawing.NOTES_REFERENCE_SCALE
+        for sheet in drawing.TOOLING_SHEETS
+    )
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -483,13 +490,6 @@ def test_bom_sheet_regions_fit_apart() -> None:
     region = drawing.REFERENCE_REGION
     assert _inside(reference, region) and _inside_sheet(region)
     assert region[0] >= bom[2] + drawing.REGION_GAP
-    for block in drawing.TOOLING_TABLE_BLOCKS:
-        if block.sheet != drawing.BOM_SHEET:
-            continue
-        tooling = _note_box(block.text, block.xy)
-        assert _inside(tooling, block.region) and _inside_sheet(tooling)
-        assert not _overlap(tooling, reference) and not _overlap(tooling, bom)
-        assert max(map(len, block.text.splitlines())) <= drawing.TOOLING_TABLE_WIDTH
 
 
 def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> None:
@@ -519,22 +519,62 @@ def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> No
     )
 
 
-def test_tooling_continuations_stay_in_their_reserved_paper_rooms() -> None:
+def test_tooling_continuations_have_dedicated_clear_paper_and_source_views() -> None:
     assert drawing.TOOLING_TABLE_BLOCKS
-    for block in drawing.TOOLING_TABLE_BLOCKS:
-        box = _note_box(block.text, block.xy)
-        assert _inside(box, block.region) and _inside_sheet(box)
-        assert max(map(len, block.text.splitlines())) <= drawing.TOOLING_TABLE_WIDTH
+    for sheet in drawing.TOOLING_SHEETS:
+        reference = drawing.NOTES_REFERENCE_REGIONS[sheet]
+        assert _inside_sheet(reference)
+        assert reference[3] - reference[1] >= 0.060 - 1e-12
+        blocks = [block for block in drawing.TOOLING_TABLE_BLOCKS if block.sheet == sheet]
+        assert blocks
+        for index, block in enumerate(blocks):
+            box = _note_box(block.text, block.xy)
+            assert _inside(box, block.region) and _inside_sheet(box)
+            assert not _overlap(box, reference)
+            assert max(map(len, block.text.splitlines())) <= drawing.TOOLING_TABLE_WIDTH
+            assert all(not _overlap(box, _note_box(other.text, other.xy))
+                       for other in blocks[index + 1:])
 
 
-def test_tooling_pagination_refuses_truncation_or_unreadable_rooms() -> None:
-    left, bottom, right, _top = drawing.BOM_RIGHT_REGION
+@pytest.mark.parametrize(
+    ("rows", "page_count", "block_count"),
+    (
+        (tuple(f"ROW{index}" for index in range(17)), 3, 6),
+        (tuple(f"ROW{index} " + "WORD " * 16 for index in range(4)), 2, 4),
+    ),
+)
+def test_tooling_pagination_adds_pages_without_splitting_or_losing_paragraphs(
+    rows, page_count, block_count,
+) -> None:
+    regions = tuple(
+        (left, bottom, right, bottom + 5.5 * drawing.NOTE_LINE_M)
+        for left, bottom, right, _top in drawing.TOOLING_TEXT_REGIONS
+    )
+    blocks = drawing.tooling_table_layout(rows, regions, first_sheet_number=11)
+    assert len(blocks) == block_count
+    assert len({block.sheet for block in blocks}) == page_count
+    bodies = [block.text.splitlines()[1:-1] for block in blocks]
+    assert " ".join(" ".join(" ".join(body).split()) for body in bodies) == " ".join(
+        " ".join(row.split()) for row in rows
+    )
+    for block in blocks:
+        assert _inside(_note_box(block.text, block.xy), block.region)
+
+
+def test_tooling_pagination_refuses_unreadable_columns_or_oversize_paragraphs() -> None:
+    left, bottom, right, _top = drawing.TOOLING_TEXT_REGIONS[0]
     room = (left, bottom, right, bottom + 4.5 * drawing.NOTE_LINE_M)
     with pytest.raises(ValueError):
-        drawing.tooling_table_layout(("X " * (3 * drawing.TOOLING_TABLE_WIDTH),), ((drawing.BOM_SHEET, room),))
+        drawing.tooling_table_layout(
+            ("X " * (3 * drawing.TOOLING_TABLE_WIDTH),), (room,),
+            first_sheet_number=11,
+        )
     too_narrow = (left, bottom, left + drawing.NOTE_CHAR_M, room[3])
     with pytest.raises(ValueError):
-        drawing.tooling_table_layout(("ROW",), ((drawing.BOM_SHEET, too_narrow),))
+        drawing.tooling_table_layout(("ROW",), (too_narrow,), first_sheet_number=11)
+    with pytest.raises(ValueError):
+        drawing.tooling_table_layout(("ROW",), (), first_sheet_number=11)
+    assert drawing.tooling_table_layout((), (room,), first_sheet_number=11) == ()
 
 
 def test_each_cluster_rings_inside_its_sheet() -> None:
@@ -1922,6 +1962,7 @@ def native_property_package(monkeypatch):
         "CARTRIDGEASSEMBLY",
         "TOPCAPTUREFIT",
         "CAPTUREANDOPERATION",
+        *drawing.TOOLING_SHEETS,
     )
     properties = {
         name: f"live {name}"
@@ -2215,6 +2256,7 @@ def test_every_physical_sheet_links_to_its_actual_live_model_view(
     (
         drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET,
         drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
+        *drawing.TOOLING_SHEETS,
     ),
 )
 def test_placed_instruction_notes_and_visible_source_view_stay_on_clear_paper(

@@ -1,4 +1,4 @@
-r"""Create the ten-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
+r"""Create the oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
@@ -9,8 +9,7 @@ the CL dowel's round tip above the riser top as a reference (the builder's
 hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated and purchased
 family from the part registry, numbered in the spec's BOM order with its full
 description and total quantity, one line a row, on the left of the sheet; its
-unballooned, collapsed parent view sits on the right above the title block,
-below the derived tooling-clearance table.
+unballooned, collapsed parent view sits on the right above the title block.
 Shared kit members retain three native configuration rows with the same
 associative SH-VN-57 Number. A BOM-scoped key identifies their common purchased
 SKU and maps the native items to named configurations and installed counts,
@@ -30,9 +29,12 @@ at the largest measured fit from 1:20, 1:25 and 1:30 below the right-column text
 their native model views supply the live ``$PRPSHEET`` title-block links.
 Sheet 10 carries operation/service (C6-C7), the hold-down stud measurement,
 limits and installed acceptance (HD1-HD3) and machine acceptance, with the
-finished isometric below the right-column checks at 1:15. Every view is one the
-builder named in the machine frame (``spec.VIEW_AXES``), its mapping proven on
-the sheet before anything is placed by it. Every text,
+finished isometric below the right-column checks at 1:15. Dedicated tooling
+acceptance sheets follow the original ten, adding pages as the complete source
+instructions require at the same readable two-column pitch. Each keeps a visible
+collapsed reference view for its live title-block property association. Every
+view is one the builder named in the machine frame (``spec.VIEW_AXES``), its
+mapping proven on the sheet before anything is placed by it. Every text,
 pose and reference value comes from
 ``ch_rocker_arm_tl_oblique_jig_assembly_spec`` (and through it the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``) or the part registry; this recipe
@@ -220,7 +222,7 @@ CLUSTERS = (
         (1.0, 5.0),
     ),
 )
-SHEET_NAMES = (
+BASE_SHEET_NAMES = (
     ASSEMBLED_SHEET,
     BOM_SHEET,
     *(cluster.sheet for cluster in CLUSTERS),
@@ -230,20 +232,19 @@ SHEET_NAMES = (
     CAPTURE_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
-BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
-STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
-TOP_CAPTURE_SHEET_NUMBER = SHEET_NAMES.index(TOP_CAPTURE_SHEET) + 1
+BOM_SHEET_NUMBER = BASE_SHEET_NAMES.index(BOM_SHEET) + 1
+STEPS_SHEET_NUMBER = BASE_SHEET_NAMES.index(STEPS_SHEET) + 1
+TOP_CAPTURE_SHEET_NUMBER = BASE_SHEET_NAMES.index(TOP_CAPTURE_SHEET) + 1
 # The spec's steps type their instruction sheets' numbers, and the stud drawing
 # prints spec.HOLD_DOWN_REFERENCE: sheets 8-10 must keep these places.
 if (
-    SHEET_NAMES.index(CARTRIDGE_SHEET) + 1,
+    BASE_SHEET_NAMES.index(CARTRIDGE_SHEET) + 1,
     TOP_CAPTURE_SHEET_NUMBER,
-    SHEET_NAMES.index(CAPTURE_SHEET) + 1,
+    BASE_SHEET_NAMES.index(CAPTURE_SHEET) + 1,
 ) != (8, 9, spec.OPERATION_SHEET_NUMBER):
     raise AssertionError("the steps' typed instruction-sheet numbers moved")
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
-SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
 # finished isometric on the capture sheet, at most 1:20 for the instruction
 # references, and 1:6 for the BOM's collapsed reference right of the table.
@@ -286,6 +287,7 @@ def package_sheet_scales(
         CARTRIDGE_SHEET: NOTES_REFERENCE_SCALE,
         TOP_CAPTURE_SHEET: NOTES_REFERENCE_SCALE,
         CAPTURE_SHEET: ISOMETRIC_SCALE,
+        **{name: NOTES_REFERENCE_SCALE for name in TOOLING_SHEETS},
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -293,9 +295,6 @@ def package_sheet_scales(
     }
 
 
-# The scales each sheet is created at; build() reports the fitted ones.
-SHEET_SCALES = package_sheet_scales({c.sheet: c.scale for c in CLUSTERS})
-SHEET_SCALE = SHEET_SCALES[ASSEMBLED_SHEET]
 
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner. Every view outline and balloon ring stays inside the
@@ -390,9 +389,9 @@ BOM_ANCHOR = (
     SHEET_INNER_BORDER[3] - BOM_SHEET_CLEARANCE,
 )
 REGION_GAP = 0.006  # between a view's room and the text beside it
-# Reserve a real 1:6 source-view room independently of the clearance table.
-# Tooling instructions continue in unused instruction-sheet paper rather than
-# driving this room through the title block or shrinking its visible model.
+# The BOM's reference owns its whole right column. Tooling instructions have
+# separate appended sheets, never leftover paper around the BOM or instruction
+# views.
 BOM_RIGHT_REGION = (
     BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values()) + REGION_GAP,
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
@@ -658,10 +657,7 @@ def _note_height(text: str) -> float:
     return (text.count("\n") + 1) * NOTE_LINE_M if text else 0.0
 
 
-REFERENCE_REGION = (
-    BOM_RIGHT_REGION[0], BOM_RIGHT_REGION[1], BOM_RIGHT_REGION[2],
-    BOM_RIGHT_REGION[1] + 0.140,
-)
+REFERENCE_REGION = BOM_RIGHT_REGION
 TOOLING_TABLE_WIDTH = STEPS_LINE_WIDTH
 
 
@@ -688,37 +684,60 @@ class ToolingBlock:
 
 def tooling_table_layout(
     rows: Sequence[str],
-    rooms: Sequence[tuple[str, tuple[float, float, float, float]]],
+    regions: Sequence[tuple[float, float, float, float]],
+    *,
+    first_sheet_number: int,
 ) -> tuple[ToolingBlock, ...]:
-    """Keep whole acceptance paragraphs at readable pitch, with continuation links."""
-    wrapped = tuple(_wrapped((row,), width=TOOLING_TABLE_WIDTH)
-                    for row in rows if row.strip())
-    pending = 0
-    placed = []
-    for sheet, (left, bottom, right, top) in rooms:
+    """Add dedicated two-column pages until every whole paragraph is placed.
+
+    Columns retain the existing instruction font, pitch and word wrapping.
+    A paragraph taller than every column refuses rather than looping, losing
+    content or shrinking text. Continuation numbers do not depend on the
+    package name tuple, which is constructed from these finished pages.
+    """
+    wrapped = tuple(
+        _wrapped((row,), width=TOOLING_TABLE_WIDTH) for row in rows if row.strip()
+    )
+    if not wrapped:
+        return ()
+    capacities = []
+    for left, bottom, right, top in regions:
         if right - left < TOOLING_TABLE_WIDTH * NOTE_CHAR_M or top <= bottom:
             raise ValueError("tooling instructions have an invalid paper room")
-        capacity = math.floor((top - bottom) / NOTE_LINE_M)
-        start, used = pending, 2  # one heading and one continuation/end line
-        while pending < len(wrapped):
-            count = wrapped[pending].count("\n") + 1
-            if used + count > capacity:
+        capacity = math.floor((top - bottom) / NOTE_LINE_M) - 2
+        if capacity < 1:
+            raise ValueError("tooling column cannot hold its heading, text and footer")
+        capacities.append(capacity)
+    if not capacities or any(
+        paragraph.count("\n") + 1 > max(capacities) for paragraph in wrapped
+    ):
+        raise ValueError("one tooling paragraph is taller than a dedicated column")
+    pending, page = 0, 0
+    placed = []
+    while pending < len(wrapped):
+        sheet = f"TOOLING ACCEPTANCE {page + 1}"
+        for region, capacity in zip(regions, capacities):
+            start, used = pending, 0
+            while pending < len(wrapped):
+                count = wrapped[pending].count("\n") + 1
+                if used + count > capacity:
+                    break
+                used += count
+                pending += 1
+            if pending > start:
+                placed.append(
+                    (sheet, first_sheet_number + page, region, wrapped[start:pending])
+                )
+            if pending == len(wrapped):
                 break
-            used += count
-            pending += 1
-        if pending > start:
-            placed.append((sheet, (left, bottom, right, top), wrapped[start:pending]))
-        if pending == len(wrapped):
-            break
-    if pending != len(wrapped):
-        raise ValueError("complete tooling acceptance does not fit its reserved paper rooms")
+        page += 1
     blocks = []
-    for index, (sheet, region, paragraphs) in enumerate(placed):
+    for index, (sheet, _number, region, paragraphs) in enumerate(placed):
         heading = f"TOOLING LIMITS {index + 1}/{len(placed)}"
         if index:
-            heading += f" (FROM PART {index}, SHEET {SHEET_NAMES.index(placed[index - 1][0]) + 1})"
+            heading += f" (FROM PART {index}, SHEET {placed[index - 1][1]})"
         ending = (
-            f"CONTINUED IN PART {index + 2} ON SHEET {SHEET_NAMES.index(placed[index + 1][0]) + 1}; USE ALL PARTS"
+            f"CONTINUED IN PART {index + 2} ON SHEET {placed[index + 1][1]}; USE ALL PARTS"
             if index + 1 < len(placed) else "END TOOLING LIMITS"
         )
         blocks.append(ToolingBlock(sheet, "\n".join((heading, *paragraphs, ending)), region))
@@ -821,39 +840,35 @@ PIN_TIP_SECTION_TIP_Y = PIN_TIP_SECTION_DATUM_Y + 0.010
 # placement/scale allowance: every endpoint must match its intended paper
 # point, not merely sit somewhere inside the much larger reserved region.
 PIN_TIP_LOCATION_TOL_M = 1e-7
-# Keep the existing visible model scales: 140 mm for the BOM's 1:6 reference,
-# 60 mm for an instruction reference (native 1:20 previously measured 45.422),
-# and 75 mm for the unchanged 1:15 finished view. Captions are reserved below.
-# Whole table paragraphs may use only the remaining clear paper above them.
-TOOLING_TABLE_ROOMS = (
-    (BOM_SHEET, (
-        BOM_RIGHT_REGION[0], REFERENCE_REGION[3] + REGION_GAP,
-        BOM_RIGHT_REGION[2], STEPS_XY[1],
-    )),
-    (BOM_SHEET, (
-        BOM_ANCHOR[0], STEPS_FLOOR, TITLE_BLOCK[0] - BOM_SHEET_CLEARANCE,
-        BOM_ANCHOR[1] - (len(BOM_COMPONENTS) + 1) * BOM_ROW_HEIGHT - REGION_GAP,
-    )),
-    *((sheet, (region[0], region[1] + 0.060 + REGION_GAP, region[2], region[3]))
-      for sheet, region in NOTES_REFERENCE_REGIONS.items() if sheet != TOP_CAPTURE_SHEET),
-    (CAPTURE_SHEET, (
-        FINISHED_REGION[0], FINISHED_REGION[1] + 0.075 + REGION_GAP,
-        FINISHED_REGION[2], FINISHED_REGION[3],
-    )),
+# Each appended tooling page has two readable instruction columns and its own
+# visible live-property reference. Reserve 60 mm for the model, with a caption
+# below it, independent of how much acceptance text is added later.
+TOOLING_REFERENCE_REGION = (
+    STEPS_CONTINUED_XY[0],
+    TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
+    SHEET_INNER_BORDER[2],
+    TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP + 0.060,
 )
-TOOLING_TABLE_ROOMS = tuple(
-    (sheet, region) for sheet, region in TOOLING_TABLE_ROOMS if region[3] > region[1]
+TOOLING_TEXT_REGIONS = (
+    (STEPS_XY[0], STEPS_FLOOR, STEPS_CONTINUED_XY[0], STEPS_XY[1]),
+    (
+        STEPS_CONTINUED_XY[0], TOOLING_REFERENCE_REGION[3] + REGION_GAP,
+        SHEET_INNER_BORDER[2], STEPS_CONTINUED_XY[1],
+    ),
 )
 TOOLING_TABLE_BLOCKS = tooling_table_layout(
-    spec.fitter_tooling_table_lines(), TOOLING_TABLE_ROOMS,
+    spec.fitter_tooling_table_lines(), TOOLING_TEXT_REGIONS,
+    first_sheet_number=len(BASE_SHEET_NAMES) + 1,
 )
-for _block in TOOLING_TABLE_BLOCKS:
-    _top = _block.xy[1] - _note_height(_block.text) - REGION_GAP
-    if _block.sheet == CAPTURE_SHEET:
-        FINISHED_REGION = (*FINISHED_REGION[:3], _top)
-    elif _block.sheet in NOTES_REFERENCE_REGIONS:
-        _region = NOTES_REFERENCE_REGIONS[_block.sheet]
-        NOTES_REFERENCE_REGIONS[_block.sheet] = (*_region[:3], _top)
+TOOLING_SHEETS = tuple(dict.fromkeys(block.sheet for block in TOOLING_TABLE_BLOCKS))
+SHEET_NAMES = (*BASE_SHEET_NAMES, *TOOLING_SHEETS)
+SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
+# The scales each sheet is created at; build() reports the fitted ones.
+SHEET_SCALES = package_sheet_scales({c.sheet: c.scale for c in CLUSTERS})
+SHEET_SCALE = SHEET_SCALES[ASSEMBLED_SHEET]
+NOTES_REFERENCE_REGIONS.update(
+    (sheet, TOOLING_REFERENCE_REGION) for sheet in TOOLING_SHEETS
+)
 
 
 
@@ -1097,7 +1112,7 @@ def bom_extent_violations(
     anchor: tuple[float, float], width: float, height: float
 ) -> list[str]:
     """Name every intersection with the border, title keep-out or reserved
-    reference/tooling column. A table left of the title may extend below it."""
+    reference column. A table left of the title may extend below it."""
     left, top = anchor
     right, bottom = left + width, top - height
     tolerance = 1e-9  # floating-point arithmetic, not a paper allowance
@@ -1110,14 +1125,7 @@ def bom_extent_violations(
         and bottom < ry1 - tolerance
         and top > ry0 + tolerance
     ):
-        findings.append("enters the reference/tooling column")
-    for block in TOOLING_TABLE_BLOCKS:
-        if block.sheet != BOM_SHEET or block.region[0] >= BOM_RIGHT_REGION[0]:
-            continue
-        nx0, ny0, nx1, ny1 = block.region
-        if (right > nx0 + tolerance and left < nx1 - tolerance
-                and bottom < ny1 + REGION_GAP - tolerance and top > ny0 + tolerance):
-            findings.append("enters the tooling instructions below the BOM")
+        findings.append("enters the reference column")
     if (
         left < border_left - tolerance
         or right > border_right + tolerance

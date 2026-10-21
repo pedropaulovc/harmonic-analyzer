@@ -188,14 +188,16 @@ KP08 or end-bracket STOCK height bands. Existing formed-wire/cotter
 envelope inspections remain required; the top cut alone does not certify
 all hardware clearances.
 
-The ten-sheet fitter package keeps cartridge manufacture, pressing, joint
-acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) on sheet 8.
+The fitter package preserves its original sheets 1–10. Cartridge manufacture,
+pressing, joint acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) stay on sheet 8.
 **TOPCAPTUREFIT** sheet 9 is the single complete instruction authority for
 C2A and C4/C5 actual qualification; operation, pass changes, the complete
 installed stud contract (HD1–HD3), and machine acceptance remain on
 **CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
-The source-derived tooling-clearance table occupies sheet 2's right column,
-above the unchanged-scale collapsed reference view. No sheet is renumbered.
+The source-derived tooling-clearance table starts on sheet 11. Dedicated
+**TOOLING ACCEPTANCE n** sheets append as the complete instructions require,
+rather than occupying leftover reference-view paper. No original sheet is
+renumbered.
 
 C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
 With the actual pin/block/cap benched without bearings and the cap temporarily
@@ -282,12 +284,17 @@ user chooses a real travel constraint and the all-support bound is closed.
 The current source N values retain the correct **fixed-support** theorem;
 they are not a bound for the unconstrained installed mechanism.
 
-The tooling table begins on sheet 2 and continues in numbered, linked parts
-on existing instruction sheets. Whole paragraphs retain the same readable
-font/pitch. The BOM's 1:6 source view has an independent 140 mm room; small
-parts may use the clear paper below the BOM, with native BOM-growth refusal.
-Instruction references and the finished 1:15 view retain their scale and
-clearance checks; ten sheets and HD1–HD3 on sheet10 left remain unchanged.
+The tooling table uses dedicated, numbered and linked acceptance sheets after
+the original ten. The source layout retains the instruction sheets' readable
+68-character columns and 4.525 mm line pitch. Whole paragraphs flow into
+additional pages rather than shrinking or truncating content. Each new sheet
+uses the real project template and reserves a lower-right, at least 60 mm-high
+model room plus its caption; the existing native 1:20/1:25/1:30 fitting path
+supplies a visible collapsed view for the live title-block property link.
+The BOM's unchanged 1:6 reference owns its whole right column. Existing
+instruction references, the finished 1:15 view and all native extent checks
+remain. Original sheets 1–10 and HD1–HD3 on sheet 10 left are unchanged.
+These are source layout provisions, not a claim that native rendering passed.
 
 The fixed-support diagnostic compares global normal gaps with source N
 plus runout/measurement uncertainty. One positive radial or axial witness
