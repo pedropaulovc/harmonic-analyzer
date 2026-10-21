@@ -6,10 +6,11 @@ the largest fitting standard scale; Isometric has its own fitting scale and
 stays unannotated. All supplier dimensions are reference-only, not fabrication
 controls or claims that nominal envelopes survive every physical feature.
 
-Supplier sources are opened read-only and their SHA-256 is checked after drawing
-export and close, including error paths. Native outline fitting uses refreshed
-display geometry and records each real candidate without replay; custom geometry
-readers retain their own refresh/measurement contract.
+Supplier sources are opened read-only and observed through view creation,
+formatting, export and close, with a final SHA-256 guard on error paths too.
+These checks detect mutation; read-only-at-open does not guarantee native source
+preservation. Native outline fitting uses refreshed display geometry and records
+each real candidate without replay; custom readers retain their own contract.
 
 The footer, bottom-left above the border and left of the title block, reads
 top to bottom: the part's own notes (installation, or a spring's acceptance
@@ -44,6 +45,7 @@ from _custom_properties import apply_custom_properties
 from _drawing_common import (
     TITLE_BLOCK_TOLERANCE_PROPERTIES,
     DrawingOutputs,
+    _drawing_checkpoint,
     assert_asme_b_sheet,
     finalize_drawing,
     new_project_drawing,
@@ -53,11 +55,17 @@ from _drawing_common import (
 from _drawing_layout_audit import annotation_display
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
+from _drawing_registry import (
+    DRAWING_TEMPLATES,
+    DrawingLayout,
+    DrawingSpec,
+    layout_report_path,
+)
 from _drawing_scan import _zoomed_on
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _fastener_catalog import fastener
+from _seat_forensics import capture_com_failure
 import _telemetry
 
 # Project-used scales, largest first, tried against actual native outlines;
@@ -226,6 +234,285 @@ def _open_supplier_source_read_only(adapter: Any, source: Path, *, label: str) -
     return model
 
 
+def _supplier_source_checkpoint(
+    adapter: Any,
+    source: Path,
+    source_model: Any,
+    expected_sha256: str,
+    *,
+    label: str,
+    evidence: list[dict[str, Any]],
+    configuration: str | None = None,
+) -> Callable[[str], None]:
+    """Observe the original native part, not just a same-named loaded document.
+
+    Read-only-at-open is not a persistence guarantee. Dirty presentation is
+    diagnostic only, as is comparison between the different source/drawing
+    documents; positive native identities and actual document types stay strict.
+    During view creation/selection, record actual configurations but enforce the
+    requested configuration only after the existing selection rebuild. After an
+    attempted close, never dereference old drawing/view handles; a missing
+    loaded source is allowed only there, and its on-disk hash is still required.
+    """
+    source = Path(source).resolve()
+    drawing_model = None
+
+    def checkpoint(phase: str) -> None:
+        nonlocal drawing_model
+        faults: list[str] = []
+        row: dict[str, Any] = {
+            "phase": phase,
+            "source_path": str(source),
+            "expected_sha256": expected_sha256,
+            "requested_configuration": configuration,
+            "errors": [],
+            "views": [],
+        }
+
+        def probe(
+            state: dict[str, Any],
+            key: str,
+            getter: Callable[[], Any],
+            *,
+            diagnostic: bool = False,
+        ) -> Any:
+            try:
+                value = getter()
+                if value is not None and type(value) not in (str, int, bool):
+                    raise TypeError(f"non-scalar native result: {type(value).__name__}")
+                state[key] = value
+                return value
+            except BaseException as error:
+                state[key] = None
+                row["errors"].append(
+                    {
+                        "field": key,
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    }
+                )
+                if not diagnostic:
+                    faults.append(f"unreadable {key}")
+                return None
+
+        def native(getter: Callable[[], Any], interface: str, field: str) -> Any:
+            try:
+                value = getter()
+                if value is None:
+                    return None
+                return _early_bound(value, interface)
+            except BaseException as error:
+                row["errors"].append(
+                    {
+                        "field": field,
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    }
+                )
+                faults.append(f"unreadable {field}")
+                return None
+
+        def identity(state: dict[str, Any], key: str, left: Any, right: Any) -> None:
+            value = probe(state, key, lambda: app.IsSame(left, right))
+            if type(value) is not int or value != 1:
+                faults.append(f"{key} native identity mismatch")
+
+        def document(model: Any, *, source_part: bool) -> dict[str, Any]:
+            state: dict[str, Any] = {"present": model is not None}
+            if model is None:
+                faults.append("missing native document")
+                return state
+            path = probe(state, "path", lambda: model.GetPathName())
+            kind = probe(state, "type", lambda: model.GetType())
+            ro = probe(state, "read_only", lambda: model.IsOpenedReadOnly())
+            probe(state, "save_flag", lambda: model.GetSaveFlag(), diagnostic=True)
+            if type(kind) is not int or kind != (1 if source_part else 3):
+                faults.append("native document type mismatch")
+            if type(path) is not str:
+                faults.append("unreadable native document path")
+            else:
+                resolved = probe(
+                    state,
+                    "resolved_path",
+                    lambda: str(Path(path).resolve()) if path.strip() else "",
+                )
+                if source_part and resolved != str(source):
+                    faults.append("supplier source path mismatch")
+                elif not source_part and resolved == str(source):
+                    faults.append("drawing receiver has supplier source path")
+            if source_part and ro is not True:
+                faults.append("supplier source is not read-only")
+            return state
+
+        current_sha256 = probe(
+            row, "current_sha256", lambda: _source_file_sha256(source)
+        )
+        if current_sha256 != expected_sha256:
+            faults.append("supplier source part bytes changed or unreadable")
+        app = native(lambda: adapter.swApp, "ISldWorks", "application")
+        loaded = native(
+            lambda: app.GetOpenDocumentByName(str(source)),
+            "IModelDoc2",
+            "loaded_source",
+        )
+        after_close = phase == "after_drawing_close"
+        row["loaded_source_present"] = loaded is not None
+        if loaded is not None or not after_close:
+            original = native(lambda: source_model, "IModelDoc2", "original_source")
+            row["original_source"] = document(original, source_part=True)
+            row["loaded_source"] = document(loaded, source_part=True)
+            if original is not None and loaded is not None:
+                identity(row, "original_loaded_identity", original, loaded)
+        if after_close:
+            row["drawing_observation"] = "not_dereferenced_after_close_attempt"
+        else:
+            current = native(
+                lambda: adapter.currentModel, "IModelDoc2", "drawing_receiver"
+            )
+            row["drawing_receiver"] = document(current, source_part=False)
+            if current is not None:
+                if drawing_model is None and phase == "after_new_document":
+                    drawing_model = current
+                if drawing_model is None:
+                    faults.append("missing original drawing receiver")
+                else:
+                    identity(
+                        row["drawing_receiver"],
+                        "original_drawing_identity",
+                        current,
+                        drawing_model,
+                    )
+                probe(
+                    row["drawing_receiver"],
+                    "original_source_identity",
+                    lambda: app.IsSame(current, source_model),
+                    diagnostic=True,
+                )
+                try:
+                    # The purchased sheet is single-sheet. Read actual live views,
+                    # not the creation list (which can hide a replacement).
+                    views = list(iter_views(adapter))
+                except BaseException as error:
+                    views = []
+                    faults.append("unreadable live drawing views")
+                    row["errors"].append(
+                        {
+                            "field": "views",
+                            "type": type(error).__name__,
+                            "message": str(error),
+                        }
+                    )
+                for raw_view in views:
+                    view = native(lambda: raw_view, "IView", "view")
+                    state: dict[str, Any] = {}
+                    row["views"].append(state)
+                    if view is None:
+                        faults.append("missing native view")
+                        continue
+                    for key, getter in (
+                        ("orientation", lambda: view.GetOrientationName()),
+                        ("name", lambda: view.GetName2()),
+                        ("source_path", lambda: view.GetReferencedModelName()),
+                        ("configuration", lambda: view.ReferencedConfiguration),
+                    ):
+                        value = probe(state, key, getter)
+                        if type(value) is not str or not value.strip():
+                            faults.append(f"unreadable view {key}")
+                    path = state["source_path"]
+                    if type(path) is str:
+                        resolved = probe(
+                            state,
+                            "resolved_source_path",
+                            lambda: str(Path(path).resolve()),
+                        )
+                        if resolved != str(source):
+                            faults.append("view source path mismatch")
+                    pending = phase.startswith(
+                        (
+                            "before_create_view:",
+                            "after_create_view:",
+                            "after_select_configuration:",
+                        )
+                    )
+                    state["configuration_selection_pending"] = pending
+                    if (
+                        configuration is not None
+                        and not pending
+                        and state["configuration"] != configuration
+                    ):
+                        faults.append("view source configuration mismatch")
+                    referenced = native(
+                        lambda: view.ReferencedDocument,
+                        "IModelDoc2",
+                        "referenced_document",
+                    )
+                    state["referenced_document"] = document(
+                        referenced, source_part=True
+                    )
+                    if referenced is not None:
+                        identity(
+                            state, "original_source_identity", referenced, source_model
+                        )
+                        if loaded is not None:
+                            identity(
+                                state, "loaded_source_identity", referenced, loaded
+                            )
+        row["failures"] = faults
+        evidence.append(row)
+        # Record before refusing; a diagnostic emission must not erase the row.
+        try:
+            _telemetry.event(
+                "drawing.purchased_source_checkpoint",
+                phase=phase,
+                source_state=json.dumps(row, sort_keys=True),
+            )
+        except BaseException as error:
+            if not faults:
+                raise
+            row["errors"].append(
+                {
+                    "field": "telemetry",
+                    "type": type(error).__name__,
+                    "message": str(error),
+                }
+            )
+        if faults:
+            raise RuntimeError(
+                f"{label}: source checkpoint {phase}: {'; '.join(faults)}"
+            )
+
+    return checkpoint
+
+
+def _retain_supplier_source_failure(
+    spec: DrawingSpec, error: BaseException, evidence: list[dict[str, Any]]
+) -> None:
+    """Retain already-exported outputs only; never SaveAs a failing source graph."""
+    try:
+        paths = spec.outputs
+        capture_com_failure(
+            None,
+            f"{spec.artifact_stem}-source-lifecycle",
+            str(error),
+            exception=error,
+            retained_artifacts={
+                "slddrw": paths["slddrw"],
+                "pdf": paths["pdf"],
+                "png": paths["png"],
+                "layout_json": layout_report_path(spec.artifact_stem),
+            },
+            source_path=str(spec.source),
+            source_lifecycle=evidence,
+        )
+    except BaseException as capture_error:
+        if capture_error is not error:
+            error.add_note(
+                "source lifecycle capture also failed: "
+                f"{type(capture_error).__name__}: {capture_error}"
+            )
+    raise error
+
+
 def _box(
     values: Any, *, label: str, kind: Literal["view", "note"] = "view"
 ) -> tuple[float, float, float, float]:
@@ -322,7 +609,9 @@ def _cell(
     return (name, ((x0 + x1) / 2, (y0 + y1) / 2), (x0, y0, x1, y1))
 
 
-def fastener_view_cells(caption_y: float) -> tuple:
+def fastener_view_cells(
+    caption_y: float, *, layout: Literal["standard", "tall_top"] = "standard"
+) -> tuple:
     """Third-angle Front/Top/Right with the Isometric upper right.
 
     Front and Right fill the band from their captions (``caption_y``) up to the
@@ -330,13 +619,21 @@ def fastener_view_cells(caption_y: float) -> tuple:
     The Isometric's cell reaches 6 mm lower, its caption ending on the Right
     cell's top, so a 1:1 pictorial of a long part (the 67 mm keeper chain)
     is not shrunk to 1:2, where small round features show their facets.
+    ``tall_top`` gives an annotated axial Top profile 96 mm rather than 64 mm,
+    lowering both bottom-row cells' tops and the Isometric's bottom together
+    while retaining the caption gaps.
     """
+    if layout not in ("standard", "tall_top"):
+        raise ValueError(f"unknown purchased fastener view layout: {layout!r}")
     bottom = caption_y + _CAPTION_TO_CELL
+    row_top = 0.150 if layout == "tall_top" else 0.182
+    top_bottom = 0.166 if layout == "tall_top" else 0.198
+    isometric_bottom = 0.160 if layout == "tall_top" else 0.192
     return (
-        _cell("*Front", 0.025, bottom, 0.205, 0.182),
-        _cell("*Top", 0.025, 0.198, 0.205, 0.262),
-        _cell("*Right", 0.225, bottom, 0.405, 0.182),
-        _cell(_ISOMETRIC, 0.225, 0.192, 0.415, 0.262),
+        _cell("*Front", 0.025, bottom, 0.205, row_top),
+        _cell("*Top", 0.025, top_bottom, 0.205, 0.262),
+        _cell("*Right", 0.225, bottom, 0.405, row_top),
+        _cell(_ISOMETRIC, 0.225, isometric_bottom, 0.415, 0.262),
     )
 
 
@@ -1130,6 +1427,7 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
+    view_layout: Literal["standard", "tall_top"] = "standard",
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
@@ -1144,6 +1442,8 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.  ``number_fit`` opts a sheet whose registry number overruns the
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
+    ``view_layout="tall_top"`` reallocates space to an annotated axial Top view
+    without changing annotation margins or the standard-scale fitting contract.
     Supplier hooks import native reference sizes after fitting; explicit margins
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
@@ -1159,6 +1459,7 @@ async def build_purchased_fastener_drawing(
 
     source_sha256 = _source_file_sha256(source)
     primary: BaseException | None = None
+    source_evidence: list[dict[str, Any]] = []
     try:
         with _telemetry.span("drawing.purchased_source", part=stock.part_name):
             model = _open_supplier_source_read_only(
@@ -1198,11 +1499,21 @@ async def build_purchased_fastener_drawing(
             cut_to_suit=cut_to_suit,
             document_title=str(registry["title"]),
             number_fit=number_fit,
+            view_layout=view_layout,
             supplier_dimensions=supplier_dimensions,
             supplier_margins=supplier_margins,
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            source_checkpoint=_supplier_source_checkpoint(
+                adapter,
+                source,
+                model,
+                source_sha256,
+                label=stock.part_name,
+                evidence=source_evidence,
+                configuration=configuration,
+            ),
         )
     except BaseException as error:
         primary = error
@@ -1222,7 +1533,11 @@ async def build_purchased_fastener_drawing(
                     f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
                 )
             else:
-                raise
+                _retain_supplier_source_failure(
+                    spec, preservation_error, source_evidence
+                )
+        if primary is not None:
+            _retain_supplier_source_failure(spec, primary, source_evidence)
 
 
 async def build_purchased_spring_drawing(
@@ -1246,6 +1561,7 @@ async def build_purchased_spring_drawing(
         raise FileNotFoundError(f"source purchased spring is missing: {source}")
     source_sha256 = _source_file_sha256(source)
     primary: BaseException | None = None
+    source_evidence: list[dict[str, Any]] = []
     try:
         model = _open_supplier_source_read_only(
             adapter, source, label=spec.artifact_stem
@@ -1271,6 +1587,15 @@ async def build_purchased_spring_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            source_checkpoint=_supplier_source_checkpoint(
+                adapter,
+                source,
+                model,
+                source_sha256,
+                label=spec.artifact_stem,
+                evidence=source_evidence,
+                configuration=configuration,
+            ),
         )
     except BaseException as error:
         primary = error
@@ -1287,7 +1612,11 @@ async def build_purchased_spring_drawing(
                     f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
                 )
             else:
-                raise
+                _retain_supplier_source_failure(
+                    spec, preservation_error, source_evidence
+                )
+        if primary is not None:
+            _retain_supplier_source_failure(spec, primary, source_evidence)
 
 
 async def _build_reference_sheet(
@@ -1302,12 +1631,14 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
+    view_layout: Literal["standard", "tall_top"] = "standard",
     number_fit: NumberFit = NumberFit.TEMPLATE,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    source_checkpoint: Callable[[str], None] | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1321,7 +1652,11 @@ async def _build_reference_sheet(
     ):
         raise ValueError(f"{label}: source configuration must be a nonempty name")
     caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
-    cells = (spring_view_cells if spring else fastener_view_cells)(caption_y)
+    cells = (
+        spring_view_cells(caption_y)
+        if spring
+        else fastener_view_cells(caption_y, layout=view_layout)
+    )
     if supplier_dimensions is None:
         if supplier_margins is not None:
             raise ValueError(f"{label}: supplier margins require an annotation hook")
@@ -1334,7 +1669,11 @@ async def _build_reference_sheet(
                 f"{label}: supplier annotations require explicit pre-fit margins"
             )
         fit_cells = supplier_fit_cells(cells, supplier_margins, label=label)
-    draw, sheet = new_project_drawing(adapter, layout=spec.layout)
+    draw, sheet = new_project_drawing(
+        adapter,
+        layout=spec.layout,
+        **({"checkpoint": source_checkpoint} if source_checkpoint is not None else {}),
+    )
     title_block_notes = _purchased_title_block(
         adapter,
         draw,
@@ -1367,15 +1706,21 @@ async def _build_reference_sheet(
     views = []
     with _telemetry.span("drawing.purchased_create_views"):
         for name, center, _ in cells:
-            view = _early_bound(
-                place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
-            )
+            with _drawing_checkpoint(source_checkpoint, f"create_view:{name}"):
+                view = _early_bound(
+                    place_view(adapter, str(source), name, *center, scale=(1, 1)),
+                    "IView",
+                )
             if configuration is not None:
                 view.ReferencedConfiguration = configuration
+                if source_checkpoint is not None:
+                    source_checkpoint(f"after_select_configuration:{name}")
             set_hidden_lines_removed(adapter, view)
             views.append(view)
         if configuration is not None:
             _rebuild(draw, phase="select supplier source configuration")
+            if source_checkpoint is not None:
+                source_checkpoint("after_configuration_rebuild")
             for view in views:
                 if str(view.ReferencedConfiguration) != configuration:
                     raise RuntimeError(
@@ -1445,10 +1790,14 @@ async def _build_reference_sheet(
     placed = []
     with _telemetry.span("drawing.purchased_annotations"):
         if supplier_dimensions is not None:
-            supplier_dimensions(
-                adapter,
-                {name: view for view, (name, _, _) in zip(views, cells, strict=True)},
-            )
+            with _drawing_checkpoint(source_checkpoint, "supplier_formatting"):
+                supplier_dimensions(
+                    adapter,
+                    {
+                        name: view
+                        for view, (name, _, _) in zip(views, cells, strict=True)
+                    },
+                )
             # Import leaves a model view active. Footer/captions are sheet-owned.
             drawing = _early_bound(draw, "IDrawingDoc")
             drawing.ActivateView("")
@@ -1591,6 +1940,8 @@ async def _build_reference_sheet(
                 sheet_notes=placed,
             ),
         )
+    if source_checkpoint is not None:
+        final_checks = (*final_checks, lambda: source_checkpoint("last_settled"))
     paths = spec.outputs
     return await finalize_drawing(
         adapter,
@@ -1599,4 +1950,5 @@ async def _build_reference_sheet(
         pdf_title=title,
         scale=scale,
         settled_checks=final_checks,
+        **({"checkpoint": source_checkpoint} if source_checkpoint is not None else {}),
     )

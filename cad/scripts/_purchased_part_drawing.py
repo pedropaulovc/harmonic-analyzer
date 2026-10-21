@@ -20,7 +20,9 @@ from _purchased_fastener_drawing import (
     _PROPERTIES,
     _build_reference_sheet,
     _open_supplier_source_read_only,
+    _retain_supplier_source_failure,
     _source_file_sha256,
+    _supplier_source_checkpoint,
 )
 
 
@@ -39,14 +41,16 @@ async def build_purchased_part_drawing(
     """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
 
     ``item`` is the catalogue designation on the ITEM row; ``cut_to_suit``
-    marks stock its note cuts at assembly. The supplier part stays read-only
-    and byte-identical through drawing export and close.
+    marks stock its note cuts at assembly. Source identity/read-only state and
+    bytes are observed through export and close; this detects mutation, not a
+    native source-preservation guarantee.
     """
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
     source_sha256 = _source_file_sha256(source)
     primary: BaseException | None = None
+    source_evidence: list[dict[str, Any]] = []
     try:
         model = _open_supplier_source_read_only(
             adapter, source, label=spec.artifact_stem
@@ -72,6 +76,15 @@ async def build_purchased_part_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            source_checkpoint=_supplier_source_checkpoint(
+                adapter,
+                source,
+                model,
+                source_sha256,
+                label=spec.artifact_stem,
+                evidence=source_evidence,
+                configuration=configuration,
+            ),
         )
     except BaseException as error:
         primary = error
@@ -88,4 +101,8 @@ async def build_purchased_part_drawing(
                     f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
                 )
             else:
-                raise
+                _retain_supplier_source_failure(
+                    spec, preservation_error, source_evidence
+                )
+        if primary is not None:
+            _retain_supplier_source_failure(spec, primary, source_evidence)

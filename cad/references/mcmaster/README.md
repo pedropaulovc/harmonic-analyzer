@@ -1544,8 +1544,15 @@ discards document changes without saving. Restoration failures are recorded
 separately from any primary capture failure.
 Read-only source acquisition and each whole-file hash have aggregate timing
 spans, `drawing.purchased_source_open` and `drawing.purchased_source_hash`;
-there is no per-chunk instrumentation. Their cost must be measured on the
-next native canary, not inferred from source-only tests.
+there is no per-chunk instrumentation. Measure their cost from native traces,
+not source-only tests.
+
+Native clamp validation nevertheless detected changed source bytes after
+finalization; read-only acquisition is not a persistence guarantee. Generic
+purchased sheets now checkpoint live document state and SHA around setup,
+presentation, saves and close to locate and refuse drift, not to claim a fix.
+Failure capture copies existing exports with unproven generation; it performs
+no additional COM save or export.
 
 The [native presentation-save receipt](../../docs/pipeline/evidence/vm2-datum-placement/probes/rack-source-save-callout/receipt.json)
 records `SetText` dirtying the source part and drawing `SaveAs3` persisting

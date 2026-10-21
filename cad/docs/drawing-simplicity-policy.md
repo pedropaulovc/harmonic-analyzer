@@ -67,6 +67,17 @@ cannot ask for what the authors were told to leave out.
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
+  The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
+  outer Top cell retains the existing 46 mm annotation reserve, leaving
+  50 mm for the measured native outline. The bottom-row cells' tops and
+  the Isometric's bottom lower 32 mm; other sheets keep `standard`.
+  Scale selection still tries the existing standard scales against complete
+  native outlines,
+  without subtracting fixed sheet-space padding. Short clamp-reference text
+  is shelved only when its measured extent cannot clear the native arrow
+  span; the measured arrow/witness stations stay fixed and final native
+  paths, text and cell containment remain checked. This layout contract is
+  not a substitute for the rendered comparison with the supplier drawing.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

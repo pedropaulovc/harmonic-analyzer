@@ -386,17 +386,54 @@ def pdf_shaded_raster_dpi(adapter: Any, span: Any) -> Iterator[None]:
 
 
 @contextlib.contextmanager
-def _drawing_artifact_save(
-    adapter: Any, kind: Literal["drawing", "pdf", "png"], path: str
+def _drawing_checkpoint(
+    checkpoint: Callable[[str], None] | None, operation: str
 ) -> Iterator[None]:
-    """One span per ``save_drawing`` artefact; the PDF also raises its raster DPI."""
+    """Observe an attempted operation without replacing its primary failure.
+
+    A refused before-check never enters the operation or emits an after-check.
+    Observers detect source mutation; read-only-at-open is not a save guarantee.
+    """
+    if checkpoint is not None:
+        checkpoint(f"before_{operation}")
+    try:
+        yield
+    except BaseException as primary:
+        if checkpoint is not None:
+            try:
+                checkpoint(f"after_{operation}")
+            except BaseException as secondary:
+                primary.add_note(
+                    f"after_{operation} checkpoint also failed: "
+                    f"{type(secondary).__name__}: {secondary}"
+                )
+        raise
+    else:
+        if checkpoint is not None:
+            checkpoint(f"after_{operation}")
+
+
+@contextlib.contextmanager
+def _drawing_artifact_save(
+    adapter: Any,
+    kind: Literal["drawing", "pdf", "png"],
+    path: str,
+    checkpoint: Callable[[str], None] | None = None,
+) -> Iterator[None]:
+    """Observe the existing save context, including preparation and file checks.
+
+    An after-check on failure means the context was entered, not proof SaveAs3
+    was reached (filesystem preparation can fail first). Successful contexts
+    have completed the native save and the existing output-file check.
+    """
     with _telemetry.span(f"drawing.save_{kind}") as span:
         with (
             pdf_shaded_raster_dpi(adapter, span)
             if kind == "pdf"
             else contextlib.nullcontext()
         ):
-            yield
+            with _drawing_checkpoint(checkpoint, f"{kind}_save"):
+                yield
         span.set_attribute("artifact.bytes", Path(path).stat().st_size)
 
 
@@ -442,6 +479,7 @@ def new_project_drawing(
     property_view: str | None = None,
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
+    checkpoint: Callable[[str], None] | None = None,
 ) -> tuple[Any, Any]:
     """Create a drawing from the selected hand-made project template.
 
@@ -452,7 +490,11 @@ def new_project_drawing(
     once views exist (SolidWorks silently ignores a CustomPropertyView naming a
     view that does not exist yet, falling back to 'Default' = first view).
     ``property_view`` is accepted for compatibility and unused.
+    ``checkpoint`` runs immediately after native document creation/binding,
+    before drawing setup, so source load transitions are not attributed to views.
     """
+    if checkpoint is not None and not callable(checkpoint):
+        raise TypeError("drawing checkpoint must be callable")
     _ = property_view
     template = DRAWING_TEMPLATES[layout]
     if not template.path.is_file() or template.path.stat().st_size == 0:
@@ -464,6 +506,8 @@ def new_project_drawing(
         width=template.width_m,
         height=template.height_m,
     )
+    if checkpoint is not None:
+        checkpoint("after_new_document")
     ddoc = _early_bound(
         draw, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -837,13 +881,18 @@ async def finalize_drawing(
     sheet_layouts: Mapping[str, DrawingLayout] | None = None,
     sheet_scales: Mapping[str, tuple[float, float]] | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
+    checkpoint: Callable[[str], None] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
 
     ``settled_checks`` run after the last rebuild, before anything is
     saved: a readback taken when an annotation was placed says nothing
     about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
+    ``checkpoint`` observes each existing native artifact-save boundary and
+    drawing close, including failed attempts. It never changes save options.
     """
+    if checkpoint is not None and not callable(checkpoint):
+        raise TypeError("drawing checkpoint must be callable")
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -1061,7 +1110,7 @@ async def finalize_drawing(
             str(outputs.slddrw),
             pdf_path=str(outputs.pdf),
             artifact_context=lambda kind, path: _drawing_artifact_save(
-                adapter, kind, path
+                adapter, kind, path, checkpoint
             ),
         )
     if set(artifacts) != {"drawing", "pdf"}:
@@ -1094,7 +1143,8 @@ async def finalize_drawing(
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".
     title = str(drawing_model.GetTitle())
-    adapter.swApp.CloseDoc(title)
+    with _drawing_checkpoint(checkpoint, "drawing_close"):
+        adapter.swApp.CloseDoc(title)
     still_open = [
         p
         for p in _visible_document_paths(adapter)

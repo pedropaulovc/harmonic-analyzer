@@ -541,6 +541,160 @@ def test_no_followup_com_capture_failure_cannot_replace_original_exception(
     assert caught.value is original
 
 
+@pytest.mark.parametrize(
+    "completed", (False, True), ids=("early-missing", "preexisting")
+)
+@pytest.mark.parametrize("error_kind", ("runtime", "cancelled"))
+def test_source_failure_retains_only_existing_outputs_without_native_export(
+    tmp_path, monkeypatch, completed, error_kind
+):
+    import asyncio
+    import os
+    import _purchased_fastener_drawing as purchased
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("source failure retention attempted native work")
+
+    for name in (
+        "seat_provenance",
+        "sketch_authoring_preferences",
+        "sketch_manager_state",
+        "display_geometry",
+        "_seat_error_state",
+        "_document_state",
+        "_save_failure_document",
+        "_save_seat_image",
+    ):
+        monkeypatch.setattr(_seat_forensics, name, forbidden)
+    monkeypatch.setattr(_sketch_closure, "_sketch_state", forbidden)
+    source = tmp_path / "supplier.SLDPRT"
+    source.write_bytes(b"do not save or restore source")
+    outputs = {
+        "slddrw": tmp_path / "supplier.SLDDRW",
+        "pdf": tmp_path / "supplier.pdf",
+        "png": tmp_path / "supplier.png",
+    }
+    layout = tmp_path / "supplier.layout.json"
+    files = {**outputs, "layout_json": layout}
+    if completed:
+        for kind, path in files.items():
+            path.write_bytes(f"completed {kind}".encode())
+            # Prior-run files can survive an early failure, especially PNG/layout
+            # before their normal exporters are reached. Never claim this run made them.
+            os.utime(path, ns=(1_600_000_000_000_000_000, 1_600_000_000_000_000_000))
+    before_capture = {
+        kind: path.stat() for kind, path in files.items() if path.exists()
+    }
+    monkeypatch.setattr(purchased, "layout_report_path", lambda _stem: layout)
+    spec = SimpleNamespace(artifact_stem="supplier", source=source, outputs=outputs)
+    error_type = RuntimeError if error_kind == "runtime" else asyncio.CancelledError
+    original = error_type("source checkpoint failed")
+    evidence = [{"phase": "after_pdf_save", "current_sha256": "changed"}]
+    with pytest.raises(error_type) as caught:
+        purchased._retain_supplier_source_failure(spec, original, evidence)
+    assert caught.value is original
+    out = _failure_dir(tmp_path, "supplier-source-lifecycle")
+    report = json.loads((out / "capture.json").read_text())
+    assert report["capture_mode"] == "no_followup_com"
+    for kind, path in files.items():
+        retained = report[f"retained_{kind}"]
+        assert retained["source"] == str(path.resolve())
+        if completed:
+            assert retained["status"] == "retained_diagnostic"
+            assert retained["generation"] == "unproven"
+            assert retained["source_bytes_before_copy"] == before_capture[kind].st_size
+            assert (
+                retained["source_mtime_ns_before_copy"]
+                == before_capture[kind].st_mtime_ns
+            )
+            assert Path(retained["path"]).parent == out
+            assert Path(retained["path"]).read_bytes() == f"completed {kind}".encode()
+            assert path.read_bytes() == f"completed {kind}".encode()
+        else:
+            assert retained["status"] == "missing"
+            assert "path" not in retained
+            assert not path.exists()
+    assert "document_copy" not in report
+    assert not tuple(out.glob("*.sldprt"))
+    assert source.read_bytes() == b"do not save or restore source"
+
+
+def test_existing_output_copy_failure_is_independent_and_preserves_primary(
+    tmp_path, monkeypatch
+):
+    pdf = tmp_path / "sheet.pdf"
+    png = tmp_path / "sheet.png"
+    pdf.write_bytes(b"finished pdf")
+    png.write_bytes(b"finished png")
+    copy = _seat_forensics.shutil.copyfileobj
+
+    def refuse_pdf(source, destination):
+        if Path(source.name) == pdf:
+            raise OSError("diagnostic PDF copy unavailable")
+        return copy(source, destination)
+
+    monkeypatch.setattr(_seat_forensics.shutil, "copyfileobj", refuse_pdf)
+    original = RuntimeError("original source failure")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            None,
+            "retained-copy",
+            str(original),
+            exception=original,
+            retained_artifacts={"pdf": pdf, "png": png},
+        )
+    assert caught.value is original
+    report = json.loads(
+        (_failure_dir(tmp_path, "retained-copy") / "capture.json").read_text()
+    )
+    assert "copy unavailable" in report["retained_pdf"]["capture_error"]
+    assert Path(report["retained_png"]["path"]).read_bytes() == b"finished png"
+    assert "retained_pdf capture also failed" in "\n".join(original.__notes__)
+    assert pdf.read_bytes() == b"finished pdf"
+    assert png.read_bytes() == b"finished png"
+
+
+def test_existing_output_retention_refuses_source_part(tmp_path):
+    source = tmp_path / "supplier.SLDPRT"
+    source.write_bytes(b"source must remain untouched")
+    original = RuntimeError("original source failure")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            None,
+            "retained-source-refused",
+            str(original),
+            exception=original,
+            retained_artifacts={"slddrw": source},
+        )
+    assert caught.value is original
+    out = _failure_dir(tmp_path, "retained-source-refused")
+    report = json.loads((out / "capture.json").read_text())
+    assert "not a known drawing output" in report["retained_slddrw"]["capture_error"]
+    assert not tuple(out.glob("*retained*.slddrw"))
+    assert source.read_bytes() == b"source must remain untouched"
+
+
+@pytest.mark.parametrize("failed_step", ("_grab_screen", "_write_failure_report"))
+def test_existing_output_capture_notes_secondary_capture_failures(
+    tmp_path, monkeypatch, failed_step
+):
+    def unavailable(*_args, **_kwargs):
+        raise OSError("secondary source-evidence capture failure")
+
+    monkeypatch.setattr(_seat_forensics, failed_step, unavailable)
+    original = RuntimeError("original source failure")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            None,
+            "retained-capture-failed",
+            str(original),
+            exception=original,
+            retained_artifacts={"pdf": tmp_path / "not-yet-exported.pdf"},
+        )
+    assert caught.value is original
+    assert "secondary source-evidence capture failure" in "\n".join(original.__notes__)
+
+
 def test_one_step_failing_does_not_stop_the_others(tmp_path, monkeypatch):
     """A seat that refuses ONE read must still yield the other evidence."""
     monkeypatch.setattr(

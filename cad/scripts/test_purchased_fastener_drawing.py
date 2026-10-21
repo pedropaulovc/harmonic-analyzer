@@ -14,6 +14,17 @@ import _purchased_variant_drawing as configured
 from _drawing_registry import DrawingLayout
 
 
+@pytest.fixture(autouse=True)
+def offline_source_failure_capture(monkeypatch, tmp_path):
+    import _seat_forensics
+
+    monkeypatch.setattr(_seat_forensics, "OUT_FAILURES", tmp_path / "failures")
+    monkeypatch.setattr(_seat_forensics, "_grab_screen", lambda target: str(target))
+    monkeypatch.setattr(
+        purchased, "layout_report_path", lambda stem: tmp_path / f"{stem}.layout.json"
+    )
+
+
 class _Model:
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -26,6 +37,9 @@ class _Model:
 
     def IsOpenedReadOnly(self) -> bool:
         return True
+
+    def GetSaveFlag(self) -> bool:
+        return False
 
 
 class _Adapter:
@@ -55,6 +69,18 @@ class _Drawing:
     def EditRebuild3() -> bool:
         return True
 
+    def GetPathName(self) -> str:
+        return ""
+
+    def GetType(self) -> int:
+        return 3
+
+    def IsOpenedReadOnly(self) -> bool:
+        return False
+
+    def GetSaveFlag(self) -> bool:
+        return True
+
 
 class _Sheet:
     def __init__(self, width: float = 0.4318, height: float = 0.2794) -> None:
@@ -77,6 +103,11 @@ class _View:
         self._center = center
         self.UseSheetScale = 1
         self.ScaleRatio = (1.0, 1.0)
+        self.ReferencedConfiguration = "Default"
+        self.ReferencedDocument = None
+
+    def GetName2(self) -> str:
+        return self._orientation
 
     def GetOrientationName(self) -> str:
         return self._orientation
@@ -194,8 +225,10 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "read_required_properties", required_properties)
 
-    def new_project_drawing(_adapter, *, layout):
+    def new_project_drawing(_adapter, *, layout, checkpoint):
         calls.append(("new", layout))
+        _adapter.currentModel = draw
+        checkpoint("after_new_document")
         return draw, sheet
 
     monkeypatch.setattr(purchased, "new_project_drawing", new_project_drawing)
@@ -214,6 +247,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         assert Path(path) == source
         assert scale == (1, 1)
         view = _View(orientation, source, centers[orientation])
+        view.ReferencedDocument = _adapter.swApp.GetOpenDocumentByName(str(source))
         views.append(view)
         return view
 
@@ -267,7 +301,14 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     monkeypatch.setattr(purchased, "_fit_number", fit_number)
 
     async def finalize(
-        _adapter, actual_outputs, *, layout, pdf_title, scale, settled_checks
+        _adapter,
+        actual_outputs,
+        *,
+        layout,
+        pdf_title,
+        scale,
+        settled_checks,
+        checkpoint,
     ):
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
@@ -6073,6 +6114,498 @@ def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
         purchased.supplier_fit_cells(cells, {"*Isometric": (0.01,) * 4}, label="test")
 
 
+@pytest.mark.parametrize(
+    "layout,orthographic", [("standard", (1, 8)), ("tall_top", (1, 1))]
+)
+def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room(
+    monkeypatch, tmp_path, layout, orthographic
+):
+    import sh_vn_clamp_screw_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    # 4dcfee native fit events, 20261021T225443Z-1-a1e7290f. These are
+    # decompositions of native outlines, NOT assumed physical-body bounds.
+    sizes = {
+        "*Front": (0.006858, 0.006858),
+        "*Top": (0.006858, 0.036145592231561),
+        "*Right": (0.036145592231561, 0.006858),
+        "*Isometric": (0.030408131682318, 0.023154077655594),
+    }
+
+    class ClampView(_View):
+        @property
+        def Position(self):
+            return self._center
+
+        def GetOutline(self):
+            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+            width, height = (
+                size * ratio + 0.011176 for size in sizes[self._orientation]
+            )
+            x, y = self._center
+            return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+        def SetViewPosition(self, position, _update):
+            self._center = tuple(position)
+            return True
+
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    margins = supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+    assert margins["*Top"] == pytest.approx((0.026, 0.026, 0.026, 0.020))
+    outer = purchased.fastener_view_cells(0.073, layout=layout)
+    fitted = purchased.supplier_fit_cells(outer, margins, label="clamp")
+    views = [
+        ClampView(name, tmp_path / "clamp.SLDPRT", center) for name, center, _ in outer
+    ]
+    scales = purchased._fit_views(_Drawing(), views, fitted)
+    assert {scales[name] for name in ("*Front", "*Top", "*Right")} == {orthographic}
+    assert scales["*Isometric"] == (2, 1)
+    for view, (_name, _center, bounds) in zip(views, fitted, strict=True):
+        assert purchased._inside(view.GetOutline(), bounds)
+    top = next(bounds for name, _center, bounds in fitted if name == "*Top")
+    assert top[3] - top[1] == pytest.approx(0.050 if layout == "tall_top" else 0.018)
+
+
+def test_clamp_tall_top_cells_and_captions_clear_each_other_border_and_title_block():
+    from itertools import combinations
+
+    from _layout_geometry import Box
+
+    cells = purchased.fastener_view_cells(0.073, layout="tall_top")
+    rectangles = {name: Box(*bounds) for name, _center, bounds in cells}
+    front, top, right, iso = (
+        rectangles[name] for name in ("*Front", "*Top", "*Right", "*Isometric")
+    )
+    assert front.ymax == right.ymax == 0.150
+    assert top.ymin == 0.166 and top.height == pytest.approx(0.096)
+    assert iso.ymin == 0.160
+    assert next(center[0] for name, center, _ in cells if name == "*Front") == next(
+        center[0] for name, center, _ in cells if name == "*Top"
+    )
+    assert next(center[1] for name, center, _ in cells if name == "*Front") == next(
+        center[1] for name, center, _ in cells if name == "*Right"
+    )
+    # Complete caption cells, including their six-mm lower extent. The
+    # isometric caption can touch the Right cell's top, as on standard sheets.
+    captions = {
+        name: Box(box.xmin, box.ymin - 0.010, box.xmax, box.ymin - 0.003)
+        for name, box in rectangles.items()
+    }
+    border = (0.0127, 0.0127, 0.4191, 0.2667)
+    title = Box(0.2159, 0.0127, 0.4191, 0.0651)
+    for box in (*rectangles.values(), *captions.values()):
+        assert purchased._inside((box.xmin, box.ymin, box.xmax, box.ymax), border)
+        assert box.overlaps(title, tol=0.0) is None
+    for first, second in combinations((*rectangles.values(), *captions.values()), 2):
+        assert first.overlaps(second, tol=0.0) is None
+    assert captions["*Top"].ymin - front.ymax >= 0.006 - 1e-12
+    assert captions["*Front"].ymin - title.ymax >= 0.0019 - 1e-12
+    assert captions["*Right"].ymin - title.ymax >= 0.0019 - 1e-12
+
+
+@pytest.mark.parametrize("axis", (0, 1), ids=("horizontal", "vertical"))
+@pytest.mark.parametrize("tail_extension", (0.0, 0.004))
+def test_clamp_shelf_follows_measured_text_and_arrow_reach(axis, tail_extension):
+    import draw_sh_vn_clamp_screw as clamp
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    # Representative settled-mode geometry, not native after-fix evidence.
+    # Horizontal text includes the whole nominal-diameter/thread-ID block.
+    text = Box(0.1029, 0.2192, 0.1271, 0.2288)
+    reach = 0.135 if axis == 0 else 0.245
+    reach += tail_extension
+    position = (0.115, 0.222, 0.0)
+    geometry = dict(axis=axis, text=text, reach=reach)
+    target = clamp._shelf_target(geometry, position, position[1 - axis])
+    dx, dy = (target[index] - position[index] for index in (0, 1))
+    moved = Box(text.xmin + dx, text.ymin + dy, text.xmax + dx, text.ymax + dy)
+    assert target[1 - axis] == position[1 - axis]
+    assert (moved.xmin if axis == 0 else moved.ymin) - reach == pytest.approx(
+        clamp.CLEAR_GAP_M + clamp.PLACE_SETTLE_M
+    )
+    line = (
+        Segment(0.108, 0.222, reach, 0.222)
+        if axis == 0
+        else Segment(0.115, 0.215, 0.115, reach)
+    )
+    assert segment_box_distance(line, moved) >= clamp.CLEAR_GAP_M
+    cell = Box(0.025, 0.166, 0.205, 0.262)
+    assert purchased._inside(
+        (moved.xmin, moved.ymin, moved.xmax, moved.ymax),
+        (cell.xmin, cell.ymin, cell.xmax, cell.ymax),
+    )
+
+
+@pytest.mark.parametrize("key", ("tips", "witnesses"))
+def test_clamp_shelving_rejects_native_line_station_drift(key):
+    import draw_sh_vn_clamp_screw as clamp
+
+    original = dict(
+        tips=((0.1, 0.2), (0.1, 0.204)),
+        witnesses=((0.2, 0.099, 0.11), (0.204, 0.099, 0.11)),
+    )
+    clamp._assert_stations("head", original, copy.deepcopy(original))
+    moved = copy.deepcopy(original)
+    moved[key] = (
+        tuple(value + 0.0001 for value in original[key][0]),
+        *original[key][1:],
+    )
+    with pytest.raises(RuntimeError, match=f"native {key} moved"):
+        clamp._assert_stations("head", original, moved)
+
+
+def _clamp_recovered_head_height():
+    # 4dcfee recovered SupplierHeadHeight display data, metres, 2026-10-21.
+    # Inline only the native primitives needed here; no external log dependency.
+    z = 0.0000125
+    return {
+        "type": 4,
+        "name": "SupplierHeadHeight",
+        "visible": 1,
+        "pos": (0.1029834, 0.2350132, z),
+        "display": {
+            "lines": [
+                [0, 0, 0, 0, 0.1135714, 0.2347655, z, 0.1019834, 0.2347655, z],
+                [0, 0, 0, 0, 0.1135714, 0.2352608, z, 0.1019834, 0.2352608, z],
+                [0, 0, 0, 0, 0.1029834, 0.2347655, z, 0.1029834, 0.2284155, z],
+                [0, 0, 0, 0, 0.1029834, 0.2352608, z, 0.1029834, 0.2416108, z],
+            ],
+            "arrows": [
+                [0.1029834, 0.2347655, z, 0, -1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+                [0.1029834, 0.2352608, z, 0, 1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+            ],
+            "texts": [
+                {
+                    "t": " (0.156 in) ",
+                    "pos": (0.0916157, 0.232235, z),
+                    "h": 0.0035,
+                    "w": 0.0227354,
+                    "ref": 1,
+                    "ang": 0.0,
+                }
+            ],
+        },
+    }
+
+
+def test_clamp_native_geometry_distinguishes_offset_ink_from_real_witnesses(
+    monkeypatch,
+):
+    import draw_sh_vn_clamp_screw as clamp
+
+    record = _clamp_recovered_head_height()
+    monkeypatch.setattr(
+        clamp, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
+    )
+    monkeypatch.setattr(clamp, "_dump_annotation", lambda *_args: record)
+    display = SimpleNamespace(GetAnnotation=lambda: object())
+    original_record = copy.deepcopy(record)
+    before = clamp._native_geometry(None, display, "SupplierHeadHeight")
+    assert before["axis"] == 1
+    assert before["tips"] == (
+        (0.1029834, 0.2347655),
+        (0.1029834, 0.2352608),
+    )
+    assert before["witnesses"] == (
+        (0.2347655, 0.1019834, 0.1135714),
+        (0.2352608, 0.1019834, 0.1135714),
+    )
+    assert before["reach"] == pytest.approx(0.2416108)
+    assert before["text"].width > 0.015
+    assert record == original_record
+
+    z = record["pos"][2]
+    # Native OffsetText uses display-data paths, not registered leaders. The
+    # perpendicular underline is NOT at either arrow-tip station; the diagonal
+    # connector is NOT a witness even when its start touches an arrow tip.
+    offset_rows = [
+        [0, 0, 0, 0, 0.0916157, 0.250, z, 0.1143511, 0.250, z],
+        [0, 0, 0, 0, 0.1029834, 0.2352608, z, 0.0916157, 0.250, z],
+    ]
+    record["display"]["lines"].extend(offset_rows)
+    for row in record["display"]["lines"][:2]:
+        row[4:7], row[7:10] = row[7:10], row[4:7]
+    with_offset = copy.deepcopy(record)
+    after = clamp._native_geometry(None, display, "SupplierHeadHeight")
+    for key in ("tips", "witnesses", "reach"):
+        assert after[key] == before[key]
+    assert after["record"] == with_offset
+    assert after["record"]["display"]["lines"][-2:] == offset_rows
+    assert record == with_offset  # No pruning of ink before the full audit.
+
+    del record["display"]["lines"][0]
+    with pytest.raises(RuntimeError, match="witness"):
+        clamp._native_geometry(None, display, "SupplierHeadHeight")
+    record = copy.deepcopy(with_offset)
+    record["display"]["lines"][0][5] += 0.0001
+    record["display"]["lines"][0][8] += 0.0001
+    with pytest.raises(RuntimeError, match="witness"):
+        clamp._native_geometry(None, display, "SupplierHeadHeight")
+    record = copy.deepcopy(with_offset)
+    record["display"]["lines"][0][4] -= 0.0001
+    changed = clamp._native_geometry(None, display, "SupplierHeadHeight")
+    with pytest.raises(RuntimeError, match="native witnesses moved"):
+        clamp._assert_stations("SupplierHeadHeight", before, changed)
+
+
+@pytest.mark.parametrize(
+    "defect", (None, "ignored-seed", "ignored-shelf", "station-drift")
+)
+def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
+    monkeypatch, defect
+):
+    import draw_sh_vn_clamp_screw as clamp
+    from _layout_geometry import Box, segment_box_distance
+
+    # Bounded native-shaped model, following the thumb measured-offset fixture:
+    # text moves independently; enabling OffsetText snaps the native line to
+    # its seeded transverse anchor, then later text moves leave it fixed.
+    # The vertical short row uses recovered HeadHeight primitives verbatim.
+    class Display:
+        def __init__(self, name, axis, span):
+            self.name, self.axis = name, axis
+            self.record = _clamp_recovered_head_height()
+            self.record["name"] = name
+            data = self.record["display"]
+            if axis == 0:
+                for row in data["lines"]:
+                    row[4], row[5] = row[5], row[4]
+                    row[7], row[8] = row[8], row[7]
+                for row in data["arrows"]:
+                    row[0], row[1] = row[1], row[0]
+                    row[3], row[4] = row[4], row[3]
+                self.record["pos"] = (0.2350132, 0.1057615, 0.0)
+                data["texts"] = [
+                    {
+                        "t": "(<MOD-DIAM>0.164 in)",
+                        "pos": (0.222, 0.1058, 0),
+                        "h": 0.0035,
+                        "w": 0.0254278,
+                        "ref": 1,
+                        "ang": 0.0,
+                    },
+                    {
+                        "t": "8-32",
+                        "pos": (0.230, 0.1002, 0),
+                        "h": 0.0035,
+                        "w": 0.009309,
+                        "ref": 1,
+                        "ang": 0.0,
+                    },
+                ]
+            if span is not None:
+                # Long vertical reference: enough native span for its text,
+                # not an outside-arrow short row that should enter offset mode.
+                data["arrows"][0][1] = 0.210
+                data["arrows"][1][1] = 0.260
+                data["lines"][0][5] = data["lines"][0][8] = 0.210
+                data["lines"][1][5] = data["lines"][1][8] = 0.260
+                data["lines"][2:] = [
+                    [0, 0, 0, 0, 0.1029834, 0.210, 0, 0.1029834, 0.229, 0],
+                    [0, 0, 0, 0, 0.1029834, 0.242, 0, 0.1029834, 0.260, 0],
+                ]
+                data["texts"][0]["t"] = "(1.25 in)"
+            self.position = tuple(self.record["pos"])
+            self.original_position = self.position
+            self._offset = False
+            dimensions = clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+            values = {name: value for name, value, _orientation in dimensions}
+            value = values[name]
+            self.native = SimpleNamespace(
+                Name=name,
+                FullName=f"{name}@SupplierReference@clamp.SLDPRT",
+                SystemValue=value / 1000,
+            )
+
+        def GetAnnotation(self):
+            return self
+
+        def GetDimension2(self, _index):
+            return self.native
+
+        def GetPosition(self):
+            return self.position
+
+        @property
+        def OffsetText(self):
+            return self._offset
+
+        @OffsetText.setter
+        def OffsetText(self, enabled):
+            if enabled and not self._offset:
+                transverse = 1 - self.axis
+                delta = (
+                    self.position[transverse]
+                    - self.record["display"]["arrows"][0][transverse]
+                )
+                self.shift_stations(transverse, delta)
+            self._offset = enabled
+
+        def shift_stations(self, axis, delta):
+            for row in self.record["display"]["lines"]:
+                row[4 + axis] += delta
+                row[7 + axis] += delta
+            for row in self.record["display"]["arrows"]:
+                row[axis] += delta
+
+        def SetPosition2(self, x, y, z):
+            if self.name == "SupplierThreadDiameter" and (
+                (defect == "ignored-seed" and not self.OffsetText)
+                or (defect == "ignored-shelf" and self.OffsetText)
+            ):
+                return True  # Native success is not proof of a settled move.
+            delta = (x - self.position[0], y - self.position[1])
+            for row in self.record["display"]["texts"]:
+                px, py, pz = row["pos"]
+                row["pos"] = (px + delta[0], py + delta[1], pz)
+            self.position = (x, y, z)
+            self.record["pos"] = self.position
+            if (
+                defect == "station-drift"
+                and self.OffsetText
+                and abs(delta[self.axis]) > 0.001
+            ):
+                self.shift_stations(self.axis, 0.0001)
+            return True
+
+    displays = {
+        name: Display(name, axis, span)
+        for name, axis, span in (
+            ("SupplierHeadHeight", 1, None),
+            ("SupplierThreadDiameter", 0, None),
+            ("SupplierLength", 1, 0.050),
+        )
+    }
+    adapter = object()
+    views = {
+        "*Top": SimpleNamespace(
+            GetOrientationName=lambda: "*Top",
+            GetName2=lambda: "Top",
+            GetOutline=lambda: (0.01, 0.01, 0.40, 0.27),
+        )
+    }
+    checks, audited = [], []
+
+    def source_callback():
+        pass
+
+    def shared_annotate(actual_adapter, actual_views, **settings):
+        assert actual_adapter is adapter and actual_views is views
+        assert settings["dimensions"] is clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+        assert settings["formats"] is clamp.supplier.SUPPLIER_REFERENCE_FORMATS
+        assert settings["settled_checks"] is checks
+        settings["settled_checks"].append(source_callback)
+
+    monkeypatch.setattr(clamp, "annotate_supplier_screw", shared_annotate)
+    monkeypatch.setattr(clamp, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(clamp, "_supplier_displays", lambda _adapter: dict(displays))
+    monkeypatch.setattr(clamp, "iter_views", lambda _adapter: iter(views.values()))
+    monkeypatch.setattr(
+        clamp, "sheet_region", lambda _adapter: Box(0.01, 0.01, 0.42, 0.27)
+    )
+    monkeypatch.setattr(
+        clamp, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
+    )
+    monkeypatch.setattr(
+        clamp,
+        "_dump_annotation",
+        lambda _reader, annotation: copy.deepcopy(annotation.record),
+    )
+    # Isolate the native shelf contract from the separate full-sheet collision
+    # rules; the real final layout guard still reacquires and measures each row.
+    monkeypatch.setattr(clamp, "audit_dump", lambda dump: audited.append(dump) or [])
+    transverse_before = {
+        name: tuple(
+            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
+        )
+        for name, display in displays.items()
+    }
+    before = {
+        name: clamp._native_geometry(adapter, display, name)
+        for name, display in displays.items()
+    }
+    native_before = {
+        name: (display.native.FullName, display.native.SystemValue)
+        for name, display in displays.items()
+    }
+    thread_text = tuple(
+        row["t"]
+        for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
+    )
+    if defect:
+        message = {
+            "ignored-seed": "anchor did not settle",
+            "ignored-shelf": "text crowds its native line",
+            "station-drift": "native (tips|witnesses) moved",
+        }[defect]
+        with pytest.raises(RuntimeError, match=message):
+            clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
+        return
+
+    clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
+    assert checks[0] is source_callback
+    assert checks[-1].func is clamp._assert_supplier_layout
+    assert audited
+    for name, display in displays.items():
+        after = clamp._native_geometry(adapter, display, name)
+        assert (display.native.FullName, display.native.SystemValue) == native_before[
+            name
+        ]
+        for key in ("tips", "witnesses"):
+            assert after[key] == before[name][key]
+        # Geometric ink clearance, not a tautological assertion about the target
+        # helper: the entire text block must clear every physical native run,
+        # including witnesses and arrowheads, on both short and long rows.
+        ink = clamp.annotation_geometry(
+            after["record"],
+            owner=name,
+            advance=clamp.calibrate_sheet_advance((after["record"],)),
+        )
+        assert ink is not None and ink.segments
+        assert all(
+            segment_box_distance(segment, after["text"]) >= clamp.CLEAR_GAP_M
+            for segment in ink.segments
+        )
+        assert tuple(
+            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
+        ) == pytest.approx(transverse_before[name])
+        if name == "SupplierLength":
+            assert display.OffsetText is False
+            assert display.position == display.original_position
+        else:
+            axis = display.axis
+            low = after["text"].xmin if axis == 0 else after["text"].ymin
+            assert display.OffsetText is True
+            assert low - after["reach"] >= clamp.CLEAR_GAP_M
+            assert display.position[1 - axis] == display.original_position[1 - axis]
+            assert display.position[axis] != display.original_position[axis]
+    assert (
+        tuple(
+            row["t"]
+            for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
+        )
+        == thread_text
+    )
+    assert "8-32" in thread_text
+    checks[-1]()  # Execute, not merely inspect, the registered late guard.
+    old = displays["SupplierHeadHeight"]
+    replacement = copy.copy(old)
+    replacement.record = copy.deepcopy(old.record)
+    replacement.record["display"]["texts"][0]["pos"] = (0.0916157, 0.232235, 0)
+    displays[old.name] = replacement
+    with pytest.raises(RuntimeError, match="text crowds its native line"):
+        checks[-1]()  # Must reacquire; a captured old display would still pass.
+    replacement.record = copy.deepcopy(old.record)
+    replacement.shift_stations(replacement.axis, 0.0001)
+    with pytest.raises(RuntimeError, match="native (tips|witnesses) moved"):
+        checks[-1]()
+
+
 def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
     import math
 
@@ -6462,6 +6995,11 @@ def _purchased_source_lifecycle(monkeypatch, tmp_path, lane):
         artifact_stem=case.source.stem,
         source=case.source,
         source_kind="part",
+        outputs={
+            "slddrw": tmp_path / "supplier.SLDDRW",
+            "pdf": tmp_path / "supplier.pdf",
+            "png": tmp_path / "supplier.png",
+        },
     )
     properties = dict.fromkeys(purchased._PROPERTIES, "test")
     properties.update(
@@ -6899,3 +7437,572 @@ def test_supplier_read_only_open_refuses_unmeasured_native_status(
             case.adapter, case.source, label="supplier"
         )
     assert case.adapter.currentModel is None
+
+
+def _source_checkpoint_case(monkeypatch, tmp_path):
+    """Method/property-shaped SDK doubles; all evidence reads are production code."""
+    source = tmp_path / "observed.SLDPRT"
+    source.write_bytes(b"original supplier source")
+
+    class Document:
+        def __init__(self, path, kind=1):
+            self.path = str(path)
+            self.kind = kind
+            self.read_only = kind == 1
+            self.dirty = True
+            self.native_id = object()
+            self.closed = False
+
+        def GetPathName(self):
+            assert not self.closed
+            return self.path
+
+        def GetType(self):
+            assert not self.closed
+            return self.kind
+
+        def IsOpenedReadOnly(self):
+            assert not self.closed
+            return self.read_only
+
+        def GetSaveFlag(self):
+            assert not self.closed
+            return self.dirty
+
+    original = Document(source)
+    loaded = Document(source)
+    loaded.native_id = original.native_id
+    drawing = Document("", 3)
+    app = SimpleNamespace(
+        loaded=loaded,
+        IsSame=lambda left, right: int(left.native_id is right.native_id),
+    )
+    app.GetOpenDocumentByName = lambda path: app.loaded
+    adapter = SimpleNamespace(swApp=app, currentModel=drawing)
+    views = []
+    evidence = []
+    events = []
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(purchased, "iter_views", lambda _adapter: iter(views))
+    monkeypatch.setattr(
+        purchased._telemetry,
+        "event",
+        lambda name, **fields: events.append((name, fields)),
+    )
+    checkpoint = purchased._supplier_source_checkpoint(
+        adapter,
+        source,
+        original,
+        purchased._source_file_sha256(source),
+        label="observed",
+        evidence=evidence,
+        configuration="Supplier",
+    )
+    checkpoint("after_new_document")
+
+    def add_view():
+        view = _View("*Front", source, (0.1, 0.1))
+        view.ReferencedDocument = loaded
+        view.ReferencedConfiguration = "Supplier"
+        views.append(view)
+        return view
+
+    return SimpleNamespace(
+        source=source,
+        original=original,
+        loaded=loaded,
+        drawing=drawing,
+        app=app,
+        adapter=adapter,
+        views=views,
+        evidence=evidence,
+        events=events,
+        checkpoint=checkpoint,
+        add_view=add_view,
+        Document=Document,
+    )
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "lost-ro",
+        "loaded-identity",
+        "reference-identity",
+        "reference-ro",
+        "reference-path",
+        "boolean-identity",
+        "boolean-type",
+        "wrong-receiver",
+    ),
+)
+def test_source_checkpoint_rejects_native_transition_during_view_creation(
+    monkeypatch, tmp_path, defect
+):
+    import json
+    import _drawing_common as common
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    with pytest.raises(RuntimeError, match="source checkpoint after_create_view"):
+        with common._drawing_checkpoint(case.checkpoint, "create_view:*Front"):
+            view = case.add_view()
+            if defect == "lost-ro":
+                case.original.read_only = False
+            elif defect == "loaded-identity":
+                case.app.loaded = case.Document(case.source)
+            elif defect == "reference-identity":
+                view.ReferencedDocument = case.Document(case.source)
+            elif defect == "reference-ro":
+                case.loaded.read_only = False
+            elif defect == "reference-path":
+                case.loaded.path = str(tmp_path / "foreign.SLDPRT")
+            elif defect == "boolean-identity":
+                case.app.IsSame = lambda left, right: left.native_id is right.native_id
+            elif defect == "boolean-type":
+                case.original.kind = True
+            else:
+                case.adapter.currentModel = case.original
+    row = case.evidence[-1]
+    assert row["phase"] == "after_create_view:*Front"
+    assert row["failures"]
+    assert row["views"][0]["name"] == "*Front"
+    assert row["views"][0]["referenced_document"]["present"] is True
+    assert json.loads(case.events[-1][1]["source_state"]) == row
+    assert case.source.read_bytes() == b"original supplier source"
+
+
+def test_source_checkpoint_observes_configuration_selection_and_dirty_presentation(
+    monkeypatch, tmp_path
+):
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    view = case.add_view()
+    view.ReferencedConfiguration = "Default"
+    for phase in (
+        "after_create_view:*Front",
+        "after_select_configuration:*Front",
+        "before_create_view:*Top",
+        "after_create_view:*Top",
+        "after_select_configuration:*Top",
+    ):
+        case.checkpoint(phase)
+        assert case.evidence[-1]["views"][0]["configuration"] == "Default"
+        assert case.evidence[-1]["views"][0]["configuration_selection_pending"] is True
+        assert not case.evidence[-1]["failures"]
+    # The existing selection rebuild reconciles the native readback.
+    view.ReferencedConfiguration = "Supplier"
+    case.checkpoint("after_configuration_rebuild")
+    assert case.evidence[-1]["views"][0]["configuration_selection_pending"] is False
+    case.checkpoint("after_supplier_formatting")
+    case.checkpoint("last_settled")
+    assert case.evidence[-1]["original_source"]["save_flag"] is True
+    assert not case.evidence[-1]["failures"]
+    view.ReferencedConfiguration = "Other"
+    with pytest.raises(RuntimeError, match="configuration mismatch"):
+        case.checkpoint("last_settled")
+
+
+def test_source_checkpoint_rejects_wrong_configuration_after_selection_rebuild(
+    monkeypatch, tmp_path
+):
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    view = case.add_view()
+    view.ReferencedConfiguration = "Default"
+    case.checkpoint("after_select_configuration:*Front")
+    with pytest.raises(RuntimeError, match="configuration mismatch"):
+        case.checkpoint("after_configuration_rebuild")
+    assert case.evidence[-1]["phase"] == "after_configuration_rebuild"
+    assert case.evidence[-1]["views"][0]["configuration"] == "Default"
+    assert case.evidence[-1]["views"][0]["configuration_selection_pending"] is False
+
+
+@pytest.mark.parametrize("cross_result", (2, "error"))
+@pytest.mark.parametrize("positive_result", (1, 0, 2, True, "error"))
+def test_source_checkpoint_cross_document_comparison_is_diagnostic_only(
+    monkeypatch, tmp_path, cross_result, positive_result
+):
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+
+    def same(left, right):
+        if left is case.drawing and right is case.original:
+            if cross_result == "error":
+                raise OSError("cross-document comparison unsupported")
+            return cross_result
+        if positive_result == "error":
+            raise OSError("positive identity unreadable")
+        return positive_result
+
+    case.app.IsSame = same
+    if type(positive_result) is int and positive_result == 1:
+        case.checkpoint("last_settled")
+        assert not case.evidence[-1]["failures"]
+    else:
+        with pytest.raises(RuntimeError, match="native identity mismatch"):
+            case.checkpoint("last_settled")
+    row = case.evidence[-1]
+    assert row["drawing_receiver"]["type"] == 3
+    assert row["original_source"]["type"] == 1
+    assert row["drawing_receiver"]["original_source_identity"] == (
+        None if cross_result == "error" else 2
+    )
+    if cross_result == "error":
+        assert any(
+            error["message"] == "cross-document comparison unsupported"
+            for error in row["errors"]
+        )
+
+
+@pytest.mark.parametrize("kind", ("drawing", "pdf"))
+def test_source_checkpoint_identifies_first_mutating_artifact_boundary(
+    monkeypatch, tmp_path, kind
+):
+    import contextlib
+    import _drawing_common as common
+    from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+    outputs = {
+        name: tmp_path / f"observed.{suffix}"
+        for name, suffix in (
+            ("drawing", "SLDDRW"),
+            ("pdf", "pdf"),
+        )
+    }
+    saved = []
+
+    def save(path, version, options):
+        assert (version, options) == (0, 0)
+        saved.append(Path(path).suffix)
+        Path(path).write_bytes(b"completed native output")
+        if Path(path) == outputs[kind]:
+            case.source.write_bytes(b"persisted despite read-only")
+
+    case.drawing.SaveAs3 = save
+    monkeypatch.setattr(native_drawing, "_draw", lambda adapter: adapter.currentModel)
+    monkeypatch.setattr(
+        common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()
+    )
+    with pytest.raises(RuntimeError, match=f"source checkpoint after_{kind}_save"):
+        native_drawing.save_drawing(
+            case.adapter,
+            str(outputs["drawing"]),
+            pdf_path=str(outputs["pdf"]),
+            artifact_context=lambda name, path: common._drawing_artifact_save(
+                case.adapter, name, path, case.checkpoint
+            ),
+        )
+    phases = [row["phase"] for row in case.evidence]
+    assert phases[-2:] == [f"before_{kind}_save", f"after_{kind}_save"]
+    assert all(not row["failures"] for row in case.evidence[:-1])
+    assert case.evidence[-1]["original_source"]["read_only"] is True
+    assert case.evidence[-1]["current_sha256"] != case.evidence[-1]["expected_sha256"]
+    assert saved == ([".SLDDRW"] if kind == "drawing" else [".SLDDRW", ".pdf"])
+    assert outputs[kind].read_bytes() == b"completed native output"
+
+
+@pytest.mark.parametrize("operation", ("drawing_save", "pdf_save", "drawing_close"))
+@pytest.mark.parametrize("error_type", (RuntimeError, asyncio.CancelledError))
+def test_source_checkpoint_after_failure_preserves_native_primary(
+    monkeypatch, tmp_path, operation, error_type
+):
+    import _drawing_common as common
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+    original = error_type("native operation failed")
+    with pytest.raises(error_type) as caught:
+        with common._drawing_checkpoint(case.checkpoint, operation):
+            case.source.write_bytes(b"native failed after source mutation")
+            raise original
+    assert caught.value is original
+    assert case.evidence[-1]["phase"] == f"after_{operation}"
+    assert f"after_{operation} checkpoint also failed" in "\n".join(original.__notes__)
+
+
+def test_source_checkpoint_before_refusal_does_not_attempt_save(monkeypatch, tmp_path):
+    import _drawing_common as common
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+    case.original.read_only = False
+    attempted = []
+    with pytest.raises(RuntimeError, match="before_drawing_save"):
+        with common._drawing_checkpoint(case.checkpoint, "drawing_save"):
+            attempted.append("save")
+    assert attempted == []
+    assert case.evidence[-1]["phase"] == "before_drawing_save"
+
+
+@pytest.mark.parametrize("source_closed", (False, True))
+def test_source_checkpoint_after_close_avoids_closed_handles(
+    monkeypatch, tmp_path, source_closed
+):
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+    case.checkpoint("before_drawing_close")
+    case.drawing.closed = True
+
+    def forbidden(_adapter):
+        raise AssertionError("closed views must not be queried")
+
+    monkeypatch.setattr(purchased, "iter_views", forbidden)
+    if source_closed:
+        case.app.loaded = None
+        case.original.closed = case.loaded.closed = True
+    case.checkpoint("after_drawing_close")
+    row = case.evidence[-1]
+    assert row["loaded_source_present"] is not source_closed
+    assert row["views"] == []
+    assert row["current_sha256"] == row["expected_sha256"]
+    case.source.write_bytes(b"changed after close")
+    with pytest.raises(RuntimeError, match="bytes changed"):
+        case.checkpoint("after_drawing_close")
+
+
+@pytest.mark.parametrize("failure", (None, "drawing_save", "pdf_save", "drawing_close"))
+@pytest.mark.parametrize("error_type", (RuntimeError, asyncio.CancelledError))
+def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
+    monkeypatch, tmp_path, failure, error_type
+):
+    import contextlib
+    import _drawing_common as common
+    from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    case.add_view()
+    draw = case.drawing
+    sheet = _Sheet()
+    sheet._properties = (0, 0, 1.0, 1.0, False, 0.4318, 0.2794, False)
+    sheet.SetScale = lambda *_args: True
+    sheet.GetViews = lambda: case.views
+    draw.GetSheetNames = lambda: ("Sheet1",)
+    draw.ActivateSheet = lambda _name: True
+    draw.GetCurrentSheet = lambda: sheet
+    draw.Sheet = lambda _name: sheet
+    draw.ClearSelection2 = lambda _append: None
+    draw.EditRebuild3 = lambda: True
+    draw.GetTitle = lambda: "observed.SLDDRW"
+    outputs = common.DrawingOutputs(
+        slddrw=tmp_path / "observed.SLDDRW",
+        pdf=tmp_path / "observed.pdf",
+        png=tmp_path / "observed.png",
+    )
+    layout = tmp_path / "observed.layout.json"
+    original = error_type("actual native boundary failed")
+    operations = []
+
+    def attempt(operation):
+        operations.append(operation)
+        if failure == operation:
+            case.source.write_bytes(b"native mutation before failure")
+            raise original
+
+    def save(path, version, options):
+        assert (version, options) == (0, 0)
+        Path(path).write_bytes(b"native output")
+        if Path(path).suffix == ".SLDDRW":
+            draw.path = path
+            attempt("drawing_save")
+        else:
+            attempt("pdf_save")
+
+    def close(title):
+        assert title == "observed.SLDDRW"
+        draw.closed = True
+        attempt("drawing_close")
+
+    draw.SaveAs3 = save
+    case.app.CloseDoc = close
+
+    def member(target, name):
+        value = getattr(target, name)
+        return value() if callable(value) else value
+
+    case.adapter._get_attr_or_call = member
+    monkeypatch.setattr(common, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        common._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
+    monkeypatch.setattr(native_drawing, "_draw", lambda adapter: adapter.currentModel)
+    monkeypatch.setattr(common, "iter_views", lambda _adapter: iter(case.views))
+    monkeypatch.setattr(common, "_build_id", lambda: "inert-source-test")
+    for name in (
+        "apply_custom_properties",
+        "assert_asme_b_sheet",
+        "read_required_properties",
+        "assert_precise_isometric_views",
+        "sanitize_pdf_metadata",
+    ):
+        monkeypatch.setattr(common, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()
+    )
+    monkeypatch.setattr(
+        common,
+        "render_pdf_png",
+        lambda _pdf, png, **_kwargs: png.write_bytes(b"rendered output"),
+    )
+    monkeypatch.setattr(common, "layout_report_path", lambda _stem: layout)
+    monkeypatch.setattr(
+        common,
+        "run_layout_audit",
+        lambda _adapter, *, report, **_kwargs: report.write_text("{}"),
+    )
+    monkeypatch.setattr(common, "_visible_document_paths", lambda _adapter: ())
+
+    async def finalize():
+        return await common.finalize_drawing(
+            case.adapter,
+            outputs,
+            layout=DrawingLayout.LANDSCAPE,
+            pdf_title="Observed source",
+            settled_checks=(lambda: case.checkpoint("last_settled"),),
+            checkpoint=case.checkpoint,
+        )
+
+    if failure is None:
+        result = asyncio.run(finalize())
+        assert set(result) == {"drawing", "pdf", "png"}
+        assert operations == ["drawing_save", "pdf_save", "drawing_close"]
+        assert [row["phase"] for row in case.evidence][-7:] == [
+            "last_settled",
+            "before_drawing_save",
+            "after_drawing_save",
+            "before_pdf_save",
+            "after_pdf_save",
+            "before_drawing_close",
+            "after_drawing_close",
+        ]
+        assert not any(row["failures"] for row in case.evidence)
+    else:
+        with pytest.raises(error_type) as caught:
+            asyncio.run(finalize())
+        assert caught.value is original
+        assert case.evidence[-1]["phase"] == f"after_{failure}"
+        assert f"after_{failure} checkpoint also failed" in "\n".join(
+            original.__notes__
+        )
+        assert operations[-1] == failure
+        assert (
+            len(operations)
+            == ("drawing_save", "pdf_save", "drawing_close").index(failure) + 1
+        )
+    assert outputs.slddrw.read_bytes() == b"native output"
+    if failure != "drawing_save":
+        assert outputs.pdf.read_bytes() == b"native output"
+    if failure in (None, "drawing_close"):
+        assert outputs.png.read_bytes() == b"rendered output"
+        assert layout.read_text() == "{}"
+
+
+def test_source_checkpoint_finalizer_rejects_noncallable_before_native_work(tmp_path):
+    import _drawing_common as common
+
+    with pytest.raises(TypeError, match="checkpoint must be callable"):
+        asyncio.run(
+            common.finalize_drawing(
+                object(),
+                common.DrawingOutputs(
+                    slddrw=tmp_path / "unused.SLDDRW",
+                    pdf=tmp_path / "unused.pdf",
+                    png=tmp_path / "unused.png",
+                ),
+                layout=DrawingLayout.LANDSCAPE,
+                pdf_title="unused",
+                checkpoint=object(),
+            )
+        )
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring", "part"))
+def test_source_checkpoint_public_wrappers_reject_and_retain_native_transition(
+    monkeypatch, tmp_path, lane
+):
+    import json
+    import _purchased_part_drawing as part
+
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    views = []
+    monkeypatch.setattr(purchased, "iter_views", lambda _adapter: iter(views))
+
+    async def create_sheet(adapter, _spec, *, source_checkpoint, **_kwargs):
+        drawing = _Drawing()
+        drawing.native_id = object()
+        adapter.currentModel = drawing
+        source_checkpoint("after_new_document")
+        view = _View("*Front", case.source, (0.1, 0.1))
+        view.ReferencedDocument = case.readback
+        views.append(view)
+        # Same name and native identity, but the view load lost read-only mode.
+        case.readback.read_only = False
+        source_checkpoint("after_create_view:*Front")
+        pytest.fail("source transition was not refused")
+
+    monkeypatch.setattr(
+        part if lane == "part" else purchased, "_build_reference_sheet", create_sheet
+    )
+    with pytest.raises(RuntimeError, match="source checkpoint after_create_view"):
+        case.run()
+    (report_path,) = tuple((tmp_path / "failures").glob("*/*/capture.json"))
+    report = json.loads(report_path.read_text())
+    observed = report["context"]["source_lifecycle"]
+    if isinstance(observed, str):
+        observed = json.loads(observed)
+    assert observed[-1]["phase"] == "after_create_view:*Front"
+    assert observed[-1]["loaded_source"]["read_only"] is False
+    assert observed[-1]["original_loaded_identity"] == 1
+    assert report["capture_mode"] == "no_followup_com"
+    assert report["retained_pdf"]["status"] == "missing"
+    assert case.source.read_bytes() == b"unchanged supplier bytes"
+
+
+def test_source_checkpoint_records_native_read_errors_before_refusing(
+    monkeypatch, tmp_path
+):
+    import json
+
+    case = _source_checkpoint_case(monkeypatch, tmp_path)
+    view = case.add_view()
+
+    def unreadable():
+        raise OSError("native source path unavailable")
+
+    view.GetReferencedModelName = unreadable
+    with pytest.raises(RuntimeError, match="unreadable source_path"):
+        case.checkpoint("after_create_view:*Front")
+    row = case.evidence[-1]
+    assert row["views"][0]["source_path"] is None
+    assert {
+        "field": "source_path",
+        "type": "OSError",
+        "message": "native source path unavailable",
+    } in row["errors"]
+    assert json.loads(case.events[-1][1]["source_state"]) == row
+
+
+def test_source_checkpoint_failure_capture_cannot_replace_primary(
+    monkeypatch, tmp_path
+):
+    original = asyncio.CancelledError("native primary")
+
+    def failed_capture(*_args, **_kwargs):
+        raise KeyboardInterrupt("secondary capture interruption")
+
+    monkeypatch.setattr(purchased, "capture_com_failure", failed_capture)
+    spec = SimpleNamespace(
+        artifact_stem="supplier",
+        source=tmp_path / "supplier.SLDPRT",
+        outputs={
+            kind: tmp_path / f"supplier.{suffix}"
+            for kind, suffix in (
+                ("slddrw", "SLDDRW"),
+                ("pdf", "pdf"),
+                ("png", "png"),
+            )
+        },
+    )
+    with pytest.raises(asyncio.CancelledError) as caught:
+        purchased._retain_supplier_source_failure(spec, original, [])
+    assert caught.value is original
+    assert "secondary capture interruption" in "\n".join(original.__notes__)
