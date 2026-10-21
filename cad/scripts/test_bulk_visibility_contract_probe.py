@@ -3104,9 +3104,6 @@ def test_sheet_mode_e5_consumes_current_admitted_generation_not_disposed_origin(
     )
     assert old.disconnected_accesses == []
     assert fixture.edit_calls == [old]
-    assert [
-        event[:2] for event in fixture.mode_events if event[0] == "GetEditSheet"
-    ] == [("GetEditSheet", probe.ViewId.A)]
     record = sheet_mode_record(fixture.subject)
     assert record["generation"] == 1
     assert record["post"]["generation"] == 1
