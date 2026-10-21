@@ -319,10 +319,11 @@ MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
 would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
 callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
-The owner-approved **Ø2.40 MAX × 6.00 MAX** bound prints the tap-drill exception
-first: **EXCEPT TAP-DRILL BORE AND POINT, FINISHED CAVITY WITHIN Ø2.40 MAX X
-6.00 MAX DEEP FROM ACTUAL ENTRY, ABOUT ACTUAL FINISHED-HOLE AXIS**. Only the
-separately dimensioned tap-drill bore and point are excluded.
+The owner-approved **Ø2.40 MAX × 6.00 MAX** bound occupies four qualifier rows:
+**FINISHED CAVITY EXCEPT TAP-DRILL BORE/POINT:** /
+**Ø2.40 MAX X 6.00 MAX DEEP FROM ACTUAL ENTRY** /
+**ABOUT ACTUAL FINISHED-HOLE AXIS;** / **TO MAINTAIN 2.0 MIN WALL**.
+Only the separately dimensioned tap-drill bore and point are excluded.
 Every other part of the finished hole cavity must lie inside the cylinder:
 full and partial threads, lead/chamfer/tip recesses, reliefs, and any extra
 void left by runout or deflection. This is geometrically equivalent to bounding

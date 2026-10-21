@@ -147,10 +147,10 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # entry. The builder saves this requirement on the SLDPRT; the drawing checks
 # its two native MAX dimensions and wall MIN requirement before printing it.
 BRACKET_THREAD_CUTTING_REQUIREMENT = (
-    "EXCEPT TAP-DRILL BORE AND POINT,\n"
-    f"FINISHED CAVITY WITHIN Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X\n"
-    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY,\n"
-    "ABOUT ACTUAL FINISHED-HOLE AXIS\n"
+    "FINISHED CAVITY EXCEPT TAP-DRILL BORE/POINT:\n"
+    f"Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
+    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY\n"
+    "ABOUT ACTUAL FINISHED-HOLE AXIS;\n"
     f"TO MAINTAIN {RECEIVER_WALL_MIN:.1f} MIN WALL\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib

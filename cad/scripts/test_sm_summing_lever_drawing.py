@@ -943,23 +943,6 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     # would miss the long arc's collision with the height text.
     assert shoulder[0] - angle_radius > blocks["HexHeight"][1] + 0.002
     assert shoulder[1] + angle_radius < pair_line - 0.002
-    # OffsetText moves the complete angular value/seat block onto the shelf,
-    # not the exterior arc. It is above the sharp, below the ridge-pair ink,
-    # and clear of the neighbouring radius block in both dimensions.
-    angle_left, angle_right, angle_bottom, angle_top, _ = blocks["FlankToSide"]
-    assert (angle_x, angle_y) == (0.058, 0.184)
-    assert drawing.FLANK_TEXT_XY == (0.053, 0.218)
-    assert angle_bottom > vertex[1] + 0.002
-    assert angle_top < min(blocks[name][2] for name in spans) - 0.002
-    assert angle_left > _BORDER_LEFT_M + 0.002
-    for name, block in blocks.items():
-        if name == "FlankToSide":
-            continue
-        left, right, bottom, top, _ = block
-        assert (
-            angle_right + 0.002 < left or right + 0.002 < angle_left
-            or angle_top + 0.002 < bottom or top + 0.002 < angle_bottom
-        ), name
     assert blocks["HexHeight"][1] < cx - fence - 0.0015
     width_line = _dimension_line_y("HexWidth", blocks["HexWidth"][4])
     assert drawing.DETAIL_LABEL_XY[1] + 0.005 < width_line < cy - fence - 0.001

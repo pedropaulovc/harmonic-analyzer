@@ -1519,7 +1519,10 @@ DETAIL_KEEP = {
     "FlankToSide": (0.058, 0.184),
     "KnifeRidgeRadius": (0.181, 0.219),
 }
-FLANK_TEXT_XY = (0.053, 0.218)
+# R16's upper shelf connected to the far/lower arrow through the angle arc.
+# Keep that arc seed; below the height caption its leader approaches from
+# below/outside instead. Recheck the regenerated ink, not just this request.
+FLANK_TEXT_XY = (0.051, 0.130)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native
@@ -1584,7 +1587,7 @@ BACK_KEEP = {
     "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
 # The receiver block keeps its full cavity bounds and explicit pilot exception.
-# Five qualifier rows, at the established width, include the wall function;
+# Four qualifier rows keep the complete finished-cavity limits and wall function;
 # the native drill/thread rows stay independent. Fresh ink still needs review.
 MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
 # Keep the caption below the complete receiver callout; native regeneration
