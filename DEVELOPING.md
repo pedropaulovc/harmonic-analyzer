@@ -104,6 +104,26 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+The startup-retry cases in `test_machinist_review.py` use a test-local MCP
+poll clock and a fixed number of pending responses. A proxy of only that test's
+`machinist_review.asyncio` binding arms a real startup `Timeout` when polling
+consumes the unchanged 0.75-second budget; neither global asyncio nor the event
+loop's clock is modified. Windows launch/pipe scheduling stays under the real,
+unchanged overall timeout instead of consuming the synthetic startup budget.
+Real cancellation/reaping, the local Python protocol child, 131-KB pipe draining,
+no prompt before connection and two attempts remain exercised. Separate slow-start
+and shared-overall-timeout tests still use real time.
+
+The refresh-carrier regression in `tests/test_farm_mode.py` runs a real nested
+pytest against the cache test with a private `--basetemp`, plugin autoload and
+ambient pytest arguments disabled, and global/signal OTLP endpoints explicitly
+empty before collection imports telemetry. It preserves the inherited child
+SolidWorks guard and deliberately retains the build refresh carrier: root
+conftest must remove that carrier itself. Synthetic stale sibling runs must
+survive, so the child cannot prune other sessions' evidence. Child stdout/stderr
+are retained under the outer test's temporary directory even on timeout; the
+30-second deadline is unchanged.
+
 ### Finite stock-envelope endpoint reuse
 
 `paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's

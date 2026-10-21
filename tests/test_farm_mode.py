@@ -2,6 +2,7 @@
 seat, never publishes, and turns a farm outcome into the task's outcome."""
 
 import asyncio
+import getpass
 import hashlib
 import importlib.util
 import inspect
@@ -2617,23 +2618,68 @@ def test_leaf_refresh_wire_and_durable_record_are_scoped_to_the_listed_task(
     )
 
 
-def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier():
+def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier(tmp_path):
     environment = dict(os.environ)
     environment["HARMONIC_REMOTE_CACHE_MODE"] = "rw"
     environment["HARMONIC_CACHE_REFRESH"] = json.dumps({
         "labels": ["part:x"], "reason": "Refresh an actual build, not test fixtures",
     })
+    # This child tests root-conftest isolation, not installed third-party plugins,
+    # the caller's worker pool, or the developer's live telemetry collector.
+    environment.pop("PYTEST_ADDOPTS", None)
+    environment.pop("PYTEST_PLUGINS", None)
+    environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    for endpoint in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        environment[endpoint] = ""
+
+    # A nested session must not spend its deadline recursively pruning unrelated
+    # runs. Real stale sibling directories make removal of --basetemp observable.
+    ambient_temp = tmp_path / "other-pytest-sessions"
+    environment["PYTEST_DEBUG_TEMPROOT"] = str(ambient_temp)
+    unrelated = ambient_temp / f"pytest-of-{getpass.getuser()}"
+    sentinels = []
+    for number in range(4):
+        session = unrelated / f"pytest-{number}"
+        session.mkdir(parents=True)
+        sentinel = session / "keep.txt"
+        sentinel.write_text("another session's evidence", encoding="utf-8")
+        sentinels.append(sentinel)
+
     # This normal cache test expects an empty publication to remain fail-soft.
     # Without suite isolation, the inherited request makes it raise instead.
-    result = subprocess.run(
-        [
-            sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
-            "cad/scripts/test_artifact_cache.py::test_store_nothing_on_disk_logs_empty",
-        ],
-        cwd=REPO_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    stdout_path = tmp_path / "nested-pytest.stdout.txt"
+    stderr_path = tmp_path / "nested-pytest.stderr.txt"
+    with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
+        "w", encoding="utf-8"
+    ) as stderr:
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                    "--basetemp", str(tmp_path / "nested-pytest"),
+                    "cad/scripts/test_artifact_cache.py::test_store_nothing_on_disk_logs_empty",
+                ],
+                cwd=REPO_ROOT,
+                env=environment,
+                stdout=stdout,
+                stderr=stderr,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as exc:
+            exc.add_note(f"Retained child output: {stdout_path}; {stderr_path}")
+            for path in (stdout_path, stderr_path):
+                exc.add_note(
+                    f"{path.name} (last 4000 characters):\n"
+                    + path.read_text(encoding="utf-8", errors="replace")[-4000:]
+                )
+            raise
+    output = (
+        stdout_path.read_text(encoding="utf-8", errors="replace")
+        + stderr_path.read_text(encoding="utf-8", errors="replace")
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 0, output[-8000:]
+    assert "1 passed" in output, output[-8000:]
+    assert all(path.read_text(encoding="utf-8") == "another session's evidence" for path in sentinels)
