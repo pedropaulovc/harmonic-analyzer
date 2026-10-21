@@ -4,7 +4,9 @@ The adapter census checks the pinned SDK MRO, NOT the COM contracts beneath it.
 The separate native-member check parses the generated typelib as data and catches
 undeclared members, call arity and result-shape mistakes on explicit bindings.
 It cannot prove that QI supplied the requested interface or that a DISPID applies
-to a live dispatch. Dynamic callout metadata needs its behavioral/native gates.
+to a live dispatch. Selection/attachment integer results use swSelectType_e:
+the 11/25 ISketchPoint distinction needs SDK semantics and behavioral coverage,
+not a different method signature. Dynamic callout metadata needs its own gates.
 Starred adapter arguments remain symbolic: geometry tests/native gates own data.
 """
 
@@ -276,3 +278,38 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     # writable ThreadCallout string. Owner/OwnerType are read only in practice
     # per SDK remarks even though the typelib also advertises their setters.
     assert "ThreadCallout" not in _native_declaration("ICThread")[1]["_prop_map_put_"]
+
+
+@pytest.mark.parametrize("interface, member, arity, retval", (
+    ("IView", "GetOutline", 0, 12),
+    ("IView", "GetNotes", 0, 12),
+    ("IView", "GetAnnotationsByType", 1, 12),
+    ("IView", "SetViewPosition", 2, 11),
+    ("INote", "GetExtent", 0, 12),
+    ("INote", "GetAnnotation", 0, 9),
+    ("IAnnotation", "GetPosition", 0, 12),
+))
+def test_bracket_layout_native_method_contracts(interface, member, arity, retval) -> None:
+    methods, maps = _native_declaration(interface)
+    assert member in methods
+    assert all(member not in values for values in maps.values())
+    assert _native_return_type(methods[member]) == (retval, 0)
+    call = ast.Call(
+        func=ast.Attribute(value=ast.Name(id="native", ctx=ast.Load()), attr=member, ctx=ast.Load()),
+        args=[ast.Constant(None) for _ in range(arity)],
+        keywords=[],
+    )
+    assert _can_bind(call, methods[member])
+    call.args.append(ast.Constant(None))
+    assert not _can_bind(call, methods[member])
+
+
+@pytest.mark.parametrize("interface, member", (
+    ("IView", "Angle"),
+    ("IView", "Position"),
+    ("INote", "PropertyLinkedText"),
+))
+def test_bracket_layout_native_properties_are_not_methods(interface, member) -> None:
+    methods, maps = _native_declaration(interface)
+    assert member not in methods
+    assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
