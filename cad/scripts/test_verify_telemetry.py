@@ -637,6 +637,238 @@ def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_pa
     assert _by_name(spans, "gear.read_links") == []
 
 
+def _phase_case(monkeypatch, tmp_path, *, manifest=True, parameter=True):
+    """Use the existing inert result/model/attempt ports without sleeps or COM."""
+    monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
+    monkeypatch.setattr(verify, "_assert_fresh", lambda *_: True)
+    for name in (verify.MOTION_OWNER, "mg-magnifier", "pd-paper-drive"):
+        (tmp_path / f"{name}.SLDASM").touch()
+    param = types.SimpleNamespace(Value=1.0, SystemValue=0.0)
+    model = MockModel("phase-model", 0)
+    model.Parameter = lambda _: param if parameter else None
+    model.EditRebuild3 = lambda: True
+    model.GetTitle = lambda: "phase-model"
+    adapter = types.SimpleNamespace(
+        currentModel=model,
+        swApp=types.SimpleNamespace(
+            CloseAllDocuments=lambda _: None, CloseDoc=lambda _: None
+        ),
+    )
+    adapter._attempt = types.MethodType(MockAdapter._attempt, adapter)
+
+    async def open_model(_):
+        return _Result(True)
+
+    async def author(*_):
+        return ["phase-drive"]
+
+    async def install(*_):
+        return {"links": 20, "scale_mm_per_unit": 1.0, "rest_deg": 0.0}
+
+    async def set_crank(_, theta):
+        param.SystemValue = theta
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(
+        verify, "load_dof_manifest",
+        lambda _: [
+            {"key": key, "params": {"distance": 1.0}}
+            for key in ("pen_travel", "lever_rock", "slide")
+        ] if manifest else [],
+    )
+    monkeypatch.setattr(verify, "author_dof_drives", author)
+    monkeypatch.setattr(verify.pen_driver, "install", install)
+    monkeypatch.setattr(verify.pen_driver, "set_crank_deg", set_crank)
+    monkeypatch.setattr(verify.pen_driver, "rest_crank_deg", lambda: 0.0)
+    monkeypatch.setattr(verify.pen_driver, "stroke_half_mm", lambda: 1.0)
+    monkeypatch.setattr(verify.pen_driver, "expected_tip_disp_mm", lambda _: 0.0)
+    monkeypatch.setattr(verify, "_pen_marker_name", lambda _: "marker")
+    monkeypatch.setattr(verify, "_tip_y_mm", lambda *_: 0.0)
+    monkeypatch.setattr(verify, "check_no_interference", lambda *_, **__: None)
+    monkeypatch.setattr(verify, "assert_components_fully_defined", lambda _: None)
+    monkeypatch.setattr(verify, "discard_open_documents", lambda _: None)
+    monkeypatch.setattr(
+        verify, "component_transform",
+        lambda *_: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+    )
+    return adapter
+
+
+def _run_phase(capture, operation):
+    async def drive():
+        with _telemetry.run_pipeline_span("verify:phase-contract"):
+            await operation()
+
+    asyncio.run(drive())
+    return capture.get_finished_spans()
+
+
+def _assert_phase_tree(spans, phases):
+    (root,) = _by_name(spans, "pipeline.verify:phase-contract")
+    assert len({s.context.trace_id for s in spans}) == 1
+    assert len(spans) < 45
+    for name in phases:
+        (phase,) = _by_name(spans, name)
+        assert phase.parent.span_id == root.context.span_id
+        assert phase.status.status_code.name == "OK"
+
+
+@pytest.mark.parametrize("kind", ["motion", "chain"])
+def test_whole_kinematic_sweeps_have_bounded_phase_spans(monkeypatch, tmp_path, kind):
+    adapter = _phase_case(monkeypatch, tmp_path)
+    capture = _attach_capture()
+    report = verify.Report()
+    operation = getattr(verify, f"_verify_{'live_chain' if kind == 'chain' else 'motion'}_one")
+    spans = _run_phase(capture, lambda: operation(adapter, report))
+    phases = ["prepare", "sweep", "restore"]
+    if kind == "motion":
+        phases += ["rest", "extremes"]
+    _assert_phase_tree(
+        spans, [f"verify.{kind}.{phase}" for phase in phases] + ["verify.cleanup"]
+    )
+
+
+@pytest.mark.parametrize("kind", ["motion", "chain"])
+@pytest.mark.parametrize("missing", ["manifest", "parameter"])
+def test_kinematic_early_return_omits_unexecuted_phases(
+    monkeypatch, tmp_path, kind, missing
+):
+    adapter = _phase_case(
+        monkeypatch, tmp_path,
+        manifest=missing != "manifest", parameter=missing != "parameter",
+    )
+    capture = _attach_capture()
+    report = verify.Report()
+    operation = getattr(verify, f"_verify_{'live_chain' if kind == 'chain' else 'motion'}_one")
+    spans = _run_phase(capture, lambda: operation(adapter, report))
+    assert report.failed
+    for phase in ("rest", "sweep", "extremes", "restore"):
+        assert not _by_name(spans, f"verify.{kind}.{phase}")
+    prepared = kind == "motion" or missing == "parameter"
+    assert len(_by_name(spans, f"verify.{kind}.prepare")) == int(prepared)
+    assert len(_by_name(spans, "verify.cleanup")) == int(kind == "motion")
+
+
+@pytest.mark.parametrize("kind", ["motion", "chain"])
+@pytest.mark.parametrize("failure_phase", ["prepare", "sweep", "cleanup"])
+def test_kinematic_phase_errors_keep_propagation_and_cleanup(
+    monkeypatch, tmp_path, kind, failure_phase
+):
+    adapter = _phase_case(monkeypatch, tmp_path)
+    failure = RuntimeError("phase failure")
+
+    def fail(*_, **__):
+        raise failure
+
+    async def afail(*_, **__):
+        raise failure
+
+    if failure_phase == "prepare":
+        monkeypatch.setattr(verify, "author_dof_drives", afail)
+    elif failure_phase == "sweep":
+        if kind == "motion":
+            original = verify.pen_driver.set_crank_deg
+
+            async def drive_or_fail(adapter, theta):
+                if theta != verify.pen_driver.rest_crank_deg():
+                    raise failure
+                await original(adapter, theta)
+
+            monkeypatch.setattr(verify.pen_driver, "set_crank_deg", drive_or_fail)
+        else:
+            original = verify.component_transform
+
+            def read_or_fail(*args):
+                if adapter.currentModel.Parameter("").SystemValue != 0.0:
+                    raise failure
+                return original(*args)
+
+            monkeypatch.setattr(verify, "component_transform", read_or_fail)
+    elif kind == "motion":
+        monkeypatch.setattr(verify, "discard_open_documents", fail)
+    else:
+        # _read_member tolerates a callable accessor's failure, but a property
+        # read fails before its callable fallback and must still propagate.
+        monkeypatch.setattr(
+            type(adapter.currentModel), "GetTitle", property(fail), raising=False
+        )
+    capture = _attach_capture()
+    report = verify.Report()
+    operation = getattr(verify, f"_verify_{'live_chain' if kind == 'chain' else 'motion'}_one")
+    with pytest.raises(RuntimeError) as caught:
+        _run_phase(capture, lambda: operation(adapter, report))
+    assert caught.value is failure
+    spans = capture.get_finished_spans()
+    name = "verify.cleanup" if failure_phase == "cleanup" else f"verify.{kind}.{failure_phase}"
+    (phase,) = _by_name(spans, name)
+    assert phase.status.status_code.name == "ERROR"
+    assert len(_by_name(spans, "verify.cleanup")) == int(
+        kind == "motion" or failure_phase == "cleanup"
+    )
+    if failure_phase != "cleanup":
+        assert not _by_name(spans, f"verify.{kind}.restore")
+
+
+@pytest.mark.parametrize("case", ["normal", "missing", "parameter", "raised"])
+def test_pass_walk_phase_parentage_and_failed_gate_conversion(monkeypatch, tmp_path, case):
+    import json
+
+    adapter = _phase_case(monkeypatch, tmp_path, parameter=case != "parameter")
+    name = verify.SWEEP_OWNER
+    if case != "missing":
+        verify._sweep_sidecar_path(name).write_text(
+            json.dumps({
+                "drive_key": "slide", "pose_tolerance_mm": 0.01,
+                "passes": [{
+                    "pass": "inner", "remate": None,
+                    "poses": [
+                        {"drive_mm": i, "theta_rad": 0.0, "carriages": {"carriage": [0, 0, 0]},
+                         "check": i % 2 == 0}
+                        for i in range(10)
+                    ],
+                }],
+            }), encoding="utf-8",
+        )
+    if case == "raised":
+        def fail(*_):
+            raise RuntimeError("readback failed")
+
+        monkeypatch.setattr(verify, "component_transform", fail)
+    capture = _attach_capture()
+    report = verify.Report()
+    spans = _run_phase(capture, lambda: verify._verify_pass_sweep(adapter, name, report))
+    (walk,) = _by_name(spans, "verify.pass_sweep.walk")
+    (prepare,) = _by_name(spans, "verify.pass_sweep.prepare")
+    assert prepare.parent.span_id == walk.context.span_id
+    _assert_phase_tree(spans, ["verify.cleanup"])
+    (root,) = _by_name(spans, "pipeline.verify:phase-contract")
+    assert walk.parent.span_id == root.context.span_id
+    assert walk.status.status_code.name == ("ERROR" if case == "raised" else "OK")
+    assert bool(report.failed) == (case != "normal")
+    if case == "raised":
+        assert "sweep walk raised: readback failed" in report.failed[0][1]
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_paper_feed_cleanup_remains_visible_after_gate_conversion(monkeypatch, tmp_path, failed):
+    import build_kinematic_probe
+
+    adapter = _phase_case(monkeypatch, tmp_path)
+
+    async def feed(_):
+        if failed:
+            raise RuntimeError("feed failed")
+
+    monkeypatch.setattr(build_kinematic_probe, "_drive_and_measure", feed)
+    capture = _attach_capture()
+    report = verify.Report()
+    spans = _run_phase(capture, lambda: verify._verify_paper_feed_one(adapter, report))
+    _assert_phase_tree(spans, ["verify.cleanup"])
+    (gate,) = _by_name(spans, "gate")
+    assert gate.status.status_code.name == ("ERROR" if failed else "OK")
+    assert bool(report.failed) == failed
+
+
 # --------------------------------------------------------------------------- #
 # Standalone demo: print the REAL console span tree for a realistic pass.       #
 # --------------------------------------------------------------------------- #
