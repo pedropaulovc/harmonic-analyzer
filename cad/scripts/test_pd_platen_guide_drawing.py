@@ -1,11 +1,17 @@
-"""Offline contracts for the platen-guide manufacturing drawing."""
+"""Offline drawing contracts; preview failures retain inputs under reports/failures."""
 
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
+import hashlib
+from importlib.metadata import version
+import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 from PIL import Image
@@ -50,6 +56,101 @@ def test_contact_preview_grid_preserves_legacy_layout_and_scales() -> None:
         _contact_preview_grid(1)
 
 
+def _retain_contact_preview_failure(pdf: Path, png: Path, error: Exception) -> Path:
+    """Keep existing input/output for unresolved content loss (#1807), never rerender."""
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "out"
+        / "reports"
+        / "failures"
+        / "test_five_page_contact_preview"
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ-")
+    retained = Path(tempfile.mkdtemp(prefix=stamp, dir=root))
+    record = {"failure": repr(error), "python": sys.version, "artifacts": {}, "runtime": {}}
+    for source in (pdf, png):
+        details = {"source": str(source)}
+        record["artifacts"][source.name] = details
+        try:
+            destination = retained / source.name
+            shutil.copy2(source, destination)
+            details["sha256"] = hashlib.sha256(destination.read_bytes()).hexdigest()
+            details["bytes"] = destination.stat().st_size
+        except Exception as capture_error:
+            details["retention_error"] = repr(capture_error)
+            continue
+        try:
+            if source == png:
+                with Image.open(destination) as image:
+                    details["pixel_size"] = list(image.size)
+                    details["dpi"] = image.info.get("dpi")
+            else:
+                from pypdf import PdfReader
+
+                details["page_points"] = [
+                    [float(page.mediabox.width), float(page.mediabox.height)]
+                    for page in PdfReader(destination).pages
+                ]
+        except Exception as capture_error:
+            details["inspection_error"] = repr(capture_error)
+    for package in ("Pillow", "pypdfium2", "pypdf"):
+        try:
+            record["runtime"][package] = version(package)
+        except Exception as capture_error:
+            record["runtime"][package] = repr(capture_error)
+    (retained / "capture.json").write_text(
+        json.dumps(record, indent=2) + "\n", encoding="utf-8"
+    )
+    return retained
+
+
+@pytest.mark.parametrize("missing_pdf", (False, True))
+def test_contact_preview_failure_retention(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_pdf: bool
+) -> None:
+    from pypdf import PdfWriter
+
+    monkeypatch.setitem(globals(), "__file__", str(tmp_path / "cad" / "scripts" / "test.py"))
+    pdf = tmp_path / "five-pages.pdf"
+    png = tmp_path / "contact.png"
+    if not missing_pdf:
+        writer = PdfWriter()
+        writer.add_blank_page(width=1224, height=792)
+        writer.write(pdf)
+    Image.new("RGB", (10, 8), "red").save(png, dpi=(30, 30))
+    original_png = png.read_bytes()
+    original_pdf = pdf.read_bytes() if pdf.exists() else None
+
+    retained = _retain_contact_preview_failure(pdf, png, AssertionError("sample failure"))
+    another = _retain_contact_preview_failure(pdf, png, AssertionError("second failure"))
+
+    assert retained != another
+    assert retained.parent == (
+        tmp_path / "cad/out/reports/failures/test_five_page_contact_preview"
+    )
+    assert (retained / png.name).read_bytes() == original_png
+    record = json.loads((retained / "capture.json").read_text(encoding="utf-8"))
+    assert record["failure"] == "AssertionError('sample failure')"
+    assert record["python"] == sys.version
+    assert record["runtime"] == {
+        package: version(package) for package in ("Pillow", "pypdfium2", "pypdf")
+    }
+    image = record["artifacts"][png.name]
+    assert image["pixel_size"] == [10, 8]
+    assert image["dpi"] == pytest.approx([30, 30], abs=0.1)
+    assert image["sha256"] == hashlib.sha256(original_png).hexdigest()
+    assert image["bytes"] == len(original_png)
+    if missing_pdf:
+        assert "retention_error" in record["artifacts"][pdf.name]
+    else:
+        assert (retained / pdf.name).read_bytes() == original_pdf
+        assert record["artifacts"][pdf.name]["page_points"] == [[1224, 792]]
+        assert record["artifacts"][pdf.name]["sha256"] == (
+            hashlib.sha256(original_pdf).hexdigest()
+        )
+
+
 def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -80,21 +181,29 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         ),
     )
 
-    render_pdf_png(
-        pdf,
-        png,
-        layout=DrawingLayout.LANDSCAPE,
-        expected_pages=5,
-    )
+    try:
+        render_pdf_png(
+            pdf,
+            png,
+            layout=DrawingLayout.LANDSCAPE,
+            expected_pages=5,
+        )
 
-    with Image.open(png) as preview:
-        assert preview.size == (510, 330)
-        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
-        centers = ((85, 82), (255, 82), (425, 82), (85, 247), (255, 247))
-        for center, color in zip(centers, colors, strict=True):
-            assert preview.getpixel(center) == pytest.approx(color, abs=2)
-        assert preview.getpixel((425, 247)) == (255, 255, 255)
-        assert preview.getpixel((85, 10)) == (255, 255, 255)
+        with Image.open(png) as preview:
+            assert preview.size == (510, 330)
+            assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
+            centers = ((85, 82), (255, 82), (425, 82), (85, 247), (255, 247))
+            for center, color in zip(centers, colors, strict=True):
+                assert preview.getpixel(center) == pytest.approx(color, abs=2)
+            assert preview.getpixel((425, 247)) == (255, 255, 255)
+            assert preview.getpixel((85, 10)) == (255, 255, 255)
+    except Exception as error:
+        try:
+            retained = _retain_contact_preview_failure(pdf, png, error)
+            error.add_note(f"Contact preview failure evidence: {retained}")
+        except Exception as capture_error:
+            error.add_note(f"Contact preview evidence retention failed: {capture_error!r}")
+        raise
 
 
 def test_portrait_raster_crops_pdfium_width_rounding(
