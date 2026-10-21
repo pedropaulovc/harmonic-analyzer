@@ -164,13 +164,30 @@ def test_native_dimension_maps_cover_every_manufacturing_control_once() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {"FinishedLength": 1, "CutEndChamfer": 1}
     assert spec.DIMENSION_TOLERANCE_TYPES == {"FinishedLength": 0, "CutEndChamfer": 6}
     assert all(not any(char.isdigit() for char in text) for text in spec.DIMENSION_CALLOUTS.values())
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert not any(char.isdigit() for char in spec.DRAWING_NOTES)
     fields = requirements_for(draw)
     assert set(fields) == {"finished_upper_end", "cut_end_chamfer"}
     assert fields["finished_upper_end"].fields["length"][0] == [56.4, 58.0]
     assert fields["cut_end_chamfer"].fields["length"][0] == [0.0, 1.0]
     assert "LENGTH_BAND" in fields["finished_upper_end"].fields["length"][1]
+
+
+def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> None:
+    # Captured native sheet: approximately 2.45 mm/character, border X12.7,
+    # Front outline X101.7. This 2.50 approximation is not native ink proof.
+    advance_mm = 2.50
+    width_mm = max(map(len, spec.DIMENSION_CALLOUTS["FinishedLength"].splitlines())) * advance_mm
+    centre_mm = draw.FRONT_KEEP["FinishedLength"][0] * 1000.0
+    border_mm, front_outline_mm = 12.7, 101.7
+    assert centre_mm - width_mm / 2.0 > border_mm
+    assert centre_mm + width_mm / 2.0 < front_outline_mm
+
+
+def test_thread_callout_screen_fits_between_native_length_line_and_left_barrel() -> None:
+    # Approximate offline screen only: native ink/leader routing remains required.
+    left_mm = draw.THREAD_NOTE_XY[0] * 1000.0
+    width_mm = max(map(len, draw.THREAD_CALLOUT.splitlines())) * 2.50
+    assert draw.FRONT_KEEP["FinishedLength"][0] * 1000.0 < left_mm
+    assert left_mm + width_mm < 107.3
 
 
 def test_feature_selector_distinguishes_actual_cut_end_from_factory_chamfer() -> None:
@@ -313,21 +330,271 @@ def test_actual_cut_feature_gets_native_max_without_forcing_driven_state(monkeyp
     assert dimension.DrivenState == (1 if failure == "reference" else 2)
 
 
+@pytest.mark.parametrize("chamfers", [(1.0, 1.0), (0.6, 1.2)])
+@pytest.mark.parametrize("end", ["lower_factory", "upper_cut"])
+@pytest.mark.parametrize("failure", [None, "missing", "duplicate"])
+def test_end_note_and_presentation_resolve_exact_visible_rim_not_projected_centre(monkeypatch, failure, end, chamfers):
+    monkeypatch.setattr(spec, "LOWER_FACTORY_CHAMFER", chamfers[0])
+    monkeypatch.setattr(spec, "CUT_END_CHAMFER_MAX", chamfers[1])
+    lower_radius = (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
+    upper_radius = (spec.RADIUS - spec.CUT_END_CHAMFER_MAX) / 1000
+    radius = lower_radius if end == "lower_factory" else upper_radius
+    y = 0.0 if end == "lower_factory" else spec.LENGTH / 1000
+    selector = draw.lower_factory_end_edge if end == "lower_factory" else draw.upper_cut_end_edge
+
+    def edge(params, *, circle=True):
+        curve = SimpleNamespace(IsCircle=lambda: circle, CircleParams=params)
+        return SimpleNamespace(GetCurve=lambda: curve)
+
+    lower = edge((0.0, 0.0, 0.0, 0.0, -1.0, 0.0, lower_radius))
+    upper = edge((0.0, spec.LENGTH / 1000, 0.0, 0.0, 1.0, 0.0, upper_radius))
+    target, other = (lower, upper) if end == "lower_factory" else (upper, lower)
+    shoulder = edge((0.0, spec.LOWER_FACTORY_CHAMFER / 1000, 0.0, 0.0, 1.0, 0.0, spec.RADIUS / 1000))
+    wrong_radius = edge((0.0, y, 0.0, 0.0, 1.0, 0.0, spec.RADIUS / 1000))
+    wrong_axis = edge((0.0, y, 0.0, 1.0, 0.0, 0.0, radius))
+    noncircle = edge(None, circle=False)
+    edges = [other, shoulder, wrong_radius, wrong_axis, noncircle]
+    if failure != "missing":
+        edges.append(target)
+    if failure == "duplicate":
+        edges.append(edge((0.0, y, 0.0, 0.0, 1.0, 0.0, radius)))
+    view = object()
+    monkeypatch.setattr(draw, "visible_view_entities", lambda owner, kind, *, label: edges)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    if failure:
+        with pytest.raises(RuntimeError, match="expected one visible native rim"):
+            selector(view)
+    else:
+        assert selector(view) is target
+
+
+@pytest.mark.parametrize("failure", [
+    None, "lower_attachment", "thread_attachment",
+    "lower_landing", "landing", "late_landing",
+])
+def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monkeypatch, failure):
+    monkeypatch.setattr(spec, "LOWER_FACTORY_CHAMFER", 0.6)
+    monkeypatch.setattr(spec, "CUT_END_CHAMFER_MAX", 1.2)
+    lower_rim, barrel_face, neighbour = object(), object(), object()
+    flank = SimpleNamespace(GetFace=lambda: barrel_face)
+    other_flank = SimpleNamespace(GetFace=lambda: neighbour)
+    front = object()
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0))
+    projected = []
+    late = False
+    selected = {}
+    inserted = []
+
+    def select(owner, view, kind, xy, *, label, entity):
+        selected.clear()
+        selected.update(entity=entity, kind=kind)
+        return entity
+
+    def set_point(index, mark, x, y, z):
+        selected["point"] = (x, y)
+        return True
+
+    def project(owner, view, points, *, label):
+        projected.append(points)
+        return [(0.120 + 2.0 * x, 0.093 + 2.0 * y) for x, y, _z in points]
+
+    def silhouettes(owner, view, picks, *, label):
+        _cylinder, xy = picks["thread"]
+        from _drawing_edges import _segment_distance
+
+        if _segment_distance(xy, (0.1073, 0.2052), (0.1073, 0.0948)) > 1e-5:
+            raise RuntimeError("no native barrel silhouette passes through the requested point")
+        return {"thread": flank}
+
+    def insert(text):
+        inserted.append(text)
+        record = dict(selected)
+        thread = record["kind"] == "SILHOUETTE"
+        actual = record["entity"]
+        if failure == "thread_attachment" and thread:
+            actual = other_flank
+        elif failure == "lower_attachment" and not thread:
+            actual = neighbour
+
+        def position(x, y, z):
+            record["note_xy"] = (x, y)
+            return True
+
+        def leader(_index):
+            x, y = record["point"]
+            if thread and (failure == "landing" or (failure == "late_landing" and late)):
+                y += 0.010
+            if not thread and failure == "lower_landing":
+                x += 0.010
+            return (*record["note_xy"], 0.0, x, y, 0.0)
+
+        annotation = SimpleNamespace(
+            SetLeader3=lambda *_args: 0,
+            SetPosition2=position,
+            GetAttachedEntities3=lambda: (actual,),
+            GetAttachedEntityCount3=lambda: 1,
+            GetAttachedEntityTypes=lambda: (46 if thread else 1,),
+            GetLeaderCount=lambda: 1,
+            IsDangling=lambda: False,
+            GetLeaderPointsAtIndex=leader,
+        )
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    adapter.currentModel = SimpleNamespace(
+        SelectionManager=SimpleNamespace(SetSelectionPoint2=set_point),
+        InsertNote=insert,
+        ClearSelection2=lambda _all: None,
+    )
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "model_points_in_view", project)
+    monkeypatch.setattr(draw, "face_silhouettes_through", silhouettes)
+    monkeypatch.setattr(draw, "lower_factory_end_edge", lambda view: lower_rim)
+    monkeypatch.setattr(draw, "_select_view_entity", select)
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda _adapter, **_kwargs: None)
+    if failure and failure != "late_landing":
+        with pytest.raises(RuntimeError):
+            draw.add_rework_notes(adapter, front)
+        return
+    settled = draw.add_rework_notes(adapter, front)
+    assert inserted == [
+        draw.property_link(f"{CONFIGURATION} Rework Lower End Note"),
+        draw.THREAD_CALLOUT,
+    ]
+    lower, thread = projected[0]
+    rim_radius = (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
+    assert lower[1] == 0.0 and 0.0 < lower[0] < rim_radius
+    assert math.hypot(lower[0], lower[2]) == pytest.approx(rim_radius)
+    assert thread[0] == -spec.RADIUS / 1000 and thread[2] == 0.0
+    assert spec.LOWER_FACTORY_CHAMFER / 1000 < thread[1] < (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
+    late = True
+    if failure == "late_landing":
+        with pytest.raises(RuntimeError, match="leader attachment moved"):
+            settled()
+    else:
+        settled()
+
+
+@pytest.mark.parametrize("failure", [
+    None, "missing", "duplicate", "name_value", "number_value", "sheet", "view",
+])
+def test_local_title_fit_preserves_full_name_number_and_never_touches_material(monkeypatch, failure):
+    number = ROW["number"]
+    name_link = draw.property_link("SW-Title(Title)")
+    number_link = draw.property_link("Number")
+
+    def note(link, text):
+        return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
+
+    name = note(
+        f"<FONT size=15PTS>{name_link}",
+        "shortened name" if failure == "name_value" else draw.PART_STEM,
+    )
+    number_note = note(number_link, "wrong" if failure == "number_value" else number)
+    material = note(draw.property_link("Material"), ROW["material"])
+    notes = [name, number_note, material]
+    if failure == "missing":
+        notes.remove(number_note)
+    if failure == "duplicate":
+        notes.append(note(number_link, number))
+    for index, item in enumerate(notes):
+        next_note = notes[index + 1] if index + 1 < len(notes) else None
+        item.GetNext = lambda next_note=next_note: next_note
+    sheet = object()
+    sheet_view = SimpleNamespace(GetFirstNote2=lambda: notes[0])
+    active = []
+    document = SimpleNamespace(
+        GetCurrentSheet=lambda: None if failure == "sheet" else sheet,
+        GetFirstView=lambda: None if failure == "view" else sheet_view,
+        ActivateSheet=lambda value: active.append(value) or True,
+    )
+    adapter = SimpleNamespace(currentModel=document)
+    fitted, settled = [], []
+
+    def fit(_adapter, drawing, actual_sheet, item, *, label, minimum):
+        assert _adapter is adapter and drawing is document and actual_sheet is sheet
+        fitted.append((item, label, minimum))
+        return lambda: settled.append((item, active[-1]))
+
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "_fit_title_note", fit)
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.fit_stud_title_block(adapter, sheet_name="REWORK", number=number)
+    else:
+        check_title = draw.fit_stud_title_block(adapter, sheet_name="REWORK", number=number)
+        assert [(item, minimum) for item, _label, minimum in fitted] == [
+            (name, 0.003), (number_note, 0.003),
+        ]
+        assert material not in [item for item, _label, _minimum in fitted]
+        check_title()
+        assert active == ["REWORK"]
+        assert settled == [(name, "REWORK"), (number_note, "REWORK")]
+        document.ActivateSheet = lambda _name: False
+        with pytest.raises(RuntimeError, match="failed to activate"):
+            check_title()
+
+
+@pytest.mark.parametrize("failure", [
+    None, "feature", "definition", "type", "angle", "degrees", "length_as_angle",
+    "nan", "infinite", "distance",
+])
+def test_saved_cutting_feature_owns_angle_not_imported_length(monkeypatch, failure):
+    angle = {
+        "angle": math.pi / 3, "degrees": 45.0, "length_as_angle": 0.001,
+        "nan": math.nan, "infinite": math.inf,
+    }.get(failure, math.pi / 4)
+    sides = []
+
+    def distance(side):
+        sides.append(side)
+        return 0.002 if failure == "distance" else 0.001
+
+    definition = SimpleNamespace(
+        Type=2 if failure == "type" else 1, EdgeChamferAngle=angle,
+        GetEdgeChamferDistance=distance,
+    )
+    feature = SimpleNamespace(GetDefinition=lambda: None if failure == "definition" else definition)
+    lookups = []
+
+    def lookup(name):
+        lookups.append(name)
+        return None if failure == "feature" else feature
+
+    # The shared producer's drawing adapter must never be retargeted to a part.
+    model = SimpleNamespace(FeatureByName=lookup)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.read_saved_cut_end_angle(model)
+    else:
+        assert draw.read_saved_cut_end_angle(model) == pytest.approx(math.pi / 4)
+        assert sides == [0]
+    assert lookups == ["CutEndChamfer"]
+
+
 class _Display:
-    def __init__(self, name, value, tolerance, *, state=2, reference=False, angle=math.pi / 4):
+    def __init__(self, name, value, tolerance, *, state=2, reference=False):
         self.name = name
-        self.primary = SimpleNamespace(SystemValue=value, DrivenState=state, Tolerance=tolerance)
-        self.angle = SimpleNamespace(SystemValue=angle)
+        feature = "StudProfile" if name == "FinishedLength" else "CutEndChamfer"
+        self.primary = SimpleNamespace(
+            SystemValue=value, DrivenState=state, Tolerance=tolerance,
+            FullName=f"{name}@{feature}@{STEM}.Part",
+        )
+        self.Type2 = 2  # The native imported chamfer driver is a linear dimension.
         self.reference = reference
 
     def GetDimension2(self, index):
-        return self.primary if index == 0 else self.angle
+        assert index == 0, "linear display must never be queried for a second angular driver"
+        return self.primary
 
     def GetText(self, index):
         return {1: "(", 2: ")"}.get(index, "") if self.reference else ""
 
 
-@pytest.mark.parametrize("failure", [None, "nominal", "reference", "brackets", "type", "band", "angle", "missing", "duplicate"])
+@pytest.mark.parametrize("failure", [
+    None, "nominal", "reference", "brackets", "type", "band", "display_type",
+    "missing", "duplicate", "factory_feature", "unqualified", "callable_full_name",
+])
 def test_sheet_requires_actual_native_drivers_and_max_not_retyped_dimensions(monkeypatch, failure) -> None:
     length = _Display("FinishedLength", spec.LENGTH / 1000, _Tolerance())
     chamfer = _Display("CutEndChamfer", 0.001, _Tolerance(6, (-0.001, 0.0)))
@@ -341,8 +608,14 @@ def test_sheet_requires_actual_native_drivers_and_max_not_retyped_dimensions(mon
         chamfer.primary.Tolerance.Type = 0
     elif failure == "band":
         chamfer.primary.Tolerance.values = (-0.001, 0.0001)
-    elif failure == "angle":
-        chamfer.angle.SystemValue = math.pi / 3
+    elif failure == "display_type":
+        chamfer.Type2 = 10
+    elif failure == "factory_feature":
+        chamfer.primary.FullName = f"CutEndChamfer@LowerFactoryChamfer@{STEM}.Part"
+    elif failure == "unqualified":
+        chamfer.primary.FullName = "CutEndChamfer@CutEndChamfer"
+    elif failure == "callable_full_name":
+        chamfer.primary.FullName = lambda: f"CutEndChamfer@CutEndChamfer@{STEM}.Part"
     displays = [length, chamfer]
     if failure == "missing":
         displays.pop()
@@ -359,6 +632,105 @@ def test_sheet_requires_actual_native_drivers_and_max_not_retyped_dimensions(mon
     else:
         draw.assert_machining_controls(object(), annotations)
         assert precision_calls == [(annotations, spec.DRAWING_PRECISION_BY_NAME)]
+
+
+@pytest.mark.parametrize("failure", [
+    None, "missing_chamfer", "duplicate_chamfer", "side_chamfer", "sheet_owner",
+    "wrong_owner", "missing_owner", "factory_end_view", "back_view", "missing_view",
+    "iso_chamfer",
+])
+def test_final_views_reacquire_exact_controls_with_native_owners_and_orientation(monkeypatch, failure):
+    length = _Display("FinishedLength", spec.LENGTH / 1000, _Tolerance())
+    chamfer = _Display("CutEndChamfer", 0.001, _Tolerance(6, (-0.001, 0.0)))
+    front = SimpleNamespace(name="Drawing View1", GetOrientationName=lambda: "*Back" if failure == "back_view" else "*Front")
+    end = SimpleNamespace(name="Drawing View2", GetOrientationName=lambda: "*Bottom" if failure == "factory_end_view" else "*Top")
+    iso = SimpleNamespace(name="Drawing View3")
+
+    def annotation(display, owner):
+        return SimpleNamespace(
+            GetSpecificAnnotation=lambda: display, display=display,
+            Owner=owner, OwnerType=0,
+        )
+
+    length_note, chamfer_note = annotation(length, front), annotation(chamfer, end)
+    if failure == "sheet_owner":
+        chamfer_note.OwnerType = 1
+    elif failure == "wrong_owner":
+        chamfer_note.Owner = front
+    elif failure == "missing_owner":
+        chamfer_note.Owner = None
+    front_notes = [length_note]
+    end_notes = [] if failure == "missing_chamfer" else [chamfer_note]
+    if failure == "duplicate_chamfer":
+        end_notes.append(chamfer_note)
+    elif failure == "side_chamfer":
+        front_notes.append(chamfer_note)
+        end_notes.clear()
+        chamfer_note.Owner = front
+    note = SimpleNamespace(display=SimpleNamespace(name=""))
+    front.GetAnnotations = lambda: [*front_notes, note]
+    end.GetAnnotations = lambda: end_notes
+    iso.GetAnnotations = lambda: [annotation(chamfer, iso)] if failure == "iso_chamfer" else []
+    precision_calls, rim_checks = [], []
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "dimension_name", lambda _adapter, item: item.display.name)
+    monkeypatch.setattr(draw, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(draw, "iter_views", lambda _adapter: [front, iso] if failure == "missing_view" else [front, end, iso])
+    monkeypatch.setattr(draw, "upper_cut_end_edge", lambda owner: rim_checks.append(owner))
+    monkeypatch.setattr(draw, "assert_imported_precision", lambda _adapter, values, _precision: precision_calls.append(values))
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.assert_rework_view_controls(object(), front, end)
+    else:
+        draw.assert_rework_view_controls(object(), front, end)
+        assert precision_calls == [[length_note, chamfer_note]]
+        assert rim_checks == [end]
+
+
+@pytest.mark.parametrize("failure", [
+    None, "stale_chamfer", "stale_length", "missing_chamfer", "missing_length",
+])
+def test_native_callouts_keep_length_governance_and_feature_derived_angle(monkeypatch, failure):
+    length = _Display("FinishedLength", spec.LENGTH / 1000, _Tolerance())
+    chamfer = _Display("CutEndChamfer", 0.001, _Tolerance(6, (-0.001, 0.0)))
+    displays = [length, chamfer]
+    if failure == "missing_length":
+        displays.remove(length)
+    elif failure == "missing_chamfer":
+        displays.remove(chamfer)
+    annotations = [
+        SimpleNamespace(GetSpecificAnnotation=lambda d=display: d, display=display)
+        for display in displays
+    ]
+    applied, text = [], {}
+
+    def apply(_adapter, notes, callouts):
+        applied.append((notes, callouts))
+        text.update(callouts)
+        if failure == "stale_chamfer":
+            text["CutEndChamfer"] = "stale"
+        elif failure == "stale_length":
+            text["FinishedLength"] = "stale"
+
+    length.GetText = lambda index: text.get("FinishedLength", "") if index == 4 else ""
+    chamfer.GetText = lambda index: text.get("CutEndChamfer", "") if index == 4 else ""
+    monkeypatch.setattr(draw, "dimension_name", lambda _adapter, note: note.display.name)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "set_dimension_callouts", apply)
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.set_machining_callouts(object(), annotations, math.pi / 6)
+    else:
+        draw.set_machining_callouts(object(), annotations, math.pi / 6)
+        assert text["CutEndChamfer"] == "X 30° CUT END"
+        assert text["FinishedLength"] == spec.DIMENSION_CALLOUTS["FinishedLength"]
+        assert applied[0][0] is annotations
+        assert length.primary.SystemValue == spec.LENGTH / 1000
+        assert chamfer.primary.SystemValue == 0.001
+        assert chamfer.primary.Tolerance.Type == 6
+        assert chamfer.primary.Tolerance.values == (-0.001, 0.0)
+
+
 
 
 class _StudAdapter:
@@ -445,35 +817,20 @@ def test_native_recipe_uses_one_true_length_driver_and_independent_end_features(
     assert dict(marks) == spec.DRAWING_DIMENSIONS
 
 
-def test_source_linked_fit_sheet_is_the_complete_actual_rework_instruction_authority() -> None:
-    instructions = "\n".join(spec.REWORK_INSTRUCTION_PROPERTIES.values())
-    assert set(draw.INSTRUCTION_PLACEMENTS) == set(spec.REWORK_INSTRUCTION_PROPERTIES)
-    assert {
-        f"{CONFIGURATION} Rework {name}" for name in spec.REWORK_INSTRUCTION_PROPERTIES
-    } <= set(part.SAVED_DRAWING_PROPERTIES)
-    for text in (
-        "BEFORE CUTTING", "measurement uncertainty", "UNVERIFIED",
-        "D: lower-end to bar underside", "H: minimum bar-top",
-        "N: seated bearing face", "W: actual washer stack", "U: bound proposed CUT-end",
-        "Do NOT reuse stock-end U",
-        "original lower loaded complete-thread interval",
-        "body height is not thread depth", "NOT stock length",
-        "Gmin = Bmin + Hmin + Dmin - Lmax",
-        "Qmin = Lmin - Dmax - Bmax - Wmax - Nmax - Umax",
-        "Gmin >= 3.0 mm", "Qmin >= 1 COMPLETE 1/2-13 PITCH",
-        "Chamfer MAX does NOT bound U", "UPPER end only",
-        "gauge complete external threads", "Restore original insertion",
-        "BOTH complete passes", "G >= 3.0 mm", "throughout each sweep",
-        "ENTIRE actual complete internal thread span engaged",
-        "Repeat after final clamping", "REJECT", "No force, preload or strength",
-    ):
-        assert text in instructions
-    # Fabrication values have just one authority: native dimensions on REWORK.
-    assert "57.2" not in instructions and "1.0 MAX" not in instructions
+def test_rework_sheet_does_not_duplicate_fixture_qualification() -> None:
+    assert draw.SHEET_NAMES == ("REWORK",)
+    assert draw.HOLD_DOWN_REFERENCE == jig.HOLD_DOWN_REFERENCE
+    assert not hasattr(draw, "INSTRUCTION_PLACEMENTS")
+    assert set(draw.STUD_REWORK_PROPERTIES) == {"Stock Length", "Stock Note", "Lower End Note"}
+    for name in part.SAVED_DRAWING_PROPERTIES:
+        assert "Stud Measurement Instructions" not in name
+        assert "Stud Fit Limits" not in name
+        assert "Stud Rework Acceptance" not in name
+    assert part.MEMBER_NOTE_PROPERTIES[f"{CONFIGURATION} Manufacturing Notes"] == "REWORKED STUD; SEE REWORK."
 
 
 @pytest.mark.parametrize("drift", [None, "configuration", "source", "scale", "activation"])
-def test_drawing_build_imports_native_controls_and_prints_source_instructions_on_second_sheet(monkeypatch, tmp_path, drift) -> None:
+def test_drawing_keeps_native_chamfer_end_view_and_part_only_rework_sheet(monkeypatch, tmp_path, drift) -> None:
     source = tmp_path / "stud.SLDPRT"
     source.touch()
     active, views, curated, notes, configured = [], [], [], [], []
@@ -513,37 +870,68 @@ def test_drawing_build_imports_native_controls_and_prints_source_instructions_on
 
     monkeypatch.setattr(draw, "SOURCE", source)
     property_reads = []
-    monkeypatch.setattr(draw, "_assert_stud_rework_properties", property_reads.append)
+
+    def properties(model):
+        property_reads.append(model)
+        return {"Number": ROW["number"]}
+
+    monkeypatch.setattr(draw, "_assert_stud_rework_properties", properties)
+    saved_angle_calls = []
+    monkeypatch.setattr(draw, "read_saved_cut_end_angle", lambda model: saved_angle_calls.append(model) or math.pi / 4)
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(draw, "place_view", place)
     monkeypatch.setattr(draw, "configure_reference_views", configure)
     monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
     monkeypatch.setattr(draw, "curate_view_dimensions", curate)
-    control_calls = []
+    control_calls, owner_checks = [], []
     monkeypatch.setattr(draw, "assert_machining_controls", lambda _adapter, annotations: control_calls.append(annotations))
+    monkeypatch.setattr(draw, "assert_rework_view_controls", lambda _adapter, front, end: owner_checks.append((front, end)))
     callouts = []
-    monkeypatch.setattr(draw, "set_dimension_callouts", lambda _adapter, annotations, values: callouts.append(values))
-    monkeypatch.setattr(draw, "model_point_in_view", lambda *_args, **_kwargs: (0.12, 0.09))
-    monkeypatch.setattr(draw, "add_property_linked_callout", lambda _adapter, view, **kwargs: notes.append((active[-1], kwargs["property_name"], None)))
+    monkeypatch.setattr(draw, "set_machining_callouts", lambda _adapter, annotations, angle: callouts.append((annotations, angle)))
+    rework_note_views, notes_settled = [], []
+
+    def rework_notes(_adapter, view):
+        rework_note_views.append(view)
+        notes.extend([
+            ("REWORK", f"{CONFIGURATION} Rework Lower End Note", None),
+            ("REWORK", "Existing Thread", None),
+        ])
+        return lambda: notes_settled.append(view)
+
+    monkeypatch.setattr(draw, "add_rework_notes", rework_notes)
+    title_calls, title_settled = [], []
+
+    def fit_title(_adapter, *, sheet_name, number):
+        title_calls.append((active[-1], sheet_name, number))
+        return lambda: title_settled.append(sheet_name)
+
+    monkeypatch.setattr(draw, "fit_stud_title_block", fit_title)
     monkeypatch.setattr(draw, "add_property_linked_note", lambda _adapter, name, *position, **kwargs: notes.append((active[-1], name, kwargs.get("char_height"))))
+    captions = []
+    monkeypatch.setattr(draw, "add_note", lambda _adapter, text, *xy: captions.append((text, xy)) or object())
     checks = draw.append_stud_rework_sheets(adapter)
-    assert active == list(draw.SHEET_NAMES) == ["REWORK", "MEASURE-AND-FIT"]
-    assert [view.orientation for view in views] == ["*Front", "*Top", "*Isometric", "*Isometric"]
+    assert active == list(draw.SHEET_NAMES) == ["REWORK"]
+    assert [view.orientation for view in views] == ["*Front", "*Top", "*Isometric"]
     assert all(view.ScaleRatio == draw.SHEET_SCALE for view in views)
-    assert configured == [views[:3], views[3:]]
+    assert configured == [views]
     assert all(view.ReferencedConfiguration == CONFIGURATION for view in views)
     assert [(keep, dimensions) for _view, keep, dimensions in curated] == [
         (draw.FRONT_KEEP, spec.DRAWING_DIMENSIONS),
         (draw.END_KEEP, spec.DRAWING_DIMENSIONS),
     ]
     assert control_calls == [["FinishedLength", "CutEndChamfer"]]
-    assert callouts == [spec.DIMENSION_CALLOUTS]
+    assert callouts == [(["FinishedLength", "CutEndChamfer"], math.pi / 4)]
+    assert saved_angle_calls == [source_model]
+    assert adapter.currentModel is document
+    assert rework_note_views == [views[0]]
+    assert title_calls == [("REWORK", "REWORK", ROW["number"])]
     assert notes == [
         ("REWORK", f"{CONFIGURATION} Rework Lower End Note", None),
+        ("REWORK", "Existing Thread", None),
         ("REWORK", f"{CONFIGURATION} Rework Stock Note", None),
-        ("REWORK", f"{CONFIGURATION} Rework Manufacturing Notes", None),
-        *[("MEASURE-AND-FIT", f"{CONFIGURATION} Rework {name}", draw.INSTRUCTION_TEXT_HEIGHT) for name in spec.REWORK_INSTRUCTION_PROPERTIES],
     ]
+    assert (draw.END_VIEW_LABEL, draw.END_VIEW_LABEL_XY) in captions
+    assert (f"INSTALLED ACCEPTANCE:\n{jig.HOLD_DOWN_REFERENCE}", draw.ASSEMBLY_REFERENCE_XY) in captions
     if drift == "configuration":
         views[-1].ReferencedConfiguration = "TNut"
     elif drift == "source":
@@ -556,9 +944,13 @@ def test_drawing_build_imports_native_controls_and_prints_source_instructions_on
         with pytest.raises(RuntimeError):
             checks[0]()
     else:
-        checks[0]()
+        for check in checks:
+            check()
         assert property_reads == [source_model, source_model]
-        assert control_calls == [["FinishedLength", "CutEndChamfer"]] * 2
+        assert control_calls == [["FinishedLength", "CutEndChamfer"]]
+        assert owner_checks == [(views[0], views[1])] * 2
+        assert notes_settled == [views[0]]
+        assert title_settled == ["REWORK"]
 
 
 def test_shared_drawing_uses_one_configured_supplier_sheet_and_appended_stud_sheets(monkeypatch) -> None:
@@ -580,7 +972,7 @@ def test_shared_drawing_uses_one_configured_supplier_sheet_and_appended_stud_she
     assert options["additional_sheet_scales"] == {name: draw.SHEET_SCALE for name in draw.SHEET_NAMES}
 
 
-@pytest.mark.parametrize("drift", [None, "Finish", "Process", "Quantity", "Stock Length", "instruction"])
+@pytest.mark.parametrize("drift", [None, "Finish", "Process", "Quantity", "Stock Length", "document_note"])
 def test_stud_sheet_requires_native_member_and_source_linked_rework_properties(monkeypatch, drift) -> None:
     common = {
         "Number": ROW["number"], "Material Specification": ROW["material_specification"],
@@ -590,8 +982,8 @@ def test_stud_sheet_requires_native_member_and_source_linked_rework_properties(m
         **part.MEMBER_PROPERTIES[CONFIGURATION],
         "Number": ROW["number"], "Quantity": str(spec.QUANTITY),
     }
-    if drift == "instruction":
-        common[f"{CONFIGURATION} Rework Stud Fit Limits"] = "stale"
+    if drift == "document_note":
+        common[f"{CONFIGURATION} Rework Lower End Note"] = "stale"
     elif drift:
         native[drift] = "stale"
     monkeypatch.setattr(draw, "read_required_properties", lambda *_args, **_kwargs: common)

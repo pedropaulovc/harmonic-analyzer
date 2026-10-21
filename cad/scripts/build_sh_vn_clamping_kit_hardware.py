@@ -121,8 +121,6 @@ STUD_REWORK_PROPERTIES = {
     "Stock Length": f"{hold_down_stud.STOCK_LENGTH} IN STOCK",
     "Stock Note": hold_down_stud.STOCK_NOTE,
     "Lower End Note": hold_down_stud.LOWER_END_NOTE,
-    "Manufacturing Notes": hold_down_stud.DRAWING_NOTES,
-    **hold_down_stud.REWORK_INSTRUCTION_PROPERTIES,
 }
 MEMBER_PROPERTIES[HOLD_DOWN_STUD_CONFIGURATION].update({
     **STUD_REWORK_PROPERTIES,
@@ -135,7 +133,7 @@ MEMBER_NOTE_PROPERTIES = {
     for configuration, spec in MEMBER_SPECS.items()
 }
 MEMBER_NOTE_PROPERTIES[f"{HOLD_DOWN_STUD_CONFIGURATION} Manufacturing Notes"] = (
-    "REWORKED STUD; SEE REWORK AND MEASURE-AND-FIT."
+    "REWORKED STUD; SEE REWORK."
 )
 MEMBER_NOTE_PROPERTIES.update({
     f"{HOLD_DOWN_STUD_CONFIGURATION} Rework {name}": value
