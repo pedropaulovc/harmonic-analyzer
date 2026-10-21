@@ -1784,6 +1784,25 @@ work on an early return or exception; setup, interference and mate phases remain
 separate. No poses, rebuilds, validation or cleanup are skipped. Other `_rebuild`
 callers do not read the timing clock.
 
+`python cad/scripts/test_verify_telemetry.py --demo` runs the real static
+soundness consumers and `Report.gate` over headless synthetic frame, drive-train
+and channel data. Component fixedness, patternness, constrained status and source
+identity are explicit. The channel population follows the current active rows:
+one independent occurrence of each moving family, one installed spring variant,
+one spring hook and one grounded anchor jam nut per row, with shared station Z
+from `rocker_bank_layout.hub_mid_z` converted to metres. Spring variant indices
+follow the configured amplitude vector's first-occurrence order. Native body
+ports simulate zero measured overlap and return the configured settled
+`final_distance_mm` readbacks, not distances invented from gate bounds.
+
+These fixtures exercise unchanged DOF, independence and native-contact gates;
+corrupt component/native data must produce real failed reports and ERROR spans.
+They do **not** certify actual CAD geometry, native solver correctness, native
+contact or performance. The demo retains `HARMONIC_MOCK_SCALE` delays calibrated
+from historical logs; behavioral regressions alone disable synthetic sleeps.
+Its CLI exits 0 only when the real report has no failures, and nonzero when any
+gate fails, even though it still prints the complete span histogram.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on

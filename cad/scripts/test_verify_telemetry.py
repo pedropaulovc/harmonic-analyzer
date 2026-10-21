@@ -4,10 +4,10 @@ The real COM seat is replaced with a fake adapter + fake model/component/IDM
 objects whose every COM call ``time.sleep``s for a duration *calibrated from the
 v0.10.0 release logs* (``harmonic-analyzer-v0.10.0-logs.zip`` ->
 ``verify-soundness.log``). Everything ABOVE that seam is the production code:
-``verify._verify_static_one`` opens the doc, activates the pose, and runs the six
-real gates through the real ``_telemetry`` spine, so the spans/logs captured here
-are exactly the ones a real ``verify:soundness`` run emits -- only the wall-clock
-is scaled (``HARMONIC_MOCK_SCALE``, default 0.01 = 1/100th real time).
+``verify._verify_static_one`` opens the doc, activates the pose, and runs the
+real gates through the real ``_telemetry`` spine. Component state and channel
+native readbacks are headless synthetic data, NOT a CAD correctness proof;
+the wall-clock is scaled (``HARMONIC_MOCK_SCALE``, default 0.01).
 
 This pins the two span-shape fixes this module exists to prove:
 
@@ -105,7 +105,12 @@ def _neutralize_com_method_flagging():
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
 import verify  # noqa: E402
-from _buildgraph import ASSEMBLY_ORDER  # noqa: E402
+import rocker_bank_layout  # noqa: E402
+from test_native_spring_contact import (  # noqa: E402
+    _IDENTITY,
+    _IntersectionBody,
+    _NativeBody,
+)
 
 # --------------------------------------------------------------------------- #
 # Timing model -- base seconds per COM call, lifted from verify-soundness.log   #
@@ -138,19 +143,19 @@ def _sleep(seconds: float) -> None:
         time.sleep(seconds * SCALE)
 
 
-# Top-level component count per (sub)assembly = the MIDPOINT of the live
-# component-count band, so the mock stays self-consistent with whatever config is
-# checked out (the v0.10.0 logs were a reduced active_count=3 build; the band
-# moves with active_count) and every component-count gate passes. `channel` is the
-# dramatic case: ~164 dof.check + ~165 whats_wrong leaf spans, pre-fix.
+# Preserve the frame/drive-train timing populations from the historical reference
+# bands. Channel occurrences are built from configured rows below, never padded
+# to a count-band midpoint.
 COMPONENT_COUNTS = {
-    name: (lo + hi) // 2 for name, (lo, hi) in verify._COMPONENT_BAND.items()
+    name: sum(verify._COMPONENT_BAND[name]) // 2
+    for name in ("fr-frame", "dt-drive-train")
 }
+_DEFAULT_ASSEMBLIES = ("fr-frame", "dt-drive-train", "ch-channel")
 
 
 # --------------------------------------------------------------------------- #
 # Mock COM objects. Each method sleeps its calibrated duration, then returns    #
-# canned-healthy data, so every gate takes its real-shaped path and PASSES.     #
+# explicit component/native-port data for the unchanged production consumers.  #
 # --------------------------------------------------------------------------- #
 class _Result:
     """Mirrors the adapter result protocol check() reads (is_success/.data)."""
@@ -162,9 +167,26 @@ class _Result:
 
 
 class MockComponent:
-    def __init__(self, name: str, model: "MockModel") -> None:
+    def __init__(
+        self,
+        name: str,
+        model: "MockModel",
+        *,
+        source_stem: str,
+        fixed: bool = False,
+        pattern: bool = False,
+        status: int = _assembly.FULLY_CONSTRAINED,
+        station_z_mm: float = 0.0,
+    ) -> None:
         self._name = name
         self._model = model
+        self.source_stem = source_stem
+        self.fixed = fixed
+        self.pattern = pattern
+        self.status = status
+        transform = list(_IDENTITY)
+        transform[11] = station_z_mm / 1000.0
+        self.Transform2 = types.SimpleNamespace(ArrayData=transform)
 
     # _read_member calls these (callable -> invoked); the per-comp cost lives here.
     def Name2(self) -> str:
@@ -173,20 +195,22 @@ class MockComponent:
 
     def IsFixed(self) -> bool:
         _sleep(T_IS_FIXED)
-        return self._name.endswith("-1")  # one grounded part per assembly
+        return self.fixed
 
     def IsPatternInstance(self) -> bool:
         _sleep(T_IS_PATTERN)
-        return False
+        return self.pattern
 
     def GetConstrainedStatus(self) -> int:
         _sleep(T_CONSTRAINED_STATUS)
-        # Faithful to a freed-DOF model: in the free pose the train reads
-        # under-constrained; a fully-defined assembly reads fully constrained.
-        # Fixed (-1) comps never reach here (IsFixed short-circuits).
-        if getattr(self._model, "_free_pose", False):
-            return _assembly.UNDER_CONSTRAINED  # 2 -> the free DOF is real
-        return _assembly.FULLY_CONSTRAINED  # 3 -> fully defined, gate passes
+        return self.status
+
+    def GetPathName(self) -> str:
+        return f"C:/cad/out/sldprt/{self.source_stem}.SLDPRT" if self.source_stem else ""
+
+    def GetBodies3(self, body_type: int):
+        assert body_type == 0  # swSolidBody, as in test_native_spring_contact.
+        return (_NativeBody(self._model, self, self._name),), (0,)
 
     def GetModelDoc2(self) -> "MockModel":
         # A distinct per-component sub-document, so assert_model_healthy's deep
@@ -213,35 +237,121 @@ class MockIDM:
         pass
 
 
-_ASSEMBLIES = frozenset(stem.replace("_", "-") for stem in ASSEMBLY_ORDER)
-
-
 class MockModel:
-    def __init__(self, name: str, n_components: int) -> None:
+    def __init__(self, name: str, n_components: int = 0) -> None:
         self._name = name
-        self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
-        # The real free-DOF gate names required families (necessity) AND
-        # rejects any under-constrained component outside the allowed coupled
-        # families (exact-set) -- both taken from the SAME maps verify passes,
-        # so the mock can't drift. Rename every non-seed component into the
-        # allowed set (cycling), which also covers the required stems (they
-        # are a subset); index 0 stays the grounded "-1" seed (IsFixed).
-        # Only an assembly has a contract; the mock also models part documents.
-        is_assembly = name in _ASSEMBLIES
-        required = verify._required_free_stems(name) if is_assembly else ()
-        allowed = (verify.allowed_free_stems(name) if is_assembly else ()) or required
-        stems = list(required) + [s for s in allowed if s not in required]
-        for j in range(1, len(self._comps)):
-            if stems:
-                self._comps[j]._name = f"{stems[(j - 1) % len(stems)]}-{j + 1}"
+        self._comps: list[MockComponent] = []
+        self.distances_mm: dict[tuple[str, str], float] = {}
+        self.overlaps_mm3: dict[tuple[str, str], float] = {}
+        if name == "ch-channel":
+            self._populate_channel()
+        elif n_components:
+            # Retain the old timing population and contract-family coverage for
+            # frame/drive-train, with actual structural seeds and explicit state.
+            seed, structure = {
+                "fr-frame": ("fr-harmonic-base", "fr-tube-frame"),
+                "dt-drive-train": ("dt-cylinder-gear-shaft", "dt-arbor-pedestal"),
+            }[name]
+            required = verify._required_free_stems(name)
+            allowed = verify.allowed_free_stems(name) or required
+            stems = (*required, *(stem for stem in allowed if stem not in required))
+            free = bool(verify._expected_free_dof(name))
+            for index in range(n_components):
+                stem = seed if index == 0 else (
+                    stems[(index - 1) % len(stems)] if stems else structure
+                )
+                self._comps.append(MockComponent(
+                    f"{stem}-{index + 1}",
+                    self,
+                    source_stem=stem,
+                    fixed=index == 0,
+                    status=(
+                        _assembly.UNDER_CONSTRAINED
+                        if index > 0 and free and stem in allowed
+                        else _assembly.FULLY_CONSTRAINED
+                    ),
+                ))
         self.InterferenceDetectionManager = MockIDM()
         self.Extension = types.SimpleNamespace(NeedsRebuild2=0)
-        # Whether this model is in its freed-DOF pose (non-fixed components read
-        # under-constrained). Set by open_model for the free drive-train.
-        self._free_pose = False
         # Count ForceRebuild3 calls so a test can prove the soundness suite shares
         # ONE re-solve across the dof/over/health gates instead of rebuilding 3x.
         self.rebuild_calls = 0
+
+    def _populate_channel(self) -> None:
+        """Model the configured moving bank and grounded spring-seat occurrences."""
+        config = verify._config
+        rows = config.active_channels()
+        assert len(rows) == config.active_count()
+        allowed = verify.allowed_free_stems("ch-channel")
+        free = bool(verify._expected_free_dof("ch-channel"))
+        # Real builder seeds/structure, not an assembly masquerading as a part.
+        self._comps.extend((
+            MockComponent("ch-pivot-shaft-1", self, source_stem="ch-pivot-shaft", fixed=True),
+            MockComponent("ch-fulcrum-shaft-1", self, source_stem="ch-fulcrum-shaft"),
+        ))
+        # The builder assigns stretch indices in full-preset first-occurrence
+        # order, even when only an active prefix is installed.
+        variants = {
+            amplitude: index
+            for index, amplitude in enumerate(dict.fromkeys(config.amplitudes()))
+        }
+        records = {
+            float(record["amplitude_mm"]): record
+            for record in config.machine("springs", "channel_seats")
+        }
+        spring_occurrences: dict[str, int] = {}
+        for station, row in enumerate(rows):
+            station_z_mm = rocker_bank_layout.hub_mid_z(station)
+            for stem in verify._MOVING_CHANNEL_STEMS:
+                self._comps.append(MockComponent(
+                    f"{stem}-{station + 1}",
+                    self,
+                    source_stem=stem,
+                    status=(
+                        _assembly.UNDER_CONSTRAINED
+                        if free and stem in allowed
+                        else _assembly.FULLY_CONSTRAINED
+                    ),
+                    station_z_mm=station_z_mm,
+                ))
+            amplitude = float(row["amplitude_mm"])
+            spring_stem = (
+                f"ch-vn-channel-spring-installed-stretch{variants[amplitude]:02d}"
+            )
+            spring_occurrences[spring_stem] = spring_occurrences.get(spring_stem, 0) + 1
+            spring_name = f"{spring_stem}-{spring_occurrences[spring_stem]}"
+            hook_name = f"ch-vn-spring-hook-{station + 1}"
+            for name, stem in (
+                (spring_name, spring_stem),
+                (hook_name, "ch-vn-spring-hook"),
+                (f"ch-anchor-jam-nut-{station + 1}", "ch-anchor-jam-nut"),
+            ):
+                self._comps.append(MockComponent(
+                    name, self, source_stem=stem, fixed=True, station_z_mm=station_z_mm
+                ))
+            # Native DATA only: measured settled readbacks, NOT acceptance
+            # maxima from channel_seat() or distances manufactured from bounds.
+            measured = records[amplitude]["final_distance_mm"]
+            self.distances_mm[(spring_name, hook_name)] = float(measured["lower"])
+            self.distances_mm[(spring_name, f"ch-channel-lever-{station + 1}")] = float(
+                measured["upper"]
+            )
+
+    def GetComponentByName(self, name: str) -> MockComponent | None:
+        return next((component for component in self._comps if component._name == name), None)
+
+    def ClosestDistance(self, first: MockComponent, second: MockComponent):
+        measured_mm = self.distances_mm[(first._name, second._name)]
+        return measured_mm / 1000.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+
+    def intersection(self, target: str, tool: str):
+        # Reuse the native-contact test's temporary-body/copy/transform ports.
+        # No result bodies is a measured zero-volume intersection, not a
+        # replacement for native_component_overlap_mm3 or any gate.
+        measured_mm3 = self.overlaps_mm3.get((target, tool))
+        if measured_mm3 is None:
+            return None, 0
+        return (_IntersectionBody(measured_mm3),), 0
 
     def ForceRebuild3(self, _quiet: bool) -> bool:
         self.rebuild_calls += 1
@@ -278,9 +388,7 @@ class MockAdapter:
     async def open_model(self, path: str) -> _Result:
         _sleep(T_OPEN)
         stem = Path(path).stem
-        self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 8))
-        # drive-train ships with its operational DOF genuinely free.
-        self._current._free_pose = stem == "dt-drive-train"
+        self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 0))
         return _Result(True)
 
     async def list_configurations(self) -> _Result:
@@ -367,6 +475,7 @@ def _run_soundness(names: list[str], monkeypatch, tmp_path: Path):
     # _verify_static_one checks `sldasm.exists()`; point OUT_SLDASM at a tmp dir
     # of empty .SLDASM files so the real existence check passes.
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: tmp_path)
     for name in names:
         (tmp_path / f"{name}.SLDASM").write_bytes(b"")
 
@@ -400,6 +509,173 @@ def _dur(span) -> float:
 # --------------------------------------------------------------------------- #
 # Tests                                                                        #
 # --------------------------------------------------------------------------- #
+def test_default_soundness_fixture_passes_real_gates_and_native_contacts(
+    monkeypatch, tmp_path
+):
+    """All three demo assemblies pass real consumers, including every channel seat."""
+    monkeypatch.setattr(sys.modules[__name__], "SCALE", 0.0)
+    spans, report = _run_soundness(list(_DEFAULT_ASSEMBLIES), monkeypatch, tmp_path)
+    assert report.failed == [], report.failed
+    assert {label for label in report.passed if label.startswith("ch-channel:")} == {
+        f"ch-channel:{suffix}"
+        for suffix in (
+            "saved-rebuild-clean",
+            "dof-free-necessity",
+            "no-over-constrained",
+            "model-healthy",
+            "interference-free",
+            "spring-native-contacts",
+            "channel-independence",
+        )
+    }
+    assert not any(span.status.status_code.name == "ERROR" for span in spans)
+    count = verify._config.active_count()
+    contacts = _by_name(spans, "spring.native_contact")
+    assert len(contacts) == 2 * count
+    assert all(
+        span.status.status_code.name == "OK"
+        and span.attributes["certificate"] == "zero_overlap_bounded_distance"
+        and span.attributes["overlap_volume_mm3"] == 0.0
+        for span in contacts
+    )
+    # Inspect consumer-visible identities/transforms as well as certificates:
+    # source variants and distances must follow preset amplitudes, not bounds.
+    assert _LAST_RUN_ADAPTER is not None
+    model = _LAST_RUN_ADAPTER.currentModel
+    variants = list(dict.fromkeys(verify._config.amplitudes()))
+    records = verify._config.machine("springs", "channel_seats")
+    for station, row in enumerate(verify._config.active_channels()):
+        amplitude = float(row["amplitude_mm"])
+        record = next(record for record in records if record["amplitude_mm"] == amplitude)
+        lower, upper = contacts[2 * station:2 * station + 2]
+        assert lower.attributes["label"] == f"channel {station:02d} lower native seat"
+        assert upper.attributes["label"] == f"channel {station:02d} upper native seat"
+        assert lower.attributes["distance_mm"] == pytest.approx(
+            record["final_distance_mm"]["lower"]
+        )
+        assert upper.attributes["distance_mm"] == pytest.approx(
+            record["final_distance_mm"]["upper"]
+        )
+        spring_name = lower.attributes["first_component"]
+        assert upper.attributes["first_component"] == spring_name
+        spring = model.GetComponentByName(spring_name)
+        assert spring is not None
+        assert Path(spring.GetPathName()).stem == (
+            f"ch-vn-channel-spring-installed-stretch{variants.index(amplitude):02d}"
+        )
+        assert spring.fixed and not spring.pattern
+        for name in (
+            spring_name,
+            lower.attributes["second_component"],
+            upper.attributes["second_component"],
+            f"ch-anchor-jam-nut-{station + 1}",
+        ):
+            component = model.GetComponentByName(name)
+            assert component is not None
+            assert component.Transform2.ArrayData[11] == pytest.approx(
+                rocker_bank_layout.hub_mid_z(station) / 1000.0
+            )
+    for stem in ("ch-vn-spring-hook", "ch-anchor-jam-nut"):
+        installed = [component for component in model._comps if component.source_stem == stem]
+        assert len(installed) == count
+        assert all(component.fixed and not component.pattern for component in installed)
+
+
+_CHANNEL_CORRUPTIONS = {
+    "frozen-motion": ("dof-free-necessity", "expected >="),
+    "missing-source": ("spring-native-contacts", "component identity unavailable"),
+    "wrong-moving-count": ("channel-independence", "independent instances"),
+    "positive-overlap": ("spring-native-contacts", "components intersect"),
+    "excessive-distance": ("spring-native-contacts", "exceeds calibrated maximum"),
+}
+
+
+def _corrupt_channel_data(monkeypatch, corruption: str) -> None:
+    """Change adapter data after open; leave every production gate and Report real."""
+    original_open = MockAdapter.open_model
+
+    async def open_model(adapter, path):
+        result = await original_open(adapter, path)
+        model = adapter.currentModel
+        if model._name != "ch-channel":
+            return result
+        if corruption == "frozen-motion":
+            for component in model._comps:
+                if component.source_stem in verify._MOVING_CHANNEL_STEMS:
+                    component.status = _assembly.FULLY_CONSTRAINED
+        elif corruption == "missing-source":
+            spring_name, _ = next(iter(model.distances_mm))
+            spring = model.GetComponentByName(spring_name)
+            assert spring is not None
+            spring.source_stem = ""
+        elif corruption == "wrong-moving-count":
+            model._comps.remove(next(
+                component for component in model._comps
+                if component.source_stem == "ch-connecting-rod"
+            ))
+        elif corruption == "positive-overlap":
+            model.overlaps_mm3[next(iter(model.distances_mm))] = 1e-9
+        elif corruption == "excessive-distance":
+            model.distances_mm[next(iter(model.distances_mm))] = 1.0
+        else:
+            raise AssertionError(f"unknown channel-data corruption: {corruption}")
+        return result
+
+    monkeypatch.setattr(MockAdapter, "open_model", open_model)
+
+
+@pytest.mark.parametrize("corruption", _CHANNEL_CORRUPTIONS)
+def test_channel_corrupt_data_fails_real_soundness_gates(
+    monkeypatch, tmp_path, corruption
+):
+    monkeypatch.setattr(sys.modules[__name__], "SCALE", 0.0)
+    _corrupt_channel_data(monkeypatch, corruption)
+    spans, report = _run_soundness(list(_DEFAULT_ASSEMBLIES), monkeypatch, tmp_path)
+    suffix, evidence = _CHANNEL_CORRUPTIONS[corruption]
+    label = f"ch-channel:{suffix}"
+    assert [failed_label for failed_label, _ in report.failed] == [label], report.failed
+    assert evidence in report.failed[0][1]
+    (gate,) = [
+        span for span in _by_name(spans, "gate") if span.attributes["label"] == label
+    ]
+    assert gate.status.status_code.name == "ERROR"
+    assert any(
+        event.name == "exception" and evidence in event.attributes["exception.message"]
+        for event in gate.events
+    )
+    assert label not in report.passed
+
+
+@pytest.mark.parametrize("corruption", (None, *_CHANNEL_CORRUPTIONS))
+def test_demo_status_reflects_real_gate_results(monkeypatch, tmp_path, capsys, corruption):
+    # Only the behavioral regression drops synthetic sleeps; --demo itself keeps
+    # the configured timing scale and runs the same real soundness consumer.
+    monkeypatch.setattr(sys.modules[__name__], "SCALE", 0.0)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: tmp_path)
+    if corruption is not None:
+        _corrupt_channel_data(monkeypatch, corruption)
+    capture = _attach_capture()
+    status = _demo()
+    spans = capture.get_finished_spans()
+    assert {span.attributes["name"] for span in _by_name(spans, "verify.open")} == set(
+        _DEFAULT_ASSEMBLIES
+    )
+    if corruption is None:
+        assert status == 0
+        assert not any(span.status.status_code.name == "ERROR" for span in spans)
+        assert len(_by_name(spans, "spring.native_contact")) == 2 * verify._config.active_count()
+    else:
+        assert status == 1
+        suffix, evidence = _CHANNEL_CORRUPTIONS[corruption]
+        (gate,) = [
+            span for span in _by_name(spans, "gate")
+            if span.attributes["label"] == f"ch-channel:{suffix}"
+        ]
+        assert gate.status.status_code.name == "ERROR"
+        assert evidence in gate.status.description
+    assert f"Gates failed: {int(corruption is not None)}" in capsys.readouterr().err
+
+
 def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     """The dof gate no longer emits one span per component (the de-noise)."""
     spans, report = _run_soundness(["fr-frame", "dt-drive-train"], monkeypatch, tmp_path)
@@ -1137,7 +1413,7 @@ def test_non_jig_rebuild_has_no_clock_reads_and_keeps_two_native_attempts(monkey
 # --------------------------------------------------------------------------- #
 # Standalone demo: print the REAL console span tree for a realistic pass.       #
 # --------------------------------------------------------------------------- #
-def _demo() -> None:
+def _demo() -> int:
     class _Patch:
         """Minimal monkeypatch shim so _run_soundness works outside pytest."""
 
@@ -1152,7 +1428,7 @@ def _demo() -> None:
             for obj, attr, old in reversed(self._undo):
                 setattr(obj, attr, old)
 
-    names = ["fr-frame", "dt-drive-train", "ch-channel"]
+    names = list(_DEFAULT_ASSEMBLIES)
     print(
         f"\n=== mock verify:soundness over {names}  "
         f"(HARMONIC_MOCK_SCALE={SCALE}) ===\n"
@@ -1175,7 +1451,10 @@ def _demo() -> None:
     print("\n=== span-name histogram (post-fix) ===", file=sys.stderr)
     for nm, c in sorted(leaf_counts.items(), key=lambda kv: -kv[1]):
         print(f"  {c:4d}  {nm}", file=sys.stderr)
-    n_comp = sum(COMPONENT_COUNTS[n] for n in names)
+    n_comp = sum(
+        int(span.attributes["targets"]) - 1
+        for span in _by_name(spans, "health.collect_targets")
+    )
     pre = n_comp + (n_comp + len(names))  # dof.check + per-target whats_wrong
     print(
         f"\nTotal spans: {len(spans)}.  Pre-fix this pass would have emitted "
@@ -1184,11 +1463,12 @@ def _demo() -> None:
         f"Gates failed: {len(report.failed)}",
         file=sys.stderr,
     )
+    return 1 if report.failed else 0
 
 
 if __name__ == "__main__":
     if "--demo" in sys.argv:
-        _demo()
+        sys.exit(_demo())
     else:
         import pytest
 
