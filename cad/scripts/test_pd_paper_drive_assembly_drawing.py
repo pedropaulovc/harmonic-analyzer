@@ -2290,6 +2290,7 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
         assert current not in _assembly._POSE_LEDGER
 
 
+_PD_NATIVE_PART_WIDTH = 0.046824451973134076
 
 
 def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
@@ -2325,7 +2326,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         native_configurations = {
             component.ReferencedConfiguration: SimpleNamespace(
                 BOMPartNoSource=8,
-                AlternateName=member or number,
+                AlternateName=member or stem,
                 UseAlternateNameInBOM=True,
                 Description=drawing.BOM_DESCRIPTIONS[key],
                 UseDescriptionInBOM=key == "pd-transgear-removable",
@@ -2371,14 +2372,15 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             kind=202, property_name="", raw_property_data="", hidden=False, width=0.025
         ),
         SimpleNamespace(
-            kind=201, property_name="", raw_property_data="", hidden=False, width=0.025
+            kind=201, property_name="", raw_property_data="", hidden=False,
+            width=_PD_NATIVE_PART_WIDTH,
         ),
         SimpleNamespace(
             kind=204, property_name="Description", raw_property_data="Description",
             hidden=False, width=0.025,
         ),
         SimpleNamespace(
-            kind=203, property_name="", raw_property_data="", hidden=False, width=0.025
+            kind=203, property_name="", raw_property_data="", hidden=False, width=0.045
         ),
     ]
     table = MagicMock()
@@ -2395,7 +2397,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     )
     state = SimpleNamespace(
         columns=columns, native_rows=native_rows, row_keys=list(keys), cells=cells,
-        advertised_extra=advertised_extra, hidden_rows=set(),
+        advertised_extra=advertised_extra, hidden_rows=set(), requested_heights={},
     )
     table._pd_state = state
     type(table).RowCount = PropertyMock(side_effect=lambda: len(cells))
@@ -2508,7 +2510,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         columns.insert(
             insertion,
             SimpleNamespace(
-                kind=204, property_name="", raw_property_data="", hidden=False, width=0.025
+                kind=204, property_name="", raw_property_data="", hidden=False,
+                width=columns[index].width,
             ),
         )
         for row in cells:
@@ -2519,7 +2522,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         if not 0 <= index < len(columns):
             raise IndexError(index)
         columns[index].hidden = bool(hidden)
-        columns[index].width = 0.0 if hidden else 0.025
         # ITableAnnotation.SetColumnHidden is VOID, not a success flag.
         return None
 
@@ -2557,11 +2559,61 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             raise IndexError(index)
         cells[row][physical] = text
 
-    def set_width(index, width, _options):
+    def width_index(index):
         if not 0 <= index < len(columns):
+            return None
+        native_columns = [
+            position for position, column in enumerate(columns) if column.kind == 201
+        ]
+        if (
+            native_columns == [len(columns) - 1]
+            and columns[-1].hidden
+            and all(not column.hidden for column in columns[:-1])
+        ):
+            # Model native2437's width projection only for its observed retained
+            # trailing201 layout. Other fixture layouts keep physical widths.
+            return raw_index(index, False)
+        return index
+
+    def get_width(index):
+        if not 0 <= index < len(columns) or columns[index].hidden:
+            return 0.0
+        physical = width_index(index)
+        return columns[physical].width if physical is not None else 0.0
+
+    def set_width(index, width, _options):
+        physical = width_index(index)
+        if physical is None:
             raise IndexError(index)
-        columns[index].width = width
-        return width
+        # ColumnHidden remains physical even in the retained trailing201 model.
+        columns[physical].width = width
+        return columns[physical].width
+
+    def row_height(row):
+        if type(row) is not int or not 0 <= row < len(cells):
+            raise IndexError(row)
+        minimum = drawing.BOM_ROW_HEIGHT
+        for index, column in enumerate(columns):
+            if column.kind != 201:
+                continue
+            # Model only the observed retained-long-name wrap dependency, not
+            # native font metrics: each extra line raises the content minimum.
+            # Compact authored rows at the original width are an assumption;
+            # successful native two-field layout still needs qualification.
+            text_width = len(cells[row][index]) * 0.0016
+            original_lines = max(1, math.ceil(text_width / _PD_NATIVE_PART_WIDTH))
+            current_lines = max(1, math.ceil(text_width / max(column.width, 0.001)))
+            minimum = max(
+                minimum,
+                drawing.BOM_ROW_HEIGHT
+                + max(0, current_lines - original_lines) * 0.00452569499611854,
+            )
+        return max(minimum, state.requested_heights.get(row, 0.0))
+
+    def set_row_height(row, height, _options):
+        row_height(row)
+        state.requested_heights[row] = height
+        return row_height(row)
 
     table.MoveColumn.side_effect = move_column
     table.InsertColumn2.side_effect = insert_column
@@ -2569,9 +2621,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.ColumnHidden.side_effect = lambda index: (
         columns[index].hidden if 0 <= index < len(columns) else False
     )
-    table.GetColumnWidth.side_effect = lambda index: (
-        columns[index].width if 0 <= index < len(columns) else 0.0
-    )
+    table.GetColumnWidth.side_effect = get_width
     table.GetColumnType3.side_effect = column_type
     table.SetColumnType3.side_effect = set_column_type
     table.GetColumnCustomProperty.side_effect = custom_property
@@ -2587,6 +2637,9 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.IsCellTextEditable.return_value = True
     table.SetText2.side_effect = set_text
     table.SetColumnWidth.side_effect = set_width
+    table.GetHeaderCount.return_value = 1
+    table.GetRowHeight.side_effect = row_height
+    table.SetRowHeight.side_effect = set_row_height
     table.GetComponents2.side_effect = lambda row, configuration: (
         native_rows[row - 1]
         if configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION else ()
@@ -2599,7 +2652,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         )
         columns.append(
             SimpleNamespace(
-                kind=201, property_name="", raw_property_data="", hidden=False, width=0.025
+                kind=201, property_name="", raw_property_data="", hidden=False,
+                width=_PD_NATIVE_PART_WIDTH,
             )
         )
         for row in cells:
@@ -2857,6 +2911,392 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
         model=model, components=components, table=table, adapter=adapter,
         cells=cells, keys=keys, state=table._pd_state, insert=insert, view=view,
     )
+
+
+def test_native_width_fixture_preserves_storage_and_legacy_projection(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    table = scene.insert()
+    native = scene.state.columns[-1]
+    quantity = scene.state.columns[3]
+    assert (native.kind, native.hidden, native.width) == (201, True, _PD_NATIVE_PART_WIDTH)
+    assert (quantity.kind, quantity.hidden, quantity.width) == (203, False, 0.045)
+    assert table.GetColumnWidth(3) == _PD_NATIVE_PART_WIDTH
+    assert table.GetColumnWidth(4) == 0.0
+    assert table.ColumnHidden(3) is False
+    assert table.ColumnHidden(4) is True
+
+    assert table.SetColumnHidden(4, False) is None
+    assert table.GetColumnWidth(3) == 0.045
+    assert table.GetColumnWidth(4) == _PD_NATIVE_PART_WIDTH
+    for index in range(5):
+        assert table.GetColumnType3(index, True) == table.GetColumnType3(index, False)
+        assert table.GetColumnTitle2(index, True) == table.GetColumnTitle2(index, False)
+        assert table.DisplayedText2(0, index, True) == table.DisplayedText2(0, index, False)
+    assert table.SetColumnHidden(4, True) is None
+    assert native.width == table.GetColumnWidth(3) == _PD_NATIVE_PART_WIDTH
+    assert quantity.width == 0.045
+
+    # Insertions inherit their physical neighbour's stored width, not a fixed
+    # reset value or the hidden retained column's legacy-projected width.
+    assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
+    assert scene.state.columns[3].width == scene.state.columns[2].width
+    assert scene.state.columns[4] is quantity
+    assert scene.state.columns[5] is native
+    assert table.GetColumnWidth(4) == _PD_NATIVE_PART_WIDTH
+    assert table.GetColumnWidth(5) == 0.0
+    for index in (6, 7, 8):
+        assert table.GetColumnWidth(index) == 0.0
+        assert table.ColumnHidden(index) is False
+        assert table.GetColumnType3(index, True) == (-1, None, 0)
+
+
+def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypatch):
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    old = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    old_table = old.insert()
+    before = _drawing_tables.validate_bom_number_property(
+        old_table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
+    widths = tuple(enumerate(
+        drawing.BOM_COLUMN_WIDTHS[key]
+        for key in ("item", "part", "description", "quantity")
+    ))
+    for index, width in widths:
+        assert old_table.SetColumnWidth(index, width, 0) == width
+    assert old_table.GetColumnType3(3, True) == (203, None, 0)
+    assert old_table.GetColumnType3(3, False) == (201, None, 0)
+    assert old.state.columns[3].width == 0.045
+    assert old.state.columns[4].width == old_table.GetColumnWidth(3) == 0.012
+    assert sum(old_table.GetColumnWidth(index) for index in range(4)) == pytest.approx(
+        sum(drawing.BOM_COLUMN_WIDTHS.values())
+    )
+    old_heights = tuple(
+        old_table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
+    )
+    assert max(old_heights) > drawing.BOM_ROW_HEIGHT * 3
+    assert old.adapter.currentModel.EditRebuild3() is True
+    assert tuple(old_table.GetRowHeight(row) for row in range(44)) == old_heights
+    assert _drawing_tables.validate_bom_number_property(
+        old_table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    ) == before
+    with pytest.raises(RuntimeError, match="complete paper-drive BOM does not fit"):
+        drawing._split_bom(old.adapter, old_table, configuration=configuration)
+
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    table = scene.insert()
+    before_identities = tuple(
+        (id(component), component.GetPathName(), component.ReferencedConfiguration,
+         component.Name2, component.ComponentReference)
+        for component in scene.components
+    )
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    items = dict(drawing._validate_bom(
+        scene.adapter, table, drawing._source_family_counts(scene.model),
+        configuration=configuration,
+    ))
+    assert set(items) == set(drawing.BOM_PART_NUMBERS)
+    assert tuple(column.width for column in scene.state.columns[:4]) == tuple(
+        width for _index, width in widths
+    )
+    assert (scene.state.columns[-1].kind, scene.state.columns[-1].hidden,
+            scene.state.columns[-1].width) == (201, True, _PD_NATIVE_PART_WIDTH)
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+    assert tuple(
+        (id(component), component.GetPathName(), component.ReferencedConfiguration,
+         component.Name2, component.ComponentReference)
+        for component in scene.components
+    ) == before_identities
+    snapshot = _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
+    assert snapshot == before
+    proof_by_row = {row[0]: row for row in snapshot}
+    for key, count, configurations in (
+        ("pd-transgear-removable", 3, {"T12 Simplified", "T18 Simplified", "T24 Simplified"}),
+        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink Simplified"}),
+        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink Simplified"}),
+    ):
+        row = scene.keys.index(key) + 1
+        members = table.GetComponents2(row, configuration)
+        assert len(members) == count
+        assert {component.ReferencedConfiguration for component in members} == configurations
+        assert table.DisplayedText2(row, 3, True) == str(count)
+        assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], str(count))
+        assert sum(identity[2] for identity in proof_by_row[row][1]) == count
+    assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
+    heights = tuple(table.GetRowHeight(row) for row in range(44))
+    assert heights == (drawing.BOM_ROW_HEIGHT,) * 44
+    split_after = drawing.bom_split_row(heights, 1)
+    for anchor, height in (
+        (drawing.BOM_ANCHOR, sum(heights[:split_after + 1])),
+        (drawing.BOM_SECOND_ANCHOR, heights[0] + sum(heights[split_after + 1:])),
+    ):
+        assert not drawing.bom_extent_violations(
+            anchor, sum(drawing.BOM_COLUMN_WIDTHS.values()), height
+        )
+    # Logical row fit is not native extent qualification. The observed legacy
+    # getter still projects the wide 201, so the unchanged split guard must
+    # refuse this ambiguous aggregate (covered by the split-piece regression).
+    assert sum(table.GetColumnWidth(index) for index in range(4)) == pytest.approx(
+        0.012 + 0.048 + 0.118 + _PD_NATIVE_PART_WIDTH
+    )
+
+
+@pytest.mark.parametrize("with_sku", (False, True))
+def test_pd_width_authoring_sets_physical_columns_and_preserves_untargeted_widths(
+    monkeypatch, with_sku
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    table = scene.insert()
+    if with_sku:
+        assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
+    quantity_column = 4 if with_sku else 3
+    widths = (
+        (0, 0.012), (1, 0.048), (2, 0.118), (quantity_column, 0.012),
+    )
+    original = {
+        id(column): (column.width, column.kind, column.property_name,
+                     column.raw_property_data, column.hidden)
+        for column in scene.state.columns
+    }
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    drawing._set_bom_column_widths(table, widths)
+    for index, column in enumerate(scene.state.columns):
+        old_width, *old_metadata = original[id(column)]
+        assert column.width == dict(widths).get(index, old_width)
+        assert [column.kind, column.property_name, column.raw_property_data, column.hidden] == (
+            old_metadata
+        )
+    assert scene.state.columns[-1].width == _PD_NATIVE_PART_WIDTH
+    assert scene.state.columns[-1].hidden is True
+    assert scene.state.columns[quantity_column].width == 0.012
+    assert table.GetColumnWidth(quantity_column) == _PD_NATIVE_PART_WIDTH
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+
+
+@pytest.mark.parametrize(
+    "fault", ("missing", "unhidden", "duplicate", "not-trailing", "hidden-neighbour")
+)
+def test_pd_width_authoring_refuses_invalid_original_retained_column_state(monkeypatch, fault):
+    _model, _components, table, _adapter, cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    if fault == "missing":
+        columns.pop()
+        for row in cells:
+            row.pop()
+    elif fault == "unhidden":
+        columns[-1].hidden = False
+    elif fault == "duplicate":
+        columns[2].kind = 201
+    elif fault == "not-trailing":
+        columns[3], columns[4] = columns[4], columns[3]
+        for row in cells:
+            row[3], row[4] = row[4], row[3]
+    else:
+        columns[2].hidden = True
+    before = [vars(column).copy() for column in columns]
+    with pytest.raises(RuntimeError):
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert [vars(column) for column in columns] == before
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ("unhide-refused", "legacy-kind", "legacy-title", "legacy-header",
+     "physical-kind-changed", "physical-order-changed"),
+)
+def test_pd_width_authoring_requires_all_visible_metadata_alignment_before_writing(
+    monkeypatch, fault
+):
+    _model, _components, table, _adapter, cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    before_widths = {id(column): column.width for column in columns}
+    native_hide = table.SetColumnHidden.side_effect
+    native_type = table.GetColumnType3.side_effect
+    native_title = table.GetColumnTitle2.side_effect
+    native_text = table.DisplayedText2.side_effect
+
+    def hide(index, hidden):
+        if not hidden and fault == "unhide-refused":
+            return None
+        result = native_hide(index, hidden)
+        if not hidden and fault == "physical-kind-changed":
+            columns[3].kind = 202
+        elif not hidden and fault == "physical-order-changed":
+            columns[0], columns[2] = columns[2], columns[0]
+            for row in cells:
+                row[0], row[2] = row[2], row[0]
+        return result
+
+    def column_type(index, include_hidden):
+        if (fault == "legacy-kind" and not columns[-1].hidden
+                and index == 3 and include_hidden is False):
+            return 201, None, 0
+        return native_type(index, include_hidden)
+
+    def title(index, include_hidden):
+        if (fault == "legacy-title" and not columns[-1].hidden
+                and index == 3 and include_hidden is False):
+            return "PART NUMBER"
+        return native_title(index, include_hidden)
+
+    def displayed(row, index, include_hidden):
+        if (fault == "legacy-header" and not columns[-1].hidden
+                and row == 0 and index == 3 and include_hidden is False):
+            return "PART NUMBER"
+        return native_text(row, index, include_hidden)
+
+    table.SetColumnHidden.side_effect = hide
+    table.GetColumnType3.side_effect = column_type
+    table.GetColumnTitle2.side_effect = title
+    table.DisplayedText2.side_effect = displayed
+    with pytest.raises(RuntimeError):
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert {id(column): column.width for column in columns} == before_widths
+    assert columns[-1].hidden is True
+
+
+@pytest.mark.parametrize(
+    "result", (float("nan"), float("inf"), 0.013),
+    ids=("nan", "infinite", "wrong-width"),
+)
+def test_pd_width_authoring_refuses_bad_setter_return_despite_correct_readback(monkeypatch, result):
+    _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    native_set = table.SetColumnWidth.side_effect
+
+    def set_width(index, width, options):
+        actual = native_set(index, width, options)
+        return result if index == 3 else actual
+
+    table.SetColumnWidth.side_effect = set_width
+    with pytest.raises(RuntimeError):
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert columns[3].width == 0.012
+    assert (columns[-1].hidden, columns[-1].width) == (True, _PD_NATIVE_PART_WIDTH)
+
+
+@pytest.mark.parametrize("fault", ("quantity", "retained-native", "untargeted-sku"))
+def test_pd_width_authoring_refuses_independent_width_readback_damage(monkeypatch, fault):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()
+    assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
+    columns = scene.state.columns
+    damaged_column = {"quantity": 4, "retained-native": 5, "untargeted-sku": 3}[fault]
+    before = columns[damaged_column].width
+    native_set = table.SetColumnWidth.side_effect
+
+    def set_width(index, width, options):
+        actual = native_set(index, width, options)
+        if index == 4:
+            columns[damaged_column].width += 0.001
+        return actual
+
+    table.SetColumnWidth.side_effect = set_width
+    with pytest.raises(RuntimeError):
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (4, 0.012))
+        )
+    assert columns[damaged_column].width == pytest.approx(
+        0.013 if fault == "quantity" else before + 0.001
+    )
+    assert columns[-1].hidden is True
+
+
+@pytest.mark.parametrize("fault", ("ignored", "wrong-column", "raises-after-effect"))
+def test_pd_width_authoring_refuses_failed_restoration_without_a_primary_error(monkeypatch, fault):
+    _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    native_hide = table.SetColumnHidden.side_effect
+
+    def hide(index, hidden):
+        if not hidden:
+            return native_hide(index, hidden)
+        if fault == "ignored":
+            return None
+        if fault == "wrong-column":
+            return native_hide(3, True)
+        native_hide(index, hidden)
+        raise RuntimeError("native restore failed after taking effect")
+
+    table.SetColumnHidden.side_effect = hide
+    with pytest.raises(RuntimeError):
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert columns[3].width == 0.012
+    assert columns[-1].width == _PD_NATIVE_PART_WIDTH
+    assert columns[-1].hidden is (fault == "raises-after-effect")
+    assert columns[3].hidden is (fault == "wrong-column")
+
+
+@pytest.mark.parametrize("restore_fault", ("raises-before-effect", "raises-after-effect", "wrong-column"))
+def test_pd_width_authoring_does_not_mask_primary_exception_when_restoration_fails(
+    monkeypatch, restore_fault
+):
+    _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    native_set = table.SetColumnWidth.side_effect
+    native_hide = table.SetColumnHidden.side_effect
+    primary = RuntimeError("primary native width failure")
+
+    def set_width(index, width, options):
+        if index == 3:
+            raise primary
+        return native_set(index, width, options)
+
+    def hide(index, hidden):
+        if not hidden:
+            return native_hide(index, hidden)
+        if restore_fault == "wrong-column":
+            return native_hide(3, True)
+        if restore_fault == "raises-after-effect":
+            native_hide(index, hidden)
+        raise RuntimeError("secondary native restoration failure")
+
+    table.SetColumnWidth.side_effect = set_width
+    table.SetColumnHidden.side_effect = hide
+    with pytest.raises(RuntimeError) as caught:
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert caught.value is primary
+    assert columns[-1].hidden is (restore_fault == "raises-after-effect")
+    assert columns[-1].width == _PD_NATIVE_PART_WIDTH
+
+
+def test_pd_width_authoring_restores_after_an_unhide_exception_with_native_side_effect(monkeypatch):
+    _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    columns = table._pd_state.columns
+    before_widths = tuple(column.width for column in columns)
+    native_hide = table.SetColumnHidden.side_effect
+    primary = RuntimeError("unhide raised after taking effect")
+
+    def hide(index, hidden):
+        result = native_hide(index, hidden)
+        if not hidden:
+            raise primary
+        return result
+
+    table.SetColumnHidden.side_effect = hide
+    with pytest.raises(RuntimeError) as caught:
+        drawing._set_bom_column_widths(
+            table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
+        )
+    assert caught.value is primary
+    assert tuple(column.width for column in columns) == before_widths
+    assert columns[-1].hidden is True
 
 
 @pytest.mark.parametrize("advertised_extra", (0, 1), ids=("accurate-count", "native-2291"))
@@ -3737,155 +4177,79 @@ def test_bom_insertion_refuses_row_loss_from_the_number_binding(monkeypatch, dro
 
 
 @pytest.mark.parametrize("effect", ("omitted", "merged", "excluded", "hidden"))
-def test_number_binding_before_after_census_explains_native_row_loss(monkeypatch, effect):
+def test_number_binding_consumer_refuses_changed_native_bom_state(monkeypatch, effect):
     scene = _pd_bom_insertion_fixture(monkeypatch)
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     native_rows = scene.state.native_rows
     gear_row = scene.keys.index("pd-transgear-removable") + 1
-    gear_components = native_rows[gear_row - 1]
-    number = drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
-    native = gear_components[0].GetModelDoc2()
-    native.properties[("", "Number")] = "DOCUMENT-DIAGNOSTIC-NUMBER"
-    exclusion_queries = set()
-    for component in gear_components:
-        def excluded(option, names, component=component):
-            query = (option, tuple(names))
-            exclusion_queries.add((component.ReferencedConfiguration, *query))
-            return (component.exclusions[query],)
-
-        component.GetExcludeFromBOM2 = excluded
-    hidden_rows = 0
-    type(scene.table).TotalRowCount = PropertyMock(
-        side_effect=lambda: len(scene.cells) + hidden_rows
-    )
-    attributes = {}
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "annotate",
-        lambda **values: attributes.update(values),
-    )
-    messages = []
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "info",
-        lambda message, **_fields: messages.append(message),
+    gear_components = tuple(native_rows[gear_row - 1])
+    gear_ids = {id(component) for component in gear_components}
+    original_rows = scene.table.RowCount
+    original_native_rows = tuple(
+        tuple(id(component) for component in group) for group in native_rows
     )
     changed = False
 
     def rebuild():
-        nonlocal changed, hidden_rows
+        nonlocal changed
         if scene.state.columns[1].property_name != "Number" or changed:
             return True
-        scene.cells.pop(gear_row)
-        native_rows.pop(gear_row - 1)
-        if effect == "merged":
-            native_rows[0].extend(gear_components)
-            scene.cells[1][3] = str(int(scene.cells[1][3]) + len(gear_components))
-        elif effect == "hidden":
-            hidden_rows += 1
-        elif effect == "excluded":
-            selected = "T18 Simplified"
-            next(
-                component for component in gear_components
-                if component.ReferencedConfiguration == selected
-            ).exclusions[(3, (configuration,))] = True
-            native.configurations[selected].BOMPartNoSource = 1
-            native.configurations[selected].AlternateName = ""
-            native.properties[(selected, "Number")] = "CHANGED-T18"
+        if effect == "hidden":
+            scene.state.hidden_rows.add(gear_row)
+        else:
+            scene.cells.pop(gear_row)
+            native_rows.pop(gear_row - 1)
+            if effect == "merged":
+                native_rows[0].extend(gear_components)
+                quantity_column = next(
+                    index for index, column in enumerate(scene.state.columns)
+                    if column.kind == 203
+                )
+                scene.cells[1][quantity_column] = str(len(native_rows[0]))
+            elif effect == "excluded":
+                for component in gear_components:
+                    component.exclusions[(3, (configuration,))] = True
         changed = True
         return True
 
     scene.adapter.currentModel.EditRebuild3 = rebuild
-    with pytest.raises(RuntimeError):
-        scene.insert()
-    stages = ("before", "after")
-    expected_rows = len(drawing.BOM_PART_NUMBERS) + 1
-    for stage in stages:
-        prefix = f"number_bind_{stage}"
-        assert attributes[f"{prefix}_row_count"] == expected_rows - (stage == "after")
-        assert attributes[f"{prefix}_total_row_count"] == (
-            expected_rows - (stage == "after" and effect != "hidden")
-        )
-        assert json.loads(attributes[f"{prefix}_caps"]) == {
-            "rows": False, "columns": False, "members": False, "grouped": False
-        }
-        assert attributes[f"{prefix}_grouping"] == 3
-        assert attributes[f"{prefix}_one_item"] is False
-        assert attributes[f"{prefix}_truncated"] is False
-        assert f"{prefix}_read_error" not in attributes
-    before = json.loads(attributes["number_bind_before_members"])
-    after = json.loads(attributes["number_bind_after_members"])
-    gear_before = [entry for entry in before if entry[1] == "pd-transgear-removable"]
-    gear_after = [entry for entry in after if entry[1] == "pd-transgear-removable"]
-    assert {entry[2] for entry in gear_before} == {"T12", "T18", "T24"}
-    assert {entry[0] for entry in gear_before} == {gear_row}
-    assert sum(entry[3] for entry in gear_before) == 3
     if effect == "merged":
-        assert {entry[2] for entry in gear_after} == {"T12", "T18", "T24"}
-        assert {entry[0] for entry in gear_after} == {1}
+        message = "associative Number.*does not match native component Numbers"
+    elif effect == "hidden":
+        message = rf"BOM row {gear_row} is not proven visible"
     else:
-        assert gear_after == []
-    printed_before = json.loads(attributes["number_bind_before_printed"])
-    printed_after = json.loads(attributes["number_bind_after_printed"])
-    assert [entry[2] for entry in printed_before if entry[1] == number] == ["3"]
-    assert not any(entry[1] == number for entry in printed_after)
-    metadata = json.loads(attributes["number_bind_before_grouped"])
-    assert {entry["configuration"] for entry in metadata} == {
-        "T12 Simplified", "T18 Simplified", "T24 Simplified"
+        message = rf"BOM table is .*expected {original_rows} rows"
+    with pytest.raises(RuntimeError, match=message):
+        scene.insert()
+    assert changed
+    associated_rows = {
+        row
+        for row in range(1, scene.table.RowCount)
+        for component in scene.table.GetComponents2(row, configuration)
+        if id(component) in gear_ids
     }
-    assert all(
-        entry["bom_source"] == 8
-        and entry["alternate_name"] == number
-        and entry["member_number"] == number
-        and entry["document_number"] == "DOCUMENT-DIAGNOSTIC-NUMBER"
-        and entry["suppression"] == 2
-        and entry["excluded"] == [False]
-        for entry in metadata
+    actual_native_rows = tuple(
+        tuple(id(component) for component in scene.table.GetComponents2(row, configuration))
+        for row in range(1, scene.table.RowCount)
     )
-    # Original native handles still expose eligibility and selected-config
-    # Number changes after their table association disappears.
-    expected_metadata = [dict(entry) for entry in metadata]
-    if effect == "excluded":
-        next(
-            entry for entry in expected_metadata
-            if entry["configuration"] == "T18 Simplified"
-        ).update(
-            excluded=[True], bom_source=1,
-            alternate_name="", member_number="CHANGED-T18",
-        )
-    assert json.loads(attributes["number_bind_after_grouped"]) == expected_metadata
-    assert exclusion_queries == {
-        (selected, 3, (configuration,))
-        for selected in ("T12 Simplified", "T18 Simplified", "T24 Simplified")
-    }
-    columns_before = json.loads(attributes["number_bind_before_columns"])
-    columns_after = json.loads(attributes["number_bind_after_columns"])
-    assert len(columns_before) == 4
-    assert len(columns_after) == 5
-    log_prefix = "drawing.bom_number_binding "
-    summaries = [
-        json.loads(message[len(log_prefix):])
-        for message in messages if message.startswith(log_prefix)
-    ]
-    assert len(summaries) == 2
-    by_stage = {summary["stage"]: summary for summary in summaries}
-    assert set(by_stage) == set(stages)
-    summary = by_stage["after"]
-    assert summary["rows"] == expected_rows - 1
-    assert summary["total_rows"] == expected_rows - (effect != "hidden")
-    assert {entry["key"] for entry in summary["grouped"]} == {
-        "pd-transgear-removable@T12",
-        "pd-transgear-removable@T18",
-        "pd-transgear-removable@T24",
-    }
-    assert all(bool(entry["rows"]) == (effect == "merged") for entry in summary["grouped"])
-    if effect == "excluded":
-        t18 = next(
-            entry for entry in summary["grouped"]
-            if entry["key"] == "pd-transgear-removable@T18"
-        )
-        assert t18["excluded"] == [True]
-        assert t18["bom_source"] == 1
-        assert t18["alternate_name"] == ""
-        assert t18["numbers"] == ["CHANGED-T18", "DOCUMENT-DIAGNOSTIC-NUMBER"]
+    if effect == "hidden":
+        assert scene.table.RowCount == scene.table.TotalRowCount == original_rows
+        assert scene.table.RowHidden(gear_row) is True
+        assert associated_rows == {gear_row}
+        assert actual_native_rows == original_native_rows
+    else:
+        assert scene.table.RowCount == scene.table.TotalRowCount == original_rows - 1
+        assert associated_rows == ({1} if effect == "merged" else set())
+        expected_native_rows = list(original_native_rows)
+        removed = expected_native_rows.pop(gear_row - 1)
+        if effect == "merged":
+            expected_native_rows[0] += removed
+        assert actual_native_rows == tuple(expected_native_rows)
+        if effect == "excluded":
+            assert all(
+                component.GetExcludeFromBOM2(3, (configuration,)) == (True,)
+                for component in gear_components
+            )
 
 
 @pytest.mark.parametrize("failure", ("configuration-metadata", "task-log"))
@@ -4080,15 +4444,28 @@ def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
     return pieces, association_reads, split_after, total_rows, expected_snapshot
 
 
-def test_split_bom_proves_native_numbers_using_each_pieces_global_rows(monkeypatch):
+def test_split_bom_proves_global_native_numbers_before_refusing_legacy_width_ambiguity(monkeypatch):
     pieces, association_reads, split_after, total_rows, expected_snapshot = (
         _pd_split_bom_fixture(monkeypatch)
     )
-    drawing._assert_bom_pieces(
-        pieces, header_count=1, total_rows=total_rows,
-        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
-        expected_snapshot=expected_snapshot,
-    )
+    for piece in pieces:
+        assert tuple(column.width for column in piece._pd_state.columns[:4]) == (
+            0.012, 0.048, 0.118, 0.012
+        )
+        assert piece._pd_state.columns[-1].width == _PD_NATIVE_PART_WIDTH
+        assert piece._pd_state.columns[-1].hidden is True
+        # Faithful native2437 getters produce 224.824 mm, not the intended
+        # physical 190 mm. Never replace this unqualified aggregate with the
+        # requested widths merely to make the split fixture pass.
+        assert sum(piece.GetColumnWidth(index) for index in range(4)) == pytest.approx(
+            0.012 + 0.048 + 0.118 + _PD_NATIVE_PART_WIDTH
+        )
+    with pytest.raises(RuntimeError, match="table column widths changed after splitting"):
+        drawing._assert_bom_pieces(
+            pieces, header_count=1, total_rows=total_rows,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            expected_snapshot=expected_snapshot,
+        )
     assert association_reads == [
         set(range(1, split_after + 1)),
         set(range(split_after + 1, total_rows)),

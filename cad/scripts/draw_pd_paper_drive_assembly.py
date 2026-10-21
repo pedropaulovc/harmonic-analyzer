@@ -86,6 +86,7 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
     BomSnapshot,
+    _bom_physical_columns,
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
@@ -1755,11 +1756,10 @@ def _create_sheets(adapter: Any) -> None:
 
 
 def _annotate_bom_width_boundary(
-    table: Any, *, configuration: str, stage: str, target_column: int | None = None,
-    requested_width: float | None = None, outcome: dict[str, Any] | None = None,
-    text_rows: Sequence[int] = (),
+    table: Any, *, configuration: str | None, stage: str,
+    outcome: dict[str, Any] | None = None,
 ) -> None:
-    """Bound read-only width evidence; never repair or replace the native proof."""
+    """Retain bounded raw measurements, never infer a hidden-column index map."""
     def read(call: Callable[[], Any]) -> dict[str, Any]:
         try:
             value = repr(call())
@@ -1769,68 +1769,141 @@ def _annotate_bom_width_boundary(
 
     try:
         rows = int(table.RowCount)
-        visible_columns = int(table.ColumnCount)
-        declared_columns = int(table.TotalColumnCount)
-        column_indices = range(max(0, min(declared_columns, 8)))
-        columns = [
-            {
-                "index": column,
-                "type_include_hidden_true": read(lambda: table.GetColumnType3(column, True)),
-                "type_include_hidden_false": read(lambda: table.GetColumnType3(column, False)),
-                "title_include_hidden_true": read(lambda: table.GetColumnTitle2(column, True)),
-                "title_include_hidden_false": read(lambda: table.GetColumnTitle2(column, False)),
-                "header_include_hidden_true": read(lambda: table.DisplayedText2(0, column, True)),
-                "header_include_hidden_false": read(lambda: table.DisplayedText2(0, column, False)),
-                "column_hidden": read(lambda: table.ColumnHidden(column)),
-                "width_no_include_hidden_parameter": read(lambda: table.GetColumnWidth(column)),
-            }
-            for column in column_indices
-        ]
-        formats = []
-        for row in tuple(text_rows)[:4]:
-            if not 0 <= row < rows:
-                continue
-            for column in range(max(0, min(visible_columns + 1, declared_columns, 8))):
-                cell = {
-                    "row": row,
-                    "column": column,
-                    "index_space": "legacy_getter_without_IncludeHidden",
-                    "use_doc": read(lambda: table.GetCellUseDocTextFormat(row, column)),
-                    "text_include_hidden_true": read(lambda: table.DisplayedText2(row, column, True)),
-                    "text_include_hidden_false": read(lambda: table.DisplayedText2(row, column, False)),
-                }
-                try:
-                    text_format = _early_bound(table.GetCellTextFormat(row, column), "ITextFormat")
-                    cell.update(
-                        height_m=read(lambda: text_format.CharHeight),
-                        width_factor=read(lambda: text_format.WidthFactor),
-                        typeface=read(lambda: text_format.TypeFaceName),
-                    )
-                except Exception as error:
-                    cell["format_error"] = f"{type(error).__name__}: {error}"[:192]
-                formats.append(cell)
+        visible = int(table.ColumnCount)
+        declared = int(table.TotalColumnCount)
         summary = {
-            "stage": stage,
-            "configuration": configuration,
-            "target_column": target_column,
-            "requested_width_m": requested_width,
-            "outcome": outcome or {},
-            "visible_columns": visible_columns,
-            "declared_columns": declared_columns,
-            "rows": rows,
-            "columns": columns,
+            "stage": stage, "configuration": configuration, "outcome": outcome or {},
+            "visible_columns": visible, "declared_columns": declared, "rows": rows,
+            "raw_aggregate_width_index_space": "unversioned_getter_index_mapping_unproven",
+            "raw_aggregate_width_m": read(
+                lambda: sum(float(table.GetColumnWidth(index)) for index in range(visible))
+            ) if 0 <= visible <= 8 else {"error": "visible-column read cap exceeded"},
+            "columns": [
+                {
+                    "index": column,
+                    "type_include_hidden_true": read(lambda: table.GetColumnType3(column, True)),
+                    "type_include_hidden_false": read(lambda: table.GetColumnType3(column, False)),
+                    "header_include_hidden_true": read(lambda: table.DisplayedText2(0, column, True)),
+                    "header_include_hidden_false": read(lambda: table.DisplayedText2(0, column, False)),
+                    "column_hidden": read(lambda: table.ColumnHidden(column)),
+                    "width_no_include_hidden_parameter": read(lambda: table.GetColumnWidth(column)),
+                }
+                for column in range(max(0, min(declared, 8)))
+            ],
             "row_heights_m": [
                 [row, read(lambda: table.GetRowHeight(row))]
                 for row in range(max(0, min(rows, 64)))
             ],
-            "legacy_cell_formats": formats,
-            "caps": {"columns": declared_columns > 8, "rows": rows > 64, "text_rows": len(text_rows) > 4},
+            "caps": {"columns": declared > 8, "rows": rows > 64},
         }
         _telemetry.info(
             "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
         )
     except Exception:
-        pass  # Observational evidence cannot mask a setter failure or weaken a guard.
+        pass  # Observational evidence cannot mask a failure or weaken a guard.
+
+
+def _set_bom_column_widths(
+    table: Any, widths: Sequence[tuple[int, float]], *,
+    configuration: str | None = None,
+) -> None:
+    """Author widths only while physical and legacy column indices agree."""
+    physical = _bom_physical_columns(table, label="paper-drive widths")
+    visible = int(table.ColumnCount)
+    if (
+        len(physical) != visible + 1
+        or physical[-1] != (201, True)
+        or any(hidden or kind == 201 for kind, hidden in physical[:-1])
+    ):
+        raise RuntimeError("paper-drive BOM widths need one hidden trailing native column")
+    native_column = len(physical) - 1
+    original_hidden = table.ColumnHidden(native_column)
+    if original_hidden is not True:
+        raise RuntimeError("paper-drive BOM native column hidden state is not proven")
+    if (
+        not widths
+        or any(type(column) is not int or not 0 <= column < visible for column, _width in widths)
+        or len({column for column, _width in widths}) != len(widths)
+        or any(not math.isfinite(width) or width <= 0.0 for _column, width in widths)
+    ):
+        raise ValueError("paper-drive BOM width targets must be distinct visible columns")
+
+    def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
+        return (
+            table.GetColumnType3(index, include_hidden),
+            table.GetColumnTitle2(index, include_hidden),
+            table.DisplayedText2(0, index, include_hidden),
+        )
+
+    original_records = tuple(column_record(index, True) for index in range(len(physical)))
+    all_visible = tuple((kind, False) for kind, _hidden in physical)
+
+    def prove_all_visible() -> None:
+        if _bom_physical_columns(table, label="paper-drive visible widths") != all_visible:
+            raise RuntimeError("paper-drive BOM column visibility/order changed during width setup")
+        for index, expected in enumerate(original_records):
+            if column_record(index, True) != expected or column_record(index, False) != expected:
+                raise RuntimeError(
+                    f"paper-drive BOM physical/legacy column identity disagrees at {index}"
+                )
+
+    primary_error: BaseException | None = None
+    try:
+        # Native2437's hidden-state SetColumnWidth(3) inflated row minima.
+        # The unversioned API has no IncludeHidden parameter: expose first.
+        table.SetColumnHidden(native_column, False)
+        prove_all_visible()
+        expected_widths = [float(table.GetColumnWidth(index)) for index in range(len(physical))]
+        if any(not math.isfinite(width) or width <= 0.0 for width in expected_widths):
+            raise RuntimeError("paper-drive BOM all-visible baseline widths are invalid")
+        _annotate_bom_width_boundary(
+            table, configuration=configuration, stage="all_visible_before_widths"
+        )
+        for column, width in widths:
+            returned = float(table.SetColumnWidth(column, width, 0))
+            if not math.isfinite(returned) or abs(returned - width) > 1e-6:
+                raise RuntimeError(f"paper-drive BOM column {column} width was refused")
+            expected_widths[column] = width
+            actual_widths = tuple(
+                float(table.GetColumnWidth(index)) for index in range(len(physical))
+            )
+            if any(
+                not math.isfinite(actual) or abs(actual - expected) > 1e-6
+                for actual, expected in zip(actual_widths, expected_widths, strict=True)
+            ):
+                raise RuntimeError(
+                    f"paper-drive BOM column {column} width readback or native key width changed"
+                )
+        prove_all_visible()
+        _annotate_bom_width_boundary(
+            table, configuration=configuration, stage="all_visible_after_widths",
+            outcome={"requested_widths": tuple(widths), "verified_widths": tuple(expected_widths)},
+        )
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        restore_error: BaseException | None = None
+        try:
+            # Also restore if exposing the native column raised after taking effect.
+            table.SetColumnHidden(native_column, original_hidden)
+            if _bom_physical_columns(table, label="paper-drive restored widths") != physical:
+                raise RuntimeError("paper-drive BOM native column hidden state was not restored")
+            if tuple(column_record(index, True) for index in range(len(physical))) != original_records:
+                raise RuntimeError("paper-drive BOM column identities changed while restoring visibility")
+        except BaseException as error:
+            restore_error = error
+            if primary_error is None:
+                raise
+            primary_error.add_note(f"paper-drive BOM width visibility restoration also failed: {error!r}")
+        finally:
+            _annotate_bom_width_boundary(
+                table, configuration=configuration, stage="after_width_visibility_restore",
+                outcome={
+                    "primary_error": repr(primary_error)[:192],
+                    "restore_error": repr(restore_error)[:192],
+                },
+            )
 
 
 def _validate_bom(
@@ -1869,38 +1942,16 @@ def _validate_bom(
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
-    text_rows = tuple(dict.fromkeys((
-        0, 1, 2,
-        *(row for row in range(1, rows)
-          if contents[row][part_column] == BOM_PART_NUMBERS["pd-transgear-removable"]),
-    )))[:4]
-    for column, width in (
-        (item_column, BOM_COLUMN_WIDTHS["item"]),
-        (part_column, BOM_COLUMN_WIDTHS["part"]),
-        (description_column, BOM_COLUMN_WIDTHS["description"]),
-        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
-    ):
-        _annotate_bom_width_boundary(
-            table, configuration=configuration, stage="before_set_column_width",
-            target_column=column, requested_width=width,
-            text_rows=text_rows if column == item_column else (),
-        )
-        try:
-            actual_width = table.SetColumnWidth(column, width, 0)
-        except Exception as error:
-            _annotate_bom_width_boundary(
-                table, configuration=configuration, stage="after_set_column_width",
-                target_column=column, requested_width=width,
-                outcome={"error": f"{type(error).__name__}: {error}"[:192]},
-            )
-            raise
-        _annotate_bom_width_boundary(
-            table, configuration=configuration, stage="after_set_column_width",
-            target_column=column, requested_width=width,
-            outcome={"return": repr(actual_width)[:192]},
-        )
-        if abs(float(actual_width) - width) > 1e-6:
-            raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
+    _set_bom_column_widths(
+        table,
+        (
+            (item_column, BOM_COLUMN_WIDTHS["item"]),
+            (part_column, BOM_COLUMN_WIDTHS["part"]),
+            (description_column, BOM_COLUMN_WIDTHS["description"]),
+            (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
+        ),
+        configuration=configuration,
+    )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     native_rows = bom_row_identities(
@@ -1941,7 +1992,6 @@ def _validate_bom(
     _annotate_bom_width_boundary(
         table, configuration=configuration, stage="after_rebuild",
         outcome={"rebuild_return": repr(rebuilt)[:192], "row_height_returns": height_returns},
-        text_rows=text_rows,
     )
     if not rebuilt:
         raise RuntimeError("paper-drive BOM rebuild failed")
