@@ -248,10 +248,12 @@ DPI = 300
 MAX_IMAGE_BYTES = 256 * 1024 * 1024
 MAX_FILES_BYTES = 192 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
-# Deployment-seeded input observed read-only on failed worker swmaker00000A.
-# Keep the exact identity in this recipe input; other workers must match or refuse.
-ASSEMBLY_TEMPLATE_PATH = Path(
-    "C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/templates/Assembly.ASMDOT"
+# Committed probe-owned copy of the published, known-positive assembly seed.
+# Keep the exact identity in this recipe input; changed bytes must refuse.
+ASSEMBLY_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "templates"
+    / "bulk-visibility-contract-probe.ASMDOT"
 )
 ASSEMBLY_TEMPLATE_SIZE = 19046
 ASSEMBLY_TEMPLATE_SHA256 = (
@@ -1942,7 +1944,7 @@ class NativeProbe:
 
     def new_assembly(self, label: Document) -> Any:
         # swDefaultTemplateAssembly=9 remains diagnostic only. Creation uses one
-        # deployment-backed, byte-pinned input, never a resolver or fallback.
+        # committed, byte-pinned input, never a resolver or fallback.
         template = str(ASSEMBLY_TEMPLATE_PATH)
         evidence = assembly_template_evidence(template)
         predicates = evidence["predicates"]

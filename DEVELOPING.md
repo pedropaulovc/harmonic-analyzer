@@ -1616,18 +1616,26 @@ title and raw activation tuple were not recorded; `(None, 0)` is an inference,
 not a captured result. C01–C27 and the normal drawing were never reached; C28
 failed its title guard. This does not establish a visibility-API or ABI defect.
 
-Fixture setup uses one explicit deployment-seeded experiment input:
-`C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/templates/Assembly.ASMDOT`,
-required size **19,046 bytes**, SHA-256
+Fixture setup uses the committed experiment input
+`cad/templates/bulk-visibility-contract-probe.ASMDOT`: **19,046 bytes**, SHA-256
 `1950533a66f08e77a710016d6dca1523bbe4ada8c294d37c0998b90208a58ea6`.
-A later read-only filesystem observation on instance 10 (`swmaker00000A`, the
-failed worker) proved that file and byte identity, matching deployment seed
-metadata. That filesystem observation did not observe the interactive preference
-or diagnose the original failure's predicate. The separate corrected `95ac901e`
-execution observed preference 9 returning `''` and successfully created native
-fixtures on worker 10. Availability and creation on other workers remain
-unproved; a worker with a missing or different seed must fail closed.
-The path/size/hash constants live in the probe recipe input, not worker settings.
+It is an unchanged copy of the published bootstrap seed captured on
+`swmaker000005` on 2026-09-16, matching the bytes admitted by `95ac901e` on
+worker 10. That execution observed preference 9 returning `''` and successfully
+created native fixtures; the preference is not the template input.
+
+The later `bd2cf97` run on worker 4 found a different installed template:
+19,493 bytes, SHA-256
+`268f72bb136dac072e961238fca8777a1a30251818c97480bf942fa4d8713c2e`.
+C00 refused it before the first `NewDocument`, so title refresh was not exercised.
+This does not establish that worker 4's template is generally invalid.
+
+The probe now resolves the byte-pinned file inside its source checkout.
+`dodo.BULK_VISIBILITY_PROBE_TEMPLATE` adds the actual binary to the shared
+channel-drawing freshness/cache dependencies. Exact-commit Git acquisition
+delivers the input without changing installed templates or worker settings.
+Missing or changed bytes still fail closed. Cross-worker native construction,
+all 29 controls and the complete 32-output acceptance remain separate proof.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible

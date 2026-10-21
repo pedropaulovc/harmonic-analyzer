@@ -7,6 +7,8 @@ or with `cad/scripts/maintain_drawing_templates.py`; do not reconstruct their
 sheet geometry from code. Rebuild/re-render and visually inspect changed
 binaries before committing them.
 
+The byte-pinned experiment input below has a separate contract.
+
 ## harmonic-analyzer.PRTDOT — part template
 
 The default part template every `part:*` build instantiates.
@@ -20,6 +22,23 @@ linear precisions (`cad/config/title_block.yaml` is the source of truth;
 get-only ones drift from the config). The template is a `file_dep` of every
 part task (`dodo.PART_TEMPLATE`), so editing it rebuilds all parts and busts
 their cache keys.
+
+## bulk-visibility-contract-probe.ASMDOT — experiment input
+
+This is an unchanged copy of the bootstrap assembly seed captured on
+`swmaker000005` on 2026-09-16: **19,046 bytes**, SHA-256
+`1950533a66f08e77a710016d6dca1523bbe4ada8c294d37c0998b90208a58ea6`.
+Those exact bytes created the experiment's native fixtures on worker 10.
+It is not the production assembly default or a drawing-layout template.
+
+The probe resolves this committed file rather than a worker's installed template.
+`dodo.BULK_VISIBILITY_PROBE_TEMPLATE` declares its actual bytes as an input to
+the experimental channel drawing's freshness and cache keys only. Exact-commit
+Git acquisition delivers it; no worker setting or installed file is changed.
+Do not silently resave or substitute it: the probe requires its exact size and
+hash before construction. Native success on another worker still needs proof;
+matching bytes alone does not establish the full visibility contract.
+
 
 ## Drawing templates
 

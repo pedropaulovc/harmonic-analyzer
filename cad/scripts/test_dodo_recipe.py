@@ -325,13 +325,18 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
+    default_stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
+    template_relative = dodo.BULK_VISIBILITY_PROBE_TEMPLATE.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
     # T_oyK), so the checkout carries the config tree its keys hash.
-    sources = {dodo.RELEASE_VERSION_FILE, *dodo.CONFIG_DIR.rglob("*.yaml")}
-    for stem in stems:
+    sources = {
+        dodo.RELEASE_VERSION_FILE,
+        dodo.BULK_VISIBILITY_PROBE_TEMPLATE,
+        *dodo.CONFIG_DIR.rglob("*.yaml"),
+    }
+    for stem in (*default_stems, "ch_channel_assembly"):
         spec = dodo.DRAWINGS_BY_NAME[stem]
         sources.update((spec.script, *spec.assets))
         sources.update(Path(path) for path in dodo._helper_deps(spec.script))
@@ -343,7 +348,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         bg.clear_import_caches()
         bg.config_files_of.cache_clear()
 
-    def checkout(name="repo", *, crlf=False):
+    def checkout(name="repo", *, crlf=False, stems=default_stems):
         root = tmp_path / name
         scripts = root / "cad" / "scripts"
         for relative, content in contents.items():
@@ -356,6 +361,11 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
         monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
         monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+        monkeypatch.setattr(
+            dodo,
+            "BULK_VISIBILITY_PROBE_TEMPLATE",
+            root / template_relative,
+        )
         monkeypatch.setattr(dodo, "CONFIG_DIR", root / config_relative)
         monkeypatch.setattr(bg, "CONFIG_DIR", dodo.CONFIG_DIR)
         monkeypatch.setattr(bg, "ASSEMBLY_CONTRACT_DIR", dodo.CONFIG_DIR / "assemblies")
@@ -407,6 +417,14 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
             token.write_bytes(b"a" * 64 + b"\n")
             index[dodo._artefact_key(str(source))] = (kind, spec.part)
         dodo._ARTEFACT_INDEX = index
+        if "ch_channel_assembly" in stems:
+            for stem in ("ch_rod_pivot_pin", "ch_pivot_shaft"):
+                source = Path(dodo._sldprt(stem))
+                token = Path(dodo._part_execution_token(stem))
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_bytes(b"fixed probe part identity")
+                token.write_bytes(b"a" * 64 + b"\n")
+                index[dodo._artefact_key(str(source))] = ("part", stem)
 
         def snapshot():
             reload_registry()
@@ -427,6 +445,71 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         yield checkout
     finally:
         clear_closure()
+
+
+def test_probe_template_bytes_change_only_channel_drawing_key(isolated_drawing_keys):
+    from doit.dependency import Dependency, JsonDB
+    from doit.task import Task
+
+    dodo, root, snapshot = isolated_drawing_keys(
+        stems=("ch_channel_assembly", "pd_platen_guide")
+    )
+    before = snapshot()
+    template = dodo.BULK_VISIBILITY_PROBE_TEMPLATE
+    tasks = {
+        stem: Task(f"drawing:{stem}", [], file_dep=dodo._drawing_file_deps(stem))
+        for stem in before
+    }
+    with contextlib.closing(
+        Dependency(
+            JsonDB, str(root / "probe-dependencies.json"), checker_cls=dodo.ContentChecker
+        )
+    ) as dependency:
+        for task in tasks.values():
+            dependency.save_success(task)
+            assert dependency.get_status(task, {}).status == "up-to-date"
+
+        original = template.read_bytes()
+        stat = template.stat()
+        template.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+        os.utime(template, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        after = snapshot()
+        assert all(
+            a != b
+            for a, b in zip(before["ch_channel_assembly"], after["ch_channel_assembly"])
+        )
+        assert before["pd_platen_guide"] == after["pd_platen_guide"]
+
+        # Doit's settled-mtime fast path is separate from actual-byte keying.
+        # Ordinary asset edits must also make the declared consumer stale.
+        os.utime(template, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10_000_000_000))
+        task = tasks["ch_channel_assembly"]
+        assert dependency.get_status(task, {}).status == "run"
+        assert str(template) in task.dep_changed
+        assert (
+            dependency.get_status(tasks["pd_platen_guide"], {}).status == "up-to-date"
+        )
+
+        template.unlink()
+        missing = snapshot()
+        assert all(
+            a != b
+            for a, b in zip(after["ch_channel_assembly"], missing["ch_channel_assembly"])
+        )
+        assert before["pd_platen_guide"] == missing["pd_platen_guide"]
+        deps = dodo._drawing_file_deps("ch_channel_assembly")
+        _key, inputs = dodo._cache.key_inputs(deps, dodo.ContentChecker._digest)
+        assert (
+            template.relative_to(dodo.REPO_ROOT).as_posix(),
+            "<missing>",
+        ) in inputs
+        # Rebuild deps after removal: an existence filter must not hide the error.
+        task = Task("drawing:ch_channel_assembly", [], file_dep=deps)
+        status = dependency.get_status(task, {})
+        assert status.status == "error"
+        assert status.get_error_message() == (
+            f"Dependent file '{template}' does not exist."
+        )
 
 
 def test_drawing_registry_projection_accepts_only_declarative_layout_members():

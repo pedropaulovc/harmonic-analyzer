@@ -172,6 +172,9 @@ RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
 # deliberately; importing _buildgraph from _paths would drag graph tooling
 # into every part's dep closure). A runtime input of every part build.
 PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
+BULK_VISIBILITY_PROBE_TEMPLATE = (
+    REPO_ROOT / "cad" / "templates" / "bulk-visibility-contract-probe.ASMDOT"
+)
 # The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
 # imported AT RUNTIME by _com/_assembly (e.g. the mate/plane creation glue), so
 # its source is a genuine build input of every COM task -- yet it is an installed
@@ -1934,9 +1937,10 @@ def _drawing_file_deps(stem: str) -> list[str]:
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
     if stem == "ch_channel_assembly":
-        # Branch-only native contract fixture: two read-only part inputs, with
-        # their exact execution identities, inside this existing drawing leaf.
+        # Branch-only native contract fixture: its committed assembly template
+        # and two read-only part inputs with their exact execution identities.
         source_deps += (
+            str(BULK_VISIBILITY_PROBE_TEMPLATE.resolve()),
             _sldprt("ch_rod_pivot_pin"),
             _part_execution_token("ch_rod_pivot_pin"),
             _sldprt("ch_pivot_shaft"),
