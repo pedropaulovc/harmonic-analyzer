@@ -1588,8 +1588,8 @@ inputs are byte-identical.
 
 ### Branch-only bulk visibility contract experiment
 
-The isolated `perf/com-bulk-visibility-probe-20261020` branch runs an experimental
-contract probe after pure spring-preset validation and before normal native
+The branch-only bulk-visibility experiment runs a contract probe after pure
+spring-preset validation and before normal native
 `drawing:ch_channel_assembly` work. Implementation
 approval is **not native-launch or production-cutover approval**; the parent must
 authorize any farm run separately. Do not run this probe locally. It uses two
@@ -1607,15 +1607,26 @@ preference enum 9 is wrong. Separately, C28 cleanup raised `0x800401FD`
 document handle. That secondary cleanup failure must not replace the original
 C00 error or be treated as a visibility failure or proof of an application crash.
 
+The corrected `95ac901e` execution on worker 10 admitted the explicit template
+twice, created the fixtures, completed four same-route assembly activations and
+passed five owned-discard controls. C00 then failed the activation result's
+non-null-model guard after drawing-sheet changes. Cleanup independently matched
+the original drawing identity but found its cached title had changed. The fresh
+title and raw activation tuple were not recorded; `(None, 0)` is an inference,
+not a captured result. C01–C27 and the normal drawing were never reached; C28
+failed its title guard. This does not establish a visibility-API or ABI defect.
+
 Fixture setup uses one explicit deployment-seeded experiment input:
 `C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/templates/Assembly.ASMDOT`,
 required size **19,046 bytes**, SHA-256
 `1950533a66f08e77a710016d6dca1523bbe4ada8c294d37c0998b90208a58ea6`.
 A later read-only filesystem observation on instance 10 (`swmaker00000A`, the
 failed worker) proved that file and byte identity, matching deployment seed
-metadata. It did not observe the interactive preference or diagnose the original
-failure's predicate. Availability on other workers and native document creation
-remain unproved; a worker with a missing or different seed must fail closed.
+metadata. That filesystem observation did not observe the interactive preference
+or diagnose the original failure's predicate. The separate corrected `95ac901e`
+execution observed preference 9 returning `''` and successfully created native
+fixtures on worker 10. Availability and creation on other workers remain
+unproved; a worker with a missing or different seed must fail closed.
 The path/size/hash constants live in the probe recipe input, not worker settings.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
@@ -1659,7 +1670,10 @@ unattended execution. Resolver dialog/hang risk remains unresolved.
 Evidence is written under
 `cad/out/reports/failures/com-perf-bulk-visibility/<run-id>/`: a checkpointed JSON
 report and, for a successful run, six all-page PDFs, full-page renders/overlays
-and owned native fixtures. The observed failed run published only its report.
+and owned native fixtures. `d61076a` published only its report. `95ac901e`
+published its report and two fixture assemblies: three of the 32 required
+successful-experiment files. Its drawing/PDF/PNG outputs were never generated,
+not lost during upload.
 The terminal task-log receipt carries the finalized report digest (the report
 does not hash itself). Exact head/tree metadata is read only during an authorized
 farm-native execution. Any failed/unsupported control blocks the normal drawing;
@@ -1682,6 +1696,26 @@ Account for implicitly closed owned dependencies as well as the named target;
 do not silently drop an unresolved acquisition. Refused or failed reconciliation
 retains held/unresolved ledger evidence and blocks normal-drawing handoff. Source
 cleanliness and read-only disk identities remain mandatory.
+
+An unsaved drawing's sheet-qualified display title may change without changing
+its native identity. Only an already-ADMITTED, originally pathless type-3 fixture
+drawing, independently matched to its retained live owner and still returning an
+exact empty path, may refresh its cached title. Both complete ownership and
+discard inventories validate every identity, metadata row and case-insensitive
+title collision before committing any title changes. Parts, assemblies,
+saved/path-changed drawings and non-admitted owners retain title immutability;
+a replacement is never adopted. Unchanged positively owned pending acquisitions
+retain their existing first-discard route, not activation permission.
+
+Drawing activation uses the freshly validated title exactly once through the
+unchanged generated `ActivateDoc3(title, False, 2, 0)` route. Invalidated owners
+and failed pre-observations refuse before activation. Strict tuple/status,
+returned-owner and active-owner checks remain in force. Receipts retain cached
+and fresh names, raw result shape and pre/post identity observations, including
+partial failures, without retrying or masking the primary error. Offline tests
+and persisted-report smoke cover title refresh and refusal; fresh-title native
+activation and the complete experiment remain unproved until a new authorized
+execution supplies their evidence.
 
 Owned models may remain resident **at probe exit** on refusal; the report
 records held-model diagnostics. There is no alternate probe close API or

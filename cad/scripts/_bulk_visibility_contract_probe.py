@@ -107,6 +107,24 @@ class AcquisitionState(StrEnum):
     DISCARD_ATTEMPTED = "discard_attempted"
 
 
+class ActivationState(StrEnum):
+    PREPARING = "preparing"
+    CALLING = "calling"
+    VALIDATING = "validating"
+    PASSED = "passed"
+    FAILED = "failed"
+
+
+class ActiveObservation(StrEnum):
+    NOT_OBSERVED = "not_observed"
+    OBSERVING = "observing"
+    NULL = "null"
+    OWNED = "owned"
+    FOREIGN = "foreign_or_ambiguous"
+    NON_NULL = "non_null"
+    ERROR = "error"
+
+
 class ViewId(StrEnum):
     A = "BulkTarget"
     B = "BulkSentinel"
@@ -1132,14 +1150,82 @@ class NativeProbe:
         )
         return model
 
-    def ownership_inventory(self) -> dict[Document, Any]:
+    @staticmethod
+    def refreshable_drawing(label: Document, owned: OwnedDocument) -> bool:
+        return (
+            label is Document.DRAWING
+            and owned.state is AcquisitionState.ADMITTED
+            and owned.native is not None
+            and type(owned.kind) is int
+            and owned.kind == 3
+            and owned.path is None
+        )
+
+    def staged_title_refresh(
+        self,
+        label: Document,
+        owned: OwnedDocument,
+        title: str,
+        kind: int,
+        path: str,
+        verdict: Verdict,
+        context: str,
+        *,
+        unknown_pending_title: bool = False,
+    ) -> dict[str, Any] | None:
+        """Validate metadata after unique native matching, without changing it."""
+        if owned.state is AcquisitionState.ADMITTED:
+            require(
+                kind == owned.kind
+                and (
+                    normalized(path) == normalized(owned.path)
+                    if owned.path is not None
+                    else path == ""
+                ),
+                verdict,
+                f"owned {context} path/type changed: {label}",
+            )
+        if title == owned.title or (
+            unknown_pending_title
+            and owned.state is AcquisitionState.PENDING
+            and owned.title is None
+        ):
+            return None
+        require(
+            self.refreshable_drawing(label, owned) and kind == 3 and path == "",
+            verdict,
+            f"owned {context} title changed: {label}",
+        )
+        return {
+            "event": "title_refresh",
+            "context": context,
+            "document": label,
+            "generation": owned.generation,
+            "cached_title": owned.title,
+            "fresh_title": title,
+            "native_is_same": 1,
+            "kind": kind,
+            "path": path,
+        }
+
+    def commit_title_refreshes(self, staged: list[dict[str, Any]]) -> None:
+        # Both callers finish the complete live/acquired bijection and collision
+        # checks first. No native identity, admission metadata or state changes.
+        for event in staged:
+            self.acquisitions[event["document"]].title = event["fresh_title"]
+            self.receipt.data["ledger"].append(event)
+
+    def ownership_inventory(self, *, context: str = "inventory") -> dict[Document, Any]:
         found: dict[Document, Any] = {}
+        titles: set[str] = set()
+        staged: list[dict[str, Any]] = []
         for raw in array(self.app.GetDocuments(), "GetDocuments", empty=True):
             model = self.bind(raw, "IModelDoc2")
             matches = [
                 label
                 for label, owned in self.acquisitions.items()
                 if owned.state in (AcquisitionState.PENDING, AcquisitionState.ADMITTED)
+                and owned.native is not None
                 and self.same(model, owned.native) == 1
             ]
             require(
@@ -1152,57 +1238,146 @@ class NativeProbe:
                 label not in found, Verdict.PRESERVATION, "duplicate document inventory"
             )
             owned = self.acquisitions[label]
-            require(
-                model.GetTitle() == owned.title,
-                Verdict.PRESERVATION,
-                f"owned document title changed: {label}",
+            title = api_string(model.GetTitle(), "fresh owned inventory title")
+            path = api_string(
+                model.GetPathName(), "fresh owned inventory path", empty=True
             )
-            if owned.state is AcquisitionState.ADMITTED:
-                require(
-                    api_int(model.GetType(), "inventory type") == owned.kind
-                    and (
-                        normalized(model.GetPathName()) == normalized(owned.path)
-                        if owned.path is not None
-                        else model.GetPathName() == ""
-                    ),
-                    Verdict.PRESERVATION,
-                    f"owned document identity/path/title changed: {label}",
-                )
+            kind = api_int(model.GetType(), "inventory type")
+            event = self.staged_title_refresh(
+                label, owned, title, kind, path, Verdict.PRESERVATION, context
+            )
+            if event is not None:
+                staged.append(event)
+            require(
+                title.casefold() not in titles,
+                Verdict.PRESERVATION,
+                "ambiguous inventory title; no foreign close permitted",
+            )
+            titles.add(title.casefold())
             found[label] = model
         require(
             set(found) == set(self.acquisitions),
             Verdict.PRESERVATION,
             "owned/unresolved acquisition unexpectedly absent",
         )
+        self.commit_title_refreshes(staged)
         return found
 
-    def inventory(self) -> dict[Document, Any]:
-        found = self.ownership_inventory()
+    def inventory(self, *, context: str = "inventory") -> dict[Document, Any]:
+        # Refuse pending/unresolved admission before a refresh can commit.
         require(
-            set(found) == set(self.documents)
+            set(self.acquisitions) == set(self.documents)
             and not self.receipt.data.get("unresolved_acquisitions"),
             Verdict.PRESERVATION,
             "pending/unresolved document not admitted",
         )
-        return found
+        return self.ownership_inventory(context=context)
 
     def activate(self, label: Document) -> Any:
         self.tick()
         self.model(label)  # Reject pending/failed-discard objects before activation.
         owned = self.documents[label]
-        result = self.app.ActivateDoc3(owned.title, False, 2, 0)
-        require(
-            isinstance(result, tuple)
-            and len(result) == 2
-            and type(result[1]) is int
-            and result[1] == 0,
-            Verdict.CONSTRUCTION,
-            f"ActivateDoc3 failed: {result!r}",
-        )
-        self.identical(result[0], owned.native, "activated returned model")
-        self.identical(self.app.ActiveDoc, owned.native, "fresh active document")
-        self.adapter.currentModel = owned.native
-        return owned.native
+        event: dict[str, Any] = {
+            "event": "activation",
+            "document": label,
+            "generation": owned.generation,
+            "cached_title": owned.title,
+            "state": ActivationState.PREPARING,
+            "pre_active": {"state": ActiveObservation.NOT_OBSERVED},
+            "post_active": {"state": ActiveObservation.NOT_OBSERVED},
+        }
+        self.receipt.data["ledger"].append(event)
+        try:
+            require(
+                owned.native is not None,
+                Verdict.CONSTRUCTION,
+                f"document handle invalidated before activation: {label}",
+            )
+            if self.refreshable_drawing(label, owned):
+                self.inventory(context="activation")
+            event["validated_title"] = owned.title
+            event["pre_active"]["state"] = ActiveObservation.OBSERVING
+            active = self.app.ActiveDoc
+            if active is None:
+                event["pre_active"] = {"state": ActiveObservation.NULL}
+            else:
+                matches = [
+                    key
+                    for key, candidate in self.documents.items()
+                    if candidate.state is AcquisitionState.ADMITTED
+                    and candidate.native is not None
+                    and self.same(active, candidate.native) == 1
+                ]
+                event["pre_active"] = {
+                    "state": (
+                        ActiveObservation.OWNED
+                        if len(matches) == 1
+                        else ActiveObservation.FOREIGN
+                    ),
+                    "documents": matches,
+                    "native_is_same": [1 for _ in matches],
+                }
+            event["arguments"] = [owned.title, False, 2, 0]
+            event["state"] = ActivationState.CALLING
+            result = self.app.ActivateDoc3(owned.title, False, 2, 0)
+            event["state"] = ActivationState.VALIDATING
+            event["result_type"] = type(result).__name__
+            event["result_repr"] = repr(result)
+            if isinstance(result, tuple):
+                event["result_length"] = len(result)
+                event["component_types"] = [type(item).__name__ for item in result]
+                if result:
+                    event["returned_model_null"] = result[0] is None
+                if len(result) == 2:
+                    event["status_type"] = type(result[1]).__name__
+                    event["status_repr"] = repr(result[1])
+                    if type(result[1]) in (str, int, bool, type(None)) or (
+                        type(result[1]) is float and math.isfinite(result[1])
+                    ):
+                        event["status"] = result[1]
+            require(
+                isinstance(result, tuple)
+                and len(result) == 2
+                and type(result[1]) is int
+                and result[1] == 0,
+                Verdict.CONSTRUCTION,
+                f"ActivateDoc3 failed: {result!r}",
+            )
+            event["returned_native_is_same"] = self.same(result[0], owned.native)
+            require(
+                event["returned_native_is_same"] == 1,
+                Verdict.IDENTITY,
+                "activated returned model: different native object",
+            )
+            event["post_active"]["state"] = ActiveObservation.OBSERVING
+            active = self.app.ActiveDoc
+            event["post_active"] = {
+                "state": (
+                    ActiveObservation.NULL
+                    if active is None
+                    else ActiveObservation.NON_NULL
+                )
+            }
+            event["post_active"]["native_is_same"] = self.same(active, owned.native)
+            require(
+                event["post_active"]["native_is_same"] == 1,
+                Verdict.IDENTITY,
+                "fresh active document: different native object",
+            )
+            self.adapter.currentModel = owned.native
+            event["state"] = ActivationState.PASSED
+            return owned.native
+        except BaseException as error:
+            event["failed_at"] = event["state"]
+            event["state"] = ActivationState.FAILED
+            for key in ("pre_active", "post_active"):
+                if event[key]["state"] is ActiveObservation.OBSERVING:
+                    event[key] = {
+                        "state": ActiveObservation.ERROR,
+                        "error": error_record(error),
+                    }
+            event["error"] = error_record(error)
+            raise
 
     def freeze_disk(self, label: Document) -> None:
         path = self.paths[label]
@@ -1522,6 +1697,7 @@ class NativeProbe:
         )
         current = array(self.app.GetDocuments(), "pre-discard inventory", empty=True)
         frozen: dict[Document, dict[str, Any]] = {}
+        staged: list[dict[str, Any]] = []
         for raw in current:
             owners = [
                 key
@@ -1546,22 +1722,18 @@ class NativeProbe:
                 model.GetPathName(), "fresh owned discard path", empty=True
             )
             kind = api_int(model.GetType(), "fresh owned discard type")
-            require(
-                owned.title is None or title == owned.title,
+            event = self.staged_title_refresh(
+                key,
+                owned,
+                title,
+                kind,
+                path,
                 Verdict.RESTORATION,
-                f"owned discard title changed: {key}",
+                "discard",
+                unknown_pending_title=True,
             )
-            if owned.state is AcquisitionState.ADMITTED:
-                require(
-                    kind == owned.kind
-                    and (
-                        normalized(path) == normalized(owned.path)
-                        if owned.path is not None
-                        else path == ""
-                    ),
-                    Verdict.RESTORATION,
-                    f"owned discard path/type changed: {key}",
-                )
+            if event is not None:
+                staged.append(event)
             require(
                 all(
                     row["title"].casefold() != title.casefold()
@@ -1582,6 +1754,7 @@ class NativeProbe:
             Verdict.RESTORATION,
             "owned/unresolved acquisition unexpectedly absent before discard",
         )
+        self.commit_title_refreshes(staged)
         return frozen
 
     def reconcile_discard(

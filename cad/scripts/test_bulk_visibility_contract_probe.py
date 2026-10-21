@@ -637,6 +637,45 @@ class OfflineModel:
         return OfflineConfiguration()
 
 
+class OfflineSheet:
+    def __init__(self, drawing):
+        self.drawing = drawing
+
+    def SetName(self, name):
+        self.drawing.assert_live("SetName")
+        self.drawing.sheet = name
+        self.drawing.title = f"Draw - {name}"
+
+    def GetName(self):
+        return self.drawing.sheet
+
+
+class OfflineDrawing(OfflineModel):
+    """Sheet-qualified titles are simulated, not an observed native outcome."""
+
+    def __init__(self, path=""):
+        super().__init__("Draw - Sheet1", 3, path, readonly=False)
+        self.sheet = "Sheet1"
+
+    def GetSheetNames(self):
+        self.assert_live("GetSheetNames")
+        return (self.sheet,)
+
+    def GetViews(self):
+        self.assert_live("GetViews")
+        return ((object(),),)
+
+    def GetCurrentSheet(self):
+        self.assert_live("GetCurrentSheet")
+        return OfflineSheet(self)
+
+    def ActivateSheet(self, name):
+        self.assert_live("ActivateSheet")
+        self.sheet = name
+        self.title = f"Draw - {name}"
+        return True
+
+
 class OfflineModelHandle:
     """Wrapper generation tracks refresh; only its document controls liveness."""
 
@@ -663,6 +702,7 @@ class OfflineApplication:
         self.lookup_calls = []
         self.preference_calls = []
         self.new_calls = []
+        self.activation_calls = []
         self.preference_error = None
         self.ActiveDoc = None
         self.template = root / "assembly.asmdot"
@@ -737,6 +777,16 @@ class OfflineApplication:
         self.models.append(model)
         self.ActiveDoc = model
         return model
+
+    def ActivateDoc3(self, title, preferences, option, errors):
+        self.activation_calls.append((title, preferences, option, errors))
+        assert preferences is False and type(option) is int and option == 2
+        assert type(errors) is int and errors == 0
+        matches = [model for model in self.models if model.title == title]
+        if len(matches) != 1:
+            return None, 0
+        self.ActiveDoc = matches[0]
+        return self.fresh_handle(matches[0]), 0
 
     def CloseDoc(self, title):
         matches = [
@@ -1479,6 +1529,611 @@ def test_owned_discard_failure_is_not_automatically_retried_or_write_admitted(
         is probe.AcquisitionState.DISCARD_ATTEMPTED
     )
     assert subject.receipt.data["handoff_allowed"] is False
+
+
+def admit_offline_drawing(subject, *, saved=False):
+    path = subject.paths[probe.Document.DRAWING] if saved else ""
+    drawing = OfflineDrawing(path)
+    with subject.acquiring(probe.Document.DRAWING) as before:
+        subject.app.models.append(drawing)
+        subject.app.ActiveDoc = drawing
+        subject.acquired(probe.Document.DRAWING, drawing, before)
+        subject.claim(probe.Document.DRAWING, 3, path if saved else None)
+    return drawing
+
+
+def title_refreshes(subject):
+    return [
+        row for row in subject.receipt.data["ledger"] if row["event"] == "title_refresh"
+    ]
+
+
+def activation_receipt(subject):
+    return next(
+        row
+        for row in reversed(subject.receipt.data["ledger"])
+        if row["event"] == "activation"
+    )
+
+
+def test_sheet_title_refresh_activation_then_second_change_cleanup(tmp_path):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    owned = subject.documents[probe.Document.DRAWING]
+    admission = [
+        dict(row)
+        for row in subject.receipt.data["ledger"]
+        if row["event"] in ("acquired", "claim")
+    ]
+    generation, native = owned.generation, owned.native
+    drawing.GetCurrentSheet().SetName(probe.ViewId.A)
+    assert drawing.ActivateSheet(probe.ViewId.B) is True
+
+    assert subject.activate(probe.Document.DRAWING) is drawing
+
+    fresh = "Draw - BulkSentinel"
+    assert subject.app.activation_calls == [(fresh, False, 2, 0)]
+    assert owned.title == fresh and owned.native is native
+    assert owned.path is None and owned.kind == 3 and owned.generation == generation
+    assert owned.state is probe.AcquisitionState.ADMITTED
+    event = activation_receipt(subject)
+    assert event["cached_title"] == "Draw - Sheet1"
+    assert event["validated_title"] == fresh
+    assert event["arguments"] == [fresh, False, 2, 0]
+    assert event["pre_active"]["state"] is probe.ActiveObservation.OWNED
+    assert event["pre_active"]["documents"] == [probe.Document.DRAWING]
+    assert event["result_type"] == "tuple" and event["result_length"] == 2
+    assert event["result_repr"] == repr((drawing, 0))
+    assert event["component_types"] == ["OfflineDrawing", "int"]
+    assert event["status"] == 0 and event["returned_model_null"] is False
+    assert event["returned_native_is_same"] == 1
+    assert event["post_active"]["native_is_same"] == 1
+    assert event["state"] is probe.ActivationState.PASSED
+    subject.inventory()
+    assert len(title_refreshes(subject)) == 1
+    assert admission == [
+        row
+        for row in subject.receipt.data["ledger"]
+        if row["event"] in ("acquired", "claim")
+    ]
+    assert drawing.ActivateSheet(probe.ViewId.A) is True
+
+    with subject.stage_scope(probe.Stage.CLEANUP):
+        subject.cleanup()
+
+    assert subject.app.close_calls == ["Draw - BulkTarget"]
+    assert not subject.app.models and not subject.acquisitions
+    assert not subject.documents and subject.adapter.currentModel is None
+    assert not drawing.disconnected_accesses
+    assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+    refreshes = title_refreshes(subject)
+    assert [(row["cached_title"], row["fresh_title"]) for row in refreshes] == [
+        ("Draw - Sheet1", fresh),
+        (fresh, "Draw - BulkTarget"),
+    ]
+    assert all(
+        row["native_is_same"] == 1 and row["kind"] == 3 and row["path"] == ""
+        for row in refreshes
+    )
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["cleanup"]["status"] == "passed"
+    assert any(row["event"] == "activation" for row in persisted["ledger"])
+
+
+def test_direct_discard_refreshes_latest_unsaved_drawing_title(tmp_path):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+
+    subject.close(probe.Document.DRAWING)
+
+    assert subject.app.close_calls == ["Draw - BulkTarget"]
+    assert not subject.app.activation_calls and not subject.acquisitions
+    assert not drawing.disconnected_accesses
+    assert title_refreshes(subject)[0]["context"] == "discard"
+    attempt = next(
+        row
+        for row in subject.receipt.data["ledger"]
+        if row["event"] == "discard_attempt"
+    )
+    assert attempt["preclose_inventory"][probe.Document.DRAWING]["title"] == (
+        "Draw - BulkTarget"
+    )
+
+
+@pytest.mark.parametrize("active", ("null", "other_owned", "foreign"))
+def test_activation_records_pre_active_without_requiring_target_already_active(
+    tmp_path, active
+):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    subject.app.open_results.append((p, 0, 0))
+    subject.open_source(probe.Document.P)
+    if active == "other_owned":
+        q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+        subject.app.open_results.append((q, 0, 0))
+        subject.open_source(probe.Document.Q)
+    else:
+        subject.app.ActiveDoc = (
+            None if active == "null" else OfflineModel("Foreign", 1, "")
+        )
+
+    assert subject.activate(probe.Document.P) is p
+
+    assert subject.app.activation_calls == [("P", False, 2, 0)]
+    event = activation_receipt(subject)
+    assert (
+        event["pre_active"]["state"]
+        == {
+            "null": "null",
+            "other_owned": "owned",
+            "foreign": "foreign_or_ambiguous",
+        }[active]
+    )
+    assert event["post_active"]["native_is_same"] == 1
+    assert not title_refreshes(subject)
+
+
+@pytest.mark.parametrize("saved", (False, True))
+def test_unchanged_drawing_title_adds_no_refresh_event(tmp_path, saved):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject, saved=saved)
+    subject.activate(probe.Document.DRAWING)
+    subject.close(probe.Document.DRAWING)
+    assert subject.app.activation_calls == [("Draw - Sheet1", False, 2, 0)]
+    assert subject.app.close_calls == ["Draw - Sheet1"]
+    assert not title_refreshes(subject) and not drawing.disconnected_accesses
+
+
+@pytest.mark.parametrize(
+    "consumer", ("ownership_inventory", "discard_inventory", "activate", "close")
+)
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "replacement_old",
+        "replacement_new",
+        "unsupported_identity",
+        "disconnected_identity",
+        "saved_path",
+        "relative_path",
+        "wrong_kind",
+        "noninteger_kind",
+        "empty_title",
+        "nonstring_title",
+        "nonstring_path",
+        "title_error",
+        "path_error",
+        "kind_error",
+    ),
+)
+def test_drawing_title_refresh_refuses_identity_or_metadata_faults_atomically(
+    tmp_path, monkeypatch, consumer, fault
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    owned = subject.documents[probe.Document.DRAWING]
+    drawing.ActivateSheet(probe.ViewId.A)
+    original = OSError(f"unreadable {fault}")
+    if fault.startswith("replacement"):
+        replacement = OfflineDrawing()
+        if fault == "replacement_new":
+            replacement.ActivateSheet(probe.ViewId.A)
+        subject.app.models[:] = [replacement]
+        subject.app.ActiveDoc = replacement
+    elif fault == "unsupported_identity":
+        drawing.unsupported_identity = True
+    elif fault == "disconnected_identity":
+        drawing.live = False
+    elif fault in ("saved_path", "relative_path"):
+        drawing.path = str(tmp_path / "saved.slddrw") if fault == "saved_path" else "x"
+    elif fault in ("wrong_kind", "noninteger_kind"):
+        drawing.kind = 2 if fault == "wrong_kind" else 3.0
+    elif fault in ("empty_title", "nonstring_title"):
+        drawing.title = "" if fault == "empty_title" else None
+    elif fault == "nonstring_path":
+        drawing.path = None
+    else:
+        member = {
+            "title_error": "GetTitle",
+            "path_error": "GetPathName",
+            "kind_error": "GetType",
+        }[fault]
+
+        def unreadable():
+            raise original
+
+        monkeypatch.setattr(drawing, member, unreadable)
+
+    with pytest.raises((probe.ProbeFailure, OSError, RuntimeError)) as caught:
+        if consumer in ("activate", "close"):
+            getattr(subject, consumer)(probe.Document.DRAWING)
+        else:
+            getattr(subject, consumer)()
+
+    if fault.endswith("_error"):
+        assert caught.value is original
+    assert owned.title == "Draw - Sheet1" and owned.native is drawing
+    assert owned.state is probe.AcquisitionState.ADMITTED
+    assert owned.path is None and owned.kind == 3 and owned.generation == 1
+    assert not title_refreshes(subject)
+    assert not subject.app.close_calls and not subject.app.activation_calls
+
+
+@pytest.mark.parametrize("consumer", ("ownership_inventory", "discard_inventory"))
+@pytest.mark.parametrize("reverse", (False, True))
+@pytest.mark.parametrize(
+    "fault",
+    ("foreign", "foreign_same_title", "duplicate", "missing", "path", "collision"),
+)
+def test_late_inventory_failure_rolls_back_every_staged_title(
+    tmp_path, consumer, reverse, fault
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    subject.app.open_results.append((p, 0, 0))
+    subject.open_source(probe.Document.P)
+    owned = subject.documents[probe.Document.DRAWING]
+    drawing.ActivateSheet(probe.ViewId.A)
+    if fault in ("foreign", "foreign_same_title"):
+        subject.app.models.append(
+            OfflineModel(
+                drawing.title if fault == "foreign_same_title" else "Foreign", 1, ""
+            )
+        )
+    elif fault == "duplicate":
+        subject.app.models.append(p)
+    elif fault == "missing":
+        subject.app.models.remove(p)
+    elif fault == "path":
+        p.path = str(tmp_path / "drift.sldprt")
+    else:
+        # Change the cached part title too, so its own immutable-title guard
+        # passes and the whole-inventory fresh-name collision is decisive.
+        p.title = drawing.title.swapcase()
+        subject.documents[probe.Document.P].title = p.title
+    if reverse:
+        subject.app.models.reverse()
+    handles = {key: owner.native for key, owner in subject.acquisitions.items()}
+
+    with pytest.raises(probe.ProbeFailure):
+        getattr(subject, consumer)()
+
+    assert owned.title == "Draw - Sheet1"
+    assert all(
+        subject.acquisitions[key].native is handle for key, handle in handles.items()
+    )
+    assert not title_refreshes(subject)
+    assert not subject.app.close_calls and not subject.app.activation_calls
+
+
+@pytest.mark.parametrize("consumer", ("ownership_inventory", "discard_inventory"))
+def test_saved_drawing_title_is_still_immutable(tmp_path, consumer):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject, saved=True)
+    drawing.ActivateSheet(probe.ViewId.A)
+    with pytest.raises(probe.ProbeFailure, match="title changed"):
+        getattr(subject, consumer)()
+    assert subject.documents[probe.Document.DRAWING].title == "Draw - Sheet1"
+    assert not title_refreshes(subject) and not subject.app.close_calls
+
+
+@pytest.mark.parametrize(
+    "state",
+    (
+        probe.AcquisitionState.PENDING,
+        probe.AcquisitionState.UNRESOLVED,
+        probe.AcquisitionState.DISCARD_ATTEMPTED,
+    ),
+)
+def test_nonadmitted_drawing_never_refreshes_or_activates(tmp_path, state):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    owned = subject.documents.pop(probe.Document.DRAWING)
+    owned.state = state
+    drawing.ActivateSheet(probe.ViewId.A)
+    if state is not probe.AcquisitionState.PENDING:
+        owned.native = None
+        drawing.live = False
+    for operation in (
+        subject.ownership_inventory,
+        subject.discard_inventory,
+        lambda: subject.activate(probe.Document.DRAWING),
+        lambda: subject.close(probe.Document.DRAWING),
+    ):
+        with pytest.raises(probe.ProbeFailure):
+            operation()
+    assert owned.title == "Draw - Sheet1"
+    assert not drawing.disconnected_accesses
+    assert not title_refreshes(subject)
+    assert not subject.app.close_calls and not subject.app.activation_calls
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "null",
+        "status",
+        "boolean_status",
+        "float_status",
+        "malformed",
+        "wrong_return",
+        "wrong_active",
+        "null_active",
+        "call_error",
+        "pre_error",
+        "post_error",
+    ),
+)
+def test_activation_failure_retains_partial_receipt_and_never_retries(
+    tmp_path, monkeypatch, fault
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+    original = OSError(f"activation {fault}")
+    foreign = OfflineModel("Foreign", 1, "")
+    activate = subject.app.ActivateDoc3
+    active_get = type(subject.app).ActiveDoc.fget
+    reads = []
+    captured_result = []
+
+    def active_read(app):
+        reads.append("read")
+        if fault == "pre_error" or fault == "post_error" and len(reads) == 2:
+            raise original
+        return active_get(app)
+
+    def failing_activation(*args):
+        result = activate(*args)
+        if fault == "call_error":
+            raise original
+        if fault in ("wrong_active", "null_active"):
+            subject.app.ActiveDoc = foreign if fault == "wrong_active" else None
+        result = {
+            "null": (None, 0),
+            "status": (drawing, 1),
+            "boolean_status": (drawing, False),
+            "float_status": (drawing, 0.0),
+            "malformed": [drawing, 0],
+            "wrong_return": (foreign, 0),
+        }.get(fault, result)
+        captured_result.append(result)
+        return result
+
+    monkeypatch.setattr(
+        OfflineApplication,
+        "ActiveDoc",
+        property(active_read, type(subject.app).ActiveDoc.fset),
+    )
+    monkeypatch.setattr(subject.app, "ActivateDoc3", failing_activation)
+
+    with pytest.raises((probe.ProbeFailure, OSError)) as caught:
+        subject.activate(probe.Document.DRAWING)
+
+    if fault.endswith("_error"):
+        assert caught.value is original
+    event = activation_receipt(subject)
+    assert event["state"] is probe.ActivationState.FAILED
+    assert event["cached_title"] == "Draw - Sheet1"
+    assert event["validated_title"] == "Draw - BulkTarget"
+    assert event["error"]["message"] == str(caught.value)
+    assert len(subject.app.activation_calls) == (0 if fault == "pre_error" else 1)
+    assert not subject.app.close_calls
+    assert subject.adapter.currentModel is None
+    if captured_result:
+        assert event["result_repr"] == repr(captured_result[0])
+        assert event["result_type"] == type(captured_result[0]).__name__
+    if fault == "pre_error":
+        assert event["pre_active"]["state"] is probe.ActiveObservation.ERROR
+    if fault == "post_error":
+        assert event["post_active"]["state"] is probe.ActiveObservation.ERROR
+    if fault in (
+        "pre_error",
+        "call_error",
+        "null",
+        "status",
+        "boolean_status",
+        "float_status",
+        "malformed",
+        "wrong_return",
+    ):
+        assert event["post_active"]["state"] is probe.ActiveObservation.NOT_OBSERVED
+
+
+def test_activation_observation_identity_error_refuses_before_native_mutation(
+    tmp_path, monkeypatch
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+    foreign = OfflineModel("ForeignActive", 1, "")
+    subject.app.ActiveDoc = foreign
+    original = OSError("pre-active identity read failed")
+    same = subject.same
+
+    def unreadable_identity(left, right):
+        if left is foreign:
+            raise original
+        return same(left, right)
+
+    monkeypatch.setattr(subject, "same", unreadable_identity)
+    with pytest.raises(OSError) as caught:
+        subject.activate(probe.Document.DRAWING)
+    assert caught.value is original
+    assert not subject.app.activation_calls
+    event = activation_receipt(subject)
+    assert event["pre_active"]["state"] is probe.ActiveObservation.ERROR
+    assert event["post_active"]["state"] is probe.ActiveObservation.NOT_OBSERVED
+    assert event["error"]["message"] == str(original)
+
+
+def test_activation_native_error_remains_primary_through_actual_owned_cleanup(
+    tmp_path, monkeypatch
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+    original = OSError("native activation threw")
+    activate = subject.app.ActivateDoc3
+
+    def throwing_activation(*args):
+        activate(*args)
+        raise original
+
+    monkeypatch.setattr(subject.app, "ActivateDoc3", throwing_activation)
+    assert (
+        capture_and_cleanup_failure(
+            subject, lambda: subject.activate(probe.Document.DRAWING)
+        )
+        is original
+    )
+    assert subject.receipt.primary is original
+    assert subject.app.activation_calls == [("Draw - BulkTarget", False, 2, 0)]
+    assert subject.app.close_calls == ["Draw - BulkTarget"]
+    assert not drawing.disconnected_accesses
+    assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(original)
+    event = next(row for row in persisted["ledger"] if row["event"] == "activation")
+    assert event["failed_at"] == "calling" and event["state"] == "failed"
+    assert event["post_active"]["state"] == "not_observed"
+
+
+def test_closed_renamed_drawing_is_never_activated_or_closed_again(tmp_path):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+    subject.close(probe.Document.DRAWING)
+    identity_count = len(subject.app.identity_calls)
+
+    with pytest.raises(probe.ProbeFailure, match="not admitted"):
+        subject.activate(probe.Document.DRAWING)
+    subject.close(probe.Document.DRAWING)
+
+    assert subject.app.close_calls == ["Draw - BulkTarget"]
+    assert not subject.app.activation_calls
+    assert len(subject.app.identity_calls) == identity_count
+    assert not drawing.disconnected_accesses
+
+
+def test_invalidated_admitted_drawing_refuses_before_activation_or_identity_calls(
+    tmp_path,
+):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    owned = subject.documents[probe.Document.DRAWING]
+    owned.native = None
+    drawing.live = False
+    identity_count = len(subject.app.identity_calls)
+
+    with pytest.raises(probe.ProbeFailure, match="handle invalidated"):
+        subject.activate(probe.Document.DRAWING)
+    with pytest.raises(probe.ProbeFailure, match="discard held"):
+        subject.close(probe.Document.DRAWING)
+
+    assert not subject.app.activation_calls and not subject.app.close_calls
+    assert len(subject.app.identity_calls) == identity_count
+    assert not drawing.disconnected_accesses
+    assert owned.title == "Draw - Sheet1" and not title_refreshes(subject)
+    assert activation_receipt(subject)["state"] is probe.ActivationState.FAILED
+
+
+@pytest.mark.parametrize("label", (probe.Document.P, probe.Document.N_AUTHOR))
+def test_part_and_assembly_activation_keep_existing_route_without_inventory_walk(
+    tmp_path, monkeypatch, assembly_template, label
+):
+    subject = OfflineProbe(tmp_path)
+    if label is probe.Document.P:
+        model = OfflineModel("Part", 1, subject.paths[label])
+        subject.app.open_results.append((model, 0, 0))
+        subject.open_source(label)
+    else:
+        model = OfflineModel("Assembly", 2, "", readonly=False)
+        subject.app.new_results.append(model)
+        subject.new_assembly(label)
+
+    def no_inventory():
+        raise AssertionError("part/assembly activation added a full inventory walk")
+
+    monkeypatch.setattr(subject.app, "GetDocuments", no_inventory)
+    assert subject.activate(label) is model
+    assert subject.app.activation_calls == [(model.title, False, 2, 0)]
+    assert activation_receipt(subject)["state"] is probe.ActivationState.PASSED
+    assert not title_refreshes(subject)
+
+
+@pytest.mark.parametrize("consumer", ("ownership_inventory", "discard_inventory"))
+@pytest.mark.parametrize(
+    "label", tuple(key for key in probe.Document if key is not probe.Document.DRAWING)
+)
+def test_nondrawing_titles_remain_immutable(tmp_path, consumer, label):
+    subject = OfflineProbe(tmp_path)
+    # This isolates the admitted-owner metadata contract, not source geometry.
+    kind = 1 if label in (probe.Document.P, probe.Document.Q) else 2
+    path = (
+        None
+        if label in (probe.Document.N_AUTHOR, probe.Document.R_AUTHOR)
+        else subject.paths[label]
+    )
+    model = OfflineModel("Original", kind, path if path is not None else "")
+    owned = probe.OwnedDocument(
+        model, "Original", path, kind, 1, probe.AcquisitionState.ADMITTED
+    )
+    subject.acquisitions[label] = subject.documents[label] = owned
+    subject.app.models.append(model)
+    subject.app.ActiveDoc = model
+    model.title = "Changed"
+
+    with pytest.raises(probe.ProbeFailure, match="title changed"):
+        getattr(subject, consumer)()
+
+    assert owned.title == "Original" and owned.native is model
+    assert not title_refreshes(subject) and not subject.app.close_calls
+
+
+def test_pending_other_owner_blocks_activation_refresh_before_commit(tmp_path):
+    subject = OfflineProbe(tmp_path)
+    drawing = admit_offline_drawing(subject)
+    drawing.ActivateSheet(probe.ViewId.A)
+    pending = OfflineModel("Pending", 1, "")
+    subject.app.models.append(pending)
+    subject.acquisitions[probe.Document.P] = probe.OwnedDocument(
+        pending, "Pending", None, None, 1, probe.AcquisitionState.PENDING
+    )
+
+    with pytest.raises(probe.ProbeFailure, match="pending/unresolved"):
+        subject.activate(probe.Document.DRAWING)
+
+    assert subject.documents[probe.Document.DRAWING].title == "Draw - Sheet1"
+    assert not title_refreshes(subject) and not subject.app.activation_calls
+    assert activation_receipt(subject)["pre_active"]["state"] is (
+        probe.ActiveObservation.NOT_OBSERVED
+    )
+
+
+def test_prior_failure_remains_primary_when_drawing_replacement_blocks_cleanup(
+    tmp_path,
+):
+    subject = OfflineProbe(tmp_path)
+    original = OSError("original construction failure")
+    drawing = admit_offline_drawing(subject)
+    replacement = OfflineDrawing()
+    replacement.ActivateSheet(probe.ViewId.A)
+    subject.app.models[:] = [replacement]
+    subject.app.ActiveDoc = replacement
+
+    def action():
+        raise original
+
+    assert capture_and_cleanup_failure(subject, action) is original
+    assert subject.receipt.primary is original
+    assert subject.receipt.data["secondary_errors"]
+    assert subject.acquisitions[probe.Document.DRAWING].native is drawing
+    assert subject.acquisitions[probe.Document.DRAWING].title == "Draw - Sheet1"
+    assert not subject.app.close_calls and not subject.app.activation_calls
+    assert not title_refreshes(subject)
 
 
 @pytest.mark.parametrize("changed", ("title", "path", "kind"))
