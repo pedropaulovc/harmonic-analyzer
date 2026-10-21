@@ -10,6 +10,8 @@ The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 The sheet remains deliberately plain: no datums, feature-control frames or
 roughness symbols.  Every controlling value is imported from the part; matched
 arm/hub and seam-pin operations are stated on their receiving feature/note.
+The pivot callout uses a single near-rim arrow, so its leader stops before the
+hole centre and does not cross the concentric end-radius leader.
 
 Run with SolidWorks open::
 
@@ -483,6 +485,23 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _omit_title_block_thread_class(pivot_callout)
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
+    pivot_annotation = _early_bound(pivot_callout, "IDisplayDimension").GetAnnotation()
+    set_near_side_diameter(pivot_annotation, "handle pivot tap")
+    rebuild_drawing(adapter, label="handle pivot near-side leader")
+    pivot_keep_out = _HANDLE_PIVOT_HOLE_DIA * SHEET_SCALE[0] / 4000.0
+    assert_leaders_clear(
+        {
+            "HandlePivotTap": dimension_segments(pivot_annotation),
+            "EndRadius": dimension_segments(_named(adapter, front_annotations, "EndRadius")),
+        },
+        centre=(_sheet_x(ARM_C2C), FRONT_CENTER[1]),
+        keep_out={"HandlePivotTap": pivot_keep_out},
+        lands_within={
+            "HandlePivotTap": (pivot_keep_out, 3.0 * pivot_keep_out),
+            "EndRadius": BOSS_RADIUS_LANDING,
+        },
+        label="crank arm handle pivot",
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
