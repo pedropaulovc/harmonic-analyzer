@@ -722,8 +722,10 @@ def test_relative_locations_use_actual_wizard_points(monkeypatch, mode) -> None:
             part._tap_placement_points(adapter)
 
 
+@pytest.mark.parametrize("point_type", (11, 25))
+@pytest.mark.parametrize("attached_point_type", (11, 25))
 @pytest.mark.parametrize("mode", ("measured", "reversed-attachments", "segment-dispatch-proxy", "missing", "arc-refused", "no-arc", "two-arcs", "wrong-value", "coordinate-copy", "dangling", "unknown-dangling", "wrong-circle-owner", "wrong-circle-type", "wrong-circle-id", "wrong-attachment-types", "extra-attachment"))
-def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circle(monkeypatch, mode) -> None:
+def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circle(monkeypatch, mode, point_type, attached_point_type) -> None:
     point, circle, copy = object(), _native_sketch_segment(kind=1), object()
     selections = []
     picks = []
@@ -734,7 +736,7 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
         identifiers=(2, 1) if mode == "wrong-circle-id" else (1, 2),
     ) if mode in ("segment-dispatch-proxy", "wrong-circle-owner", "wrong-circle-type", "wrong-circle-id") else circle
     attached = (copy if mode == "coordinate-copy" else point, attached_circle)
-    types = (11, 11) if mode == "wrong-attachment-types" else (11, 10)
+    types = (11, 11) if mode == "wrong-attachment-types" else (attached_point_type, 10)
     if mode == "reversed-attachments":
         attached, types = attached[::-1], types[::-1]
     if mode == "extra-attachment":
@@ -767,7 +769,7 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
     manager = SimpleNamespace(
         GetSelectedObjectCount2=lambda _mark: len(selections),
         GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
-        GetSelectedObjectType3=lambda index, _mark: (11, 10)[index - 1],
+        GetSelectedObjectType3=lambda index, _mark: (point_type, 10)[index - 1],
     )
     model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None, SelectionManager=manager, FeatureManager=_native_inventory(circle, attached_circle))
     adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=_native_same))
@@ -783,8 +785,9 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
             part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
 
 
+@pytest.mark.parametrize("point_type", (11, 25))
 @pytest.mark.parametrize("mode", ("retained", "bad-radius", "wrong-count", "wrong-circle", "set-refused", "stale-pick", "unavailable-pick", "bad-transform"))
-def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkeypatch, mode) -> None:
+def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkeypatch, mode, point_type) -> None:
     from solidworks_mcp.adapters import com_variant
     import _telemetry
 
@@ -819,7 +822,7 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
     manager = SimpleNamespace(
         GetSelectedObjectCount2=lambda _mark: 1 if mode == "wrong-count" else 2,
         GetSelectedObject6=lambda index, _mark: point if index == 1 else object() if mode == "wrong-circle" else circle,
-        GetSelectedObjectType3=lambda index, _mark: (11, 10)[index - 1],
+        GetSelectedObjectType3=lambda index, _mark: (point_type, 10)[index - 1],
         SetSelectionPoint2=set_point,
         GetSelectionPointInSketchSpace2=lambda _index, _mark: None if mode == "unavailable-pick" else (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
     )
@@ -847,8 +850,9 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
         assert "retained_sketch=" in message
 
 
+@pytest.mark.parametrize("point_type", (11, 25))
 @pytest.mark.parametrize("mode", ("retained", "different-segment-dispatch", "unknown-segment-dispatch", "unknown-segment-self", "one-selected", "missing-object", "wrong-point", "unknown-point", "unknown-point-self", "wrong-selection-type", "wrong-owner", "wrong-kind", "wrong-id", "unknown-owner", "invalid-id"))
-def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch, mode) -> None:
+def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch, mode, point_type) -> None:
     import _telemetry
 
     point, circle = object(), _native_sketch_segment(kind=1)
@@ -861,7 +865,7 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
     if mode == "unknown-owner":
         returned_circle.GetSketch = lambda: None
     selected = (point,) if mode == "one-selected" else (selected_point, None if mode == "missing-object" else returned_circle)
-    selected_types = (11, 2 if mode == "wrong-selection-type" else 10)[:len(selected)]
+    selected_types = (point_type, 2 if mode == "wrong-selection-type" else 10)[:len(selected)]
     events = []
 
     def same(left, right):
@@ -941,8 +945,9 @@ def test_native_segment_identity_requires_complete_documented_key(monkeypatch, m
             part._segment_identity(adapter, segment, stage="key-control", role="selected")
 
 
+@pytest.mark.parametrize("point_type", (11, 25))
 @pytest.mark.parametrize("mode", ("native-proxy", "wrong-point", "wrong-circle-id", "dangling", "unknown-dangling", "missing-attachment", "wrong-value", "wrong-band", "wrong-end"))
-def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end(monkeypatch, mode) -> None:
+def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end(monkeypatch, mode, point_type) -> None:
     source_circle, point = object(), object()
     circle = _native_sketch_segment(owner="LeverBoreLocationProfile", kind=1)
     circle.GetRadius = lambda: spec.LEVER_BORE_DIA / 2000.0
@@ -956,7 +961,7 @@ def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end
         attached = (point,)
     annotation = SimpleNamespace(
         GetAttachedEntities3=lambda: attached,
-        GetAttachedEntityTypes=lambda: (11, 10)[:len(attached)],
+        GetAttachedEntityTypes=lambda: (point_type, 10)[:len(attached)],
         IsDangling=lambda: None if mode == "unknown-dangling" else mode == "dangling",
     )
     display = SimpleNamespace(ShowParenthesis=False, GetAnnotation=lambda: annotation)
@@ -1112,8 +1117,9 @@ def test_segment_owner_inventory_is_refreshed_after_rename_and_rebuild(monkeypat
     assert calls == [False, False, False]
 
 
+@pytest.mark.parametrize("point_type", (11, 25))
 @pytest.mark.parametrize("mode", ("retained", "wrong-point", "bad-point-self", "wrong-owner", "unavailable-readback"))
-def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode) -> None:
+def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode, point_type) -> None:
     import _telemetry
 
     point = object()
@@ -1131,7 +1137,7 @@ def test_attachment_failures_report_actual_native_state_before_raising(monkeypat
             return -1
         return _native_same(left, right)
 
-    annotation = SimpleNamespace(GetAttachedEntities3=entities, GetAttachedEntityTypes=lambda: (10, 11), IsDangling=lambda: False)
+    annotation = SimpleNamespace(GetAttachedEntities3=entities, GetAttachedEntityTypes=lambda: (10, point_type), IsDangling=lambda: False)
     display = SimpleNamespace(GetAnnotation=lambda: annotation)
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(FeatureManager=_native_inventory(circle, attached_circle)),
@@ -1152,7 +1158,51 @@ def test_attachment_failures_report_actual_native_state_before_raising(monkeypat
         assert "readback unavailable" in fields["attachment_readback_error"]
     else:
         assert fields["attachment_count"] == 2
-        assert fields["attached_types"] == (10, 11)
+        assert fields["attached_types"] == (10, point_type)
         assert fields["expected_segment_identity"] == repr(("ActualLocationProfile", 1, 1, 2))
     if mode == "wrong-owner":
         assert fields["attached_segment_identity"] == repr(("OtherProfile", 1, 1, 2))
+
+
+@pytest.mark.parametrize("types", (
+    (0, 10), (1, 10), (3, 10), (6, 10), (9, 10), (10, 10), (24, 10),
+    (-1, 10), (11, 24), (25, 24), (11, 25), (25, 25), (10, 11),
+))
+def test_location_selection_rejects_other_entity_kinds_even_when_identity_matches(monkeypatch, types) -> None:
+    point, circle = object(), _native_sketch_segment(kind=1)
+    selected = (point, circle)
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: 2,
+        GetSelectedObject6=lambda index, _mark: selected[index - 1],
+        GetSelectedObjectType3=lambda index, _mark: types[index - 1],
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(SelectionManager=manager, FeatureManager=_native_inventory(circle)),
+        swApp=SimpleNamespace(IsSame=_native_same),
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    with pytest.raises(RuntimeError, match="selection types"):
+        part._require_location_selection(adapter, circle, point=point, stage="wrong-native-kinds")
+
+
+@pytest.mark.parametrize("types", (
+    (), (25,), (25, 10, 11), (0, 10), (3, 10), (6, 10), (9, 10),
+    (24, 10), (-1, 10), (11, 24), (25, 24), (11, 25), (25, 25), (10, 10),
+))
+def test_attachment_types_require_exactly_one_documented_point_and_converted_segment(monkeypatch, types) -> None:
+    point, circle = object(), _native_sketch_segment(kind=1)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: (point, circle),
+        GetAttachedEntityTypes=lambda: types,
+        IsDangling=lambda: False,
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureManager=_native_inventory(circle)),
+        swApp=SimpleNamespace(IsSame=_native_same),
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    with pytest.raises(RuntimeError, match="invalid native point/circle attachments"):
+        part._assert_relative_attachment(
+            adapter, SimpleNamespace(GetAnnotation=lambda: annotation), point, circle,
+            name="TapToBoreRim", stage="wrong-native-kinds",
+        )

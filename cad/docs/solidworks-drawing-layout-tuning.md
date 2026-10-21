@@ -1601,6 +1601,13 @@ raw codes, actual/expected keys and retained native pick coordinates by stage.
 Do not substitute coordinate equality, a new witness copy, or a fixed number.
 The original null dimension creation still requires native proof.
 
+The actual Wizard entry point is external to the active bore witness sketch:
+native selection reports `swSelEXTSKETCHPOINTS=25`, still an `ISketchPoint`.
+Accept only the documented internal/external point kinds, retaining exact
+Wizard-point identity and the circle's owner/type/ID guard. Annotation
+attachment types use the same `swSelectType_e` enum; do not assume every actual
+sketch-point attachment is type11. Type25 alone does not prove the right point.
+
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
 own an across-flats acceptance band. Attach the height precision's functional
@@ -1614,6 +1621,22 @@ then bind the matching concrete string interface for `String`. Merely wrapping
 a returned variable as the declared base `ICalloutVariable` can invoke an
 incompatible DISPID. Preserve the native2B value before and after print-only
 class removal; the drawing's title block does not change the model fit.
+
+For a drawing-only cosmetic-thread `INote`, preserve the portable source text
+but send a native CRLF payload and compare its literal readback. The observed
+native setter retains CRLF even when sent LF; this is a line-ending boundary,
+not permission to collapse spaces, blank lines or changed thread/mate text.
+Read every independent post-state field before refusal, with per-reader errors
+and precise indexed identity-call labels. Keep owner/attachment/dangling checks.
+
+Cut-only section display can retain a whole-model native view outline, not just
+the visible mouth slice. Place the complete measured outline after rotation,
+preserving3:1 and the real cut; verify it again after annotation rebuilds.
+Use actual text runs and the linked caption's six-value extent for layout,
+and retain unproved automatic centre marks as measured line obstacles. Wrap
+qualifiers without changing words, dimensions or bands. Native export/audit
+success alone does not prove border/title-block clearance or readable ink:
+inspect the exact final PNG/PDF before calling the sheet SHIP.
 
 Keep nominal model travel separate from published operating capacity. The
 accepted shortest rod and longest thread move nominal runout X149.50 to

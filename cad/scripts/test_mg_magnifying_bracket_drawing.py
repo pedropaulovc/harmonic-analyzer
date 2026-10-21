@@ -6,6 +6,7 @@ import asyncio
 import itertools
 import math
 from types import SimpleNamespace
+import copy
 
 import pytest
 
@@ -15,7 +16,7 @@ import magnifying_bracket_joint_layout as mounting
 import mg_lever_thread_joint as joint
 import mg_magnifying_bracket_spec as spec
 from _drawing_edges import ViewEdge, ViewEdges
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_layout_check import DrawableRegion, LeaderSegment, find_leader_leader_crossings
 from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _printed_tolerance import printed_band_mm
 
@@ -226,7 +227,7 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
             annotations.append(SimpleNamespace(GetSpecificAnnotation=lambda display=display: display))
         return annotations
 
-    def mouth_section(_adapter, parent):
+    def mouth_section(_adapter, parent, _iso):
         assert parent == "*Right"
         imported["section A-A"] = set()
         return "section A-A"
@@ -253,9 +254,9 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
     expected = {
         "NeckThickness": ("*Top", spec.NECK_THICKNESS_CALLOUT),
         "FlangeDepth": ("*Top", spec.FLANGE_DEPTH_CALLOUT),
-        "RootR": ("*Top", spec.ROOT_CALLOUT),
+        "RootR": ("*Top", drawing.ROOT_PRINT_CALLOUT),
         "FootCornerR": ("*Front", spec.FOOT_CORNER_CALLOUT),
-        "MouthChamfer": ("section A-A", spec.MOUTH_CALLOUT),
+        "MouthChamfer": ("section A-A", drawing.MOUTH_PRINT_CALLOUT),
         "ThreadRootEnvelope": ("*Right", spec.THREAD_ENVELOPE_CALLOUT),
     }
     actual = {
@@ -263,55 +264,381 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
         for name, display in displays.items() if display.text
     }
     assert actual == expected
+    assert " ".join(displays["RootR"].text[4].split()) == " ".join(spec.ROOT_CALLOUT.split())
+    assert " ".join(displays["MouthChamfer"].text[4].split()) == " ".join(spec.MOUTH_CALLOUT.split())
     assert set(displays) == set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
-@pytest.mark.parametrize("fault", (None, "uncut_geometry", "end_on"))
-def test_mouth_section_shows_both_chamfer_legs_on_the_axis_plane(monkeypatch, fault) -> None:
-    """The real section recipe must cut Z=0 and preserve axial/radial lengths."""
+# R8 native GetOutline, 3:1, before any recipe repair. Its full-model box is
+# much taller than the actual Z=0 cut. Keep both, rather than inventing a
+# tiny outline around the visible mouth and thereby hiding the original bug.
+_R8_SECTION_OUTLINE = (0.203362, 0.000537, 0.252638, 0.159463)
+_R8_ISO_OUTLINE = (0.3169855, 0.1059865, 0.3830145, 0.1540135)
+_R8_REGION = DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667)
+
+
+class _MouthSection:
+    def __init__(self, *, fault=None, angle=0.0, extra_width=0.0):
+        self.fault = fault
+        self.Position = (0.228, 0.080)
+        self.Angle = angle
+        self.extra_width = extra_width
+        self.cut_only = False
+        self.notes = []
+        self.marks = []
+        self.moves = []
+
+    def turn(self, point):
+        c, s = math.cos(self.Angle), math.sin(self.Angle)
+        return (c * point[0] - s * point[1], s * point[0] + c * point[1])
+
+    def GetOutline(self):
+        points = [
+            self.turn((x - 0.228, y - 0.080))
+            for x in (_R8_SECTION_OUTLINE[0] - self.extra_width, _R8_SECTION_OUTLINE[2] + self.extra_width)
+            for y in (_R8_SECTION_OUTLINE[1], _R8_SECTION_OUTLINE[3])
+        ]
+        return (
+            self.Position[0] + min(p[0] for p in points), self.Position[1] + min(p[1] for p in points),
+            self.Position[0] + max(p[0] for p in points), self.Position[1] + max(p[1] for p in points),
+        )
+
+    def project(self, point):
+        x, y, _z = point
+        # The R8 mouth's visible ends were Y6.125/43.625; the origin is
+        # therefore Y24.875, 55.125 mm below the whole-model outline centre.
+        dx, dy = self.turn((-3.0 * y, (0.0 if self.fault == "end_on" else 3.0 * x) - 0.055125))
+        return self.Position[0] + dx, self.Position[1] + dy
+
+    def SetViewPosition(self, position, move_children):
+        assert move_children is False
+        self.moves.append(tuple(position))
+        if self.fault == "move_refused":
+            return False
+        if self.fault != "move_ignored":
+            self.Position = (self.Position[0] if self.fault == "still_aligned" else position[0], position[1])
+        return True
+
+    def GetSection(self):
+        return self
+
+    def SetDisplayOnlySurfaceCut(self, value):
+        if self.fault != "uncut_geometry":
+            self.cut_only = value
+        # Native void; no success Boolean.
+
+    def GetDisplayOnlySurfaceCut(self):
+        return self.cut_only
+
+    def GetNotes(self):
+        return self.notes
+
+    def GetAnnotationsByType(self, kind):
+        assert kind == 13
+        return self.marks
+
+
+def _mouth_layout_fixture(monkeypatch, *, fault=None, angle=0.0, extra_width=0.0):
     parent = object()
-    state = SimpleNamespace(cut_only=False)
-
-    def set_cut_only(value):
-        if fault != "uncut_geometry":
-            state.cut_only = value
-        # Native SetDisplayOnlySurfaceCut returns void, not a success boolean.
-
-    definition = SimpleNamespace(
-        SetDisplayOnlySurfaceCut=set_cut_only,
-        GetDisplayOnlySurfaceCut=lambda: state.cut_only,
-    )
-    section = SimpleNamespace(GetSection=lambda: definition)
+    section = _MouthSection(fault=fault, angle=angle, extra_width=extra_width)
+    iso = SimpleNamespace(GetOutline=lambda: _R8_ISO_OUTLINE)
+    adapter = SimpleNamespace()
 
     def project(_adapter, view, point, *, label):
-        x, y, z = point
         if view is parent:
-            return -y, -z
+            return -point[1], -point[2]
         assert view is section
-        scale = drawing.MOUTH_SECTION_SCALE[0] / drawing.MOUTH_SECTION_SCALE[1]
-        return (0.0 if fault == "end_on" else scale * x), scale * y
+        return section.project(point)
 
     def create(_adapter, view, *, line_start, line_end, **kwargs):
         assert view is parent
-        # The end view's projected horizontal cut is the model XY plane:
-        # both endpoints have Z=0, and it spans beyond both neck sides.
         extent = (joint.NOSE_R + 3.0) / 1000.0
         assert line_start == pytest.approx((-extent, 0.0))
         assert line_end == pytest.approx((extent, 0.0))
-        assert kwargs["scale"] == drawing.MOUTH_SECTION_SCALE
+        assert kwargs["scale"] == (3, 1)
         return section
 
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "create_section_view", create)
-    for name in ("set_hidden_lines_removed", "rebuild_drawing", "position_section_caption"):
+    monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
+    for name in ("set_hidden_lines_removed", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
-    if fault is None:
-        assert drawing._mouth_section(object(), parent) is section
-        assert state.cut_only is True
+    return adapter, parent, section, iso
+
+
+@pytest.mark.parametrize("angle, extra_width", ((0.0, 0.0), (0.37, 0.0001), (-1.1, -0.0002)))
+def test_section_rotates_and_fits_real_native_extent_without_rescaling_or_cropping(monkeypatch, angle, extra_width):
+    adapter, parent, section, iso = _mouth_layout_fixture(monkeypatch, angle=angle, extra_width=extra_width)
+    assert _R8_SECTION_OUTLINE[1] < _R8_REGION.ymin  # Frozen failure control.
+    assert drawing._mouth_section(adapter, parent, iso) is section
+    outline = Box(*section.GetOutline())
+    assert outline.escape(_R8_REGION) is None
+    assert outline.ymin - _R8_ISO_OUTLINE[3] >= 0.003
+    assert outline.xmin > 0.250 and outline.ymax < 0.207
+    assert outline.width == pytest.approx(0.158926)
+    assert outline.height == pytest.approx(0.049276 + 2 * extra_width)
+    origin = section.project((0.0, 0.0, 0.0))
+    assert origin[0] > outline.center()[0]
+    for point in ((0.01, 0.0, 0.0), (0.0, 0.01, 0.0)):
+        assert math.dist(origin, section.project(point)) == pytest.approx(0.030)
+    profile = Box(*drawing._mouth_profile_box(adapter, section))
+    assert profile.escape(_R8_REGION) is None
+    assert profile.width == pytest.approx(3.0 * joint.NECK_THICKNESS / 1000.0)
+    assert profile.height == pytest.approx(6.0 * joint.NOSE_R / 1000.0)
+    assert section.cut_only and len(section.moves) == 1
+
+
+@pytest.mark.parametrize("fault, message", (
+    ("uncut_geometry", "geometry beyond the cutting plane"),
+    ("end_on", "both chamfer legs in true profile"),
+    ("move_refused", "refused its measured placement"),
+    ("move_ignored", "placement/alignment did not persist"),
+    ("still_aligned", "placement/alignment did not persist"),
+))
+def test_section_refuses_native_display_projection_and_alignment_failures(monkeypatch, fault, message):
+    adapter, parent, _section, iso = _mouth_layout_fixture(monkeypatch, fault=fault)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._mouth_section(adapter, parent, iso)
+
+
+def test_section_refuses_a_real_extent_that_cannot_fit_instead_of_shrinking_it(monkeypatch):
+    adapter, parent, section, iso = _mouth_layout_fixture(monkeypatch, extra_width=0.002)
+    with pytest.raises(RuntimeError, match="native outline does not fit"):
+        drawing._mouth_section(adapter, parent, iso)
+    assert not section.moves
+
+
+def _native_text(text, x, y, width, *, height=0.0035):
+    return {"t": text, "pos": (x, y, 0.0), "h": height, "w": width, "ref": 1, "ang": 0.0}
+
+
+def _native_line(x0, y0, x1, y1):
+    return (0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0)
+
+
+class _LayoutDimension:
+    def __init__(self, name, position, *, width=0.034, centered=False, fault=None):
+        self.name = name
+        self.position = (*position, 0.0)
+        self.width = width
+        self.centered = centered
+        self.fault = fault
+        self.value = 0.0002
+        self.tolerance = (-0.00005, 0.00005)
+        self.qualifier = drawing.MOUTH_PRINT_CALLOUT
+        self.attachments = (object(), object())
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition2(self, x, y, z):
+        if self.fault == "move_refused":
+            return False
+        if self.fault != "move_ignored":
+            self.position = (x, y, z)
+        return True
+
+    def display(self, section):
+        x, y, _z = self.position
+        left = x - self.width / 2.0 if self.centered else x
+        base = y - 0.0073038
+        qualifier_rows = self.qualifier.splitlines()
+        shoulder = base - (len(qualifier_rows) - 1) * 0.0055563
+        a = section.project((joint.NECK_HALF_X / 1000.0, joint.TAP_DRILL_DIA / 2000.0, 0.0))
+        b = section.project(((joint.NECK_HALF_X - joint.MOUTH_CHAMFER) / 1000.0, joint.TAP_DRILL_DIA / 2000.0, 0.0))
+        # Simulated post-rotation display: fixed model-attached witnesses,
+        # horizontal size line, and R8's native tolerance/qualifier row pitch.
+        return {
+            "texts": [
+                _native_text("0.20 ", left + self.width / 2.0 - 0.0103444, y - 0.0016941, 0.0103444),
+                _native_text("+0.05", left + self.width / 2.0, y + 0.0027781, 0.0118806),
+                _native_text("-0.05", left + self.width / 2.0, y - 0.0017476, 0.0112413),
+                *(_native_text(row, left, base - index * 0.0055563, self.width)
+                  for index, row in enumerate(qualifier_rows)),
+            ],
+            "lines": [
+                _native_line(*a, a[0], shoulder),
+                _native_line(*b, b[0], shoulder),
+                _native_line(left, shoulder, b[0], shoulder),
+            ],
+        }
+
+
+class _LayoutCaption:
+    PropertyLinkedText = "<VLNAME> <VLLABEL>\n<VLSCALE> <VLSCALEV>"
+
+    def __init__(self, *, fault=None):
+        self.position = (0.209, 0.048, 0.0)
+        self.fault = fault
+
+    def GetAnnotation(self):
+        return self
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition2(self, x, y, z):
+        if self.fault != "caption_ignored":
+            self.position = (x, y, z)
+        return True
+
+    def GetExtent(self):
+        # R8 native six-value note extent relative to its actual GetPosition.
+        x, y, _z = self.position
+        return (x - 0.0231238, y - 0.0160045, 0.0, x + 0.0226268, y + 0.0001988, 0.0)
+
+
+def _annotation_layout_fixture(monkeypatch, *, width=0.034, centered=False, fault=None):
+    import _section_axis
+
+    adapter, parent, section, iso = _mouth_layout_fixture(monkeypatch)
+    drawing._mouth_section(adapter, parent, iso)
+    annotation = _LayoutDimension("MouthChamfer", (0.330, 0.190), width=width, centered=centered, fault=fault)
+    caption = _LayoutCaption(fault=fault)
+    section.notes = [caption]
+
+    def mark_display(view, original_y):
+        dx, dy = view.turn((0.0, original_y - 0.080))
+        x, y = view.Position[0] + dx, view.Position[1] + dy
+        # Outer extents of R8's eight native line runs, kept as two complete
+        # crosses. No annotation is deleted and no source identity is guessed.
+        return {"lines": [
+            _native_line(x - 0.0113862, y, x + 0.0113862, y),
+            _native_line(x, y - 0.0113862, x, y + 0.0113862),
+        ]}
+
+    section.marks = [
+        SimpleNamespace(display=lambda view, y=y: mark_display(view, y))
+        for y in (0.100775, 0.141875)
+    ]
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
+    monkeypatch.setattr(drawing, "annotation_display", lambda _a, item: (item.display(section), {}))
+    monkeypatch.setattr(_section_axis, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_section_axis, "rebuild_drawing", lambda *_a, **_kw: None)
+
+    def move(_adapter, item, dx, dy, *, label):
+        x, y, z = item.GetPosition()
+        if not item.SetPosition2(x + dx, y + dy, z):
+            raise RuntimeError(f"failed to move {label}")
+
+    monkeypatch.setattr(drawing, "move_annotation", move)
+    return adapter, section, iso, annotation, caption
+
+
+@pytest.mark.parametrize("width, centered", ((0.034, False), (0.036, True), (0.030, False)))
+def test_native_text_and_caption_fit_beside_complete_mouth_profile(monkeypatch, width, centered):
+    adapter, section, iso, annotation, caption = _annotation_layout_fixture(monkeypatch, width=width, centered=centered)
+    physical = (annotation.value, annotation.tolerance, annotation.attachments, annotation.qualifier)
+    fields = caption.PropertyLinkedText
+    marks = tuple(section.marks)
+    old_ink = Box(0.290, 0.0876962, 0.3514153, 0.1012781)
+    iso_scale = Box(0.3204, 0.0884, 0.3796, 0.0920)
+    assert old_ink.overlaps(iso_scale, tol=0.0) is not None
+    drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+    ink = drawing._dimension_layout_ink(adapter, annotation, label="mouth")
+    profile = Box(*drawing._mouth_profile_box(adapter, section))
+    extent = caption.GetExtent()
+    caption_box = Box(extent[0], extent[1], extent[3], extent[4])
+    text = Box(*ink.text)
+    assert profile.xmin - text.xmax == pytest.approx(0.006)
+    assert text.ymin - caption_box.ymax == pytest.approx(0.004)
+    for box in (text, profile, caption_box):
+        assert box.escape(_R8_REGION) is None
+        assert box.ymin > _R8_ISO_OUTLINE[3] + 0.002
+        assert box.gap(iso_scale) > 0.002
+        assert box.ymin > 0.066
+    for line in ink.leader:
+        assert segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), caption_box) == 0.0
+    assert (annotation.value, annotation.tolerance, annotation.attachments, annotation.qualifier) == physical
+    assert tuple(section.marks) == marks
+    assert caption.PropertyLinkedText == fields
+
+
+@pytest.mark.parametrize("fault, width, message", (
+    ("move_refused", 0.0614153, "failed to move"),
+    ("move_ignored", 0.0614153, "callout placement did not persist"),
+    ("caption_ignored", 0.0614153, "caption position did not persist"),
+    (None, 0.150, "crosses the zone frame"),
+))
+def test_annotation_layout_refuses_ignored_moves_and_unfit_text(monkeypatch, fault, width, message):
+    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch, fault=fault, width=width)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+
+
+@pytest.mark.parametrize("fault", ("missing_width", "nan_width", "missing_lines", "read_error"))
+def test_native_text_layout_never_substitutes_nominal_boxes_for_missing_readbacks(monkeypatch, fault):
+    adapter, section, _iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
+    display = copy.deepcopy(annotation.display(section))
+    errors = {}
+    if fault == "missing_width":
+        display["texts"][-1].pop("w")
+    elif fault == "nan_width":
+        display["texts"][-1]["w"] = math.nan
+    elif fault == "missing_lines":
+        display.pop("lines")
     else:
-        message = "geometry beyond the cutting plane" if fault == "uncut_geometry" else "both chamfer legs in true profile"
-        with pytest.raises(RuntimeError, match=message):
-            drawing._mouth_section(object(), parent)
+        errors["GetTextPositionAtIndex"] = 1
+    monkeypatch.setattr(drawing, "annotation_display", lambda *_a: (display, errors))
+    with pytest.raises(RuntimeError, match="native"):
+        drawing._dimension_layout_ink(adapter, annotation, label="mouth")
+
+
+@pytest.mark.parametrize("wrapped", (False, True))
+def test_inside_corner_callout_wrap_keeps_all_words_and_fits_actual_border_lane(monkeypatch, wrapped):
+    text = drawing.ROOT_PRINT_CALLOUT if wrapped else spec.ROOT_CALLOUT
+    # Simulated font advances use R8's measured full-row width. This tests
+    # layout behavior; it is not proof of newly rendered native glyphs.
+    advance = 0.0767764 / len(spec.ROOT_CALLOUT)
+    rows = [_native_text("R0.25 max.", 0.0328618, 0.145, 0.0242764)]
+    for index, row in enumerate(text.splitlines()):
+        width = len(row) * advance
+        rows.append(_native_text(row, 0.045 - width / 2.0, 0.1394437 - index * 0.0055563, width))
+    shoulder_y = rows[-1]["pos"][1]
+    left = min(row["pos"][0] for row in rows)
+    right = max(row["pos"][0] + row["w"] for row in rows)
+    display = {"texts": rows, "lines": [
+        _native_line(left, shoulder_y, right, shoulder_y),
+        _native_line(right, shoulder_y, 0.0908152, 0.115719),
+    ]}
+    monkeypatch.setattr(drawing, "annotation_display", lambda *_a: (display, {}))
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_a: "RootR")
+    monkeypatch.setattr(drawing, "sheet_region", lambda *_a: _R8_REGION)
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (0.097375 + p[0], 0.2124488))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    assert " ".join(text.split()) == " ".join(spec.ROOT_CALLOUT.split())
+    if wrapped:
+        drawing._require_root_callout_inside(object(), object(), [object()])
+        assert left > _R8_REGION.xmin and right + 0.003 < 0.091125
+    else:
+        assert left == pytest.approx(0.0066118)
+        with pytest.raises(RuntimeError, match="crosses the zone frame"):
+            drawing._require_root_callout_inside(object(), object(), [object()])
+
+
+def test_annotation_rebuild_cannot_restore_the_r8_off_sheet_section_extent(monkeypatch):
+    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
+    monkeypatch.setattr(section, "GetOutline", lambda: _R8_SECTION_OUTLINE)
+    with pytest.raises(RuntimeError, match="final complete thread-mouth outline.*crosses the zone frame"):
+        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+
+
+def test_unwrapped_mouth_text_is_rejected_against_retained_native_center_marks(monkeypatch):
+    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch, width=0.0614153)
+    annotation.qualifier = spec.MOUTH_CALLOUT
+    marks = tuple(section.marks)
+    with pytest.raises(RuntimeError, match="mouth callout.*crowds.*section centre mark"):
+        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+    assert tuple(section.marks) == marks
+
+
+def test_unreadable_center_mark_ink_is_not_treated_as_an_empty_caption_lane(monkeypatch):
+    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
+    section.marks[0].display = lambda _view: {}
+    with pytest.raises(RuntimeError, match="centre mark 0 has unreadable native ink"):
+        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
 
 
 def _tap_name_adapter(monkeypatch, *, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
@@ -517,7 +844,7 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (adapter.currentModel, object()))
     monkeypatch.setattr(drawing, "place_view", lambda _a, _source, orientation, *_xy, **_kw: side if orientation == "*Right" else object())
     monkeypatch.setattr(drawing, "_mouth_section", lambda *_a: object())
-    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note"):
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note", "_require_root_callout_inside", "_layout_mouth_annotations"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
     for name in ("curate_view_dimensions", "curate_hidden_dimensions"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: [])
