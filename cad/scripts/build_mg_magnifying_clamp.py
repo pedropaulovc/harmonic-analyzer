@@ -462,95 +462,103 @@ def _point_in_location_sketch(adapter: Any, point: Any, sketch: Any) -> tuple[fl
     return _transform_location(adapter, model_point, target.ModelToSketchTransform)
 
 
-def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str) -> None:
-    """Read every actual kind/definition before filtering; never infer enum aliases.
-
-    AddRelation and GetRelationType both document swConstraintType_e, not an
-    input/output normalization map. A different returned kind remains a failure,
-    even when its actual entities and geometric alignment match the request.
-    """
-    import _telemetry
+def _witness_relation_records(relations: Any) -> tuple[list[dict[str, Any]], list[tuple[Any, ...]]]:
+    """Snapshot actual kinds/definitions without treating a returned handle as effect."""
     import pythoncom
     from solidworks_mcp.adapters._generated.sldworks_2026 import ISketchPoint, ISketchSegment
 
+    rows, definitions = [], []
+    for raw in relations or ():
+        row = {"kind": None, "count": None, "definition_interfaces": [], "definition_fields": [], "internal_entity_types": None, "internal_count": None, "suppressed": None, "point_codes": [], "segment_key": None, "identity_matches": False, "alignment": None, "readback_errors": [], "mandatory_readback_errors": [], "unavailable_fields": []}
+        rows.append(row)
+
+        def capture(field, getter, *, mandatory=False):
+            try:
+                return getter()
+            except Exception as exc:
+                detail = f"{field}: {exc!r}"
+                row["readback_errors"].append(detail)
+                if mandatory:
+                    row["mandatory_readback_errors"].append(detail)
+                row["unavailable_fields"].append(field)
+                return None
+
+        relation = capture("binding", lambda: _early_bound(raw, "ISketchRelation"), mandatory=True)
+        if relation is None:
+            row["readback_errors"].append("binding: native relation unavailable")
+            row["mandatory_readback_errors"].append("binding: native relation unavailable")
+            row["unavailable_fields"].extend(("kind", "definitions", "suppressed", "internal_types", "internal_entities"))
+            row["definitions_available"] = False
+            definitions.append(())
+            continue
+        row["kind"] = capture("kind", lambda: relation.GetRelationType(), mandatory=True)
+        actual = capture("definitions", lambda: tuple(relation.GetDefinitionEntities2()), mandatory=True)
+        entities = actual or ()
+        row["count"] = len(entities)
+        row["definitions_available"] = actual is not None
+        row["suppressed"] = capture("suppressed", lambda: relation.Suppressed, mandatory=True)
+        # These optional diagnostics describe GetEntities, NOT the actual
+        # definitions. Their availability must not change relation acceptance.
+        row["internal_entity_types"] = capture("internal_types", lambda: relation.GetEntitiesType())
+        row["internal_count"] = capture("internal_entities", lambda: len(relation.GetEntities()))
+        for index, entity in enumerate(entities):
+            fields = {"present": entity is not None, "interface": None}
+            row["definition_fields"].append(fields)
+            if entity is not None:
+                # Query actual native capabilities; generated wrapper creation
+                # can fall through after failed QI and is not capability proof.
+                # IUnknown is a valid base for every COM interface. We never
+                # invoke methods on these capability-only returned pointers.
+                queries = []
+                fields["query_interfaces"] = queries
+                for interface, cls in (("ISketchPoint", ISketchPoint), ("ISketchSegment", ISketchSegment)):
+                    query = {"interface": interface, "iid": str(cls.CLSID), "hresult": None, "supported": None}
+                    queries.append(query)
+
+                    def query_support():
+                        try:
+                            result = entity._oleobj_.QueryInterface(cls.CLSID, pythoncom.IID_IUnknown)
+                        except pythoncom.com_error as exc:
+                            query["hresult"] = exc.hresult
+                            if exc.hresult == -2147467262:  # E_NOINTERFACE, not arbitrary failure.
+                                return False
+                            raise
+                        if result is None:
+                            raise RuntimeError("native QueryInterface returned no interface pointer")
+                        query["hresult"] = 0  # S_OK; pywin32 raises on failure.
+                        return True
+
+                    query["supported"] = capture(f"definition[{index}].QI({interface})", query_support, mandatory=True)
+                supported = [query["interface"] for query in queries if query["supported"] is True]
+                if len(supported) == 1 and all(type(query["supported"]) is bool for query in queries):
+                    fields["interface"] = supported[0]
+                else:
+                    detail = f"definition[{index}]: ambiguous, unsupported or unavailable native interfaces"
+                    row["readback_errors"].append(detail)
+                    row["mandatory_readback_errors"].append(detail)
+            row["definition_interfaces"].append(fields["interface"])
+            if fields["interface"] == "ISketchPoint":
+                point = capture(f"definition[{index}].diagnostic-binding", lambda: _early_bound(entity, "ISketchPoint"))
+                fields["id"] = capture(f"definition[{index}].id", lambda: point.GetID())
+                fields["coordinates"] = capture(f"definition[{index}].coordinates", lambda: (float(point.X), float(point.Y), float(point.Z)))
+        definitions.append(entities)
+    return rows, definitions
+
+
+def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str) -> None:
+    """Require the exact requested constraint in the actual owner relation inventory.
+
+    AddRelation and GetRelationType both document swConstraintType_e, not an
+    input/output normalization map. Only the requested kind with the actual
+    definition entities and alignment proves the required constraint.
+    """
+    import _telemetry
+
     application = _early_bound(adapter.swApp, "ISldWorks")
-    matches, rows, definitions = 0, [], []
+    matches, rows = 0, []
     error = None
     try:
-        for raw in relations or ():
-            row = {"kind": None, "count": None, "definition_interfaces": [], "definition_fields": [], "internal_entity_types": None, "internal_count": None, "suppressed": None, "point_codes": [], "segment_key": None, "identity_matches": False, "alignment": None, "readback_errors": [], "mandatory_readback_errors": [], "unavailable_fields": []}
-            rows.append(row)
-
-            def capture(field, getter, *, mandatory=False):
-                try:
-                    return getter()
-                except Exception as exc:
-                    detail = f"{field}: {exc!r}"
-                    row["readback_errors"].append(detail)
-                    if mandatory:
-                        row["mandatory_readback_errors"].append(detail)
-                    row["unavailable_fields"].append(field)
-                    return None
-
-            relation = capture("binding", lambda: _early_bound(raw, "ISketchRelation"), mandatory=True)
-            if relation is None:
-                row["readback_errors"].append("binding: native relation unavailable")
-                row["mandatory_readback_errors"].append("binding: native relation unavailable")
-                row["unavailable_fields"].extend(("kind", "definitions", "suppressed", "internal_types", "internal_entities"))
-                row["definitions_available"] = False
-                definitions.append(())
-                continue
-            row["kind"] = capture("kind", lambda: relation.GetRelationType(), mandatory=True)
-            actual = capture("definitions", lambda: tuple(relation.GetDefinitionEntities2()), mandatory=True)
-            entities = actual or ()
-            row["count"] = len(entities)
-            row["definitions_available"] = actual is not None
-            row["suppressed"] = capture("suppressed", lambda: relation.Suppressed, mandatory=True)
-            # These optional diagnostics describe GetEntities, NOT the actual
-            # definitions. Their availability must not change relation acceptance.
-            row["internal_entity_types"] = capture("internal_types", lambda: relation.GetEntitiesType())
-            row["internal_count"] = capture("internal_entities", lambda: len(relation.GetEntities()))
-            for index, entity in enumerate(entities):
-                fields = {"present": entity is not None, "interface": None}
-                row["definition_fields"].append(fields)
-                if entity is not None:
-                    # Query actual native capabilities; generated wrapper creation
-                    # can fall through after failed QI and is not capability proof.
-                    # IUnknown is a valid base for every COM interface. We never
-                    # invoke methods on these capability-only returned pointers.
-                    queries = []
-                    fields["query_interfaces"] = queries
-                    for interface, cls in (("ISketchPoint", ISketchPoint), ("ISketchSegment", ISketchSegment)):
-                        query = {"interface": interface, "iid": str(cls.CLSID), "hresult": None, "supported": None}
-                        queries.append(query)
-
-                        def query_support():
-                            try:
-                                result = entity._oleobj_.QueryInterface(cls.CLSID, pythoncom.IID_IUnknown)
-                            except pythoncom.com_error as exc:
-                                query["hresult"] = exc.hresult
-                                if exc.hresult == -2147467262:  # E_NOINTERFACE, not arbitrary failure.
-                                    return False
-                                raise
-                            if result is None:
-                                raise RuntimeError("native QueryInterface returned no interface pointer")
-                            query["hresult"] = 0  # S_OK; pywin32 raises on failure.
-                            return True
-
-                        query["supported"] = capture(f"definition[{index}].QI({interface})", query_support, mandatory=True)
-                    supported = [query["interface"] for query in queries if query["supported"] is True]
-                    if len(supported) == 1 and all(type(query["supported"]) is bool for query in queries):
-                        fields["interface"] = supported[0]
-                    else:
-                        detail = f"definition[{index}]: ambiguous, unsupported or unavailable native interfaces"
-                        row["readback_errors"].append(detail)
-                        row["mandatory_readback_errors"].append(detail)
-                row["definition_interfaces"].append(fields["interface"])
-                if fields["interface"] == "ISketchPoint":
-                    point = capture(f"definition[{index}].diagnostic-binding", lambda: _early_bound(entity, "ISketchPoint"))
-                    fields["id"] = capture(f"definition[{index}].id", lambda: point.GetID())
-                    fields["coordinates"] = capture(f"definition[{index}].coordinates", lambda: (float(point.X), float(point.Y), float(point.Z)))
-            definitions.append(entities)
+        rows, definitions = _witness_relation_records(relations)
         for point in points:
             code = application.IsSame(point, point)
             if type(code) is not int or code != 1:
@@ -697,13 +705,54 @@ def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -
     end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
     relations = _early_bound(sketch.RelationManager, "ISketchRelationManager")
     for kind, points, segment in ((4, (), line), (26, (start, point), None), (25, (end, center), None), (9, (end,), circle)):
+        # Prove a new constraint on its actual owning entity, not merely a
+        # non-null AddRelation return. R12 returned a USEEDGE handle for a
+        # VERTPOINTS request without ever observing the endpoint's post-state.
+        constraint_owner = line if kind == 4 else points[0]
+        owner_interface = "ISketchSegment" if kind == 4 else "ISketchPoint"
+        native_owner = _early_bound(constraint_owner, owner_interface)
+        before_rows, before_error = [], None
+        try:
+            before_rows, _ = _witness_relation_records(native_owner.GetRelations())
+        except Exception as exc:
+            before_error = exc
+        before_kinds = tuple(row["kind"] for row in before_rows)
+        _telemetry.info(
+            f"clamp native constraint before-state: name={name}, requested_kind={kind}, actual_kinds={before_kinds!r}, definitions={before_rows!r}, error={before_error!r}",
+            operation_stage=f"{name}.before-constraint", relation_kind=kind,
+            actual_relation_kinds=before_kinds, relation_definitions=repr(before_rows),
+            relation_readback_error=repr(before_error), relation_owner_interface=owner_interface,
+        )
+        if before_error is not None or any(type(value) is not int for value in before_kinds):
+            raise RuntimeError(f"{name}: native pre-constraint relation inventory unavailable") from before_error
+        if kind in before_kinds:
+            raise RuntimeError(f"{name}: native constraint {kind} already exists before creation")
         entities = [*points, *(() if segment is None else (segment,))]
         _telemetry.info(f"clamp native constraint request: name={name}, kind={kind}", operation_stage=f"{name}.add-relation-request", relation_kind=kind)
         relation = relations.AddRelation(dispatch_array(entities), kind)
-        _telemetry.info(f"clamp native constraint creation: name={name}, kind={kind}, created={relation is not None}", operation_stage=f"{name}.add-relation", relation_kind=kind, native_created=relation is not None)
+        returned_rows, _ = _witness_relation_records((relation,))
+        _telemetry.info(
+            f"clamp native constraint return: name={name}, requested_kind={kind}, created={relation is not None}, returned_kinds={tuple(row['kind'] for row in returned_rows)!r}, returned_definitions={returned_rows!r}",
+            operation_stage=f"{name}.add-relation", relation_kind=kind, native_created=relation is not None,
+            returned_relation_kinds=tuple(row["kind"] for row in returned_rows),
+            returned_relation_definitions=repr(returned_rows),
+        )
         if relation is None:
             raise RuntimeError(f"{name}: native constraint {kind} creation failed")
-        _require_witness_relation(adapter, (relation,), kind, points, segment, stage=f"{name}.created-constraint")
+        after, after_error = (), None
+        try:
+            after = tuple(native_owner.GetRelations() or ())
+        except Exception as exc:
+            after_error = exc
+        _telemetry.info(
+            f"clamp native constraint post-state: name={name}, requested_kind={kind}, count={len(after)}, error={after_error!r}",
+            operation_stage=f"{name}.constraint-poststate", relation_kind=kind,
+            relation_count=len(after), relation_readback_error=repr(after_error),
+            relation_owner_interface=owner_interface,
+        )
+        if after_error is not None:
+            raise RuntimeError(f"{name}: native post-constraint relation inventory unavailable") from after_error
+        _require_witness_relation(adapter, after, kind, points, segment, stage=f"{name}.created-constraint")
     _assert_relative_witness(adapter, line, point, circle, stage=f"{name}.before-dimension")
     return line
 
