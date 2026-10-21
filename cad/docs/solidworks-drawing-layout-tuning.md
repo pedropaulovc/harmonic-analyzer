@@ -1097,8 +1097,15 @@ Require fully defined status, actual relation definition entities, unchanged
 source identities and the positive-rim readback before and after rebuild.
 The native dimension attaches to both local line endpoints, carrying the
 actual value, driven ownership, explicit band and unparenthesized ordinary ink
-through equations/rebuild and per-view hidden-sketch import. This replacement
-construction still needs native-seat proof.
+through equations/rebuild and per-view hidden-sketch import.
+
+Keep the three actual witness feature names in the builder's literal
+`REFERENCE_SKETCHES` tuple. `_location_sources` uses that declaration to name
+the actual source map, and `_location_profiles` creates and blanks every
+returned source. The repository hidden-sketch routing scan must resolve those
+computed blanking names and verify drawing curation through
+`_drawing_hidden_sketches`; an unresolved name is an error, not a reason to
+skip the drawing.
 
 The former direct point-to-circle constructor is removed, not retained as a
 fallback. R9 proved exact circle identity and accepted/read-back rim selection,
