@@ -99,6 +99,8 @@ from magnifying_bracket_joint_layout import (
     DRILL_POINT_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     THREAD_DEPTH_BAND,
+    THREAD_CUTTING_ENVELOPE_DIA_MAX,
+    THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
     RIB_DEPTH as RECEIVER_RIB_T,
 )
 from _drawing_marks import (
@@ -122,6 +124,7 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
     BACK_VIEW_NOTE,
+    BRACKET_THREAD_CUTTING_REQUIREMENT,
     CYLINDER_REFERENCE_Z,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
@@ -1065,15 +1068,16 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 def _assert_receiver_profile_walls(adapter) -> None:
-    """Independent longitudinal-profile and sharp-step wall gates before taps.
+    """Prove walls for the separate pilot and required cutting envelopes.
 
-    Native end-plane/depth and drill-volume gates separately prove axial
-    containment. A longitudinal face distance is NOT the inward cap-to-plate
-    step wall: the pure joint budget below proves that separately. Later
-    concave root fillets only add material; the taps are cut after them.
+    Native trimmed-face distances establish the nominal profile carrying the
+    cutting-envelope radius; the tolerance budget bounds conforming removal,
+    not the unknown physical tool. Native pilot-volume/end-plane gates remain
+    separate. Later concave roots only add material; taps follow them.
     """
     from magnifying_bracket_joint_layout import (
-        RECEIVER_WALL_MIN, SCREW_MAJOR_DIA, receiver_step_wall_budget,
+        RECEIVER_WALL_MIN, THREAD_CUTTING_PROOF_RESERVE,
+        receiver_thread_cutting_step_wall_budget, receiver_pilot_step_wall_budget,
     )
 
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EdgeRibBack")
@@ -1089,6 +1093,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
         sides.append(face)
     if not sides:
         raise RuntimeError("receiver: no native longitudinal profile faces")
+    radius = THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0
     z = -PLATE_L / 2.0 + RECEIVER_RIB_T / 2.0
     for x, y, _ in LEVER_HOLE_POINTS:
         distances = []
@@ -1099,35 +1104,63 @@ def _assert_receiver_profile_walls(adapter) -> None:
             ):
                 raise RuntimeError("receiver: invalid native trimmed-face closest point")
             point = tuple(float(value) * 1000.0 for value in result[:3])
-            distances.append(math.dist((x, y, z), point) - SCREW_MAJOR_DIA / 2.0)
-        actual = min(distances)
-        expected = receiver_wall_margin(x, y, SCREW_MAJOR_DIA / 2.0)
-        if not math.isclose(actual, expected, abs_tol=1e-4):
+            distances.append(math.dist((x, y, z), point) - radius)
+        native_clearance = min(distances)
+        expected = receiver_wall_margin(x, y, radius)
+        if not math.isclose(native_clearance, expected, abs_tol=1e-4):
             raise RuntimeError(
-                f"receiver X{x}: native wall {actual:.6f} != signed profile {expected:.6f}"
+                f"receiver X{x}: native envelope-profile clearance {native_clearance:.6f} "
+                f"!= signed profile {expected:.6f}"
             )
-        if actual < RECEIVER_WALL_MIN:
-            raise RuntimeError(f"receiver X{x}: native wall {actual:.6f} below rule17")
-        _telemetry.success(f"receiver X{x}: actual native profile wall {actual:.6f} mm")
-    for budget in receiver_wall_budget():
-        if budget.minimum_mm < RECEIVER_WALL_MIN:
+        if native_clearance < RECEIVER_WALL_MIN:
             raise RuntimeError(
-                f"receiver X{budget.x_mm}: worst signed wall {budget.minimum_mm:.6f} "
-                f"below {RECEIVER_WALL_MIN}; witness {budget.minimum_witness}"
+                f"receiver X{x}: native envelope-profile clearance {native_clearance:.6f} "
+                f"below {RECEIVER_WALL_MIN:g} mm"
             )
         _telemetry.success(
-            f"receiver X{budget.x_mm}: worst signed wall {budget.minimum_mm:.6f} mm "
-            f"(upper {budget.upper_mm:.6f}, lower {budget.lower_mm:.6f})"
+            f"receiver X{x}: native envelope-profile clearance {native_clearance:.6f} mm "
+            f"outside required radius {radius:.6f} mm; not a measured physical thread"
         )
-    step_wall = receiver_step_wall_budget()
+    for budget in receiver_wall_budget():
+        if not math.isfinite(budget.minimum_mm) or budget.minimum_mm < RECEIVER_WALL_MIN:
+            raise RuntimeError(
+                f"receiver X{budget.x_mm}: required-envelope longitudinal wall "
+                f"{budget.minimum_mm:.6f} below {RECEIVER_WALL_MIN}; "
+                f"witness {budget.minimum_witness}"
+            )
+        _telemetry.success(
+            f"receiver X{budget.x_mm}: required-envelope longitudinal wall "
+            f"{budget.minimum_mm:.6f} mm (upper {budget.upper_mm:.6f}, "
+            f"lower {budget.lower_mm:.6f}); cutting OD "
+            f"{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX includes runout/deflection; "
+            f"extra proof reserve {THREAD_CUTTING_PROOF_RESERVE:.2f} mm, not a process tolerance"
+        )
+    step_wall = receiver_pilot_step_wall_budget()
     if not math.isfinite(step_wall) or step_wall < RECEIVER_WALL_MIN:
         raise RuntimeError(
-            f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
+            f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
             f"below {RECEIVER_WALL_MIN:g} mm"
         )
     _telemetry.success(
-        f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
-        f">= {RECEIVER_WALL_MIN:g} mm; RibDepth {RECEIVER_RIB_T:.2f} mm"
+        f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
+        f">= {RECEIVER_WALL_MIN:g} mm; RibDepth {RECEIVER_RIB_T:.2f} mm; pilot only"
+    )
+    cutting_step = receiver_thread_cutting_step_wall_budget()
+    if not math.isfinite(cutting_step) or cutting_step < RECEIVER_WALL_MIN:
+        raise RuntimeError(
+            f"receiver: required thread-cutting step wall {cutting_step:.6f} mm "
+            f"below {RECEIVER_WALL_MIN:g} mm"
+        )
+    _telemetry.success(
+        f"receiver: required thread-cutting step wall {cutting_step:.6f} mm; "
+        f"all removal within {THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX diameter x "
+        f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX from actual entry/about actual hole axis; "
+        "printed position bands and one conservative proof reserve charged"
+    )
+    _telemetry.info(
+        "receiver: requirement bounds walls for a conforming process; process choice "
+        "and inspection required before machining. Native pilot/cosmetic threads "
+        "are not physical-tool proof; no stock tap is qualified by these gates."
     )
 
 
@@ -1690,6 +1723,91 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
     blank_reference_sketches(adapter, ("KnifeStubReference",))
 
 
+async def _bracket_thread_cutting_envelope_reference(
+    adapter, drive_jobs: list[tuple[str, str]]
+) -> None:
+    """Hidden construction dimensions own the manufacturing removal limits.
+
+    This is requirement PMI, never a cylindrical cut or a claim that native
+    cosmetic threads model actual removal. Top-plane sketch Y is minus model
+    Z. The first nominal hole locates the reference; the requirement applies
+    independently about each actual finished-hole axis/from its actual entry.
+    """
+    reference = SketchDims()
+    check("create thread-cutting envelope reference", await adapter.create_sketch("Top"))
+    x = LEVER_HOLE_POINTS[0][0]
+    entry = -LEVER_HOLE_POINTS[0][2]
+    radius = THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0
+    set_sketch_direct_db(adapter, True)
+    diameter = check(
+        "thread-cutting envelope diameter reference",
+        await adapter.add_line(x - radius, entry, x + radius, entry),
+    )
+    depth = check(
+        "thread-cutting envelope depth reference",
+        await adapter.add_line(x, entry, x, entry - THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (diameter, depth):
+        _as_construction(adapter, entity)
+    check(
+        "thread-cutting envelope diameter horizontal",
+        await adapter.add_sketch_constraint(diameter, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter, f"{diameter}.start", f"{diameter}.end", "horizontal_distance",
+        THREAD_CUTTING_ENVELOPE_DIA_MAX, "thread-cutting envelope diameter",
+    )
+    reference.record("BracketThreadCuttingEnvelopeDiameter", '"ThreadCuttingEnvelopeDiameter"')
+    await anchor_point_to_origin(
+        adapter, f"{diameter}.start", x - radius, entry, "thread-cutting envelope diameter start"
+    )
+    reference.record("ThreadEnvelopeDiameterX", None)
+    reference.record("ThreadEnvelopeDiameterZ", None)
+    check(
+        "thread-cutting envelope depth vertical",
+        await adapter.add_sketch_constraint(depth, None, "vertical"),
+    )
+    await dimension_between(
+        adapter, f"{depth}.start", f"{depth}.end", "vertical_distance",
+        THREAD_CUTTING_ENVELOPE_DEPTH_MAX, "thread-cutting envelope depth",
+    )
+    reference.record("BracketThreadCuttingEnvelopeDepth", '"ThreadCuttingEnvelopeDepth"')
+    await anchor_point_to_origin(
+        adapter, f"{depth}.start", x, entry, "thread-cutting envelope depth start"
+    )
+    reference.record("ThreadEnvelopeDepthX", None)
+    reference.record("ThreadEnvelopeDepthZ", None)
+    await ensure_fully_defined(adapter, "thread-cutting envelope reference sketch")
+    check("exit thread-cutting envelope reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BracketThreadCuttingEnvelope")
+    drive_jobs += reference.apply(adapter, "BracketThreadCuttingEnvelope")
+    blank_reference_sketches(adapter, ("BracketThreadCuttingEnvelope",))
+
+
+def _thread_cutting_envelope_max_limits(adapter) -> None:
+    """Native MAX-only requirement dimensions, not title-block ordinary bands."""
+    feature = "BracketThreadCuttingEnvelope"
+    for name, maximum in (
+        ("BracketThreadCuttingEnvelopeDiameter", THREAD_CUTTING_ENVELOPE_DIA_MAX),
+        ("BracketThreadCuttingEnvelopeDepth", THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
+    ):
+        _, dimension = _named_dimension(adapter, feature, name)
+        if not math.isclose(float(dimension.SystemValue) * 1000.0, maximum, abs_tol=1e-6):
+            raise RuntimeError(f"{name}@{feature}: native removal-envelope limit changed")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 6  # swTolType_e.swTolMAX
+        if not tolerance.SetValues(-maximum / 1000.0, 0.0):
+            raise RuntimeError(f"{name}@{feature}: removal-envelope MAX limits refused")
+        if (
+            int(tolerance.Type) != 6
+            or not math.isclose(float(tolerance.GetMinValue()), -maximum / 1000.0, abs_tol=1e-12)
+            or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+        ):
+            raise RuntimeError(f"{name}@{feature}: removal-envelope MAX limits did not persist")
+        set_dimension_display_precision(adapter, feature, name, 2)
+
+
 def _hex_width_reference(adapter) -> None:
     """HexWidth prints as a reference, "2X (8.080)": untoleranced, the
     parentheses its native prefix (DIMENSION_PREFIXES) and suffix."""
@@ -1897,6 +2015,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexW", f"{HEX_W}mm")
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
+    await set_global(adapter, "ThreadCuttingEnvelopeDiameter", f"{THREAD_CUTTING_ENVELOPE_DIA_MAX}mm")
+    await set_global(adapter, "ThreadCuttingEnvelopeDepth", f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
@@ -1935,6 +2055,7 @@ async def build(adapter) -> dict[str, str]:
     await _knife_envelope_reference(adapter, drive_jobs)
     await _cylinder_reference(adapter, drive_jobs)
     await _knife_stub_reference(adapter, drive_jobs)
+    await _bracket_thread_cutting_envelope_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -1984,6 +2105,7 @@ async def build(adapter) -> dict[str, str]:
     _knife_ridge_max_limit(adapter)
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
+    _thread_cutting_envelope_max_limits(adapter)
     await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
@@ -1993,6 +2115,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Bracket Thread-Cutting Requirement": BRACKET_THREAD_CUTTING_REQUIREMENT,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -2012,6 +2135,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Bracket Thread-Cutting Requirement",
         ),
     )
     return artefacts

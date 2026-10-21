@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -150,9 +151,9 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC is joint.TAP_SPEC
     assert (part.TAP_SPEC.kind, part.TAP_SPEC.end) == ("tapped_bottoming", "blind")
     # Native depth/band behavior is exercised by the adapter tests below.
-    # The process line leads the callout; the native size starts the next row.
-    assert notes.BRACKET_TAP_CALLOUT_PROCESS.endswith("\n")
-    assert notes.BRACKET_SCREW_NUMBER in notes.BRACKET_TAP_CALLOUT_PROCESS
+    # The bounded-cutting process precedes the native pilot and usable-thread
+    # rows, but does not replace either of their native depth variables.
+    assert notes.BRACKET_THREAD_CUTTING_REQUIREMENT.endswith("\n")
     assert part.TAP_SPEC.size == "#2-56"
     assert part.TAP_SPEC.depth_mm == 6.50
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
@@ -445,12 +446,15 @@ def test_view_f_r7_translation_and_complete_text_have_analytical_air() -> None:
     detail_right = 0.1925879  # full native detail outline, not ideal crop alone
     assert min(receiver[0], y0[0], x1[0]) > detail_right + 0.002
     assert receiver[2] < 0.4318 - 0.0127 - 0.002
-    # Source-budget envelopes at the approved (360,115)/(260,100) mm anchors.
-    # Replay their offsets from the actual requested positions so a placement
-    # change can exhaust the budget. These are predictions, not native bounds.
+    # R8's four-row box includes the leader, not only text. Additional process
+    # rows grow down from its unchanged native drill row at 5.5 mm per row.
+    # This source estimate must not be mistaken for regenerated native ink.
     callout_x, callout_y = drawing.MOUNTING_CALLOUT_XY
+    process_rows = notes.BRACKET_THREAD_CUTTING_REQUIREMENT.strip().splitlines()
+    assert max(map(len, process_rows)) <= 43  # R8's longest process row
+    extra_rows = len(process_rows) - 2
     callout = (
-        callout_x - 0.0621, callout_y - 0.011166,
+        callout_x - 0.0621, callout_y - 0.011166 - extra_rows * _LINE_M,
         callout_x + 0.0541, callout_y + 0.035767,
     )
     caption_x, caption_y = drawing.BACK_VIEW_NOTE_XY
@@ -463,7 +467,7 @@ def test_view_f_r7_translation_and_complete_text_have_analytical_air() -> None:
         assert right < 0.4318 - 0.0127 - 0.002
         assert bottom > 0.066 + 0.004  # title block x216..431.8, y0..66 mm
         assert top < _BORDER_TOP_M - 0.004
-    assert caption[3] + 0.003 < callout[1]
+    assert caption[3] + 0.004 < callout[1]
     assert caption[3] + 0.004 < receiver[1]
     # Conservative source reservation around the unchanged 1:4 isometric,
     # not a measured native outline (which still needs parent acceptance).
@@ -1328,6 +1332,150 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
         bracket_depth_callout.dress()
 
 
+def test_cutting_envelope_requirement_bounds_all_removal_not_only_full_thread() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    prose = " ".join(notes.BRACKET_THREAD_CUTTING_REQUIREMENT.split())
+    assert "ALL THREAD-CUTTING MATERIAL REMOVAL WITHIN" in prose
+    size = re.search(
+        r"Ø(\d+\.\d{2}) MAX X (\d+\.\d{2}) MAX DEEP FROM ACTUAL ENTRY", prose,
+    )
+    assert size is not None
+    assert tuple(map(float, size.groups())) == (
+        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX, joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+    )
+    assert "ABOUT ACTUAL FINISHED-HOLE AXIS" in prose
+    assert "PILOT DRILL AND CONE EXCLUDED" in prose
+    # The native thread row, not this independent maximum-removal envelope,
+    # still owns the usable-thread minimum.
+    assert joint.THREAD_DEPTH < float(size[2])
+    assert f"{joint.THREAD_DEPTH:.2f}" not in notes.BRACKET_THREAD_CUTTING_REQUIREMENT
+
+
+def _native_thread_cutting_envelope(monkeypatch):
+    """Exercise source property + native MAX identity, not renderer string wiring."""
+    import magnifying_bracket_joint_layout as joint
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    properties = {"Bracket Thread-Cutting Requirement": notes.BRACKET_THREAD_CUTTING_REQUIREMENT}
+    dimensions = {}
+    displays = []
+    for name, value_mm in (
+        ("BracketThreadCuttingEnvelopeDiameter", joint.THREAD_CUTTING_ENVELOPE_DIA_MAX),
+        ("BracketThreadCuttingEnvelopeDepth", joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
+    ):
+        tolerance = SimpleNamespace(Type=6, lower=-value_mm / 1000.0, upper=0.0)
+        tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
+        tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
+        dimension = SimpleNamespace(
+            FullName=f"{name}@BracketThreadCuttingEnvelope@sm-summing-lever.SLDPRT",
+            SystemValue=value_mm / 1000.0, Tolerance=tolerance,
+        )
+        display = SimpleNamespace(precision=2, dimension=dimension)
+        display.GetDimension2 = lambda _index, display=display: display.dimension
+        display.GetPrimaryPrecision2 = lambda display=display: display.precision
+        dimensions[name] = display
+        displays.append(display)
+    feature = SimpleNamespace(displays=displays)
+    source = SimpleNamespace(
+        GetCustomInfoValue=lambda _config, name: properties.get(name, ""),
+        FeatureByName=lambda name: feature if name == "BracketThreadCuttingEnvelope" else None,
+    )
+    monkeypatch.setattr(drawing, "_feature_display_dimensions", lambda owner: iter(owner.displays))
+    return SimpleNamespace(
+        read=lambda: drawing._bracket_thread_cutting_requirement(source),
+        properties=properties, dimensions=dimensions, displays=displays, source=source,
+    )
+
+
+def test_cutting_requirement_reads_the_saved_model_and_both_native_maxima(monkeypatch) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
+    # SolidWorks may serialize the property with Windows line endings; it is
+    # still the same complete requirement, not a reason to drop a process row.
+    value = notes.BRACKET_THREAD_CUTTING_REQUIREMENT.replace("\n", "\r\n")
+    case.properties["Bracket Thread-Cutting Requirement"] = value
+    assert case.read() == value
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [
+        ("ALL ", ""),
+        ("MATERIAL REMOVAL WITHIN", "FULL THREAD ONLY"),
+        ("ACTUAL ENTRY", "DRILL POINT"),
+        ("ACTUAL FINISHED-HOLE AXIS", "NOMINAL AXIS"),
+        ("PILOT DRILL AND CONE EXCLUDED", "PILOT DRILL AND CONE INCLUDED"),
+    ],
+)
+def test_cutting_requirement_rejects_lost_scope_even_with_matching_native_sizes(
+    monkeypatch, original, replacement,
+) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    case.properties["Bracket Thread-Cutting Requirement"] = (
+        notes.BRACKET_THREAD_CUTTING_REQUIREMENT.replace(original, replacement)
+    )
+    with pytest.raises(RuntimeError, match="requirement differs"):
+        case.read()
+
+
+@pytest.mark.parametrize("index", [0, 1], ids=["diameter", "reach"])
+@pytest.mark.parametrize(
+    "damage",
+    ["owner", "name", "value", "nonfinite", "missing_tolerance", "bilateral",
+     "minimum", "lower_limit", "upper_limit", "precision", "duplicate", "missing"],
+)
+def test_cutting_requirement_rejects_wrong_native_association_or_limits(
+    monkeypatch, index, damage,
+) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    display = case.displays[index]
+    dimension = display.dimension
+    if damage == "owner":
+        dimension.FullName = dimension.FullName.replace(
+            "@BracketThreadCuttingEnvelope@", "@UnrelatedReference@",
+        )
+    elif damage == "name":
+        dimension.FullName = "SameSizeButWrongMeaning@BracketThreadCuttingEnvelope@lever"
+    elif damage == "value":
+        dimension.SystemValue += 0.00001
+    elif damage == "nonfinite":
+        dimension.SystemValue = math.nan
+    elif damage == "missing_tolerance":
+        dimension.Tolerance = None
+    elif damage == "bilateral":
+        dimension.Tolerance.Type = 2
+    elif damage == "minimum":
+        dimension.Tolerance.Type = 5
+    elif damage == "lower_limit":
+        dimension.Tolerance.lower = 0.0
+    elif damage == "upper_limit":
+        dimension.Tolerance.upper = 0.00001
+    elif damage == "precision":
+        display.precision = 1
+    elif damage == "duplicate":
+        case.displays.append(display)
+    else:
+        case.displays.remove(display)
+    with pytest.raises(RuntimeError):
+        case.read()
+
+
+def test_cutting_requirement_rejects_an_unbacked_source_property(monkeypatch) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    case.source.FeatureByName = lambda _name: None
+    with pytest.raises(RuntimeError, match="no native envelope owner"):
+        case.read()
+
+
+def test_cutting_requirement_rechecks_source_limits_after_initial_admission(monkeypatch) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    case.read()
+    case.displays[1].dimension.Tolerance.upper = 0.00005
+    with pytest.raises(RuntimeError, match="MAX envelope limit"):
+        case.read()
+
+
 
 
 @pytest.mark.parametrize(
@@ -1576,6 +1724,25 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
     case.callouts[0][2].hole_callout = False
     with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
         drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [("ALL ", ""), ("FROM ACTUAL ENTRY", "FROM DRILL POINT"), ("MAX", "MIN")],
+)
+def test_settled_receiver_callout_cannot_lose_its_cutting_requirement(
+    monkeypatch, original, replacement,
+) -> None:
+    case = _thread_annotation_drawing(monkeypatch, note_count=0)
+    receiver = case.callouts[2][2]
+    receiver.definitions[5] = (
+        notes.BRACKET_THREAD_CUTTING_REQUIREMENT + receiver.definitions[5]
+    )
+    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+    check()
+    receiver.definitions[5] = receiver.definitions[5].replace(original, replacement)
+    with pytest.raises(RuntimeError, match="authored native hole callout"):
+        check()
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):

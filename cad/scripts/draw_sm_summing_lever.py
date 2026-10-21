@@ -41,6 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 import _config
 from _com import _early_bound, _read_member
+from _dimensions import _feature_display_dimensions
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -84,11 +85,13 @@ from magnifying_bracket_joint_layout import (
     LEVER_HOLE_POINTS,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
+    THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+    THREAD_CUTTING_ENVELOPE_DIA_MAX,
 )
 from sm_summing_lever_notes import (
     BACK_VIEW_LETTER,
     BOSS_Z_CALLOUT,
-    BRACKET_TAP_CALLOUT_PROCESS,
+    BRACKET_THREAD_CUTTING_REQUIREMENT,
     CYLINDER_REFERENCE_Z,
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
@@ -1517,12 +1520,13 @@ BACK_KEEP = {
     "ReceiverX1": (BACK_CENTER[0] - 0.095, BACK_CENTER[1] + 0.0245),
     "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
-# The complete R7 receiver block is 109.9 mm wide. Moving it farther right
-# than the view puts the diagonal LEFT of every process row, not through
-# its own text; its expected right edge is X414.1, inside X419.1 mm.
+# R8's complete four-row receiver block measured about 110 x 47 mm including
+# its leader at (360,115). The bounded-cutting requirement adds two text rows,
+# not width; reserve 11 mm more below it. Fresh native ink must still be checked.
 MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
-# The caption's printed bottom is Y96.4, over 30 mm above the title rule.
-BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.050)
+# Lower the caption below that six-row callout. Its predicted bottom is Y80.4,
+# leaving 14.4 mm to the title rule and over 8 mm above it to the callout text.
+BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.066)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
@@ -1557,6 +1561,67 @@ VIEW_G_ARROW = (
 # leader (x 0.2452), 1 cm over the 20X frame's leader.  The point is its top
 # left.
 FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
+
+
+def _bracket_thread_cutting_requirement(source_model: Any) -> str:
+    """Admit the saved source requirement only with its native bounded envelope.
+
+    The hidden reference sketch describes a manufacturing limit, not a solid
+    cut or a qualification of any particular tap. Read both owned dimensions
+    and MAX limits; a matching string alone cannot prove the source contract.
+    """
+    property_name = "Bracket Thread-Cutting Requirement"
+    properties = read_required_properties(
+        source_model, (property_name,), required=(property_name,),
+    )
+    requirement = properties[property_name]
+    if requirement.replace("\r\n", "\n") != BRACKET_THREAD_CUTTING_REQUIREMENT:
+        raise RuntimeError("bracket thread-cutting requirement differs from its model specification")
+    feature_name = "BracketThreadCuttingEnvelope"
+    model = _early_bound(source_model, "IPartDoc")
+    raw_feature = model.FeatureByName(feature_name)
+    if raw_feature is None:
+        raise RuntimeError("bracket thread-cutting requirement has no native envelope owner")
+    feature = _early_bound(raw_feature, "IFeature")
+    expected = {
+        "BracketThreadCuttingEnvelopeDiameter": THREAD_CUTTING_ENVELOPE_DIA_MAX,
+        "BracketThreadCuttingEnvelopeDepth": THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+    }
+    found = []
+    for raw_display in _feature_display_dimensions(feature):
+        display = _early_bound(raw_display, "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError("bracket thread-cutting envelope has an unowned native dimension")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        full_name = dimension.FullName
+        if type(full_name) is not str:
+            raise RuntimeError("bracket thread-cutting envelope has an unreadable native identity")
+        name = full_name.split("@")[0]
+        if name not in expected:
+            continue
+        raw_tolerance = dimension.Tolerance
+        if raw_tolerance is None:
+            raise RuntimeError(f"{name}: missing native MAX limit")
+        tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
+        nominal_m = expected[name] / 1000.0
+        value = dimension.SystemValue
+        lower, upper = tolerance.GetMinValue(), tolerance.GetMaxValue()
+        if (
+            full_name.split("@")[:2] != [name, feature_name]
+            or type(tolerance.Type) is not int or tolerance.Type != 6  # swTolMAX
+            or any(type(item) not in (int, float) or not math.isfinite(item)
+                   for item in (value, lower, upper))
+            or not math.isclose(value, nominal_m, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
+            or not math.isclose(lower, -nominal_m, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
+            or not math.isclose(upper, 0.0, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
+            or display.GetPrimaryPrecision2() != 2
+        ):
+            raise RuntimeError(f"{name}: lost native owner, two-place value or MAX envelope limit")
+        found.append(name)
+    if sorted(found) != sorted(expected):
+        raise RuntimeError(f"bracket thread-cutting envelope dimensions missing or duplicated: {found}")
+    return requirement
 
 
 def _dress_bracket_depth_callout(callout: Any) -> None:
@@ -1624,6 +1689,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
+    bracket_thread_cutting_requirement = _bracket_thread_cutting_requirement(source_model)
     read_required_properties(
         adapter.currentModel,
         (
@@ -2072,7 +2138,7 @@ async def build(adapter: Any) -> dict[str, str]:
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
         callout_xy=MOUNTING_CALLOUT_XY, label="two blind bracket mounting taps",
-        process=BRACKET_TAP_CALLOUT_PROCESS,
+        process=bracket_thread_cutting_requirement,
     )
     _dress_bracket_depth_callout(mounting_callout)
     back_annotations = curate_hidden_dimensions(
@@ -2112,6 +2178,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     check_dimension_ownership()
+
+    def check_bracket_thread_cutting_requirement() -> None:
+        if _bracket_thread_cutting_requirement(source_model) != bracket_thread_cutting_requirement:
+            raise RuntimeError("bracket thread-cutting source requirement changed during drawing")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -2124,6 +2195,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Recheck after the final rebuild, before either drawing or PDF is saved.
         settled_checks=(
             check_thread_annotations, check_plate_thickness, check_dimension_ownership,
+            check_bracket_thread_cutting_requirement,
         ),
     )
 

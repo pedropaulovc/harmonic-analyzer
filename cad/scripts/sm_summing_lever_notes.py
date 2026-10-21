@@ -12,7 +12,12 @@ offline drawing test.
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import LINEAR_BAND, SCREW_THREAD
+from magnifying_bracket_joint_layout import (
+    LINEAR_BAND,
+    SCREW_THREAD,
+    THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+    THREAD_CUTTING_ENVELOPE_DIA_MAX,
+)
 from sm_summing_lever_spec import COEFFICIENT_T, HOLE_SPEC
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
@@ -74,7 +79,6 @@ CYLINDER_REFERENCE_Z = 45.6
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-02"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
-BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 
 # Drawing-side callout text keyed on the parametric dimension name: each tight
 # band names its mate and function (drawing-guidelines rule 4), and the rib
@@ -131,13 +135,19 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "PlateLength": "BODY\nEND FACES",
 }
 
-# Leads the 2-56 receiver callout: the rib contains the drill with an ordinary
-# bounded .XX depth band. The lower limit clears the unchanged screw and
-# two-pitch tap lead; the upper limit keeps its point inside the rib.
-# The native depth callout and source-model blind-depth proof remain authoritative.
-BRACKET_TAP_CALLOUT_PROCESS = (
-    "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
-    f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
+# This is a manufacturing limit, not a claim that the Hole Wizard's pilot and
+# cosmetic thread model every removed crest. ALL includes partial threads,
+# tap lead, chamfer, tip, runout and deflection. The cylindrical envelope is
+# about each actual finished-hole axis, from its actual entry, independently
+# of the deeper pilot drill and drill cone. The builder saves this complete
+# requirement on the SLDPRT; the drawing checks its two native MAX dimensions
+# before placing the source property ahead of the native pilot/thread rows.
+BRACKET_THREAD_CUTTING_REQUIREMENT = (
+    "ALL THREAD-CUTTING MATERIAL REMOVAL WITHIN\n"
+    f"Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
+    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY\n"
+    "ABOUT ACTUAL FINISHED-HOLE AXIS;\n"
+    "PILOT DRILL AND CONE EXCLUDED\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.

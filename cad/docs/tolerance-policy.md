@@ -539,6 +539,40 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 ## Open items the budget exposed
 
+- **Summing-lever receiver process qualification.** The owner-approved **9.00 mm**
+  receiver on the uniform **7.00 mm** slab retains ordinary bands and pilot
+  dimensions. The new model-owned **Ø2.40 MAX × 6.00 MAX** envelope bounds
+  **all thread-cutting removal**, including partial threads, lead, chamfer,
+  tip, runout and deflection, about each **actual finished-hole axis** and
+  from its **actual entry**. Separate pilot drilling is excluded.
+  `receiver_pilot_step_wall_budget` / `RECEIVER_PILOT_STEP_WALL_MIN` retain
+  the **≥2 mm pilot-only** sharp-step wall (about **2.103 mm**, with printed
+  pilot limits and one 0.3° wander charge).
+  `receiver_thread_cutting_step_wall_budget` /
+  `RECEIVER_THREAD_CUTTING_STEP_WALL_MIN` now use the full required removal
+  envelope, shortest rib, actual-top/thickness floors and printed position
+  bands: **hypot(8.49−6.00,2.49−1.20)−0.04 ≈ 2.764318 mm**. The extra
+  **0.04 mm** is a conservative proof reserve, not another runout charge or
+  tighter hole tolerance. `receiver_wall_budget` recomputes both longitudinal
+  walls with the larger of cutting-envelope radius plus reserve or printed
+  pilot radius plus drill wander. The native trimmed-face comparison uses
+  the **1.20 mm** required radius. These bounds guarantee walls for a
+  **conforming process**, rather than assuming a maximum internal root from
+  external screw size or treating native full-thread metadata as cutting reach.
+  Hidden construction dimensions own the two native MAX limits, and the
+  **Bracket Thread-Cutting Requirement** property supplies the drawing text.
+  Printed **4.95 MIN** usable full thread leaves **1.05 mm** within the
+  envelope for all remaining axial removal; a two-pitch design allowance
+  consumes **0.907143 mm**, leaving **0.142857 mm**, or **0.092857 mm** after
+  the retained native metadata's extra 0.05. This necessary budget does not
+  qualify an available tool. Before machining, process choice and inspection
+  must demonstrate actual crest/oversize, lead/chamfer/tip, reach/stop error
+  and runout/deflection fit the envelope while meeting usable thread.
+  ASME B1.1 §§5.5/8.3.2 and class 2B fit do not bound maximum internal root;
+  OSG 1011100 nominal data do not establish maximum crest/tip reach.
+  Native Hole Wizard pilot/cosmetic threads or more COM are not physical-tool
+  evidence; engagement, tip-gap, drill-lead and native-pilot guards remain.
+
 - **Stock spring selection and static balance** (#747). The custom springs have
   been replaced by catalog force curves: twenty hook-ended **9432K31** channel
   springs (0.175127 N/mm, 1.77929 N initial tension) and one double-loop

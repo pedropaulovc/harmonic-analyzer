@@ -256,7 +256,7 @@ class RibProfile:
         return distance if inside else -distance
 
     def receiver_wall_margin(self, x: float, y: float, radius: float) -> float:
-        """Signed nearest material clearance for a circular thread/drill envelope."""
+        """Signed profile distance outside a supplied material-removal envelope."""
         if radius < 0.0:
             raise ValueError("receiver envelope radius must be nonnegative")
         return self.signed_boundary_distance(x, y) - radius
@@ -300,6 +300,7 @@ def receiver_wall_margin(x: float, y: float, radius: float) -> float:
 
 @dataclass(frozen=True)
 class ReceiverWallBudget:
+    """Longitudinal wall bound for the required cutting envelope and pilot."""
     x_mm: float
     upper_mm: float
     lower_mm: float
@@ -311,21 +312,32 @@ class ReceiverWallBudget:
 
 
 def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
-    """Independent ordinary bands, with the drawing's real datum correlations.
+    """Bounded manufacturing walls with ordinary bands and datum correlations.
 
     Width, wrap and reach each take +/-0.51. The R1 MAX runout independently
-    spans 0..1. Top takes +/-0.255 and thickness independently +/-0.51. A tap
-    is +/-0.05 from the ACTUAL free
-    edge and top, so a top/edge shift is shared, not charged a second time as
-    independent axis motion. The maximum thread major (or larger drill) gets
-    +0.10 diametral allowance and the joint's deepest drill wander radially.
-    The finite corner enumeration is dimensional budgeting, not integration.
-    Axial full-thread, lead and drill-point containment remain joint authority.
+    spans 0..1. Top takes +/-0.255 and thickness independently +/-0.51. A hole
+    is +/-0.05 from the ACTUAL free edge and top, so a top/edge shift is shared,
+    not charged a second time as independent axis motion. The radius contains
+    both the entire required thread-cutting cylinder (runout/deflection already
+    included, plus a separate conservative proof reserve) and the printed
+    pilot plus deepest drill wander. Never add pilot wander to the cutting
+    envelope again. Finite corner enumeration is dimensional budgeting, not
+    integration or physical-tool qualification. Native pilot/cosmetic threads
+    do not establish that an unqualified process meets the requirement.
     """
     import magnifying_bracket_joint_layout as joint
 
-    radius = max(joint.SCREW_MAJOR_DIA, joint.TAP_DRILL_DIA) / 2.0
-    radius += joint.DRILLED_DIAMETER_PLUS / 2.0 + joint.DRILL_WANDER_MAX
+    pilot_radius = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
+        + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
+        joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
+    )
+    radius = max(
+        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE,
+        pilot_radius + pilot_wander,
+    )
     points = joint.LEVER_HOLE_POINTS
     values = [[math.inf, math.inf, math.inf] for _ in points]
     witnesses = [[(), (), ()] for _ in points]

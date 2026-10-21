@@ -319,7 +319,7 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         functions.append(function)
     namespace = {
         "math": math, "_early_bound": lambda value, interface: value,
-        "_telemetry": SimpleNamespace(success=lambda message: None),
+        "_telemetry": SimpleNamespace(success=lambda message: None, info=lambda message: None),
         "COEFFICIENT_T": spec.COEFFICIENT_T,
         "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
         "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,
@@ -336,9 +336,14 @@ def _source_helpers(names: tuple[str, ...], **bindings):
     namespace.update(
         RECEIVER_RIB_T=joint.RIB_DEPTH, SCREW_MAJOR_DIA=joint.SCREW_MAJOR_DIA,
         RECEIVER_WALL_MIN=joint.RECEIVER_WALL_MIN, LEVER_HOLE_POINTS=joint.LEVER_HOLE_POINTS,
+        THREAD_CUTTING_ENVELOPE_DIA_MAX=joint.THREAD_CUTTING_ENVELOPE_DIA_MAX,
+        THREAD_CUTTING_ENVELOPE_DEPTH_MAX=joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+        THREAD_CUTTING_PROOF_RESERVE=joint.THREAD_CUTTING_PROOF_RESERVE,
+        THREAD_DEPTH=joint.THREAD_DEPTH, THREAD_DEPTH_BAND=joint.THREAD_DEPTH_BAND,
         receiver_wall_margin=profile.receiver_wall_margin,
         receiver_wall_budget=profile.receiver_wall_budget,
-        receiver_step_wall_budget=joint.receiver_step_wall_budget,
+        receiver_pilot_step_wall_budget=joint.receiver_pilot_step_wall_budget,
+        receiver_thread_cutting_step_wall_budget=joint.receiver_thread_cutting_step_wall_budget,
     )
     namespace.update(bindings)
     module = ast.Module(body=[
@@ -568,6 +573,19 @@ def _receiver_faces(*, invalid=None, perturb: float = 0.0):
     return [cap, longitudinal], queries
 
 
+@pytest.mark.parametrize("clearance", [1.99, math.nan, math.inf, -math.inf])
+def test_extracted_receiver_rejects_invalid_required_longitudinal_budget(clearance) -> None:
+    faces, _ = _receiver_faces()
+    namespace = _source_helpers(
+        ("_assert_receiver_profile_walls",),
+        receiver_wall_budget=lambda: (
+            SimpleNamespace(x_mm=29.7, minimum_mm=clearance, minimum_witness=()),
+        ),
+    )
+    with pytest.raises(RuntimeError, match="required-envelope longitudinal wall"):
+        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+
+
 def test_extracted_receiver_readback_uses_trimmed_longitudinal_faces_at_actual_mid_depth() -> None:
     import magnifying_bracket_joint_layout as joint
 
@@ -577,58 +595,66 @@ def test_extracted_receiver_readback_uses_trimmed_longitudinal_faces_at_actual_m
     assert len(queries) == len(joint.LEVER_HOLE_POINTS)
     for actual, (x, y, _) in zip(queries, joint.LEVER_HOLE_POINTS):
         assert actual == pytest.approx((x, y, -spec.PLATE_L / 2.0 + joint.RIB_DEPTH / 2.0))
-    # A matching ideal curve alone is insufficient: actual native readback
-    # must agree, and the independent ordinary-band wall must also pass.
+    # Matching ideal curves are insufficient: actual trimmed-face readback
+    # must agree under the required cutting radius, not the pilot radius.
     bad_faces, _ = _receiver_faces(perturb=0.1)
-    with pytest.raises(RuntimeError, match="native wall .* != signed profile"):
+    with pytest.raises(RuntimeError, match="native envelope-profile clearance .* != signed profile"):
         namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=bad_faces)))
     namespace["receiver_wall_budget"] = lambda: (
         SimpleNamespace(x_mm=29.7, minimum_mm=joint.RECEIVER_WALL_MIN - 0.01, minimum_witness=()),
     )
-    with pytest.raises(RuntimeError, match="worst signed wall"):
+    with pytest.raises(RuntimeError, match="required-envelope longitudinal wall"):
         namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
 
 
 @pytest.mark.parametrize("step_wall", [2.0, 2.103])
-def test_extracted_receiver_calls_and_logs_independent_step_budget_after_native_proof(
-    step_wall: float,
-) -> None:
+def test_extracted_receiver_logs_manufacturing_requirement_not_actual_tool_qualification(step_wall: float) -> None:
     import magnifying_bracket_joint_layout as joint
 
     faces, queries = _receiver_faces()
     events = []
 
-    def step_budget():
-        events.append(("step-budget", len(queries)))
+    def pilot_budget():
+        events.append(("pilot-budget", len(queries)))
         return step_wall
+
+    def cutting_budget():
+        events.append(("cutting-budget", len(queries)))
+        return joint.receiver_thread_cutting_step_wall_budget()
+
+    radii = []
+
+    def signed_margin(x, y, radius):
+        radii.append(radius)
+        return profile.receiver_wall_margin(x, y, radius)
 
     namespace = _source_helpers(
         ("_assert_receiver_profile_walls",),
-        receiver_step_wall_budget=step_budget,
-        _telemetry=SimpleNamespace(success=lambda message: events.append(("log", message))),
+        receiver_wall_margin=signed_margin,
+        receiver_pilot_step_wall_budget=pilot_budget,
+        receiver_thread_cutting_step_wall_budget=cutting_budget,
+        _telemetry=SimpleNamespace(
+            success=lambda message: events.append(("log", message)),
+            info=lambda message: events.append(("info", message)),
+        ),
     )
     namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    assert radii == [1.20] * len(joint.LEVER_HOLE_POINTS)
     assert len(queries) == len(joint.LEVER_HOLE_POINTS)
-    assert [event for event in events if event[0] == "step-budget"] == [
-        ("step-budget", len(joint.LEVER_HOLE_POINTS)),
-    ]
-    assert sum("actual native profile wall" in value for kind, value in events if kind == "log") == len(
-        joint.LEVER_HOLE_POINTS
-    )
-    assert sum("worst signed wall" in value for kind, value in events if kind == "log") == len(
-        profile.receiver_wall_budget()
-    )
-    assert events[-1] == (
-        "log",
-        f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
-        f">= {joint.RECEIVER_WALL_MIN:g} mm; RibDepth {joint.RIB_DEPTH:.2f} mm",
-    )
+    assert events.index(("pilot-budget", len(queries))) < events.index(("cutting-budget", len(queries)))
+    logs = [value for kind, value in events if kind == "log"]
+    assert sum("native envelope-profile clearance" in value for value in logs) == len(queries)
+    assert sum("required-envelope longitudinal wall" in value for value in logs) == len(profile.receiver_wall_budget())
+    assert any(f"printed-pilot sharp-step wall {step_wall:.6f}" in value for value in logs)
+    assert any("required thread-cutting step wall" in value for value in logs)
+    info = " ".join(value for kind, value in events if kind == "info").lower()
+    for statement in ("conforming", "process", "inspection", "before machining", "native pilot", "cosmetic"):
+        assert statement in info
+    assert "not physical-tool proof" in info
 
 
 @pytest.mark.parametrize("step_wall", [1.99, 0.0, math.nan, math.inf, -math.inf])
-def test_extracted_receiver_rejects_failed_step_budget_despite_valid_longitudinal_walls(
-    step_wall: float,
-) -> None:
+def test_extracted_receiver_rejects_failed_pilot_step_despite_valid_required_envelope(step_wall: float) -> None:
     import magnifying_bracket_joint_layout as joint
 
     faces, queries = _receiver_faces()
@@ -641,18 +667,150 @@ def test_extracted_receiver_rejects_failed_step_budget_despite_valid_longitudina
 
     namespace = _source_helpers(
         ("_assert_receiver_profile_walls",),
-        receiver_step_wall_budget=step_budget,
+        receiver_pilot_step_wall_budget=step_budget,
         _telemetry=SimpleNamespace(success=messages.append),
     )
     with pytest.raises(RuntimeError, match="sharp-step wall"):
         namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
     assert calls == [len(joint.LEVER_HOLE_POINTS)]
-    assert len(queries) == len(joint.LEVER_HOLE_POINTS)
-    assert sum("actual native profile wall" in message for message in messages) == len(
-        joint.LEVER_HOLE_POINTS
-    )
-    assert sum("worst signed wall" in message for message in messages) == len(profile.receiver_wall_budget())
+    assert sum("native envelope-profile clearance" in message for message in messages) == len(queries)
+    assert sum("required-envelope longitudinal wall" in message for message in messages) == len(profile.receiver_wall_budget())
     assert not any("sharp-step wall" in message for message in messages)
+
+
+@pytest.mark.parametrize("cutting_wall", [1.99, 0.0, math.nan, math.inf, -math.inf])
+def test_extracted_receiver_keeps_independent_thread_cutting_step_guard(cutting_wall: float) -> None:
+    faces, _queries = _receiver_faces()
+    messages = []
+    namespace = _source_helpers(
+        ("_assert_receiver_profile_walls",),
+        receiver_thread_cutting_step_wall_budget=lambda: cutting_wall,
+        _telemetry=SimpleNamespace(success=messages.append, info=messages.append),
+    )
+    with pytest.raises(RuntimeError, match="required thread-cutting step wall"):
+        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    assert any("printed-pilot sharp-step wall" in message for message in messages)
+    assert not any("before machining" in message for message in messages)
+
+
+def test_extracted_receiver_rejects_larger_required_envelope_without_changing_pilot(monkeypatch) -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    pilot = joint.receiver_pilot_step_wall_budget()
+    monkeypatch.setattr(joint, "THREAD_CUTTING_ENVELOPE_DIA_MAX", 4.0)
+    faces, _queries = _receiver_faces()
+    namespace = _source_helpers(("_assert_receiver_profile_walls",))
+    with pytest.raises(RuntimeError, match="required-envelope longitudinal wall"):
+        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    assert joint.receiver_pilot_step_wall_budget() == pilot
+
+
+def test_extracted_hidden_envelope_reference_emits_independent_construction_requirements() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    recorder = _SketchRecorder()
+    planes, construction, anchors, hidden, direct = [], [], [], [], []
+
+    async def create(plane):
+        planes.append(plane)
+        return recorder._result(None)
+
+    async def dimension(adapter, first, second, kind, value, label):
+        recorder.dimensions.append((first, second, kind, value))
+
+    async def anchor(adapter, entity, x, y, label):
+        anchors.append((entity, x, y))
+
+    async def fully_defined(adapter, label):
+        assert len(anchors) == 2
+
+    class Dims:
+        def record(self, name, expression):
+            recorder.records.append((name, expression))
+
+        def apply(self, adapter, owner):
+            return [(f"{name}@{owner}", expression) for name, expression in recorder.records if expression]
+
+    recorder.create_sketch = create
+    namespace = _source_helpers(
+        ("_bracket_thread_cutting_envelope_reference",),
+        SketchDims=Dims,
+        check=lambda label, result: result.data,
+        set_sketch_direct_db=lambda adapter, enabled: direct.append(enabled),
+        _as_construction=lambda adapter, entity: construction.append(entity),
+        dimension_between=dimension, anchor_point_to_origin=anchor,
+        ensure_fully_defined=fully_defined,
+        name_last_feature=lambda adapter, name: hidden.append(("name", name)),
+        blank_reference_sketches=lambda adapter, names: hidden.append(("blank", names)),
+    )
+    jobs = []
+    asyncio.run(namespace["_bracket_thread_cutting_envelope_reference"](recorder, jobs))
+    x, _, z = joint.LEVER_HOLE_POINTS[0]
+    assert planes == ["Top"]
+    assert direct == [True, False]
+    assert list(recorder.primitives.values()) == [
+        ("line", (x - 1.2, -z, x + 1.2, -z)),
+        ("line", (x, -z, x, -z - 6.0)),
+    ]
+    assert construction == ["line0", "line1"]
+    assert recorder.constraints == [("line0", None, "horizontal"), ("line1", None, "vertical")]
+    assert anchors == [("line0.start", x - 1.2, -z), ("line1.start", x, -z)]
+    assert recorder.dimensions == [
+        ("line0.start", "line0.end", "horizontal_distance", 2.4),
+        ("line1.start", "line1.end", "vertical_distance", 6.0),
+    ]
+    assert jobs == [
+        ("BracketThreadCuttingEnvelopeDiameter@BracketThreadCuttingEnvelope", '"ThreadCuttingEnvelopeDiameter"'),
+        ("BracketThreadCuttingEnvelopeDepth@BracketThreadCuttingEnvelope", '"ThreadCuttingEnvelopeDepth"'),
+    ]
+    assert hidden == [
+        ("name", "BracketThreadCuttingEnvelope"), ("blank", ("BracketThreadCuttingEnvelope",)),
+    ]
+
+
+@pytest.mark.parametrize("failure", [None, "nominal", "refused", "type", "minimum", "maximum"])
+def test_extracted_envelope_max_metadata_authors_and_reads_back_real_limits(failure) -> None:
+    dimensions = {}
+    precision = []
+
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, minimum, maximum):
+            self.minimum, self.maximum = minimum, maximum
+            if failure == "type":
+                self.Type = 2
+            return failure != "refused"
+
+        def GetMinValue(self):
+            return 0.0 if failure == "minimum" else self.minimum
+
+        def GetMaxValue(self):
+            return 0.001 if failure == "maximum" else self.maximum
+
+    for name, maximum in (
+        ("BracketThreadCuttingEnvelopeDiameter", 2.4),
+        ("BracketThreadCuttingEnvelopeDepth", 6.0),
+    ):
+        dimensions[name] = SimpleNamespace(
+            SystemValue=(maximum + (0.1 if failure == "nominal" else 0.0)) / 1000.0,
+            Tolerance=Tolerance(),
+        )
+    namespace = _source_helpers(
+        ("_thread_cutting_envelope_max_limits",),
+        _named_dimension=lambda adapter, owner, name: (None, dimensions[name]),
+        set_dimension_display_precision=lambda adapter, owner, name, places: precision.append((owner, name, places)),
+    )
+    if failure:
+        with pytest.raises(RuntimeError, match="removal-envelope"):
+            namespace["_thread_cutting_envelope_max_limits"](object())
+        return
+    namespace["_thread_cutting_envelope_max_limits"](object())
+    for name, dimension in dimensions.items():
+        assert dimension.Tolerance.Type == 6  # SDK swTolMAX, not swTolBILAT.
+        assert dimension.Tolerance.GetMinValue() == -dimension.SystemValue
+        assert dimension.Tolerance.GetMaxValue() == 0.0
+        assert ("BracketThreadCuttingEnvelope", name, 2) in precision
 
 
 @pytest.mark.parametrize("invalid", [(0.0, 0.0, 0.0), (math.nan, 0.0, 0.0, 0.0, 0.0)])
