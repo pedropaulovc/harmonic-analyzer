@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from functools import partial
 from typing import Any
 
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_part_drawing import build_purchased_part_drawing
+from _purchased_title_fit import fit_purchased_title_block
 from ch_rocker_arm_tl_vn_oblique_pivot_lock_wire_spec import CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_lock_wire"]
@@ -16,7 +18,13 @@ ITEM = CALLOUT
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_part_drawing(adapter, SPEC, item=ITEM, cut_to_suit=True)
+    return await build_purchased_part_drawing(
+        adapter,
+        SPEC,
+        item=ITEM,
+        cut_to_suit=True,
+        title_block_setup=partial(fit_purchased_title_block, spec=SPEC),
+    )
 
 
 def _parse_args() -> argparse.Namespace:

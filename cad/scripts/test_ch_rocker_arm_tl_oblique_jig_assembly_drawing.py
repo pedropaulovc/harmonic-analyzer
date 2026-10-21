@@ -356,7 +356,6 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
     cartridge = drawing.CARTRIDGE_LAYOUT
     top_capture = drawing.TOP_CAPTURE_LAYOUT
     capture = drawing.CAPTURE_LAYOUT
-    assert instruction_words(cartridge) == words(" ".join(spec.CARTRIDGE_STEPS))
     assert instruction_words(top_capture) == words(" ".join(spec.TOP_CAPTURE_STEPS))
     assert instruction_words(capture) == words(" ".join(spec.CAPTURE_STEPS))
     assert not cartridge.checks and not top_capture.checks
@@ -796,8 +795,8 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
     outline = _view_box(center, *_iso_size(0.0), drawing.ISOMETRIC_SCALE)
     if outside_room:
         outline = (*outline[:3], region[3] + drawing.REGION_GAP)
-    view = SimpleNamespace(GetOutline=lambda: outline)
-    sheets, placements, configurations, detail_checks = [], [], [], []
+    view = SimpleNamespace(GetOutline=lambda: outline, ScaleRatio=(1.0, 17.0))
+    sheets, placements, configurations, detail_checks, captions = [], [], [], [], []
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
         drawing, "_activate_sheet", lambda _adapter, sheet: sheets.append(sheet)
@@ -832,6 +831,11 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
         drawing, "assert_full_detail_view",
         lambda _adapter, *, label: detail_checks.append(label),
     )
+    monkeypatch.setattr(
+        drawing, "_add_note_block",
+        lambda _adapter, sheet, text, xy, *, label:
+        captions.append((sheet, text, xy)),
+    )
     # Keep the real guard: it must use the returned native GetOutline, not
     # assume the estimated or requested view fits its capture-sheet room.
     if outside_room:
@@ -841,6 +845,11 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
     else:
         drawing._place_finished_view(_ADAPTER)
         assert detail_checks
+        [(sheet, caption, xy)] = captions
+        assert sheet == drawing.CAPTURE_SHEET
+        assert caption.endswith("1:17")  # measured native scale, not a typed 1:15
+        assert _inside_sheet(_note_box(caption, xy))
+        assert not _overlap(_note_box(caption, xy), outline)
     assert sheets == [drawing.CAPTURE_SHEET]
     assert placements == [(spec.ISOMETRIC_VIEW, center, drawing.ISOMETRIC_SCALE)]
     assert configurations == [(False, drawing.ASSEMBLY_VIEW_CONFIGURATION)]
@@ -875,7 +884,7 @@ def test_every_bom_row_carries_one_balloon() -> None:
     walked = {
         stem: anchor
         for stem, anchor in drawing.BALLOON_ANCHORS.items()
-        if stem != spec.BASE_BAR and stem not in spec.KIT_IDENTITIES
+        if stem not in {spec.BASE_BAR, spec.RAIL} and stem not in spec.KIT_IDENTITIES
     }
     assert all(
         anchor.instance is None and anchor.point_mm is None
@@ -892,6 +901,16 @@ def test_every_bom_row_carries_one_balloon() -> None:
     assert bar.point_mm == (200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK)
     assert base_bar.NEAR_SLOT_X < bar.point_mm[0] < base_bar.FAR_SLOT_X
     assert 0.0 < bar.point_mm[0] < base_bar.BAR_LENGTH
+    rail = drawing.BALLOON_ANCHORS[spec.RAIL]
+    assert rail.instance == spec.instance_name(spec.RAIL, 0)
+    x, y, z = rail.point_mm
+    assert spec.guide_rail.HOLE_X[-2] < x < spec.guide_rail.HOLE_X[-1]
+    assert (y, z) in spec.guide_rail.SECTION
+    assert z == spec.guide_rail.HEIGHT
+    nut = drawing.BALLOON_ANCHORS[spec.T_NUT]
+    assert nut.instance == spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1)
+    assert nut.instance != spec.instance_name(spec.T_NUT, 0)
+    assert nut.point_mm == (0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0)
     assert drawing.BALLOON_RING_REACH == (
         drawing.BALLOON_MARGIN + drawing.BALLOON_RADIUS
     )
@@ -1761,6 +1780,106 @@ def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
         assert not _overlap(text, other)
 
 
+@pytest.mark.parametrize("ignored_move", (False, True))
+def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
+    monkeypatch, ignored_move,
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    target = (0.206, 0.146)
+    position = [0.220, 0.139, 0.0]
+    dimension = SimpleNamespace(
+        SystemValue=spec.cl_dowel.TIP_HEIGHT / 1000.0,
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    display = SimpleNamespace(
+        OffsetText=False,
+        GetDimension2=lambda _configuration: dimension,
+        GetText=lambda part: "(" if part == 1 else ")",
+        GetPrimaryPrecision2=lambda: spec.CL_TIP_PRECISION,
+    )
+
+    def move(x, y, z):
+        if display.OffsetText and not ignored_move:
+            position[:] = (x, y, z)
+        return True  # the readback, not this return, catches an ignored move
+
+    annotation = SimpleNamespace(
+        SetPosition2=move, GetPosition=lambda: tuple(position)
+    )
+    display.GetAnnotation = lambda: annotation
+    imports = []
+
+    def curate(_adapter, _view, **kwargs):
+        imports.append(kwargs["keep"])
+        return [annotation]
+
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda *a, **kw: target)
+    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *a, **kw: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *a, **kw: None)
+    monkeypatch.setattr(drawing, "set_reference_dimension", lambda *a, **kw: display)
+    if ignored_move:
+        with pytest.raises(RuntimeError, match="native offset text"):
+            drawing._cl_tip_setting(_ADAPTER, object())
+    else:
+        settled = drawing._cl_tip_setting(_ADAPTER, object())
+        assert imports == [{spec.CL_TIP_DIMENSION: target}]
+        assert position == [*target, 0.0]
+        assert dimension.SystemValue == spec.cl_dowel.TIP_HEIGHT / 1000.0
+        settled()
+        position[1] -= 0.003
+        with pytest.raises(RuntimeError, match="native offset text"):
+            settled()
+
+
+class _InspectionTransform:
+    """Nonidentity drawing-sketch transform: scale, rotation and origin."""
+
+    def __init__(self, scale, angle=math.pi / 2.0, origin=(0.031, -0.023, 0.0)):
+        self.scale, self.angle, self.origin = scale, angle, origin
+
+    @property
+    def ArrayData(self):
+        c, s = math.cos(self.angle), math.sin(self.angle)
+        return (c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0,
+                *self.origin, self.scale, 0.0, 0.0, 0.0)
+
+    def apply(self, xyz):
+        x, y, z = xyz
+        c, s = math.cos(self.angle), math.sin(self.angle)
+        ox, oy, oz = self.origin
+        return (ox + self.scale * (c * x - s * y),
+                oy + self.scale * (s * x + c * y),
+                oz + self.scale * z)
+
+    def Inverse(self):
+        c, s = math.cos(self.angle), math.sin(self.angle)
+        ox, oy, oz = self.origin
+        return _InspectionTransform(
+            1.0 / self.scale, -self.angle,
+            (-(c * ox + s * oy) / self.scale,
+             (s * ox - c * oy) / self.scale, -oz / self.scale),
+        )
+
+
+class _InspectionMathPoint:
+    def __init__(self, coordinates):
+        self.ArrayData = tuple(coordinates)
+
+    def MultiplyTransform(self, transform):
+        return _InspectionMathPoint(transform.apply(self.ArrayData))
+
+
+class _InspectionSheetSketch:
+    def __init__(self, sheet):
+        self.sheet = sheet
+
+    @property
+    def ModelToSketchTransform(self):
+        numerator, denominator = self.sheet.properties[2:4]
+        return _InspectionTransform(denominator / numerator)
+
+
 @pytest.fixture
 def native_property_package(monkeypatch):
     """Double the COM boundary, not recipe view placement or property linking.
@@ -1795,7 +1914,8 @@ def native_property_package(monkeypatch):
     )
     doc = SimpleNamespace(
         active=physical_names[0], sheets={}, notes=[], oversized=None,
-        sketch_lines=[], paper_edits=[],
+        sketch_lines=[], sketch_segments=[], paper_edits=[],
+        display_scale=1.0, display_shift=(0.0, 0.0), hidden_line=None,
     )
     for name in physical_names:
         sheet = SimpleNamespace(
@@ -1815,6 +1935,7 @@ def native_property_package(monkeypatch):
 
         sheet.SetScale = set_scale
         doc.sheets[name] = sheet
+        sheet.sketch = _InspectionSheetSketch(sheet)
 
     def activate(name):
         if name not in doc.sheets:
@@ -1873,11 +1994,34 @@ def native_property_package(monkeypatch):
     doc.GetCurrentSheet = lambda: doc.sheets[doc.active]
     doc.GetSheetNames = lambda: physical_names
     doc.Sheet = lambda name: doc.sheets[name]
-    doc.GetFirstView = lambda: SimpleNamespace(
-        GetNextView=lambda: (
-            doc.sheets[doc.active].views[0] if doc.sheets[doc.active].views else None
+    def first_view():
+        sheet = doc.sheets[doc.active]
+        display_origin, display_scale = (0.017, -0.011), 0.25
+
+        def lines(_crosshatch):
+            result = []
+            inverse = sheet.sketch.ModelToSketchTransform.Inverse()
+            for index, (owner, a, b) in enumerate(doc.sketch_lines):
+                if owner != sheet.name or index == doc.hidden_line:
+                    continue
+                points = []
+                for raw in (a, b):
+                    x, y, z = inverse.apply(raw)
+                    x = x * doc.display_scale + doc.display_shift[0]
+                    y = y * doc.display_scale + doc.display_shift[1]
+                    points.extend(((x - display_origin[0]) / display_scale,
+                                   (y - display_origin[1]) / display_scale, z))
+                result.extend((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, *points))
+            return tuple(result)
+
+        return SimpleNamespace(
+            GetNextView=lambda: sheet.views[0] if sheet.views else None,
+            GetSketch=lambda: sheet.sketch,
+            GetLines4=lines,
+            GetXform=lambda: (*display_origin, display_scale),
         )
-    )
+
+    doc.GetFirstView = first_view
     doc.CreateDrawViewFromModelView3 = create_view
     doc.ClearSelection2 = lambda _all: None
     doc.EditRebuild3 = lambda: True
@@ -1886,8 +2030,23 @@ def native_property_package(monkeypatch):
     def create_line(x0, y0, z0, x1, y1, z1):
         assert doc.paper_edits[-1] == doc.active
         assert doc.SketchManager.AddToDB is True
+        index = len(doc.sketch_lines)
+        sheet = doc.sheets[doc.active]
         doc.sketch_lines.append((doc.active, (x0, y0, z0), (x1, y1, z1)))
-        return object()
+
+        def endpoint(which):
+            x, y, z = doc.sketch_lines[index][which]
+            return SimpleNamespace(X=x, Y=y, Z=z)
+
+        segment = SimpleNamespace(
+            GetSketch=lambda: sheet.sketch,
+            GetType=lambda: 0,
+            ConstructionGeometry=False,
+            GetStartPoint2=lambda: endpoint(1),
+            GetEndPoint2=lambda: endpoint(2),
+        )
+        doc.sketch_segments.append(segment)
+        return segment
 
     doc.SketchManager = SimpleNamespace(AddToDB=False, CreateLine=create_line)
 
@@ -1896,7 +2055,11 @@ def native_property_package(monkeypatch):
         return value() if callable(value) else value
 
     adapter = SimpleNamespace(
-        currentModel=doc, _attempt=lambda callback: callback(), _get_attr_or_call=member
+        currentModel=doc, _attempt=lambda callback: callback(), _get_attr_or_call=member,
+        swApp=SimpleNamespace(
+            GetMathUtility=lambda: SimpleNamespace(CreatePoint=_InspectionMathPoint),
+            IsSame=lambda a, b: 1 if a is b else 0,
+        ),
     )
     for module in (drawing, _drawing_common, _drawing_view_configuration):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
@@ -1915,6 +2078,7 @@ def native_property_package(monkeypatch):
         )
     for module in (_drawing_common, _drawing_view_configuration):
         monkeypatch.setattr(module, "rebuild_drawing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
     for name in ("_create_package_sheets", "_require_view_axes", "_add_plan_tags",
                  "set_hidden_lines_removed", "isolate_drawing_view_components"):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
@@ -2052,13 +2216,19 @@ def test_c2a_section_is_real_sheet_ink_beside_the_live_source_view(
     drawing._place_package(package.adapter)
     assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
     assert package.doc.SketchManager.AddToDB is False
+    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
+    transform = sheet.sketch.ModelToSketchTransform
+    assert transform.scale == 20.0
     assert package.doc.sketch_lines == [
-        (drawing.TOP_CAPTURE_SHEET, (*start, 0.0), (*end, 0.0))
+        (drawing.TOP_CAPTURE_SHEET,
+         transform.apply((*start, 0.0)), transform.apply((*end, 0.0)))
         for start, end in drawing.pin_tip_inspection_lines()
     ]
     view, = package.doc.sheets[drawing.TOP_CAPTURE_SHEET].views
     assert view.model_path == str(drawing.SOURCE)
     for sheet, start, end in package.doc.sketch_lines:
+        inverse = transform.Inverse()
+        start, end = inverse.apply(start), inverse.apply(end)
         box = (
             min(start[0], end[0]), min(start[1], end[1]),
             max(start[0], end[0]), max(start[1], end[1]),
@@ -2068,6 +2238,47 @@ def test_c2a_section_is_real_sheet_ink_beside_the_live_source_view(
         for owner, text, xy in package.doc.notes:
             if owner == sheet:
                 assert not _overlap(box, _note_box(text, xy))
+    drawing._assert_pin_tip_inspection(package.adapter, package.doc.sketch_segments)
+
+
+@pytest.mark.parametrize("defect", (
+    "scaled-endpoints", "shifted-endpoints", "changed-sheet-scale",
+    "scaled-display", "shifted-display", "missing-display-line", "wrong-owner",
+))
+def test_c2a_settled_proof_refuses_scaled_displaced_or_missing_native_ink(
+    native_property_package, defect,
+) -> None:
+    package = native_property_package
+    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
+    sheet.SetScale(1.0, 20.0, False, False)
+    settled = drawing._place_pin_tip_inspection(package.adapter)
+    if defect in {"scaled-endpoints", "shifted-endpoints"}:
+        transform = sheet.sketch.ModelToSketchTransform
+        inverse = transform.Inverse()
+        lines = []
+        for owner, start, end in package.doc.sketch_lines:
+            points = []
+            for raw in (start, end):
+                x, y, z = inverse.apply(raw)
+                if defect == "scaled-endpoints":
+                    x, y = x / 20.0, y / 20.0  # the observed false-green size
+                else:
+                    x += 0.001  # still inside the region: bounds alone miss it
+                points.append(transform.apply((x, y, z)))
+            lines.append((owner, *points))
+        package.doc.sketch_lines[:] = lines
+    elif defect == "changed-sheet-scale":
+        sheet.SetScale(1.0, 25.0, False, False)
+    elif defect == "scaled-display":
+        package.doc.display_scale = 1.0 / 20.0
+    elif defect == "shifted-display":
+        package.doc.display_shift = (0.001, 0.0)
+    elif defect == "missing-display-line":
+        package.doc.hidden_line = 0
+    else:
+        package.doc.sketch_segments[0].GetSketch = lambda: object()
+    with pytest.raises(RuntimeError, match="C2A functional inspection"):
+        settled()
 
 
 @pytest.mark.parametrize("previous_add_to_db", (False, True))

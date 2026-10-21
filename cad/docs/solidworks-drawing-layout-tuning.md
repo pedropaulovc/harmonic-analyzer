@@ -130,6 +130,28 @@ outline and retain the strict final region/title-block check; exhausting the
 ladder still refuses the drawing. The reference caption and finalizer's
 per-sheet scale both report the measured-fit scale. The visible collapsed
 model view remains the live source of the instruction sheet's properties.
+
+The TL-00 C2A functional section in farm run
+`20261021T104559405Z-fe8717a1858740b59ae5521c62b90d19` created all 23 native
+lines but printed them at 1/20 size near the sheet origin, outside the border,
+while its labels remained in the intended area. `CreateLine` takes coordinates
+in the active drawing sketch, not paper metres. Obtain the sheet's own
+`IView` from `IDrawingDoc.GetFirstView`, then its `GetSketch()` and live
+`ModelToSketchTransform`; map the requested paper endpoints before creation.
+Do not hard-code a ×20 correction or change the sheet scale to conceal it.
+
+The recipe now requires every segment to belong to that sheet sketch and
+remain non-construction geometry. Both native endpoints inverse-map to their
+individual intended paper points within 0.1 µm, with their full bounds inside
+the reserved schematic region. Independently match all 23 lines against the
+sheet view's native `GetLines4` display ink, using `GetXform` for its paper
+origin and scale; model `GetPolylines` data excludes these user-drawn segments.
+Repeat the proofs after the finalizer re-pins the sheet scales and rebuilds.
+A count of successful `CreateLine` returns or a broad region-containment
+check alone cannot prove a full-sized, correctly located schematic. Offline
+regressions exercise nonidentity scale, rotation and origin, plus misplaced,
+scaled and missing display ink; fresh native export and all-ten-sheet visual
+inspection remain required.
 ### TL-22 pivot-block callout lanes
 
 The native drawing at `6dd691486` refused three enforced findings. On

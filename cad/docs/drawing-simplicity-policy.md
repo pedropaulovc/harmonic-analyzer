@@ -103,11 +103,17 @@ cannot ask for what the authors were told to leave out.
   gate 3 in the root `AGENTS.md`).
   Purchased drawings may opt into a recipe-local title-block setup after the
   source links resolve, returning final-rebuild checks through the existing
-  `settled_checks` contract. The TL-VN-74 clevis sheet widens only its existing
-  linked Name and Material notes to their actual native ruled cells, then fits
-  each to one row using native font metres and strict readable-height floors.
-  It preserves the complete linked values, anchors, typefaces and source-model
-  association; no saved template, model property or reference-view scale changes.
+  `settled_checks` contract. Only the TL-VN-73/74/75/76 captured-pivot purchases
+  opt into `_purchased_title_fit`: it widens their existing linked Name, Material
+  and DWG. NO. notes to their actual native ruled cells, then fits each to one
+  row. Readable native-height floors are 3 mm for Name/Number and 2 mm for
+  Material; an unfit complete value refuses export, never truncates it.
+  `SetTextFormat` can remove a leading native `<FONT size=15PTS>` tag. The
+  identity guard permits only that supported size-tag syntax around the same
+  exact `$PRPSHEET` expression and still requires the full resolved value.
+  Font, anchor and whole-cell bounds remain independently checked after the
+  final rebuild. No saved template, source property, purchase identity, grade
+  or reference-view scale changes.
 - **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
   and match-drilling open space for sloppy work, so avoid them as much as
   possible: prefer geometry whose loose bands hold the stack at the worst

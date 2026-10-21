@@ -8324,3 +8324,235 @@ def test_source_checkpoint_failure_capture_cannot_replace_primary(
         purchased._retain_supplier_source_failure(spec, original, [])
     assert caught.value is original
     assert "secondary capture interruption" in "\n".join(original.__notes__)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expression"),
+    [
+        ('$PRPSHEET:"SW-Title(Title)"', '$PRPSHEET:"SW-Title(Title)"'),
+        (
+            '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+            '$PRPSHEET:"SW-Title(Title)"',
+        ),
+        ('<FONT size=15.5PTS>$PRPSHEET:"Material"', '$PRPSHEET:"Material"'),
+        ('<FONT size=0.5PTS>$PRPSHEET:"Material"', '$PRPSHEET:"Material"'),
+    ],
+)
+def test_source_property_expression_accepts_only_the_optional_font_wrapper(
+    raw: str, expression: str
+) -> None:
+    from _purchased_title_fit import source_property_expression
+
+    assert source_property_expression(raw) == expression
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        '$PRP:"SW-Title(Title)"',
+        'NAME $PRPSHEET:"SW-Title(Title)"',
+        '$PRPSHEET:"SW-Title(Title)" suffix',
+        ' $PRPSHEET:"SW-Title(Title)"',
+        '$PRPSHEET:"SW-Title(Title)" ',
+        '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
+        '$PRPSHEET:"SW-Title(Title)"\n$PRPSHEET:"Material"',
+        '$PRPSHEET:"SW-Title(Title)"\n',
+        '$PRPSHEET:"SW-Title(Title)',
+        '$PRPSHEET:SW-Title(Title)',
+        '<B>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"</FONT>',
+        '<FONT size=15PTS><FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS> $PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRP:"SW-Title(Title)"',
+        '<FONT size=15PTS>literal',
+        '<FONT size=0PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=-15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=+15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=1e1PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=NaNPTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=infPTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PX>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size="15PTS">$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS color=red>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
+        '<font size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+    ],
+)
+def test_source_property_expression_refuses_noncontract_content(raw: str) -> None:
+    from _purchased_title_fit import source_property_expression
+
+    assert source_property_expression(raw) is None
+
+
+def test_linked_value_preserves_captured_name_when_native_format_strips_font() -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    # Captured native SetTextFormat readback: only FONT disappears; the full
+    # source property and resolved Name remain intact. This is not a COM echo.
+    assert_linked_value(
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        '$PRPSHEET:"SW-Title(Title)"',
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        label="Name",
+    )
+
+
+def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    # Synthetic identity control, not native after-fix evidence.
+    assert_linked_value(
+        '<FONT size=15PTS>$PRPSHEET:"Material"',
+        "ALLOY STEEL",
+        '$PRPSHEET:"Material"',
+        "ALLOY STEEL",
+        label="Material",
+    )
+
+
+@pytest.mark.parametrize(
+    ("actual_link", "actual_text"),
+    [
+        pytest.param(
+            '$PRPSHEET:"Title"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="different-property-even-with-identical-resolved-text",
+        ),
+        pytest.param(
+            '$PRP:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="different-property-owner",
+        ),
+        pytest.param(
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="literal-replacement",
+        ),
+        pytest.param(
+            'NAME $PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="extra-prefix",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)" suffix',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="extra-suffix",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="second-link",
+        ),
+        pytest.param(
+            '<B>$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="unsupported-markup",
+        ),
+        pytest.param(
+            '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="malformed-font",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot",
+            id="truncated-full-value",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin ",
+            id="value-whitespace-is-not-normalized",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-CLEVIS-PIN",
+            id="value-case-is-not-normalized",
+        ),
+    ],
+)
+def test_linked_value_refuses_true_identity_or_full_value_changes(
+    actual_link: str, actual_text: str
+) -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    expected_link = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
+    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    with pytest.raises(RuntimeError) as caught:
+        assert_linked_value(
+            expected_link, expected_text, actual_link, actual_text, label="Name"
+        )
+    message = str(caught.value)
+    for raw in (expected_link, expected_text, actual_link, actual_text):
+        assert repr(raw) in message
+
+
+@pytest.mark.parametrize(
+    "invalid_link",
+    [
+        'NAME $PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=0PTS>$PRPSHEET:"SW-Title(Title)"',
+        '$PRP:"SW-Title(Title)"',
+        "literal",
+    ],
+)
+def test_linked_value_refuses_invalid_expected_link_even_when_unchanged(
+    invalid_link: str,
+) -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    with pytest.raises(RuntimeError) as caught:
+        assert_linked_value(invalid_link, text, invalid_link, text, label="Name")
+    assert repr(invalid_link) in str(caught.value)
+    assert repr(text) in str(caught.value)
+
+
+def test_note_fits_cell_refuses_captured_native_name_overflow() -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    box = (0.310260575, 0.032472074, 0.409863405, 0.042956582)
+    ruled_cell = (0.3083506, 0.035906, 0.4191, 0.0475164)
+    inset = 0.0006
+    limit = (
+        ruled_cell[0] + inset,
+        ruled_cell[1] + inset,
+        ruled_cell[2] - inset,
+        ruled_cell[3] - inset,
+    )
+    assert not note_fits_cell(box, 2, limit)
+    # The captured bottom edge also fails independently of its two-row state.
+    assert not note_fits_cell(box, 1, limit)
+
+
+@pytest.mark.parametrize(
+    ("box", "fits"),
+    [
+        pytest.param((2.0, 3.0, 8.0, 7.0), True, id="interior"),
+        pytest.param((1.0, 2.0, 9.0, 8.0), True, id="all-four-boundaries"),
+        pytest.param((0.999, 3.0, 8.0, 7.0), False, id="left-overflow"),
+        pytest.param((2.0, 1.999, 8.0, 7.0), False, id="bottom-overflow"),
+        pytest.param((2.0, 3.0, 9.001, 7.0), False, id="right-overflow"),
+        pytest.param((2.0, 3.0, 8.0, 8.001), False, id="top-overflow"),
+        pytest.param((0.0, 1.0, 10.0, 9.0), False, id="center-inside-edges-outside"),
+    ],
+)
+def test_note_fits_cell_synthetic_four_edge_predicate_controls(
+    box: tuple[float, ...], fits: bool
+) -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    # Mathematical predicate controls only, never native after-fix proof.
+    assert note_fits_cell(box, 1, (1.0, 2.0, 9.0, 8.0)) is fits
+
+
+@pytest.mark.parametrize("rows", [-1, 0, 1, 2, 3])
+def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    # Mathematical predicate controls only, never native after-fix proof.
+    assert note_fits_cell((2.0, 3.0, 8.0, 7.0), rows, (1.0, 2.0, 9.0, 8.0)) is (
+        rows == 1
+    )
