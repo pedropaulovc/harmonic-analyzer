@@ -1348,11 +1348,34 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
         )
 
 
+def _native_dimension_anchor(annotation: Any) -> tuple[float, float, float] | None:
+    """``IAnnotation::GetPosition`` of an imported display dimension as
+    (sheet x, sheet y, native z), or None when unreadable.
+
+    Only x and y are the documented sheet placement (``types/IAnnotation/
+    GetPosition.md``: relative to the sheet's lower-left corner; a display
+    dimension's x, y is its text box's bottom-border centre). An imported model
+    dimension keeps a native z the move does not set: on farm source 9e0cccd61
+    curation's two ``SetPosition(x, y, 0.0)`` passes (it deleted two unrequested
+    imports) and ``SetPosition2(x, y, 0.0)`` read back (0.23628, 0.1381095625,
+    -0.03273): the line midpoint's sheet y as the offline elevation mapping
+    computes it, with z 32.7 mm off the sheet plane. The
+    recipes compare ``position[:2]`` (``_reposition_rerun_reason``,
+    ``_section_axis``) and carry the native z through a move
+    (``_drawing_annotation_extent``).
+    """
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        return None
+    return position
+
+
 def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
     """Import the builder's CL tip-above-riser dimension into the elevation at
     ``CL_TIP_TEXT_MODEL_MM``, parenthesise it as a reference and prove its
     nominal, places and that it carries no band; returns the same proof for
-    the settled drawing."""
+    the settled drawing. Every native anchor, arrow tip and requested point is
+    compared on the sheet plane (x, y); see ``_native_dimension_anchor``."""
     label = "jig elevation CL tip above riser"
     name = spec.CL_TIP_DIMENSION
     line_xy = model_point_in_view(
@@ -1370,7 +1393,7 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
         [(x / 1000.0, 0.0, z / 1000.0) for x, z in spec.CL_TIP_LINE],
         label=f"{label} native witness ends",
     )
-    arrow_tips = tuple((line_xy[0], y, 0.0) for _x, y in source_ends)
+    arrow_tips = tuple((line_xy[0], y) for _x, y in source_ends)
     _show_base_view_sketches(adapter, elevation, (spec.CL_TIP_FEATURE,), label=label)
     annotations = curate_view_dimensions(
         adapter,
@@ -1389,17 +1412,21 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     # Reset an inherited offset before positioning the dimension line. With
     # OffsetText on, SetPosition2 moves only the text and cannot repair a line
-    # curation previously left in the text lane.
+    # curation previously left in the text lane. The move keeps the native z.
     display.OffsetText = False
-    if bool(display.OffsetText) or not annotation.SetPosition2(*line_xy, 0.0):
-        raise RuntimeError(f"failed to position {label} dimension line")
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    anchor = _native_dimension_anchor(annotation)
     if (
-        len(position) != 3
-        or not all(math.isfinite(value) for value in position)
-        or math.dist(position, (*line_xy, 0.0)) > 0.00005
+        anchor is None
+        or bool(display.OffsetText)
+        or not annotation.SetPosition2(*line_xy, anchor[2])
     ):
-        raise RuntimeError(f"{label}: native dimension-line anchor at {position!r}")
+        raise RuntimeError(f"failed to position {label} dimension line at {anchor!r}")
+    position = _native_dimension_anchor(annotation)
+    if position is None or math.dist(position[:2], line_xy) > 0.00005:
+        raise RuntimeError(
+            f"{label}: native dimension-line anchor at {position!r}, "
+            f"expected sheet {line_xy!r}"
+        )
 
     def prove_dimension_line() -> None:
         data = _early_bound(display.GetDisplayData(), "IDisplayData")
@@ -1410,7 +1437,7 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
             raw = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
             if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
                 raise RuntimeError(f"{label}: unreadable native dimension-line arrow")
-            native_tips.append(raw[:3])
+            native_tips.append(raw[:2])
         # Use the same 0.05 mm paper tolerance as native annotation positions,
         # not the schematic's tighter mathematical endpoint-transform proof.
         for expected in arrow_tips:
@@ -1445,16 +1472,15 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
                 f"{when} {label}: {value_mm!r} mm, brackets {brackets!r}, "
                 f"tolerance type {int(tolerance.Type)}, {places} places"
             )
-        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        position = _native_dimension_anchor(annotation)
         if (
             not bool(display.OffsetText)
-            or len(position) != 3
-            or not all(math.isfinite(value) for value in position)
-            or math.dist(position, (*text_xy, 0.0)) > 0.00005
+            or position is None
+            or math.dist(position[:2], text_xy) > 0.00005
         ):
             raise RuntimeError(
                 f"{when} {label}: native offset text at {position!r}, "
-                f"expected {text_xy!r}"
+                f"expected sheet {text_xy!r}"
             )
         prove_dimension_line()
 

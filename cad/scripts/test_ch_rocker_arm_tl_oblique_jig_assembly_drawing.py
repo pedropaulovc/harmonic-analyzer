@@ -1776,7 +1776,7 @@ def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
 
 
 @pytest.mark.parametrize("defect", (
-    None, "ignored-offset", "line-follows-text", "inherited-offset",
+    None, "ignored-offset", "line-follows-text", "inherited-offset", "line-off-sheet-x",
 ))
 def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
     monkeypatch, defect,
@@ -1792,7 +1792,11 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
     for module in (drawing, _drawing_dimensions):
         monkeypatch.setattr(module, "rebuild_drawing", lambda *a, **kw: None)
     line_target, text_target = (0.217, 0.1382), (0.206, 0.146)
-    position = [0.220, 0.139, 0.0]
+    # SetPosition2's z is not the sheet: the imported dimension kept its own
+    # z -0.03273 after curation and SetPosition2 asked 0.0 (farm source
+    # 9e0cccd61), so the double ignores the requested z the same way.
+    native_z = -0.03273400182554304
+    position = [0.220, 0.139, native_z]
     line_position = position.copy()
     dimension = SimpleNamespace(
         SystemValue=spec.cl_dowel.TIP_HEIGHT / 1000.0,
@@ -1805,11 +1809,13 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
         GetPrimaryPrecision2=lambda: spec.CL_TIP_PRECISION,
     )
 
-    def move(x, y, z):
+    def move(x, y, _z):
+        # A real sheet miss, unlike the native z, still refuses the placement.
+        miss = 0.0001 if defect == "line-off-sheet-x" and not display.OffsetText else 0.0
         if not (display.OffsetText and defect == "ignored-offset"):
-            position[:] = (x, y, z)
+            position[:] = (x + miss, y, native_z)
         if not display.OffsetText or defect == "line-follows-text":
-            line_position[:] = (x, y, z)
+            line_position[:] = (x + miss, y, native_z)
         return True
 
     annotation = SimpleNamespace(
@@ -1820,7 +1826,7 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
     display.GetDisplayData = lambda: SimpleNamespace(
         GetArrowHeadCount=lambda: 2,
         GetArrowHeadAtIndex2=lambda index: (
-            line_position[0], line_position[1] + (-0.0002, 0.0002)[index], 0.0,
+            line_position[0], line_position[1] + (-0.0002, 0.0002)[index], native_z,
             0.0, 1.0, 0.0, 0.001, 0.003, 0.0, 0.0, 0.0, 1.0,
         ),
     )
@@ -1848,20 +1854,25 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
     adapter = SimpleNamespace(
         currentModel=_ADAPTER.currentModel, _attempt=lambda callback: callback()
     )
-    if defect in {"ignored-offset", "line-follows-text"}:
-        with pytest.raises(RuntimeError, match="native offset text|native dimension line"):
+    refusal = {
+        "ignored-offset": "native offset text",
+        "line-follows-text": "native dimension line lost arrow",
+        "line-off-sheet-x": "native dimension-line anchor",
+    }.get(defect)
+    if refusal is not None:
+        with pytest.raises(RuntimeError, match=refusal):
             drawing._cl_tip_setting(adapter, object())
     else:
         settled = drawing._cl_tip_setting(adapter, object())
         assert imports == [{spec.CL_TIP_DIMENSION: line_target}]
-        assert position == [*text_target, 0.0]
-        assert line_position == [*line_target, 0.0]
+        assert position == [*text_target, native_z]
+        assert line_position == [*line_target, native_z]
         assert dimension.SystemValue == spec.cl_dowel.TIP_HEIGHT / 1000.0
         settled()
         line_position[0] += 0.003
         with pytest.raises(RuntimeError, match="native dimension line"):
             settled()
-        line_position[:] = (*line_target, 0.0)
+        line_position[:] = (*line_target, native_z)
         position[1] -= 0.003
         with pytest.raises(RuntimeError, match="native offset text"):
             settled()
