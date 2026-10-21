@@ -1291,7 +1291,7 @@ def test_supplier_stock_view_settles_the_measured_frame_before_annotations(
 ) -> None:
     seat, stock = _supplier_seat(monkeypatch, center, scale, source_angle=source_angle)
     result = drawing._supplier_stock_view(
-        seat, center=center, scale=scale, keep=keep, label="MSC source", crop_head=crop_head,
+        seat, center=center, scale=scale, label="MSC source", crop_head=crop_head,
     )
     assert result is stock
     assert stock.Angle == pytest.approx(stock.INITIAL_ANGLE - source_angle, abs=1e-12)
@@ -1300,6 +1300,9 @@ def test_supplier_stock_view_settles_the_measured_frame_before_annotations(
     )
     assert tuple(stock.ScaleRatio) == scale and stock.UseSheetScale == 0
     assert stock.IsCropped() is crop_head
+    assert not seat.annotated
+    assert not any(entry[0] == "import" for entry in seat.log)
+    drawing._present_supplier_stock_view(seat, stock, keep=keep, label="MSC source")
     kinds = [entry[0] for entry in seat.log]
     first_measure = kinds.index("source-feature")
     assert kinds[:first_measure] == [
@@ -1342,7 +1345,20 @@ def test_supplier_final_frame_reader_reprojects_and_rejects_native_drift(
 ) -> None:
     seat, stock = _supplier_seat(monkeypatch, center, scale)
     drawing._supplier_stock_view(
-        seat, center=center, scale=scale, keep=keep, label="MSC source", crop_head=crop_head,
+        seat,
+        center=center,
+        scale=scale,
+        label="MSC source",
+        crop_head=crop_head,
+    )
+    points = drawing._supplier_profile_model_points(
+        seat,
+        stock,
+        crop_head=crop_head,
+        label="target capture",
+    )
+    stock.ReferencedDocument.FeatureByName = lambda _name: pytest.fail(
+        "settled frame must not re-read restored source geometry",
     )
     # Simulate a settled native transform changing behind the recorded view
     # properties. Keep the semantic center exact for the axis-only faults.
@@ -1369,17 +1385,16 @@ def test_supplier_final_frame_reader_reprojects_and_rejects_native_drift(
     seat.display_dirty = True
     if fault == "none":
         drawing._assert_supplier_profile_frame(
-            seat, stock, center, scale, crop_head=crop_head, label="settled source",
+            seat, stock, center, scale, points=points, label="settled source",
         )
     else:
         reason = "center moved" if fault.startswith("center-") else "axes lost"
         with pytest.raises(RuntimeError, match=reason):
             drawing._assert_supplier_profile_frame(
-                seat, stock, center, scale, crop_head=crop_head, label="settled source",
+                seat, stock, center, scale, points=points, label="settled source",
             )
     kinds = [entry[0] for entry in seat.log]
-    assert kinds.count("source-feature") == kinds.count("inverse-source-frame") == 1
-    assert kinds.count("sketch-to-model") == 4
+    assert not {"source-feature", "inverse-source-frame", "sketch-to-model"}.intersection(kinds)
     assert kinds.count("project-frame") == 1
     assert kinds.count("update") == 1
     assert kinds.index("update") < kinds.index("project-frame")
@@ -1446,21 +1461,59 @@ def test_full_supplier_profile_fits_its_fixed_cell_only_when_horizontal() -> Non
     assert ratio * (xmax - xmin) > top - bottom
 
 
-@pytest.mark.parametrize("newline", ["\n", "\r\n"])
-def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
-    monkeypatch, newline,
-):
+def _supplier_capture_value():
+    vertices = tuple(
+        (float(x) / 1000.0, float(y) / 1000.0, 0.0)
+        for x, y in drawing.SUPPLIER_PROFILE_MM
+    )
+    pairs = tuple(
+        (index, (index + 1) % len(vertices)) for index in range(len(vertices))
+    ) + tuple(drawing.SUPPLIER_PROFILE_SECTIONS)
+    model_points = tuple(vertices[index] for pair in pairs for index in pair)
+    xmin = min(point[0] for point in vertices)
+    xmax = max(point[0] for point in vertices)
+    axes = ((0.0, 0.0, 0.0), (0.001, 0.0, 0.0), (0.0, 0.001, 0.0))
+    return drawing.SupplierStockCapture(
+        drawing.NativeSketchGeometry(
+            model_points, tuple(range(0, len(model_points), 2)), ()
+        ),
+        (*axes, ((xmin + xmax) / 2.0, 0.0, 0.0)),
+        (*axes, (xmin / 2.0, 0.0, 0.0)),
+        str(drawing.SOURCE.resolve()),
+    )
+
+
+def _supplier_settled_seat(monkeypatch, *, newline="\n"):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(drawing, "_log_supplier_view_state", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
-    monkeypatch.setattr(drawing, "assert_supplier_view_fits", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "assert_supplier_annotations_fit", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        drawing, "_assert_supplier_profile_ink", lambda *_args, **_kwargs: None
+    )
+    presentations = []
+    monkeypatch.setattr(
+        drawing,
+        "assert_supplier_reference_dimension",
+        lambda adapter, display, **kwargs: presentations.append((display, kwargs)),
+    )
+    membership = []
+    monkeypatch.setattr(
+        drawing,
+        "_assert_source",
+        lambda adapter, view, display, **kwargs: membership.append(
+            (view, display, kwargs)
+        ),
+    )
+    capture = _supplier_capture_value()
     frames = []
     monkeypatch.setattr(
         drawing, "_assert_supplier_profile_frame",
-        lambda _adapter, view, center, scale, *, crop_head, label: frames.append(
-            (view.Name, center, scale, crop_head)
+        lambda _adapter, view, center, scale, *, points, label: frames.append(
+            (view.Name, center, scale, points)
         ),
     )
     template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
@@ -1494,10 +1547,12 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
                 GetDimension2=lambda _index, native=native: native,
                 GetPrimaryTolPrecision2=lambda: drawing.SUPPLIER_PRECISION,
             )
-            points = tuple(
-                SimpleNamespace(X=x / 1000.0, Y=y / 1000.0, Z=0.0)
-                for x, y in (drawing.SUPPLIER_PROFILE_MM[index] for index in row.vertices)
-            )
+
+            class NoLiveCoordinates:
+                def __getattr__(self, attribute):
+                    pytest.fail(f"settled attachment must not read {attribute}")
+
+            points = (NoLiveCoordinates(), NoLiveCoordinates())
             annotations.append(SimpleNamespace(
                 name=row.name, Visible=1,
                 GetSpecificAnnotation=lambda display=display: display,
@@ -1507,6 +1562,8 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
         views.append(SimpleNamespace(
             Name=name, ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
             UseSheetScale=0, ScaleRatio=scale,
+            GetReferencedModelName=lambda: str(drawing.SOURCE),
+            ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(drawing.SOURCE)),
             IsCropped=lambda cropped=cropped: cropped,
             UpdateViewDisplayGeometry=lambda: None,
             GetAnnotations=lambda annotations=annotations: annotations,
@@ -1527,14 +1584,115 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
         GetExtent=lambda: (0.03, 0.22, 0.0, 0.15, 0.24, 0.0),
     )
     notes = [(note, text, (0.02, 0.20, 0.18, 0.25))]
-    drawing._check_supplier_stock(adapter, *views, notes)
-    assert frames == [
-        ("stock", drawing.STOCK_CENTER, drawing.STOCK_SCALE, False),
-        ("head", drawing.STOCK_HEAD_CENTER, drawing.STOCK_HEAD_SCALE, True),
+    monkeypatch.setattr(
+        drawing, "_assert_supplier_source_bodiless",
+        lambda *_args: pytest.fail("settled checks must not switch source configurations"),
+    )
+    return SimpleNamespace(
+        adapter=adapter, views=views, notes=notes, capture=capture,
+        frames=frames, membership=membership, presentations=presentations, state=state,
+    )
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(monkeypatch, newline):
+    seat = _supplier_settled_seat(monkeypatch, newline=newline)
+    drawing._check_supplier_stock(seat.adapter, *seat.views, seat.notes, seat.capture)
+    assert seat.frames == [
+        ("stock", drawing.STOCK_CENTER, drawing.STOCK_SCALE, seat.capture.full_frame),
+        ("head", drawing.STOCK_HEAD_CENTER, drawing.STOCK_HEAD_SCALE, seat.capture.head_frame),
     ]
-    state.text = state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
+    assert len(seat.membership) == len(drawing.SUPPLIER_REFERENCE_DIMENSIONS)
+    assert all(
+        call[2]["feature"] == drawing.SUPPLIER_STOCK_FEATURE for call in seat.membership
+    )
+    assert {call[2]["name"] for call in seat.membership} == {
+        row.name for row in drawing.SUPPLIER_REFERENCE_DIMENSIONS
+    }
+    assert all(
+        contract["configuration"] == drawing.SUPPLIER_STOCK_CONFIGURATION
+        for _, contract in seat.presentations
+    )
+    seat.state.text = seat.state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
     with pytest.raises(RuntimeError, match="source label changed"):
-        drawing._check_supplier_stock(adapter, *views, notes)
+        drawing._check_supplier_stock(seat.adapter, *seat.views, seat.notes, seat.capture)
+
+
+@pytest.mark.parametrize("fault,reason", [
+    ("sheet", "cannot activate"), ("view-coverage", "two native views"),
+    ("identity", "identity changed"), ("view-path", "path changed"),
+    ("model-path", "path changed"), ("configuration", "configuration/scale/crop"),
+    ("sheet-scale", "configuration/scale/crop"), ("scale", "configuration/scale/crop"),
+    ("crop", "configuration/scale/crop"), ("coverage", "coverage changed"),
+    ("hidden", "dimension is hidden"), ("owner", "ownership/type"),
+    ("type", "ownership/type"), ("driven", "ownership/type"),
+    ("tolerance-type", "limit type"), ("tolerance-band", "limit band"),
+    ("tolerance-precision", "limit precision"), ("attachments", "two diagram vertices"),
+    ("attachment-kind", "two diagram vertices"), ("mapped-membership", "mapped member changed"),
+    ("presentation", "native presentation changed"), ("note-owner", "source label changed"),
+    ("note-hidden", "source label changed"), ("note-bounds", "source label changed"),
+])
+def test_supplier_settled_capture_retains_native_guards(monkeypatch, fault, reason):
+    seat = _supplier_settled_seat(monkeypatch)
+    full = seat.views[0]
+    annotation = full.GetAnnotations()[0]
+    display = annotation.GetSpecificAnnotation()
+    native = display.GetDimension2(0)
+    if fault == "sheet":
+        seat.adapter.currentModel.ActivateSheet = lambda _name: False
+    elif fault == "view-coverage":
+        monkeypatch.setattr(drawing, "iter_views", lambda _adapter: seat.views[:1])
+    elif fault == "identity":
+        seat.adapter.swApp.IsSame = lambda *_args: 0
+    elif fault == "view-path":
+        full.GetReferencedModelName = lambda: "wrong-source.SLDPRT"
+    elif fault == "model-path":
+        full.ReferencedDocument.GetPathName = lambda: "wrong-source.SLDPRT"
+    elif fault == "configuration":
+        full.ReferencedConfiguration = "Original"
+    elif fault == "sheet-scale":
+        full.UseSheetScale = 1
+    elif fault == "scale":
+        full.ScaleRatio = (1.0, 1.0)
+    elif fault == "crop":
+        full.IsCropped = lambda: True
+    elif fault == "coverage":
+        full.GetAnnotations = lambda: []
+    elif fault == "hidden":
+        annotation.Visible = 0
+    elif fault == "owner":
+        native.FullName = "SupplierHeadHeight@UnrelatedSketch@source"
+    elif fault == "type":
+        display.Type2 = -1
+    elif fault == "driven":
+        native.DrivenState = 0
+    elif fault == "tolerance-type":
+        native.Tolerance.Type = -1
+    elif fault == "tolerance-band":
+        native.Tolerance.GetMaxValue = lambda: 0.1
+    elif fault == "tolerance-precision":
+        display.GetPrimaryTolPrecision2 = lambda: -1
+    elif fault == "attachments":
+        annotation.GetAttachedEntities3 = lambda: ()
+    elif fault == "attachment-kind":
+        annotation.GetAttachedEntityTypes = lambda: (2, 2)
+    elif fault in ("mapped-membership", "presentation"):
+        def refuse(*_args, **_kwargs):
+            raise RuntimeError(reason)
+
+        monkeypatch.setattr(
+            drawing,
+            "_assert_source" if fault == "mapped-membership" else "assert_supplier_reference_dimension",
+            refuse,
+        )
+    elif fault == "note-owner":
+        seat.notes[0][0].GetAnnotation().OwnerType = 0
+    elif fault == "note-hidden":
+        seat.notes[0][0].GetAnnotation().Visible = 0
+    else:
+        seat.notes[0][0].GetExtent = lambda: (-0.1, 0.22, 0.0, 0.15, 0.24, 0.0)
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._check_supplier_stock(seat.adapter, *seat.views, seat.notes, seat.capture)
 
 
 def test_supplier_diagnostics_read_native_vertices_not_expected_profile(monkeypatch):
@@ -1605,13 +1763,16 @@ def test_supplier_diagnostics_read_native_vertices_not_expected_profile(monkeypa
 
 
 @pytest.mark.parametrize("identity", [0, 1])
-def test_supplier_failure_captures_sheet_and_checks_final_frame_before_outline(monkeypatch, identity):
+@pytest.mark.parametrize("failure_stage", ["ink", "annotations"])
+def test_supplier_failure_captures_sheet_after_frame_ink_and_annotations(monkeypatch, identity, failure_stage):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
     views = [
         SimpleNamespace(
             Name=name, ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
             UseSheetScale=0, ScaleRatio=scale, IsCropped=lambda cropped=cropped: cropped,
+            GetReferencedModelName=lambda: str(drawing.SOURCE),
+            ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(drawing.SOURCE)),
             UpdateViewDisplayGeometry=lambda: None,
         )
         for name, scale, cropped in (
@@ -1634,10 +1795,17 @@ def test_supplier_failure_captures_sheet_and_checks_final_frame_before_outline(m
     monkeypatch.setattr(drawing, "_assert_supplier_profile_frame", lambda _adapter, view, *_args, **_kwargs: calls.append(
         ("frame", view.Name),
     ))
-    refusal = RuntimeError("native outline is still vertical")
+    refusal = RuntimeError(f"native {failure_stage} leaves its cell")
+
+    def ink(_adapter, view, *_args, **_kwargs):
+        calls.append(("ink", view.Name))
+        if failure_stage == "ink":
+            raise refusal
+
+    monkeypatch.setattr(drawing, "_assert_supplier_profile_ink", ink)
 
     def cell(*_args, **_kwargs):
-        calls.append(("cell",))
+        calls.append(("annotations",))
         raise refusal
 
     def capture(actual_adapter, label, message, **kwargs):
@@ -1647,10 +1815,18 @@ def test_supplier_failure_captures_sheet_and_checks_final_frame_before_outline(m
         calls.append(("capture", kwargs["exception"]))
         raise kwargs["exception"]
 
-    monkeypatch.setattr(drawing, "assert_supplier_view_fits", cell)
+    monkeypatch.setattr(drawing, "assert_supplier_annotations_fit", cell)
     monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(
+        drawing,
+        "_assert_supplier_source_bodiless",
+        lambda *_args: pytest.fail(
+            "settled checks must not switch source configurations"
+        ),
+    )
+    captured_source = _supplier_capture_value()
     with pytest.raises(RuntimeError) as caught:
-        drawing._verify_supplier_stock(adapter, *views, [])
+        drawing._verify_supplier_stock(adapter, *views, [], captured_source)
     assert calls[-1] == ("capture", caught.value)
     if identity:
         assert caught.value is refusal
@@ -1658,7 +1834,1735 @@ def test_supplier_failure_captures_sheet_and_checks_final_frame_before_outline(m
             ("snapshot", view.Name, f"{view.Name}: settled {phase} refresh")
             for view in views for phase in ("before", "after")
         ]
-        assert calls[4:6] == [("frame", "Drawing View4"), ("cell",)]
+        expected = [("frame", "Drawing View4"), ("ink", "Drawing View4")]
+        if failure_stage == "annotations":
+            expected.append(("annotations",))
+        assert calls[4:-1] == expected
     else:
         assert "identity changed" in str(caught.value)
         assert len(calls) == 1
+
+
+def _supplier_ink_seat(monkeypatch, cropped):
+    """Capture native endpoints once; final bounds use only immutable floats."""
+    import _drawing_detail_crop as crop
+    import _drawing_projection as projection
+
+    for module in (drawing, crop):
+        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+        monkeypatch.setattr(module, "double_array", _DoubleArray)
+    monkeypatch.setattr(projection, "double_array", _DoubleArray)
+
+    def invoke(obj, _interface, member, *args):
+        if member == "ModelToViewTransform":
+            assert messages[-1] == "refresh"
+        value = getattr(obj, member)
+        return (
+            value if member in ("ModelToViewTransform", "ArrayData") else value(*args)
+        )
+
+    monkeypatch.setattr(projection, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    points = [(*point, 0.0) for point in drawing.SUPPLIER_PROFILE_MM]
+    pairs = [(index, (index + 1) % len(points)) for index in range(len(points))]
+    pairs += list(drawing.SUPPLIER_PROFILE_SECTIONS)
+    lines = []
+    for first, last in pairs:
+        start = _SketchPoint(tuple(value / 1000.0 for value in points[first]))
+        end = _SketchPoint(tuple(value / 1000.0 for value in points[last]))
+        lines.append(
+            SimpleNamespace(
+                GetType=lambda: 0,
+                ConstructionGeometry=True,
+                GetStartPoint2=lambda start=start: start,
+                GetEndPoint2=lambda end=end: end,
+            )
+        )
+    assert len(lines) == 18
+
+    def source_to_model(xyz):
+        return (0.031 - xyz[1], xyz[0] - 0.043, xyz[2] + 0.057)
+
+    source = SimpleNamespace(
+        GetSketchSegments=lambda: lines,
+        ModelToSketchTransform=SimpleNamespace(Inverse=lambda: source_to_model),
+    )
+    feature = SimpleNamespace(
+        Name=drawing.SUPPLIER_STOCK_FEATURE,
+        GetTypeName2=lambda: "ProfileFeature",
+        GetSpecificFeature2=lambda: source,
+        Visible=0,
+        GetErrorCode2=lambda: (0, False),
+    )
+    other = SimpleNamespace(
+        Name="UnrelatedSketch", GetTypeName2=lambda: "ProfileFeature", Visible=2
+    )
+    shown = SimpleNamespace(Visible=2)
+    hidden = SimpleNamespace(Visible=1)
+    correspondence = {id(feature): shown, id(other): hidden}
+    correspondence.update((id(line), line) for line in lines)
+    model = SimpleNamespace(FeatureByName=lambda _name: feature)
+    monkeypatch.setattr(
+        drawing,
+        "FeatureWalk",
+        lambda actual: (feature, other) if actual is model else (),
+    )
+    center = drawing.STOCK_HEAD_CENTER if cropped else drawing.STOCK_CENTER
+    scale = drawing.STOCK_HEAD_SCALE if cropped else drawing.STOCK_SCALE
+    ratio = scale[0] / scale[1]
+    xs = [point[0] / 1000.0 for point in points]
+    semantic_x = (min(xs) / 2.0) if cropped else (min(xs) + max(xs)) / 2.0
+    projected = []
+
+    def model_to_sheet(xyz):
+        projected.append(tuple(xyz))
+        return (
+            center[0] + ratio * (xyz[1] + 0.043 - semantic_x),
+            center[1] + ratio * (0.031 - xyz[0]),
+            0.0,
+        )
+
+    # Crop sketch coordinates are rotated and translated independently of source.
+    circle = _Arc(
+        (0.017, -0.023, 0.0),
+        drawing.STOCK_HEAD_RADIUS_MM
+        * drawing.STOCK_HEAD_SCALE[0]
+        / drawing.STOCK_HEAD_SCALE[1]
+        / 1000.0,
+    )
+    circle.GetType = lambda: 1
+    circle.IsCircle = lambda: 1
+    drawing_segments = [circle] if cropped else []
+
+    def crop_to_sheet(xyz):
+        return (
+            drawing.STOCK_HEAD_CENTER[0] - (xyz[1] + 0.023),
+            drawing.STOCK_HEAD_CENTER[1] + (xyz[0] - 0.017),
+            xyz[2],
+        )
+
+    sketch = SimpleNamespace(
+        GetSketchSegments=lambda: drawing_segments,
+        ModelToSketchTransform=SimpleNamespace(Inverse=lambda: crop_to_sheet),
+    )
+
+    def forbidden_outline():
+        raise AssertionError("GetOutline is not native construction ink")
+
+    view = SimpleNamespace(
+        Name="MSC native ink",
+        ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+        ReferencedDocument=model,
+        GetBodiesCount=lambda: 0,
+        GetCorresponding=lambda obj: correspondence.get(id(obj)),
+        ModelToViewTransform=model_to_sheet,
+        GetSketch=lambda: sketch,
+        IsCropped=lambda: cropped,
+        GetOutline=forbidden_outline,
+        UpdateViewDisplayGeometry=lambda: messages.append("refresh"),
+    )
+    adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda: _Utility()))
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+
+    geometry = drawing.NativeSketchGeometry(
+        tuple(
+            source_to_model((point.X, point.Y, point.Z))
+            for line in lines
+            for point in (line.GetStartPoint2(), line.GetEndPoint2())
+        ),
+        tuple(range(0, 36, 2)),
+        (),
+    )
+
+    return SimpleNamespace(
+        adapter=adapter,
+        view=view,
+        lines=lines,
+        shown=shown,
+        hidden=hidden,
+        geometry=geometry,
+        feature=feature,
+        source=source,
+        correspondence=correspondence,
+        drawing_segments=drawing_segments,
+        circle=circle,
+        projected=projected,
+        messages=messages,
+        cell=drawing.STOCK_HEAD_CELL if cropped else drawing.STOCK_VIEW_CELL,
+    )
+
+
+@pytest.mark.parametrize("cropped", [False, True])
+def test_supplier_profile_ink_projects_immutable_target_without_live_source_reads(
+    monkeypatch, cropped
+):
+    seat = _supplier_ink_seat(monkeypatch, cropped)
+    if cropped:
+        monkeypatch.setattr(
+            drawing,
+            "native_sketch_view_bounds",
+            lambda *_args, **_kwargs: pytest.fail(
+                "head crop projected its hidden full carrier"
+            ),
+        )
+    seat.feature.GetSpecificFeature2 = lambda: pytest.fail(
+        "final ink read live source sketch"
+    )
+    seat.source.GetSketchSegments = lambda: pytest.fail(
+        "final ink read live source segments"
+    )
+    seat.source.ModelToSketchTransform.Inverse = lambda: pytest.fail(
+        "final ink read source frame"
+    )
+    for line in seat.lines:
+        line.GetStartPoint2 = lambda: pytest.fail("final ink read source endpoint")
+    drawing._assert_supplier_profile_ink(
+        seat.adapter,
+        seat.view,
+        seat.cell,
+        seat.geometry,
+        cropped=cropped,
+    )
+    assert len(seat.projected) == (0 if cropped else 36)
+    assert all(point[2] == 0.057 for point in seat.projected)
+
+
+@pytest.mark.parametrize(
+    "fault,reason",
+    [
+        ("configuration", "configuration"),
+        ("missing-shown", "reference inventory"),
+        ("extra-shown", "reference inventory"),
+        ("unknown-visibility", "unknown drawing reference visibility"),
+        ("drawing-geometry", "drawing-sketch geometry"),
+    ],
+)
+def test_supplier_profile_ink_rejects_current_view_inventory_changes(
+    monkeypatch, fault, reason
+):
+    seat = _supplier_ink_seat(monkeypatch, False)
+    if fault == "configuration":
+        seat.view.ReferencedConfiguration = "Default"
+    elif fault == "missing-shown":
+        seat.shown.Visible = 1
+    elif fault == "extra-shown":
+        seat.hidden.Visible = 2
+    elif fault == "unknown-visibility":
+        seat.shown.Visible = 3
+    else:
+        seat.drawing_segments.append(seat.circle)
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_profile_ink(
+            seat.adapter, seat.view, seat.cell, seat.geometry, cropped=False
+        )
+    if fault == "unknown-visibility":
+        assert any(
+            "view_reference_states=" in message
+            and "UnrelatedSketch" in message
+            and drawing.SUPPLIER_STOCK_FEATURE in message
+            for message in seat.messages
+        )
+
+
+@pytest.mark.parametrize(
+    "fault,reason",
+    [
+        ("missing", "unique persisted"),
+        ("extra", "unique persisted"),
+        ("not-cropped", "unique persisted"),
+        ("shifted", "crop frame"),
+        ("size", "crop frame"),
+        ("noncircle", "complete circle"),
+        ("nonarc", "sketch arc"),
+        ("null-inverse", "inverse is unavailable"),
+    ],
+)
+def test_supplier_profile_ink_rejects_changed_persisted_crop(
+    monkeypatch, fault, reason
+):
+    seat = _supplier_ink_seat(monkeypatch, True)
+    if fault == "missing":
+        seat.drawing_segments.clear()
+    elif fault == "extra":
+        seat.drawing_segments.append(seat.circle)
+    elif fault == "not-cropped":
+        seat.view.IsCropped = lambda: False
+    elif fault == "shifted":
+        seat.circle.center = (0.018, -0.023, 0.0)
+    elif fault == "size":
+        seat.circle.radius *= 1.1
+    elif fault == "noncircle":
+        seat.circle.IsCircle = lambda: 0
+    elif fault == "null-inverse":
+        seat.view.GetSketch().ModelToSketchTransform.Inverse = lambda: None
+    else:
+        seat.circle.GetType = lambda: 0
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_profile_ink(
+            seat.adapter, seat.view, seat.cell, seat.geometry, cropped=True
+        )
+    assert any(
+        f"drawing_sketch_segment_count={len(seat.drawing_segments)}" in message
+        and "drawing_sketch_segment_types=" in message
+        for message in seat.messages
+    )
+
+
+@pytest.mark.parametrize("cropped", [False, True])
+def test_supplier_profile_ink_cell_has_zero_slack(monkeypatch, cropped):
+    seat = _supplier_ink_seat(monkeypatch, cropped)
+    if cropped:
+        inverse = seat.view.GetSketch().ModelToSketchTransform.Inverse()
+        cx, cy, cz = seat.circle.center
+        center = inverse((cx, cy, cz))
+        radial = inverse((cx, cy + seat.circle.radius, cz))
+        right = center[0] + abs(radial[0] - center[0])
+    else:
+        right = max(
+            seat.view.ModelToViewTransform(
+                (0.031 - point.Y, point.X - 0.043, point.Z + 0.057)
+            )[0]
+            for line in seat.lines
+            for point in (line.GetStartPoint2(), line.GetEndPoint2())
+        )
+    left, bottom, _right, top = seat.cell
+    drawing._assert_supplier_profile_ink(
+        seat.adapter,
+        seat.view,
+        (left, bottom, right, top),
+        seat.geometry,
+        cropped=cropped,
+    )
+    with pytest.raises(RuntimeError, match="ink leaves its cell"):
+        drawing._assert_supplier_profile_ink(
+            seat.adapter,
+            seat.view,
+            (left, bottom, math.nextafter(right, -math.inf), top),
+            seat.geometry,
+            cropped=cropped,
+        )
+
+
+@pytest.mark.parametrize("fault", ["one-ulp", "duplicate"])
+def test_supplier_profile_state_matches_vertices_without_float_ordering(fault):
+    row = next(
+        row
+        for row in drawing.SUPPLIER_REFERENCE_DIMENSIONS
+        if drawing.SUPPLIER_PROFILE_MM[row.vertices[0]][0]
+        == drawing.SUPPLIER_PROFILE_MM[row.vertices[1]][0]
+        and drawing.SUPPLIER_PROFILE_MM[row.vertices[0]][1]
+        != drawing.SUPPLIER_PROFILE_MM[row.vertices[1]][1]
+    )
+    points = sorted(
+        [(*drawing.SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices],
+        key=lambda point: point[1],
+    )
+    points = [
+        (math.nextafter(points[0][0], math.inf), *points[0][1:]),
+        (math.nextafter(points[1][0], -math.inf), *points[1][1:]),
+    ]
+    if fault == "duplicate":
+        points[1] = points[0]
+    if fault == "duplicate":
+        with pytest.raises(RuntimeError, match="source-diagram vertices"):
+            drawing._assert_supplier_profile_vertices(row, points)
+    else:
+        drawing._assert_supplier_profile_vertices(row, points)
+
+
+@pytest.mark.parametrize(
+    "actual,expected",
+    [
+        ([(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)]),
+        ([(0.0, 0.0, 0.0), (1e-9, 0.0, 0.0)], [(0.0, 0.0, 0.0), (1e-9, 0.0, 0.0)]),
+    ],
+)
+def test_supplier_points_match_refuses_duplicate_or_ambiguous_points(actual, expected):
+    assert not drawing._supplier_points_match(actual, expected, tolerance=1e-8)
+
+
+class _SupplierCensusTransform:
+    def __init__(self):
+        self.ArrayData = [
+            0.0,
+            -1.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.043,
+            0.031,
+            -0.057,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        ]
+
+    def Inverse(self):
+        matrix = self.ArrayData
+        rotation = [matrix[column * 3 + row] for row in range(3) for column in range(3)]
+        translation = [
+            -sum(matrix[9 + row] * rotation[row * 3 + axis] for row in range(3))
+            for axis in range(3)
+        ]
+        return _SupplierCensusInverse(rotation + translation + [1.0, 0.0, 0.0, 0.0])
+
+
+class _SupplierCensusInverse:
+    def __init__(self, matrix):
+        self.ArrayData = matrix
+
+    def __call__(self, point):
+        matrix = self.ArrayData
+        return tuple(
+            sum(point[row] * matrix[row * 3 + axis] for row in range(3))
+            + matrix[9 + axis]
+            for axis in range(3)
+        )
+
+
+def _supplier_body_census_seat(monkeypatch, *, original="Original", dirty=False):
+    import _supplier_reference_geometry as native_geometry
+
+    monkeypatch.setattr(native_geometry, "_bind", lambda obj, _interface: obj)
+    monkeypatch.setattr(native_geometry, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", _DoubleArray)
+    state = SimpleNamespace(configuration=original, dirty=dirty, calls=[], messages=[])
+    installed = "Installed"
+    counts = {installed: (1, 0), drawing.SUPPLIER_STOCK_CONFIGURATION: (0, 0)}
+    geometry = {}
+    displays = {}
+    pairs = [
+        (index, (index + 1) % len(drawing.SUPPLIER_PROFILE_MM))
+        for index in range(len(drawing.SUPPLIER_PROFILE_MM))
+    ] + list(drawing.SUPPLIER_PROFILE_SECTIONS)
+    for configuration in {original, installed, drawing.SUPPLIER_STOCK_CONFIGURATION}:
+        lines = []
+        for first, last in pairs:
+            start, end = (
+                _SketchPoint(
+                    (
+                        *[
+                            value / 1000.0
+                            for value in drawing.SUPPLIER_PROFILE_MM[index]
+                        ],
+                        0.0,
+                    )
+                )
+                for index in (first, last)
+            )
+            lines.append(
+                SimpleNamespace(
+                    GetType=lambda: 0,
+                    ConstructionGeometry=True,
+                    GetStartPoint2=lambda start=start: start,
+                    GetEndPoint2=lambda end=end: end,
+                )
+            )
+        geometry[configuration] = SimpleNamespace(
+            GetSketchSegments=lambda lines=lines: lines,
+            lines=lines,
+            Is3D=lambda: False,
+            GetSketchBlockInstanceCount=lambda: 0,
+            GetSketchTextSegments=lambda: (),
+            GetUserPointsCount=lambda: 0,
+            ModelToSketchTransform=_SupplierCensusTransform(),
+        )
+        displays[configuration] = []
+        for row in drawing.SUPPLIER_REFERENCE_DIMENSIONS:
+            band = row.deviations_mm or (0.0, 0.0)
+            native = SimpleNamespace(
+                FullName=f"{row.name}@{drawing.SUPPLIER_STOCK_FEATURE}@source",
+                DrivenState=1,
+                Tolerance=SimpleNamespace(
+                    Type=0 if row.deviations_mm is None else 3,
+                    GetMinValue=lambda band=band: band[0] / 1000.0,
+                    GetMaxValue=lambda band=band: band[1] / 1000.0,
+                ),
+            )
+            attachment_points = tuple(
+                _SketchPoint(
+                    (
+                        *[
+                            value / 1000.0
+                            for value in drawing.SUPPLIER_PROFILE_MM[index]
+                        ],
+                        0.0,
+                    )
+                )
+                for index in row.vertices
+            )
+            annotation = SimpleNamespace(
+                GetAttachedEntityTypes=lambda: (11, 11),
+                GetAttachedEntities3=lambda points=attachment_points: points,
+            )
+            displays[configuration].append(
+                SimpleNamespace(
+                    Type2=row.native_type,
+                    GetDimension2=lambda _index, native=native: native,
+                    GetPrimaryTolPrecision2=lambda: drawing.SUPPLIER_PRECISION,
+                    GetAnnotation=lambda annotation=annotation: annotation,
+                )
+            )
+
+    def feature(name):
+        assert name == drawing.SUPPLIER_STOCK_FEATURE
+        state.calls.append(("feature", state.configuration))
+        return SimpleNamespace(
+            GetSpecificFeature2=lambda: geometry[state.configuration],
+            GetErrorCode2=lambda: (0, False),
+        )
+
+    def show(configuration):
+        state.calls.append(("show", configuration))
+        state.configuration = configuration
+        return True
+
+    def rebuild():
+        state.calls.append(("rebuild", state.configuration))
+        return True
+
+    def bodies(kind, visible_only):
+        assert visible_only is False
+        state.calls.append(("bodies", state.configuration, kind))
+        return tuple(object() for _ in range(counts[state.configuration][kind]))
+
+    # No save, feature-edit or other geometry-mutation APIs on this fake.
+    model = SimpleNamespace(
+        ShowConfiguration2=show,
+        EditRebuild3=rebuild,
+        GetBodies2=bodies,
+        GetSaveFlag=lambda: state.dirty,
+        IsOpenedReadOnly=lambda: True,
+        FeatureByName=feature,
+        GetPathName=lambda: str(drawing.SOURCE),
+        Parameter=lambda name: next(
+            (
+                display.GetDimension2(0)
+                for display in displays[state.configuration]
+                if display.GetDimension2(0).FullName.rsplit("@", 1)[0] == name
+            ),
+            None,
+        ),
+    )
+    views = [
+        SimpleNamespace(
+            Name=name,
+            ReferencedDocument=model,
+            ReferencedConfiguration=configuration,
+            GetBodiesCount=lambda: 0,
+            GetReferencedModelName=lambda: str(drawing.SOURCE),
+            GetCorresponding=lambda obj: obj,
+        )
+        for name, configuration in (
+            ("full", drawing.SUPPLIER_STOCK_CONFIGURATION),
+            ("head", drawing.SUPPLIER_STOCK_CONFIGURATION),
+            ("solid", installed),
+        )
+    ]
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            IsSame=lambda first, second: int(first is second),
+            GetMathUtility=lambda: _Utility(),
+        )
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_bind", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(
+        drawing,
+        "active_configuration_name",
+        lambda _adapter, _model: state.configuration,
+    )
+    monkeypatch.setattr(drawing._telemetry, "info", state.messages.append)
+
+    def source_displays(_feature):
+        state.calls.append(("source-dimensions", state.configuration))
+        return displays[state.configuration]
+
+    monkeypatch.setattr(drawing, "_feature_display_dimensions", source_displays)
+    capture_native = native_geometry.capture_native_sketch_geometry
+
+    def capture(sketch, *, label):
+        state.calls.append(("capture", state.configuration))
+        return capture_native(sketch, label=label)
+
+    monkeypatch.setattr(drawing, "capture_native_sketch_geometry", capture)
+    return SimpleNamespace(
+        adapter=adapter,
+        model=model,
+        views=views,
+        counts=counts,
+        state=state,
+        installed=installed,
+        geometry=geometry,
+        displays=displays,
+    )
+
+
+@pytest.mark.parametrize(
+    "original", ["Original", "Installed", drawing.SUPPLIER_STOCK_CONFIGURATION]
+)
+def test_supplier_source_bodiless_reads_actual_bodies_and_restores_original(
+    monkeypatch, original
+):
+    seat = _supplier_body_census_seat(monkeypatch, original=original)
+    drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == original
+    assert [call for call in seat.state.calls if call[0] == "bodies"] == [
+        ("bodies", configuration, kind)
+        for configuration in (seat.installed, drawing.SUPPLIER_STOCK_CONFIGURATION)
+        for kind in (0, 1)
+    ]
+    assert seat.state.calls[-1] == ("rebuild", original)
+    assert any(
+        "solid_bodies=1 sheet_bodies=0" in message for message in seat.state.messages
+    )
+    assert any(
+        f"source restored: original={original!r} configuration={original!r}" in message
+        for message in seat.state.messages
+    )
+
+
+@pytest.mark.parametrize(
+    "configuration,counts",
+    [
+        ("Installed", (0, 0)),
+        ("Installed", (2, 0)),
+        ("Installed", (1, 1)),
+        (drawing.SUPPLIER_STOCK_CONFIGURATION, (1, 0)),
+        (drawing.SUPPLIER_STOCK_CONFIGURATION, (0, 1)),
+    ],
+)
+def test_supplier_source_bodiless_rejects_actual_body_inventory_and_restores(
+    monkeypatch, configuration, counts
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    seat.counts[configuration] = counts
+    with pytest.raises(RuntimeError, match="solid/sheet="):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+
+
+@pytest.mark.parametrize(
+    "fault,reason",
+    [
+        ("identity", "same source"),
+        ("no-installed", "positive control"),
+        ("activate", "cannot activate"),
+        ("readback", "readback differs"),
+        ("rebuild", "cannot rebuild"),
+        ("rebuild-config", "rebuild changed configuration"),
+    ],
+)
+def test_supplier_source_bodiless_refuses_unproven_configuration(
+    monkeypatch, fault, reason
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    show, rebuild = seat.model.ShowConfiguration2, seat.model.EditRebuild3
+    if fault == "identity":
+        seat.views[0].ReferencedDocument = object()
+    elif fault == "no-installed":
+        seat.views[2].ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "activate":
+        seat.model.ShowConfiguration2 = lambda name: (
+            False if name == seat.installed else show(name)
+        )
+    elif fault == "readback":
+        seat.model.ShowConfiguration2 = lambda name: (
+            True if name == seat.installed else show(name)
+        )
+    elif fault == "rebuild":
+        seat.model.EditRebuild3 = lambda: (
+            False if seat.state.configuration == seat.installed else rebuild()
+        )
+    else:
+
+        def change_configuration():
+            if seat.state.configuration == seat.installed:
+                seat.state.configuration = "Wrong"
+            return rebuild()
+
+        seat.model.EditRebuild3 = change_configuration
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+
+
+@pytest.mark.parametrize("exception_type", [RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("restore_fails", [False, True])
+def test_supplier_source_bodiless_preserves_body_read_exception(
+    monkeypatch, restore_fails, exception_type
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    refusal = exception_type("native body read failed")
+    bodies, show = seat.model.GetBodies2, seat.model.ShowConfiguration2
+
+    def fail_supplier(kind, visible_only):
+        if seat.state.configuration == drawing.SUPPLIER_STOCK_CONFIGURATION:
+            raise refusal
+        return bodies(kind, visible_only)
+
+    seat.model.GetBodies2 = fail_supplier
+    if restore_fails:
+        seat.model.ShowConfiguration2 = lambda name: (
+            False if name == "Original" else show(name)
+        )
+    with pytest.raises(exception_type) as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert caught.value is refusal
+    if restore_fails:
+        assert any("restoration also failed" in note for note in refusal.__notes__)
+    else:
+        assert seat.state.configuration == "Original"
+
+
+def test_supplier_source_bodiless_refuses_failed_restore_after_successful_census(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    show = seat.model.ShowConfiguration2
+    seat.model.ShowConfiguration2 = lambda name: (
+        False if name == "Original" else show(name)
+    )
+    with pytest.raises(RuntimeError, match="cannot activate 'Original'"):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+
+
+def test_supplier_source_bodiless_tolerates_diagnostic_view_count_failure(monkeypatch):
+    seat = _supplier_body_census_seat(monkeypatch)
+
+    def unavailable():
+        raise RuntimeError("view selection count unavailable")
+
+    seat.views[2].GetBodiesCount = unavailable
+    drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert any(
+        "view selection count unavailable" in message for message in seat.state.messages
+    )
+
+
+def test_supplier_profile_ink_logs_complete_census_after_visibility_read_failure(
+    monkeypatch,
+):
+    seat = _supplier_ink_seat(monkeypatch, False)
+    corresponding = seat.view.GetCorresponding
+
+    def fail_source(feature):
+        if getattr(feature, "Name", None) == drawing.SUPPLIER_STOCK_FEATURE:
+            raise RuntimeError("native visibility unavailable")
+        return corresponding(feature)
+
+    seat.view.GetCorresponding = fail_source
+    with pytest.raises(RuntimeError, match="unknown drawing reference visibility"):
+        drawing._assert_supplier_profile_ink(
+            seat.adapter, seat.view, seat.cell, seat.geometry, cropped=False
+        )
+    assert any(
+        "native visibility unavailable" in message and "UnrelatedSketch" in message
+        for message in seat.messages
+    )
+
+
+def test_supplier_body_census_precedes_finalize_not_settled_checks():
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(
+        textwrap.dedent(inspect.getsource(drawing._build_read_only_source))
+    )
+    calls = {
+        name: [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        ]
+        for name in (
+            "_supplier_stock_sheet",
+            "_assert_supplier_source_bodiless",
+            "finalize_drawing",
+        )
+    }
+    assert all(len(nodes) == 1 for nodes in calls.values())
+    assert (
+        calls["_supplier_stock_sheet"][0].lineno
+        < calls["_assert_supplier_source_bodiless"][0].lineno
+        < calls["finalize_drawing"][0].lineno
+    )
+    for check in (
+        drawing._check_supplier_stock,
+        drawing._verify_supplier_stock,
+        drawing._assert_supplier_profile_frame,
+        drawing._assert_supplier_profile_ink,
+    ):
+        check_tree = ast.parse(textwrap.dedent(inspect.getsource(check)))
+        assert not any(
+            isinstance(node, ast.Call)
+            and (
+                isinstance(node.func, ast.Name)
+                and node.func.id
+                in (
+                    "_assert_supplier_source_bodiless",
+                    "active_configuration_name",
+                    "_supplier_profile_model_points",
+                    "capture_native_sketch_geometry",
+                )
+                or isinstance(node.func, ast.Attribute)
+                and node.func.attr
+                in (
+                    "ShowConfiguration2",
+                    "EditRebuild3",
+                    "GetBodies2",
+                    "GetStartPoint2",
+                    "GetEndPoint2",
+                )
+            )
+            for node in ast.walk(check_tree)
+        )
+        if check is not drawing._assert_supplier_profile_ink:
+            assert not any(
+                isinstance(node, ast.Attribute)
+                and node.attr in ("X", "Y", "Z", "ModelToSketchTransform")
+                for node in ast.walk(check_tree)
+            )
+
+
+def test_supplier_source_bodiless_refuses_existing_dirtiness_before_configuration_switch(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch, dirty=True)
+    with pytest.raises(RuntimeError, match="already dirty before clean capture"):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.dirty is True
+    assert not any(
+        call[0] in ("show", "bodies", "capture") for call in seat.state.calls
+    )
+    assert any("dirty=True" in message for message in seat.state.messages)
+
+
+def test_supplier_source_bodiless_refuses_configuration_churn_dirtiness(monkeypatch):
+    seat = _supplier_body_census_seat(monkeypatch)
+    show = seat.model.ShowConfiguration2
+
+    def dirty_switch(configuration):
+        seat.state.dirty = True
+        return show(configuration)
+
+    seat.model.ShowConfiguration2 = dirty_switch
+    with pytest.raises(
+        RuntimeError, match="already dirty before clean capture"
+    ) as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.dirty is True
+    assert any(
+        "dirty_before=False dirty_after=True" in message
+        for message in seat.state.messages
+    )
+    assert any("dirtied the source" in note for note in caught.value.__notes__)
+    assert not any(call[0] == "capture" for call in seat.state.calls)
+
+
+def test_supplier_source_bodiless_keeps_primary_error_when_restoration_dirties_source(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    seat.counts[drawing.SUPPLIER_STOCK_CONFIGURATION] = (1, 0)
+    show = seat.model.ShowConfiguration2
+
+    def dirty_restore(configuration):
+        if configuration == "Original":
+            seat.state.dirty = True
+        return show(configuration)
+
+    seat.model.ShowConfiguration2 = dirty_restore
+    with pytest.raises(RuntimeError, match="solid/sheet=") as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert any("dirtied the source" in note for note in caught.value.__notes__)
+
+
+def test_supplier_source_bodiless_refuses_and_logs_unreadable_readonly_state(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+
+    def unavailable():
+        raise RuntimeError("read-only state unavailable")
+
+    seat.model.IsOpenedReadOnly = unavailable
+    with pytest.raises(RuntimeError, match="read-only state unavailable"):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert not any(call[0] in ("show", "capture") for call in seat.state.calls)
+    assert any(
+        "read-only state unavailable" in message for message in seat.state.messages
+    )
+
+
+@pytest.mark.parametrize(
+    "fault,reason",
+    [
+        ("endpoint", "invalid native line inventory/endpoints"),
+        ("duplicate", "invalid native line inventory/endpoints"),
+        ("nonline", "invalid native line inventory/endpoints"),
+        ("nonconstruction", "invalid native line inventory/endpoints"),
+        ("count", "invalid native line inventory/endpoints"),
+        ("nonfinite-endpoint", "invalid native line inventory/endpoints"),
+        ("short-frame", "malformed sketch transform"),
+        ("nonfinite-frame", "malformed sketch transform"),
+        ("correspondence", "drawing correspondence"),
+    ],
+)
+def test_supplier_target_capture_rejects_canonical_defects_and_restores(
+    monkeypatch, fault, reason
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    sketch = seat.geometry[drawing.SUPPLIER_STOCK_CONFIGURATION]
+    if fault == "endpoint":
+        sketch.lines[0].GetStartPoint2().X += 0.0001
+    elif fault == "duplicate":
+        sketch.lines[-1] = sketch.lines[0]
+    elif fault == "nonline":
+        sketch.lines[0].GetType = lambda: 1
+    elif fault == "nonconstruction":
+        sketch.lines[0].ConstructionGeometry = False
+    elif fault == "count":
+        sketch.lines.pop()
+    elif fault == "nonfinite-endpoint":
+        sketch.lines[0].GetEndPoint2().Z = math.nan
+    elif fault == "short-frame":
+        sketch.ModelToSketchTransform.ArrayData.pop()
+    elif fault == "nonfinite-frame":
+        sketch.ModelToSketchTransform.ArrayData[0] = math.inf
+    else:
+        seat.views[0].GetCorresponding = lambda _segment: None
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+    diagnostics = [
+        message
+        for message in seat.state.messages
+        if "MSC configured source geometry configuration=" in message
+        and "native_line_inventory=" in message
+    ]
+    assert len(diagnostics) == 1
+    assert f"configuration={drawing.SUPPLIER_STOCK_CONFIGURATION!r}" in diagnostics[0]
+    assert "ModelToSketchTransform=" in diagnostics[0]
+
+
+def test_supplier_target_capture_accepts_reversed_one_ulp_native_lines(monkeypatch):
+    seat = _supplier_body_census_seat(monkeypatch)
+    sketch = seat.geometry[drawing.SUPPLIER_STOCK_CONFIGURATION]
+    sketch.lines.reverse()
+    for line in sketch.lines:
+        start, end = line.GetStartPoint2(), line.GetEndPoint2()
+        start.X = math.nextafter(start.X, math.inf)
+        end.X = math.nextafter(end.X, -math.inf)
+        line.GetStartPoint2 = lambda end=end: end
+        line.GetEndPoint2 = lambda start=start: start
+    capture = drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert len(capture.geometry.line_offsets) == 18
+    assert seat.state.configuration == "Original"
+
+
+def test_supplier_capture_accepts_different_original_geometry_without_reading_it(
+    monkeypatch,
+):
+    from dataclasses import FrozenInstanceError
+
+    seat = _supplier_body_census_seat(monkeypatch)
+    original = seat.geometry["Original"]
+    original.lines.clear()
+    original.ModelToSketchTransform.ArrayData[:] = [math.nan]
+    original.GetSketchSegments = lambda: pytest.fail("original geometry was read")
+    original.GetSketchTextSegments = lambda: pytest.fail("original ink was read")
+    original.ModelToSketchTransform.Inverse = lambda: pytest.fail(
+        "original frame was read"
+    )
+    capture = drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert [call for call in seat.state.calls if call[0] == "capture"] == [
+        ("capture", drawing.SUPPLIER_STOCK_CONFIGURATION),
+    ]
+    assert all(
+        call[1] == drawing.SUPPLIER_STOCK_CONFIGURATION
+        for call in seat.state.calls
+        if call[0] in ("feature", "source-dimensions")
+    )
+    target = seat.geometry[drawing.SUPPLIER_STOCK_CONFIGURATION]
+    target_point = target.lines[0].GetStartPoint2()
+    first_point = (target_point.X, target_point.Y, target_point.Z)
+    assert capture.geometry.model_points[0] == pytest.approx(
+        (
+            0.031 - first_point[1],
+            first_point[0] - 0.043,
+            first_point[2] + 0.057,
+        )
+    )
+    expected_axes = (
+        (0.031, -0.043, 0.057),
+        (0.031, -0.042, 0.057),
+        (0.030, -0.043, 0.057),
+    )
+    for probes in (capture.full_frame, capture.head_frame):
+        for actual, expected in zip(probes[:3], expected_axes, strict=True):
+            assert actual == pytest.approx(expected, rel=0.0, abs=1e-12)
+    assert capture.full_frame[3] == pytest.approx((0.031, -0.043 + 0.0477901, 0.057))
+    assert capture.head_frame[3] == pytest.approx((0.031, -0.043 - 0.0030099, 0.057))
+    snapshot = capture.geometry.model_points
+    target_point.X += 0.5
+    target.lines.clear()
+    assert capture.geometry.model_points == snapshot
+    with pytest.raises(FrozenInstanceError):
+        capture.source_path = "changed"
+    with pytest.raises(FrozenInstanceError):
+        capture.geometry.model_points = ()
+
+
+def test_supplier_source_geometry_restores_after_target_native_read_exception(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    refusal = RuntimeError("native target endpoints unavailable")
+
+    def unavailable():
+        raise refusal
+
+    seat.geometry[drawing.SUPPLIER_STOCK_CONFIGURATION].lines[
+        0
+    ].GetStartPoint2 = unavailable
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert caught.value is refusal
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+    assert any("source restored:" in message for message in seat.state.messages)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        (4, False),
+        (False, False),
+        (None, False),
+        ("0", False),
+        None,
+        0,
+        (),
+        (0,),
+        (0, False, False),
+    ],
+)
+def test_supplier_feature_status_refuses_before_target_native_inventory(
+    monkeypatch, status
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    feature = seat.model.FeatureByName(drawing.SUPPLIER_STOCK_FEATURE)
+    feature.GetErrorCode2 = lambda: status
+    feature.GetSpecificFeature2 = lambda: pytest.fail(
+        "invalid feature reached native inventory"
+    )
+    seat.model.FeatureByName = lambda _name: feature
+    with pytest.raises(RuntimeError, match="feature error/unreadable status"):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert any(
+        f"source_sketch_feature_error={status!r}" in message
+        for message in seat.state.messages
+    )
+
+
+@pytest.mark.parametrize("status", [(0, None), (0, True), [0, False]])
+def test_supplier_feature_status_ignores_undefined_success_warning(monkeypatch, status):
+    seat = _supplier_body_census_seat(monkeypatch)
+    feature_by_name = seat.model.FeatureByName
+
+    def feature(name):
+        result = feature_by_name(name)
+        result.GetErrorCode2 = lambda: status
+        return result
+
+    seat.model.FeatureByName = feature
+    drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+
+
+def test_supplier_feature_status_rejects_missing_target_native_feature(monkeypatch):
+    seat = _supplier_body_census_seat(monkeypatch)
+    seat.model.FeatureByName = lambda _name: None
+    with pytest.raises(RuntimeError, match="missing supplier sketch"):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+
+
+def test_supplier_feature_status_native_exception_preserves_identity_and_restores(
+    monkeypatch,
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    refusal = RuntimeError("native feature status unavailable")
+    feature_by_name = seat.model.FeatureByName
+
+    def unavailable():
+        raise refusal
+
+    def feature(name):
+        result = feature_by_name(name)
+        if seat.state.configuration == drawing.SUPPLIER_STOCK_CONFIGURATION:
+            result.GetErrorCode2 = unavailable
+            result.GetSpecificFeature2 = lambda: pytest.fail(
+                "failed status reached native inventory"
+            )
+        return result
+
+    seat.model.FeatureByName = feature
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert caught.value is refusal
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+
+
+@pytest.mark.parametrize(
+    "kind,reason",
+    [
+        ("blocks", "sketch blocks"),
+        ("text", "sketch text"),
+        ("user_points", "sketch user points"),
+    ],
+)
+def test_supplier_target_capture_rejects_nonsegment_ink(monkeypatch, kind, reason):
+    seat = _supplier_body_census_seat(monkeypatch)
+    sketch = seat.geometry[drawing.SUPPLIER_STOCK_CONFIGURATION]
+    if kind == "blocks":
+        sketch.GetSketchBlockInstanceCount = lambda: 1
+    elif kind == "text":
+        sketch.GetSketchTextSegments = lambda: (object(),)
+    else:
+        sketch.GetUserPointsCount = lambda: 1
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+
+
+@pytest.mark.parametrize("cropped", [False, True])
+def test_supplier_final_projection_uses_captured_target_after_actual_restore(
+    monkeypatch, cropped
+):
+    census = _supplier_body_census_seat(monkeypatch)
+    census.geometry["Original"].lines.clear()
+    census.geometry["Original"].ModelToSketchTransform.ArrayData[:] = [math.nan]
+    capture = drawing._assert_supplier_source_bodiless(census.adapter, *census.views)
+    assert census.state.configuration == "Original"
+    saved_calls = tuple(census.state.calls)
+
+    def unavailable(*_args, **_kwargs):
+        pytest.fail("settled proof accessed live source/configuration state")
+
+    census.model.ShowConfiguration2 = unavailable
+    census.model.EditRebuild3 = unavailable
+    census.model.FeatureByName = unavailable
+    for sketch in census.geometry.values():
+        sketch.GetSketchSegments = unavailable
+        sketch.ModelToSketchTransform.Inverse = unavailable
+    ink = _supplier_ink_seat(monkeypatch, cropped)
+    ink.view.ReferencedDocument.FeatureByName = unavailable
+    ink.source.GetSketchSegments = unavailable
+    ink.source.ModelToSketchTransform.Inverse = unavailable
+    for line in ink.lines:
+        line.GetStartPoint2 = unavailable
+        line.GetEndPoint2 = unavailable
+    center = drawing.STOCK_HEAD_CENTER if cropped else drawing.STOCK_CENTER
+    scale = drawing.STOCK_HEAD_SCALE if cropped else drawing.STOCK_SCALE
+    drawing._assert_supplier_profile_frame(
+        ink.adapter,
+        ink.view,
+        center,
+        scale,
+        points=capture.head_frame if cropped else capture.full_frame,
+        label="restored immutable target frame",
+    )
+    drawing._assert_supplier_profile_ink(
+        ink.adapter,
+        ink.view,
+        ink.cell,
+        capture.geometry,
+        cropped=cropped,
+    )
+    assert tuple(census.state.calls) == saved_calls
+    assert len(ink.projected) == (4 if cropped else 40)
+
+
+@pytest.mark.parametrize(
+    "fault,reason",
+    [
+        ("endpoint", "source-diagram vertices"),
+        ("duplicate", "source-diagram vertices"),
+        ("nonfinite", "source-diagram vertices"),
+        ("identity", "dimension identity changed"),
+        ("missing", "dimension coverage changed"),
+        ("repeated", "dimension coverage changed"),
+        ("attachment-count", "two diagram vertices"),
+        ("attachment-kind", "two diagram vertices"),
+        ("native-type", "ownership/type"),
+        ("driven-state", "ownership/type"),
+        ("tolerance-type", "limit type"),
+        ("tolerance-band", "limit band"),
+        ("tolerance-precision", "limit precision"),
+    ],
+)
+def test_supplier_capture_checks_actual_target_source_dimensions(
+    monkeypatch, fault, reason
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    displays = seat.displays[drawing.SUPPLIER_STOCK_CONFIGURATION]
+    display = displays[0]
+    annotation = display.GetAnnotation()
+    native = display.GetDimension2(0)
+    points = annotation.GetAttachedEntities3()
+    if fault == "endpoint":
+        points[0].X += 0.001
+    elif fault == "duplicate":
+        annotation.GetAttachedEntities3 = lambda: (points[0], points[0])
+    elif fault == "nonfinite":
+        points[0].Z = math.nan
+    elif fault == "identity":
+        seat.model.Parameter = lambda _name: object()
+    elif fault == "missing":
+        displays.pop()
+    elif fault == "repeated":
+        displays.append(display)
+    elif fault == "attachment-count":
+        annotation.GetAttachedEntities3 = lambda: points[:1]
+    elif fault == "attachment-kind":
+        annotation.GetAttachedEntityTypes = lambda: (2, 2)
+    elif fault == "native-type":
+        display.Type2 = -1
+    elif fault == "driven-state":
+        native.DrivenState = 0
+    elif fault == "tolerance-type":
+        native.Tolerance.Type = -1
+    elif fault == "tolerance-band":
+        native.Tolerance.GetMaxValue = lambda: 0.5
+    else:
+        display.GetPrimaryTolPrecision2 = lambda: -1
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert seat.state.calls[-1] == ("rebuild", "Original")
+    assert (
+        "source-dimensions",
+        drawing.SUPPLIER_STOCK_CONFIGURATION,
+    ) in seat.state.calls
+
+
+@pytest.mark.parametrize(
+    "restore_failure", ["activate", "readback", "rebuild", "rebuild-config", "dirty"]
+)
+def test_supplier_capture_primary_survives_every_restore_failure(
+    monkeypatch, restore_failure
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    refusal = KeyboardInterrupt("native target source points interrupted")
+    display = seat.displays[drawing.SUPPLIER_STOCK_CONFIGURATION][0]
+
+    def interrupted():
+        raise refusal
+
+    display.GetAnnotation = interrupted
+    show, rebuild = seat.model.ShowConfiguration2, seat.model.EditRebuild3
+
+    def restoring(configuration):
+        if configuration == "Original":
+            if restore_failure == "activate":
+                return False
+            if restore_failure == "readback":
+                return True
+            if restore_failure == "dirty":
+                seat.state.dirty = True
+        return show(configuration)
+
+    def rebuilding():
+        if seat.state.configuration == "Original":
+            if restore_failure == "rebuild":
+                return False
+            if restore_failure == "rebuild-config":
+                seat.state.configuration = "Wrong"
+        return rebuild()
+
+    seat.model.ShowConfiguration2 = restoring
+    seat.model.EditRebuild3 = rebuilding
+    with pytest.raises(KeyboardInterrupt) as caught:
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert caught.value is refusal
+    assert any("restoration also failed" in note for note in refusal.__notes__)
+
+
+def test_supplier_final_diagnostics_read_only_pose_not_live_source(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    # Deliberately no ReferencedDocument/GetSketch/geometry API on this view.
+    view = SimpleNamespace(
+        Name="settled source",
+        ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+        UseSheetScale=0,
+        ScaleRatio=drawing.STOCK_SCALE,
+        Angle=0.0,
+        Position=drawing.STOCK_CENTER,
+        GetOutline=lambda: drawing.STOCK_VIEW_CELL,
+        IsCropped=lambda: False,
+        ModelToViewTransform=SimpleNamespace(ArrayData=tuple(range(16))),
+    )
+    drawing._log_supplier_view_state(object(), view, stage="settled")
+    assert len(messages) == 2
+    assert all("read_error" not in message for message in messages)
+    assert "pose=" in messages[0] and "model_to_view=" in messages[1]
+
+
+def test_supplier_capture_binds_raw_source_display_dimensions(monkeypatch):
+    seat = _supplier_body_census_seat(monkeypatch)
+    displays = seat.displays[drawing.SUPPLIER_STOCK_CONFIGURATION]
+
+    class RawSourceDisplay:
+        def __init__(self, display):
+            self.display = display
+
+        def __getattr__(self, member):
+            pytest.fail(f"raw source display used before native binding: {member}")
+
+    raw_displays = [RawSourceDisplay(display) for display in displays]
+    bound = []
+
+    def bind(raw, interface):
+        assert interface == "IDisplayDimension"
+        bound.append(raw)
+        return raw.display
+
+    monkeypatch.setattr(
+        drawing, "_feature_display_dimensions", lambda _feature: raw_displays
+    )
+    monkeypatch.setattr(drawing, "_bind", bind)
+    drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert bound == raw_displays
+    assert seat.state.configuration == "Original"
+
+
+def _readonly_msc_build(monkeypatch, tmp_path):
+    """In-memory native boundaries; only the persisted-byte witness uses a file."""
+    import hashlib
+
+    source_path = tmp_path / "msc-source.SLDPRT"
+    source_path.write_bytes(b"original MSC source bytes")
+    monkeypatch.setattr(drawing, "SOURCE", source_path)
+    state = SimpleNamespace(
+        dirty=False,
+        read_only=True,
+        path=str(source_path),
+        configuration="Installed",
+        sheet=None,
+        captured=False,
+        events=[],
+        messages=[],
+        prepared_hook=None,
+        presentation_hook=None,
+        finalize_hook=None,
+        drawing_closed=False,
+    )
+    source = SimpleNamespace(
+        GetPathName=lambda: state.path,
+        GetSaveFlag=lambda: state.dirty,
+        IsOpenedReadOnly=lambda: state.read_only,
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Installed"),
+        ),
+    )
+
+    def activate_sheet(name):
+        state.sheet = name
+        state.events.append(("sheet", name))
+        return True
+
+    document = SimpleNamespace(ActivateSheet=activate_sheet)
+    adapter = SimpleNamespace(
+        currentModel=None,
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
+
+    class NativeView(SimpleNamespace):
+        def __getattribute__(self, name):
+            if (
+                name in ("Name", "GetReferencedModelName", "ReferencedDocument")
+                and state.drawing_closed
+            ):
+                raise RuntimeError("native drawing view disconnected after CloseDoc")
+            return super().__getattribute__(name)
+
+    def view(name):
+        return NativeView(
+            Name=name,
+            ReferencedDocument=source,
+            ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+            GetReferencedModelName=lambda: str(source_path),
+            UpdateViewDisplayGeometry=lambda: None,
+        )
+
+    full, head, tip = (view(name) for name in ("full", "head", "tip"))
+    placed = []
+
+    def opened(actual_adapter, path, *, label):
+        assert actual_adapter is adapter and path == source_path
+        state.events.append(("open-read-only", label))
+        adapter.currentModel = source
+        return source
+
+    def sha256(path):
+        assert path == source_path
+        value = hashlib.sha256(path.read_bytes()).hexdigest()
+        state.events.append(("hash", value))
+        return value
+
+    def new_drawing(actual_adapter, **_kwargs):
+        assert actual_adapter.currentModel is source
+        state.events.append(("drawing",))
+        actual_adapter.currentModel = document
+        return document, object()
+
+    def place(_adapter, path, orientation, *_args, **_kwargs):
+        assert path == str(source_path)
+        assert state.sheet == drawing.SHEET_NAMES[0]
+        assert not state.captured and not state.dirty
+        native = view("front" if not placed else "iso")
+        native.ReferencedConfiguration = "Installed"
+        placed.append(native)
+        state.events.append(("create-view", orientation))
+        return native
+
+    def prepare(_adapter):
+        assert state.sheet == drawing.SHEET_NAMES[1]
+        assert not state.captured and not state.dirty
+        state.events.append(("prepare-supplier",))
+        if state.prepared_hook is not None:
+            state.prepared_hook()
+        return full, head
+
+    def capture(_adapter, actual_full, actual_head, front):
+        assert actual_full is full and actual_head is head and front is placed[0]
+        assert (
+            state.sheet == drawing.SHEET_NAMES[1]
+            and not state.dirty
+            and state.read_only
+        )
+        assert not state.captured
+        state.events.append(("capture",))
+        state.captured = True
+        return _supplier_capture_value()
+
+    def import_front(_adapter, front, **_kwargs):
+        assert front is placed[0]
+        assert state.sheet == drawing.SHEET_NAMES[0] and state.captured
+        state.events.append(("front-import",))
+        return []
+
+    def front_presentation(*_args):
+        assert state.captured and state.read_only
+        state.dirty = True  # Actual imported SetText is known to do this.
+        state.events.append(("front-presentation",))
+
+    def create_tip(_adapter):
+        assert state.sheet == drawing.SHEET_NAMES[0] and state.captured
+        state.events.append(("tip-presentation",))
+        return tip
+
+    def supplier_presentation(_adapter, actual_full, actual_head):
+        assert (actual_full, actual_head) == (full, head)
+        assert (
+            state.sheet == drawing.SHEET_NAMES[1] and state.captured and state.read_only
+        )
+        state.events.append(("supplier-presentation",))
+        state.dirty = True
+        if state.presentation_hook is not None:
+            state.presentation_hook()
+        return []
+
+    async def finalize(_adapter, _outputs, **kwargs):
+        state.events.append(("finalize",))
+        assert state.read_only
+        for callback in kwargs["settled_checks"]:
+            callback()
+        try:
+            if state.finalize_hook is not None:
+                state.finalize_hook()
+            return {"drawing": "complete"}
+        finally:
+            state.drawing_closed = True
+            state.events.append(("drawing-closed",))
+
+    def forensics(_adapter, _label, _message, **kwargs):
+        assert kwargs["sheet_png"] is True
+        state.events.append(("forensics", kwargs["exception"]))
+        raise kwargs["exception"]
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, native: native.Name)
+    monkeypatch.setattr(
+        drawing, "active_configuration_name", lambda *_args: state.configuration
+    )
+    monkeypatch.setattr(drawing._telemetry, "info", state.messages.append)
+    monkeypatch.setattr(drawing, "_open_supplier_source_read_only", opened)
+    monkeypatch.setattr(drawing, "_source_file_sha256", sha256)
+    monkeypatch.setattr(
+        drawing, "read_required_properties", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(
+        drawing, "create_blank_drawing_sheets", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args: None)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_supplier_stock_sheet", prepare)
+    monkeypatch.setattr(drawing, "_assert_supplier_source_bodiless", capture)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", import_front)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_reference_cut_length", lambda *_args: None)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", front_presentation)
+    monkeypatch.setattr(drawing, "cropped_tip_view", create_tip)
+    monkeypatch.setattr(drawing, "_curate_tip_view", lambda *_args: [])
+    for name in (
+        "place_break_text_outside",
+        "_verify_tip_view",
+        "label_tip_view",
+        "mark_tip_on_front",
+        "activate_front_for_notes",
+        "add_property_linked_note",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_present_supplier_stock_sheet", supplier_presentation)
+    monkeypatch.setattr(
+        drawing,
+        "_verify_finished_controls",
+        lambda *_args: state.events.append(("finished-check",)),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_verify_supplier_stock",
+        lambda *_args: state.events.append(("supplier-check",)),
+    )
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", forensics)
+    return SimpleNamespace(
+        adapter=adapter,
+        source=source,
+        state=state,
+        path=source_path,
+        placed=placed,
+        full=full,
+        head=head,
+        tip=tip,
+    )
+
+
+def test_msc_readonly_build_captures_clean_before_any_presentation(
+    monkeypatch, tmp_path
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+    result = asyncio.run(drawing.build(seat.adapter))
+    assert result == {"drawing": "complete"}
+    kinds = [event[0] for event in seat.state.events]
+    assert kinds[0] == "hash" and kinds[1] == "open-read-only"
+    assert kinds.count("capture") == 1
+    assert (
+        kinds.index("prepare-supplier")
+        < kinds.index("capture")
+        < kinds.index("front-import")
+        < kinds.index("front-presentation")
+        < kinds.index("tip-presentation")
+        < kinds.index("supplier-presentation")
+        < kinds.index("finalize")
+        < kinds.index("finished-check")
+        < kinds.index("supplier-check")
+    )
+    assert seat.state.dirty is True and seat.state.read_only is True
+    assert seat.path.read_bytes() == b"original MSC source bytes"
+    hashes = [event[1] for event in seat.state.events if event[0] == "hash"]
+    assert len(hashes) == 4 and len(set(hashes)) == 1
+    assert any("'dirty': True" in message for message in seat.state.messages)
+    assert any("drawing lifecycle exit" in message for message in seat.state.messages)
+
+
+@pytest.mark.parametrize("stage", ["initial", "preparation"])
+def test_msc_readonly_build_refuses_dirty_source_before_capture(
+    monkeypatch, tmp_path, stage
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+    if stage == "initial":
+        seat.state.dirty = True
+    else:
+        seat.state.prepared_hook = lambda: setattr(seat.state, "dirty", True)
+    with pytest.raises(RuntimeError, match="already dirty before clean capture"):
+        asyncio.run(drawing.build(seat.adapter))
+    assert not seat.state.captured
+    assert not any(
+        event[0] in ("front-presentation", "finalize") for event in seat.state.events
+    )
+    assert seat.state.dirty is True
+
+
+@pytest.mark.parametrize(
+    "fault", ["read-only", "model-path", "view-path", "view-identity", "bytes"]
+)
+def test_msc_readonly_build_refuses_source_loss_before_finalize(
+    monkeypatch, tmp_path, fault
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+
+    def changed():
+        if fault == "read-only":
+            seat.state.read_only = False
+        elif fault == "model-path":
+            seat.state.path = str(tmp_path / "different.SLDPRT")
+        elif fault == "view-path":
+            seat.full.GetReferencedModelName = lambda: str(
+                tmp_path / "different.SLDPRT"
+            )
+        elif fault == "view-identity":
+            seat.full.ReferencedDocument = object()
+        else:
+            seat.path.write_bytes(b"source changed before finalization")
+
+    seat.state.presentation_hook = changed
+    reason = (
+        "not read-only"
+        if fault == "read-only"
+        else "SHA-256 changed"
+        if fault == "bytes"
+        else "identity/path changed"
+    )
+    with pytest.raises(RuntimeError, match=reason):
+        asyncio.run(drawing.build(seat.adapter))
+    assert not any(event[0] == "finalize" for event in seat.state.events)
+    assert any(event[0] == "forensics" for event in seat.state.events)
+
+
+@pytest.mark.parametrize("fault", ["bytes", "read-only", "source-path"])
+def test_msc_readonly_build_finally_refuses_successful_save_that_changes_source(
+    monkeypatch, tmp_path, fault
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+
+    def changed():
+        seat.state.dirty = False
+        if fault == "bytes":
+            seat.path.write_bytes(b"source bytes changed by drawing SaveAs3")
+        elif fault == "read-only":
+            seat.state.read_only = False
+        else:
+            seat.state.path = str(tmp_path / "changed-source.SLDPRT")
+
+    seat.state.finalize_hook = changed
+    reason = (
+        "SHA-256 changed"
+        if fault == "bytes"
+        else "not read-only"
+        if fault == "read-only"
+        else "identity/path changed"
+    )
+    with pytest.raises(RuntimeError, match=reason):
+        asyncio.run(drawing.build(seat.adapter))
+    assert seat.state.dirty is False
+    assert any(event[0] == "finalize" for event in seat.state.events)
+
+
+@pytest.mark.parametrize("exception_type", [RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("mutation", ["none", "bytes", "bytes-and-readonly"])
+def test_msc_readonly_build_preserves_finalizer_primary_with_integrity_note(
+    monkeypatch,
+    tmp_path,
+    exception_type,
+    mutation,
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+    primary = exception_type("native drawing finalization failed")
+
+    def fail():
+        seat.state.dirty = False
+        if mutation != "none":
+            seat.path.write_bytes(b"source changed despite failed finalization")
+        if mutation == "bytes-and-readonly":
+            seat.state.read_only = False
+        raise primary
+
+    seat.state.finalize_hook = fail
+    with pytest.raises(exception_type) as caught:
+        asyncio.run(drawing.build(seat.adapter))
+    assert caught.value is primary
+    if mutation == "none":
+        assert not getattr(primary, "__notes__", ())
+    else:
+        assert any(
+            "source integrity check also failed" in note and "SHA-256 changed" in note
+            for note in primary.__notes__
+        )
+        if mutation == "bytes-and-readonly":
+            assert any("not read-only" in note for note in primary.__notes__)
+
+
+@pytest.mark.parametrize("fault", ["readonly", "path"])
+def test_msc_target_capture_rechecks_native_source_protection_after_switch(
+    monkeypatch, fault
+):
+    seat = _supplier_body_census_seat(monkeypatch)
+    if fault == "readonly":
+        seat.model.IsOpenedReadOnly = lambda: (
+            seat.state.configuration != drawing.SUPPLIER_STOCK_CONFIGURATION
+        )
+    else:
+        seat.model.GetPathName = lambda: (
+            "wrong-source.SLDPRT"
+            if seat.state.configuration == drawing.SUPPLIER_STOCK_CONFIGURATION
+            else str(drawing.SOURCE)
+        )
+    reason = "not read-only" if fault == "readonly" else "identity/path changed"
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_source_bodiless(seat.adapter, *seat.views)
+    assert seat.state.configuration == "Original"
+    assert not any(call[0] == "capture" for call in seat.state.calls)
+
+
+def test_msc_readonly_build_never_queries_views_after_finalizer_closes_drawing(
+    monkeypatch, tmp_path
+):
+    import asyncio
+
+    seat = _readonly_msc_build(monkeypatch, tmp_path)
+    assert asyncio.run(drawing.build(seat.adapter)) == {"drawing": "complete"}
+    assert seat.state.drawing_closed is True
+    with pytest.raises(RuntimeError, match="disconnected after CloseDoc"):
+        seat.full.GetReferencedModelName()
+    assert seat.state.events[-1][0] == "hash"
+    assert any("drawing lifecycle exit" in message for message in seat.state.messages)

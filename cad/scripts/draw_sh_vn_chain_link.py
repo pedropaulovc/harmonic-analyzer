@@ -15,6 +15,7 @@ from _config import parts
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_chain_dimensions import (
+    SOURCE_FEATURES,
     SUPPLIER_MARGINS,
     annotate_chain_stock,
     prepare_chain_diagrams,
@@ -36,11 +37,14 @@ VARIANTS = (
 
 async def build(adapter: Any) -> dict[str, str]:
     return await build_supplier_spring_drawing(
-        adapter, SPEC, item=ITEM,
+        adapter,
+        SPEC,
+        item=ITEM,
         supplier_dimensions=annotate_chain_stock,
         supplier_margins=SUPPLIER_MARGINS,
         stock_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
         prepare_views=prepare_chain_diagrams,
+        supplier_reference_features=SOURCE_FEATURES,
         include_right=False,
         installed_variants=VARIANTS,
         installed_configuration="InnerLink",

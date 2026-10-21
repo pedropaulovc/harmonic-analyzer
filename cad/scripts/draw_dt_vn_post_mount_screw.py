@@ -37,8 +37,16 @@ drawing crop sketch. Map them through the inverse model-to-sketch transform,
 then measure and turn the projected axial direction onto sheet +X before
 centering, cropping or importing dimensions. The intended fixed 2:1 full
 profile is horizontal in its reserved cell and the 6:1 head uses the same
-frame. Native phase diagnostics compare that mathematical frame with the
-actual source vertices and view outline; neither substitutes for visible ink.
+frame. A native PNG and source-vertex readback proved that the zero-body
+view's GetOutline is not its displayed construction-ink extent. Before final
+settling, capture canonical native geometry and frame probes in the actual
+supplier configuration, then restore the original source configuration. Final
+guards project only that immutable capture through the current native view and
+retain mapped native dimension attachments, crop, annotation and note checks.
+The source is opened read-only and stays clean through preparation and capture.
+Imported presentation runs afterwards: it can mark the source dirty, but never
+authorizes writing it. Native read-only/path checks and a persisted SHA-256
+witness bracket final drawing/PDF save, including errors.
 
 Run with SolidWorks open::
 
@@ -50,6 +58,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import math
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -63,8 +72,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
+from _dimensions import _feature_display_dimensions
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -79,6 +88,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 import _drawing_hidden_sketches as hidden_sketches
+from _drawing_detail_crop import native_circle_geometry, _transform_point
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
@@ -86,7 +96,15 @@ from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
 from _layout_geometry import Box, estimate_text_box
-from _purchased_fastener_drawing import _box, _inside, _literal_note, assert_supplier_view_fits
+from _purchased_fastener_drawing import (
+    _box,
+    _inside,
+    _literal_note,
+    assert_supplier_annotations_fit,
+    _open_supplier_source_read_only,
+    _source_file_sha256,
+)
+from _rebuild import active_configuration_name
 from _session import run_build
 import _seat_forensics
 from _stock_trim_drawing import TrimSheet
@@ -95,7 +113,13 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _visibility import visible_reference_geometry
+from _supplier_reference_geometry import (
+    NativeSketchGeometry,
+    capture_native_sketch_geometry,
+    native_sketch_view_bounds,
+)
+from _supplier_screw_dimensions import _assert_source
+from _visibility import FeatureWalk, REFERENCE_FEATURE_KINDS, visible_reference_geometry
 from dt_vn_post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
     CUT_END_BREAK_BAND,
@@ -117,6 +141,7 @@ from dt_vn_post_mount_screw_spec import (
     SUPPLIER_PROFILE_DIMENSIONS,
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_PROFILE_MM,
+    SUPPLIER_PROFILE_SECTIONS,
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_DIMENSIONS,
     SUPPLIER_STOCK_FEATURE,
@@ -264,15 +289,51 @@ def _supplier_contract(row) -> dict[str, Any]:
     return dict(
         label=row.name, expected_mm=row.expected_mm,
         units="in", precision=SUPPLIER_PRECISION, presentation=row.presentation,
-        callout=row.callout,
+        callout=row.callout, configuration=SUPPLIER_STOCK_CONFIGURATION,
     )
+
+
+def _supplier_points_match(actual, expected, *, tolerance):
+    """Unique within-tolerance matching; raw float ordering is not identity."""
+    remaining = list(expected)
+    if len(actual) != len(remaining):
+        return False
+    for point in actual:
+        if len(point) != 3 or not all(math.isfinite(value) for value in point):
+            return False
+        matches = [
+            index
+            for index, target in enumerate(remaining)
+            if math.dist(point, target) <= tolerance
+        ]
+        if len(matches) != 1:
+            return False
+        remaining.pop(matches[0])
+    return not remaining
+
+
+def _supplier_lines_match(actual, expected):
+    """Match the entire native line inventory without endpoint ordering."""
+    remaining = list(expected)
+    if len(actual) != len(remaining):
+        return False
+    for pair in actual:
+        matches = [
+            index
+            for index, targets in enumerate(remaining)
+            if _supplier_points_match(pair, targets, tolerance=1e-8)
+        ]
+        if len(matches) != 1:
+            return False
+        remaining.pop(matches[0])
+    return not remaining
 
 
 def assert_supplier_profile_state(
     row, *, qualified_name, native_type, driven_state, tolerance_type,
-    tolerance_band_mm, tolerance_precision, attachment_points_mm,
+    tolerance_band_mm, tolerance_precision,
 ) -> None:
-    """Check the source diagram's identity, bands and actual profile vertices."""
+    """Check current native source ownership, type and limit metadata."""
     if (
         str(qualified_name).split("@")[:2] != [row.name, SUPPLIER_STOCK_FEATURE]
         or native_type != row.native_type
@@ -290,13 +351,12 @@ def assert_supplier_profile_state(
         for actual, expected in zip(tolerance_band_mm, expected_band, strict=True)
     ):
         raise RuntimeError(f"{row.name}: native supplier limit band changed")
-    expected = sorted((*SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices)
-    actual = sorted(tuple(point) for point in attachment_points_mm)
-    if len(actual) != 2 or any(
-        len(point) != 3 or not all(math.isfinite(value) for value in point)
-        or math.dist(point, target) > 1e-5
-        for point, target in zip(actual, expected, strict=True)
-    ):
+
+
+def _assert_supplier_profile_vertices(row, attachment_points_mm):
+    """Validate actual source-dimension points only while Supplier is active."""
+    expected = [(*SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices]
+    if not _supplier_points_match(attachment_points_mm, expected, tolerance=1e-5):
         raise RuntimeError(f"{row.name}: native dimension left its source-diagram vertices")
 
 
@@ -350,7 +410,7 @@ def _supplier_profile_model_points(adapter, view, *, crop_head, label):
         if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
             raise RuntimeError(f"{label}: supplier source model point is invalid")
         model_points.append(coordinates)
-    return model_points
+    return tuple(model_points)
 
 
 def _log_supplier_view_state(adapter, view, *, stage, geometry=False):
@@ -454,12 +514,9 @@ def _log_supplier_view_state(adapter, view, *, stage, geometry=False):
 
 
 def _assert_supplier_profile_frame(
-    adapter, view, center, scale, *, crop_head, label,
+    adapter, view, center, scale, *, points, label,
 ):
-    """Refresh native view geometry, then prove source axes and semantic center."""
-    points = _supplier_profile_model_points(
-        adapter, view, crop_head=crop_head, label=label,
-    )
+    """Project captured native source probes through the current view frame."""
     # Rebuild does not guarantee Windows has repainted a moved view. Refresh
     # before reading ModelToViewTransform, including the first post-move proof.
     _early_bound(view, "IView").UpdateViewDisplayGeometry()
@@ -488,7 +545,7 @@ def _assert_supplier_profile_frame(
         raise RuntimeError(f"{label}: supplier source center moved from {center!r}")
 
 
-def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False):
+def _supplier_stock_view(adapter, *, center, scale, label, crop_head=False):
     """Reveal, orient and center the source sketch before crop or annotations."""
     stock = _early_bound(
         place_view(adapter, str(SOURCE), "*Front", *center), "IView",
@@ -551,7 +608,9 @@ def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False
         raise RuntimeError(f"{label}: cannot rebuild positioned source profile")
     _log_supplier_view_state(adapter, stock, stage=f"{label}: positioned before refresh")
     _assert_supplier_profile_frame(
-        adapter, stock, center, scale, crop_head=crop_head, label=label,
+        adapter, stock, center, scale, points=_supplier_profile_model_points(
+            adapter, stock, crop_head=crop_head, label=label,
+        ), label=label,
     )
     _log_supplier_view_state(adapter, stock, stage=f"{label}: prepared", geometry=True)
     if crop_head:
@@ -567,6 +626,11 @@ def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False
         if status != _CROP_NO_ERROR or not bool(stock.IsCropped()):
             raise RuntimeError(f"source head profile crop failed ({status})")
         _log_supplier_view_state(adapter, stock, stage=f"{label}: cropped", geometry=True)
+    return stock
+
+
+def _present_supplier_stock_view(adapter, stock, *, keep, label):
+    """Dress imported references only after clean immutable source capture."""
     annotations = hidden_sketches.curate_view_dimensions(
         adapter, stock, keep=keep, view_label=label,
         dimensions_by_feature=SUPPLIER_STOCK_DIMENSIONS,
@@ -578,20 +642,35 @@ def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False
         supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **_supplier_contract(row),
         )
-    _log_supplier_view_state(adapter, stock, stage=f"{label}: imported", geometry=True)
-    return stock
+    _log_supplier_view_state(adapter, stock, stage=f"{label}: imported")
 
 
 def _supplier_stock_sheet(adapter):
     full = _supplier_stock_view(
-        adapter, center=STOCK_CENTER, scale=STOCK_SCALE, keep=STOCK_KEEP,
+        adapter, center=STOCK_CENTER, scale=STOCK_SCALE,
         label="source full stock and factory thread",
     )
     head = _supplier_stock_view(
-        adapter, center=STOCK_HEAD_CENTER, scale=STOCK_HEAD_SCALE, keep=STOCK_HEAD_KEEP,
+        adapter, center=STOCK_HEAD_CENTER, scale=STOCK_HEAD_SCALE,
         label="source head slot-plane bounding profile", crop_head=True,
     )
     _log_supplier_view_state(adapter, full, stage="full after head creation", geometry=True)
+    return full, head
+
+
+def _present_supplier_stock_sheet(adapter, full, head):
+    _present_supplier_stock_view(
+        adapter,
+        full,
+        keep=STOCK_KEEP,
+        label="source full stock and factory thread",
+    )
+    _present_supplier_stock_view(
+        adapter,
+        head,
+        keep=STOCK_HEAD_KEEP,
+        label="source head slot-plane bounding profile",
+    )
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # ActivateView("") returns False for sheet context; require native context.
     ddoc.ActivateView("")
@@ -603,13 +682,402 @@ def _supplier_stock_sheet(adapter):
         if int(_early_bound(note.GetAnnotation(), "IAnnotation").OwnerType) != 1:
             raise RuntimeError("source envelope label is not sheet-owned")
         notes.append((note, text, cell))
-    return full, head, notes
+    return notes
 
 
-def _verify_supplier_stock(adapter, full, head, notes) -> None:
+def _assert_supplier_feature_valid(feature, *, label):
+    """Refuse a sketch whose native segment inventory may be incomplete."""
+    if feature is None:
+        raise RuntimeError(f"{label}: missing supplier sketch feature")
+    error = feature.GetErrorCode2()
+    _telemetry.info(f"{label}: source_sketch_feature_error={error!r}")
+    # The warning out-parameter is undefined for zero; only the integer return
+    # proves success. GetSketchSegments can omit entities when a sketch errs.
+    if (
+        not isinstance(error, (tuple, list))
+        or len(error) != 2
+        or type(error[0]) is not int
+        or error[0] != 0
+    ):
+        raise RuntimeError(
+            f"{label}: supplier sketch feature error/unreadable status {error!r}"
+        )
+
+
+def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
+    """Bound the verified native construction ink, not the model-view extent.
+
+    a27's native PNG and vertex readbacks show the horizontal source profile
+    while GetOutline retains a vertical extent from before the configuration
+    switch. That extent is still logged; it is not a sketch-ink measurement.
+    This path is restricted to the exact zero-body MSC source configuration.
+    """
+    label = f"MSC source ink {view_name(adapter, view)}"
+    view = _early_bound(view, "IView")
+    if str(view.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError(f"{label}: wrong source configuration")
+    model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    visible = []
+    reference_states = {}
+    for raw in FeatureWalk(model):
+        feature = _early_bound(raw, "IFeature")
+        if str(feature.GetTypeName2()) not in REFERENCE_FEATURE_KINDS:
+            continue
+        try:
+            corresponding = view.GetCorresponding(feature)
+            state = (
+                None
+                if corresponding is None
+                else int(_early_bound(corresponding, "IFeature").Visible)
+            )
+        except Exception as exc:
+            state = f"read_error: {type(exc).__name__}: {exc}"
+        reference_states[str(feature.Name)] = state
+        if state == 2:  # swVisibilityStateShown, in DRAWING context.
+            visible.append(str(feature.Name))
+    _telemetry.info(
+        f"{label}: view_reference_states={reference_states!r} "
+        f"view_shown_references={visible!r}"
+    )
+    if any(state not in (None, 1, 2) for state in reference_states.values()):
+        raise RuntimeError(
+            f"{label}: unknown drawing reference visibility {reference_states!r}"
+        )
+    if set(visible) != {SUPPLIER_STOCK_FEATURE}:
+        raise RuntimeError(
+            f"{label}: unexpected visible reference inventory {visible!r}"
+        )
+    drawing_sketch = _early_bound(view.GetSketch(), "ISketch")
+    drawing_segments = tuple(drawing_sketch.GetSketchSegments() or ())
+    drawing_types = [
+        int(_early_bound(segment, "ISketchSegment").GetType())
+        for segment in drawing_segments
+    ]
+    _telemetry.info(
+        f"{label}: drawing_sketch_segment_count={len(drawing_segments)} "
+        f"drawing_sketch_segment_types={drawing_types!r} cropped={bool(view.IsCropped())}"
+    )
+    if not cropped and drawing_segments:
+        raise RuntimeError(f"{label}: full view has unexpected drawing-sketch geometry")
+    if cropped:
+        if not bool(view.IsCropped()) or len(drawing_segments) != 1:
+            raise RuntimeError(f"{label}: missing unique persisted crop circle")
+        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+        centre, radius = native_circle_geometry(drawing_segments[0], label=label)
+        inverse = _early_bound(
+            drawing_sketch.ModelToSketchTransform, "IMathTransform"
+        ).Inverse()
+        if inverse is None:
+            raise RuntimeError(f"{label}: persisted crop sketch inverse is unavailable")
+        sheet = [
+            _transform_point(utility, point, inverse, label=label)
+            for point in (
+                centre,
+                (centre[0] + radius, centre[1], centre[2]),
+                (centre[0], centre[1] + radius, centre[2]),
+            )
+        ]
+        cx, cy, _cz = sheet[0]
+        dx = tuple(sheet[1][index] - sheet[0][index] for index in range(2))
+        dy = tuple(sheet[2][index] - sheet[0][index] for index in range(2))
+        rx, ry = math.hypot(*dx), math.hypot(*dy)
+        expected_radius = (
+            STOCK_HEAD_RADIUS_MM * STOCK_HEAD_SCALE[0] / STOCK_HEAD_SCALE[1] / 1000.0
+        )
+        if (
+            any(abs(point[2]) > CIRCLE_TOL_M for point in sheet)
+            or math.dist((cx, cy), STOCK_HEAD_CENTER) > CIRCLE_TOL_M
+            or abs(rx - expected_radius) > CIRCLE_TOL_M
+            or abs(ry - expected_radius) > CIRCLE_TOL_M
+            or abs(dx[0] * dy[0] + dx[1] * dy[1]) > expected_radius**2 * 1e-8
+        ):
+            raise RuntimeError(f"{label}: persisted crop frame changed: {sheet!r}")
+        # Entire native crop footprint must fit. Do not clip it to the cell or
+        # use the full (deliberately cropped) carrier's projected endpoint box.
+        width, height = math.hypot(dx[0], dy[0]), math.hypot(dx[1], dy[1])
+        bounds = (cx - width, cy - height, cx + width, cy + height)
+    else:
+        view.UpdateViewDisplayGeometry()
+        bounds = native_sketch_view_bounds(adapter, view, geometry, label=label)
+    _telemetry.info(f"{label}: native_ink_bounds_m={bounds!r} cell_m={cell!r}")
+    if not _inside(bounds, cell):
+        raise RuntimeError(f"{label}: native source ink leaves its cell: {bounds!r}")
+
+
+@dataclass(frozen=True)
+class SupplierStockCapture:
+    """Actual Supplier geometry and model-metre probes; never live COM handles."""
+
+    geometry: NativeSketchGeometry
+    full_frame: tuple[tuple[float, float, float], ...]
+    head_frame: tuple[tuple[float, float, float], ...]
+    source_path: str
+
+
+def _capture_supplier_stock(adapter, model, full, head):
+    """Prove canonical source ink and dimensions in the active target config."""
+    label = f"MSC source geometry {SUPPLIER_STOCK_CONFIGURATION!r}"
+    feature = _early_bound(
+        _early_bound(model, "IPartDoc").FeatureByName(SUPPLIER_STOCK_FEATURE),
+        "IFeature",
+    )
+    _assert_supplier_feature_valid(feature, label=label)
+    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{label}: missing sketch transform")
+    frame = tuple(float(value) for value in transform.ArrayData)
+    inventory = []
+    segments = tuple(sketch.GetSketchSegments() or ())
+    for raw in segments:
+        segment = _early_bound(raw, "ISketchSegment")
+        kind = int(segment.GetType())
+        construction = bool(segment.ConstructionGeometry)
+        pair = None
+        if kind == 0:
+            line = _early_bound(raw, "ISketchLine")
+            points = [
+                _early_bound(point, "ISketchPoint")
+                for point in (line.GetStartPoint2(), line.GetEndPoint2())
+            ]
+            pair = tuple(
+                tuple(float(value) for value in (point.X, point.Y, point.Z))
+                for point in points
+            )
+        inventory.append((kind, construction, pair))
+    _telemetry.info(
+        f"MSC configured source geometry configuration={SUPPLIER_STOCK_CONFIGURATION!r} "
+        f"ModelToSketchTransform={frame!r} native_line_inventory={inventory!r}"
+    )
+    if len(frame) != 16 or not all(math.isfinite(value) for value in frame[:13]):
+        raise RuntimeError(f"{label}: malformed sketch transform")
+    expected = [
+        (SUPPLIER_PROFILE_MM[index], SUPPLIER_PROFILE_MM[(index + 1) % len(SUPPLIER_PROFILE_MM)])
+        for index in range(len(SUPPLIER_PROFILE_MM))
+    ] + [(SUPPLIER_PROFILE_MM[first], SUPPLIER_PROFILE_MM[last]) for first, last in SUPPLIER_PROFILE_SECTIONS]
+    expected = [
+        tuple((point[0] / 1000.0, point[1] / 1000.0, 0.0) for point in pair)
+        for pair in expected
+    ]
+    if any(
+        kind != 0 or not construction or pair is None
+        or not all(math.isfinite(value) for point in pair for value in point)
+        for kind, construction, pair in inventory
+    ) or not _supplier_lines_match([pair for _, _, pair in inventory], expected):
+        raise RuntimeError(f"{label}: invalid native line inventory/endpoints")
+    for segment in segments:
+        if _early_bound(full, "IView").GetCorresponding(segment) is None:
+            raise RuntimeError(f"{label}: source segment has no drawing correspondence")
+
+    # Source annotation points are in the actual target source sketch. Drawing
+    # point IDs, drawing XYZ and raw cross-context sketch identity are NOT proof.
+    rows = {row.name: row for row in SUPPLIER_REFERENCE_DIMENSIONS}
+    found = []
+    for raw in _feature_display_dimensions(feature):
+        display = _early_bound(_bind(raw, "IDisplayDimension"), "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        owner = str(native.FullName).split("@")
+        if len(owner) < 2 or owner[1] != SUPPLIER_STOCK_FEATURE or owner[0] not in rows:
+            continue
+        name = owner[0]
+        source_dimension = model.Parameter(f"{name}@{SUPPLIER_STOCK_FEATURE}")
+        if source_dimension is None or int(adapter.swApp.IsSame(native, source_dimension)) != 1:
+            raise RuntimeError(f"{name}: source feature dimension identity changed")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+        entities = tuple(annotation.GetAttachedEntities3() or ())
+        if len(entities) != 2 or len(kinds) != 2 or any(kind not in (11, 25) for kind in kinds):
+            raise RuntimeError(f"{name}: source dimension must attach to two diagram vertices")
+        points = []
+        for entity in entities:
+            point = _early_bound(entity, "ISketchPoint")
+            points.append(tuple(float(value) * 1000.0 for value in (point.X, point.Y, point.Z)))
+        _telemetry.info(f"{label}: source_dimension={name!r} attachment_points_mm={points!r}")
+        _assert_supplier_profile_vertices(rows[name], points)
+        tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+        assert_supplier_profile_state(
+            rows[name], qualified_name=str(native.FullName), native_type=int(display.Type2),
+            driven_state=int(native.DrivenState), tolerance_type=int(tolerance.Type),
+            tolerance_band_mm=(
+                float(tolerance.GetMinValue()) * 1000.0,
+                float(tolerance.GetMaxValue()) * 1000.0,
+            ),
+            tolerance_precision=int(display.GetPrimaryTolPrecision2()),
+        )
+        found.append(name)
+    if sorted(found) != sorted(rows):
+        raise RuntimeError(f"{label}: canonical source dimension coverage changed: {found!r}")
+    geometry = capture_native_sketch_geometry(sketch, label=label)
+    full_frame = _supplier_profile_model_points(adapter, full, crop_head=False, label=label)
+    head_frame = _supplier_profile_model_points(adapter, head, crop_head=True, label=label)
+    return SupplierStockCapture(geometry, full_frame, head_frame, str(Path(model.GetPathName()).resolve()))
+
+
+def _assert_supplier_source_read_only(adapter, model, views, *, stage):
+    """Read actual source state without clearing known presentation dirtiness."""
+    state = {}
+    errors = []
+    for name, read in (
+        ("path", lambda: str(model.GetPathName())),
+        ("configuration", lambda: active_configuration_name(adapter, model)),
+        ("dirty", lambda: bool(model.GetSaveFlag())),
+        ("read_only", lambda: model.IsOpenedReadOnly()),
+    ):
+        try:
+            state[name] = read()
+        except BaseException as exc:
+            state[name] = f"read_error: {type(exc).__name__}: {exc}"
+            errors.append(exc)
+    bindings = []
+    for view in views:
+        try:
+            native = _early_bound(view, "IView")
+            bindings.append((
+                view_name(adapter, native), str(native.GetReferencedModelName()),
+                int(adapter.swApp.IsSame(model, native.ReferencedDocument)),
+            ))
+        except BaseException as exc:
+            bindings.append(f"read_error: {type(exc).__name__}: {exc}")
+            errors.append(exc)
+    _telemetry.info(f"MSC source {stage}: actual={state!r} view_bindings={bindings!r}")
+    if errors:
+        raise errors[0]
+    expected = SOURCE.resolve()
+    if Path(state["path"]).resolve() != expected or any(
+        Path(path).resolve() != expected or same != 1 for _, path, same in bindings
+    ):
+        raise RuntimeError(f"MSC source {stage}: source identity/path changed")
+    if state["read_only"] is not True:
+        raise RuntimeError(f"MSC source {stage}: source is not read-only")
+    return state["dirty"]
+
+
+def _assert_supplier_source_clean(adapter, model, views, *, stage):
+    if _assert_supplier_source_read_only(adapter, model, views, stage=stage):
+        raise RuntimeError(f"MSC source {stage}: source is already dirty before clean capture")
+
+
+def _assert_supplier_source_integrity(adapter, model, views, baseline, *, stage):
+    """Prove native write protection and persisted bytes, including failures."""
+    errors = []
+    try:
+        _assert_supplier_source_read_only(adapter, model, views, stage=stage)
+    except BaseException as exc:
+        errors.append(exc)
+    try:
+        actual = _source_file_sha256(SOURCE)
+        _telemetry.info(
+            f"MSC source {stage}: source_sha256_before={baseline!r} source_sha256_actual={actual!r}"
+        )
+        if actual != baseline:
+            raise RuntimeError(f"MSC source {stage}: persisted source SHA-256 changed")
+    except BaseException as exc:
+        errors.append(exc)
+    if errors:
+        for error in errors[1:]:
+            errors[0].add_note(f"MSC additional source integrity failure: {error}")
+        raise errors[0]
+
+
+def _assert_supplier_source_bodiless(adapter, full, head, solid_view):
+    """Census actual configured bodies and restore the source before finalize."""
+    views = [_early_bound(view, "IView") for view in (solid_view, full, head)]
+    model = _early_bound(views[0].ReferencedDocument, "IModelDoc2")
+    if model is None or any(
+        int(adapter.swApp.IsSame(model, view.ReferencedDocument)) != 1 for view in views
+    ):
+        raise RuntimeError("MSC body census views do not reference the same source")
+    installed = str(views[0].ReferencedConfiguration)
+    if not installed or installed == SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("MSC body census has no installed solid-view positive control")
+    # IView.GetBodiesCount describes a multibody view selection. A zero is
+    # ambiguous without a solid-view control; never use it as the body proof.
+    view_counts = {}
+    for view in views:
+        name = view_name(adapter, view)
+        try:
+            view_counts[name] = {
+                "configuration": str(view.ReferencedConfiguration),
+                "GetBodiesCount": int(view.GetBodiesCount()),
+            }
+        except Exception as exc:
+            view_counts[name] = {"read_error": f"{type(exc).__name__}: {exc}"}
+    _telemetry.info(f"MSC native view body-count controls={view_counts!r}")
+    original = active_configuration_name(adapter, model)
+    was_dirty = bool(model.GetSaveFlag())
+
+    def read_only_state():
+        try:
+            return bool(model.IsOpenedReadOnly())
+        except Exception as exc:
+            return f"read_error: {type(exc).__name__}: {exc}"
+
+    _telemetry.info(
+        f"MSC body census source before: configuration={original!r} "
+        f"dirty={was_dirty!r} opened_read_only={read_only_state()!r}"
+    )
+    _assert_supplier_source_clean(adapter, model, views, stage="before body census")
+
+    def show(configuration):
+        if active_configuration_name(adapter, model) != configuration:
+            if model.ShowConfiguration2(configuration) is not True:
+                raise RuntimeError(f"MSC body census cannot activate {configuration!r}")
+        if active_configuration_name(adapter, model) != configuration:
+            raise RuntimeError(f"MSC body census configuration readback differs from {configuration!r}")
+        if model.EditRebuild3() is not True:
+            raise RuntimeError(f"MSC body census cannot rebuild {configuration!r}")
+        if active_configuration_name(adapter, model) != configuration:
+            raise RuntimeError(f"MSC body census rebuild changed configuration {configuration!r}")
+
+    primary = None
+    try:
+        for configuration, expected_solids in (
+            (installed, 1), (SUPPLIER_STOCK_CONFIGURATION, 0),
+        ):
+            show(configuration)
+            part = _early_bound(model, "IPartDoc")
+            counts = tuple(len(tuple(part.GetBodies2(kind, False) or ())) for kind in (0, 1))
+            _telemetry.info(
+                f"MSC native source body census configuration={configuration!r} "
+                f"solid_bodies={counts[0]} sheet_bodies={counts[1]}"
+            )
+            if counts != (expected_solids, 0):
+                raise RuntimeError(
+                    f"MSC body census {configuration!r}: solid/sheet={counts!r}, "
+                    f"expected={(expected_solids, 0)!r}"
+                )
+            if configuration == SUPPLIER_STOCK_CONFIGURATION:
+                _assert_supplier_source_clean(
+                    adapter, model, views, stage="target before immutable capture",
+                )
+                capture = _capture_supplier_stock(adapter, model, full, head)
+    except BaseException as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            show(original)
+            is_dirty = bool(model.GetSaveFlag())
+            _telemetry.info(
+                f"MSC body census source restored: original={original!r} "
+                f"configuration={active_configuration_name(adapter, model)!r} "
+                f"dirty_before={was_dirty!r} dirty_after={is_dirty!r} "
+                f"opened_read_only={read_only_state()!r}"
+            )
+            if is_dirty and not was_dirty:
+                raise RuntimeError("MSC body census configuration switch dirtied the source")
+            _assert_supplier_source_clean(adapter, model, views, stage="after body census restoration")
+        except BaseException as restore_error:
+            if primary is None:
+                raise
+            primary.add_note(f"MSC source configuration restoration also failed: {restore_error}")
+    return capture
+
+
+def _verify_supplier_stock(adapter, full, head, notes, capture: SupplierStockCapture) -> None:
     """Preserve the failed native sheet before session teardown closes it."""
     try:
-        _check_supplier_stock(adapter, full, head, notes)
+        _check_supplier_stock(adapter, full, head, notes, capture)
     except Exception as exc:
         _seat_forensics.capture_com_failure(
             adapter, f"{PART_STEM}-supplier-envelope", str(exc),
@@ -617,7 +1085,7 @@ def _verify_supplier_stock(adapter, full, head, notes) -> None:
         )
 
 
-def _check_supplier_stock(adapter, full, head, notes) -> None:
+def _check_supplier_stock(adapter, full, head, notes, capture: SupplierStockCapture) -> None:
     """Check seven authentic source groups, the nominal major carrier and ink."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     if ddoc.ActivateSheet(SHEET_NAMES[1]) is not True:
@@ -633,9 +1101,19 @@ def _check_supplier_stock(adapter, full, head, notes) -> None:
         _telemetry.info(f"MSC native settled identity view={name!r} IsSame={same}")
         if same != 1:  # swObjectSame; unknown is not evidence of identity.
             raise RuntimeError(f"MSC source view identity changed: {name!r} ({same})")
-        _log_supplier_view_state(adapter, view, stage=f"{name}: settled before refresh", geometry=True)
+        if (
+            str(Path(view.GetReferencedModelName()).resolve()) != capture.source_path
+            or str(
+                Path(
+                    _early_bound(view.ReferencedDocument, "IModelDoc2").GetPathName()
+                ).resolve()
+            )
+            != capture.source_path
+        ):
+            raise RuntimeError(f"MSC source view path changed: {name!r}")
+        _log_supplier_view_state(adapter, view, stage=f"{name}: settled before refresh")
         view.UpdateViewDisplayGeometry()
-        _log_supplier_view_state(adapter, view, stage=f"{name}: settled after refresh", geometry=True)
+        _log_supplier_view_state(adapter, view, stage=f"{name}: settled after refresh")
     template = DRAWING_TEMPLATES[SPEC.layout]
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     region = sheet_drawable_region(
@@ -658,9 +1136,15 @@ def _check_supplier_stock(adapter, full, head, notes) -> None:
         ):
             raise RuntimeError("supplier envelope view lost source configuration/scale/crop")
         _assert_supplier_profile_frame(
-            adapter, view, center, scale, crop_head=cropped, label="MSC source envelope",
+            adapter,
+            view,
+            center,
+            scale,
+            points=capture.head_frame if cropped else capture.full_frame,
+            label="MSC source envelope",
         )
-        assert_supplier_view_fits(adapter, view, cell, label=f"MSC source envelope {view_name(adapter, view)}")
+        _assert_supplier_profile_ink(adapter, view, cell, capture.geometry, cropped=cropped)
+        assert_supplier_annotations_fit(adapter, view, cell, label=f"MSC source envelope {view_name(adapter, view)}")
         annotations = [
             _early_bound(raw, "IAnnotation") for raw in (view.GetAnnotations() or ())
             if dimension_name(adapter, _early_bound(raw, "IAnnotation"))
@@ -675,16 +1159,13 @@ def _check_supplier_stock(adapter, full, head, notes) -> None:
             row = rows[name]
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
             assert_supplier_reference_dimension(adapter, display, **_supplier_contract(row))
+            _assert_source(adapter, view, display, name=name, feature=SUPPLIER_STOCK_FEATURE)
             native = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
             kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
             entities = tuple(annotation.GetAttachedEntities3() or ())
             if len(entities) != 2 or len(kinds) != 2 or any(kind not in (11, 25) for kind in kinds):
                 raise RuntimeError(f"{name}: source dimension must attach to two diagram vertices")
-            points = []
-            for entity in entities:
-                point = _early_bound(entity, "ISketchPoint")
-                points.append(tuple(float(value) * 1000.0 for value in (point.X, point.Y, point.Z)))
             assert_supplier_profile_state(
                 row, qualified_name=str(native.FullName), native_type=int(display.Type2),
                 driven_state=int(native.DrivenState), tolerance_type=int(tolerance.Type),
@@ -693,7 +1174,6 @@ def _check_supplier_stock(adapter, full, head, notes) -> None:
                     float(tolerance.GetMaxValue()) * 1000.0,
                 ),
                 tolerance_precision=int(display.GetPrimaryTolPrecision2()),
-                attachment_points_mm=points,
             )
     source_names = {row.name for row in SUPPLIER_PROFILE_DIMENSIONS}
     if len(source_names) != 7 or sorted(
@@ -1327,8 +1807,35 @@ def _verify_finished_controls(adapter, front, tip, installed_configuration) -> N
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open cut post mount screw", await adapter.open_model(str(SOURCE)))
-    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    source_sha256 = _source_file_sha256(SOURCE)
+    source_model = _open_supplier_source_read_only(
+        adapter, SOURCE, label="MSC modified-stock drawing source",
+    )
+    primary = None
+    try:
+        return await _build_read_only_source(adapter, source_model, source_sha256)
+    except BaseException as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            _assert_supplier_source_integrity(
+                adapter, source_model, (), source_sha256, stage="drawing lifecycle exit",
+            )
+        except BaseException as integrity_error:
+            if primary is None:
+                raise
+            details = "; ".join((
+                str(integrity_error), *getattr(integrity_error, "__notes__", ()),
+            ))
+            primary.add_note(f"MSC source integrity check also failed: {details}")
+
+
+async def _build_read_only_source(adapter, source_model, source_sha256):
+    # finalize_drawing closes the drawing; view bindings are valid only here,
+    # before its save. The outer finally retains only the live source handle.
+    source_views = []
+    _assert_supplier_source_clean(adapter, source_model, source_views, stage="opened before preparation")
     installed_configuration = str(_early_bound(
         _early_bound(source_model.ConfigurationManager, "IConfigurationManager").ActiveConfiguration,
         "IConfiguration",
@@ -1361,6 +1868,44 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
+    source_views.extend((front, iso))
+    try:
+        _assert_supplier_source_clean(
+            adapter,
+            source_model,
+            source_views,
+            stage="before supplier preparation",
+        )
+        if not drawing_doc.ActivateSheet(SHEET_NAMES[1]):
+            raise RuntimeError("cannot activate source max-limit envelope sheet")
+        full_stock, source_head = _supplier_stock_sheet(adapter)
+        source_views.extend((full_stock, source_head))
+        _assert_supplier_source_clean(
+            adapter,
+            source_model,
+            source_views,
+            stage="prepared before capture",
+        )
+        supplier_capture = _assert_supplier_source_bodiless(
+            adapter, full_stock, source_head, front
+        )
+        _assert_supplier_source_clean(
+            adapter,
+            source_model,
+            source_views,
+            stage="after clean source capture",
+        )
+    except Exception as exc:
+        _seat_forensics.capture_com_failure(
+            adapter,
+            f"{PART_STEM}-supplier-envelope",
+            str(exc),
+            api="MSC pre-presentation source capture",
+            exception=exc,
+            sheet_png=True,
+        )
+    if not drawing_doc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate finished screw sheet for presentation")
 
     # The cut length lives on a part-hidden reference sketch, so the Front
     # view takes the opt-in curation that shows it in this view only.
@@ -1380,6 +1925,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # labelled as detail A and circled and lettered on the Front.
     with _telemetry.span("drawing.tip_view", scale=f"{DETAIL_SCALE[0]:g}:1"):
         tip = cropped_tip_view(adapter)
+        source_views.append(tip)
         set_hidden_lines_removed(adapter, tip)
         _early_bound(tip, "IView").UpdateViewDisplayGeometry()
         tip_annotations = _curate_tip_view(adapter, tip)
@@ -1399,7 +1945,24 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, front)
     if not drawing_doc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate source max-limit envelope sheet")
-    full_stock, source_head, stock_notes = _supplier_stock_sheet(adapter)
+    stock_notes = _present_supplier_stock_sheet(adapter, full_stock, source_head)
+    try:
+        _assert_supplier_source_integrity(
+            adapter,
+            source_model,
+            source_views,
+            source_sha256,
+            stage="before drawing finalization",
+        )
+    except Exception as exc:
+        _seat_forensics.capture_com_failure(
+            adapter,
+            f"{PART_STEM}-supplier-envelope",
+            str(exc),
+            api="MSC pre-finalize source integrity",
+            exception=exc,
+            sheet_png=True,
+        )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1409,8 +1972,14 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
+            lambda: _assert_supplier_source_read_only(
+                adapter, source_model, source_views, stage="before settled checks",
+            ),
             lambda: _verify_finished_controls(adapter, front, tip, installed_configuration),
-            lambda: _verify_supplier_stock(adapter, full_stock, source_head, stock_notes),
+            lambda: _verify_supplier_stock(adapter, full_stock, source_head, stock_notes, supplier_capture),
+            lambda: _assert_supplier_source_integrity(
+                adapter, source_model, source_views, source_sha256, stage="settled before drawing save",
+            ),
         ),
     )
 

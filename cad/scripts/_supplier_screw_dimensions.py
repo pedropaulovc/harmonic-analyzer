@@ -154,22 +154,18 @@ def _source_owner_context(
 def _attachment_correspondence(
     adapter: Any,
     view: Any,
-    model: Any,
     *,
-    source_feature: Any,
     source_sketch: Any,
-    feature_owner: Any,
-    native: Any,
-    annotation: Any,
     entities: tuple[Any, ...],
     types: tuple[int, ...],
 ) -> dict[str, Any]:
-    """Prove membership in the corresponding source sketch in this drawing view.
+    """Prove direct source-member identity in this drawing view.
 
-    GetCorresponding explicitly supports ISketch; enumerate that mapped sketch
-    rather than assuming support for converting individual sketch points.
-    Direct point conversion, inverse mappings and local-view objects are controls,
-    never alternative acceptance paths. The inverse belongs to the source model.
+    Enumerate only the actual model sketch and map every point or segment with
+    IView.GetCorresponding. Native positive controls establish its point mapping.
+    Require complete, distinct model/view inventories and supported comparisons.
+    Sketch mapping, inverse mapping, IDs, coordinates and raw cross-context
+    identity are not alternative attachment proofs.
     """
     census: dict[str, Any] = {"sources": [], "attachments": []}
 
@@ -180,7 +176,10 @@ def _attachment_correspondence(
         row: dict[str, Any], key: str, interface: str, read: Callable[[], Any]
     ) -> Any:
         try:
-            obj = _early_bound(_bind(read(), interface), interface)
+            raw = read()
+            obj = (
+                None if raw is None else _early_bound(_bind(raw, interface), interface)
+            )
         except Exception as exc:
             row[key] = error(exc)
             return None
@@ -195,284 +194,119 @@ def _attachment_correspondence(
         except Exception as exc:
             return error(exc)
 
-    def corresponding(
-        row: dict[str, Any],
-        key: str,
-        interface: str,
-        obj: Any,
-        *,
-        reverse: bool = False,
-    ) -> Any:
-        if obj is None or (reverse and extension is None):
-            row[key] = {
-                "present": False,
-                "skipped": "null_input" if obj is None else "source_extension_missing",
-            }
-            return None
-        return read_object(
-            row,
-            key,
-            interface,
-            lambda: (
-                extension.GetCorresponding2(obj)
-                if reverse
-                else view.GetCorresponding(obj)
-            ),
-        )
-
-    extension = read_object(
-        census, "source_extension", "IModelDocExtension", lambda: model.Extension
-    )
-    mapped_sketch = corresponding(
-        census,
-        "mapped_source_sketch",
-        "ISketch",
-        source_sketch,
-    )
-    restored_sketch = corresponding(
-        census,
-        "roundtrip_source_sketch",
-        "ISketch",
-        mapped_sketch,
-        reverse=True,
-    )
-    view_sketch = read_object(
-        census, "drawing_view_sketch", "ISketch", lambda: view.GetSketch()
-    )
-    mapped_feature = corresponding(
-        census,
-        "mapped_source_feature",
-        "IFeature",
-        source_feature,
-    )
-    restored_feature = corresponding(
-        census,
-        "roundtrip_source_feature",
-        "IFeature",
-        mapped_feature,
-        reverse=True,
-    )
-    restored_owner = corresponding(
-        census,
-        "reverse_native_feature_owner",
-        "IFeature",
-        feature_owner,
-        reverse=True,
-    )
-    census["controls"] = {
-        "source_dimension_self": same(native, native),
-        "annotation_self": same(annotation, annotation),
-        "source_feature_self": same(source_feature, source_feature),
-        "mapped_feature_self": same(mapped_feature, mapped_feature),
-        "mapped_feature_owner": same(mapped_feature, feature_owner),
-        "roundtrip_feature_source": same(restored_feature, source_feature),
-        "reverse_owner_source": same(restored_owner, source_feature),
-        "source_sketch_self": same(source_sketch, source_sketch),
-        "mapped_sketch_self": same(mapped_sketch, mapped_sketch),
-        "roundtrip_sketch_source": same(restored_sketch, source_sketch),
-    }
-    try:
-        census["annotation_dangling"] = bool(annotation.IsDangling())
-    except Exception as exc:
-        census["annotation_dangling"] = error(exc)
-
-    source_members: dict[int, list[tuple[Any, Any, dict[str, Any]]]] = {}
-    mapped_sketch_members: dict[int, list[Any]] = {}
-    local_view_members: dict[int, list[Any]] = {}
-    inventories_complete: dict[int, bool] = {}
-    mapped_inventories_complete: dict[int, bool] = {}
-    mapped_member_self: dict[int, list[Any]] = {}
-    for kind in sorted(set(types) & {10, 11}):
-        interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
-        source: dict[str, Any] = {"kind": kind, "members": []}
+    mapped_members: dict[int, list[Any]] = {}
+    mapping_complete: dict[int, bool] = {}
+    for kind in sorted(set(types)):
+        source: dict[str, Any] = {
+            "kind": kind,
+            "members": [],
+            "distinctness": [],
+            "inventory_complete": False,
+        }
         census["sources"].append(source)
-        source_members[kind] = []
-        mapped_sketch_members[kind] = []
-        local_view_members[kind] = []
-        inventories_complete[kind] = True
-        mapped_inventories_complete[kind] = True
+        mapped_members[kind] = []
+        mapping_complete[kind] = False
+        if kind not in (10, 11):
+            source["invalid_attachment_type"] = True
+            continue
+        interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
         try:
-            raw_members = (
-                source_sketch.GetSketchSegments()
-                if kind == 10
-                else source_sketch.GetSketchPoints2()
+            raw_members = tuple(
+                (
+                    source_sketch.GetSketchSegments()
+                    if kind == 10
+                    else source_sketch.GetSketchPoints2()
+                )
+                or ()
             )
-            raw_members = tuple(raw_members or ())
+            source["inventory_complete"] = True
         except Exception as exc:
             source["inventory_error"] = error(exc)
-            inventories_complete[kind] = False
             raw_members = ()
+        originals: list[Any] = []
         for index, raw_member in enumerate(raw_members):
             member: dict[str, Any] = {"index": index}
             source["members"].append(member)
             original = read_object(member, "native", interface, lambda: raw_member)
-            mapped = corresponding(member, "forward", interface, original)
-            restored = corresponding(
-                member,
-                "reverse_forward",
-                interface,
-                mapped,
-                reverse=True,
-            )
+            if original is None:
+                member["forward"] = {"present": False, "skipped": "null_input"}
+                mapped = None
+            else:
+                mapped = read_object(
+                    member,
+                    "forward",
+                    interface,
+                    lambda: view.GetCorresponding(original),
+                )
             member["self"] = same(original, original)
             member["forward_self"] = same(mapped, mapped)
-            member["roundtrip_source"] = same(restored, original)
-            source_members[kind].append((original, mapped, member))
-            if original is None:
-                inventories_complete[kind] = False
-        for index, (original, mapped, member) in enumerate(source_members[kind]):
-            other_index = 1 if index == 0 else 0
-            if other_index < len(source_members[kind]):
-                other, mapped_other, _ = source_members[kind][other_index]
-                member["other_index"] = other_index
-                member["other_source"] = same(original, other)
-                member["other_forward"] = same(mapped, mapped_other)
-        try:
-            raw_mapped_members = (
-                mapped_sketch.GetSketchSegments()
-                if kind == 10
-                else mapped_sketch.GetSketchPoints2()
-            )
-            for raw_member in raw_mapped_members or ():
-                mapped_member = read_object(
-                    source,
-                    f"mapped_sketch_member_{len(mapped_sketch_members[kind])}",
-                    interface,
-                    lambda: raw_member,
+            originals.append(original)
+            mapped_members[kind].append(mapped)
+        # One comparison per unordered pair proves injectivity in both contexts.
+        for left in range(len(originals)):
+            for right in range(left + 1, len(originals)):
+                source["distinctness"].append(
+                    {
+                        "left_index": left,
+                        "right_index": right,
+                        "source_is_same": same(originals[left], originals[right]),
+                        "forward_is_same": same(
+                            mapped_members[kind][left], mapped_members[kind][right]
+                        ),
+                    }
                 )
-                mapped_sketch_members[kind].append(mapped_member)
-                if mapped_member is None:
-                    mapped_inventories_complete[kind] = False
-        except Exception as exc:
-            source["mapped_sketch_inventory_error"] = error(exc)
-            mapped_inventories_complete[kind] = False
-        source["source_member_count"] = len(source_members[kind])
-        source["mapped_sketch_member_count"] = len(mapped_sketch_members[kind])
-        mapped_member_self[kind] = [
-            same(member, member) for member in mapped_sketch_members[kind]
-        ]
-        source["mapped_sketch_member_self"] = mapped_member_self[kind]
-        source["mapped_sketch_member_other"] = [
-            same(member, mapped_sketch_members[kind][1 if index == 0 else 0])
-            if len(mapped_sketch_members[kind]) > 1
-            else None
-            for index, member in enumerate(mapped_sketch_members[kind])
-        ]
-        try:
-            raw_local_members = (
-                view_sketch.GetSketchSegments()
-                if kind == 10
-                else view_sketch.GetSketchPoints2()
+        source["source_member_count"] = len(originals)
+        source["mapped_member_count"] = sum(
+            member is not None for member in mapped_members[kind]
+        )
+        mapping_complete[kind] = (
+            source["inventory_complete"]
+            and source["source_member_count"] > 0
+            and source["source_member_count"] == source["mapped_member_count"]
+            and all(
+                member["self"] == 1 and member["forward_self"] == 1
+                for member in source["members"]
             )
-            for raw_member in raw_local_members or ():
-                local_member = read_object(
-                    source,
-                    f"drawing_view_member_{len(local_view_members[kind])}",
-                    interface,
-                    lambda: raw_member,
-                )
-                local_view_members[kind].append(local_member)
-        except Exception as exc:
-            source["drawing_view_inventory_error"] = error(exc)
-
-    other_sketches: list[Any] = []
-    census["other_views"] = []
-    try:
-        for raw_view in iter_views(adapter):
-            other = _early_bound(_bind(raw_view, "IView"), "IView")
-            if same(other, view) == 1:
-                continue
-            row: dict[str, Any] = {"name": str(view_name(adapter, other))}
-            census["other_views"].append(row)
-            other_sketches.append(
-                read_object(
-                    row,
-                    "sketch",
-                    "ISketch",
-                    lambda: other.GetSketch(),
-                )
+            and all(
+                pair["source_is_same"] == 0 and pair["forward_is_same"] == 0
+                for pair in source["distinctness"]
             )
-    except Exception as exc:
-        census["other_views_error"] = error(exc)
+        )
+        source["mapping_complete"] = mapping_complete[kind]
 
     for index, (raw_entity, kind) in enumerate(zip(entities, types, strict=True)):
-        proof: dict[str, Any] = {"index": index, "kind": kind, "proven": False}
+        proof: dict[str, Any] = {
+            "index": index,
+            "kind": kind,
+            "member_proof": "direct_view_corresponding",
+            "proven": False,
+        }
         census["attachments"].append(proof)
-        if raw_entity is None or kind not in (10, 11):
-            proof["invalid_attachment"] = True
+        if kind not in (10, 11):
+            proof["invalid_attachment_type"] = True
             continue
         interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
         entity = read_object(proof, "native", interface, lambda: raw_entity)
-        sketch = read_object(proof, "sketch", "ISketch", lambda: entity.GetSketch())
-        restored = corresponding(
-            proof,
-            "reverse",
-            interface,
-            entity,
-            reverse=True,
-        )
-        restored_view = corresponding(
-            proof,
-            "reverse_forward",
-            interface,
-            restored,
-        )
-        restored_owner_sketch = corresponding(
-            proof,
-            "reverse_sketch",
-            "ISketch",
-            sketch,
-            reverse=True,
-        )
         proof["self"] = same(entity, entity)
-        proof["sketch_self"] = same(sketch, sketch)
-        proof["sketch_source"] = same(sketch, source_sketch)
-        proof["sketch_mapped_source"] = same(sketch, mapped_sketch)
-        proof["sketch_drawing_view"] = same(sketch, view_sketch)
-        proof["sketch_other_views"] = [same(sketch, other) for other in other_sketches]
-        proof["reverse_sketch_source"] = same(restored_owner_sketch, source_sketch)
-        proof["reverse_forward_self"] = same(restored_view, entity)
-        proof["model_source_entity_is_same"] = [
-            same(entity, original) for original, _, _ in source_members[kind]
-        ]
-        proof["view_source_entity_is_same"] = [
-            same(entity, mapped) for _, mapped, _ in source_members[kind]
-        ]
-        proof["reverse_source_entity_is_same"] = [
-            same(restored, original) for original, _, _ in source_members[kind]
-        ]
-        proof["mapped_sketch_entity_is_same"] = [
-            same(entity, member) for member in mapped_sketch_members[kind]
-        ]
-        proof["drawing_view_entity_is_same"] = [
-            same(entity, member) for member in local_view_members[kind]
-        ]
+        comparisons = [same(entity, mapped) for mapped in mapped_members[kind]]
+        proof["view_source_entity_is_same"] = comparisons
         matches = [
             member_index
-            for member_index, equality in enumerate(
-                proof["mapped_sketch_entity_is_same"]
-            )
+            for member_index, equality in enumerate(comparisons)
             if equality == 1
         ]
         proof["matched_mapped_members"] = matches
-        proof["member_proof"] = "mapped_source_sketch"
         proof["negative_controls_proven"] = all(
             equality == 0
-            for member_index, equality in enumerate(
-                proof["mapped_sketch_entity_is_same"]
-            )
+            for member_index, equality in enumerate(comparisons)
             if member_index not in matches
         )
         proof["proven"] = (
             entity is not None
-            and sketch is not None
             and proof["self"] == 1
-            and inventories_complete[kind]
-            and mapped_inventories_complete[kind]
-            and len(mapped_sketch_members[kind]) == len(source_members[kind])
+            and mapping_complete[kind]
             and len(matches) == 1
             and proof["negative_controls_proven"]
-            and mapped_member_self[kind][matches[0]] == 1
         )
     proven_members: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for proof in census["attachments"]:
@@ -484,40 +318,6 @@ def _attachment_correspondence(
             for proof in owners:
                 proof["proven"] = False
                 proof["duplicate_mapped_member"] = True
-
-    census["source_annotation_controls"] = []
-    try:
-        for raw_display in _feature_display_dimensions(source_feature):
-            display = _bind(raw_display, "IDisplayDimension")
-            source_native = display.GetDimension2(0)
-            if same(native, source_native) != 1:
-                continue
-            row = {}
-            census["source_annotation_controls"].append(row)
-            source_annotation = read_object(
-                row,
-                "source",
-                "IAnnotation",
-                lambda: display.GetAnnotation(),
-            )
-            mapped_annotation = corresponding(
-                row,
-                "forward",
-                "IAnnotation",
-                source_annotation,
-            )
-            reversed_annotation = corresponding(
-                row,
-                "reverse",
-                "IAnnotation",
-                annotation,
-                reverse=True,
-            )
-            row["source_self"] = same(source_annotation, source_annotation)
-            row["forward_imported"] = same(mapped_annotation, annotation)
-            row["reverse_source"] = same(reversed_annotation, source_annotation)
-    except Exception as exc:
-        census["source_annotation_error"] = error(exc)
     census["proven"] = bool(census["attachments"]) and all(
         proof["proven"] for proof in census["attachments"]
     )
@@ -613,25 +413,21 @@ def _assert_source(
             allow_nan=False,
         )
     )
-    raw_sketch = _early_bound(source_feature, "IFeature").GetSpecificFeature2()
-    source_sketch = _early_bound(_bind(raw_sketch, "ISketch"), "ISketch")
-    entities = tuple(annotation.GetAttachedEntities3() or ())
-    types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
-    if source_sketch is None or not entities or len(entities) != len(types):
-        raise RuntimeError(
-            f"{name}: supplier reference lost its source sketch attachments"
-        )
+    source_sketch: Any = None
     correspondence: dict[str, Any] = {}
     try:
+        raw_sketch = _early_bound(source_feature, "IFeature").GetSpecificFeature2()
+        source_sketch = _early_bound(_bind(raw_sketch, "ISketch"), "ISketch")
+        entities = tuple(annotation.GetAttachedEntities3() or ())
+        types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+        if source_sketch is None or not entities or len(entities) != len(types):
+            raise RuntimeError(
+                f"{name}: supplier reference lost its source sketch attachments"
+            )
         correspondence = _attachment_correspondence(
             adapter,
             view,
-            model,
-            source_feature=source_feature,
             source_sketch=source_sketch,
-            feature_owner=feature_owner,
-            native=native,
-            annotation=annotation,
             entities=entities,
             types=types,
         )

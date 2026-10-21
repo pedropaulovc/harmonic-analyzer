@@ -6,6 +6,11 @@ the largest fitting standard scale; Isometric has its own fitting scale and
 stays unannotated. All supplier dimensions are reference-only, not fabrication
 controls or claims that nominal envelopes survive every physical feature.
 
+Supplier sources are opened read-only and their SHA-256 is checked after drawing
+export and close, including error paths. Native outline fitting uses refreshed
+display geometry and records each real candidate without replay; custom geometry
+readers retain their own refresh/measurement contract.
+
 The footer, bottom-left above the border and left of the title block, reads
 top to bottom: the part's own notes (installation, or a spring's acceptance
 data), one general line, then ITEM (the catalogue designation in plain text,
@@ -16,6 +21,7 @@ stock name, which restates the material, is read and checked but not printed.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -32,7 +38,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _check import check
 from _com import _early_bound
 import _config
 from _custom_properties import apply_custom_properties
@@ -136,6 +141,89 @@ _NUMBER_CENTRE = (
 )
 
 
+def _source_file_sha256(source: Path) -> str:
+    """Read source bytes without loading the native part or buffering the file."""
+    with Path(source).open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def _open_supplier_source_read_only(adapter: Any, source: Path, *, label: str) -> Any:
+    """Acquire the exact native part read-only; session teardown owns its close.
+
+    OpenDoc6(FileName, Type, Options, Configuration, out Errors, out Warnings)
+    returns (IModelDoc2, errors, warnings) through makepy. IsOpenedReadOnly(),
+    GetType() and GetPathName() are methods, not dispatch properties.
+    """
+    source = Path(source).resolve()
+    if source.suffix.lower() != ".sldprt" or not source.is_file():
+        raise ValueError(
+            f"{label}: supplier source must be an existing SLDPRT: {source}"
+        )
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    model = app.GetOpenDocumentByName(str(source))
+    if model is None:
+        # swDocPART=1; swOpenDocOptions_Silent=1 | ReadOnly=2. As in
+        # _native_projected_zone, the two native [out] integers follow retval.
+        opened = app.OpenDoc6(str(source), 1, 1 | 2, "", 0, 0)
+        if not isinstance(opened, tuple) or len(opened) != 3:
+            raise RuntimeError(
+                f"{label}: unreadable supplier native open result: {opened!r}"
+            )
+        model, errors, warnings = opened
+        if type(errors) is not int or type(warnings) is not int:
+            raise RuntimeError(
+                f"{label}: unreadable supplier open status: {errors!r}, {warnings!r}"
+            )
+        _telemetry.event(
+            "drawing.purchased_source_open",
+            document_path=str(source),
+            open_error_raw=errors,
+            open_warning_raw=warnings,
+        )
+        if model is None or errors != 0:
+            raise RuntimeError(
+                f"{label}: supplier read-only open failed ({errors=}, {warnings=})"
+            )
+    model = _early_bound(model, "IModelDoc2")
+    loaded = app.GetOpenDocumentByName(str(source))
+    if loaded is None:
+        raise RuntimeError(
+            f"{label}: supplier source was not found in the loaded documents"
+        )
+    loaded = _early_bound(loaded, "IModelDoc2")
+    for document in (model, loaded):
+        kind = document.GetType()
+        path = document.GetPathName()
+        if type(kind) is not int or kind != 1:
+            raise RuntimeError(
+                f"{label}: supplier source is not a native part: {kind!r}"
+            )
+        if type(path) is not str or not path.strip() or Path(path).resolve() != source:
+            raise RuntimeError(
+                f"{label}: supplier source path identity mismatch: {path!r}"
+            )
+        if document.IsOpenedReadOnly() is not True:
+            raise RuntimeError(f"{label}: supplier source must be opened read-only")
+    identity = app.IsSame(model, loaded)
+    if type(identity) is not int or identity != 1:  # swObjectSame=1, not VT_BOOL.
+        raise RuntimeError(
+            f"{label}: supplier loaded document identity mismatch: {identity!r}"
+        )
+    # io.open_model binds IModelDoc2 then assigns currentModel; it has no other
+    # model-state assignment. Do not guess private adapter fields or ActiveDoc.
+    adapter.currentModel = model
+    current = adapter.currentModel
+    if current is None:
+        raise RuntimeError(f"{label}: adapter lost the supplier source document")
+    for document in (model, loaded):
+        identity = app.IsSame(current, document)
+        if type(identity) is not int or identity != 1:
+            raise RuntimeError(
+                f"{label}: adapter supplier source identity mismatch: {identity!r}"
+            )
+    return model
+
+
 def _box(
     values: Any, *, label: str, kind: Literal["view", "note"] = "view"
 ) -> tuple[float, float, float, float]:
@@ -199,13 +287,13 @@ def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
         or len(line) > MAX_ITEM_CHARS
         for line in lines
     ):
-        raise ValueError(f"{label}: supplier operating data must fit single footer lines")
+        raise ValueError(
+            f"{label}: supplier operating data must fit single footer lines"
+        )
     return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
 
 
-def footer_top(
-    notes: str, *, label: str, supplier_data: Sequence[str] = ()
-) -> float:
+def footer_top(notes: str, *, label: str, supplier_data: Sequence[str] = ()) -> float:
     """The top edge of installation notes and separate supplier operating data."""
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
@@ -220,7 +308,8 @@ def view_band_bottom(
 ) -> float:
     """Bottom-row captions clear the complete footer and title block."""
     return max(
-        footer_top(notes, label=label, supplier_data=supplier_data) + _CAPTION_CLEARANCE,
+        footer_top(notes, label=label, supplier_data=supplier_data)
+        + _CAPTION_CLEARANCE,
         _LOWEST_CAPTION_Y,
     )
 
@@ -284,7 +373,9 @@ def supplier_fit_cells(cells: tuple, margins: SupplierMargins, *, label: str) ->
         left, bottom, right, top = padding
         inset = (cell[0] + left, cell[1] + bottom, cell[2] - right, cell[3] - top)
         if inset[0] >= inset[2] or inset[1] >= inset[3]:
-            raise ValueError(f"{label} {name}: supplier margins leave no geometry space")
+            raise ValueError(
+                f"{label} {name}: supplier margins leave no geometry space"
+            )
         fitted.append(_cell(name, *inset))
     return tuple(fitted)
 
@@ -297,7 +388,9 @@ def assert_supplier_view_fits(
     view = _early_bound(view, "IView")
     outline = _box(view.GetOutline(), label=label)
     if not _inside(outline, cell):
-        raise RuntimeError(f"{label}: settled supplier view leaves its cell: {outline!r}")
+        raise RuntimeError(
+            f"{label}: settled supplier view leaves its cell: {outline!r}"
+        )
     assert_supplier_annotations_fit(adapter, view, cell, label=label)
 
 
@@ -314,7 +407,9 @@ def assert_supplier_annotations_fit(
         display = _early_bound(display, "IDisplayDimension")
         raw_dimension = display.GetDimension2(0)
         if raw_dimension is None:
-            raise RuntimeError(f"{label}: supplier annotation lost its native dimension")
+            raise RuntimeError(
+                f"{label}: supplier annotation lost its native dimension"
+            )
         native = _early_bound(raw_dimension, "IDimension")
         identity = str(native.FullName)
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
@@ -327,7 +422,9 @@ def assert_supplier_annotations_fit(
             or display.GetOverride()
             or not display.ShowDimensionValue
         ):
-            raise RuntimeError(f"{label} {identity}: unsound supplier annotation owner/value")
+            raise RuntimeError(
+                f"{label} {identity}: unsound supplier annotation owner/value"
+            )
         geometry, refused = annotation_display(adapter, annotation)
         if refused or not geometry.get("texts"):
             raise RuntimeError(
@@ -367,16 +464,25 @@ def _assert_supplier_layout(
 ) -> None:
     """Reacquire after the final rebuild; no refitting or repair in this guard."""
     actual = list(iter_views(adapter))
-    views = {str(view.GetOrientationName()): _early_bound(view, "IView") for view in actual}
+    views = {
+        str(view.GetOrientationName()): _early_bound(view, "IView") for view in actual
+    }
     if len(actual) != len(cells) or set(views) != {name for name, _, _ in cells}:
         raise RuntimeError(f"{label}: supplier layout lost its four native view cells")
     for name, _, cell in cells:
         view = views[name]
-        source = (str(Path(view.GetReferencedModelName()).resolve()), str(view.ReferencedConfiguration))
+        source = (
+            str(Path(view.GetReferencedModelName()).resolve()),
+            str(view.ReferencedConfiguration),
+        )
         if source != sources[name]:
-            raise RuntimeError(f"{label} {name}: supplier view changed source/configuration")
+            raise RuntimeError(
+                f"{label} {name}: supplier view changed source/configuration"
+            )
         if tuple(view.ScaleRatio) != scales[name] or view.UseSheetScale != 0:
-            raise RuntimeError(f"{label} {name}: supplier callback changed fitted scale")
+            raise RuntimeError(
+                f"{label} {name}: supplier callback changed fitted scale"
+            )
         view.UpdateViewDisplayGeometry()
         origin = model_point_in_view(
             adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} settled origin"
@@ -385,7 +491,9 @@ def _assert_supplier_layout(
             abs(actual - expected) > 1e-6
             for actual, expected in zip(origin, origins[name], strict=True)
         ):
-            raise RuntimeError(f"{label} {name}: supplier callback moved the fitted view")
+            raise RuntimeError(
+                f"{label} {name}: supplier callback moved the fitted view"
+            )
         if (view.GetFirstDisplayDimension6() is not None) != (name in margins):
             raise RuntimeError(
                 f"{label} {name}: actual supplier dimensions do not match reserved views"
@@ -400,7 +508,9 @@ def _assert_supplier_layout(
             or note.GetText().replace("\r\n", "\n") != resolved
             or not _inside(bounds, cell)
         ):
-            raise RuntimeError(f"{label}: settled caption/footer changed owner/text/space: {text!r}")
+            raise RuntimeError(
+                f"{label}: settled caption/footer changed owner/text/space: {text!r}"
+            )
 
 
 def _custom_fit_bounds(raw: Any, *, label: str) -> tuple[float, ...]:
@@ -424,6 +534,21 @@ def _custom_fit_bounds(raw: Any, *, label: str) -> tuple[float, ...]:
     return bounds
 
 
+def _refreshed_native_fit_bounds(
+    view: Any, *, label: str
+) -> tuple[tuple[float, ...], dict[str, Any]]:
+    outlines: dict[str, Any] = {}
+    try:
+        outlines["outline_before_refresh_m"] = _box(view.GetOutline(), label=label)
+    except Exception as error:
+        outlines["outline_before_refresh_error"] = repr(error)
+    # VT_VOID: refresh has no Boolean result. Only its validated outline fits.
+    view.UpdateViewDisplayGeometry()
+    box = _box(view.GetOutline(), label=label)
+    outlines["outline_after_refresh_m"] = box
+    return box, outlines
+
+
 def _fit_group(
     draw: Any,
     members: list[tuple[Any, tuple]],
@@ -434,10 +559,71 @@ def _fit_group(
 
     Native outlines include fixed sheet-space padding, so scaling a 1:1 outline
     can reject a larger view that actually fits; measure each standard scale.
-    A custom bounds reader requires current, refreshed native geometry and must
-    return four finite numeric coordinates, ordered with at least one positive
-    extent; a one-dimensional extent is allowed.
+    Only the native-outline path refreshes display geometry before measuring;
+    its post-refresh outline selects the scale. Custom readers retain ownership
+    of their geometry refresh and return four finite numeric coordinates,
+    ordered with at least one positive extent (one-dimensional is allowed).
     """
+
+    def record(
+        view: Any,
+        name: str,
+        center: tuple,
+        cell: tuple,
+        box: tuple,
+        *,
+        scale: tuple[int, int],
+        phase: str,
+        reason: str,
+        outlines: dict[str, Any],
+    ) -> None:
+        width, height = box[2] - box[0], box[3] - box[1]
+        state: dict[str, Any] = {
+            "view_key": name,
+            "requested_scale": scale,
+            "phase": phase,
+            "reason": reason,
+            "bounds_kind": "native_outline" if read_bounds is None else "custom",
+            "fit_bounds_m": box,
+            "cell_m": cell,
+            "cell_center_m": center,
+            "width_m": width,
+            "height_m": height,
+            "width_excess_m": width - (cell[2] - cell[0]),
+            "height_excess_m": height - (cell[3] - cell[1]),
+            **outlines,
+        }
+        errors = {}
+        for key, getter in (
+            ("actual_scale_ratio", lambda: tuple(view.ScaleRatio)),
+            ("use_sheet_scale", lambda: view.UseSheetScale),
+            ("view_name", lambda: view.GetName2()),
+            ("orientation", lambda: view.GetOrientationName()),
+            ("source_path", lambda: view.GetReferencedModelName()),
+            ("configuration", lambda: view.ReferencedConfiguration),
+            ("position_m", lambda: tuple(view.Position)),
+        ):
+            try:
+                state[key] = getter()
+            except Exception as error:
+                errors[key] = repr(error)
+        if errors:
+            state["metadata_errors"] = errors
+        if phase == "postcenter":
+            state.update(
+                center_error_m=(
+                    (box[0] + box[2]) / 2 - center[0],
+                    (box[1] + box[3]) / 2 - center[1],
+                ),
+                containment_excess_m={
+                    "left": cell[0] - box[0],
+                    "bottom": cell[1] - box[1],
+                    "right": box[2] - cell[2],
+                    "top": box[3] - cell[3],
+                },
+            )
+        _telemetry.event("drawing.purchased_fit_candidate", **state)
+
     for scale in _SCALES:
         with _telemetry.span(
             "drawing.purchased_scale_candidate", scale=f"{scale[0]}:{scale[1]}"
@@ -446,17 +632,32 @@ def _fit_group(
                 view.UseSheetScale = 0
                 view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
             _rebuild(draw, phase="apply view scale")
-            bounds = [
-                _box(view.GetOutline(), label=name)
-                if read_bounds is None
-                else _custom_fit_bounds(read_bounds(view, name), label=name)
-                for view, (name, _, _) in members
-            ]
-            if any(
-                box[2] - box[0] > cell[2] - cell[0]
-                or box[3] - box[1] > cell[3] - cell[1]
-                for box, (_, (_, _, cell)) in zip(bounds, members, strict=True)
-            ):
+            bounds = []
+            oversized = False
+            for view, (name, center, cell) in members:
+                if read_bounds is None:
+                    box, outlines = _refreshed_native_fit_bounds(view, label=name)
+                else:
+                    box = _custom_fit_bounds(read_bounds(view, name), label=name)
+                    outlines = {}
+                bounds.append(box)
+                too_large = (
+                    box[2] - box[0] > cell[2] - cell[0]
+                    or box[3] - box[1] > cell[3] - cell[1]
+                )
+                record(
+                    view,
+                    name,
+                    center,
+                    cell,
+                    box,
+                    scale=scale,
+                    phase="precenter",
+                    reason="precenter_size" if too_large else "accepted",
+                    outlines=outlines,
+                )
+                oversized = oversized or too_large
+            if oversized:
                 continue
             for (view, (name, center, _)), box in zip(members, bounds, strict=True):
                 position = tuple(float(value) for value in view.Position)
@@ -482,17 +683,32 @@ def _fit_group(
                     raise RuntimeError(
                         f"{name}: independent view scale did not persist: {ratio!r}"
                     )
-                box = (
-                    _box(view.GetOutline(), label=name)
-                    if read_bounds is None
-                    else _custom_fit_bounds(read_bounds(view, name), label=name)
+                if read_bounds is None:
+                    box, outlines = _refreshed_native_fit_bounds(view, label=name)
+                else:
+                    box = _custom_fit_bounds(read_bounds(view, name), label=name)
+                    outlines = {}
+                centered = (
+                    abs((box[0] + box[2]) / 2 - center[0]) <= 1e-6
+                    and abs((box[1] + box[3]) / 2 - center[1]) <= 1e-6
                 )
-                if (
-                    abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
-                    or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
-                ):
+                contained = _inside(box, cell)
+                record(
+                    view,
+                    name,
+                    center,
+                    cell,
+                    box,
+                    scale=scale,
+                    phase="postcenter",
+                    reason="accepted"
+                    if centered and contained
+                    else "postcenter_containment",
+                    outlines=outlines,
+                )
+                if not centered:
                     raise RuntimeError(f"{name}: native view failed to center: {box!r}")
-                fits = fits and _inside(box, cell)
+                fits = fits and contained
             if fits:
                 return scale
     names = ", ".join(name for _, (name, _, _) in members)
@@ -509,7 +725,6 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
             raise RuntimeError(
                 f"{name}: initial 1:1 view scale did not persist: {ratio!r}"
             )
-        _box(view.GetOutline(), label=name)
     members = list(zip(views, cells, strict=True))
     scales: dict[str, tuple[int, int]] = {}
     for group in (
@@ -871,7 +1086,9 @@ def add_purchased_footer(
     if data:
         text = "\n".join(data)
         top = footer_top(notes, label=label, supplier_data=supplier_data)
-        bottom = footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+        bottom = (
+            footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+        )
         note = _literal_note(adapter, text, _NOTE_X, top)
         placed.append(
             (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
@@ -938,49 +1155,72 @@ async def build_purchased_fastener_drawing(
     if not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
 
-    with _telemetry.span("drawing.purchased_source", part=stock.part_name):
-        check(f"open {stock.part_name} source", await adapter.open_model(str(source)))
-        model = _early_bound(adapter.currentModel, "IModelDoc2")
-        if Path(model.GetPathName()).resolve() != source.resolve():
-            raise RuntimeError(f"opened purchased part is not {source}")
-        properties = read_required_properties(model, _PROPERTIES, required=_PROPERTIES)
-        registry = _config.parts(stock.part_name)
-        finish = registry["finish"]
-        if not isinstance(finish, str) or not finish.strip():
-            raise RuntimeError(
-                f"{stock.part_name}: registered purchased finish is empty"
+    source_sha256 = _source_file_sha256(source)
+    primary: BaseException | None = None
+    try:
+        with _telemetry.span("drawing.purchased_source", part=stock.part_name):
+            model = _open_supplier_source_read_only(
+                adapter, source, label=stock.part_name
             )
-        expected = {
-            "Number": str(registry["number"]),
-            # The PART cell prints the slug (_part_properties.part_properties).
-            "Title": stock.part_name,
-            "Material": str(registry["material"]),
-            "Stock Name": stock.stock_name,
-            "Supplier": stock.supplier,
-            "Supplier SKUs": ", ".join(stock.skus),
-        }
-        for name, value in expected.items():
-            if properties[name] != value:
+            properties = read_required_properties(
+                model, _PROPERTIES, required=_PROPERTIES
+            )
+            registry = _config.parts(stock.part_name)
+            finish = registry["finish"]
+            if not isinstance(finish, str) or not finish.strip():
                 raise RuntimeError(
-                    f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
+                    f"{stock.part_name}: registered purchased finish is empty"
                 )
+            expected = {
+                "Number": str(registry["number"]),
+                # The PART cell prints the slug (_part_properties.part_properties).
+                "Title": stock.part_name,
+                "Material": str(registry["material"]),
+                "Stock Name": stock.stock_name,
+                "Supplier": stock.supplier,
+                "Supplier SKUs": ", ".join(stock.skus),
+            }
+            for name, value in expected.items():
+                if properties[name] != value:
+                    raise RuntimeError(
+                        f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
+                    )
 
-    return await _build_reference_sheet(
-        adapter,
-        spec,
-        properties=properties,
-        finish=finish,
-        item=item if item is not None else stock.stock_name.upper(),
-        notes=str(registry.get("installation_notes", "")),
-        cut_to_suit=cut_to_suit,
-        document_title=str(registry["title"]),
-        number_fit=number_fit,
-        supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_margins,
-        configuration=configuration,
-        settled_checks=settled_checks,
-        supplier_data=supplier_data,
-    )
+        return await _build_reference_sheet(
+            adapter,
+            spec,
+            properties=properties,
+            finish=finish,
+            item=item if item is not None else stock.stock_name.upper(),
+            notes=str(registry.get("installation_notes", "")),
+            cut_to_suit=cut_to_suit,
+            document_title=str(registry["title"]),
+            number_fit=number_fit,
+            supplier_dimensions=supplier_dimensions,
+            supplier_margins=supplier_margins,
+            configuration=configuration,
+            settled_checks=settled_checks,
+            supplier_data=supplier_data,
+        )
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        # Includes finalize_drawing's SLDDRW/PDF saves and drawing CloseDoc.
+        # SetText can dirty source presentation without changing native values.
+        # Never save or clear that flag; the source must remain byte-identical.
+        try:
+            if _source_file_sha256(source) != source_sha256:
+                raise RuntimeError(
+                    f"{stock.part_name}: supplier source part bytes changed during drawing"
+                )
+        except BaseException as preservation_error:
+            if primary is not None:
+                primary.add_note(
+                    f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
+                )
+            else:
+                raise
 
 
 async def build_purchased_spring_drawing(
@@ -1002,27 +1242,50 @@ async def build_purchased_spring_drawing(
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased spring is missing: {source}")
-    check(f"open {spec.artifact_stem} source", await adapter.open_model(str(source)))
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    if Path(model.GetPathName()).resolve() != source.resolve():
-        raise RuntimeError(f"opened purchased spring is not {source}")
-    names = (*_PROPERTIES, "Material Specification", "Finish", "Manufacturing Notes")
-    properties = read_required_properties(model, names, required=names)
-    return await _build_reference_sheet(
-        adapter,
-        spec,
-        properties=properties,
-        finish=properties["Finish"],
-        item=item,
-        material_property="Material Specification",
-        notes=properties["Manufacturing Notes"],
-        spring=True,
-        supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_margins,
-        configuration=configuration,
-        settled_checks=settled_checks,
-        supplier_data=supplier_data,
-    )
+    source_sha256 = _source_file_sha256(source)
+    primary: BaseException | None = None
+    try:
+        model = _open_supplier_source_read_only(
+            adapter, source, label=spec.artifact_stem
+        )
+        names = (
+            *_PROPERTIES,
+            "Material Specification",
+            "Finish",
+            "Manufacturing Notes",
+        )
+        properties = read_required_properties(model, names, required=names)
+        return await _build_reference_sheet(
+            adapter,
+            spec,
+            properties=properties,
+            finish=properties["Finish"],
+            item=item,
+            material_property="Material Specification",
+            notes=properties["Manufacturing Notes"],
+            spring=True,
+            supplier_dimensions=supplier_dimensions,
+            supplier_margins=supplier_margins,
+            configuration=configuration,
+            settled_checks=settled_checks,
+            supplier_data=supplier_data,
+        )
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        try:
+            if _source_file_sha256(source) != source_sha256:
+                raise RuntimeError(
+                    f"{spec.artifact_stem}: supplier source part bytes changed during drawing"
+                )
+        except BaseException as preservation_error:
+            if primary is not None:
+                primary.add_note(
+                    f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
+                )
+            else:
+                raise
 
 
 async def _build_reference_sheet(
@@ -1065,7 +1328,9 @@ async def _build_reference_sheet(
         if not callable(supplier_dimensions):
             raise TypeError(f"{label}: supplier annotation hook must be callable")
         if supplier_margins is None:
-            raise ValueError(f"{label}: supplier annotations require explicit pre-fit margins")
+            raise ValueError(
+                f"{label}: supplier annotations require explicit pre-fit margins"
+            )
         fit_cells = supplier_fit_cells(cells, supplier_margins, label=label)
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
@@ -1250,7 +1515,9 @@ async def _build_reference_sheet(
         if any(not callable(verify) for verify in supplier_checks):
             raise TypeError(f"{label}: settled checks must be callable")
         if supplier_dimensions is not None and not supplier_checks:
-            raise RuntimeError(f"{label}: supplier annotations require final settled native checks")
+            raise RuntimeError(
+                f"{label}: supplier annotations require final settled native checks"
+            )
         final_checks = supplier_checks
         if number_fit is NumberFit.SHRINK_TO_CELL:
             final_checks = (
@@ -1277,7 +1544,10 @@ async def _build_reference_sheet(
             view = views_by_orientation[name]
             if Path(view.GetReferencedModelName()).resolve() != source.resolve():
                 raise RuntimeError(f"{name}: purchased view references the wrong model")
-            if configuration is not None and str(view.ReferencedConfiguration) != configuration:
+            if (
+                configuration is not None
+                and str(view.ReferencedConfiguration) != configuration
+            ):
                 raise RuntimeError(f"{name}: final purchased configuration changed")
             if tuple(view.ScaleRatio) != scales[name]:
                 raise RuntimeError(f"{name}: final purchased view scale changed")
@@ -1309,8 +1579,13 @@ async def _build_reference_sheet(
         final_checks = (
             *final_checks,
             lambda: _assert_supplier_layout(
-                adapter, cells, label=label, margins=supplier_margins,
-                scales=scales, origins=fitted_origins, sources=fitted_sources,
+                adapter,
+                cells,
+                label=label,
+                margins=supplier_margins,
+                scales=scales,
+                origins=fitted_origins,
+                sources=fitted_sources,
                 sheet_notes=placed,
             ),
         )

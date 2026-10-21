@@ -21,13 +21,29 @@ class _Model:
     def GetPathName(self) -> str:
         return str(self._path)
 
+    def GetType(self) -> int:
+        return 1
+
+    def IsOpenedReadOnly(self) -> bool:
+        return True
+
 
 class _Adapter:
     def __init__(self, source: Path) -> None:
-        self.currentModel = _Model(source)
+        self.currentModel = None
+        model = _Model(source)
+        documents = {}
 
-    async def open_model(self, _path: str) -> bool:
-        return True
+        def open_doc(path, kind, options, configuration, errors, warnings):
+            assert (kind, options, configuration, errors, warnings) == (1, 3, "", 0, 0)
+            documents[str(Path(path).resolve())] = model
+            return model, 0, 0
+
+        self.swApp = SimpleNamespace(
+            OpenDoc6=open_doc,
+            GetOpenDocumentByName=lambda path: documents.get(str(Path(path).resolve())),
+            IsSame=lambda left, right: int(left is right),
+        )
 
     @staticmethod
     def _get_attr_or_call(target, name: str):
@@ -71,6 +87,9 @@ class _View:
     def GetOutline(self) -> tuple[float, float, float, float]:
         x, y = self._center
         return (x - 0.001, y - 0.001, x + 0.001, y + 0.001)
+
+    def UpdateViewDisplayGeometry(self) -> None:
+        return None
 
     def GetFirstCenterMark2(self):
         return None
@@ -167,7 +186,6 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     monkeypatch.setattr(purchased, "fastener", lambda _stem: stock)
     monkeypatch.setattr(purchased._config, "parts", lambda _name: registry)
     monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(purchased, "check", lambda _label, result: result)
 
     def required_properties(_model, names, *, required):
         assert tuple(names) == tuple(purchased._PROPERTIES)
@@ -753,17 +771,6 @@ def test_configured_sheet_refuses_projection_or_native_view_inventory_drift(
     assert not state.finalized
 
 
-@pytest.mark.parametrize(
-    "outline", [(0.0, 0.0, 1.0), (0.0, 0.0, float("nan"), 1.0), (0.0, 0.0, 1.0, 0.0)]
-)
-def test_fit_group_default_rejects_malformed_native_outline(monkeypatch, outline):
-    monkeypatch.setattr(purchased, "double_array", tuple)
-    view = SimpleNamespace(GetOutline=lambda: outline)
-    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
-    with pytest.raises(RuntimeError, match="native extent"):
-        purchased._fit_group(_Drawing(), members)
-
-
 class _BoundsView:
     def __init__(self):
         self.Position = (0.2, 0.3)
@@ -818,7 +825,9 @@ def test_fit_group_rejects_malformed_custom_bounds_without_outline_fallback(
 
 
 @pytest.mark.parametrize("height", [0.0, 0.1])
-def test_fit_group_custom_bounds_measures_candidates_and_centered_view(monkeypatch, height):
+def test_fit_group_custom_bounds_measures_candidates_and_centered_view(
+    monkeypatch, height
+):
     monkeypatch.setattr(purchased, "double_array", tuple)
     view = _BoundsView()
     reads = []
@@ -862,7 +871,9 @@ def test_fit_group_custom_bounds_post_center_error_propagates(monkeypatch):
         return (x, y, x + 0.1, y)
 
     members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
-    with pytest.raises(RuntimeError, match="settled construction bounds unavailable") as caught:
+    with pytest.raises(
+        RuntimeError, match="settled construction bounds unavailable"
+    ) as caught:
         purchased._fit_group(_Drawing(), members, read_bounds=read_bounds)
     assert caught.value is error
     assert len(reads) == 2
@@ -5449,7 +5460,9 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     annotation.GetAttachedEntityCount3 = lambda: len(annotation.entities)
     annotation.GetAttachedEntityTypes = lambda: (11,) * len(annotation.entities)
     text = {}
-    state = SimpleNamespace(unit=0, fraction=1, denominator=0, precision=2, rounding=False)
+    state = SimpleNamespace(
+        unit=0, fraction=1, denominator=0, precision=2, rounding=False
+    )
     display = SimpleNamespace(
         Type2=kind,
         ShowDimensionValue=True,
@@ -5480,37 +5493,60 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     display.SetPrecision3 = precision
     annotation.GetSpecificAnnotation = lambda: display
     return SimpleNamespace(
-        helper=supplier, display=display, native=native, annotation=annotation,
-        view=view, state=state, text=text,
+        helper=supplier,
+        display=display,
+        native=native,
+        annotation=annotation,
+        view=view,
+        state=state,
+        text=text,
     )
 
 
-def test_supplier_native_size_preserves_exact_fraction_not_rounded_catalogue_ink(monkeypatch):
+def test_supplier_native_size_preserves_exact_fraction_not_rounded_catalogue_ink(
+    monkeypatch,
+):
     case = _supplier_native(monkeypatch)
-    settings = dict(label="7/16 supplier length", units="in", precision=3, expected_mm=11.1125)
+    settings = dict(
+        label="7/16 supplier length", units="in", precision=3, expected_mm=11.1125
+    )
     case.helper.supplier_reference_dimension(None, case.display, **settings)
     assert case.native.SystemValue == 0.0111125
     assert case.text == {1: "(", 2: " in)", 4: ""}
     with pytest.raises(RuntimeError, match="!= exact expected"):
         case.helper.assert_supplier_reference_dimension(
-            None, case.display, **{**settings, "expected_mm": 0.438 * 25.4},
+            None,
+            case.display,
+            **{**settings, "expected_mm": 0.438 * 25.4},
         )
 
 
-def test_supplier_value_uses_referenced_configuration_not_active_model_configuration(monkeypatch):
+def test_supplier_value_uses_referenced_configuration_not_active_model_configuration(
+    monkeypatch,
+):
     case = _supplier_native(monkeypatch, value=0.008)
     case.native.GetSystemValue3 = lambda _which, configuration: (
         0.0111125 if configuration == "Supplier" else 0.008,
     )
     case.helper.supplier_reference_dimension(
-        None, case.display, label="supplier length", units="in", precision=3,
-        expected_mm=11.1125, configuration="Supplier",
+        None,
+        case.display,
+        label="supplier length",
+        units="in",
+        precision=3,
+        expected_mm=11.1125,
+        configuration="Supplier",
     )
     assert case.native.SystemValue == 0.008
     with pytest.raises(RuntimeError, match="!= exact expected"):
         case.helper.assert_supplier_reference_dimension(
-            None, case.display, label="supplier length", units="in", precision=3,
-            expected_mm=11.1125, configuration="Installed",
+            None,
+            case.display,
+            label="supplier length",
+            units="in",
+            precision=3,
+            expected_mm=11.1125,
+            configuration="Installed",
         )
 
 
@@ -5519,7 +5555,11 @@ def test_supplier_linear_size_rejects_other_native_dimension_types(monkeypatch, 
     case = _supplier_native(monkeypatch, kind=kind)
     with pytest.raises(RuntimeError, match="dimension type"):
         case.helper.supplier_reference_dimension(
-            None, case.display, label="supplier length", units="in", precision=3,
+            None,
+            case.display,
+            label="supplier length",
+            units="in",
+            precision=3,
             expected_mm=11.1125,
         )
 
@@ -5529,17 +5569,32 @@ def test_supplier_native_size_rejects_nonfinite_values(monkeypatch, value):
     case = _supplier_native(monkeypatch, value=value)
     with pytest.raises(RuntimeError, match="native value"):
         case.helper.supplier_reference_dimension(
-            None, case.display, label="supplier length", units="in", precision=3,
+            None,
+            case.display,
+            label="supplier length",
+            units="in",
+            precision=3,
             expected_mm=11.1125,
         )
 
 
 @pytest.mark.parametrize(
-    "drift", ("override", "hidden-value", "hidden-annotation", "dangling", "half-detached", "sheet-owner", "missing-owner"),
+    "drift",
+    (
+        "override",
+        "hidden-value",
+        "hidden-annotation",
+        "dangling",
+        "half-detached",
+        "sheet-owner",
+        "missing-owner",
+    ),
 )
 def test_supplier_settled_reference_rejects_unsound_native_ink(monkeypatch, drift):
     case = _supplier_native(monkeypatch)
-    settings = dict(label="supplier length", units="in", precision=3, expected_mm=11.1125)
+    settings = dict(
+        label="supplier length", units="in", precision=3, expected_mm=11.1125
+    )
     case.helper.supplier_reference_dimension(None, case.display, **settings)
     if drift == "override":
         case.display.GetOverride = lambda: True
@@ -5562,8 +5617,12 @@ def test_supplier_settled_reference_rejects_unsound_native_ink(monkeypatch, drif
 def test_supplier_thread_identification_keeps_native_nominal_major_value(monkeypatch):
     case = _supplier_native(monkeypatch, value=0.0028448)
     settings = dict(
-        label="nominal thread major", units="in", precision=3, expected_mm=2.8448,
-        presentation="diameter", callout="4-40 THREAD\nNOMINAL MAJOR",
+        label="nominal thread major",
+        units="in",
+        precision=3,
+        expected_mm=2.8448,
+        presentation="diameter",
+        callout="4-40 THREAD\nNOMINAL MAJOR",
     )
     case.helper.supplier_reference_dimension(None, case.display, **settings)
     assert case.native.SystemValue == 0.0028448
@@ -5576,12 +5635,19 @@ def test_supplier_thread_identification_keeps_native_nominal_major_value(monkeyp
 
 
 @pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
-def test_supplier_fraction_requires_an_exact_integer_power_of_two(monkeypatch, denominator):
+def test_supplier_fraction_requires_an_exact_integer_power_of_two(
+    monkeypatch, denominator
+):
     case = _supplier_native(monkeypatch, value=0.00238125)
     with pytest.raises(ValueError, match="power of two"):
         case.helper.supplier_reference_dimension(
-            None, case.display, label="supplier head height", units="in",
-            precision=3, expected_mm=2.38125, fraction_denominator=denominator,
+            None,
+            case.display,
+            label="supplier head height",
+            units="in",
+            precision=3,
+            expected_mm=2.38125,
+            fraction_denominator=denominator,
         )
 
 
@@ -5589,8 +5655,13 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
     case = _supplier_native(monkeypatch, value=0.003)
     with pytest.raises(ValueError, match="cannot display that inch fraction"):
         case.helper.supplier_reference_dimension(
-            None, case.display, label="supplier head height", units="in",
-            precision=3, expected_mm=3.0, fraction_denominator=32,
+            None,
+            case.display,
+            label="supplier head height",
+            units="in",
+            precision=3,
+            expected_mm=3.0,
+            fraction_denominator=32,
         )
 
 
@@ -5604,23 +5675,32 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
         "feature-membership",
         "model-dimension",
         "attachment-owner",
-        "point-fallback",
+        "null-attachment",
+        "source-sketch-error",
+        "attachment-read-error",
+        "attachment-type-count",
+        "source-inventory-error",
+        "source-null-member",
+        "mapping-error",
+        "mapping-null",
+        "mapping-foreign",
         "duplicate-member",
-        "mapped-count",
-        "mapped-missing",
-        "mapped-error",
-        "mapped-null",
-        "member-self",
+        "duplicate-mapping",
+        "source-self",
+        "mapped-self",
         "target-self",
         "ambiguous-member",
         "unsupported-comparison",
+        "mapping-other-unsupported",
         "census-error",
         "capture-error",
         "configuration",
         "orientation",
     ),
 )
-def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_drift(monkeypatch, drift):
+def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_drift(
+    monkeypatch, drift
+):
     import _supplier_screw_dimensions as screws
 
     case = _supplier_native(monkeypatch)
@@ -5632,31 +5712,25 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
 
     def capture(_adapter, _label, _message, **context):
         captures.append(context)
-        assert context["sheet_png"] is True
         if drift == "capture-error":
             raise OSError("forensic destination unavailable")
         raise context["exception"]
 
     monkeypatch.setattr(screws._seat_forensics, "capture_com_failure", capture)
-    attachment_sketch_wrapper = SimpleNamespace(
-        GetSketchPoints2=lambda: drawing_points,
-        GetSketchSegments=lambda: (),
+    source_points = tuple(SimpleNamespace(native_identity=object()) for _ in range(2))
+    drawing_points = tuple(SimpleNamespace(native_identity=object()) for _ in range(2))
+    # Separate COM wrappers identify the same native drawing-context points.
+    attachment_points = tuple(
+        SimpleNamespace(native_identity=point.native_identity)
+        for point in drawing_points
     )
-    # A drawing's own sketch is not proof of mapped source-sketch membership.
-    view_sketch = SimpleNamespace(
-        GetSketchPoints2=lambda: local_view_points,
-        GetSketchSegments=lambda: (),
-    )
+    case.annotation.entities = attachment_points
     source_sketch = SimpleNamespace(
         GetSketchPoints2=lambda: source_points,
         GetSketchSegments=lambda: (),
     )
     raw_source_display = object()
-    source_annotation = object()
-    source_display = SimpleNamespace(
-        GetDimension2=lambda _index: case.native,
-        GetAnnotation=lambda: source_annotation,
-    )
+    source_display = SimpleNamespace(GetDimension2=lambda _index: case.native)
     source_feature = SimpleNamespace(
         Name="SupplierReference",
         GetTypeName2=lambda: "ProfileFeature",
@@ -5664,7 +5738,6 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         GetFirstDisplayDimension=lambda: raw_source_display,
         GetNextDisplayDimension=lambda _display: None,
     )
-
     bind = screws._bind
 
     def bind_source_display(raw, interface):
@@ -5674,60 +5747,23 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         return bind(raw, interface)
 
     monkeypatch.setattr(screws, "_bind", bind_source_display)
-    # Source and drawing instances differ; only native view correspondence joins them.
-    source_points = (
-        SimpleNamespace(GetSketch=lambda: source_sketch),
-        SimpleNamespace(GetSketch=lambda: source_sketch),
-    )
-    drawing_points = (
-        SimpleNamespace(
-            GetSketch=lambda: attachment_sketch_wrapper,
-            native_identity=object(),
-        ),
-        SimpleNamespace(
-            GetSketch=lambda: attachment_sketch_wrapper,
-            native_identity=object(),
-        ),
-    )
-    # Separate COM wrappers can identify the same native drawing-context point.
-    attachment_points = tuple(
-        SimpleNamespace(
-            GetSketch=lambda: attachment_sketch_wrapper,
-            native_identity=point.native_identity,
-        )
-        for point in drawing_points
-    )
-    local_view_points = tuple(
-        SimpleNamespace(GetSketch=lambda: view_sketch) for _ in range(2)
-    )
-    case.annotation.entities = attachment_points
     model = SimpleNamespace(
         Parameter=lambda _name: case.native,
         FeatureByName=lambda _name: source_feature,
-        Extension=SimpleNamespace(
-            GetCorresponding2=lambda obj: reverse_map.get(id(obj)),
-        ),
     )
-    # Native can return a distinct IFeature wrapper for this exact model dimension.
-    owner_wrapper = SimpleNamespace(
-        Name="SupplierReference", GetTypeName2=lambda: "ProfileFeature",
+    # A distinct IFeature wrapper is not the native source-dimension proof.
+    case.native.GetFeatureOwner = lambda: SimpleNamespace(
+        Name="SupplierReference", GetTypeName2=lambda: "ProfileFeature"
     )
-    case.native.GetFeatureOwner = lambda: owner_wrapper
     case.view.name = "Drawing View1"
     case.view.binding = (case.view.name, "stock.SLDPRT", "Default")
     case.view.ReferencedDocument = model
     case.view.GetOrientationName = lambda: "*Front"
-    correspondence = (
-        (source_feature, owner_wrapper),
-        (source_sketch, attachment_sketch_wrapper),
-        (source_annotation, case.annotation),
-    )
-    forward_map = {id(source): mapped for source, mapped in correspondence}
-    reverse_map = {id(mapped): source for source, mapped in correspondence}
-    # Individual point conversion is deliberately unsupported by this fixture.
-    # The one supported source-sketch conversion must prove native membership.
+    forward_map = {
+        id(source): mapped
+        for source, mapped in zip(source_points, drawing_points, strict=True)
+    }
     case.view.GetCorresponding = lambda obj: forward_map.get(id(obj))
-    case.view.GetSketch = lambda: view_sketch
     annotations = [case.annotation]
     case.view.GetAnnotations = lambda: annotations
     adapter = SimpleNamespace(
@@ -5745,11 +5781,18 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         _bindings={"*Front": case.view.binding},
     )
     case.helper.supplier_reference_dimension(
-        adapter, case.display, label="Length@SupplierReference", units="in",
-        precision=3, expected_mm=11.1125, configuration="Default",
+        adapter,
+        case.display,
+        label="Length@SupplierReference",
+        units="in",
+        precision=3,
+        expected_mm=11.1125,
+        configuration="Default",
     )
-    assert set(screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)) == {"Length"}
-    original_census_error = None
+    assert set(
+        screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)
+    ) == {"Length"}
+    original_attachment_error = None
     if drift == "missing":
         annotations.clear()
     elif drift == "duplicate":
@@ -5765,79 +5808,88 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
     elif drift in {"attachment-owner", "capture-error"}:
-        # A different native point cannot borrow the same claimed sketch owner.
         case.annotation.entities = (
-            SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
+            SimpleNamespace(native_identity=object()),
             attachment_points[1],
         )
+    elif drift == "null-attachment":
+        case.annotation.entities = (None, attachment_points[1])
+    elif drift in {"source-sketch-error", "attachment-read-error"}:
+        original_attachment_error = RuntimeError(
+            "supplier attachment acquisition failed"
+        )
+
+        def unreadable_attachment():
+            raise original_attachment_error
+
+        if drift == "source-sketch-error":
+            source_feature.GetSpecificFeature2 = unreadable_attachment
+        else:
+            case.annotation.GetAttachedEntities3 = unreadable_attachment
+    elif drift == "attachment-type-count":
+        case.annotation.GetAttachedEntityTypes = lambda: (11,)
+    elif drift == "source-inventory-error":
+
+        def unreadable_inventory():
+            raise RuntimeError("source sketch inventory unreadable")
+
+        source_sketch.GetSketchPoints2 = unreadable_inventory
+    elif drift == "source-null-member":
+        source_sketch.GetSketchPoints2 = lambda: (None, source_points[1])
+    elif drift == "mapping-error":
+
+        def unreadable_mapping(obj):
+            if obj is source_points[0]:
+                raise RuntimeError("source point mapping unreadable")
+            return forward_map.get(id(obj))
+
+        case.view.GetCorresponding = unreadable_mapping
+    elif drift == "mapping-null":
+        forward_map[id(source_points[0])] = None
+    elif drift == "mapping-foreign":
+        forward_map[id(source_points[0])] = SimpleNamespace(native_identity=object())
     elif drift == "duplicate-member":
         case.annotation.entities = (attachment_points[0],) * 2
-    elif drift == "mapped-count":
-        attachment_sketch_wrapper.GetSketchPoints2 = lambda: drawing_points[1:]
-    elif drift == "point-fallback":
-        # Equal counts and working point conversions cannot replace sketch membership.
-        foreign_mapped_points = tuple(
-            SimpleNamespace(
-                GetSketch=lambda: attachment_sketch_wrapper,
-                native_identity=object(),
-            )
-            for _ in range(2)
-        )
-        attachment_sketch_wrapper.GetSketchPoints2 = lambda: foreign_mapped_points
-        forward_map.update(
-            (id(source), mapped)
-            for source, mapped in zip(source_points, drawing_points, strict=True)
-        )
-        reverse_map.update(
-            (id(mapped), source)
-            for source, mapped in zip(source_points, drawing_points, strict=True)
-        )
-        reverse_map.update(
-            (id(point), source)
-            for source, point in zip(source_points, attachment_points, strict=True)
-        )
-    elif drift == "mapped-missing":
-        forward_map.pop(id(source_sketch))
-    elif drift == "mapped-error":
-        def unreadable_inventory():
-            raise RuntimeError("mapped sketch inventory unreadable")
-
-        attachment_sketch_wrapper.GetSketchPoints2 = unreadable_inventory
-    elif drift == "mapped-null":
-        attachment_sketch_wrapper.GetSketchPoints2 = lambda: (None, drawing_points[1])
+    elif drift == "duplicate-mapping":
+        forward_map[id(source_points[1])] = drawing_points[0]
     elif drift in {
-        "unsupported-comparison",
-        "member-self",
+        "source-self",
+        "mapped-self",
         "target-self",
         "ambiguous-member",
+        "unsupported-comparison",
+        "mapping-other-unsupported",
     }:
         original_comparison = adapter.swApp.IsSame
 
         def comparison(left, right):
-            if (
-                drift == "unsupported-comparison"
-                and left is attachment_points[0]
-                and right is drawing_points[1]
-            ):
-                return 2  # swObjectUnsupported cannot prove a negative.
-            if drift == "member-self" and left is right is drawing_points[0]:
+            if drift == "source-self" and left is right is source_points[0]:
+                return 2
+            if drift == "mapped-self" and left is right is drawing_points[0]:
                 return 2
             if drift == "target-self" and left is right is attachment_points[0]:
                 return 2
             if (
-                drift == "ambiguous-member"
-                and left is attachment_points[0]
+                drift == "mapping-other-unsupported"
+                and left is drawing_points[0]
                 and right is drawing_points[1]
             ):
-                return 1
+                return 2
+            if left is attachment_points[0] and right is drawing_points[1]:
+                if drift == "unsupported-comparison":
+                    return 2  # swObjectUnsupported is not a known negative.
+                if drift == "ambiguous-member":
+                    return 1
             return original_comparison(left, right)
 
         adapter.swApp.IsSame = comparison
     elif drift == "census-error":
-        original_census_error = RuntimeError("supplier correspondence census failed")
+        original_attachment_error = RuntimeError(
+            "supplier correspondence census failed"
+        )
 
         def refuse(*_args, **_kwargs):
-            raise original_census_error
+            raise original_attachment_error
 
         monkeypatch.setattr(screws, "_attachment_correspondence", refuse)
     elif drift == "configuration":
@@ -5846,62 +5898,67 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         case.view.GetOrientationName = lambda: "*Top"
     with pytest.raises(RuntimeError, match="supplier") as caught:
         screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)
-    capture_expected = drift in {
-        "attachment-owner",
-        "point-fallback",
-        "duplicate-member",
-        "mapped-count",
-        "mapped-missing",
-        "mapped-error",
-        "mapped-null",
-        "member-self",
-        "target-self",
-        "ambiguous-member",
-        "unsupported-comparison",
-        "census-error",
-        "capture-error",
+    capture_expected = drift not in {
+        "missing",
+        "duplicate",
+        "unknown",
+        "view-owner",
+        "feature-membership",
+        "model-dimension",
+        "configuration",
+        "orientation",
     }
     assert len(captures) == int(capture_expected)
     if captures:
         assert captures[0]["sheet_png"] is True
+        assert captures[0]["sketch"] is (
+            None if drift == "source-sketch-error" else source_sketch
+        )
         assert captures[0]["exception"] is caught.value
         context = captures[0]["attachment_context"]
         census = context["attachment_correspondence"]
-        if original_census_error is not None:
-            assert caught.value is original_census_error
+        if original_attachment_error is not None:
+            assert caught.value is original_attachment_error
             assert census == {}
             assert context["attachment_error"] == {
                 "error_type": "RuntimeError",
-                "message": str(original_census_error),
+                "message": str(original_attachment_error),
             }
+        elif drift == "attachment-type-count":
+            assert census == {}
+            assert "lost its source sketch attachments" in str(caught.value)
         else:
             assert len(census["attachments"]) == 2
             first, second = census["attachments"]
             assert first["proven"] is False
-            second_expected = drift not in {
-                "point-fallback",
-                "duplicate-member",
-                "mapped-count",
-                "mapped-missing",
-                "mapped-error",
-                "mapped-null",
+            mapping_invalid = drift in {
+                "source-inventory-error",
+                "source-null-member",
+                "mapping-error",
+                "mapping-null",
+                "duplicate-mapping",
+                "source-self",
+                "mapped-self",
+                "mapping-other-unsupported",
             }
-            assert second["proven"] is second_expected
-            assert first["member_proof"] == "mapped_source_sketch"
-            assert first["model_source_entity_is_same"] == [0, 0]
-            assert first["view_source_entity_is_same"] == (
-                [1, 0] if drift == "point-fallback" else [None, None]
+            assert second["proven"] is not (
+                mapping_invalid or drift == "duplicate-member"
             )
-            if drift == "point-fallback":
+            assert first["member_proof"] == "direct_view_corresponding"
+            if drift == "mapping-foreign":
                 assert census["sources"][0]["source_member_count"] == 2
-                assert census["sources"][0]["mapped_sketch_member_count"] == 2
-                assert first["mapped_sketch_entity_is_same"] == [0, 0]
+                assert census["sources"][0]["mapped_member_count"] == 2
+                assert census["sources"][0]["mapping_complete"] is True
+                assert first["view_source_entity_is_same"] == [0, 0]
             if drift == "unsupported-comparison":
+                assert first["view_source_entity_is_same"] == [1, 2]
                 assert first["negative_controls_proven"] is False
 
 
 @pytest.mark.parametrize("outline_fits", [False, True])
-def test_supplier_view_guard_checks_native_outline_before_annotations(monkeypatch, outline_fits):
+def test_supplier_view_guard_checks_native_outline_before_annotations(
+    monkeypatch, outline_fits
+):
     monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
     cell = (0.0, 0.0, 1.0, 1.0)
     view = SimpleNamespace(
@@ -5910,8 +5967,11 @@ def test_supplier_view_guard_checks_native_outline_before_annotations(monkeypatc
     calls = []
     adapter = object()
     monkeypatch.setattr(
-        purchased, "assert_supplier_annotations_fit",
-        lambda adapter, view, cell, *, label: calls.append((adapter, view, cell, label)),
+        purchased,
+        "assert_supplier_annotations_fit",
+        lambda adapter, view, cell, *, label: calls.append(
+            (adapter, view, cell, label)
+        ),
     )
     if outline_fits:
         purchased.assert_supplier_view_fits(adapter, view, cell, label="supplier")
@@ -5934,16 +5994,27 @@ def test_supplier_view_guard_checks_native_outline_before_annotations(monkeypatc
         ("note-outside", "supplier note leaves its cell"),
     ],
 )
-def test_supplier_annotations_guard_validates_native_ink_without_outline(monkeypatch, drift, message):
+def test_supplier_annotations_guard_validates_native_ink_without_outline(
+    monkeypatch, drift, message
+):
     case = _supplier_native(monkeypatch)
     monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
     adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
     case.display.GetNext5 = lambda: None
     case.view.GetFirstDisplayDimension6 = lambda: case.display
     note = SimpleNamespace(
-        GetExtent=lambda: (0.1, 0.1, 0.0, 1.1 if drift == "note-outside" else 0.9, 0.9, 0.0)
+        GetExtent=lambda: (
+            0.1,
+            0.1,
+            0.0,
+            1.1 if drift == "note-outside" else 0.9,
+            0.9,
+            0.0,
+        )
     )
-    note_annotation = SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda: note)
+    note_annotation = SimpleNamespace(
+        GetType=lambda: 6, GetSpecificAnnotation=lambda: note
+    )
     case.view.GetAnnotations = lambda: (case.annotation, note_annotation)
     # No GetOutline: sketch-only views can have unusable outlines while their
     # native dimensions and notes must still pass the original containment guard.
@@ -5955,19 +6026,30 @@ def test_supplier_annotations_guard_validates_native_ink_without_outline(monkeyp
         case.display.ShowDimensionValue = False
     geometry = {
         "texts": [
-            {"t": "(7/16)", "pos": (0.5, 0.5, 0.0), "h": 0.01,
-             "w": 2.0 if drift == "dimension-outside" else 0.1, "ang": 0.0, "ref": 2}
+            {
+                "t": "(7/16)",
+                "pos": (0.5, 0.5, 0.0),
+                "h": 0.01,
+                "w": 2.0 if drift == "dimension-outside" else 0.1,
+                "ang": 0.0,
+                "ref": 2,
+            }
         ]
     }
     monkeypatch.setattr(
-        purchased, "annotation_display",
+        purchased,
+        "annotation_display",
         lambda *_args: (geometry, {"refused": True} if drift == "unreadable" else {}),
     )
     if message is None:
-        purchased.assert_supplier_annotations_fit(adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier")
+        purchased.assert_supplier_annotations_fit(
+            adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier"
+        )
     else:
         with pytest.raises(RuntimeError, match=message):
-            purchased.assert_supplier_annotations_fit(adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier")
+            purchased.assert_supplier_annotations_fit(
+                adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier"
+            )
 
 
 def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
@@ -5984,7 +6066,9 @@ def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
     actual = {name: cell for name, _center, cell in fitted}
     assert original["*Top"] == actual["*Top"]
     assert original["*Isometric"] == actual["*Isometric"]
-    assert actual["*Front"][3] == pytest.approx(original["*Front"][3] - margins["*Front"][3])
+    assert actual["*Front"][3] == pytest.approx(
+        original["*Front"][3] - margins["*Front"][3]
+    )
     with pytest.raises(ValueError, match="orthographic"):
         purchased.supplier_fit_cells(cells, {"*Isometric": (0.01,) * 4}, label="test")
 
@@ -5994,8 +6078,13 @@ def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
 
     case = _supplier_native(monkeypatch, value=math.radians(82.0), kind=3)
     case.helper.supplier_reference_dimension(
-        None, case.display, label="included angle", units="deg", precision=0,
-        expected_degrees=82.0, presentation="angle",
+        None,
+        case.display,
+        label="included angle",
+        units="deg",
+        precision=0,
+        expected_degrees=82.0,
+        presentation="angle",
     )
     assert case.native.SystemValue == math.radians(82.0)
     assert case.text[2] == ")"
@@ -6005,16 +6094,21 @@ def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
     "start,end",
     (((0.0, 0.0), (-6.35, 0.0)), ((1.0, 0.0), (7.35, 0.0))),
 )
-def test_supplier_chord_rejects_same_length_in_wrong_final_frame(monkeypatch, start, end):
+def test_supplier_chord_rejects_same_length_in_wrong_final_frame(
+    monkeypatch, start, end
+):
     import _supplier_screw_reference as reference
 
     monkeypatch.setattr(reference, "_early_bound", lambda obj, _interface: obj)
 
     def point(coordinates):
-        return SimpleNamespace(X=coordinates[0] / 1000.0, Y=coordinates[1] / 1000.0, Z=0.0)
+        return SimpleNamespace(
+            X=coordinates[0] / 1000.0, Y=coordinates[1] / 1000.0, Z=0.0
+        )
 
     line = SimpleNamespace(
-        GetStartPoint2=lambda: point(start), GetEndPoint2=lambda: point(end),
+        GetStartPoint2=lambda: point(start),
+        GetEndPoint2=lambda: point(end),
     )
     adapter = SimpleNamespace(_sketch_entities={"chord": line})
     reference._assert_line_frame(adapter, "chord", start, end)
@@ -6022,10 +6116,15 @@ def test_supplier_chord_rejects_same_length_in_wrong_final_frame(monkeypatch, st
         reference._assert_line_frame(adapter, "chord", (0.0, 0.0), (6.35, 0.0))
 
 
-def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(monkeypatch):
+def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(
+    monkeypatch,
+):
     case = _supplier_native(monkeypatch, value=0.00238125)
     settings = dict(
-        label="supplier head height", units="in", precision=3, expected_mm=2.38125,
+        label="supplier head height",
+        units="in",
+        precision=3,
+        expected_mm=2.38125,
         fraction_denominator=32,
     )
     case.helper.supplier_reference_dimension(None, case.display, **settings)
@@ -6038,7 +6137,9 @@ def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_roundin
 
 @pytest.mark.parametrize("units,unit_code", [("in", 3), ("mm", 0)])
 def test_supplier_row_units_survive_annotation_and_final_reacquisition(
-    monkeypatch, units, unit_code,
+    monkeypatch,
+    units,
+    unit_code,
 ):
     import _supplier_screw_dimensions as screws
 
@@ -6049,22 +6150,31 @@ def test_supplier_row_units_survive_annotation_and_final_reacquisition(
     case.view.UpdateViewDisplayGeometry = lambda: None
     case.view.GetAnnotations = lambda: [case.annotation]
     monkeypatch.setattr(screws, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(screws, "_binding", lambda *_args: ("Front", "stock.SLDPRT", "Default"))
+    monkeypatch.setattr(
+        screws, "_binding", lambda *_args: ("Front", "stock.SLDPRT", "Default")
+    )
     monkeypatch.setattr(screws, "_assert_source", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(screws, "iter_views", lambda _adapter: [case.view])
     monkeypatch.setattr(screws, "view_name", lambda *_args: "Front")
     monkeypatch.setattr(screws, "dimension_name", lambda *_args: "Length")
     monkeypatch.setattr(
-        screws, "model_points_in_view", lambda *_args, **_kwargs: [(0.075, 0.125)],
+        screws,
+        "model_points_in_view",
+        lambda *_args, **_kwargs: [(0.075, 0.125)],
     )
     monkeypatch.setattr(
-        screws, "curate_view_dimensions", lambda *_args, **_kwargs: [case.annotation],
+        screws,
+        "curate_view_dimensions",
+        lambda *_args, **_kwargs: [case.annotation],
     )
     checks = []
     found = screws.annotate_supplier_screw(
-        None, {"*Front": case.view}, dimensions=(("Length", 6.0, "vertical"),),
+        None,
+        {"*Front": case.view},
+        dimensions=(("Length", 6.0, "vertical"),),
         formats={"Length": (3, "length", None, None)},
-        units={"Length": units}, settled_checks=checks,
+        units={"Length": units},
+        settled_checks=checks,
     )
     assert found == {"Length": case.display}
     assert case.native.SystemValue == 0.006
@@ -6079,11 +6189,15 @@ def test_supplier_row_units_survive_annotation_and_final_reacquisition(
 
 @pytest.mark.parametrize("units", [{"Alien": "mm"}, {"Length": "cm"}])
 def test_supplier_unknown_or_unsupported_row_units_fail_before_native_access(units):
-    from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+    from _supplier_screw_dimensions import (
+        annotate_supplier_screw,
+        assert_supplier_screw,
+    )
 
     options = dict(
         dimensions=(("Length", 6.0, "vertical"),),
-        formats={"Length": (3, "length", None, None)}, units=units,
+        formats={"Length": (3, "length", None, None)},
+        units=units,
     )
     for operation in (annotate_supplier_screw, assert_supplier_screw):
         with pytest.raises(ValueError, match="supplier reference units"):
@@ -6099,14 +6213,689 @@ def test_metric_flange_nut_supplier_lanes_leave_a_fittable_end_view():
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
-    cells = purchased.fastener_view_cells(purchased.view_band_bottom(
-        supplier.DRAWING_NOTES, label="metric flange nut",
-        supplier_data=("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",),
-    ))
+    cells = purchased.fastener_view_cells(
+        purchased.view_band_bottom(
+            supplier.DRAWING_NOTES,
+            label="metric flange nut",
+            supplier_data=("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",),
+        )
+    )
     fitted = purchased.supplier_fit_cells(cells, margins, label="metric flange nut")
     end_cell = next(bounds for name, _center, bounds in fitted if name == "*Top")
     # A positive cell alone is insufficient: even the smallest permitted scale
     # must retain the real flange envelope plus native-view padding.
-    smallest_ratio = min(numerator / denominator for numerator, denominator in purchased._SCALES)
+    smallest_ratio = min(
+        numerator / denominator for numerator, denominator in purchased._SCALES
+    )
     required_span = supplier.FLANGE_DIA / 1000.0 * smallest_ratio + 0.002
     assert min(end_cell[2] - end_cell[0], end_cell[3] - end_cell[1]) >= required_span
+
+
+class _SupplierReadOnlyDocument(_Model):
+    """Method-shaped IModelDoc2 getters; no source save/flag-clear operations."""
+
+    def __init__(self, path):
+        super().__init__(path)
+        self.native_id = object()
+        self.kind = 1
+        self.read_only = True
+        self.read_only_error = None
+        self.presentation_dirty = False
+
+    def GetType(self):
+        return self.kind
+
+    def IsOpenedReadOnly(self):
+        if self.read_only_error is not None:
+            raise self.read_only_error
+        return self.read_only
+
+    def GetSaveFlag(self):
+        raise AssertionError(
+            "source cleanliness is stage-specific, not an opener policy"
+        )
+
+
+def _supplier_read_only_case(monkeypatch, tmp_path, *, already_open=False):
+    source = tmp_path / "supplier.SLDPRT"
+    source.write_bytes(b"unchanged supplier bytes")
+    model = _SupplierReadOnlyDocument(source)
+    readback = _SupplierReadOnlyDocument(source)
+    readback.native_id = model.native_id
+
+    class App:
+        def __init__(self):
+            self.loaded = model if already_open else None
+            self.readback = readback
+            self.errors = 0
+            self.warnings = 4
+            self.identity_result = None
+            self.opens = []
+            self.on_open = lambda: None
+
+        def GetOpenDocumentByName(self, path):
+            assert Path(path).resolve() == source.resolve()
+            return self.loaded
+
+        def OpenDoc6(self, path, kind, options, configuration, errors, warnings):
+            self.opens.append((path, kind, options, configuration, errors, warnings))
+            self.on_open()
+            self.loaded = self.readback
+            return model, self.errors, self.warnings
+
+        def IsSame(self, left, right):
+            if self.identity_result is not None:
+                return self.identity_result
+            return int(left.native_id is right.native_id)
+
+    app = App()
+    adapter = SimpleNamespace(swApp=app, currentModel=None)
+    events = []
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        purchased._telemetry,
+        "event",
+        lambda name, **fields: events.append((name, fields)),
+    )
+    return SimpleNamespace(
+        source=source,
+        model=model,
+        readback=readback,
+        app=app,
+        adapter=adapter,
+        events=events,
+    )
+
+
+@pytest.mark.parametrize("already_open", (False, True), ids=("new", "loaded"))
+@pytest.mark.parametrize("path_type", (Path, str), ids=("path", "string"))
+def test_supplier_read_only_open_acquires_or_reuses_exact_native_part(
+    monkeypatch,
+    tmp_path,
+    already_open,
+    path_type,
+):
+    case = _supplier_read_only_case(monkeypatch, tmp_path, already_open=already_open)
+    # Expected native annotation presentation dirtiness is not a blanket veto.
+    case.model.presentation_dirty = True
+    model = purchased._open_supplier_source_read_only(
+        case.adapter,
+        path_type(case.source),
+        label="supplier",
+    )
+    assert model is case.model
+    assert case.adapter.currentModel is model
+    assert model.presentation_dirty is True
+    if already_open:
+        assert case.app.opens == []
+    else:
+        assert case.app.opens == [(str(case.source.resolve()), 1, 3, "", 0, 0)]
+        assert case.events[-1][1]["open_error_raw"] == 0
+        assert case.events[-1][1]["open_warning_raw"] == 4
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "writable",
+        "integer-read-only",
+        "unreadable-read-only",
+        "missing-read-only",
+        "wrong-type",
+        "boolean-type",
+        "wrong-path",
+        "empty-path",
+        "unloaded",
+        "loaded-writable",
+        "loaded-wrong-path",
+        "loaded-wrong-type",
+        "loaded-native-identity",
+        "boolean-native-identity",
+        "adapter-native-identity",
+    ),
+)
+@pytest.mark.parametrize("already_open", (False, True), ids=("new", "loaded"))
+def test_supplier_read_only_open_refuses_untrusted_native_source(
+    monkeypatch,
+    tmp_path,
+    defect,
+    already_open,
+):
+    case = _supplier_read_only_case(monkeypatch, tmp_path, already_open=already_open)
+    if defect == "writable":
+        case.model.read_only = False
+    elif defect == "integer-read-only":
+        case.model.read_only = 1
+    elif defect == "unreadable-read-only":
+        case.model.read_only_error = RuntimeError("read-only getter unavailable")
+    elif defect == "missing-read-only":
+        case.model.read_only = None
+    elif defect == "wrong-type":
+        case.model.kind = 3
+    elif defect == "boolean-type":
+        case.model.kind = True
+    elif defect == "wrong-path":
+        case.model._path = tmp_path / "other.SLDPRT"
+    elif defect == "empty-path":
+        case.model._path = ""
+    elif defect.startswith("loaded-") or defect == "unloaded":
+        # The second lookup is an independent native readback, including reuse.
+        readback = None if defect == "unloaded" else case.readback
+        lookups = iter((case.model if already_open else None, readback))
+        case.app.GetOpenDocumentByName = lambda _path: next(lookups)
+        if defect == "loaded-writable":
+            case.readback.read_only = False
+        elif defect == "loaded-wrong-path":
+            case.readback._path = tmp_path / "other.SLDPRT"
+        elif defect == "loaded-wrong-type":
+            case.readback.kind = 2
+        elif defect == "loaded-native-identity":
+            case.readback.native_id = object()
+    elif defect == "boolean-native-identity":
+        case.app.identity_result = True
+    else:
+        foreign = _SupplierReadOnlyDocument(case.source)
+
+        class RedirectedAdapter:
+            swApp = case.app
+
+            @property
+            def currentModel(self):
+                return foreign
+
+            @currentModel.setter
+            def currentModel(self, _value):
+                return None
+
+        case.adapter = RedirectedAdapter()
+    with pytest.raises(RuntimeError):
+        purchased._open_supplier_source_read_only(
+            case.adapter, case.source, label="supplier"
+        )
+    if already_open:
+        assert case.app.opens == []
+
+
+@pytest.mark.parametrize(
+    ("errors", "warnings", "has_model"),
+    (
+        (2, 0, True),
+        (True, 0, True),
+        ("0", 0, True),
+        (0, False, True),
+        (0, None, True),
+        (0, 0, False),
+    ),
+    ids=(
+        "native-error",
+        "boolean-error",
+        "string-error",
+        "boolean-warning",
+        "missing-warning",
+        "missing-document",
+    ),
+)
+def test_supplier_read_only_open_refuses_native_error_or_noninteger_status(
+    monkeypatch,
+    tmp_path,
+    errors,
+    warnings,
+    has_model,
+):
+    case = _supplier_read_only_case(monkeypatch, tmp_path)
+    case.app.errors, case.app.warnings = errors, warnings
+    if not has_model:
+        case.app.OpenDoc6 = lambda *_args: (None, errors, warnings)
+    with pytest.raises(RuntimeError):
+        purchased._open_supplier_source_read_only(
+            case.adapter, case.source, label="supplier"
+        )
+    assert case.adapter.currentModel is None
+
+
+def _purchased_source_lifecycle(monkeypatch, tmp_path, lane):
+    """Run the real public lifecycle; fake all native/source-property/drawing work."""
+    case = _supplier_read_only_case(monkeypatch, tmp_path)
+    case.phases = []
+    case.on_phase = lambda _phase: None
+    spec = SimpleNamespace(
+        artifact_stem=case.source.stem,
+        source=case.source,
+        source_kind="part",
+    )
+    properties = dict.fromkeys(purchased._PROPERTIES, "test")
+    properties.update(
+        Number="42",
+        Title=case.source.stem,
+        Material="Steel",
+        **{
+            "Stock Name": "Supplier stock",
+            "Supplier": "Supplier",
+            "Supplier SKUs": "SKU-1",
+            "Material Specification": "Steel",
+            "Finish": "As purchased",
+            "Manufacturing Notes": "",
+        },
+    )
+    if lane == "part":
+        import _purchased_part_drawing as module
+
+        builder = module.build_purchased_part_drawing
+    else:
+        module = purchased
+        builder = (
+            purchased.build_purchased_fastener_drawing
+            if lane == "fastener"
+            else purchased.build_purchased_spring_drawing
+        )
+    monkeypatch.setattr(
+        purchased,
+        "fastener",
+        lambda _stem: SimpleNamespace(
+            part_name=case.source.stem,
+            stock_name="Supplier stock",
+            supplier="Supplier",
+            skus=("SKU-1",),
+        ),
+    )
+    monkeypatch.setattr(
+        purchased._config,
+        "parts",
+        lambda _stem: {
+            "number": "42",
+            "material": "Steel",
+            "finish": "As purchased",
+            "title": "Supplier",
+        },
+    )
+
+    def phase(name):
+        case.phases.append(name)
+        case.on_phase(name)
+
+    case.app.on_open = lambda: phase("open")
+
+    def read_properties(_model, _names, *, required):
+        phase("properties")
+        return properties
+
+    async def complete_sheet(_adapter, _spec, **_kwargs):
+        case.model.presentation_dirty = True
+        for name in ("layout", "slddrw-save", "pdf-save", "drawing-close"):
+            phase(name)
+        return {"pdf": "reference.pdf"}
+
+    monkeypatch.setattr(module, "read_required_properties", read_properties)
+    monkeypatch.setattr(module, "_build_reference_sheet", complete_sheet)
+    case.run = lambda: asyncio.run(builder(case.adapter, spec, item="SUPPLIER STOCK"))
+    return case
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring", "part"))
+@pytest.mark.parametrize("mutation", ("unchanged", "rewrite", "unreadable"))
+def test_purchased_source_integrity_covers_completed_sheet(
+    monkeypatch,
+    tmp_path,
+    lane,
+    mutation,
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+
+    def completed(phase):
+        if phase == "drawing-close":
+            if mutation == "rewrite":
+                case.source.write_bytes(b"changed supplier bytes")
+            elif mutation == "unreadable":
+                case.source.unlink()
+
+    case.on_phase = completed
+    if mutation == "unchanged":
+        assert case.run() == {"pdf": "reference.pdf"}
+        assert case.source.read_bytes() == b"unchanged supplier bytes"
+        assert case.model.presentation_dirty is True
+    elif mutation == "rewrite":
+        with pytest.raises(RuntimeError, match="source part bytes changed"):
+            case.run()
+    else:
+        with pytest.raises(FileNotFoundError):
+            case.run()
+    assert case.phases[-3:] == ["slddrw-save", "pdf-save", "drawing-close"]
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring", "part"))
+@pytest.mark.parametrize(
+    "phase", ("open", "properties", "layout", "pdf-save", "drawing-close")
+)
+@pytest.mark.parametrize("mutation", ("rewrite", "unreadable"))
+@pytest.mark.parametrize("error_type", (RuntimeError, asyncio.CancelledError))
+def test_purchased_source_integrity_preserves_primary_failure(
+    monkeypatch,
+    tmp_path,
+    lane,
+    phase,
+    mutation,
+    error_type,
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    primary = error_type("primary native/drawing failure")
+
+    def fail(current):
+        if current == phase:
+            if mutation == "rewrite":
+                case.source.write_bytes(b"changed supplier bytes")
+            else:
+                case.source.unlink()
+            raise primary
+
+    case.on_phase = fail
+    with pytest.raises(error_type) as caught:
+        case.run()
+    assert caught.value is primary
+    assert "supplier source file preservation also failed" in "\n".join(
+        primary.__notes__
+    )
+    assert (
+        "bytes changed" if mutation == "rewrite" else "FileNotFoundError"
+    ) in "\n".join(primary.__notes__)
+    assert case.phases[-1] == phase
+
+
+class _RefreshedOutlineView:
+    """Native display bounds lag both scale and position until the void refresh."""
+
+    def __init__(self, source, *, display_ratio=8.0):
+        self.source = source
+        self.Position = (0.25, 0.25)
+        self.UseSheetScale = 1
+        self.ReferencedConfiguration = "Supplier"
+        self._scale = (1.0, 1.0)
+        self._display_ratio = display_ratio
+        self._display_position = self.Position
+        self.scales = []
+        self.moves = []
+        self.refreshes = []
+
+    @property
+    def ScaleRatio(self):
+        return self._scale
+
+    @ScaleRatio.setter
+    def ScaleRatio(self, value):
+        self._scale = tuple(value)
+        self.scales.append(self._scale)
+
+    def GetName2(self):
+        return "Drawing View1"
+
+    def GetOrientationName(self):
+        return "*Front"
+
+    def GetReferencedModelName(self):
+        return str(self.source)
+
+    def GetOutline(self):
+        x, y = self._display_position
+        x, y = x + 0.125, y - 0.0625
+        width, height = 0.2 * self._display_ratio, 0.04 * self._display_ratio
+        return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+    def UpdateViewDisplayGeometry(self):
+        self._display_ratio = self._scale[0] / self._scale[1]
+        self._display_position = self.Position
+        self.refreshes.append((self._scale, self.Position))
+        return None  # Real IView method is VT_VOID, not a success Boolean.
+
+    def SetViewPosition(self, position, move_children):
+        assert move_children is False
+        self.Position = tuple(position)
+        self.moves.append(self.Position)
+        return True
+
+
+def _native_fit_records(monkeypatch):
+    records = []
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    monkeypatch.setattr(
+        purchased._telemetry,
+        "event",
+        lambda name, **fields: records.append((name, fields)),
+    )
+    return records
+
+
+@pytest.mark.parametrize(
+    "display_ratio", (8.0, 1.0), ids=("stale-too-large", "stale-too-small")
+)
+def test_fit_group_selects_post_refresh_native_outline(
+    monkeypatch, tmp_path, display_ratio
+):
+    records = _native_fit_records(monkeypatch)
+    view = _RefreshedOutlineView(
+        tmp_path / "supplier.SLDPRT", display_ratio=display_ratio
+    )
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    assert purchased._fit_group(_Drawing(), members) == (5, 1)
+    assert view.scales == [(8.0, 1.0), (5.0, 1.0)]  # No diagnostic replay.
+    assert len(view.refreshes) == 3 and len(view.moves) == 1
+    assert view.Position == pytest.approx((0.375, 0.5625))
+    states = [
+        state for name, state in records if name == "drawing.purchased_fit_candidate"
+    ]
+    assert [(state["phase"], state["reason"]) for state in states] == [
+        ("precenter", "precenter_size"),
+        ("precenter", "accepted"),
+        ("postcenter", "accepted"),
+    ]
+    candidate = states[1]
+    assert candidate["requested_scale"] == (5, 1)
+    assert candidate["actual_scale_ratio"] == (5.0, 1.0)
+    assert candidate["use_sheet_scale"] == 0
+    assert candidate["view_name"] == "Drawing View1"
+    assert candidate["orientation"] == "*Front"
+    assert candidate["source_path"] == str(view.source)
+    assert candidate["configuration"] == "Supplier"
+    before = candidate["outline_before_refresh_m"]
+    after = candidate["outline_after_refresh_m"]
+    assert before[2] - before[0] == pytest.approx(1.6)
+    assert after[2] - after[0] == pytest.approx(1.0)
+    assert candidate["fit_bounds_m"] == after
+    assert candidate["width_excess_m"] == pytest.approx(0.0)
+    assert candidate["height_excess_m"] < 0.0
+    settled = states[-1]
+    assert settled["outline_before_refresh_m"] != settled["outline_after_refresh_m"]
+    assert settled["center_error_m"] == pytest.approx((0.0, 0.0))
+    assert set(settled["containment_excess_m"]) == {"left", "bottom", "right", "top"}
+    assert all(value <= 1e-12 for value in settled["containment_excess_m"].values())
+
+
+@pytest.mark.parametrize(
+    "failure", ("degenerate", "short", "nonfinite", "getter-error")
+)
+def test_fit_views_ignores_unusable_pre_refresh_diagnostics(
+    monkeypatch, tmp_path, failure
+):
+    records = _native_fit_records(monkeypatch)
+
+    class InvalidStaleOutline(_RefreshedOutlineView):
+        def GetOutline(self):
+            if (
+                self._display_ratio != self._scale[0] / self._scale[1]
+                or self._display_position != self.Position
+            ):
+                if failure == "getter-error":
+                    raise RuntimeError("stale native outline unavailable")
+                return {
+                    "degenerate": (0.0, 0.0, 0.0, 0.0),
+                    "short": (0.0, 0.0, 1.0),
+                    "nonfinite": (0.0, 0.0, float("nan"), 1.0),
+                }[failure]
+            return super().GetOutline()
+
+    view = InvalidStaleOutline(tmp_path / "supplier.SLDPRT", display_ratio=0.0)
+    cells = (("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)),)
+    assert purchased._fit_views(_Drawing(), [view], cells) == {"*Front": (5, 1)}
+    assert view.Position == pytest.approx((0.375, 0.5625))
+    states = [
+        state for name, state in records if name == "drawing.purchased_fit_candidate"
+    ]
+    assert [state["phase"] for state in states] == [
+        "precenter",
+        "precenter",
+        "postcenter",
+    ]
+    for state in states:
+        assert "outline_before_refresh_m" not in state
+        assert "outline_before_refresh_error" in state
+        assert state["fit_bounds_m"] == state["outline_after_refresh_m"]
+
+
+@pytest.mark.parametrize("phase", ("candidate", "postcenter"))
+@pytest.mark.parametrize(
+    "outline",
+    (
+        (0.0, 0.0, 1.0),
+        (0.0, 0.0, float("nan"), 1.0),
+        (1.0, 0.0, 0.0, 1.0),
+        (0.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 1.0, 0.0),
+    ),
+    ids=("short", "nonfinite", "inverted", "degenerate", "zero-height"),
+)
+def test_fit_group_refresh_retains_native_extent_guard(
+    monkeypatch, tmp_path, outline, phase
+):
+    _native_fit_records(monkeypatch)
+
+    class BrokenRefresh(_RefreshedOutlineView):
+        def GetOutline(self):
+            if self.refreshes and (phase == "candidate" or self.moves):
+                return outline
+            return super().GetOutline()
+
+    view = BrokenRefresh(tmp_path / "supplier.SLDPRT")
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    with pytest.raises(RuntimeError, match="native extent"):
+        purchased._fit_group(_Drawing(), members)
+    assert len(view.refreshes) == (1 if phase == "candidate" else 3)
+    assert len(view.moves) == (0 if phase == "candidate" else 1)
+
+
+@pytest.mark.parametrize(
+    ("key", "method"),
+    (("view_name", "GetName2"), ("source_path", "GetReferencedModelName")),
+)
+def test_fit_group_metadata_failure_is_diagnostic(monkeypatch, tmp_path, key, method):
+    records = _native_fit_records(monkeypatch)
+    view = _RefreshedOutlineView(tmp_path / "supplier.SLDPRT")
+
+    def unavailable():
+        raise RuntimeError("native metadata getter unavailable")
+
+    setattr(view, method, unavailable)
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    assert purchased._fit_group(_Drawing(), members) == (5, 1)
+    for _name, state in records:
+        assert key not in state
+        assert "native metadata getter unavailable" in state["metadata_errors"][key]
+        assert state["actual_scale_ratio"] == tuple(
+            float(value) for value in state["requested_scale"]
+        )
+
+
+def test_fit_group_records_postcenter_containment_rejection(monkeypatch, tmp_path):
+    records = _native_fit_records(monkeypatch)
+
+    class ExpandedAfterCenter(_RefreshedOutlineView):
+        def GetOutline(self):
+            left, bottom, right, top = super().GetOutline()
+            if self.moves and self.ScaleRatio == (5.0, 1.0):
+                left, right = left - 0.1, right + 0.1
+            return left, bottom, right, top
+
+    view = ExpandedAfterCenter(tmp_path / "supplier.SLDPRT")
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    assert purchased._fit_group(_Drawing(), members) == (4, 1)
+    rejected = [
+        state for _name, state in records if state["reason"] == "postcenter_containment"
+    ]
+    assert len(rejected) == 1
+    state = rejected[0]
+    assert state["phase"] == "postcenter" and state["requested_scale"] == (5, 1)
+    assert state["center_error_m"] == pytest.approx((0.0, 0.0))
+    assert state["width_excess_m"] == pytest.approx(0.2)
+    assert state["containment_excess_m"]["left"] == pytest.approx(0.1)
+    assert state["containment_excess_m"]["right"] == pytest.approx(0.1)
+    assert state["containment_excess_m"]["bottom"] < 0.0
+    assert state["containment_excess_m"]["top"] < 0.0
+
+
+def test_fit_group_records_center_failure_without_refitting(monkeypatch, tmp_path):
+    records = _native_fit_records(monkeypatch)
+
+    class Unmoved(_RefreshedOutlineView):
+        def SetViewPosition(self, position, move_children):
+            self.moves.append(tuple(position))
+            return True  # A lying success must still fail authoritative bounds.
+
+    view = Unmoved(tmp_path / "supplier.SLDPRT")
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    with pytest.raises(RuntimeError, match="native view failed to center"):
+        purchased._fit_group(_Drawing(), members)
+    assert view.scales == [(8.0, 1.0), (5.0, 1.0)]
+    state = records[-1][1]
+    assert state["phase"] == "postcenter"
+    assert state["reason"] == "postcenter_containment"
+    assert state["center_error_m"] == pytest.approx((-0.125, -0.3125))
+
+
+def test_fit_group_custom_reader_keeps_refresh_ownership(monkeypatch, tmp_path):
+    records = _native_fit_records(monkeypatch)
+
+    class CustomView(_RefreshedOutlineView):
+        def GetOutline(self):
+            raise AssertionError("custom geometry must not read native outlines")
+
+        def UpdateViewDisplayGeometry(self):
+            raise AssertionError("custom reader owns its refresh")
+
+    view = CustomView(tmp_path / "supplier.SLDPRT")
+    reads = []
+
+    def custom_bounds(actual_view, _name):
+        reads.append((actual_view.ScaleRatio, actual_view.Position))
+        ratio = actual_view.ScaleRatio[0] / actual_view.ScaleRatio[1]
+        x, y = actual_view.Position
+        x, y = x + 0.125, y - 0.0625
+        return x - 0.1 * ratio, y - 0.02 * ratio, x + 0.1 * ratio, y + 0.02 * ratio
+
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    assert purchased._fit_group(_Drawing(), members, read_bounds=custom_bounds) == (
+        5,
+        1,
+    )
+    assert [ratio for ratio, _position in reads] == [(8.0, 1.0), (5.0, 1.0), (5.0, 1.0)]
+    assert len(view.moves) == 1 and view.refreshes == []
+    for _name, state in records:
+        assert state["bounds_kind"] == "custom"
+        assert "outline_before_refresh_m" not in state
+        assert "outline_after_refresh_m" not in state
+
+
+@pytest.mark.parametrize("result_kind", ("scalar", "short-tuple", "long-tuple"))
+def test_supplier_read_only_open_refuses_unmeasured_native_status(
+    monkeypatch,
+    tmp_path,
+    result_kind,
+):
+    case = _supplier_read_only_case(monkeypatch, tmp_path)
+    result = {
+        "scalar": case.model,
+        "short-tuple": (case.model, 0),
+        "long-tuple": (case.model, 0, 0, 0),
+    }[result_kind]
+    case.app.OpenDoc6 = lambda *_args: result
+    with pytest.raises(RuntimeError, match="unreadable supplier native open result"):
+        purchased._open_supplier_source_read_only(
+            case.adapter, case.source, label="supplier"
+        )
+    assert case.adapter.currentModel is None

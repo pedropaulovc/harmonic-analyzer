@@ -1516,18 +1516,67 @@ never automatic configuration-comment folders. Body-Delete ownership retains
 both known names until rename readback succeeds, so a committed rename followed
 by a transient read failure still permits original-member restoration.
 
-Supplier source ownership is proved through native source membership, not
+Sketch-only supplier views fit actual native construction curves, not the
+drawing view's padded `GetOutline` rectangle. Before fitting, the shared capture
+reader maps native sketch coordinates through the actual rigid sketch inverse
+into immutable model-metre points. Each later bounds read projects those points
+through the current, refreshed native view frame; complete circles use exact
+projected ellipse extrema. One-dimensional projections are valid. Partial arcs,
+blocks, text and explicit user-point ink refuse rather than being omitted.
+Capture proves error-free named source features, actual requested configuration,
+zero solid/sheet bodies, shown reference inventory and drawing correspondences.
+The spring/chain path makes one capture pass per source configuration, then
+restores the original configuration, body counts, dirty/read-only state and
+drawing context before fitting. It never switches or rebuilds the source during
+fitting, dimension placement or final settled checks. Captures are bound to the
+actual source document/path/configuration and view, with no live-sketch fallback;
+the drawing path performs no source geometry mutations after capture.
+Source parts are opened with the native silent/read-only option, with actual
+read-only state and path identity checked; a resident writable source is refused.
+Only clean source documents are captured, without saving or clearing their
+flags. The capture/preparation phase must remain clean. After capture, the known
+imported-dimension text/precision presentation stage may dirty the in-memory
+source without changing its geometry. That expected dirty bit is not treated as
+a geometry-change signal. Read-only state remains mandatory through drawing
+save, and a source-part SHA-256 check before opening and after drawing
+finalization rejects any persisted source-byte change. Existing build teardown
+discards document changes without saving. Restoration failures are recorded
+separately from any primary capture failure.
+
+The [native presentation-save receipt](../../docs/pipeline/evidence/vm2-datum-placement/probes/rack-source-save-callout/receipt.json)
+records `SetText` dirtying the source part and drawing `SaveAs3` persisting
+changed source bytes while the measured dimension and tolerance stayed
+unchanged. That is presentation persistence, not evidence of a geometry change.
+
+Installed pictorials retain their native-outline guards. Standard scales,
+reserved cells and final native dimension/note-ink containment are unchanged.
+
+Supplier source ownership is proved across model and drawing contexts, not by
 equality of COM feature or sketch wrappers. The displayed `IDimension` must
 compare `IsSame == 1` both with the referenced model's named `Parameter` and
-with a dimension enumerated from the intended source feature. Every non-null
-attached point or segment must have a non-null `GetSketch()` and compare `IsSame == 1`
-with an actual same-kind member of the named source sketch's
-`GetSketchPoints2()` or `GetSketchSegments()` inventory. Empty, unreadable or
-nonmatching inventories refuse the drawing; matching names, coordinates,
-local IDs, persistent IDs or wrapper identity cannot replace this proof.
+with a dimension enumerated from the intended source feature. Enumerate the
+actual source sketch's same-kind `GetSketchPoints2()` or `GetSketchSegments()`
+members and map each individually through the view's `GetCorresponding()`.
+Source and mapped counts must match; each member must compare equal to itself
+(`IsSame == 1`) and distinct from every other same-context member (`IsSame == 0`).
+Each attached point or segment needs a non-null `GetSketch()`, a positive native
+self-comparison, and exactly one mapped same-kind match; all other candidates
+must compare distinct. Attachments must map one-to-one to source members.
+Empty, unreadable, unsupported or ambiguous inventories refuse the drawing.
+Sketch-level or reverse mappings, names, coordinates, local IDs, persistent IDs
+and wrapper identity cannot substitute for these individual correspondences.
+These associative references may be nominal supplier gauges; source membership
+does not make a reference line or circle a physical finished edge.
 Source path/configuration, annotation ownership/type/count, final value,
 dangling/override, inventory and layout guards remain in force. Source-only
 regressions do not by themselves qualify this COM behavior on a native seat.
+
+Generic purchased-view fitting refreshes native display geometry at each
+candidate scale and after centering. Only the validated post-refresh outline
+selects the scale and proves containment; an unavailable or invalid pre-refresh
+diagnostic snapshot cannot reject valid refreshed geometry. Custom geometry
+readers retain ownership of their refresh. Standard scales and the settled
+native-extent, centering and containment guards remain mandatory.
 
 The thumb-screw sheet keeps axial dimensions on physical finished-face rims
 and diameters on their model-owned source-circle references. Place complete

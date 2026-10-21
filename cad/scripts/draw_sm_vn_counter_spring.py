@@ -15,6 +15,7 @@ from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_spring_drawing import build_supplier_spring_drawing
 from _supplier_extension_spring import (
+    SOURCE_FEATURES,
     extension_spring_dimensions, prepare_extension_spring_diagrams,
 )
 import sm_vn_counter_spring_spec as supplier
@@ -26,9 +27,15 @@ ITEM = "EXTENSION SPRING, DOUBLE-LOOP ENDS"
 PART_STEM = SPEC.artifact_stem
 
 
-def _supplier_dimensions(adapter: Any, views: dict[str, Any]) -> tuple[Callable[[], None], ...]:
+def _supplier_dimensions(
+    adapter: Any,
+    views: dict[str, Any],
+    *,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
+) -> tuple[Callable[[], None], ...]:
     return extension_spring_dimensions(
         adapter, views, free_length_mm=supplier.FREE_LENGTH_MM,
+        reference_bounds=reference_bounds,
         max_length_mm=supplier.MAX_LENGTH_MM, coil_od_mm=supplier.SUPPLIER_COIL_OD_MM,
         wire_dia_mm=supplier.SUPPLIER_WIRE_DIA_MM, precision=supplier.SUPPLIER_PRECISION,
     )
@@ -39,6 +46,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SPEC, item=ITEM, supplier_dimensions=_supplier_dimensions,
         maximum=True, include_top=False, spring_metadata=True,
         prepare_views=prepare_extension_spring_diagrams,
+        supplier_reference_features=SOURCE_FEATURES,
         stock_caption="SUPPLIER NOMINAL FREE-STOCK GAUGES — NOT PART SHAPE",
         supplier_margins={
             "free_front": (0.0, 0.0, 0.0, 0.018),

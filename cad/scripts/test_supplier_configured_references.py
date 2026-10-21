@@ -53,9 +53,16 @@ class _View:
         self.Name = name
         self.ReferencedConfiguration = configuration
         self.annotations = []
+        self.Position = (0.073, 0.119)
+        self.ScaleRatio = (1.0, 2.0)
+        self.source_points = ()
+        self.dimension_positions = {}
+        self.outline = (0.05, 0.12, 0.15, 0.16)
+        self.outline_calls = 0
 
     def GetOutline(self):
-        return (0.05, 0.12, 0.15, 0.16)
+        self.outline_calls += 1
+        return self.outline
 
     def GetAnnotations(self):
         return tuple(self.annotations)
@@ -63,13 +70,53 @@ class _View:
     def GetDisplayDimensionCount(self):
         return len(self.annotations)
 
+    @property
+    def ModelToViewTransform(self):
+        scale = self.ScaleRatio[0] / self.ScaleRatio[1]
+        x, y = self.Position
+        return SimpleNamespace(
+            apply=lambda point: (x + point[0] * scale, y + point[1] * scale)
+        )
 
-def _chain_sheet(monkeypatch, *, connecting):
+
+def _chain_sheet(
+    monkeypatch,
+    *,
+    connecting,
+    position=(0.073, 0.119),
+    scale=(1.0, 2.0),
+    outline=(0.05, 0.12, 0.15, 0.16),
+):
     views = {
         "free_front": _View("front", chain_stock.SUPPLIER_REFERENCE_CONFIGURATION),
         "free_top": _View("top", chain_stock.SUPPLIER_REFERENCE_CONFIGURATION),
         "installed_iso": _View("installed", "InnerLink"),
     }
+    views["free_front"].source_points = (
+        (0.001, -chain_stock.ROLLER_DIAMETER / 2000),
+        (0.001 + 2 * chain_stock.PITCH / 1000, chain_stock.ROLLER_DIAMETER / 2000),
+    )
+    views["free_top"].source_points = (
+        (0.002, -chain_stock.PLATE_THICKNESS / 1000),
+        (0.002 + chain_stock.ROLLER_WIDTH / 1000, chain_stock.PLATE_THICKNESS / 1000),
+    )
+    for view in views.values():
+        view.Position = position
+        view.ScaleRatio = scale
+        view.outline = outline
+
+    def reference_bounds(key):
+        assert key in chain_dimensions.SOURCE_FEATURES
+        view = views[key]
+        assert (
+            view.ReferencedConfiguration == chain_stock.SUPPLIER_REFERENCE_CONFIGURATION
+        )
+        # Only the validated bounds boundary is faked here. Its source curves
+        # and current native transform are unrelated to cells or GetOutline.
+        transform = view.ModelToViewTransform
+        xs, ys = zip(*(transform.apply(point) for point in view.source_points))
+        return (min(xs), min(ys), max(xs), max(ys))
+
     values = {
         chain_stock.PIN_DIMENSION: chain_stock.PIN_DIAMETER,
         chain_stock.ROLLER_DIMENSION: chain_stock.ROLLER_DIAMETER,
@@ -80,17 +127,24 @@ def _chain_sheet(monkeypatch, *, connecting):
     }
     for module in (chain_dimensions, supplier_drawing):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(supplier_drawing, "iter_views", lambda _adapter: tuple(views.values()))
+    monkeypatch.setattr(
+        supplier_drawing, "iter_views", lambda _adapter: tuple(views.values())
+    )
     monkeypatch.setattr(supplier_drawing, "view_name", lambda _adapter, view: view.Name)
     monkeypatch.setattr(
-        chain_dimensions, "dimension_name",
+        chain_dimensions,
+        "dimension_name",
         lambda _adapter, annotation: annotation.display.native.FullName.split("@")[0],
     )
 
     def curate(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
-        owner = (chain_stock.FRONT_FEATURE if view is views["free_front"]
-                 else chain_stock.SECTION_FEATURE)
+        owner = (
+            chain_stock.FRONT_FEATURE
+            if view is views["free_front"]
+            else chain_stock.SECTION_FEATURE
+        )
         assert set(keep) <= dimensions_by_feature[owner]
+        view.dimension_positions = dict(keep)
         view.annotations = [
             _Annotation(_Display(name, owner, values[name])) for name in keep
         ]
@@ -107,23 +161,36 @@ def _chain_sheet(monkeypatch, *, connecting):
 
     monkeypatch.setattr(chain_dimensions, "curate_view_dimensions", curate)
     monkeypatch.setattr(chain_dimensions, "supplier_reference_dimension", present)
-    monkeypatch.setattr(chain_dimensions, "assert_supplier_reference_dimension", assert_presentation)
+    monkeypatch.setattr(
+        chain_dimensions, "assert_supplier_reference_dimension", assert_presentation
+    )
     checks = chain_dimensions.annotate_chain_stock(
-        SimpleNamespace(), views, connecting=connecting,
+        SimpleNamespace(),
+        views,
+        connecting=connecting,
+        reference_bounds=reference_bounds,
     )
     return views, checks[0]
 
 
 @pytest.mark.parametrize("connecting,expected_count", [(False, 4), (True, 6)])
 def test_supplier_inventory_retains_exact_nominals_and_reacquires_rebuilt_annotations(
-    monkeypatch, connecting, expected_count,
+    monkeypatch,
+    connecting,
+    expected_count,
 ):
     views, settled = _chain_sheet(monkeypatch, connecting=connecting)
-    assert sum(view.GetDisplayDimensionCount() for view in views.values()) == expected_count
+    assert (
+        sum(view.GetDisplayDimensionCount() for view in views.values())
+        == expected_count
+    )
     assert not views["installed_iso"].annotations
     pin = next(
-        annotation.display for annotation in views["free_front"].annotations
-        if annotation.display.native.FullName.startswith(chain_stock.PIN_DIMENSION + "@")
+        annotation.display
+        for annotation in views["free_front"].annotations
+        if annotation.display.native.FullName.startswith(
+            chain_stock.PIN_DIMENSION + "@"
+        )
     )
     assert pin.native.value_mm == pytest.approx(2.2987, abs=1e-12)
     assert pin.native.value_mm != pytest.approx(0.091 * 25.4, abs=1e-8)
@@ -144,7 +211,9 @@ def test_supplier_inventory_retains_exact_nominals_and_reacquires_rebuilt_annota
     settled()
 
 
-@pytest.mark.parametrize("fault", ["owner", "value", "band", "missing", "foreign", "configuration"])
+@pytest.mark.parametrize(
+    "fault", ["owner", "value", "band", "missing", "foreign", "configuration"]
+)
 def test_final_supplier_readback_rejects_source_or_inventory_drift(monkeypatch, fault):
     views, settled = _chain_sheet(monkeypatch, connecting=True)
     front = views["free_front"]
@@ -167,17 +236,79 @@ def test_final_supplier_readback_rejects_source_or_inventory_drift(monkeypatch, 
         settled()
 
 
-def test_connecting_application_references_are_explicit_not_physical_roller_claims(monkeypatch):
+def test_connecting_application_references_are_explicit_not_physical_roller_claims(
+    monkeypatch,
+):
     views, settled = _chain_sheet(monkeypatch, connecting=True)
     displays = {
         annotation.display.native.FullName.split("@")[0]: annotation.display
-        for view in views.values() for annotation in view.annotations
+        for view in views.values()
+        for annotation in view.annotations
     }
     assert displays[chain_stock.ROLLER_DIMENSION].options["callout"] == "FOR ROLLER"
-    assert displays[chain_stock.WIDTH_DIMENSION].options["callout"] == "FOR ROLLER WIDTH"
-    assert displays[chain_stock.LENGTH_DIMENSION].native.value_mm == pytest.approx(8.509)
+    assert (
+        displays[chain_stock.WIDTH_DIMENSION].options["callout"] == "FOR ROLLER WIDTH"
+    )
+    assert displays[chain_stock.LENGTH_DIMENSION].native.value_mm == pytest.approx(
+        8.509
+    )
     assert displays[chain_stock.PLATE_DIMENSION].native.value_mm == pytest.approx(0.762)
     settled()
+
+
+@pytest.mark.parametrize("connecting", [False, True])
+@pytest.mark.parametrize(
+    "position,scale,outline",
+    [
+        ((0.073, 0.119), (1.0, 2.0), (0.05, 0.12, 0.15, 0.16)),
+        ((0.182, 0.221), (2.0, 1.0), (-2.0, -3.0, 4.0, 5.0)),
+    ],
+    ids=["stale", "padded"],
+)
+def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
+    monkeypatch, connecting, position, scale, outline
+):
+    views, settled = _chain_sheet(
+        monkeypatch,
+        connecting=connecting,
+        position=position,
+        scale=scale,
+        outline=outline,
+    )
+    ratio = scale[0] / scale[1]
+    x, y = position
+    front_left = x + 0.001 * ratio
+    front_right = front_left + 2 * chain_stock.PITCH / 1000 * ratio
+    front_bottom = y - chain_stock.ROLLER_DIAMETER / 2000 * ratio
+    front_top = y + chain_stock.ROLLER_DIAMETER / 2000 * ratio
+    expected_front = {
+        chain_stock.PIN_DIMENSION: (front_left - 0.014, front_bottom - 0.008),
+        chain_stock.ROLLER_DIMENSION: (front_right + 0.014, front_bottom - 0.008),
+        chain_stock.PITCH_DIMENSION: (
+            (front_left + front_right) / 2,
+            front_top + 0.008,
+        ),
+    }
+    top_left = x + 0.002 * ratio
+    top_right = top_left + chain_stock.ROLLER_WIDTH / 1000 * ratio
+    expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
+    if connecting:
+        expected_top.update(
+            {
+                chain_stock.PLATE_DIMENSION: (
+                    (top_left + top_right) / 2,
+                    y + chain_stock.PLATE_THICKNESS / 1000 * ratio + 0.008,
+                ),
+                chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
+            }
+        )
+    for key, expected in (("free_front", expected_front), ("free_top", expected_top)):
+        assert set(views[key].dimension_positions) == set(expected)
+        for name, xy in expected.items():
+            assert views[key].dimension_positions[name] == pytest.approx(xy)
+    assert not views["installed_iso"].dimension_positions
+    settled()
+    assert all(view.outline_calls == 0 for view in views.values())
 
 
 def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
@@ -188,13 +319,21 @@ def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
         SUPPLIER_REFERENCE_FEATURE,
     )
 
-    monkeypatch.setattr(supplier_drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        supplier_drawing, "_early_bound", lambda value, _interface: value
+    )
     display = _Display(SUPPLIER_REFERENCE_DIMENSION, SUPPLIER_REFERENCE_FEATURE, DIA)
     supplier_drawing.assert_supplier_configuration_value(
-        display, SUPPLIER_REFERENCE_CONFIGURATION, 0.7874, label="supplier wire circle",
+        display,
+        SUPPLIER_REFERENCE_CONFIGURATION,
+        0.7874,
+        label="supplier wire circle",
     )
     display.native.value_mm = 0.8
     with pytest.raises(RuntimeError, match="configured supplier dimension changed"):
         supplier_drawing.assert_supplier_configuration_value(
-            display, SUPPLIER_REFERENCE_CONFIGURATION, DIA, label="supplier wire circle",
+            display,
+            SUPPLIER_REFERENCE_CONFIGURATION,
+            DIA,
+            label="supplier wire circle",
         )

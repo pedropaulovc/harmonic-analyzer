@@ -294,15 +294,55 @@ def _short_native_geometry(record: Mapping[str, Any]) -> dict[str, Any]:
             raise RuntimeError("short thumb supplier dimension lost a native witness")
         ys = [y for segment in runs for y in (segment.y0, segment.y1)]
         witnesses.append((x, min(ys), max(ys)))
+    physical_lines = [
+        segment
+        for segment in geometry.segments
+        if segment.role == "dim-line"
+        and abs(segment.y1 - segment.y0) < 1e-7
+        and any(
+            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
+            for tip in tips
+            for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        )
+    ]
+    if any(
+        not any(
+            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
+            for segment in physical_lines
+            for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        )
+        for tip in tips
+    ):
+        raise RuntimeError(
+            "short thumb supplier dimension lost a tip-incident native line"
+        )
+    # Offset text can draw an unregistered connector and underline. When these
+    # become collinear with the physical line they are also classified dim-line,
+    # but neither has an endpoint at a physical arrow tip (native 012dd).
+    # They remain in the full raw-path ink audit, never in the physical tail reach.
     reach = [
         x
-        for segment in geometry.segments
-        if segment.role in ("dim-line", "arrow")
+        for segment in (
+            *physical_lines,
+            *(segment for segment in geometry.segments if segment.role == "arrow"),
+        )
         for x in (segment.x0, segment.x1)
     ]
     if not reach:
         raise RuntimeError("short thumb supplier dimension lost native line/arrow ink")
-    return {"tips": tips, "witnesses": tuple(witnesses), "left": min(reach)}
+    return {
+        "tips": tips,
+        "witnesses": tuple(witnesses),
+        "left": min(reach),
+        "physical_line_runs": tuple(
+            {
+                "start": (segment.x0, segment.y0),
+                "end": (segment.x1, segment.y1),
+                "length_m": segment.length,
+            }
+            for segment in physical_lines
+        ),
+    }
 
 
 def _short_native_snapshot(
@@ -585,13 +625,61 @@ def _shelf_short_text(
             for name in _AXIAL_NAMES
         },
     )
+    anchors = {}
     for name in _AXIAL_NAMES:
         if not expected[name]["shelved"]:
             continue
         display = found[name]
+        if display.OffsetText is not False:
+            raise RuntimeError(
+                f"{name}: short supplier line was not placed before offset mode"
+            )
+        # Native 012dd made the offset-mode line pass through the old annotation
+        # anchor, not its text baseline. Seed that anchor from BOTH measured
+        # arrow tips before changing mode; never guess the font-dependent gap.
+        left, right = expected[name]["tips"]
+        if abs(left[1] - right[1]) > _POSITION_TOLERANCE_M:
+            raise RuntimeError(
+                f"{name}: short supplier dimension line is not horizontal"
+            )
+        anchor = (positions[name][0], (left[1] + right[1]) / 2)
+        anchors[name] = anchor
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if not annotation.SetPosition2(*anchor, 0.0):
+            raise RuntimeError(
+                f"{name}: failed to seed measured supplier offset anchor"
+            )
+    rebuild_drawing(adapter, label="thumb supplier measured pre-offset anchors")
+    prepared = _supplier_displays(adapter)
+    _log_short_native_transition(
+        "prepared_offset_text_anchors",
+        {
+            name: {
+                "before": expected[name]["native_before"],
+                "prepared": _short_native_snapshot(
+                    adapter,
+                    prepared[name],
+                    _supplier_annotation_record(adapter, prepared[name]),
+                ),
+                "measured_offset_anchor_m": (*anchors[name], 0.0),
+            }
+            for name in anchors
+        },
+    )
+    for name, anchor in anchors.items():
+        display = prepared[name]
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        actual = tuple(float(value) for value in annotation.GetPosition())
+        if (
+            len(actual) != 3
+            or not all(isfinite(value) for value in actual)
+            or dist(actual, (*anchor, 0.0)) > _POSITION_TOLERANCE_M
+        ):
+            raise RuntimeError(
+                f"{name}: measured supplier offset anchor did not settle"
+            )
         display.OffsetText = True
-        if not annotation.SetPosition2(*positions[name], 0.0):
+        if not annotation.SetPosition2(*anchor, 0.0):
             raise RuntimeError(
                 f"{name}: failed to enable short thumb supplier text offset"
             )

@@ -10,13 +10,13 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _com import _early_bound
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
-from _drawing_layout_check import DEFAULT_BOUNDARY_ALLOWANCE_M
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
 from _supplier_spring_drawing import (
-    assert_supplier_configuration_value, reacquire_supplier_dimensions,
+    assert_supplier_configuration_value,
+    reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 from vn_disc_spring_supplier_stock import (
@@ -26,10 +26,8 @@ from vn_disc_spring_supplier_stock import (
 )
 
 
-def prepare_supplier_disc_diagram(
-    adapter: Any, views: dict[str, Any], *, spec: Any
-) -> tuple[Callable[[], None], ...]:
-    """Show only each dimensioned diagram owner before the native view fit."""
+def supplier_disc_reference_features(spec: Any) -> dict[str, tuple[str, ...]]:
+    """Exact source owners shared by preparation, fitting and dimension placement."""
     application = set(spec.SUPPLIER_APPLICATION_DIMENSIONS)
     features = {
         "free_front": ("DiscSupplierHeight", "DiscSupplierStrip"),
@@ -38,9 +36,22 @@ def prepare_supplier_disc_diagram(
     }
     if application.intersection(("WORKING_HEIGHT", "WORKING_DEFLECTION")):
         features["free_right"] = ("DiscSupplierApplication",)
+    return features
+
+
+def prepare_supplier_disc_diagram(
+    adapter: Any,
+    views: dict[str, Any],
+    *,
+    spec: Any,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
+) -> tuple[Callable[[], None], ...]:
+    """Show only each dimensioned diagram owner before the native view fit."""
+    features = supplier_disc_reference_features(spec)
     expected_extents = supplier_diagram_extents(spec)
     if set(features) != set(expected_extents) or set(views) != {
-        *features, "installed_iso"
+        *features,
+        "installed_iso",
     }:
         raise RuntimeError(f"{spec.SKU}: nominal diagram view/feature mismatch")
     for key, owners in features.items():
@@ -52,25 +63,15 @@ def prepare_supplier_disc_diagram(
 
     def check_rebuilt_diagram_extents() -> None:
         for key, expected_mm in expected_extents.items():
-            outline = tuple(float(value) for value in views[key].GetOutline())
-            if (
-                len(outline) != 4
-                or not all(math.isfinite(value) for value in outline)
-                or outline[2] <= outline[0]
-                or outline[3] <= outline[1]
-            ):
-                raise RuntimeError(f"{spec.SKU} {key}: empty/invalid diagram outline")
-            actual_m = (outline[2] - outline[0], outline[3] - outline[1])
-            # Native outlines include calibrated whitespace, not exact ink bounds.
+            bounds = reference_bounds(key)
+            actual_m = (bounds[2] - bounds[0], bounds[3] - bounds[1])
             if not all(
-                expected / 1000.0 - 1e-7
-                <= actual
-                <= expected / 1000.0 + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M
+                math.isclose(actual, expected / 1000.0, rel_tol=0.0, abs_tol=1e-7)
                 for actual, expected in zip(actual_m, expected_mm, strict=True)
             ):
                 raise RuntimeError(
-                    f"{spec.SKU} {key}: diagram outline {actual_m} m "
-                    f"is outside nominal {expected_mm} mm plus native outline padding"
+                    f"{spec.SKU} {key}: native diagram ink {actual_m} m "
+                    f"differs from nominal {expected_mm} mm"
                 )
 
     return (check_rebuilt_diagram_extents,)
@@ -81,6 +82,7 @@ def supplier_disc_spring_dimensions(
     views: dict[str, Any],
     *,
     spec: Any,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
     settled_checks: list[Callable[[], None]] | None = None,
 ) -> None:
     """Import native nominal sizes from explicitly nonphysical diagrams.
@@ -92,12 +94,14 @@ def supplier_disc_spring_dimensions(
     """
     references = []
     placements = {}
+    source_bounds = {
+        key: reference_bounds(key) for key in supplier_disc_reference_features(spec)
+    }
     for key, left_size, right_size in (
         ("free_top", "ID", "OD"),
         ("free_front", "THICKNESS", "FREE_HEIGHT"),
     ):
-        view = _early_bound(views[key], "IView")
-        x0, y0, x1, y1 = (float(value) for value in view.GetOutline())
+        x0, y0, x1, y1 = source_bounds[key]
         placements[key] = {
             left_size: (x0 - 0.018, (y0 + y1) / 2.0),
             right_size: (x1 + 0.018, (y0 + y1) / 2.0),
@@ -105,9 +109,7 @@ def supplier_disc_spring_dimensions(
 
     application = set(spec.SUPPLIER_APPLICATION_DIMENSIONS)
     if "SHAFT_DIA" in application:
-        x0, _y0, x1, y1 = (
-            float(value) for value in views["free_top"].GetOutline()
-        )
+        x0, _y0, x1, y1 = source_bounds["free_top"]
         placements["free_top"]["SHAFT_DIA"] = ((x0 + x1) / 2.0, y1 + 0.010)
     height_sizes = [
         semantic
@@ -115,9 +117,7 @@ def supplier_disc_spring_dimensions(
         if semantic in application
     ]
     if height_sizes:
-        x0, y0, x1, y1 = (
-            float(value) for value in views["free_right"].GetOutline()
-        )
+        x0, y0, x1, y1 = source_bounds["free_right"]
         placements["free_right"] = {
             semantic: (
                 x0 - 0.014 if index == 0 else x1 + 0.014,
@@ -133,8 +133,7 @@ def supplier_disc_spring_dimensions(
 
     for key, positions in placements.items():
         keep = {
-            SUPPLIER_DIMENSION_NAMES[semantic]: xy
-            for semantic, xy in positions.items()
+            SUPPLIER_DIMENSION_NAMES[semantic]: xy for semantic, xy in positions.items()
         }
         imported = curate_view_dimensions(
             adapter,
@@ -164,48 +163,70 @@ def supplier_disc_spring_dimensions(
             if semantic in application_labels:
                 arguments["callout"] = application_labels[semantic]
             supplier_reference_dimension(adapter, display, **arguments)
-            references.append((key, SUPPLIER_DIMENSION_NAMES[semantic], arguments, semantic))
+            references.append(
+                (key, SUPPLIER_DIMENSION_NAMES[semantic], arguments, semantic)
+            )
 
     expected = {key: {} for key in views}
-    configurations = {key: str(view.ReferencedConfiguration) for key, view in views.items()}
+    configurations = {
+        key: str(view.ReferencedConfiguration) for key, view in views.items()
+    }
     for key, name, _arguments, _semantic in references:
         if configurations[key] != SUPPLIER_DIAGRAM_CONFIGURATION:
-            raise RuntimeError(f"{spec.SKU} {key}: nominal diagram uses wrong configuration")
+            raise RuntimeError(
+                f"{spec.SKU} {key}: nominal diagram uses wrong configuration"
+            )
         expected[key][name] = next(
-            feature for feature, names in SUPPLIER_DIMENSIONS_BY_FEATURE.items() if name in names
+            feature
+            for feature, names in SUPPLIER_DIMENSIONS_BY_FEATURE.items()
+            if name in names
         )
 
     def check_settled_references() -> None:
         if len(references) != 4 + len(application):
             raise RuntimeError(f"{spec.SKU}: supplier stock/application sizes missing")
         displays = reacquire_supplier_dimensions(
-            adapter, views, expected=expected, configurations=configurations,
+            adapter,
+            views,
+            expected=expected,
+            configurations=configurations,
         )
         for key, name, arguments, semantic in references:
             display = displays[name]
             assert_supplier_reference_dimension(adapter, display, **arguments)
             assert_supplier_configuration_value(
-                display, configurations[key], arguments["expected_mm"], label=name,
+                display,
+                configurations[key],
+                arguments["expected_mm"],
+                label=name,
             )
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
             band = getattr(spec, f"{semantic}_BAND", None)
             if band is None:
                 if int(tolerance.Type) != 0:
-                    raise RuntimeError(f"{spec.SKU} {semantic}: unprovided source band appeared")
+                    raise RuntimeError(
+                        f"{spec.SKU} {semantic}: unprovided source band appeared"
+                    )
                 continue
             upper, lower = band
             expected_type = 4 if math.isclose(upper, -lower, abs_tol=1e-12) else 2
             if int(tolerance.Type) != expected_type or not all(
                 math.isclose(actual, value / 1000.0, rel_tol=0.0, abs_tol=1e-9)
-                for actual, value in ((float(tolerance.GetMinValue()), lower),
-                                      (float(tolerance.GetMaxValue()), upper))
+                for actual, value in (
+                    (float(tolerance.GetMinValue()), lower),
+                    (float(tolerance.GetMaxValue()), upper),
+                )
             ):
                 raise RuntimeError(f"{spec.SKU} {semantic}: native source band changed")
             if int(display.GetPrimaryTolPrecision2()) != 3:
-                raise RuntimeError(f"{spec.SKU} {semantic}: source band needs three places")
+                raise RuntimeError(
+                    f"{spec.SKU} {semantic}: source band needs three places"
+                )
 
     if settled_checks is not None:
         settled_checks.append(check_settled_references)
     else:
-        raise ValueError("supplier disc dimensions require the finalizer's settled_checks list")
+        raise ValueError(
+            "supplier disc dimensions require the finalizer's settled_checks list"
+        )

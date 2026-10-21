@@ -7,6 +7,9 @@ and path guards below; they are not evidence of a successful native rerender.
 Native 34eb subsequently refused a station transition without numeric evidence;
 these synthetic failures require full before/after data and live-sheet capture,
 not a relaxed station tolerance or a claimed native layout fix.
+Native 012dd showed that enabling offset mode relocates its line to the prior
+annotation anchor, which is above the text baseline by a measured font offset.
+The primitive fixture models that transition independently of text-only moves.
 """
 
 from __future__ import annotations
@@ -166,7 +169,8 @@ class _NativeDisplay:
         self.orientation = orientation
         self.position = (0.12, 0.125, 0.0)
         self.line_position = self.position
-        self.OffsetText = True
+        self._offset_text = True
+        self._pending_offset_anchor = False
         self.OwnerType = 0
         self.Owner = state.view
         self.Visible = 1
@@ -176,6 +180,29 @@ class _NativeDisplay:
         self.ArrowSide = 0
         self.LeaderVisibility = 0
         self.MaxWitnessLineLength = 0.05
+
+    @property
+    def OffsetText(self):
+        return self._offset_text
+
+    @OffsetText.setter
+    def OffsetText(self, enabled):
+        if not enabled:
+            self._pending_offset_anchor = False
+        elif not self._offset_text and self.orientation == "horizontal":
+            # 012dd observed the transition only after toggle + same-point
+            # SetPosition2. Exercise either possible snap point, then freeze the
+            # line for later text-only moves. Physical rim starts/X never move.
+            if self.state.offset_anchor_phase == "toggle":
+                x, y, z = self.position
+                self.line_position = (x, y + self.text_line_offset, z)
+            else:
+                self._pending_offset_anchor = True
+        self._offset_text = enabled
+
+    @property
+    def text_line_offset(self):
+        return self.state.text_line_offsets.get(self.native.Name, 0.0027781)
 
     def GetWitnessLineGap(self, index, use_doc, gap):
         assert index in (0, 1)
@@ -197,25 +224,23 @@ class _NativeDisplay:
         return self
 
     def GetLeaderCount(self):
-        return int(self.OffsetText and self.native.Name in thumb._AXIAL_NAMES)
+        # Native 012dd reports NoLeader: the connector/underline exist ONLY as
+        # display-data lines, not as registered IAnnotation leaders.
+        return 0
 
-    def GetLeaderPointsAtIndex(self, index):
-        assert index == 0 and self.GetLeaderCount() == 1
-        override = self.state.leader_overrides.get(self.native.Name)
+    def offset_path_points(self):
+        override = self.state.native_path_overrides.get(self.native.Name)
         if override is not None:
-            points = override
-        else:
-            x, y, _ = self.position
-            baseline = self.line_position[1] - 0.0027781
-            center = sum(point[0] for point in self.points) / 2
-            # Synthetic native offset leader: attachment on the fixed line,
-            # landing on the text's right baseline border. It is registered
-            # AND drawn in display data, as the real audit expects.
-            points = (
-                (center, baseline),
-                (x + self.state.text_mode_shift + 0.0227354 / 2, y - 0.0027781),
-            )
-        return tuple(value for point in points for value in (*point, 0.0))
+            return override
+        x, y, _ = self.position
+        baseline = self.line_position[1] - self.text_line_offset
+        center = sum(point[0] for point in self.points) / 2
+        left = x + self.state.text_mode_shift - 0.0227354 / 2
+        return (
+            (center, baseline),
+            (left, y - self.text_line_offset),
+            (left + 0.0227354, y - self.text_line_offset),
+        )
 
     def GetDimension2(self, index):
         assert index == 0
@@ -239,7 +264,16 @@ class _NativeDisplay:
             self.position = (x, y, z)
         if not self.OffsetText and self.state.defect not in ("ignored", "stale-lines"):
             self.line_position = self.position
-        if self.OffsetText and self.state.defect == "mode-line-drift":
+        if self.OffsetText and self._pending_offset_anchor:
+            self.line_position = (x, y + self.text_line_offset, z)
+            self._pending_offset_anchor = False
+        if self.OffsetText and (
+            self.state.defect == "mode-line-drift"
+            or (
+                self.state.defect == "shelf-line-drift"
+                and abs(x - self.line_position[0]) > 0.001
+            )
+        ):
             lx, ly, lz = self.line_position
             self.line_position = (lx, ly + 0.0001, lz)
         return True
@@ -275,7 +309,7 @@ def _display_ink(_adapter, display):
     if display.orientation == "horizontal":
         width, height = 0.0227354, 0.0035
         text = " (0.438 in) " if name == "SupplierThreadLength" else " (0.094 in) "
-        baseline = ly - 0.0027781
+        baseline = ly - display.text_line_offset
         outward = 1 if baseline > a[1] else -1
         lines = [
             _line(a, (a[0], baseline + outward * 0.001)),
@@ -297,8 +331,8 @@ def _display_ink(_adapter, display):
                     ),
                 )
             )
-        else:
-            lines.append(_line((a[0], baseline), (b[0], baseline)))
+        # Native 012dd retains the central run even with both arrows outside.
+        lines.append(_line((a[0], baseline), (b[0], baseline)))
         for point, direction in ((a, -1 if outside else 1), (b, 1 if outside else -1)):
             if display.OffsetText:
                 direction = -direction  # Native smart-arrow direction may change.
@@ -323,7 +357,7 @@ def _display_ink(_adapter, display):
         texts = [
             {
                 "t": text,
-                "pos": (x - width / 2, y - 0.0027781, 0.0),
+                "pos": (x - width / 2, y - display.text_line_offset, 0.0),
                 "h": height,
                 "w": width,
                 "ang": 0.0,
@@ -389,10 +423,13 @@ def _display_ink(_adapter, display):
                     1.0,
                 ]
             )
-    if display.GetLeaderCount():
-        points = display.GetLeaderPointsAtIndex(0)
-        xy = [(points[index], points[index + 1]) for index in range(0, len(points), 3)]
-        lines.extend(_line(a, b) for a, b in zip(xy, xy[1:]))
+    if display.OffsetText and name in thumb._AXIAL_NAMES:
+        points = display.offset_path_points()
+        lines.extend(_line(a, b) for a, b in zip(points, points[1:]))
+        if display.state.defect == "merged-offset-tail" and x < a[0] - 0.01:
+            # Native post-shelf topology is unobserved: refuse a hypothetical
+            # single merged physical tail that actually reaches the text.
+            lines.append(_line((a[0], baseline), points[1]))
     return {"texts": texts, "lines": lines, "arrows": arrows}, {}
 
 
@@ -408,9 +445,15 @@ def native_thumb(monkeypatch, request):
         authored=[],
         text_mode_shift=0.004,
         tail_extra=0.0,
-        leader_overrides={},
+        native_path_overrides={},
         other_views=[],
         native_transitions=[],
+        offset_anchor_phase="toggle",
+        text_line_offsets={
+            "SupplierHeadHeight": 0.0027781,
+            "SupplierCollarHeight": 0.0027782,
+            "SupplierThreadLength": 0.0027782,
+        },
     )
     state.adapter = SimpleNamespace(
         swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b))
@@ -561,7 +604,9 @@ def native_thumb(monkeypatch, request):
 @pytest.mark.parametrize(
     "native_thumb", [((4, 1), ""), ((2, 1), "FIRST\nSECOND\nTHIRD")], indirect=True
 )
-def test_thumb_settled_native_geometry_and_leaders_remain_clear(native_thumb):
+def test_thumb_settled_native_geometry_and_drawn_offset_paths_remain_clear(
+    native_thumb,
+):
     state = native_thumb
     positions, short_geometry = thumb.supplier_dimensions(
         state.adapter, {"*Front": state.view}
@@ -570,10 +615,17 @@ def test_thumb_settled_native_geometry_and_leaders_remain_clear(native_thumb):
         if short_geometry.get(display.native.Name, {}).get("shelved"):
             assert display.OffsetText is True
             record = thumb._supplier_annotation_record(state.adapter, display)
-            assert len(record["leaders"]) == 1
-            assert record["leaders"][0] == pytest.approx(
-                display.GetLeaderPointsAtIndex(0), abs=1e-7
-            )
+            assert "leaders" not in record
+            drawn = [thumb.line_segment(row) for row in record["display"]["lines"]]
+            for start, end in zip(
+                display.offset_path_points(), display.offset_path_points()[1:]
+            ):
+                assert any(
+                    segment is not None
+                    and (segment.x0, segment.y0) == pytest.approx(start)
+                    and (segment.x1, segment.y1) == pytest.approx(end)
+                    for segment in drawn
+                )
             assert display.line_position[0] > display.position[0]
             assert display.line_position[1] == pytest.approx(display.position[1])
         else:
@@ -736,7 +788,9 @@ def test_thumb_final_readback_measures_changed_native_arrow_tail_reach(native_th
         thumb._assert_supplier_dimensions(state.adapter, positions, short_geometry)
 
 
-def test_thumb_native_audit_reads_offset_leader_crossing_foreign_text(native_thumb):
+def test_thumb_native_audit_reads_draw_only_offset_path_crossing_foreign_text(
+    native_thumb,
+):
     state = native_thumb
     positions, short_geometry = thumb.supplier_dimensions(
         state.adapter, {"*Front": state.view}
@@ -756,9 +810,9 @@ def test_thumb_native_audit_reads_offset_leader_crossing_foreign_text(native_thu
     # The two-row union's centre is in blank inter-row space, not glyph ink.
     # Land inside a real row, using the same calibrated row model as the audit.
     target = target_geometry.text_boxes[0]
-    origin = head.GetLeaderPointsAtIndex(0)[:2]
-    state.leader_overrides["SupplierHeadHeight"] = (origin, target.center())
-    with pytest.raises(RuntimeError, match="leader-through-text"):
+    origin = head.offset_path_points()[0]
+    state.native_path_overrides["SupplierHeadHeight"] = (origin, target.center())
+    with pytest.raises(RuntimeError, match="text-on-line"):
         thumb._assert_supplier_dimensions(state.adapter, positions, short_geometry)
 
 
@@ -881,7 +935,7 @@ def test_thumb_station_refusal_logs_complete_native_transition(
         assert snapshot["witness_gaps"]["0"]["success"] is True
         assert snapshot["witness_gaps"]["1"]["uses_document"] is True
     assert "leaders" not in before["native"]
-    assert len(after["native"]["leaders"]) == 1
+    assert "leaders" not in after["native"]
     assert before["properties"]["OffsetText"] is False
     assert after["properties"]["OffsetText"] is True
     comparison = head["comparison"]
@@ -911,7 +965,7 @@ def test_thumb_unreadable_arrow_inventory_still_logs_raw_native_records(native_t
     assert len(head["before"]["native"]["display"]["arrows"]) == 2
     assert len(head["after"]["native"]["display"]["arrows"]) == 3
     assert head["after"]["native"]["display"]["lines"]
-    assert head["after"]["native"]["leaders"]
+    assert "leaders" not in head["after"]["native"]
     assert head["after"]["classified_segments"]
     assert "unreadable native arrows" in head["after"]["guard_error"]["message"]
     assert set(transition["dimensions"]) == set(thumb._AXIAL_NAMES)
@@ -986,3 +1040,189 @@ def test_thumb_build_preserves_original_failure_and_requests_sheet_capture(
     )
     if capture_refuses:
         assert any("forensic capture failed" in note for note in original.__notes__)
+
+
+@pytest.mark.parametrize(
+    "native_thumb", [((4, 1), ""), ((2, 1), "FIRST\nSECOND\nTHIRD")], indirect=True
+)
+@pytest.mark.parametrize(
+    "offsets",
+    [
+        {
+            "SupplierHeadHeight": 0.0027781,
+            "SupplierCollarHeight": 0.0027782,
+            "SupplierThreadLength": 0.0027782,
+        },
+        {
+            "SupplierHeadHeight": 0.0017,
+            "SupplierCollarHeight": 0.0031,
+            "SupplierThreadLength": 0.0023,
+        },
+    ],
+)
+@pytest.mark.parametrize("anchor_phase", ("toggle", "first-offset-position"))
+def test_thumb_measured_offset_anchor_preserves_original_line_stations(
+    native_thumb, offsets, anchor_phase
+):
+    state = native_thumb
+    state.offset_anchor_phase = anchor_phase
+    state.text_line_offsets = offsets
+    positions, expected = thumb.supplier_dimensions(
+        state.adapter, {"*Front": state.view}
+    )
+    found = thumb._supplier_displays(state.adapter)
+    for name in thumb._AXIAL_NAMES:
+        before = expected[name]["native_before"]
+        original_position = before["native"]["pos"]
+        original_tips = expected[name]["tips"]
+        original_baseline = original_tips[0][1]
+        assert original_tips[1][1] == pytest.approx(original_baseline)
+        assert original_position[1] - original_baseline == pytest.approx(offsets[name])
+        after = thumb._short_native_geometry(
+            thumb._supplier_annotation_record(state.adapter, found[name])
+        )
+        for key in ("tips", "witnesses"):
+            for original, actual in zip(expected[name][key], after[key], strict=True):
+                assert actual == pytest.approx(original, abs=1e-7)
+        assert found[name].GetPosition()[1] == pytest.approx(original_position[1])
+        if expected[name]["shelved"]:
+            prepared = next(
+                event
+                for event in state.native_transitions
+                if event["phase"] == "prepared_offset_text_anchors"
+            )["dimensions"][name]
+            assert prepared["measured_offset_anchor_m"][1] == pytest.approx(
+                original_baseline
+            )
+            assert prepared["prepared"]["native"]["pos"][1] == pytest.approx(
+                original_baseline
+            )
+        else:
+            assert name == "SupplierThreadLength"
+            assert found[name].GetPosition() == pytest.approx(original_position)
+        assert positions[name][1] == pytest.approx(original_position[1])
+    thumb._assert_supplier_dimensions(state.adapter, positions, expected)
+
+
+@pytest.mark.parametrize("anchor_phase", ("toggle", "first-offset-position"))
+def test_thumb_native_offset_transition_reproduces_012dd_without_anchor_preparation(
+    native_thumb, anchor_phase
+):
+    state = native_thumb
+    state.offset_anchor_phase = anchor_phase
+    thumb.supplier_dimensions(state.adapter, {"*Front": state.view})
+    for name in ("SupplierHeadHeight", "SupplierCollarHeight"):
+        display = thumb._supplier_displays(state.adapter)[name]
+        display.OffsetText = False
+        before = thumb._supplier_annotation_record(state.adapter, display)
+        prior = thumb._short_native_geometry(before)
+        old_anchor = display.GetPosition()
+        display.OffsetText = True
+        assert display.SetPosition2(*old_anchor) is True
+        after = thumb._short_native_geometry(
+            thumb._supplier_annotation_record(state.adapter, display)
+        )
+        assert after["tips"][0][1] == pytest.approx(old_anchor[1])
+        assert after["tips"][0][1] - prior["tips"][0][1] == pytest.approx(
+            state.text_line_offsets[name]
+        )
+        assert [tip[0] for tip in after["tips"]] == pytest.approx(
+            [tip[0] for tip in prior["tips"]]
+        )
+        expected = {
+            other: {
+                **thumb._short_native_geometry(
+                    thumb._supplier_annotation_record(state.adapter, current)
+                ),
+                "native_before": thumb._short_native_snapshot(
+                    state.adapter,
+                    current,
+                    thumb._supplier_annotation_record(state.adapter, current),
+                ),
+                "shelved": current.OffsetText,
+            }
+            for other, current in thumb._supplier_displays(state.adapter).items()
+            if other in thumb._AXIAL_NAMES
+        }
+        expected[name] = {**prior, "native_before": {"native": before}, "shelved": True}
+        with pytest.raises(RuntimeError, match="witness/arrow station moved"):
+            thumb._read_settled_short_geometry(
+                state.adapter,
+                thumb._supplier_displays(state.adapter),
+                expected,
+                phase="legacy_unprepared_offset_transition",
+            )
+
+
+def test_thumb_station_guard_still_refuses_line_motion_during_later_text_move(
+    native_thumb,
+):
+    state = native_thumb
+    state.defect = "shelf-line-drift"
+    with pytest.raises(RuntimeError, match="phase=after_text_shelves; key=tips"):
+        thumb.supplier_dimensions(state.adapter, {"*Front": state.view})
+    after_mode = next(
+        event
+        for event in state.native_transitions
+        if event["phase"] == "after_offset_text_mode"
+    )
+    assert not any(
+        change["changed"]
+        for dimension in after_mode["dimensions"].values()
+        for change in dimension["comparison"].values()
+    )
+    after_shelf = next(
+        event
+        for event in state.native_transitions
+        if event["phase"] == "after_text_shelves"
+    )
+    head = after_shelf["dimensions"]["SupplierHeadHeight"]["comparison"]
+    assert head["tips"]["changed"] is True
+    assert head["tips"]["max_distance_m"] == pytest.approx(0.0001)
+
+
+def test_thumb_draw_only_connector_and_underline_do_not_change_physical_reach(
+    native_thumb,
+):
+    state = native_thumb
+    _positions, expected = thumb.supplier_dimensions(
+        state.adapter, {"*Front": state.view}
+    )
+    found = thumb._supplier_displays(state.adapter)
+    for name in ("SupplierHeadHeight", "SupplierCollarHeight"):
+        record = thumb._supplier_annotation_record(state.adapter, found[name])
+        assert "leaders" not in record
+        actual = thumb._short_native_geometry(record)
+        assert actual["left"] == pytest.approx(expected[name]["left"])
+        points = found[name].offset_path_points()
+        assert min(point[0] for point in points) < actual["left"] - 0.002
+
+
+def test_thumb_merged_tip_to_text_native_run_is_refused_not_filtered_out(native_thumb):
+    state = native_thumb
+    state.defect = "merged-offset-tail"
+    with pytest.raises(RuntimeError, match="supplier axial text crowds"):
+        thumb.supplier_dimensions(state.adapter, {"*Front": state.view})
+
+
+def test_thumb_native_audit_refuses_draw_only_path_through_own_text(native_thumb):
+    state = native_thumb
+    thumb.supplier_dimensions(state.adapter, {"*Front": state.view})
+    found = thumb._supplier_displays(state.adapter)
+    records = {
+        name: thumb._supplier_annotation_record(state.adapter, display)
+        for name, display in found.items()
+    }
+    head = found["SupplierHeadHeight"]
+    geometry = thumb.annotation_geometry(
+        records["SupplierHeadHeight"],
+        owner=state.view.GetName2(),
+        advance=thumb.calibrate_sheet_advance(records.values()),
+    )
+    assert geometry is not None and geometry.text_boxes
+    state.native_path_overrides["SupplierHeadHeight"] = (
+        head.offset_path_points()[0],
+        geometry.text_boxes[0].center(),
+    )
+    with pytest.raises(RuntimeError, match="extension-through-own-text"):
+        thumb._assert_supplier_paths(state.adapter, found)

@@ -11,7 +11,9 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_disc_spring_drawing import (
-    prepare_supplier_disc_diagram, supplier_disc_spring_dimensions,
+    prepare_supplier_disc_diagram,
+    supplier_disc_reference_features,
+    supplier_disc_spring_dimensions,
 )
 from _supplier_spring_drawing import build_supplier_spring_drawing
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
@@ -29,6 +31,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SPEC, item=ITEM,
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
         prepare_views=partial(prepare_supplier_disc_diagram, spec=supplier_spec),
+        supplier_reference_features=supplier_disc_reference_features(supplier_spec),
         stock_caption="SUPPLIER NOMINAL DIMENSION DIAGRAM — NOT PART SHAPE",
         supplier_margins={
             "free_front": (0.035, 0.0, 0.035, 0.0),
