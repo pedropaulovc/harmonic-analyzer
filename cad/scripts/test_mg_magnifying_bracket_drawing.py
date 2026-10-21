@@ -1146,6 +1146,57 @@ def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypat
         assert any("GetCThreadQuality=True" in message for message in messages)
 
 
+@pytest.mark.parametrize("case", ("flat", "roundoff", "gap", "y_chain"))
+def test_thread_flank_union_is_order_independent_and_does_not_bridge(monkeypatch, case):
+    import ast
+    from itertools import permutations
+
+    if case == "gap":
+        intervals = ((0.300, 0.3075), (0.3075, 0.315), (0.3225, 0.330), (0.330, 0.3375))
+    else:
+        count = 5 if case == "y_chain" else 4
+        endpoints = [0.300 + 0.0375 * index / count for index in range(count + 1)]
+        intervals = tuple(zip(endpoints, endpoints[1:]))
+    step = {"flat": 0.0, "roundoff": 1e-12, "gap": 1e-12, "y_chain": 6e-8}[case]
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
+    monkeypatch.setattr(drawing, "_mouth_profile_box", lambda *_a: (0.300, 0.170, 0.3375, 0.203))
+    for name in ("set_hidden_lines_removed", "rebuild_drawing"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+
+    for order in permutations(range(len(intervals))):
+        messages.clear()
+        # Actual counterexample: touching quarter spans in X, but each next
+        # segment's Y decreases by 1e-12. Raw-Y sorting reverses their X order.
+        lines = [
+            _native_line(intervals[index][0], base_y - index * step,
+                         intervals[index][1], base_y - index * step)
+            for index in order for base_y in (0.176, 0.197)
+        ]
+        data = SimpleNamespace(
+            GetLineCount=lambda: len(lines), GetLineAtIndex2=lambda i: lines[i],
+            GetPolyLineCount=lambda: 0, GetArcCount=lambda: 0,
+        )
+        annotation = SimpleNamespace(Visible=1, IsDangling=lambda: False, GetDisplayData=lambda: None)
+        thread = SimpleNamespace(GetAnnotation=lambda: annotation, GetDisplayData=lambda: data)
+        section = SimpleNamespace(GetCThreads=lambda: (thread,), GetDisplayMode2=lambda: 2, GetCThreadQuality=lambda: True)
+        if case in ("gap", "y_chain"):
+            # The gap leaves two 15-mm islands; the Y chain's adjacent offsets
+            # fit the tolerance but its complete spread does not. Neither may
+            # become a full-width flank through interval or tolerance chaining.
+            with pytest.raises(RuntimeError, match="both longitudinal flanks"):
+                drawing._show_mouth_thread(object(), section)
+        else:
+            drawing._show_mouth_thread(object(), section)
+            runs = ast.literal_eval(next(message.split("longitudinal_runs=", 1)[1]
+                                         for message in messages if "longitudinal_runs=" in message))
+            assert len(runs) == 2
+            for _y, xmin, xmax in runs:
+                assert (xmin, xmax) == pytest.approx((0.300, 0.3375), abs=1e-12)
+
+
 @pytest.mark.parametrize("tapped", (False, True))
 @pytest.mark.parametrize("fault", (None, "missing_diameter", "ignored_write"))
 def test_native_process_rows_preserve_all_hole_variables_and_mate(monkeypatch, tapped, fault):
