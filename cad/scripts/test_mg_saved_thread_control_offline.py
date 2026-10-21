@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from contextlib import ExitStack, contextmanager
+import hashlib
 import importlib.abc
 import importlib.util
 import json
@@ -121,29 +122,49 @@ class Telemetry:
 
 
 class Sheet:
+    def __init__(self, name):
+        self.name = name
+
     def GetName(self):
-        return "Lever Geometry"
+        return self.name
 
 
 class SectionLabel:
+    def __init__(self, label):
+        self.label = label
+
     def GetLabel(self):
-        return "H"
+        return self.label
 
 
 class View:
-    def __init__(self, part, *, sheet=False, base=False):
+    def __init__(self, part, sheet_name, section_label, *, sheet=False, base=False):
         self.part, self.sheet, self.base = part, sheet, base
-        self.Name = "Lever Geometry" if sheet else "Section View H-H"
+        self.sheet_name, self.section_label = sheet_name, section_label
+        self.Name = sheet_name if sheet else f"Section View {section_label}-{section_label}"
 
     def GetSection(self):
-        return None if self.sheet or self.base else SectionLabel()
+        return None if self.sheet or self.base else SectionLabel(self.section_label)
 
     def GetBaseView(self):
-        return View(self.part, base=True)
+        return View(self.part, self.sheet_name, self.section_label, base=True)
 
     @property
     def ReferencedDocument(self):
         return self.part
+
+
+class SketchManager:
+    def __init__(self, document):
+        self.document = document
+
+    @property
+    def ActiveSketch(self):
+        doc = self.document
+        doc.app.events.append(("ActiveSketch", doc.kind, doc.active_sketch))
+        if isinstance(doc.active_sketch, BaseException):
+            trip(doc.active_sketch)
+        return doc.active_sketch
 
 
 class Document:
@@ -154,6 +175,16 @@ class Document:
         self.part = None
         self.app = None
         self.native_identity = object()
+        self.sheet_name = "Lever Geometry" if "sm-summing-lever" in self.path else "Sheet1"
+        self.section_label = "H" if self.sheet_name == "Lever Geometry" else "A"
+        self.active_sketch = None
+        self.sketch_manager_error = None
+
+    @property
+    def SketchManager(self):
+        if self.sketch_manager_error is not None:
+            trip(self.sketch_manager_error)
+        return SketchManager(self)
 
     def GetPathName(self):
         return self.path
@@ -175,21 +206,22 @@ class Document:
         return self.readonly
 
     def GetSheetNames(self):
-        return ("Lever Geometry",)
+        return (self.sheet_name,)
 
     def GetViews(self):
-        return ((View(self.part, sheet=True), View(self.part)),)
+        return ((View(self.part, self.sheet_name, self.section_label, sheet=True),
+                 View(self.part, self.sheet_name, self.section_label)),)
 
     def Sheet(self, name):
-        if name != "Lever Geometry":
+        if name != self.sheet_name:
             raise AssertionError("unexpected sheet")
-        return Sheet()
+        return Sheet(name)
 
     def ActivateSheet(self, name):
-        return name == "Lever Geometry"
+        return name == self.sheet_name
 
     def GetCurrentSheet(self):
-        return Sheet()
+        return Sheet(self.sheet_name)
 
     def GetNext(self):
         return self.app.next_document(self)
@@ -214,6 +246,9 @@ class Application:
         self.events = []
         self.auto_unload_part = False
         self.control_after_first_close = True
+        self.after_open = lambda _doc: None
+        self.before_open = lambda _path, _kind: None
+        self.close_error = None
 
     def __setattr__(self, name, value):
         if name in ("UserControl", "Visible", "UserControlBackground"):
@@ -260,13 +295,19 @@ class Application:
 
     def OpenDoc6(self, path, kind, options, configuration, errors, warnings):
         self.open_calls.append((path, kind, options, configuration, errors, warnings))
+        self.before_open(path, kind)
+        if kind == 1 and self.documents:
+            raise AssertionError("next pair opened before native emptiness")
+        self.events.append(("OpenDoc6", Path(path).name))
         if (options, configuration, errors, warnings) != (3, "", 0, 0):
             raise AssertionError("readonly/silent open contract changed")
         doc = Document(path, kind, readonly=self.readonly[kind])
+        doc.app = self
         if kind == 3:
             doc.part = next(item for item in self.documents if item.kind == 1)
         self.documents.append(doc)
         self.active = doc
+        self.after_open(doc)
         return doc, 0, 0
 
     def ActivateDoc3(self, path, preferences, option, errors):
@@ -279,8 +320,11 @@ class Application:
         self.close_calls.append(title)  # An unsafe ATTEMPT must fail the harness too.
         if not self.events or self.events[-1] != "UserControl" or self.control is not True:
             raise AssertionError("UserControl must be the final native close witness")
-        if any(Path(doc.path).stem != "sm-summing-lever" or doc.dirty is not False for doc in self.documents):
+        if any(Path(doc.path).stem not in ("sm-summing-lever", "mg-magnifying-bracket", "mg-magnifying-bracket-native-thread")
+               or doc.dirty is not False for doc in self.documents):
             raise AssertionError("CloseDoc could touch a foreign/dirty document")
+        if self.close_error is not None:
+            trip(self.close_error)
         self.events.append("CloseDoc")
         target = next(doc for doc in self.documents if doc.GetTitle() == title)
         self.documents.remove(target)
@@ -350,6 +394,47 @@ class Environment:
         self.diagnostic_calls = 0
         self.after_diagnostic = lambda: None
         self.guard = NoNativeImports()
+        self.blob_calls = []
+        self.blob_payload = b"offline captured drawing fixture"
+        self.blob_error = None
+        self.blob_close_error = None
+        self.before_diagnostic = lambda: None
+        self.diagnostic_result = lambda feature: {"feature": feature, "reads": {"fake_boundary": True}, "errors": {}}
+        self.identity_override = None
+
+    def credential(self):
+        self.blob_calls.append("ManagedIdentityCredential")
+        return module("fake_credential", close=lambda: self.blob_calls.append("credential.close"))
+
+    def container(self, account_url, container, *, credential):
+        self.blob_calls.append(("ContainerClient", account_url, container))
+
+        def get_blob_client(blob):
+            self.blob_calls.append(("get_blob_client", blob))
+
+            def readall():
+                self.blob_calls.append("readall")
+                if self.blob_error is not None:
+                    trip(self.blob_error)
+                return self.blob_payload
+
+            def download_blob():
+                self.blob_calls.append("download_blob")
+                return module("fake_download", readall=readall)
+
+            return module("fake_blob", download_blob=download_blob)
+
+        def close():
+            self.blob_calls.append("container.close")
+            if self.blob_close_error is not None:
+                trip(self.blob_close_error)
+
+        return module("fake_container", get_blob_client=get_blob_client, close=close)
+
+    def restore_path(self, path):
+        if path.resolve() != path or not path.is_relative_to(self.driver.ROOT / "cad/out"):
+            raise AssertionError("uncertified output path")
+        return path
 
     def stop(self):
         self.watchdog_events.append("stop")
@@ -357,15 +442,20 @@ class Environment:
             trip(self.watchdog_stop_error)
 
     def restore(self, key, outputs, label):
+        if self.app.documents:
+            raise AssertionError("restore attempted before native emptiness")
         self.cache_calls.append((key, outputs, label))
         return True
 
     def diagnostic(self, _adapter, _section, *, feature_name):
-        if feature_name != "BracketMountingTaps":
-            raise AssertionError("wrong diagnostic feature")
+        expected = "BracketMountingTaps" if self.diagnostic_calls == 0 else "LeverTap"
+        if feature_name != expected:
+            raise AssertionError("wrong diagnostic feature/order")
         self.diagnostic_calls += 1
+        self.app.events.append(("diagnostic", feature_name))
+        self.before_diagnostic()
         self.after_diagnostic()
-        return {"reads": {"fake_boundary": True}, "errors": {}}
+        return self.diagnostic_result(feature_name)
 
     @contextmanager
     def installed(self):
@@ -388,7 +478,11 @@ class Environment:
                 "_com": module("_com", _early_bound=lambda value, _kind: value),
                 "_telemetry": self.telemetry,
                 "_watchdog": module("_watchdog", start=lambda: self.watchdog_events.append("start"), stop=self.stop),
-                "_artifact_cache": module("_artifact_cache", restore=self.restore),
+                "_artifact_cache": module("_artifact_cache", restore=self.restore, _restore_path=self.restore_path),
+                "azure": module("azure", __path__=[]),
+                "azure.identity": module("azure.identity", ManagedIdentityCredential=self.credential),
+                "azure.storage": module("azure.storage", __path__=[]),
+                "azure.storage.blob": module("azure.storage.blob", ContainerClient=self.container),
                 "draw_mg_magnifying_bracket": module("draw_mg_magnifying_bracket", _mouth_thread_diagnostic=self.diagnostic),
                 "solidworks_mcp": module("solidworks_mcp", __path__=[]),
                 "solidworks_mcp.adapters": module("solidworks_mcp.adapters", __path__=[]),
@@ -416,13 +510,26 @@ class Environment:
             driver.ROOT = root
             driver.REPORT = root / "cad/out/reports/diagnostics/mg-saved-thread-control.json"
             driver.CONTRACT_PATH = root / "contract.json"
-            driver.CONTRACT_PATH.write_text(json.dumps(driver.CONTROL), encoding="utf-8")
+            # Synthetic bytes are explicitly pinned for the fake provider;
+            # production constants/committed contract are checked separately.
+            driver.B0["drawing"].update(
+                bytes=len(b"offline captured drawing fixture"),
+                sha256=hashlib.sha256(b"offline captured drawing fixture").hexdigest(),
+            )
+            driver.CONTRACT_PATH.write_text(json.dumps(driver.CONTRACT), encoding="utf-8")
             original_identity = driver.file_identity
 
             def identity(path):
-                for kind in ("part", "drawing"):
-                    if Path(path) == root / driver.CONTROL[kind]["path"]:
-                        return {key: driver.CONTROL[kind][key] for key in ("bytes", "sha256")}
+                if self.identity_override is not None:
+                    value = self.identity_override(path)
+                    if value is not DEFAULT:
+                        return value
+                for case in driver.CONTRACT["cases"]:
+                    for kind in ("part", "drawing"):
+                        if Path(path) == root / case[kind]["path"]:
+                            if case["case"] == "b0" and kind == "drawing":
+                                return original_identity(path)
+                            return {key: case[kind][key] for key in ("bytes", "sha256")}
                 return original_identity(path)
 
             original_open, original_mkdir = Path.open, Path.mkdir
@@ -577,8 +684,8 @@ class OwnedControlSmoke(unittest.TestCase):
         with Environment().installed() as env:
             code, report, captures = env.run_driver()
             self.assertEqual(code, 0)
-            self.assertEqual(report["isolation_gate"], "accepted")
-            initial = report["inventories"]["initial"]
+            self.assertEqual(report["cases"][0]["isolation_gate"], "accepted")
+            initial = report["cases"][0]["inventories"]["initial"]
             self.assertEqual(initial["method"], "GetFirstDocument/GetNext")
             self.assertEqual(initial["native_count_before"], 0)
             self.assertEqual(initial["native_count_after"], 0)
@@ -596,12 +703,12 @@ class OwnedControlSmoke(unittest.TestCase):
             env.app.documents.append(foreign)
             code, report, _ = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertEqual(report["isolation_gate"], "refused")
+            self.assertEqual(report["cases"][0]["isolation_gate"], "refused")
             self.assertEqual(env.cache_calls, [])
             self.assertEqual(env.app.close_calls, [])
             self.assertEqual(env.app.documents, [foreign])
             self.assertIsNone(env.app.active)
-            initial = report["inventories"]["initial"]
+            initial = report["cases"][0]["inventories"]["initial"]
             self.assertEqual(initial["native_count_before"], 1)
             self.assertEqual(initial["native_count_after"], 1)
             self.assertEqual(initial["visited_count"], 1)
@@ -615,7 +722,7 @@ class OwnedControlSmoke(unittest.TestCase):
                 env.app.control = value
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertEqual(report["isolation_gate"], "refused")
+                self.assertEqual(report["cases"][0]["isolation_gate"], "refused")
                 self.assertEqual(env.cache_calls, [])
                 self.assertEqual(env.app.close_calls, [])
                 self.assertEqual(len(captures), 1)
@@ -625,7 +732,7 @@ class OwnedControlSmoke(unittest.TestCase):
             env.app.count_override = True
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertEqual(report["isolation_gate"], "refused")
+            self.assertEqual(report["cases"][0]["isolation_gate"], "refused")
             self.assertEqual(env.cache_calls, [])
             self.assertEqual(env.app.close_calls, [])
             self.assertEqual(len(captures), 1)
@@ -636,8 +743,9 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(report["status"], "observed")
             self.assertEqual(report["native_ship"], "NOT_EVALUATED")
-            self.assertEqual([row[1] for row in env.app.open_calls], [1, 3])
-            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT"])
+            self.assertEqual([row[1] for row in env.app.open_calls], [1, 3, 1, 3])
+            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT",
+                                                 "mg-magnifying-bracket-native-thread.SLDDRW", "mg-magnifying-bracket.SLDPRT"])
             self.assertEqual(env.app.documents, [])
             self.assertEqual(captures, [])
 
@@ -646,15 +754,15 @@ class OwnedControlSmoke(unittest.TestCase):
             env.app.auto_unload_part = True
             code, report, _ = env.run_driver()
             self.assertEqual(code, 0)
-            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW"])
-            self.assertEqual(report["closures"][1]["status"], "already_unloaded")
-            two_owned = report["inventories"]["after_open_drawing"]
+            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "mg-magnifying-bracket-native-thread.SLDDRW"])
+            self.assertEqual(report["cases"][0]["closures"][1]["status"], "already_unloaded")
+            two_owned = report["cases"][0]["inventories"]["after_open_drawing"]
             self.assertEqual(two_owned["native_count_before"], 2)
             self.assertEqual(two_owned["native_count_after"], 2)
             self.assertEqual(two_owned["visited_count"], 2)
             self.assertIs(two_owned["cursor_terminated"], True)
             self.assertIs(two_owned["enumerated"], True)
-            unloaded = report["inventories"]["before_close_1"]
+            unloaded = report["cases"][0]["inventories"]["before_close_1"]
             self.assertEqual(unloaded["native_count_before"], 0)
             self.assertEqual(unloaded["native_count_after"], 0)
             self.assertEqual(unloaded["visited_count"], 0)
@@ -670,7 +778,7 @@ class OwnedControlSmoke(unittest.TestCase):
                     code, report, captures = env.run_driver()
                     self.assertEqual(code, 1)
                     self.assertEqual(env.diagnostic_calls, 0)
-                    self.assertFalse(report["collection_completed"])
+                    self.assertFalse(report["cases"][0]["collection_completed"])
                     self.assertEqual(len(captures), 1)
 
     def test_unowned_new_document_blocks_every_close(self):
@@ -679,11 +787,11 @@ class OwnedControlSmoke(unittest.TestCase):
             env.after_diagnostic = lambda: env.app.documents.append(foreign)
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertTrue(report["collection_completed"])
+            self.assertTrue(report["cases"][0]["collection_completed"])
             self.assertEqual(env.app.close_calls, [])
             self.assertIn(foreign, env.app.documents)
             self.assertEqual(len(captures), 1)
-            self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+            self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
 
     def test_cleanup_only_saveflag_failure_keeps_actual_traceback_and_exports(self):
         with Environment().installed() as env:
@@ -691,15 +799,15 @@ class OwnedControlSmoke(unittest.TestCase):
             env.after_diagnostic = lambda: setattr(env.app.documents[0], "dirty", primary)
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertEqual(report["runner_exit_code"], 0)
-            self.assertTrue(report["collection_completed"])
+            self.assertEqual(report["runner_exit_code"], 1)
+            self.assertTrue(report["cases"][0]["collection_completed"])
             self.assertEqual(env.app.close_calls, [])
             self.assertEqual(len(captures), 1)
             capture = captures[0]
             self.assertEqual(capture["primary_failure"]["type"], "BrokenText")
             self.assertEqual(capture["primary_failure"]["message"], "<exception text unavailable>")
             self.assertTrue(any(frame["function"] == "GetSaveFlag" for frame in capture["primary_traceback"]["frames"]))
-            self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["closures"]))
+            self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["cases"][0]["closures"]))
 
     def test_interrupt_is_retained_before_secondary_cleanup_failure(self):
         for exception_type in (SystemExit, KeyboardInterrupt):
@@ -722,7 +830,7 @@ class OwnedControlSmoke(unittest.TestCase):
                 self.assertEqual(capture["primary_failure"]["message"], "original interrupt")
                 self.assertTrue(any(frame["function"] == "interrupt_diagnostic" for frame in capture["primary_traceback"]["frames"]))
                 self.assertTrue(any(row["type"] == "ProbeError" for row in capture["errors"]))
-                self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["closures"]))
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["cases"][0]["closures"]))
 
     def test_dirty_or_unknown_saveflag_never_closes(self):
         for value in (True, None, 0):
@@ -740,7 +848,7 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW"])
             self.assertEqual(len(env.app.documents), 1)
-            self.assertEqual(captures[0]["closures"][1]["status"], "stranded_owned")
+            self.assertEqual(captures[0]["cases"][0]["closures"][1]["status"], "stranded_owned")
 
     def test_unsupported_identity_cannot_authorize_close(self):
         with Environment().installed() as env:
@@ -748,7 +856,7 @@ class OwnedControlSmoke(unittest.TestCase):
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
             self.assertEqual(env.app.close_calls, [])
-            self.assertTrue(any(row.get("raw") == -1 for row in report["identity_comparisons"]))
+            self.assertTrue(any(row.get("raw") == -1 for row in report["cases"][0]["identity_comparisons"]))
             self.assertEqual(len(captures), 1)
 
     def test_initial_cursor_rejects_invalid_count_before_and_after(self):
@@ -758,9 +866,9 @@ class OwnedControlSmoke(unittest.TestCase):
                     env.app.count_results = [value, 0] if phase == "before" else [0, value]
                     code, report, captures = env.run_driver()
                     self.assertEqual(code, 1)
-                    self.assertEqual(report["isolation_gate"], "refused")
-                    self.assertFalse(report["inventories"]["initial"]["enumerated"])
-                    self.assertEqual(report["inventories"]["initial"]["first_document_state"], "NULL")
+                    self.assertEqual(report["cases"][0]["isolation_gate"], "refused")
+                    self.assertFalse(report["cases"][0]["inventories"]["initial"]["enumerated"])
+                    self.assertEqual(report["cases"][0]["inventories"]["initial"]["first_document_state"], "NULL")
                     self.assertEqual(len(env.app.count_values), 2)
                     self.assertTrue(any(row["operation"] == f"initial.GetDocumentCount.{phase}" for row in report["errors"]))
                     self.assertEqual(env.cache_calls, [])
@@ -788,8 +896,8 @@ class OwnedControlSmoke(unittest.TestCase):
                 initial_documents = list(env.app.documents)
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertEqual(report["isolation_gate"], "refused")
-                self.assertFalse(report["inventories"]["initial"]["enumerated"])
+                self.assertEqual(report["cases"][0]["isolation_gate"], "refused")
+                self.assertFalse(report["cases"][0]["inventories"]["initial"]["enumerated"])
                 self.assertTrue(any(row["operation"] == "initial.cursor.cardinality" for row in report["errors"]))
                 self.assertEqual(len(env.app.count_values), 2)
                 self.assertEqual(env.app.documents, initial_documents)
@@ -812,10 +920,10 @@ class OwnedControlSmoke(unittest.TestCase):
                     second.native_identity = first.native_identity
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertFalse(report["inventories"]["initial"]["enumerated"])
-                self.assertFalse(report["inventories"]["initial"]["cursor_terminated"])
+                self.assertFalse(report["cases"][0]["inventories"]["initial"]["enumerated"])
+                self.assertFalse(report["cases"][0]["inventories"]["initial"]["cursor_terminated"])
                 self.assertTrue(any(row["message"] == "duplicate/cyclic native document cursor" for row in report["errors"]))
-                self.assertLessEqual(report["inventories"]["initial"]["visited_count"], 3)
+                self.assertLessEqual(report["cases"][0]["inventories"]["initial"]["visited_count"], 3)
                 self.assertEqual(len(env.app.count_values), 2)
                 self.assertEqual(env.app.documents, [first, second])
                 self.assertEqual(env.cache_calls, [])
@@ -835,8 +943,8 @@ class OwnedControlSmoke(unittest.TestCase):
                     env.app.next_overrides[foreign] = primary
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertFalse(report["inventories"]["initial"]["enumerated"])
-                self.assertFalse(report["inventories"]["initial"]["cursor_terminated"])
+                self.assertFalse(report["cases"][0]["inventories"]["initial"]["enumerated"])
+                self.assertFalse(report["cases"][0]["inventories"]["initial"]["cursor_terminated"])
                 self.assertEqual(len(env.app.count_values), 2)
                 self.assertEqual(report["primary_failure"]["type"], "ProbeError")
                 self.assertTrue(report["primary_failure"]["operation"].endswith(member))
@@ -851,22 +959,22 @@ class OwnedControlSmoke(unittest.TestCase):
                 env.after_diagnostic = lambda: setattr(env.app, "identity_override", lambda _left, _right: result)
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertTrue(report["collection_completed"])
-                self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
+                self.assertTrue(report["cases"][0]["collection_completed"])
+                self.assertFalse(report["cases"][0]["inventories"]["before_close_0"]["enumerated"])
                 self.assertEqual(env.app.close_calls, [])
                 self.assertEqual(len(env.app.documents), 2)
-                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
         with Environment().installed() as env:
             env.after_diagnostic = lambda: setattr(
                 env.app, "identity_override", lambda left, right: 1 if left is right else -1
             )
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertTrue(report["collection_completed"])
-            self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
-            self.assertTrue(any(row.get("raw") == -1 and ".identity.previous[" in row["operation"] for row in report["identity_comparisons"]))
+            self.assertTrue(report["cases"][0]["collection_completed"])
+            self.assertFalse(report["cases"][0]["inventories"]["before_close_0"]["enumerated"])
+            self.assertTrue(any(row.get("raw") == -1 and ".identity.previous[" in row["operation"] for row in report["cases"][0]["identity_comparisons"]))
             self.assertEqual(env.app.close_calls, [])
-            self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+            self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
 
     def test_cleanup_cursor_drift_cardinality_cycles_and_duplicates_never_close(self):
         for shape in ("drift", "cardinality", "cycle", "duplicate_wrapper"):
@@ -887,10 +995,10 @@ class OwnedControlSmoke(unittest.TestCase):
                 env.after_diagnostic = change_inventory
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertTrue(report["collection_completed"])
-                self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
+                self.assertTrue(report["cases"][0]["collection_completed"])
+                self.assertFalse(report["cases"][0]["inventories"]["before_close_0"]["enumerated"])
                 self.assertEqual(env.app.close_calls, [])
-                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
 
     def test_cleanup_cursor_readers_preserve_error_and_independent_after_count(self):
         for member in ("GetFirstDocument", "GetNext", "count_before", "count_after",
@@ -913,9 +1021,9 @@ class OwnedControlSmoke(unittest.TestCase):
                 env.after_diagnostic = fail_reader
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertEqual(report["runner_exit_code"], 0)
-                self.assertTrue(report["collection_completed"])
-                initial_cleanup = report["inventories"]["before_close_0"]
+                self.assertEqual(report["runner_exit_code"], 1)
+                self.assertTrue(report["cases"][0]["collection_completed"])
+                initial_cleanup = report["cases"][0]["inventories"]["before_close_0"]
                 self.assertFalse(initial_cleanup["enumerated"])
                 if member != "count_after":
                     self.assertEqual(initial_cleanup["native_count_after"], 2)
@@ -924,11 +1032,271 @@ class OwnedControlSmoke(unittest.TestCase):
                 self.assertTrue(captures[0]["primary_traceback"]["available"])
                 self.assertEqual(env.app.close_calls, [])
                 self.assertEqual(len(env.app.documents), 2)
-                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
                 if member == "GetPathName":
                     self.assertEqual(initial_cleanup["documents"][0]["title"], "sm-summing-lever.SLDPRT")
                     self.assertIs(initial_cleanup["documents"][0]["dirty"], False)
                     self.assertEqual(len(initial_cleanup["documents"]), 2)
+
+    def test_committed_two_case_contract_matches_actual_driver(self):
+        with Environment().installed() as env:
+            contract = json.loads(DRIVER_PATH.with_suffix(".json").read_text(encoding="utf-8"))
+            self.assertEqual(contract, env.driver.CONTRACT)
+            self.assertEqual(contract["schema"], 2)
+            self.assertEqual([case["case"] for case in contract["cases"]], ["sm_positive", "b0"])
+            self.assertFalse(hasattr(env.driver, "CONTROL"))
+            self.assertEqual(contract["cases"][1]["drawing"]["bytes"], 177427)
+            self.assertEqual(contract["cases"][1]["part"]["bytes"], 114126)
+
+    def test_two_pairs_have_independent_evidence_in_one_attached_callback(self):
+        with Environment().installed() as env:
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 0)
+            self.assertTrue(report["collection_completed"])
+            self.assertEqual(report["cases"][0]["session_python_handles"], report["cases"][1]["session_python_handles"])
+            self.assertEqual(report["cases"][0]["session_python_handles"]["adapter"], id(env.adapter))
+            self.assertEqual(env.diagnostic_calls, 2)
+            self.assertEqual(env.adapter.disconnect_calls, 1)
+            self.assertEqual(env.telemetry.events.count("sw.attach.enter"), 1)
+            self.assertEqual([row[0] for row in env.cache_calls], [
+                env.driver.SM_POSITIVE["drawing"]["key"], env.driver.SM_POSITIVE["part"]["key"],
+                env.driver.B0["part"]["key"],
+            ])
+            self.assertEqual(env.blob_calls, [
+                "ManagedIdentityCredential",
+                ("ContainerClient", "https://stswboot5qnlwu2vtr6gs.blob.core.windows.net", "results"),
+                ("get_blob_client", env.driver.B0["drawing"]["blob"]),
+                "download_blob", "readall", "container.close", "credential.close",
+            ])
+            for index, feature in enumerate(("BracketMountingTaps", "LeverTap")):
+                case = report["cases"][index]
+                self.assertEqual(case["status"], "observed")
+                self.assertTrue(case["collection_completed"])
+                self.assertEqual(case["diagnostic"]["feature"], feature)
+                self.assertEqual(case["errors"], [])
+                self.assertEqual(len(case["opens"]), 2)
+                self.assertEqual(len(case["closures"]), 2)
+                self.assertTrue(case["reads"]["base.reference_IsSame_opened_part"])
+                for phase in ("initial", "final"):
+                    self.assertTrue(case["inventories"][phase]["enumerated"])
+                    self.assertEqual(case["inventories"][phase]["native_count_before"], 0)
+                    self.assertEqual(case["inventories"][phase]["native_count_after"], 0)
+                    self.assertEqual(case["inventories"][phase]["documents"], [])
+                for kind in ("drawing", "part"):
+                    self.assertEqual(case["reads"][f"staged.{kind}"], case["reads"][f"final.{kind}"])
+                self.assertTrue(case["reads"]["final.currentModel_identity_restored"])
+                self.assertTrue(case["reads"]["final.active_identity_restored"])
+            self.assertEqual(report["cases"][1]["reads"]["sheet_names"], ["Sheet1"])
+            self.assertEqual(report["cases"][1]["views"][1]["section_label"], "A")
+            self.assertEqual(captures, [])
+
+    def test_active_sketch_reads_enclose_entire_diagnostic_for_both_documents(self):
+        with Environment().installed() as env:
+            def during_diagnostic():
+                for doc in env.app.documents:
+                    doc.active_sketch = object()
+
+            env.after_diagnostic = during_diagnostic
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            for case in report["cases"]:
+                for name in ("source", "drawing"):
+                    before = case["active_sketch"]["before_diagnostic_including_generation"][name]
+                    after = case["active_sketch"]["after_diagnostic_including_generation"][name]
+                    self.assertEqual(before, {"state": "NULL", "errors": []})
+                    self.assertEqual(after, {"state": "PRESENT", "errors": []})
+            events = [event for event in env.app.events if isinstance(event, tuple)
+                      and event[0] in ("ActiveSketch", "diagnostic")]
+            self.assertEqual([event[0] for event in events],
+                             ["ActiveSketch", "ActiveSketch", "diagnostic", "ActiveSketch", "ActiveSketch"] * 2)
+            self.assertEqual([event[1] for event in events if event[0] == "ActiveSketch"], [1, 3, 1, 3] * 2)
+
+    def test_b0_sketch_read_failures_are_independent_unavailable_not_null(self):
+        with Environment().installed() as env:
+            primary = BrokenText()
+
+            def prepare(doc):
+                if "mg-magnifying-bracket" in doc.path:
+                    if doc.kind == 1:
+                        doc.sketch_manager_error = primary
+                    else:
+                        doc.active_sketch = object()
+
+            env.app.after_open = prepare
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertEqual(report["cases"][0]["errors"], [])
+            b0 = report["cases"][1]
+            self.assertTrue(b0["collection_completed"])
+            for phase in ("before_diagnostic_including_generation", "after_diagnostic_including_generation"):
+                source = b0["active_sketch"][phase]["source"]
+                self.assertEqual(source["state"], "UNAVAILABLE")
+                self.assertEqual(source["errors"][0]["type"], "BrokenText")
+                self.assertEqual(b0["active_sketch"][phase]["drawing"]["state"], "PRESENT")
+            self.assertEqual(env.app.documents, [])
+            self.assertEqual(captures[0]["primary_failure"]["case"], "b0")
+            body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+            self.assertIs(body_exit[2], primary)
+            self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
+
+    def test_wrong_reference_or_auto_loaded_document_never_gets_adopted(self):
+        for case_index in (0, 1):
+            for mode in ("wrong_path", "same_path_wrong_identity", "auto_loaded"):
+                with self.subTest(case=case_index, mode=mode), Environment().installed() as env:
+                    def change_reference(doc):
+                        if doc.kind != 3 or ("mg-magnifying-bracket" in doc.path) != bool(case_index):
+                            return
+                        foreign = Document(doc.part.path if mode == "same_path_wrong_identity"
+                                           else "C:/foreign/mg-magnifying-bracket.SLDPRT", 1)
+                        doc.part = foreign
+                        if mode == "auto_loaded":
+                            env.app.documents.append(foreign)
+
+                    env.app.after_open = change_reference
+                    code, report, _ = env.run_driver()
+                    self.assertEqual(code, 1)
+                    self.assertEqual(env.diagnostic_calls, case_index)
+                    failed = report["cases"][case_index]
+                    self.assertEqual(len(failed["owned_documents"]), 2)
+                    self.assertFalse(failed["collection_completed"])
+                    if mode == "auto_loaded":
+                        self.assertTrue(all(row["status"] == "stranded_owned" for row in failed["closures"]))
+                        self.assertEqual(len(env.app.documents), 3)
+                    else:
+                        self.assertEqual(env.app.documents, [])
+                    if case_index == 0:
+                        self.assertEqual(report["cases"][1]["status"], "not_started")
+                        self.assertEqual(env.blob_calls, [])
+
+    def test_sm_final_hash_failure_prevents_b0_staging(self):
+        with Environment().installed() as env:
+            def changed_identity(path):
+                if Path(path).name == "sm-summing-lever.SLDPRT" and env.diagnostic_calls:
+                    return {"bytes": 1, "sha256": "changed"}
+                return DEFAULT
+
+            env.identity_override = changed_identity
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertEqual(report["cases"][1]["status"], "not_started")
+            self.assertEqual(env.blob_calls, [])
+            self.assertEqual(len(env.cache_calls), 2)
+            self.assertEqual(env.app.documents, [])
+
+    def test_b0_download_errors_or_hash_mismatch_cannot_open_or_replace_source(self):
+        for mode in ("access_denied", "wrong_bytes"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                if mode == "access_denied":
+                    env.blob_error = BrokenText()
+                    env.blob_close_error = KeyboardInterrupt("secondary transport close")
+                else:
+                    env.blob_payload = b"wrong captured drawing"
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["cases"][0]["status"], "observed")
+                self.assertEqual(report["cases"][1]["opens"], [])
+                self.assertEqual(env.diagnostic_calls, 1)
+                self.assertEqual(len(env.cache_calls), 2)
+                self.assertEqual(env.app.documents, [])
+                self.assertEqual(captures[0]["primary_failure"]["case"], "b0")
+                self.assertEqual(captures[0]["primary_failure"]["operation"], "captured_blob.download")
+                self.assertIn("credential.close", env.blob_calls)
+                if mode == "access_denied":
+                    self.assertEqual(captures[0]["primary_failure"]["type"], "BrokenText")
+                    body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+                    self.assertIs(body_exit[2], env.blob_error)
+                    self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
+
+    def test_b0_final_disk_hash_change_is_reported_after_owned_cleanup(self):
+        with Environment().installed() as env:
+            def change_bytes():
+                if env.diagnostic_calls == 2:
+                    (env.driver.ROOT / env.driver.B0["drawing"]["path"]).write_bytes(b"changed on disk")
+
+            env.after_diagnostic = change_bytes
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 1)
+            sm, b0 = report["cases"]
+            self.assertEqual(sm["status"], "observed")
+            self.assertEqual(b0["status"], "failed")
+            self.assertNotEqual(b0["reads"]["staged.drawing"], b0["reads"]["final.drawing"])
+            self.assertEqual(env.app.documents, [])
+
+    def test_b0_dirty_and_readonly_failures_do_not_weaken_owned_close_gates(self):
+        for mode in ("dirty", "readonly"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def prepare(doc):
+                    if mode == "readonly" and "mg-magnifying-bracket" in doc.path:
+                        doc.readonly = False
+
+                def dirty_after():
+                    if mode == "dirty" and env.diagnostic_calls == 2:
+                        env.app.documents[0].dirty = True
+
+                env.app.after_open = prepare
+                env.after_diagnostic = dirty_after
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["cases"][0]["status"], "observed")
+                if mode == "dirty":
+                    self.assertEqual(len(env.app.documents), 2)
+                    self.assertTrue(all(row["status"] == "stranded_owned" for row in report["cases"][1]["closures"]))
+                else:
+                    self.assertEqual(env.diagnostic_calls, 1)
+                    self.assertEqual(env.app.documents, [])
+
+    def test_b0_original_baseexception_survives_cleanup_baseexception(self):
+        with Environment().installed() as env:
+            primary = KeyboardInterrupt("original B0 diagnostic")
+
+            def interrupt():
+                if env.diagnostic_calls == 2:
+                    env.app.close_error = SystemExit("secondary CloseDoc")
+                    trip(primary)
+
+            env.after_diagnostic = interrupt
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertEqual(report["cases"][0]["errors"], [])
+            self.assertEqual(captures[0]["primary_failure"]["type"], "KeyboardInterrupt")
+            self.assertEqual(captures[0]["primary_failure"]["case"], "b0")
+            self.assertEqual(len(env.app.documents), 2)
+            self.assertIn("after_diagnostic_including_generation", report["cases"][1]["active_sketch"])
+            body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+            self.assertIs(body_exit[2], primary)
+            self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
+
+    def test_b0_positive_ink_records_stop_without_claiming_flank_recovery(self):
+        with Environment().installed() as env:
+            key = "after_generation.thread[0].ICThread.lines.count"
+            env.diagnostic_result = lambda feature: {
+                "feature": feature,
+                "reads": {key: 1, "after_generation.thread[0].ICThread.lines[0]": [0, 1, 2]},
+                "errors": {},
+            }
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            b0 = report["cases"][1]
+            self.assertEqual(b0["thread_ink"]["state"], "PRESENT")
+            self.assertEqual(b0["thread_ink"]["positive_count_fields"], [key])
+            self.assertTrue(b0["thread_ink"]["recommendation"].startswith("STOP;"))
+            self.assertEqual(b0["diagnostic"]["reads"]["after_generation.thread[0].ICThread.lines[0]"], [0, 1, 2])
+            self.assertEqual(env.diagnostic_calls, 2)
+            self.assertEqual(report["native_ship"], "NOT_EVALUATED")
+
+    def test_diagnostic_reader_failure_is_not_reported_as_zero_ink(self):
+        with Environment().installed() as env:
+            env.diagnostic_result = lambda feature: {
+                "feature": feature, "reads": {},
+                "errors": {"after_generation.thread[0].ICThread.lines.count": "reader failed"},
+            }
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            self.assertEqual(report["status"], "observed_with_diagnostic_read_errors")
+            b0 = report["cases"][1]
+            self.assertEqual(b0["thread_ink"]["state"], "NOT_ESTABLISHED")
+            self.assertEqual(b0["diagnostic"]["reads"], {})
+            self.assertEqual(len(b0["diagnostic"]["errors"]), 1)
 
 
 

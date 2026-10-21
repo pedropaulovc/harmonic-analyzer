@@ -1,5 +1,8 @@
 {
-  "schema": 1,
+  "schema": 2,
+  "cases": [
+  {
+  "case": "sm_positive",
   "sheet_number": 1,
   "sheet_name": "Lever Geometry",
   "section_label": "H",
@@ -79,4 +82,41 @@
     },
     "scope": "Externally verified historical evidence, not worker-fetched proof files or live native reference resolution. The later archive inventory supersedes the proof JSON's pending archive-inventory note."
   }
+  },
+  {
+    "case": "b0",
+    "sheet_number": 1,
+    "sheet_name": "Sheet1",
+    "section_label": "A",
+    "feature_name": "LeverTap",
+    "drawing": {
+      "path": "cad/out/slddrw/mg-magnifying-bracket-native-thread.SLDDRW",
+      "account": "stswboot5qnlwu2vtr6gs",
+      "container": "results",
+      "blob": "leaf/drawing__mg_magnifying_bracket/e2ceb7e1acd2954697f722021cdb83804314010d31c90f14f0ebf7bc980fd619/20261021T204253Z-1-9e30b42f/failures/mg-magnifying-bracket-native-thread/20261021T204332Z/mg-magnifying-bracket-native-thread.SLDDRW",
+      "bytes": 177427,
+      "sha256": "35d764341f0c221559e0793e63656578fee6c7f72452155897a1f56d71ce415d"
+    },
+    "part": {
+      "path": "cad/out/sldprt/mg-magnifying-bracket.SLDPRT",
+      "key": "6976969e72d6cd4dfc8775bb4d71e7a69ccc1c9034d064f9c53486bffd5eedf2",
+      "bytes": 114126,
+      "sha256": "cd30821111672d4c0a4e52ed36992ccda2594bd7a735d260c5cceea31cc13932"
+    },
+    "historical_provenance": {
+      "status": "EXECUTION_PINNED_SOURCE_WITH_CAPTURED_FAILED_DRAWING",
+      "run": "20261021T185156246Z-b65986dc5548401aa7cd9b2d8999526e",
+      "source_commit": "bd160ae0f2994f5018c187279d41cd00f1fe7ab9",
+      "part_input_count": 40,
+      "duplicate_release_yaml_retained": true,
+      "part_recipe_digest": "2d56f0ac631eb3207e61b6a0ba437201",
+      "execution_token_bytes": 66,
+      "execution_token_canonical_md5": "8469206605bed8151524b843ada692f2",
+      "capture_manifest": "C:/src/dt-logs/pr1769-r26-bracket-forensics/manifest.json",
+      "capture_document_title": "Draw54 - Sheet1",
+      "capture_section_label": "A-A",
+      "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both."
+    }
+  }
+  ]
 }

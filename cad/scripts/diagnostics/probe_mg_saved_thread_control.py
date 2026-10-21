@@ -1,4 +1,4 @@
-"""Disposable saved-native SM H-H observation, not a native SHIP gate.
+"""Disposable sequential saved-native SM positive and R26 B0 observations.
 
 Temporary destination: cad/scripts/diagnostics/probe_mg_saved_thread_control.py.
 Run ONLY through the temporary drawing:mg_magnifying_bracket farm record.
@@ -8,6 +8,13 @@ No recipes, saves, settings, rebuilds, startup, or session-wide document closes.
 The imported diagnostic performs its existing single display-generation boundary.
 Every inventory uses the native first/next document cursor, null termination,
 and matching strictly typed counts before/after; no array-result fallback.
+The schema-2 contract/report has only cases[0]=sm_positive, cases[1]=b0.
+B0 uses the repository's ContainerClient download convention with the worker's
+system-assigned ManagedIdentityCredential only (the managed-identity branch of
+the cache's DefaultAzureCredential convention). Reads may affect server-side
+last-access tracking; only disposable local outputs/reports are written.
+SketchManager and ActiveSketch are read-only SDK getters (DISPID 66308 and 55).
+Their observations enclose the entire diagnostic, not an invented inner hook.
 """
 
 from __future__ import annotations
@@ -23,8 +30,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[3]
 REPORT = ROOT / "cad/out/reports/diagnostics/mg-saved-thread-control.json"
 CONTRACT_PATH = Path(__file__).with_suffix(".json")
-CONTROL = {
-    "schema": 1,
+SM_POSITIVE = {
+    "case": "sm_positive",
     "sheet_number": 1,
     "sheet_name": "Lever Geometry",
     "section_label": "H",
@@ -105,6 +112,42 @@ CONTROL = {
         "scope": "Externally verified historical evidence, not worker-fetched proof files or live native reference resolution. The later archive inventory supersedes the proof JSON's pending archive-inventory note.",
     },
 }
+B0 = {
+    "case": "b0",
+    "sheet_number": 1,
+    "sheet_name": "Sheet1",
+    "section_label": "A",
+    "feature_name": "LeverTap",
+    "drawing": {
+        "path": "cad/out/slddrw/mg-magnifying-bracket-native-thread.SLDDRW",
+        "account": "stswboot5qnlwu2vtr6gs",
+        "container": "results",
+        "blob": "leaf/drawing__mg_magnifying_bracket/e2ceb7e1acd2954697f722021cdb83804314010d31c90f14f0ebf7bc980fd619/20261021T204253Z-1-9e30b42f/failures/mg-magnifying-bracket-native-thread/20261021T204332Z/mg-magnifying-bracket-native-thread.SLDDRW",
+        "bytes": 177427,
+        "sha256": "35d764341f0c221559e0793e63656578fee6c7f72452155897a1f56d71ce415d",
+    },
+    "part": {
+        "path": "cad/out/sldprt/mg-magnifying-bracket.SLDPRT",
+        "key": "6976969e72d6cd4dfc8775bb4d71e7a69ccc1c9034d064f9c53486bffd5eedf2",
+        "bytes": 114126,
+        "sha256": "cd30821111672d4c0a4e52ed36992ccda2594bd7a735d260c5cceea31cc13932",
+    },
+    "historical_provenance": {
+        "status": "EXECUTION_PINNED_SOURCE_WITH_CAPTURED_FAILED_DRAWING",
+        "run": "20261021T185156246Z-b65986dc5548401aa7cd9b2d8999526e",
+        "source_commit": "bd160ae0f2994f5018c187279d41cd00f1fe7ab9",
+        "part_input_count": 40,
+        "duplicate_release_yaml_retained": True,
+        "part_recipe_digest": "2d56f0ac631eb3207e61b6a0ba437201",
+        "execution_token_bytes": 66,
+        "execution_token_canonical_md5": "8469206605bed8151524b843ada692f2",
+        "capture_manifest": "C:/src/dt-logs/pr1769-r26-bracket-forensics/manifest.json",
+        "capture_document_title": "Draw54 - Sheet1",
+        "capture_section_label": "A-A",
+        "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both.",
+    },
+}
+CONTRACT = {"schema": 2, "cases": [SM_POSITIVE, B0]}
 MISSING = object()
 
 
@@ -128,40 +171,39 @@ def main():
     primary_exception = None
     primary_traceback = None
     report = {
-        "kind": "mg-saved-sm-thread-control",
+        "kind": "mg-saved-thread-control-b0",
         "status": "running",
         "native_ship": "NOT_EVALUATED",
         "mode": "read_only_no_save_with_display_generation",
-        "contract": CONTROL,
-        "prior_evidence": {
-            "packet": "pr1769-sm-thread-control-20261021",
-            "saved_native_audit": "Hole Thread23: IAnnotation 6 lines + 1 polyline; three other empty cosmetic annotations",
-            "saved_png": "paired flanks x=.1192 to .139 at y=.0596312 and .0683688; 4:1",
-            "boundary": "Prior saved evidence is not this fresh probe, nor proof of ICThread-primary display counts.",
-        },
-        "part_input_provenance": {
-            "historical_recipe_execution_linkage": "VERIFIED_EXTERNAL_EVIDENCE",
-            "evidence": "contract.historical_provenance",
-            "digest_semantics": "Historical recipe digest is not raw part MD5; do not recompute today's recipe as the historical part.",
-            "runtime_proof_scope": "Verify pinned restored bytes and token digest derivation without writing a token; BASE ReferencedDocument exact path and IsSame remain required live witnesses.",
+        "contract": CONTRACT,
+        "cases": [],
+        "session": {
+            "scope": "Exactly two sequential pairs in one attached adapter callback; no reattach between pairs.",
+            "native_pid_evidence": "Existing owned runner attach witness; no additional native process calls.",
         },
         "reads": {},
         "errors": [],
         "primary_failure": None,
-        "inventories": {},
-        "restores": [],
-        "opens": [],
-        "closures": [],
-        "views": [],
-        "identity_comparisons": [],
-        "diagnostic": None,
-        "isolation_gate": "not_entered",
+        "collection_completed": False,
         "limitations": [
             "Python finally/report/cleanup is not guaranteed after watchdog os._exit, native crash, process kill, or machine loss.",
             "Native reads are not atomic against external UI/add-ins; exclusive worker-seat ownership is required.",
         ],
-        "collection_completed": False,
     }
+    summary = report
+
+    def case_report(control):
+        return {
+            "case": control["case"], "contract": control, "status": "not_started",
+            "native_ship": "NOT_EVALUATED",
+            "reads": {}, "errors": [], "primary_failure": None,
+            "inventories": {}, "restores": [], "opens": [], "closures": [],
+            "views": [], "identity_comparisons": [], "active_sketch": {},
+            "diagnostic": None, "isolation_gate": "not_entered",
+            "collection_completed": False,
+        }
+
+    summary["cases"] = [case_report(control) for control in CONTRACT["cases"]]
 
     def failure(label, error, original_tb=MISSING):
         nonlocal primary_exception, primary_traceback
@@ -190,12 +232,16 @@ def main():
         report["errors"].append(row)
         if report["primary_failure"] is None:
             report["primary_failure"] = row
+        if report is not summary:
+            summary["errors"].append(dict(row, case=report["case"]))
+            if summary["primary_failure"] is None:
+                summary["primary_failure"] = summary["errors"][-1]
         return row
 
     def attempt(label, reader):
         try:
             return reader()
-        except Exception as error:
+        except BaseException as error:
             failure(label, error)
             return MISSING
 
@@ -208,21 +254,54 @@ def main():
     def checkpoint():
         REPORT.parent.mkdir(parents=True, exist_ok=True)
         # No default=str: unexpected native objects must not be rendered as COM repr.
-        REPORT.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+        REPORT.write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
-    def pinned_identity(kind, phase):
-        value = file_identity(ROOT / CONTROL[kind]["path"])
+    def pinned_identity(control, kind, phase):
+        value = file_identity(ROOT / control[kind]["path"])
         report["reads"][f"{phase}.{kind}"] = value
-        require(value == {key: CONTROL[kind][key] for key in ("bytes", "sha256")},
+        require(value == {key: control[kind][key] for key in ("bytes", "sha256")},
                 f"{phase}: {kind} is not the pinned saved native")
         if kind == "part":
             # Match the preserved generation token's canonical text in memory;
             # never mint/write a production .execution token for this probe.
             token_md5 = hashlib.md5((value["sha256"] + "\n").encode("utf-8"), usedforsecurity=False).hexdigest()
             report["reads"][f"{phase}.part.execution_token_canonical_md5"] = token_md5
-            require(token_md5 == CONTROL["historical_provenance"]["execution_token_canonical_md5"],
+            require(token_md5 == control["historical_provenance"]["execution_token_canonical_md5"],
                     f"{phase}: part SHA does not derive the historical generation-token digest")
         return value
+
+    def download_capture(spec, target):
+        # Same ContainerClient/get_blob_client/download_blob/readall convention
+        # as _artifact_cache; worker auth is restricted to its managed identity.
+        # No CLI/login, SAS, permission change, upload, or alternate source.
+        from azure.identity import ManagedIdentityCredential
+        from azure.storage.blob import ContainerClient
+
+        credential = None
+        client = None
+        try:
+            target = cache._restore_path(target)
+            report["reads"]["captured_blob.auth"] = "system_assigned_ManagedIdentityCredential_only"
+            credential = ManagedIdentityCredential()
+            client = ContainerClient(
+                f"https://{spec['account']}.blob.core.windows.net",
+                spec["container"], credential=credential,
+            )
+            payload = client.get_blob_client(spec["blob"]).download_blob().readall()
+            identity = {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+            report["reads"]["captured_blob.download_identity"] = identity
+            require(identity == {key: spec[key] for key in ("bytes", "sha256")},
+                    "captured drawing download differs from pinned bytes")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            cache._restore_path(target).write_bytes(payload)
+        except BaseException as error:
+            failure("captured_blob.download", error)
+            raise
+        finally:
+            if client is not None:
+                attempt("captured_blob.client.close", client.close)
+            if credential is not None:
+                attempt("captured_blob.credential.close", credential.close)
 
     try:
         checkpoint()
@@ -233,7 +312,7 @@ def main():
         require(os.environ.get("HARMONIC_COM_SEAT"), "the admitted task must hold the coordinated COM seat")
         require(os.environ.get("HARMONIC_SW_AUTOSTART") == "0", "attach-only worker seat required")
         contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-        require(contract == CONTROL, "committed control contract differs from the immutable probe contract")
+        require(contract == CONTRACT, "committed two-case contract differs from the immutable probe contract")
         report["reads"]["probe_identity"] = file_identity(Path(__file__))
         report["reads"]["contract_identity"] = file_identity(CONTRACT_PATH)
         sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
@@ -243,10 +322,10 @@ def main():
         import _artifact_cache as cache
         from draw_mg_magnifying_bracket import _mouth_thread_diagnostic
 
-        async def probe(adapter):
+        async def run_pair(adapter, control):
             app = adapter.swApp
             owned = []
-            targets = {kind: ROOT / CONTROL[kind]["path"] for kind in ("part", "drawing")}
+            targets = {kind: ROOT / control[kind]["path"] for kind in ("part", "drawing")}
 
             def inventory(label):
                 rows = []
@@ -438,7 +517,7 @@ def main():
                 report["reads"][f"{label}.ActiveDoc_IsSame"] = witnessed
                 require(int(errors) == 0 and witnessed, f"{label}: exact active document not witnessed")
 
-            # FIRST native boundary of the callback: read-only refusal gate.
+            # FIRST native boundary of EACH pair: read-only refusal gate.
             # This is deliberately OUTSIDE the mutation/cleanup try/finally.
             # Refusal must never activate/close a foreign or background session.
             report["isolation_gate"] = "refused"
@@ -457,17 +536,27 @@ def main():
             require(initial_control is True, "control requires actual UserControl=True; no setter/repair permitted")
             report["isolation_gate"] = "accepted"
             try:
-                # Historical cache restores are fatal on miss/RestoreLocked. There
-                # is no recipe fallback, retry, or worker/session cleanup here.
+                # Refuse redirected cache/SAS configuration; keep canonical
+                # archive restore semantics and never mint execution tokens.
+                require(not os.environ.get("HARMONIC_CACHE_SAS"), "SAS is forbidden")
+                for name, expected in (("HARMONIC_CACHE_ACCOUNT", "stswbuildcache07aba2"),
+                                       ("HARMONIC_CACHE_CONTAINER", "buildcache")):
+                    require(os.environ.get(name) in (None, "", expected), f"{name} redirects pinned cache")
                 for kind in ("drawing", "part"):
-                    spec = CONTROL[kind]
-                    row = {"kind": kind, "key": spec["key"], "hit": None}
-                    report["restores"].append(row)
-                    row["hit"] = cache.restore(spec["key"], [targets[kind]], f"diagnostic:sm-thread-control-{kind}")
-                    require(row["hit"] is True, f"historical {kind} cache restore missed; regeneration forbidden")
-                # Both hashes are checked only after both archives have installed.
+                    spec = control[kind]
+                    if control["case"] == "b0" and kind == "drawing":
+                        row = {"kind": kind, "source": "private_failure_blob", "complete": False}
+                        report["restores"].append(row)
+                        download_capture(spec, targets[kind])
+                        row["complete"] = True
+                    else:
+                        row = {"kind": kind, "key": spec["key"], "hit": None}
+                        report["restores"].append(row)
+                        row["hit"] = cache.restore(spec["key"], [targets[kind]], f"diagnostic:{control['case']}-{kind}")
+                        require(row["hit"] is True, f"historical {kind} cache restore missed; regeneration forbidden")
+                # Both hashes are checked after all staging, before any open.
                 for kind in ("drawing", "part"):
-                    attempt(f"staged.{kind}.identity", lambda kind=kind: pinned_identity(kind, "staged"))
+                    attempt(f"staged.{kind}.identity", lambda kind=kind: pinned_identity(control, kind, "staged"))
                 require(not report["errors"], "staged native identity verification failed")
                 part = open_native("part", 1)
                 drawing_model = open_native("drawing", 3)
@@ -477,7 +566,7 @@ def main():
                 drawing = _early_bound(drawing_model, "IDrawingDoc")
                 names = tuple(str(name) for name in drawing.GetSheetNames() or ())
                 report["reads"]["sheet_names"] = names
-                require(names and names[0] == CONTROL["sheet_name"], "intended sheet 1 is not Lever Geometry")
+                require(names and names[0] == control["sheet_name"], "intended native sheet 1 differs from pinned case")
                 rows = drawing.GetViews()
                 require(rows is not None, "saved drawing returned no per-sheet views")
                 candidates = []
@@ -509,14 +598,14 @@ def main():
                             label = attempt(f"view[{row_index},{view_index}].label", lambda: str(section.GetLabel()))
                             if label is not MISSING:
                                 item["section_label"] = label
-                                if sheet_name == CONTROL["sheet_name"] and label == CONTROL["section_label"]:
+                                if sheet_name == control["sheet_name"] and label == control["section_label"]:
                                     candidates.append(view)
-                report["reads"]["H_candidates_on_intended_sheet"] = len(candidates)
+                report["reads"]["section_candidates_on_intended_sheet"] = len(candidates)
                 require(sorted(found_sheets) == sorted(names), "per-sheet view inventory differs from native sheet names")
-                require(not report["errors"] and len(candidates) == 1, "exactly one native H section on intended sheet required")
+                require(not report["errors"] and len(candidates) == 1, "exactly one native case section on intended sheet required")
                 section = candidates[0]
                 base = _early_bound(section.GetBaseView(), "IView")
-                require(base is not None, "H section has no native base view")
+                require(base is not None, "case section has no native base view")
                 source = _early_bound(base.ReferencedDocument, "IModelDoc2")
                 require(source is not None, "base view has no resolved ReferencedDocument")
                 reference_path = observe("base.reference_path", lambda: str(source.GetPathName()))
@@ -525,18 +614,59 @@ def main():
                         and reference_same is True, "base reference is not the exact staged/opened part")
                 # GetViews order is not sheet order. Activate the pinned native
                 # sheet by name, then independently witness its current identity.
-                activated = drawing.ActivateSheet(CONTROL["sheet_name"])
+                activated = drawing.ActivateSheet(control["sheet_name"])
                 report["reads"]["activate_sheet.return"] = bool(activated)
                 current_sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
                 require(activated is True and current_sheet is not None
-                        and str(current_sheet.GetName()) == CONTROL["sheet_name"], "intended sheet activation failed")
-                report["diagnostic"] = _mouth_thread_diagnostic(
-                    adapter, section, feature_name="BracketMountingTaps"
-                )
+                        and str(current_sheet.GetName()) == control["sheet_name"], "intended sheet activation failed")
+
+                def observe_active_sketch(phase):
+                    observations = {}
+                    report["active_sketch"][phase] = observations
+                    for name, document in (("source", source), ("drawing", drawing_model)):
+                        row = {"state": "UNAVAILABLE", "errors": []}
+                        observations[name] = row
+                        start = len(report["errors"])
+
+                        def read_sketch():
+                            manager = _early_bound(document.SketchManager, "ISketchManager")
+                            require(manager is not None, "SketchManager returned null")
+                            return manager.ActiveSketch
+
+                        sketch = attempt(f"{phase}.{name}.ActiveSketch", read_sketch)
+                        row["errors"] = report["errors"][start:]
+                        if sketch is not MISSING:
+                            row["state"] = "NULL" if sketch is None else "PRESENT"
+
+                # These actual native reads enclose the ENTIRE existing call,
+                # including its fixed generation boundary, not just generation.
+                observe_active_sketch("before_diagnostic_including_generation")
+                try:
+                    report["diagnostic"] = _mouth_thread_diagnostic(
+                        adapter, section, feature_name=control["feature_name"]
+                    )
+                except BaseException as error:
+                    failure("collect", error)
+                    raise
+                finally:
+                    observe_active_sketch("after_diagnostic_including_generation")
+                if control["case"] == "b0":
+                    diagnostic = report["diagnostic"]
+                    positive = [
+                        key for key, value in diagnostic["reads"].items()
+                        if ".thread[" in key and any(f".{channel}." in key for channel in ("ICThread", "IAnnotation"))
+                        and key.endswith((".lines.count", ".polylines.count", ".arcs.count"))
+                        and type(value) is int and value > 0
+                    ]
+                    report["thread_ink"] = {
+                        "positive_count_fields": positive,
+                        "state": "PRESENT" if positive else "NOT_ESTABLISHED",
+                        "recommendation": "STOP; inspect recorded thread-owned primitives; counts alone do not prove recovered flank identity."
+                        if positive else "STOP after B0; missing/failed readers are not zero ink or causal proof.",
+                    }
                 report["collection_completed"] = True
             except BaseException as error:
                 failure("collect", error)
-                raise
             finally:
                 # CloseDoc also closes non-active hidden documents. Therefore
                 # EVERY live document must be an exact retained owned control,
@@ -567,7 +697,7 @@ def main():
                     attempt(f"close[{index}]", close_owned)
                 # Initial state was proven empty/null. Only restore this Python
                 # reference; never activate anything or force native emptiness.
-                adapter.currentModel = initial_current
+                attempt("final.restore_currentModel", lambda: setattr(adapter, "currentModel", initial_current))
                 final = inventory("final")
                 final_active = attempt("final.ActiveDoc", lambda: app.ActiveDoc)
                 report["reads"]["final.ActiveDoc_state"] = (
@@ -583,27 +713,60 @@ def main():
                     require(adapter.currentModel is None, "initial null currentModel was not restored") or True
                 ))
                 for kind in ("drawing", "part"):
-                    attempt(f"final.{kind}.identity", lambda kind=kind: pinned_identity(kind, "final"))
+                    attempt(f"final.{kind}.identity", lambda kind=kind: pinned_identity(control, kind, "final"))
                 attempt("callback.checkpoint", checkpoint)
-            return {"report": str(REPORT), "collection_completed": report["collection_completed"]}
+            if primary_exception is not None:
+                raise primary_exception.with_traceback(primary_traceback)
+
+        async def probe(adapter):
+            nonlocal report
+            application = adapter.swApp
+            summary["session"]["python_handles"] = {
+                "adapter": id(adapter), "application_wrapper": id(application),
+                "scope": "Python object identity only; native PID/revision are the existing runner's attach telemetry.",
+            }
+            try:
+                # Explicit order; one adapter/native session, no case matrix.
+                for control, case in zip((SM_POSITIVE, B0), summary["cases"], strict=True):
+                    report = case
+                    report["status"] = "running"
+                    try:
+                        report["session_python_handles"] = {
+                            "adapter": id(adapter), "application_wrapper": id(adapter.swApp),
+                        }
+                        require(adapter.swApp is application, "attached application wrapper changed between pairs")
+                        await run_pair(adapter, control)
+                    except BaseException as error:
+                        failure("pair", error)
+                        raise primary_exception.with_traceback(primary_traceback)
+                    finally:
+                        report["status"] = "failed" if report["errors"] else (
+                            "observed_with_diagnostic_read_errors"
+                            if (report["diagnostic"] or {}).get("errors") else "observed"
+                        )
+                    # run_pair returns only after clean owned-close, full empty/
+                    # null proof, and both final pinned hashes without any errors.
+                summary["collection_completed"] = True
+                return {"report": str(REPORT), "collection_completed": True}
+            finally:
+                report = summary
 
         runner_failures = []
         report["runner_exit_code"] = run_owned_diagnostic(probe, failures=runner_failures)
         for phase, error, original_tb in runner_failures:
             failure(f"runner.{phase}", error, original_tb)
-    except (Exception, SystemExit) as error:
+    except BaseException as error:
         failure("driver", error)
     finally:
-        # Also cover attach/import/contract failures that never entered the callback.
-        for kind in ("drawing", "part"):
-            if f"final.{kind}" not in report["reads"]:
-                attempt(f"final.{kind}.identity", lambda kind=kind: pinned_identity(kind, "final"))
+        report = summary
         report["status"] = "failed" if report["errors"] else (
-            "observed_with_diagnostic_read_errors" if (report["diagnostic"] or {}).get("errors") else "observed"
+            "observed_with_diagnostic_read_errors"
+            if any((case["diagnostic"] or {}).get("errors") for case in report["cases"])
+            else "observed"
         )
         try:
             checkpoint()
-        except Exception as error:
+        except BaseException as error:
             # A filesystem failure cannot be represented in an unwritable file.
             row = failure("report_write", error)
             try:
@@ -644,7 +807,7 @@ def main():
                 failure_path.write_text(
                     json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8"
                 )
-            except Exception as error:
+            except BaseException as error:
                 row = failure("failure_artifact_write", error)
                 try:
                     print(f"control failure artifact write failed: {row['type']}: {row['message']}", file=sys.stderr)
