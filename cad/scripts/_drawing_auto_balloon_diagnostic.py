@@ -13,7 +13,7 @@ import math
 import os
 from pathlib import Path
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
 
 from solidworks_mcp.adapters.solidworks.drawing import view_name
@@ -27,6 +27,19 @@ from _drawing_sm_pose_diagnostic import _VisibilityDeadline
 
 STOP = "ISSUE1667_AUTO_BALLOON_STOP"
 FAILURES = Path(__file__).resolve().parents[1] / "out" / "reports" / "failures"
+# Explicit recipe inputs: arm B changes attachment only from arm A (face/square).
+# Arm C restores "face" and changes layout to 2 (Circle); keep spread unchanged.
+# Offline API bundle v3.12.1: IAutoBalloonOptions + swBalloonLayoutType_e.
+_EXPERIMENT_ATTACHMENT: Literal["face", "edge"] = "edge"
+_EXPERIMENT_LAYOUT = 1  # swDetailingBalloonLayout_Square; Circle = 2.
+_LAYOUT_ENUM_NAMES = {
+    1: "swDetailingBalloonLayout_Square",
+    2: "swDetailingBalloonLayout_Circle",
+    3: "swDetailingBalloonLayout_Top",
+    4: "swDetailingBalloonLayout_Bottom",
+    5: "swDetailingBalloonLayout_Right",
+    6: "swDetailingBalloonLayout_Left",
+}
 # v3.12.1 swSelectType_e; GetAttachedEntities3 documents these as IEntity geometry.
 _KINDS = {1: "EDGE", 2: "FACE", 3: "VERTEX"}
 
@@ -200,6 +213,14 @@ def collect_and_stop(
     started = time.perf_counter()
     report: dict[str, Any] = {
         "experiment": "existing native auto balloons, then existing spread",
+        "auto_balloon_options_requested": {
+            "attachment": _EXPERIMENT_ATTACHMENT,
+            "LeaderAttachmentToFaces": {"face": True, "edge": False}.get(
+                _EXPERIMENT_ATTACHMENT
+            ),
+            "Layout": _EXPERIMENT_LAYOUT,
+            "layout_enum": _LAYOUT_ENUM_NAMES.get(_EXPERIMENT_LAYOUT),
+        },
         "stop": STOP,
         "status": "begun",
         "label": label,
@@ -294,7 +315,13 @@ def collect_and_stop(
                 checkpoint("prepared")
                 before = time.perf_counter()
                 try:
-                    notes = balloons._create_auto_balloons(adapter, view, label=label)
+                    notes = balloons._create_auto_balloons(
+                        adapter,
+                        view,
+                        label=label,
+                        attachment=_EXPERIMENT_ATTACHMENT,
+                        layout=_EXPERIMENT_LAYOUT,
+                    )
                 finally:
                     report["timings_ms"]["create_helper"] = (
                         time.perf_counter() - before

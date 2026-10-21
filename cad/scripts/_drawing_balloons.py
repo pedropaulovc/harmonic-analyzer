@@ -428,10 +428,13 @@ def _create_auto_balloons(
     label: str,
     allow_empty: bool = False,
     layout: int = 1,
+    attachment: Literal["face", "edge"] = "face",
 ) -> list[Any]:
     """Create item-number balloons for one selected view without repositioning."""
     if layout not in range(1, 7):
         raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
+    if attachment not in ("face", "edge"):
+        raise ValueError(f"{label}: invalid auto-balloon attachment {attachment!r}")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -443,7 +446,8 @@ def _create_auto_balloons(
     options.ReverseDirection = False
     options.IgnoreMultiple = True
     options.InsertMagneticLine = False
-    options.LeaderAttachmentToFaces = True
+    # IAutoBalloonOptions: true attaches to faces; false attaches to edges.
+    options.LeaderAttachmentToFaces = attachment == "face"
     options.Style = 1
     options.Size = 2
     options.UpperTextContent = 1
