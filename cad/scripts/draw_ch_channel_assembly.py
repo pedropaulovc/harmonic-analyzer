@@ -47,8 +47,7 @@ from _check import check
 from _com import _early_bound
 import _config
 from _drawing_balloons import (
-    BalloonAnchor,
-    add_component_bom_balloons,
+    add_auto_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
@@ -65,6 +64,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_fr_ch_native_probe import run_native_compatibility_probe
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
@@ -1356,9 +1356,11 @@ def _place_assembled_sheet(adapter: Any) -> None:
 def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
 ) -> Callable[[], None]:
-    """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    BOM row on the family's north-most instance; returns the check that proves
-    every balloon again after the last rebuild."""
+    """Probe native full-BOM placement against every existing north-most pin.
+
+    The printed north-most promise is unchanged. Retain evidence and stop before
+    later placement/save/export; family coverage alone is not compatibility.
+    """
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1388,19 +1390,21 @@ def _place_exploded_sheet(
         label="channel",
     )
     items = _validate_bom(adapter, table)
-    landings = add_component_bom_balloons(
+    # Diagnostic only: every source-validated north-most full path remains
+    # required. Same-family native selection does not satisfy the printed promise.
+    landings = run_native_compatibility_probe(
         adapter,
         exploded,
         items=items,
-        anchors={
-            stem: BalloonAnchor(
-                point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
-                instance=north_instances[stem],
-            )
-            for stem in BOM_COMPONENTS
-        },
+        required_instances=north_instances,
         label="channel exploded-view BOM coverage",
-        margin=BALLOON_MARGIN,
+        artifact_stem=ARTIFACT_STEM,
+        place=lambda: add_auto_balloons(
+            adapter,
+            exploded,
+            items=items,
+            label="channel exploded-view BOM coverage",
+        ),
     )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
