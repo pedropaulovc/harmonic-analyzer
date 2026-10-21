@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _drawing_balloons
 import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
@@ -858,43 +859,210 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
     assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
 
 
-def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
-    import math
+class _NativeWheelBalloon:
+    """A returned native note with independently readable item and attachment."""
 
-    import mg_vn_wheel_axle_front_washer_spec as washer
-    import mg_vn_wheel_axle_nut_spec as nut
+    def __init__(self, item: str, owner: str):
+        self.item = item
+        self.owner = owner
+        self.annotation = self
+        self.entities = (
+            SimpleNamespace(GetComponent=lambda: SimpleNamespace(Name2=self.owner)),
+        )
+        self.kinds = (1,)  # swSelEDGES
 
-    def screen(point):
-        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
-        x, y, z = -point[0], point[1], -point[2]
-        return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
+    def GetBomBalloonText(self, _upper):
+        return self.item
 
-    wx, wy, wz = drawing.FRONT_WASHER_BALLOON_POINT_MM
-    assert wz == 0.0 and math.hypot(wx, wy) == pytest.approx(washer.OD / 2.0)
-    nx, ny, nz = drawing.LOCKNUT_BALLOON_POINT_MM
-    # On the flat facing 240 deg (corners on the local +-Y meridian).
-    normal = math.radians(240.0)
-    assert nz == 0.0
-    assert nx * math.cos(normal) + ny * math.sin(normal) == pytest.approx(
-        nut.ACROSS_FLATS / 2.0
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetAttachedEntityTypes(self):
+        return self.kinds
+
+
+@pytest.fixture
+def native_wheel_balloons(monkeypatch):
+    items = drawing.balloon_items(
+        {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)},
+        explode.WHEEL_GROUP_STEMS,
     )
-    axle = screen((0.0, 0.0, 1.0))  # the stack's explode runs along local +z
-    for point, side in (
-        (drawing.FRONT_WASHER_BALLOON_POINT_MM, (-0.5, math.sqrt(3.0) / 2.0)),
-        (drawing.LOCKNUT_BALLOON_POINT_MM, (0.5, -math.sqrt(3.0) / 2.0)),
-    ):
-        sx, sy = screen(point)
-        length = math.hypot(sx, sy)
-        assert (sx / length, sy / length) == pytest.approx(side)
-        assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
-    anchors = drawing.BALLOON_ANCHORS
-    assert anchors["mg-vn-wheel-axle-nut"].instance == "mg-vn-wheel-axle-nut-2"
-    # Instance 2 is the locknut, exploded farthest out.
-    farthest = min(
-        (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
-        key=lambda step: step.distance_mm,
+    owners = {stem: f"wheel-sub-1/{stem}-1" for stem, _item in items}
+    native = [_NativeWheelBalloon(item, owners[stem]) for stem, item in items]
+
+    def component(stem, path, *, visible=True):
+        return SimpleNamespace(
+            Name=f"mg-magnifier-1/{path}@Drawing View1",
+            GetChildren=lambda: (),
+            Visible=visible,
+            Component=SimpleNamespace(
+                Name2=path, GetPathName=lambda: f"C:/parts/{stem}.SLDPRT"
+            ),
+        )
+
+    children = [component(stem, owners[stem]) for stem, _item in items] + [
+        component("mg-vn-wheel-axle-nut", "wheel-sub-1/mg-vn-wheel-axle-nut-2"),
+        component(
+            "mg-vn-wheel-axle-nut",
+            "wheel-sub-1/mg-vn-wheel-axle-nut-3",
+            visible=False,
+        ),
+    ]
+    root = SimpleNamespace(GetChildren=lambda: children)
+    view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
+
+    def attempt(callback, default=None):
+        try:
+            return callback()
+        except Exception:
+            return default
+
+    adapter = SimpleNamespace(_attempt=attempt)
+    # Only the native generation boundary is replaced; view-family resolution,
+    # BOM text, EDGE types and full component ownership use production readers.
+    monkeypatch.setattr(
+        _drawing_balloons, "_create_auto_balloons", lambda *args, **kwargs: native
     )
-    assert farthest.members == ("mg-vn-wheel-axle-nut:2",)
+    return SimpleNamespace(
+        notes=native,
+        owners=owners,
+        create=lambda: drawing.add_auto_balloons(
+            adapter, view, items=items, label="magnifier wheel BOM coverage"
+        ),
+        adapter=adapter,
+    )
+
+
+def test_native_wheel_balloons_cover_rows_and_keep_their_native_attachments(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    nut = next(
+        note for note in fixture.notes if note.owner.endswith("mg-vn-wheel-axle-nut-1")
+    )
+    # Native placement may choose any shown instance, not the old pinned locknut.
+    nut.owner = "WHEEL-SUB-1\\MG-VN-WHEEL-AXLE-NUT-2"
+    landings = fixture.create()
+    assert len(landings) == len(explode.WHEEL_GROUP_STEMS)
+    assert {landing.stem for landing in landings} == explode.WHEEL_GROUP_STEMS
+    assert all(landing.sheet_xy is None for landing in landings)
+    for landing in landings:
+        assert landing.instance == landing.note.owner.replace("\\", "/")
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+def test_native_wheel_rejects_swapped_washer_owners_even_with_every_bom_row(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    back = next(note for note in fixture.notes if "back-washer" in note.owner)
+    front = next(note for note in fixture.notes if "front-washer" in note.owner)
+    back.owner, front.owner = front.owner, back.owner
+    assert len({note.item for note in fixture.notes}) == len(explode.WHEEL_GROUP_STEMS)
+    with pytest.raises(RuntimeError, match="native EDGE owner.*not a shown instance"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("duplicate", "duplicate native BOM item"),
+        ("missing", "missing native BOM items"),
+        ("unexpected", "unexpected native BOM item"),
+        ("unresolved", "unresolved item"),
+    ],
+)
+def test_native_wheel_refuses_inexact_bom_coverage(
+    native_wheel_balloons, fault, message
+) -> None:
+    fixture = native_wheel_balloons
+    if fault == "duplicate":
+        fixture.notes[-1].item = fixture.notes[0].item
+    elif fault == "missing":
+        fixture.notes.pop()
+    elif fault == "unexpected":
+        fixture.notes[-1].item = "999"
+    else:
+        fixture.notes[-1].item = "?"
+    with pytest.raises(RuntimeError, match=message):
+        fixture.create()
+
+
+@pytest.mark.parametrize("kind", [0, 2, 3, 999])
+def test_native_wheel_refuses_non_edge_and_unknown_native_attachment_types(
+    native_wheel_balloons, kind
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.notes[0].kinds = (kind,)
+    with pytest.raises(RuntimeError, match="must attach to one native EDGE"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "annotation",
+        "entities",
+        "types",
+        "dangling",
+        "extra_entity",
+        "unknown_entity",
+        "unknown_owner",
+    ],
+)
+def test_native_wheel_refuses_absent_or_unreadable_native_attachments(
+    native_wheel_balloons, fault
+) -> None:
+    fixture = native_wheel_balloons
+    note = fixture.notes[0]
+    if fault == "annotation":
+        note.annotation = None
+    elif fault == "entities":
+        note.entities = ()
+    elif fault == "types":
+        note.kinds = ()
+    elif fault == "dangling":
+        note.entities = (None,)
+    elif fault == "extra_entity":
+        note.entities *= 2
+    elif fault == "unknown_entity":
+        note.entities = (object(),)
+    else:
+        note.owner = ""
+    with pytest.raises(RuntimeError, match="native annotation|native EDGE"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    "owner",
+    [
+        "other-sub-1/mg-vn-wheel-axle-nut-1",
+        "wheel-sub-1/mg-vn-wheel-axle-nut-3",
+    ],
+)
+def test_native_wheel_rejects_same_family_wrong_full_path_and_hidden_owner(
+    native_wheel_balloons, owner
+) -> None:
+    fixture = native_wheel_balloons
+    nut = next(
+        note for note in fixture.notes if note.owner.endswith("mg-vn-wheel-axle-nut-1")
+    )
+    nut.owner = owner
+    with pytest.raises(RuntimeError, match="native EDGE owner.*not a shown instance"):
+        fixture.create()
+
+
+def test_native_wheel_attachments_remain_checked_after_the_final_rebuild(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    fixture.notes[0].owner = fixture.notes[1].owner
+    with pytest.raises(RuntimeError, match="changed after the final rebuild"):
+        _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
 
 
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:

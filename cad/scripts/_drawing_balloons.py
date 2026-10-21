@@ -379,10 +379,13 @@ def _create_auto_balloons(
     label: str,
     allow_empty: bool = False,
     layout: int = 1,
+    attachment: Literal["face", "edge"] = "face",
 ) -> list[Any]:
     """Create item-number balloons for one selected view without repositioning."""
     if layout not in range(1, 7):
         raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
+    if attachment not in ("face", "edge"):
+        raise ValueError(f"{label}: invalid auto-balloon attachment {attachment!r}")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -394,7 +397,7 @@ def _create_auto_balloons(
     options.ReverseDirection = False
     options.IgnoreMultiple = True
     options.InsertMagneticLine = False
-    options.LeaderAttachmentToFaces = True
+    options.LeaderAttachmentToFaces = attachment == "face"
     options.Style = 1
     options.Size = 2
     options.UpperTextContent = 1
@@ -435,26 +438,87 @@ def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
     return item
 
 
+@_telemetry.traced("drawing.validated_auto_balloons", label_param="label")
 def add_auto_balloons(
-    adapter: Any, view: Any, *, expected: int, label: str
-) -> list[Any]:
-    """Auto-insert circular item-number balloons around one assembly view.
+    adapter: Any,
+    view: Any,
+    *,
+    items: Sequence[tuple[str, str]],
+    label: str,
+) -> list[BalloonLanding]:
+    """Insert one native EDGE/Square balloon per requested ``(stem, BOM item)``.
 
-    ``IDrawingDoc.CreateAutoBalloonOptions`` + ``AutoBalloon5`` on the selected
-    ``view``: square layout, circular 2-character style, upper text = the BOM
-    item number (so balloons and the BOM table cross-reference), one balloon
-    per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
-    balloons landed. Returns the balloon notes.
+    Keep AutoBalloon5's positions, with no sheet-coordinate picks or spreading.
+    Every returned item must occur exactly once and attach to one real edge of
+    a shown full component path belonging to that row's family. Return native
+    landings for the drawing's existing final-rebuild attachment check.
+    The span covers component resolution, creation, rebuild and validation,
+    not just the AutoBalloon5 call.
     """
-    balloons = _create_auto_balloons(adapter, view, label=label)
-    if len(balloons) < expected:
-        raise RuntimeError(
-            f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
+    if not items:
+        raise ValueError(f"{label}: component balloon list must not be empty")
+    stems = [stem for stem, _item in items]
+    numbers = [item for _stem, item in items]
+    if len(stems) != len(set(stems)) or len(numbers) != len(set(numbers)):
+        raise ValueError(f"{label}: duplicate component or item number")
+    leaves = _view_component_leaves(adapter, view, label=label)
+    expected = {
+        item: (
+            stem,
+            {
+                leaf.path.casefold()
+                for leaf in _shown_instances(leaves, stem, BalloonAnchor(), label=label)
+            },
         )
-    _spread_balloons(adapter, view, balloons)
-    rebuild_drawing(adapter, label="add_auto_balloons")
-    _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
-    return balloons
+        for stem, item in items
+    }
+    _telemetry.annotate(expected=len(expected), attachment="EDGE", layout=1)
+    balloons = _create_auto_balloons(
+        adapter, view, label=label, attachment="edge", layout=1
+    )
+    seen: set[str] = set()
+    landings: list[BalloonLanding] = []
+    for raw_note in balloons:
+        note = _early_bound(raw_note, "INote")
+        item = _balloon_item_number(adapter, note, label=label)
+        if item not in expected:
+            raise RuntimeError(f"{label}: unexpected native BOM item {item}")
+        if item in seen:
+            raise RuntimeError(f"{label}: duplicate native BOM item {item}")
+        seen.add(item)
+        stem, allowed = expected[item]
+        annotation = note.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"{label}: {stem} item {item} has no native annotation")
+        annotation = _early_bound(annotation, "IAnnotation")
+        entities = tuple(annotation.GetAttachedEntities3() or ())
+        kinds = tuple(
+            int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())
+        )
+        if len(entities) != 1 or kinds != (_SEL_EDGES,) or entities[0] is None:
+            raise RuntimeError(
+                f"{label}: {stem} item {item} must attach to one native EDGE; "
+                f"entities={len(entities)}, types={list(kinds)}"
+            )
+        owner = _entity_owner(adapter, entities[0])
+        _telemetry.event(
+            "drawing.auto_balloon_owner", stem=stem, item=item, instance=owner
+        )
+        if not owner or owner.casefold() not in allowed:
+            raise RuntimeError(
+                f"{label}: {stem} item {item} native EDGE owner {owner!r} "
+                f"is not a shown instance of its BOM row; expected={sorted(allowed)}"
+            )
+        landings.append(
+            BalloonLanding(
+                stem=stem, instance=owner, note=note, sheet_xy=None, label=label
+            )
+        )
+    missing = sorted(expected.keys() - seen)
+    if missing:
+        raise RuntimeError(f"{label}: missing native BOM items {missing}")
+    _telemetry.success(f"{label}: validated {len(landings)} native BOM balloons")
+    return landings
 
 
 def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
@@ -1399,9 +1463,11 @@ def _verify_anchor_attachment(
 
 @dataclass(frozen=True)
 class BalloonLanding:
-    """One component balloon as :func:`add_component_bom_balloons` proved it:
-    attached to one edge of ``instance``, its leader ending at ``sheet_xy``
-    (``None`` for a ``listed-edge`` balloon, whose landing SolidWorks chose)."""
+    """One checked component balloon, attached to one edge of ``instance``.
+
+    Its leader ends at ``sheet_xy`` when a manual point was proven; ``None``
+    leaves the native or listed-edge attachment position to SolidWorks.
+    """
 
     stem: str
     instance: str
