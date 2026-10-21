@@ -153,16 +153,21 @@ def main():
         "views": [],
         "identity_comparisons": [],
         "diagnostic": None,
+        "isolation_gate": "not_entered",
+        "limitations": [
+            "Python finally/report/cleanup is not guaranteed after watchdog os._exit, native crash, process kill, or machine loss.",
+            "Native reads are not atomic against external UI/add-ins; exclusive worker-seat ownership is required.",
+        ],
         "collection_completed": False,
     }
 
-    def failure(label, error):
+    def failure(label, error, original_tb=MISSING):
         nonlocal primary_exception, primary_traceback
         if primary_exception is None:
             # Retain the actual exception and original traceback before any
             # formatting, cleanup, or aggregate failure can obscure them.
             primary_exception = error
-            primary_traceback = error.__traceback__
+            primary_traceback = error.__traceback__ if original_tb is MISSING else original_tb
         # Error rendering must not interrupt an optional reader or cleanup.
         # Never fall back to repr(error), which can fail for the same reason.
         try:
@@ -170,6 +175,16 @@ def main():
         except BaseException:
             message = "<exception text unavailable>"
         row = {"operation": label, "type": type(error).__name__, "message": message}
+        tb = error.__traceback__ if original_tb is MISSING else original_tb
+        row["traceback_available"] = tb is not None
+        row["traceback_frames"] = []
+        while tb is not None:
+            row["traceback_frames"].append({
+                "file": tb.tb_frame.f_code.co_filename,
+                "function": tb.tb_frame.f_code.co_name,
+                "line": tb.tb_lineno,
+            })
+            tb = tb.tb_next
         report["errors"].append(row)
         if report["primary_failure"] is None:
             report["primary_failure"] = row
@@ -228,13 +243,8 @@ def main():
 
         async def probe(adapter):
             app = adapter.swApp
-            initial = None
-            initial_active = MISSING
-            initial_current = MISSING
             owned = []
-            open_attempted = False
             targets = {kind: ROOT / CONTROL[kind]["path"] for kind in ("part", "drawing")}
-            target_names = {path.name.casefold() for path in targets.values()}
 
             def inventory(label):
                 rows = []
@@ -252,12 +262,7 @@ def main():
                     return None
                 if raw_docs is None:
                     snapshot["null_document_array"] = True
-                    # GetDocuments does not document null as an empty array.
-                    # Only its independent, documented count can establish zero.
-                    if count == 0:
-                        snapshot["empty_witness"] = "GetDocumentCount=0"
-                        return rows
-                    failure(f"{label}.GetDocuments", RuntimeError("null document array with nonzero native count"))
+                    failure(f"{label}.GetDocuments", RuntimeError("null document array is unavailable, not complete empty-session proof"))
                     return None
                 if not isinstance(raw_docs, (tuple, list)) or len(raw_docs) != count:
                     failure(f"{label}.GetDocuments", RuntimeError("document array unavailable or cardinality differs from native count"))
@@ -309,46 +314,78 @@ def main():
                         f"{label}: IsSame did not establish same/different identity")
                 return result == 1
 
-            def claim_new(rows, label):
-                require(initial is not None and complete(rows), "cannot establish post-open ownership")
+            def user_control(label):
+                value = attempt(f"{label}.UserControl", lambda: app.UserControl)
+                if type(value) is bool:
+                    report["reads"][f"{label}.UserControl"] = value
+                    return value
+                report["reads"][f"{label}.UserControl_state"] = "UNAVAILABLE"
+                if value is not MISSING:
+                    failure(f"{label}.UserControl", RuntimeError("UserControl did not return an actual Boolean"))
+                return MISSING
+
+            def require_owned_inventory(rows, label, *, clean=False):
+                require(complete(rows), f"{label}: complete live inventory required")
+                require(len(rows) <= len(owned) <= 2, f"{label}: unknown or excess live documents")
+                matched = set()
                 for row in rows:
-                    doc = row["native"]
-                    if any(same(doc, old["native"], f"{label}.candidate_vs_initial") for old in initial):
-                        continue
-                    if any(same(doc, old["native"], f"{label}.candidate_vs_owned") for old in owned):
-                        continue
-                    # Under the exclusive seat, new documents immediately after our
-                    # OpenDoc6 are ours, including automatically loaded references.
-                    row["opened_by"] = label
-                    owned.append(row)
-                report["owned_documents"] = [dict(row["data"], opened_by=row["opened_by"]) for row in owned]
+                    data = row["data"]
+                    candidates = [
+                        index for index, owner in enumerate(owned)
+                        if canonical(data["path"]) == canonical(owner["data"]["path"])
+                        and data["type"] == owner["data"]["type"]
+                    ]
+                    require(len(candidates) == 1, f"{label}: live document has no unique exact-path/type owner")
+                    index = candidates[0]
+                    require(index not in matched, f"{label}: duplicate live owner")
+                    require(same(row["native"], owned[index]["native"], f"{label}.live_vs_owned[{index}]"),
+                            f"{label}: live document differs from retained direct OpenDoc6 result")
+                    require(data["title"] == owned[index]["data"]["title"],
+                            f"{label}: owned document title changed")
+                    if clean:
+                        require(data["dirty"] is False, f"{label}: dirty owned document is stranded; refusing CloseDoc")
+                    matched.add(index)
+                return rows
 
             def open_native(kind, doc_type):
-                nonlocal open_attempted
                 path = targets[kind]
                 row = {"kind": kind, "requested_path": str(path), "options": 3}
                 report["opens"].append(row)
-                open_attempted = True
-                try:
-                    # swOpenDocOptions_Silent=1 | swOpenDocOptions_ReadOnly=2.
-                    result = app.OpenDoc6(str(path), doc_type, 1 | 2, "", 0, 0)
-                    require(isinstance(result, tuple) and len(result) == 3,
-                            "early-bound OpenDoc6 did not return document/errors/warnings")
-                    raw, errors, warnings = result
-                    row.update(errors=int(errors), warnings=int(warnings), returned_document=raw is not None)
-                    require(raw is not None, f"OpenDoc6 returned no {kind}")
-                    doc = _early_bound(raw, "IModelDoc2")
-                    row["path"] = str(doc.GetPathName())
-                    row["type"] = int(doc.GetType())
-                    require(canonical(row["path"]) == canonical(path), f"OpenDoc6 returned the wrong {kind} path")
-                    require(row["type"] == doc_type, f"OpenDoc6 returned the wrong {kind} type")
-                    require(row["errors"] == 0, f"OpenDoc6 reported {kind} load errors")
-                    # Warnings remain explicit evidence; they do not replace the
-                    # exact reference/path/IsSame witnesses required below.
-                    return doc
-                finally:
-                    rows = inventory(f"after_open_{kind}")
-                    attempt(f"after_open_{kind}.ownership", lambda: claim_new(rows, kind))
+                # swOpenDocOptions_Silent=1 | swOpenDocOptions_ReadOnly=2.
+                result = app.OpenDoc6(str(path), doc_type, 1 | 2, "", 0, 0)
+                require(isinstance(result, tuple) and len(result) == 3,
+                        "early-bound OpenDoc6 did not return document/errors/warnings")
+                raw, errors, warnings = result
+                row["returned_document"] = raw is not None
+                require(raw is not None, f"OpenDoc6 returned no {kind}")
+                doc = _early_bound(raw, "IModelDoc2")
+                for key, reader, expected_type in (
+                    ("path", lambda: doc.GetPathName(), str),
+                    ("title", lambda: doc.GetTitle(), str),
+                    ("type", lambda: doc.GetType(), int),
+                    ("read_only", lambda: doc.IsOpenedReadOnly(), bool),
+                ):
+                    value = attempt(f"open.{kind}.{key}", reader)
+                    if value is not MISSING:
+                        if type(value) is expected_type:
+                            row[key] = value
+                        else:
+                            failure(f"open.{kind}.{key}", RuntimeError("native open readback has an unavailable or unexpected type"))
+                # Retain ONLY the direct result with certified path/type/title.
+                # Never adopt auto-loaded references or arbitrary inventory deltas.
+                if (type(row.get("path")) is str and canonical(row["path"]) == canonical(path)
+                        and row.get("type") == doc_type and type(row.get("title")) is str and row["title"]):
+                    owned.append({"native": doc, "data": {key: row[key] for key in ("path", "title", "type")}})
+                    row["retained_owned"] = True
+                    report["owned_documents"] = [dict(owner["data"]) for owner in owned]
+                require(row.get("retained_owned") is True, f"OpenDoc6 did not certify the exact {kind} owner")
+                require(type(errors) is int and type(warnings) is int, "OpenDoc6 status codes unavailable")
+                row.update(errors=errors, warnings=warnings)
+                require(errors == 0, f"OpenDoc6 reported {kind} load errors")
+                require(row.get("read_only") is True, f"OpenDoc6 {kind} is not proven read-only")
+                require_owned_inventory(inventory(f"after_open_{kind}"), f"after_open_{kind}")
+                require(not report["errors"], "open readback/ownership collection failed")
+                return doc
 
             def activate(doc, name, label):
                 result = app.ActivateDoc3(name, False, 1, 0)  # swDontRebuildActiveDoc
@@ -362,31 +399,25 @@ def main():
                 report["reads"][f"{label}.ActiveDoc_IsSame"] = witnessed
                 require(int(errors) == 0 and witnessed, f"{label}: exact active document not witnessed")
 
+            # FIRST native boundary of the callback: read-only refusal gate.
+            # This is deliberately OUTSIDE the mutation/cleanup try/finally.
+            # Refusal must never activate/close a foreign or background session.
+            report["isolation_gate"] = "refused"
+            initial = inventory("initial")
+            initial_active = attempt("initial.ActiveDoc", lambda: app.ActiveDoc)
+            initial_current = attempt("initial.currentModel", lambda: adapter.currentModel)
+            initial_control = user_control("initial")
+            for label, handle in (("currentModel", initial_current), ("ActiveDoc", initial_active)):
+                report["reads"][f"initial.{label}_state"] = (
+                    "UNAVAILABLE" if handle is MISSING else "NULL" if handle is None else "PRESENT"
+                )
+            require(complete(initial) and initial == [] and not report["errors"],
+                    "control requires a proven empty initial count AND complete native document array")
+            require(initial_active is None and initial_current is None,
+                    "control requires measured-null initial ActiveDoc and currentModel")
+            require(initial_control is True, "control requires actual UserControl=True; no setter/repair permitted")
+            report["isolation_gate"] = "accepted"
             try:
-                initial = inventory("initial")
-                initial_active = attempt("initial.ActiveDoc", lambda: app.ActiveDoc)
-                initial_current = attempt("initial.currentModel", lambda: adapter.currentModel)
-                for label, handle in (("currentModel", initial_current), ("ActiveDoc", initial_active)):
-                    report["reads"][f"initial.{label}_state"] = (
-                        "UNAVAILABLE" if handle is MISSING else "NULL" if handle is None else "PRESENT"
-                    )
-                    if handle is not MISSING:
-                        report["reads"][f"initial.{label}_present"] = handle is not None
-                require(complete(initial) and not report["errors"], "initial ownership inventory incomplete")
-                for label, handle in (("active", initial_active), ("currentModel", initial_current)):
-                    if handle is not None:
-                        matches = [i for i, row in enumerate(initial) if same(handle, row["native"], f"initial.{label}_vs_inventory[{i}]")]
-                        report["reads"][f"initial.{label}_inventory_matches"] = matches
-                        require(len(matches) == 1, f"initial {label} is not one inventoried native document")
-                require(initial_active is not None or not initial,
-                        "nonempty initial inventory without active document cannot be restored without a UI change")
-                for row in initial:
-                    data = row["data"]
-                    require(Path(data["path"]).name.casefold() not in target_names
-                            and data["title"].casefold() not in target_names,
-                            "pre-existing SM control basename: refuse even matching/clean natives; never close them")
-                    require(not data["path"] or not Path(data["path"]).resolve().is_relative_to(ROOT / "cad/out"),
-                            "archive restores may replace extra cad/out members: refuse resident disposable-output documents")
                 # Historical cache restores are fatal on miss/RestoreLocked. There
                 # is no recipe fallback, retry, or worker/session cleanup here.
                 for kind in ("drawing", "part"):
@@ -467,88 +498,59 @@ def main():
             except Exception as error:
                 failure("collect", error)
             finally:
-                # Each cleanup operation/reader has its own failure boundary.
-                # A failure here cannot mask the original collection error.
-                if initial is not None and open_attempted:
-                    rows = inventory("before_cleanup")
-                    attempt("before_cleanup.ownership", lambda: claim_new(rows, "open_side_effect"))
-                for index, owned_row in enumerate(sorted(owned, key=lambda row: row["data"].get("type") != 3)):
+                # CloseDoc also closes non-active hidden documents. Therefore
+                # EVERY live document must be an exact retained owned control,
+                # and every live dirty flag must be measured False before ANY close.
+                for index, owned_row in enumerate(sorted(owned, key=lambda row: row["data"]["type"] != 3)):
                     data = owned_row["data"]
-                    closure = {"path": data.get("path"), "title": data.get("title"), "status": "not_closed"}
+                    closure = {"path": data["path"], "title": data["title"], "status": "stranded_owned"}
                     report["closures"].append(closure)
 
                     def close_owned():
-                        # Re-enumerate every time: closing a drawing may unload
-                        # its part. Never dereference a closed original handle.
-                        now = inventory(f"before_close_{index}")
-                        require(complete(now), "cannot safely close after incomplete re-inventory")
+                        now = require_owned_inventory(inventory(f"before_close_{index}"),
+                                                      f"before_close_{index}", clean=True)
                         matches = [row for row in now if canonical(row["data"]["path"]) == canonical(data["path"])]
                         if not matches:
                             closure["status"] = "already_unloaded"
                             return
-                        require(len(matches) == 1, "ambiguous path during owned-document closure")
-                        live = matches[0]
-                        require(same(live["native"], owned_row["native"], f"close[{index}].live_vs_owned"), "owned document identity changed before close")
-                        require(not any(same(live["native"], old["native"], f"close[{index}].live_vs_initial") for old in initial),
-                                "refusing to close an initial document")
-                        title = live["data"]["title"]
+                        require(len(matches) == 1, "ambiguous owned path before CloseDoc")
+                        title = matches[0]["data"]["title"]
                         require(title and sum(row["data"]["title"] == title for row in now) == 1,
                                 "ambiguous/empty CloseDoc title")
-                        app.CloseDoc(title)  # VT_VOID: do not truth-test.
+                        # Last native read before CloseDoc. Never set this flag:
+                        # closing the last doc with False may terminate the seat.
+                        require(user_control(f"before_close_{index}") is True,
+                                "UserControl not proven True; owned documents stranded")
+                        app.CloseDoc(title)  # VT_VOID; may also unload the owned part.
                         closure["status"] = "close_requested_without_save"
 
                     attempt(f"close[{index}]", close_owned)
-                if initial_active is not MISSING and initial_active is not None and initial is not None:
-                    def restore_active():
-                        now = inventory("before_restore_active")
-                        require(complete(now), "cannot restore active document without inventory")
-                        matches = [row for row in now if same(row["native"], initial_active, "restore_active.inventory_vs_initial")]
-                        require(len(matches) == 1, "initial active document no longer present")
-                        data = matches[0]["data"]
-                        activate(initial_active, data["path"] or data["title"], "restore_active")
-                    attempt("restore_active", restore_active)
-                # Adapter state restoration is independent of native activation.
-                if initial_current is not MISSING:
-                    adapter.currentModel = initial_current
+                # Initial state was proven empty/null. Only restore this Python
+                # reference; never activate anything or force native emptiness.
+                adapter.currentModel = initial_current
                 final = inventory("final")
                 final_active = attempt("final.ActiveDoc", lambda: app.ActiveDoc)
                 report["reads"]["final.ActiveDoc_state"] = (
                     "UNAVAILABLE" if final_active is MISSING else "NULL" if final_active is None else "PRESENT"
                 )
-                if initial_active is not MISSING and final_active is not MISSING:
-                    observe("final.active_identity_restored", lambda: (
-                        require(final_active is None if initial_active is None else
-                                final_active is not None and same(final_active, initial_active, "final.active_identity"),
-                                "initial active identity was not restored") or True
-                    ))
-                if initial_current is not MISSING:
-                    observe("final.currentModel_identity_restored", lambda: (
-                        require(adapter.currentModel is None if initial_current is None else
-                                adapter.currentModel is not None and same(adapter.currentModel, initial_current, "final.currentModel_identity"),
-                                "initial adapter.currentModel identity was not restored") or True
-                    ))
-                if initial is not None and final is not None:
-                    observe("final.inventory_count_unchanged", lambda: (
-                        require(len(initial) == len(final), "document inventory count changed") or True
-                    ))
-                    for index, old in enumerate(initial):
-                        def compare_initial():
-                            matches = [row for row in final if same(row["native"], old["native"], f"final.initial_document[{index}]")]
-                            require(len(matches) == 1, "initial native identity missing or duplicated")
-                            current = matches[0]["data"]
-                            require(all(key in old["data"] and key in current and old["data"][key] == current[key]
-                                        for key in ("path", "title", "type", "dirty")),
-                                    "initial document metadata/dirty flag changed")
-                            return True
-                        observe(f"final.initial_document[{index}]_unchanged", compare_initial)
+                observe("final.inventory_empty", lambda: (
+                    require(complete(final) and final == [], "native documents remain or final inventory unavailable") or True
+                ))
+                observe("final.active_identity_restored", lambda: (
+                    require(final_active is None, "initial null ActiveDoc was not restored") or True
+                ))
+                observe("final.currentModel_identity_restored", lambda: (
+                    require(adapter.currentModel is None, "initial null currentModel was not restored") or True
+                ))
                 for kind in ("drawing", "part"):
                     attempt(f"final.{kind}.identity", lambda kind=kind: pinned_identity(kind, "final"))
                 attempt("callback.checkpoint", checkpoint)
             return {"report": str(REPORT), "collection_completed": report["collection_completed"]}
 
-        report["runner_exit_code"] = run_owned_diagnostic(probe)
-        require(report["runner_exit_code"] == 0, "owned runner failed to attach, execute, or disconnect")
-        require(report["collection_completed"], "control collection did not complete")
+        runner_failures = []
+        report["runner_exit_code"] = run_owned_diagnostic(probe, failures=runner_failures)
+        for phase, error, original_tb in runner_failures:
+            failure(f"runner.{phase}", error, original_tb)
     except (Exception, SystemExit) as error:
         failure("driver", error)
     finally:
