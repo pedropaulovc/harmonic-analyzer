@@ -1,4 +1,29 @@
-r"""Create the drawing for the oblique trammel's pivot pin (MHA-CH-06-TL-23)."""
+r"""Create the oblique trammel pivot-pin drawing (MHA-CH-06-TL-23).
+
+Layout evidence: the d349b9930 native PDF and layout-audit report from worker
+swmaker00000a, drawing leaf 2026-10-21T05:32:39Z. All 20 gating records are
+visible paper defects, not collector phantoms: five strike the flange/upper-boss
+stack, three strike the bearing-end lead, eight involve the carrier-end lead,
+cross-hole size or 6.0 station, three involve the lower-boss/fit/radius group,
+and one is the inspection note's right-border overrun.
+
+Keep the 3:1 profile and 2:1 pictorial. The upper-boss block occupies the
+90.5..164 mm witness bay; the flange and fitted lower-boss blocks stack in
+the 213.5..279.5 mm bay. In particular the lower-boss line is above its
+182.05 mm witness origins, so neither witness descends through the native
+R0.2 MAX shoulder at Y134.2219 mm or its material-arc leader. The radius
+itself, its attachment and the measured (1.15) reference remain unchanged.
+
+The two left callouts have separate rows outside X90.5; the bearing-end lead
+uses clear paper below the pictorial. Budget the inspection note's measured
+107.7045 mm native extent, not character count. Raising the bearing-fit block
+also separates it from the flange-diameter block. Of the six advisory records,
+the cross-hole diameter crossing its own axis-location witness is an ordinary
+dimension intersection, not a text collision; the other five motivate the
+same lane repairs. No finding is masked or reclassified here. These are
+measured-boundary placement choices, not after-fix native acceptance: the
+owner must regenerate the audit/PDF and inspect complete text and leaders.
+"""
 
 from __future__ import annotations
 
@@ -59,9 +84,9 @@ PROFILE_CENTER = (0.185, 0.164)
 ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (2, 1)
 ISO_NOTE_XY = (0.325, 0.252)
-# Clear paper below the isometric and the lower-boss callout;
-# four source-owned lines stay above the title block's 65 mm keep-out.
-STOP_FACE_NOTE_XY = (0.315, 0.096)
+# The native four-row note is 107.7045 mm wide. Keep its whole extent clear
+# of the right border, bearing-fit text and 66 mm title-block keep-out.
+STOP_FACE_NOTE_XY = (0.302, 0.096)
 INSPECTION_NOTE_CHAR_HEIGHT = 0.0035
 _ABOVE = PROFILE_CENTER[1] + part_spec.FLANGE_DIA / 2.0 * _S
 _BELOW = PROFILE_CENTER[1] - part_spec.FLANGE_DIA / 2.0 * _S
@@ -81,19 +106,19 @@ CHAMFER_Y = _ABOVE - 0.025
 PROFILE_KEEP = {
     "CarrierLength": (_span_mid(CARRIER_STATION), ROW_Y[0]),
     "BearingLength": (_x(BEARING_LENGTH / 2.0), ROW_Y[1]),
-    "UpperBossHeight": (_x((part_spec.FLANGE_TOP_STATION + CARRIER_STATION) / 2.0), 0.210),
+    "UpperBossHeight": (0.125, 0.211),
     "PinLength": (_span_mid(0.0), ROW_Y[2]),
-    "TopChamfer": (_x(OVERALL_LENGTH) - 0.012, CHAMFER_Y),
-    "BottomChamfer": (_x(0.0) + 0.012, CHAMFER_Y),
-    "BearingDia": (_x(BEARING_LENGTH / 2.0), 0.101),
+    "TopChamfer": (0.050, CHAMFER_Y),
+    "BottomChamfer": (0.310, 0.130),
+    "BearingDia": (_x(BEARING_LENGTH / 2.0), 0.104),
     "CarrierDia": (_x(OVERALL_LENGTH) + 0.004, 0.082),
     "CollarDia": (_x(CARRIER_STATION - 5.0), 0.127),
     "FlangeDia": (_x(part_spec.FLANGE_BOTTOM_STATION + part_spec.FLANGE_THICK / 2.0), 0.079),
-    "FlangeThick": (_x(part_spec.FLANGE_BOTTOM_STATION + part_spec.FLANGE_THICK / 2.0), 0.229),
-    "LowerBossHeight": (0.303, 0.118),
+    "FlangeThick": (0.249, 0.224),
+    "LowerBossHeight": (0.245, 0.202),
     "CarrierFilletR": (_x(CARRIER_STATION) - 0.012, 0.137),
     "SeatFilletR": (_x(COLLAR_STATION) + 0.012, 0.137),
-    "CrossHoleDia": (_x(part_spec.CROSS_HOLE_STATION) - 0.035, 0.209),
+    "CrossHoleDia": (0.050, 0.230),
     "CrossHoleFromEnd": (_x(OVERALL_LENGTH - part_spec.CROSS_HOLE_FROM_END / 2.0), 0.192),
 }
 CENTERLINE_PICK = (_x(CARRIER_STATION - 5.0), PROFILE_CENTER[1] + 0.003)
