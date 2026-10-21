@@ -1880,6 +1880,8 @@ def test_config_files_conservative_on_unknown_use():
         "import _config\nx = _config._doc('nope')\n",  # literal but unknown doc
         "import _config\nx = _config.machine('no_such_sub')\n",  # unknown machine subsystem
         "from _config import machine\nx = machine()\n",  # bare-name import (untracked)
+        "from ._config import machine\n",  # relative import remains untracked
+        "_config = replacement\n",  # bare stores are not scope-analyzed
     ]
     for src in raise_cases:
         try:
@@ -1933,6 +1935,12 @@ def test_config_files_resolve_known_forms():
     )
     # no _config use at all -> empty read-set (no config dependency).
     assert _tokens("WIDTH = 3.0\n") == frozenset()
+    assert _tokens("_config.machine('output')\n") == frozenset(
+        {"machine/output.yaml"}
+    )
+    assert _tokens("from . import _config\n_config.active_count()\n") == frozenset(
+        {"machine/channels.yaml"}
+    )
 
 
 @pytest.mark.parametrize(
@@ -1958,6 +1966,122 @@ def test_bare_config_module_references_fail_closed(monkeypatch, tmp_path, source
             bg._config_tokens_in_source(script)
     finally:
         bg.config_files_of.cache_clear()
+
+
+@pytest.mark.parametrize(
+    "imports",
+    [
+        "    import _config as \uff43\uff46\uff47\n",
+        "    import _config as cfg\n    import _config as cfg\n",
+    ],
+    ids=["normalized-only", "repeated-alias"],
+)
+def test_config_alias_discovery_includes_later_nested_normalized_imports(
+    tmp_path, imports
+):
+    source = tmp_path / "aliases.py"
+    source.write_text(
+        "value = cfg.machine('output')\n"
+        "def load():\n"
+        + imports,
+        encoding="utf-8",
+    )
+    assert bg._config_tokens_in_source(source) == frozenset({"machine/output.yaml"})
+
+
+def test_config_facts_distinguish_calls_references_and_literal_arguments():
+    for expression, use, argument in (
+        ("machine('output')", bg._ConfigUse.CALL, "output"),
+        ("machine(name)", bg._ConfigUse.CALL, None),
+        ("machine()", bg._ConfigUse.CALL, None),
+        ("machine(subsystem='output')", bg._ConfigUse.CALL, None),
+        ("fit", bg._ConfigUse.REFERENCE, None),
+        ("fit('gear_mesh').limit", bg._ConfigUse.CALL, "gear_mesh"),
+        ("fit.lower()", bg._ConfigUse.REFERENCE, None),
+    ):
+        facts = bg._source_facts(f"_config.{expression}\n", bg._CONFIG_MODULES)
+        accessor = "machine" if expression.startswith("machine") else "fit"
+        assert facts.config_references == ((accessor, use, argument),)
+
+
+@pytest.mark.parametrize(
+    "config_use",
+    ["from _config import machine\n", "send(_config)\n"],
+    ids=["from-import", "escaped-module"],
+)
+def test_unknown_config_keeps_useful_import_and_function_facts(
+    tmp_path, monkeypatch, config_use
+):
+    script = tmp_path / "entry.py"
+    source = "import helper\n" + config_use + "\ndef build():\n    helper.make()\n"
+    script.write_text(source, encoding="utf-8")
+    (tmp_path / "helper.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", tmp_path)
+    bg.clear_import_caches()
+    bg.config_files_of.cache_clear()
+    try:
+        assert bg._direct_local_imports(script) == frozenset({"helper"})
+        calls, _, aliases = bg._module_call_graph((("entry", source), ("helper", None)))
+        assert calls[("entry", "build")] == (
+            frozenset(),
+            frozenset({("helper", "make")}),
+        )
+        assert aliases["entry"] == {"helper": "helper"}
+        assert bg.config_files_of(script) == frozenset({"**"})
+        with pytest.raises(bg._UnknownConfigUse):
+            bg._config_tokens_in_source(script)
+    finally:
+        bg.config_files_of.cache_clear()
+        bg.clear_import_caches()
+
+
+def test_source_facts_preserve_function_subtrees_and_binding_order():
+    source = (
+        "import one as alias\n"
+        "module_only()\n"
+        "class Top:\n"
+        "    def method(self):\n"
+        "        ignored()\n"
+        "@decorate(factory())\n"
+        "async def f(value=default()):\n"
+        "    import two as alias\n"
+        "    direct()\n"
+        "    m.call()\n"
+        "    def nested():\n"
+        "        inner()\n"
+        "    class Nested:\n"
+        "        def method(self):\n"
+        "            method_call()\n"
+        "    later = lambda: lambda_call()\n"
+        "import three as alias\n"
+        "def f():\n"
+        "    replacement()\n"
+    )
+    facts = bg._source_facts(source, bg._CONFIG_MODULES)
+    assert facts.imports == (("one", "alias"), ("three", "alias"), ("two", "alias"))
+    assert facts.functions == (
+        (
+            "f",
+            frozenset(
+                {
+                    "decorate",
+                    "factory",
+                    "default",
+                    "direct",
+                    "inner",
+                    "method_call",
+                    "lambda_call",
+                }
+            ),
+            frozenset({("m", "call")}),
+        ),
+        ("f", frozenset({"replacement"}), frozenset()),
+    )
+    calls, _, aliases = bg._module_call_graph(
+        (("entry", source), ("one", None), ("two", None), ("three", None))
+    )
+    assert calls == {("entry", "f"): (frozenset({"replacement"}), frozenset())}
+    assert aliases["entry"] == {"alias": "two"}
 
 
 def test_config_accessor_coverage():
@@ -2355,15 +2479,53 @@ def test_assembly_part_cell_prints_the_slug(stem):
 
 
 
-def test_config_syntax_is_reused_by_content_not_source_path():
-    bg._config_references_in_text.cache_clear()
-    first = "import _config as cfg\nx = cfg.machine('gear_train')\n"
-    changed = "import _config as cfg\nx = cfg.machine('output')\n"
-    with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
-        assert _tokens(first) == frozenset({"machine/gear_train.yaml"})
-        assert _tokens(first) == frozenset({"machine/gear_train.yaml"})
-        assert _tokens(changed) == frozenset({"machine/output.yaml"})
-    assert parse.call_count == 2, "identical shared helper syntax must be analyzed once"
+@pytest.mark.parametrize(
+    "config_first", [False, True], ids=["imports-first", "config-first"]
+)
+def test_source_syntax_is_reused_by_content_not_source_path(
+    tmp_path, monkeypatch, config_first
+):
+    _fresh_store(monkeypatch, tmp_path / "facts")
+    bg._source_facts.cache_clear()
+    first = (
+        "import helper\nimport _config as cfg\n"
+        "def build():\n    helper.make()\n"
+        "x = cfg.machine('gear_train')\n"
+    )
+    changed = first.replace("gear_train", "output")
+    script = tmp_path / "entry.py"
+    twin = tmp_path / "twin.py"
+    script.write_text(first, encoding="utf-8")
+    twin.write_text(first, encoding="utf-8")
+    (tmp_path / "helper.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", tmp_path)
+    bg.clear_import_caches()
+    try:
+        with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
+            if config_first:
+                assert bg._config_tokens_in_source(script) == frozenset(
+                    {"machine/gear_train.yaml"}
+                )
+            assert bg._direct_local_imports(script) == frozenset({"helper"})
+            assert bg._config_tokens_in_source(twin) == frozenset(
+                {"machine/gear_train.yaml"}
+            )
+            calls, _, aliases = bg._module_call_graph(
+                (("entry", first), ("helper", None))
+            )
+            assert calls[("entry", "build")] == (
+                frozenset(),
+                frozenset({("helper", "make")}),
+            )
+            assert aliases["entry"] == {"helper": "helper"}
+            script.write_text(changed, encoding="utf-8")
+            assert bg._config_tokens_in_source(script) == frozenset(
+                {"machine/output.yaml"}
+            )
+        assert parse.call_count == 2, "each source content must be analyzed once"
+    finally:
+        bg.clear_import_caches()
+        bg._source_facts.cache_clear()
 
 
 def test_cached_config_syntax_still_resolves_current_family_membership():
@@ -2376,19 +2538,16 @@ def test_cached_config_syntax_still_resolves_current_family_membership():
     assert resolve.call_count == 2, "filesystem/config resolution is not a syntax fact"
 
 
-def test_cached_config_syntax_preserves_unknown_reference_rejection():
+def test_cached_config_syntax_preserves_unknown_reference_rejection(tmp_path, monkeypatch):
+    _fresh_store(monkeypatch, tmp_path)
     source = "import _config as cfg\nx = cfg.machine\n"
-    bg._config_references_in_text.cache_clear()
+    bg._source_facts.cache_clear()
     with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
         for _ in range(2):
-            try:
+            with pytest.raises(bg._UnknownConfigUse):
                 _tokens(source)
-            except bg._UnknownConfigUse:
-                continue
-            raise AssertionError(
-                "unclassified config reference must remain conservative"
-            )
     assert parse.call_count == 1
+    bg._source_facts.cache_clear()
 
 
 def _run() -> int:
@@ -2442,39 +2601,103 @@ def test_syntax_facts_are_keyed_by_content_not_by_file(tmp_path, monkeypatch):
     assert calls == ["import a", "import b"]
 
 
-def test_module_syntax_round_trips_through_the_store(tmp_path, monkeypatch):
-    source = "import os\nfrom . import x\n\ndef f():\n    g()\n    m.h()\n"
+def test_source_facts_round_trip_through_the_store(tmp_path, monkeypatch):
+    source = (
+        "import _config as cfg\nfrom . import x\n"
+        "\ndef f():\n    g()\n    m.h()\n"
+        "    return cfg.machine('output')\n"
+        "fit = cfg.fit\n"
+    )
     _fresh_store(monkeypatch, tmp_path)
-    bg._module_syntax.cache_clear()
-    expected = bg._module_syntax(source)
+    bg._source_facts.cache_clear()
+    expected = bg._source_facts(source, bg._CONFIG_MODULES)
+    assert expected.imports == (("_config", "cfg"),)
+    assert expected.from_imports == ((1, None, (("x", None),)),)
+    assert expected.functions == (
+        ("f", frozenset({"g"}), frozenset({("m", "h"), ("cfg", "machine")})),
+    )
+    assert expected.config_references == (
+        ("fit", bg._ConfigUse.REFERENCE, None),
+        ("machine", bg._ConfigUse.CALL, "output"),
+    )
+    # Both retained facts and encoded values contain no AST or mutable maps.
+    pending = [expected, *bg._FACTS._entries.values()]
+    while pending:
+        value = pending.pop()
+        assert type(value) in (
+            bg._SourceFacts,
+            tuple,
+            frozenset,
+            str,
+            int,
+            type(None),
+            bg._ConfigUse,
+        )
+        if isinstance(value, (tuple, frozenset)):
+            pending.extend(value)
     bg._FACTS.save()
     _fresh_store(monkeypatch, tmp_path)
-    bg._module_syntax.cache_clear()
+    bg._source_facts.cache_clear()
     with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
-        assert bg._module_syntax(source) == expected
-    bg._module_syntax.cache_clear()
+        restored = bg._source_facts(source, bg._CONFIG_MODULES)
+        assert restored == expected
+        assert restored.config_references[0][1] is bg._ConfigUse.REFERENCE
+        assert restored.config_references[1][1] is bg._ConfigUse.CALL
+        assert _tokens(source) == frozenset(
+            {"machine/output.yaml", "tolerances/*"}
+        )
+    bg._source_facts.cache_clear()
 
 
-def test_config_references_round_trip_through_the_store(tmp_path, monkeypatch):
-    source = "import _config\n\ndef f():\n    return _config.tolerances()\n"
-    modules = frozenset({"_config"})
+def test_config_module_sets_have_distinct_persisted_facts(tmp_path, monkeypatch):
+    source = "import custom as cfg\nx = cfg.machine('output')\n"
+    custom_modules = frozenset({"custom"})
     _fresh_store(monkeypatch, tmp_path)
-    bg._config_references_in_text.cache_clear()
-    expected = bg._config_references_in_text(source, modules)
-    assert expected and isinstance(expected[0][1], bg._ConfigUse)
+    bg._source_facts.cache_clear()
+    assert bg._source_facts(source, bg._CONFIG_MODULES).config_references == ()
+    assert bg._source_facts(source, custom_modules).config_references == (
+        ("machine", bg._ConfigUse.CALL, "output"),
+    )
     bg._FACTS.save()
     _fresh_store(monkeypatch, tmp_path)
-    bg._config_references_in_text.cache_clear()
+    bg._source_facts.cache_clear()
     with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
-        assert bg._config_references_in_text(source, modules) == expected
-    bg._config_references_in_text.cache_clear()
+        assert bg._source_facts(source, custom_modules).config_references == (
+            ("machine", bg._ConfigUse.CALL, "output"),
+        )
+        assert bg._source_facts(source, bg._CONFIG_MODULES).config_references == ()
+    bg._source_facts.cache_clear()
+
+
+def test_negative_and_unknown_config_facts_preserve_results_after_reload(
+    tmp_path, monkeypatch
+):
+    negative = "import helper\n"
+    unknown = "import helper\nsend(_config)\n"
+    _fresh_store(monkeypatch, tmp_path)
+    bg._source_facts.cache_clear()
+    assert _tokens(negative) == frozenset()
+    with pytest.raises(bg._UnknownConfigUse):
+        _tokens(unknown)
+    assert bg._source_facts(negative, bg._CONFIG_MODULES).config_references == ()
+    assert bg._source_facts(unknown, bg._CONFIG_MODULES).config_references is None
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    bg._source_facts.cache_clear()
+    with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
+        assert _tokens(negative) == frozenset()
+        with pytest.raises(bg._UnknownConfigUse):
+            _tokens(unknown)
+        assert bg._source_facts(negative, bg._CONFIG_MODULES).config_references == ()
+        assert bg._source_facts(unknown, bg._CONFIG_MODULES).config_references is None
+    bg._source_facts.cache_clear()
 
 
 def test_syntax_errors_are_never_stored(tmp_path, monkeypatch):
     _fresh_store(monkeypatch, tmp_path)
-    bg._module_syntax.cache_clear()
+    bg._source_facts.cache_clear()
     with pytest.raises(SyntaxError):
-        bg._module_syntax("def (:\n")
+        bg._source_facts("def (:\n", bg._CONFIG_MODULES)
     bg._FACTS.save()
     assert not list(tmp_path.glob("*.pickle"))
 
@@ -2524,15 +2747,25 @@ def test_the_store_file_is_named_for_this_analyzer(tmp_path, monkeypatch):
 
 def test_a_malformed_entry_is_overwritten_by_the_recomputed_fact(tmp_path, monkeypatch):
     store = _fresh_store(monkeypatch, tmp_path)
-    bg._module_syntax.cache_clear()
+    bg._source_facts.cache_clear()
     source = "import json\n"
-    bg._module_syntax(source)
-    (key,) = [k for k in store._entries]
-    store._entries[key] = ("garbage",)
-    bg._module_syntax.cache_clear()
-    bg._module_syntax(source)
-    assert bg._ModuleSyntax(*store._entries[key]) == bg._module_syntax(source)
-    bg._module_syntax.cache_clear()
+    expected = bg._source_facts(source, bg._CONFIG_MODULES)
+    (key,) = store._entries
+    valid = store._entries[key]
+    for malformed in (
+        ("garbage",),
+        (("json",), *valid[1:]),
+        (valid[0], ((True, None, (("helper", None),)),), *valid[2:]),
+        (valid[0], ((1, None, ("helper",)),), *valid[2:]),
+        (*valid[:2], (("f", frozenset(), frozenset({"m.h"})),), valid[3]),
+    ):
+        store._entries[key] = malformed
+        bg._source_facts.cache_clear()
+        with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
+            assert bg._source_facts(source, bg._CONFIG_MODULES) == expected
+        assert parse.call_count == 1
+        assert store._entries[key] == valid
+    bg._source_facts.cache_clear()
 
 
 def test_no_nameable_home_disables_the_store_instead_of_failing(monkeypatch):
@@ -2553,22 +2786,39 @@ def test_no_nameable_home_disables_the_store_instead_of_failing(monkeypatch):
 
     monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
     monkeypatch.setattr(bg.Path, "home", classmethod(no_home))
-    bg._module_syntax.cache_clear()
-    assert bg._module_syntax("import os\n").imports == (("os", None),)
+    bg._source_facts.cache_clear()
+    assert bg._source_facts("import os\n", bg._CONFIG_MODULES).imports == (("os", None),)
     assert bg._FACTS._path is None
-    bg._module_syntax.cache_clear()
+    bg._source_facts.cache_clear()
 
 
-def test_a_malformed_stored_entry_is_recomputed(tmp_path, monkeypatch):
+def test_malformed_config_facts_recompute_even_for_an_import_consumer(
+    tmp_path, monkeypatch
+):
     store = _fresh_store(monkeypatch, tmp_path)
-    bg._module_syntax.cache_clear()
-    source = "import os\n"
-    expected = bg._module_syntax(source)
-    for key in list(store._entries):
-        store._entries[key] = ("not", "a", "module", "syntax")
-    bg._module_syntax.cache_clear()
-    assert bg._module_syntax(source) == expected
-    bg._module_syntax.cache_clear()
+    bg._source_facts.cache_clear()
+    source = "import helper\nx = _config.machine('output')\n"
+    assert _tokens(source) == frozenset({"machine/output.yaml"})
+    (key,) = store._entries
+    valid = store._entries[key]
+    for malformed_references in (
+        {},
+        (("machine", "unknown-use", "output"),),
+        (("machine", "call", False),),
+        (("machine", "call"),),
+    ):
+        store._entries[key] = (*valid[:3], malformed_references)
+        bg._source_facts.cache_clear()
+        bg._module_call_graph.cache_clear()
+        with patch.object(bg.ast, "parse", wraps=bg.ast.parse) as parse:
+            _, _, aliases = bg._module_call_graph(
+                (("entry", source), ("helper", None))
+            )
+            assert aliases["entry"] == {"helper": "helper"}
+            assert _tokens(source) == frozenset({"machine/output.yaml"})
+        assert parse.call_count == 1
+        assert store._entries[key] == valid
+    bg._source_facts.cache_clear()
 
 
 # --- Fastener catalog per-row digest (dict-table projection) -------------------
