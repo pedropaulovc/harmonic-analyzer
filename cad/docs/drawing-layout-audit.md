@@ -82,26 +82,37 @@ the zoomed-readback precedent, not proof of this longer note. Focused native
 post-fix and printed-sheet acceptance remain required; no fallback or
 relaxed containment is introduced.
 
-## Measuring-stick item-1 balloon visibility
+## Measuring-stick upright cutover and enforced review
 
-The measuring-stick assembly's exploded sheet pins the stop-block balloon to
-the midpoint of its +X/+Z vertical floor edge, in the part-local frame:
-`(BLOCK_LENGTH, FLOOR_THICKNESS / 2, BLOCK_DEPTH)` from `ms_stop_spec`.
-That edge is below the window and on the closed side facing the isometric
-camera; the stick withdraws toward -Z while the block stays stationary.
-The other families retain their automatic anchors and screw-instance pins.
+The measuring-stick assembly uses the existing automatic family-anchor
+selection for its stop-block balloon. The explicit part-local
+`(BLOCK_LENGTH, FLOOR_THICKNESS / 2, BLOCK_DEPTH)` override belonged to the old
+orientation: #1764's upright frames and camera make that point hidden. The
+override and its coordinate-pinning test are retired, not replaced with another
+corner or a new frame helper. The plate-screw instance pins remain unchanged.
+This cutover depends on #1764's upright orientation before the final combined
+candidate can pass its gates or merge; the pre-#1764 standalone source is not a
+new balloon-visibility fix.
 
-The retained 2026-10-20 comparison of `ecf642f7` and `cc36b453` exposed why
-landing readback alone is insufficient: the candidate's item-1 arrow was
-obscured by the graduated stick, while main's arrow was clearly exposed.
-An explicit `BalloonAnchor` still uses the existing native own-component
-hit test and final leader-landing checks; it is not an occlusion waiver.
-Native regeneration, the printed sheet-2 eye pass (including the other
-balloons), and the package's machinist gate remain required to establish
-acceptance of this replacement anchor.
-The drawing declares `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE`,
+Automatic selection retains the existing exact-instance, BOM and attachment
+checks and records the method used. It does not guarantee that every fallback
+has an exact hit-tested visible point. In particular, `listed-edge` leaves the
+reported landing `sheet_xy` as `None`: its attachment checks prove component
+ownership, not a chosen visible landing or freedom from occlusion. No geometry,
+selection guard or tolerance is changed by retiring the override.
+
+The earlier old-orientation comparison showed why attachment readback alone is
+insufficient: an item-1 arrow could belong to the block yet print behind the
+graduated stick. The upright owner's automatic-anchor result is prior evidence,
+not acceptance of a new combined candidate. That exact candidate, including
+#1764, still requires native regeneration, exact-instance/BOM/attachment
+readback, inspection of all printed measuring-stick sheets and balloon landings,
+and the package's machinist gate. No fallback method waives the printed-sheet
+visibility inspection.
+
+The drawing retains `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE`,
 opting into the existing `check:machinist_review:ms_measuring_stick_assembly`
-leaf; it previously had no declaration and therefore no review task.
+leaf. A FIX or ERROR remains a build failure; no gate is waived.
 
 ## Where it runs
 
