@@ -43,13 +43,11 @@ from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
+    BalloonAnchor,
     BalloonLanding,
-    add_auto_balloons,
-    assert_balloon_landings,
 )
 from _drawing_common import (
     DrawingOutputs,
-    finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_high_quality_shaded_with_edges,
@@ -60,6 +58,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_group_perf_probe import native_input_identity, run_matched_group_probe
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -221,6 +220,9 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
+# Diagnostic manual arm: exact BALLOON_ANCHORS from fb1fe894e595c397d0945af042f7071f16200299,
+# recipe blob eb018a8805b7185df499ec4ab409ca8bb3b39765.
+OLD_EXPLODED_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
@@ -877,10 +879,14 @@ def _assert_exploded_balloon_bounds(
                 )
 
 
-def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """The exploded isometric, its BOM (with vendor SKU) and one native EDGE
-    balloon on each BOM family's own visible edge; returns the final-rebuild
-    attachment, caption and rendered-circle bounds check."""
+def _place_exploded_sheet(
+    adapter: Any, report: dict[str, Any]
+) -> tuple[
+    Any,
+    tuple[tuple[str, str], ...],
+    Callable[[Any, list[BalloonLanding]], None],
+]:
+    """Actual exploded view/BOM setup, ending at the unchanged helper boundary."""
     label = "summing exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -905,35 +911,34 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="summing",
     )
     items = _validate_bom(adapter, table)
-    landings = add_auto_balloons(
-        adapter,
-        exploded,
-        items=items,
-        label="summing exploded-view BOM coverage",
-    )
-    if len(landings) != len(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"summing exploded view carries {len(landings)} balloons, "
-            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
+    report["setup"] = {
+        "bom_items": items,
+        "bom_cells": _bom_cells(_early_bound(table, "ITableAnnotation")),
+        "fitted_scale": tuple(
+            float(value) for value in _early_bound(exploded, "IView").ScaleRatio
+        ),
+        "fitted_outline_m": _view_outline(exploded, label=label),
+        "configuration": str(_early_bound(exploded, "IView").ReferencedConfiguration),
+        "exploded_view": EXPLODED_VIEW_NAMES[configuration],
+    }
+
+    def finish_and_assert_bounds(
+        current_adapter: Any, landings: list[BalloonLanding]
+    ) -> None:
+        bottom, _top = _bom_vertical_limits(table)
+        caption = _add_note_block(
+            current_adapter,
+            SHEET_NAMES[1],
+            notes.EXPLODED_CAPTION,
+            exploded_caption_xy(bottom),
+            label="exploded-view caption",
         )
-    bottom, _top = _bom_vertical_limits(table)
-    caption = _add_note_block(
-        adapter,
-        SHEET_NAMES[1],
-        notes.EXPLODED_CAPTION,
-        exploded_caption_xy(bottom),
-        label="exploded-view caption",
-    )
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError("summing exploded caption rebuild failed")
-    _assert_exploded_caption(adapter, table, caption)
+        if not current_adapter.currentModel.EditRebuild3():
+            raise RuntimeError("summing exploded caption rebuild failed")
+        caption_box = _assert_exploded_caption(current_adapter, table, caption)
+        _assert_exploded_balloon_bounds(current_adapter, table, landings, caption_box)
 
-    def settled() -> None:
-        assert_balloon_landings(adapter, landings)
-        caption_box = _assert_exploded_caption(adapter, table, caption)
-        _assert_exploded_balloon_bounds(adapter, table, landings, caption_box)
-
-    return settled
+    return exploded, items, finish_and_assert_bounds
 
 
 def _place_steps_sheet(adapter: Any) -> None:
@@ -972,6 +977,26 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.sm_summing_assembly")
 async def build(adapter: Any) -> dict[str, str]:
+    """Diagnostic ONLY: exploded10 ABBA, STOP before later sheets/publication."""
+    await run_matched_group_probe(
+        adapter,
+        template=DRAWING_TEMPLATES[SPEC.layout].path,
+        case="sm-exploded-10",
+        manual_recipe_blob="eb018a8805b7185df499ec4ab409ca8bb3b39765",
+        anchors=OLD_EXPLODED_ANCHORS,
+        label="summing exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+        prepare_arm=_prepare_exploded_perf_arm,
+    )
+
+
+async def _prepare_exploded_perf_arm(
+    adapter: Any, report: dict[str, Any]
+) -> tuple[
+    Any,
+    tuple[tuple[str, str], ...],
+    Callable[[Any, list[BalloonLanding]], None],
+]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open summing drawing source", await adapter.open_model(str(SOURCE)))
@@ -986,27 +1011,11 @@ async def build(adapter: Any) -> dict[str, str]:
             f"summing source Number {properties['Number']!r} != {notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
+    report["native_inputs"] = native_input_identity(source_model, SOURCE)
 
     _create_sheets(adapter)
-    assembled_settled = _place_assembled_sheet(adapter)
-    exploded_settled = _place_exploded_sheet(adapter)
-    _place_steps_sheet(adapter)
-
-    def settled() -> None:
-        assembled_settled()
-        exploded_settled()
-
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title=PDF_TITLE,
-        scale=ASSEMBLED_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        sheet_scales=SHEET_SCALES,
-        settled_checks=(settled,),
-    )
+    _place_assembled_sheet(adapter)
+    return _place_exploded_sheet(adapter, report)
 
 
 def _parse_args() -> argparse.Namespace:

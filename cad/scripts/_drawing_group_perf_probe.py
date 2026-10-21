@@ -1,4 +1,4 @@
-"""Issue-1667 wheel-helper ABBA diagnostic ONLY; NEVER MERGE.
+"""Issue-1667 remaining-group helper ABBA diagnostic ONLY; NEVER MERGE.
 
 Four fresh drawings on one held seat, current template and native inputs. The
 production helpers are called unchanged. No save/export or successful return is
@@ -8,11 +8,10 @@ allowed: the fixed sequence ends in an explicit STOP before cache publication.
 from __future__ import annotations
 
 import hashlib
-import math
 from pathlib import Path
 import re
 import time
-from typing import Any, Awaitable, Callable, NoReturn, Sequence
+from typing import Any, Awaitable, Callable, Mapping, NoReturn, Sequence
 
 from solidworks_mcp.adapters.sw_type_info import constant
 
@@ -26,50 +25,20 @@ from _session import (
     discard_open_documents,
 )
 import _telemetry
-import mg_magnifier_explode_spec as explode
-import mg_vn_wheel_axle_front_washer_spec as front_washer
-import mg_vn_wheel_axle_nut_spec as axle_nut
 
 
-BASE_COMMIT = "860dcfd433b7dd7b5257acc8ea7106502adf3c3c"
-BASE_RECIPE_BLOB = "bbf5146a5f6f6b792631db8ed048352067b83515"
-PRODUCTION_COMMIT = "fb1fe894e595c397d0945af042f7071f16200299"
+MANUAL_COMMIT = "fb1fe894e595c397d0945af042f7071f16200299"
+PRODUCTION_COMMIT = "01ec8054295c68a72a095db84f0ba6940f5f0d96"
 SEQUENCE = ("manual", "native", "native", "manual")
 
-# Recovered with git show <BASE_COMMIT>:cad/scripts/draw_mg_magnifier_assembly.py,
-# wheel anchor block, not from the earlier template experiment. Both imported specs
-# have identical git blobs at BASE_COMMIT and PRODUCTION_COMMIT. Keep the original
-# point construction and manual locknut pin; native may choose another shown nut.
-_WASHER_R = front_washer.OD / 2.0
-_NUT_FLAT_R = axle_nut.ACROSS_FLATS / 2.0 / math.cos(math.radians(15.0))
-OLD_WHEEL_ANCHORS = {
-    stem: balloons.BalloonAnchor() for stem in explode.WHEEL_GROUP_STEMS
-} | {
-    "mg-vn-wheel-axle-front-washer": balloons.BalloonAnchor(
-        point_mm=(
-            _WASHER_R * math.cos(math.radians(45.0)),
-            _WASHER_R * math.sin(math.radians(45.0)),
-            0.0,
-        )
-    ),
-    "mg-vn-wheel-axle-nut": balloons.BalloonAnchor(
-        point_mm=(
-            _NUT_FLAT_R * math.cos(math.radians(225.0)),
-            _NUT_FLAT_R * math.sin(math.radians(225.0)),
-            0.0,
-        ),
-        instance="mg-vn-wheel-axle-nut-2",
-    ),
-}
 
-
-class WheelPerfProbeStop(RuntimeError):
+class GroupPerfProbeStop(RuntimeError):
     """Diagnostic completion, including failed arms, is NOT a drawing success."""
 
     def __init__(self, report: dict[str, Any]) -> None:
         self.report = report
         super().__init__(
-            "INTENTIONAL WHEEL PERFORMANCE DIAGNOSTIC STOP before save/export/cache "
+            "INTENTIONAL GROUP PERFORMANCE DIAGNOSTIC STOP before save/export/cache "
             f"publication; status={report['status']}; report={report['report_path']}"
         )
 
@@ -90,7 +59,7 @@ def native_input_identity(source_model: Any, source: Path) -> dict[str, Any]:
         path = str(component.GetPathName() or "")
         if not path:
             raise RuntimeError(
-                f"wheel probe: component {component.Name2!r} has no path"
+                f"group probe: component {component.Name2!r} has no path"
             )
         resolved = Path(path).resolve()
         paths.add(resolved)
@@ -153,13 +122,14 @@ def _helper_call(
     items: Sequence[tuple[str, str]],
     label: str,
     margin: float,
+    anchors: Mapping[str, balloons.BalloonAnchor],
     report: dict[str, Any],
 ) -> list[balloons.BalloonLanding]:
     if arm == "manual":
         helper = balloons.add_component_bom_balloons
         kwargs = {
             "items": items,
-            "anchors": OLD_WHEEL_ANCHORS,
+            "anchors": anchors,
             "label": label,
             "margin": margin,
         }
@@ -167,7 +137,7 @@ def _helper_call(
         helper = balloons.add_auto_balloons
         kwargs = {"items": items, "label": label}
     else:
-        raise ValueError(f"unknown wheel probe arm {arm!r}")
+        raise ValueError(f"unknown group probe arm {arm!r}")
     # The entire unchanged helper, including resolution, manual picking/captures,
     # insertion/spreading, native preference guard, rebuild and validation. Do not
     # subtract its internal diagnostics or compare native-call-only to manual.
@@ -190,11 +160,16 @@ def _prove_result(
     items: Sequence[tuple[str, str]],
     label: str,
     arm: str,
+    anchors: Mapping[str, balloons.BalloonAnchor],
     report: dict[str, Any],
-    assert_bounds: Callable[[Any, list[balloons.BalloonLanding]], None],
+    finish_and_assert_bounds: Callable[[Any, list[balloons.BalloonLanding]], None],
 ) -> None:
     """Common correctness readback AFTER the helper timer, including fresh rebuild."""
-    rebuild_drawing(adapter, label="wheel performance common attachment proof")
+    rebuild_drawing(adapter, label="group performance common attachment proof")
+    # Captions are authored at their original post-helper boundary, then each
+    # recipe reads its actual settled field/BOM/caption bounds. Owner readback
+    # follows that final caption rebuild; none of this is primary timing.
+    finish_and_assert_bounds(adapter, landings)
     balloons.assert_balloon_landings(adapter, landings)
     leaves = balloons._view_component_leaves(adapter, view, label=label)
     allowed = {
@@ -238,20 +213,19 @@ def _prove_result(
                 f"{label}: incorrect final item/EDGE owner: {rows[-1]!r}"
             )
         if arm == "manual":
-            pin = OLD_WHEEL_ANCHORS[landing.stem].instance
+            pin = anchors[landing.stem].instance
             if pin is not None and owners[0].casefold() != pin.casefold():
                 raise RuntimeError(
                     f"{label}: manual historical pin {pin!r} was not retained"
                 )
         seen.add(landing.stem)
-    if len(rows) != 11 or seen != set(expected):
+    if len(rows) != len(expected) or seen != set(expected):
         raise RuntimeError(
-            f"{label}: final coverage {len(rows)} != 11 unique expected items"
+            f"{label}: final coverage {len(rows)} != {len(expected)} unique expected items"
         )
-    assert_bounds(adapter, landings)
-    report["unique_expected_items"] = 11
+    report["unique_expected_items"] = len(expected)
     report["edge_owners_valid"] = True
-    report["wheel_field_bounds_valid"] = True
+    report["group_bounds_valid"] = True
 
 
 def _summary(arms: list[dict[str, Any]]) -> dict[str, Any]:
@@ -268,7 +242,7 @@ def _summary(arms: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     complete = len(arms) == 4 and all(row["status"] == "passed" for row in arms)
     summary: dict[str, Any] = {
-        "scope": "wheel group whole-helper only; NOT whole-drawing or farm-leaf speedup",
+        "scope": "requested group whole-helper only; NOT whole-drawing or farm-leaf speedup",
         "samples": samples,
         "complete_matched_abba": complete,
         "manual_mean_ms": None,
@@ -302,35 +276,62 @@ def _empty_documents(adapter: Any) -> dict[str, Any]:
         "resident_output_documents": _resident_output_documents(adapter),
     }
     if state["visible_document_paths"] or state["resident_output_documents"]:
-        raise RuntimeError(f"wheel probe requires a fresh document context: {state!r}")
+        raise RuntimeError(f"group probe requires a fresh document context: {state!r}")
     return state
 
 
-async def run_matched_wheel_probe(
+async def run_matched_group_probe(
     adapter: Any,
     *,
     template: Path,
+    case: str,
+    manual_recipe_blob: str,
+    anchors: Mapping[str, balloons.BalloonAnchor],
     label: str,
     margin: float,
     prepare_arm: Callable[
-        [Any, dict[str, Any]], Awaitable[tuple[Any, Sequence[tuple[str, str]]]]
+        [Any, dict[str, Any]],
+        Awaitable[
+            tuple[
+                Any,
+                Sequence[tuple[str, str]],
+                Callable[[Any, list[balloons.BalloonLanding]], None],
+            ]
+        ],
     ],
-    assert_bounds: Callable[[Any, list[balloons.BalloonLanding]], None],
 ) -> NoReturn:
     """Fixed ABBA, no retries: unexpected native/identity/cleanup errors abort."""
-    out_dir = _seat_forensics._capture_dir("1667-matched-wheel-performance")
+    out_dir = _seat_forensics._capture_dir(f"1667-matched-{case}-performance")
     report: dict[str, Any] = {
         "diagnostic_only": True,
         "never_merge": True,
         "intentional_stop_before_save_export_cache_publication": True,
         "status": "aborted",
+        "case": case,
+        "helper_label": label,
+        "manual_margin_m": margin,
+        "proof_scope": (
+            "post-helper diagnostic field/BOM/caption and attachment readback; "
+            "NOT final-sheet or export proof"
+        ),
+        # The unchanged helper records actual original/Normal/restored readbacks;
+        # do not present an expected slot-1 value here as a measured readback.
+        "native_weight_guard_trace": {
+            "span": "drawing.auto_balloon_edge_weight",
+            "label": label,
+            "readbacks": (
+                "original_slot",
+                "normal_readback_slot",
+                "restore_readback_slot",
+            ),
+        },
         "sequence": SEQUENCE,
         "production_source": PRODUCTION_COMMIT,
-        "manual_anchor_base": BASE_COMMIT,
-        "manual_anchor_recipe_blob": BASE_RECIPE_BLOB,
+        "manual_anchor_base": MANUAL_COMMIT,
+        "manual_anchor_recipe_blob": manual_recipe_blob,
         "manual_anchors": {
             stem: {"point_mm": anchor.point_mm, "instance": anchor.instance}
-            for stem, anchor in sorted(OLD_WHEEL_ANCHORS.items())
+            for stem, anchor in sorted(anchors.items())
         },
         "report_path": str(out_dir / "capture.json"),
         "arms": [
@@ -343,7 +344,7 @@ async def run_matched_wheel_probe(
     try:
         seat_pid = int(adapter.swApp.GetProcessID())
         if seat_pid <= 0:
-            raise RuntimeError(f"wheel probe has invalid SolidWorks PID {seat_pid}")
+            raise RuntimeError(f"group probe has invalid SolidWorks PID {seat_pid}")
         report["seat_pid"] = seat_pid
         report["native_helper"] = _file_identity(Path(balloons.__file__))
         report["seat_provenance"] = _seat_forensics.seat_provenance(adapter)
@@ -354,11 +355,11 @@ async def run_matched_wheel_probe(
                 row["seat_pid_before"] = int(adapter.swApp.GetProcessID())
                 if row["seat_pid_before"] != seat_pid:
                     raise RuntimeError(
-                        "wheel probe: SolidWorks seat changed before setup"
+                        "group probe: SolidWorks seat changed before setup"
                     )
                 row["template"] = _file_identity(template)
                 phase = "setup"
-                view, items = await prepare_arm(adapter, row)
+                view, items, finish_and_assert_bounds = await prepare_arm(adapter, row)
                 phase = "matched_context"
                 row["drawing_title"] = str(adapter.currentModel.GetTitle() or "")
                 row["drawing_path"] = str(adapter.currentModel.GetPathName() or "")
@@ -368,20 +369,20 @@ async def run_matched_wheel_probe(
                     or int(adapter.currentModel.GetType()) != 3
                 ):
                     raise RuntimeError(
-                        "wheel probe did not create a fresh unsaved drawing"
+                        "group probe did not create a fresh unsaved drawing"
                     )
                 if int(adapter.swApp.GetProcessID()) != seat_pid:
                     raise RuntimeError(
-                        "wheel probe: SolidWorks seat changed during setup"
+                        "group probe: SolidWorks seat changed during setup"
                     )
                 row["items"] = list(items)
                 if (
-                    len(items) != 11
-                    or len({item for _stem, item in items}) != 11
-                    or {stem for stem, _item in items} != explode.WHEEL_GROUP_STEMS
+                    len(items) != len(anchors)
+                    or len({item for _stem, item in items}) != len(anchors)
+                    or {stem for stem, _item in items} != set(anchors)
                 ):
                     raise RuntimeError(
-                        "wheel probe requires exactly 11 unique wheel BOM items"
+                        f"group probe requires exactly {len(anchors)} unique {case} BOM items"
                     )
                 row["preference_before"] = _preference(adapter)
                 # Equal inputs and fit are prerequisites, not a certificate system.
@@ -397,7 +398,7 @@ async def run_matched_wheel_probe(
                     ):
                         if row[key] != baseline[key]:
                             raise RuntimeError(
-                                f"wheel probe matched context differs: {key}"
+                                f"group probe matched context differs: {key}"
                             )
                 phase = "helper"
                 try:
@@ -408,6 +409,7 @@ async def run_matched_wheel_probe(
                         items=items,
                         label=label,
                         margin=margin,
+                        anchors=anchors,
                         report=row,
                     )
                 except Exception as exc:
@@ -429,8 +431,9 @@ async def run_matched_wheel_probe(
                         items=items,
                         label=label,
                         arm=row["arm"],
+                        anchors=anchors,
                         report=row,
-                        assert_bounds=assert_bounds,
+                        finish_and_assert_bounds=finish_and_assert_bounds,
                     )
                     row["status"] = "passed"
                 finally:
@@ -438,7 +441,7 @@ async def run_matched_wheel_probe(
                     if row["preference_after"] != row["preference_before"]:
                         phase = "preference_restoration"
                         raise RuntimeError(
-                            "wheel probe: document visible-edge preference changed"
+                            "group probe: document visible-edge preference changed"
                         )
             except BaseException as exc:
                 row.update(
@@ -459,16 +462,16 @@ async def run_matched_wheel_probe(
                     row["seat_pid_after"] = int(adapter.swApp.GetProcessID())
                     if row["seat_pid_after"] != seat_pid:
                         raise RuntimeError(
-                            "wheel probe: SolidWorks seat changed during cleanup"
+                            "group probe: SolidWorks seat changed during cleanup"
                         )
                     if _file_identity(template) != row.get("template"):
                         raise RuntimeError(
-                            "wheel probe: template bytes changed during arm"
+                            "group probe: template bytes changed during arm"
                         )
                     for identity in row.get("native_inputs", {}).get("files", ()):
                         if _file_identity(Path(identity["path"])) != identity:
                             raise RuntimeError(
-                                f"wheel probe: native input changed: {identity['path']}"
+                                f"group probe: native input changed: {identity['path']}"
                             )
                 except BaseException as exc:
                     # Keep an earlier native/identity failure as the primary
@@ -501,8 +504,8 @@ async def run_matched_wheel_probe(
         report["elapsed_ms"] = (time.perf_counter() - started) * 1000.0
         _seat_forensics._write_failure_report(out_dir, report)
         _telemetry.info(
-            f"Matched wheel diagnostic retained: {report['report_path']}",
+            f"Matched group diagnostic retained: {report['report_path']}",
             status=report["status"],
             summary=report["summary"],
         )
-    raise WheelPerfProbeStop(report)
+    raise GroupPerfProbeStop(report)

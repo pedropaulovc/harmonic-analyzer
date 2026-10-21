@@ -64,6 +64,7 @@ from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
+    add_auto_balloons,
     isolate_drawing_view_components,
 )
 from _drawing_centerline import add_view_centerline
@@ -77,6 +78,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_group_perf_probe import native_input_identity, run_matched_group_probe
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -92,11 +94,11 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
-from _drawing_wheel_perf_probe import native_input_identity, run_matched_wheel_probe
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
+from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
@@ -870,6 +872,18 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
 
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
+
+# Diagnostic manual arm: exact lever-family portion of BALLOON_ANCHORS from
+# fb1fe894e595c397d0945af042f7071f16200299, recipe blob
+# 3d2e7f53c81caa70d6082bb2370af8e7cb91ee73. The wire is beyond our STOP.
+OLD_LEVER_ANCHORS = {stem: BalloonAnchor() for stem in explode.LEVER_GROUP_STEMS} | {
+    "mg-magnifying-lever": BalloonAnchor(
+        point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
+    ),
+    "mg-magnifying-vertical-rod": BalloonAnchor(
+        point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
+    ),
+}
 
 
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
@@ -1645,20 +1659,26 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
-    """Diagnostic branch ONLY: fixed wheel ABBA, STOP before cache publication."""
-    await run_matched_wheel_probe(
+    """Diagnostic ONLY: lever7 ABBA, STOP before later sheet work/publication."""
+    await run_matched_group_probe(
         adapter,
         template=DRAWING_TEMPLATES[SPEC.layout].path,
-        label=f"magnifier {WHEEL_LABEL} BOM coverage",
+        case="mg-lever-7",
+        manual_recipe_blob="3d2e7f53c81caa70d6082bb2370af8e7cb91ee73",
+        anchors=OLD_LEVER_ANCHORS,
+        label=f"magnifier {LEVER_LABEL} BOM coverage",
         margin=BALLOON_MARGIN,
-        prepare_arm=_prepare_wheel_perf_arm,
-        assert_bounds=_assert_wheel_balloon_bounds,
+        prepare_arm=_prepare_lever_perf_arm,
     )
 
 
-async def _prepare_wheel_perf_arm(
+async def _prepare_lever_perf_arm(
     adapter: Any, report: dict[str, Any]
-) -> tuple[Any, tuple[tuple[str, str], ...]]:
+) -> tuple[
+    Any,
+    tuple[tuple[str, str], ...],
+    Callable[[Any, list[BalloonLanding]], None],
+]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
@@ -1732,19 +1752,51 @@ async def _prepare_wheel_perf_arm(
         raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
 
     _activate_sheet(adapter, SHEET_NAMES[1])
-    scale = _fit_ring(
+    wheel_scale = _fit_ring(
         adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
     )
-    wheel_items = balloon_items(items, explode.WHEEL_GROUP_STEMS)
+    # This is unchanged production setup before the lever boundary, not a
+    # measured wheel arm or a rerun of the completed wheel benchmark.
+    add_auto_balloons(
+        adapter,
+        wheel,
+        items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
+        label=f"magnifier {WHEEL_LABEL} BOM coverage",
+    )
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    scale = _fit_ring(
+        adapter, lever, LEVER_SCALE_LADDER, LEVER_FIELD, label=LEVER_LABEL
+    )
+    lever_items = balloon_items(items, explode.LEVER_GROUP_STEMS)
     report["setup"] = {
         "bom_items": items,
+        "bom_cells": _bom_cells(_early_bound(table, "ITableAnnotation")),
+        "wheel_fitted_scale": wheel_scale,
+        "wheel_fitted_outline_m": _view_outline(wheel, label=WHEEL_LABEL),
         "fitted_scale": scale,
-        "fitted_outline_m": _view_outline(wheel, label=WHEEL_LABEL),
-        "configuration": str(_early_bound(wheel, "IView").ReferencedConfiguration),
+        "fitted_outline_m": _view_outline(lever, label=LEVER_LABEL),
+        "configuration": str(_early_bound(lever, "IView").ReferencedConfiguration),
         "exploded_view": EXPLODED_VIEW_NAMES[SIMPLIFIED_VIEW_CONFIGURATION],
-        "isolated_stems": sorted(explode.WHEEL_GROUP_STEMS),
+        "isolated_stems": sorted(explode.LEVER_GROUP_STEMS),
     }
-    return wheel, wheel_items
+
+    def finish_and_assert_bounds(
+        current_adapter: Any, landings: list[BalloonLanding]
+    ) -> None:
+        # Same caption text/coordinates as 01ec; only bring this common proof
+        # forward across the STOP, without fitting/ballooning the finished wire.
+        text = exploded_caption(LEVER_GROUP, scale)
+        caption = _add_note_block(
+            current_adapter,
+            SHEET_NAMES[2],
+            text,
+            lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), text),
+            label="lever caption",
+        )
+        rebuild_drawing(current_adapter, label="lever performance caption proof")
+        _assert_lever_balloon_bounds(current_adapter, landings, caption)
+
+    return lever, lever_items, finish_and_assert_bounds
 
 
 def _parse_args() -> argparse.Namespace:
