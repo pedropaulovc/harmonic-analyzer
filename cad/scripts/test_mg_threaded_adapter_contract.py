@@ -381,6 +381,17 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IFace2", "GetEdges", 0, 12),
     ("IModelDocExtension", "GetPersistReference3", 1, 12),
     ("IModelDocExtension", "IsSamePersistentID", 2, 3),
+    ("IDimension", "GetFeatureOwner", 0, 9),
+    ("IModelDoc2", "GetSaveFlag", 0, 11),
+    ("IModelDoc2", "GetTitle", 0, 8),
+    ("IModelDoc2", "GetLayerManager", 0, 9),
+    ("IModelDocExtension", "GetUserPreferenceToggle", 2, 11),
+    ("IFeature", "GetDefinition", 0, 9),
+    ("IView", "GetOrientationName", 0, 8),
+    ("IView", "GetFacettedHlrDisplay", 0, 11),
+    ("IView", "GetUseParentDisplayMode", 0, 11),
+    ("ISldWorks", "RevisionNumber", 0, 8),
+    ("ILayerMgr", "GetLayer", 1, 9),
 ))
 def test_witness_and_bracket_native_method_contracts(interface, member, arity, retval) -> None:
     methods, maps = _native_declaration(interface)
@@ -481,6 +492,30 @@ def test_native_polyline_census_retains_optional_variant_out_parameter() -> None
     ("ICurve", "CircleParams", 12, False),
     ("IMathPoint", "ArrayData", 12, True),
     ("ISketchManager", "AddToDB", 11, True),
+    # These diagnostics only read getters. Typelib setter entries are ABI
+    # metadata, not permission to mutate SDK-documented read-only properties.
+    ("IAnnotation", "Owner", 9, True),
+    ("IAnnotation", "OwnerType", 3, True),
+    ("IAnnotation", "Layer", 8, True),
+    ("ISldWorks", "ActiveDoc", 9, False),
+    ("IView", "ReferencedConfiguration", 8, True),
+    ("IView", "ModelToViewTransform", 9, True),
+    ("IMathTransform", "ArrayData", 12, True),
+    ("ILayer", "Visible", 11, True),
+    ("ILayer", "Printable", 11, True),
+    ("IWizardHoleFeatureData2", "Type", 3, True),
+    ("IWizardHoleFeatureData2", "FastenerSize", 8, True),
+    ("IWizardHoleFeatureData2", "EndCondition", 3, True),
+    ("IWizardHoleFeatureData2", "ThreadEndCondition", 3, True),
+    ("IWizardHoleFeatureData2", "ThreadClass", 8, True),
+    ("IWizardHoleFeatureData2", "CosmeticThreadType", 3, True),
+    ("IWizardHoleFeatureData2", "HoleDepth", 5, True),
+    ("IWizardHoleFeatureData2", "TapDrillDepth", 5, True),
+    ("IWizardHoleFeatureData2", "ThruTapDrillDepth", 5, True),
+    ("IWizardHoleFeatureData2", "ThreadDepth", 5, True),
+    ("IWizardHoleFeatureData2", "TapDrillDiameter", 5, True),
+    ("IWizardHoleFeatureData2", "ThruTapDrillDiameter", 5, True),
+    ("IWizardHoleFeatureData2", "ThreadDiameter", 5, True),
 ))
 def test_thread_detail_geometry_properties_have_native_result_shapes(interface, member, retval, writable) -> None:
     methods, maps = _native_declaration(interface)
