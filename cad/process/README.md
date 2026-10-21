@@ -13,10 +13,12 @@ enroll one merely because its plan file exists.
 ## Bind stable labels, not STEP entity numbers
 
 Use the part's scoped `cad/out/features/<stem>/features.toml` and adjacent STEP
-as the drawing/geometry authority. Tracked plans name their part consistently
+as the drawing/geometry authority. Enrolled plans name their part consistently
 with that manifest and carry a literal `[drawing].revision` equal to
-`cad/config/release.yaml:next_revision`. They use bare stable labels matching
-`HAF_[A-Z0-9_]+__P\d{2}` wherever prechips expects a face reference. Do not commit
+`cad/config/release.yaml:next_revision`. Unenrolled plans retain their historical
+revisions; only enrolled plans advance with a release. Tracked plans use bare
+stable labels matching `HAF_[A-Z0-9_]+__P\d{2}` wherever prechips expects a face
+reference. Do not commit
 exact `#<entity>/ADVANCED_FACE[<ordinal>]/<label>` references: export can renumber
 entities without changing geometry.
 
