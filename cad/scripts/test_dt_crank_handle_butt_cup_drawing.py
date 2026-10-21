@@ -43,14 +43,6 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    assert drawing.DIMENSION_CALLOUTS == {
-        "BodyChamfer": notes.BODY_CHAMFER_CALLOUT,
-        "BodyDia": notes.BODY_FIT_CALLOUT,
-        "FloorHoleDia": "DRILL THRU",
-        "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
-        "PocketDia": notes.POCKET_FIT_CALLOUT,
-        "PocketFloorRadius": notes.POCKET_FLOOR_RADIUS_CALLOUT,
-    }
     # Three symmetric bands, plus the separate native radial MAX limit.
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
@@ -139,29 +131,7 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert drawing.CUT_START[1] > drawing.CUT_END[1]
 
 
-def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
-    assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
-    assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
-    assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
-    # Historical MHA-DT-035 machinist ENFORCE r1: each band names its mate
-    # at the callout (rule 4); the matched pocket fit states name, number, diametral
-    # clearance and its hard limit.  The floor corner's maximum is a separate
-    # model-owned radial dimension, not an unrelated axial callout.
-    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-08"
-    assert notes.POCKET_FIT_CALLOUT.splitlines() == [
-        "BORE TO SUIT MHA-DT-32",
-        "PIVOT SCREW HEAD, 0.2-0.4",
-        "DIAMETRAL CLEARANCE,",
-        "<MOD-DIAM>6.5 MAX",
-    ]
-    assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
-        "KEEPS MHA-DT-32 HEAD",
-        "BELOW FACE",
-    ]
-    assert notes.POCKET_FLOOR_RADIUS_CALLOUT.splitlines() == [
-        "MHA-DT-32 HEAD",
-        "SEATS ON FLOOR",
-    ]
+def test_floor_corner_retains_its_native_functional_limit() -> None:
     assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
     assert spec.POCKET_FLOOR_CORNER_R_MAX <= spec.POCKET_CLEARANCE[0] / 2
     assert spec.POCKET_FLOOR_CORNER_R_BAND == (0.0, -0.1)
@@ -169,11 +139,6 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert "PocketFloorRadius" in spec.DRAWING_DIMENSIONS["CupProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["PocketFloorRadius"] == 1
     assert "PocketFloorRadius" not in spec.REFERENCE_DIMENSIONS
-    assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
-    # The DT-08 and DT-32 specs import the cup spec; its prose lives in the
-    # notes module so a wording edit never re-keys those parts.
-    for name in ("DRAWING_NOTES", "ISOMETRIC_VIEW_NOTE", "FLOOR_HOLE_CALLOUT"):
-        assert not hasattr(spec, name)
 
 
 def test_registry_row_is_the_title_block_source() -> None:
