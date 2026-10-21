@@ -1,15 +1,17 @@
-"""Issue-1667 SM EDGE/FACE/FACE/EDGE diagnostic ONLY; NEVER MERGE.
+"""Issue-1667 SM EDGE-only draft/high/high/draft diagnostic; NEVER MERGE.
 
-Four fresh production-prepared SM drawings, one held PID, one AutoBalloon5 call
-per drawing. Both attachment modes borrow the same Normal mapping. Observations
-are post-call (never proof of in-call display/eligibility), and no sheet is saved
-or exported. Even a fully qualified contrast ends in diagnostic STOP.
+Four fresh production-prepared drawings, one held PID and one native call each.
+Every arm uses the same HLV->HLR excursion, explicit shaded-quality request and
+Normal mapping. Pre-call quality reads are not proof of in-call geometry; later
+observers retain their post-call boundary. No sheet is saved or exported, and
+even a qualified contrast ends in diagnostic STOP.
 """
 
 from __future__ import annotations
 
 import math
 from pathlib import Path
+import re
 from sys import exception as _active_exception
 import time
 from typing import Any, Awaitable, Callable, NoReturn, Sequence
@@ -25,11 +27,12 @@ from _drawing_group_perf_probe import (
     _preference,
     assert_matched_setup,
 )
+from _drawing_view_display import set_hidden_lines_removed
 import _seat_forensics as forensics
 from _session import discard_open_documents
 
 
-SEQUENCE = ("edge", "face", "face", "edge")
+SEQUENCE = ("draft", "high", "high", "draft")
 LABEL = "summing exploded-view BOM coverage"
 SPRING = "sm-vn-counter-spring"
 # The actual SM preparer already resolves ten families. These bounds only limit
@@ -40,17 +43,17 @@ MAX_SPRING_INSTANCES = 8
 MAX_SPRING_EDGES = 64
 
 
-class SmAttachmentCandidateInvalid(RuntimeError):
+class SmQualityCandidateInvalid(RuntimeError):
     """An observed coverage/attachment/layout failure, not a native exception."""
 
 
-class SmAttachmentProbeStop(RuntimeError):
+class SmQualityProbeStop(RuntimeError):
     """Reports were retained; this deliberate failure cannot publish a drawing."""
 
     def __init__(self, report: dict[str, Any]) -> None:
         self.report = report
         super().__init__(
-            "INTENTIONAL SM ATTACHMENT DIAGNOSTIC STOP before save/export/cache "
+            "INTENTIONAL SM QUALITY DIAGNOSTIC STOP before save/export/cache "
             f"publication; status={report['status']}; report={report['report_path']}"
         )
 
@@ -315,6 +318,66 @@ def _collect_stage(
         snapshot["observer_ms"] = (time.perf_counter() - started) * 1000.0
 
 
+def _quality_state(view: Any) -> dict[str, Any]:
+    """Identical getter order in every arm; transient faceted read is LAST."""
+    bound = _early_bound(view, "IView")
+    return {
+        "display_mode": bound.GetDisplayMode2(),
+        "use_parent": bound.GetUseParentDisplayMode(),
+        "shaded_edges": bound.GetDisplayEdgesInShadedMode(),
+        "precision_threads": bound.GetCThreadQuality(),
+        "facetted_hlr": bound.GetFacettedHlrDisplay(),
+    }
+
+
+def _view_semantics(view: Any) -> dict[str, Any]:
+    bound = _early_bound(view, "IView")
+    return {
+        "position_m": tuple(bound.Position),
+        "scale_ratio": tuple(bound.ScaleRatio),
+        "configuration": bound.ReferencedConfiguration,
+        "exploded": bound.IsExploded(),
+    }
+
+
+def _apply_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
+    """One common excursion and one assigned request; never repair or restore."""
+    started = time.perf_counter()
+    row["quality_treatment_failures"] = []
+    try:
+        row["quality_before"] = _quality_state(view)
+        row["view_semantics_before_quality"] = _view_semantics(view)
+        try:
+            set_hidden_lines_removed(adapter, view)
+        except RuntimeError as error:
+            # Only these two existing helper readback failures are a failed
+            # treatment, not an unknown COM exception or permission to retry.
+            if type(error) is not RuntimeError or not re.fullmatch(
+                r"failed to (?:transition drawing view through HLV|"
+                r"set hidden-lines-removed drawing view) \(mode reads -?\d+\)",
+                str(error),
+            ):
+                raise
+            row["quality_treatment_failures"].append(f"normalization: {error}")
+        bound = _early_bound(view, "IView")
+        row["quality_set_return"] = bound.SetDisplayMode4(
+            False, 3, row["quality"] == "draft", True, True
+        )
+        if row["quality_set_return"] is not True:
+            row["quality_treatment_failures"].append(
+                f"final shaded-quality setter returned {row['quality_set_return']!r}"
+            )
+        row["view_semantics_after_quality"] = _view_semantics(view)
+        row["post_quality_outline_m"] = tuple(bound.GetOutline() or ())
+        # Quality can legitimately change outline geometry; do NOT gate on it.
+        if row["view_semantics_after_quality"] != row["view_semantics_before_quality"]:
+            raise RuntimeError(
+                "SM quality contrast: view semantics changed during treatment"
+            )
+    finally:
+        row["quality_setup_ms"] = (time.perf_counter() - started) * 1000.0
+
+
 def _call_once(
     adapter: Any,
     view: Any,
@@ -335,7 +398,7 @@ def _call_once(
         "ReverseDirection": False,
         "IgnoreMultiple": True,
         "InsertMagneticLine": False,
-        "LeaderAttachmentToFaces": row["attachment"] == "face",
+        "LeaderAttachmentToFaces": False,
         "Style": 1,
         "Size": 2,
         "UpperTextContent": 1,
@@ -360,7 +423,7 @@ def _call_once(
         "original_slot": original,
         "normal_slot": normal,
     }
-    # The same guard encloses BOTH EDGE and FACE. Restoration precedes the same
+    # Every EDGE arm uses the same Normal guard. Restoration precedes the same
     # existing ClearSelection2/EditRebuild3 boundary, without extra native calls.
     try:
         started = time.perf_counter()
@@ -374,6 +437,12 @@ def _call_once(
             raise RuntimeError(
                 "SM contrast: Normal visible-edge mapping was not applied"
             )
+        quality_started = time.perf_counter()
+        row["pre_call_quality"] = _quality_state(view)
+        row["quality_pre_call_readback_ms"] = (
+            time.perf_counter() - quality_started
+        ) * 1000.0
+        # No COM between the last faceted getter and this one native invocation.
         started = time.perf_counter()
         try:
             raw = ddoc.AutoBalloon5(options)
@@ -457,11 +526,9 @@ def _call_once(
                 )
             elif not row["option_comparison_failures"]:
                 for name in authored:
-                    if name != "LeaderAttachmentToFaces" and (
-                        row["native_options"][name] != baseline["native_options"][name]
-                    ):
+                    if row["native_options"][name] != baseline["native_options"][name]:
                         row["option_comparison_failures"].append(
-                            f"post-call options differ beyond attachment: {name}"
+                            f"post-call authored options differ: {name}"
                         )
                 if (
                     row["unmodified_native_options"]
@@ -561,7 +628,7 @@ def _validate_snapshots(
     return valid_indices, failures
 
 
-async def run_sm_attachment_probe(
+async def run_sm_quality_probe(
     adapter: Any,
     *,
     template: Path,
@@ -577,7 +644,7 @@ async def run_sm_attachment_probe(
     ],
 ) -> NoReturn:
     """Fixed SM-only coverage contrast; known invalid arms continue, errors abort."""
-    out_dir = forensics._capture_dir("1667-sm-edge-face-fixed-contrast")
+    out_dir = forensics._capture_dir("1667-sm-edge-quality-fixed-contrast")
     report: dict[str, Any] = {
         "diagnostic_only": True,
         "never_merge": True,
@@ -585,11 +652,20 @@ async def run_sm_attachment_probe(
         "sequence": SEQUENCE,
         "report_path": str(out_dir / "capture.json"),
         "proof_scope": "post-helper diagnostic owner/circle/field/BOM/caption only; NOT full-sheet/PDF/machinist proof",
-        "observer_limit": "all scene/identity evidence is post-call; no observation proves native in-call state",
+        "observer_limit": (
+            "pre-call quality getters do not prove in-call geometry; all later "
+            "scene/identity evidence is post-call. The common HLV->HLR excursion "
+            "and identical pre-call getter sequence were absent from run1790."
+        ),
         "no_save_export_or_publication": True,
         "arms": [
-            {"order": order, "attachment": arm, "status": "not_reached"}
-            for order, arm in enumerate(SEQUENCE, start=1)
+            {
+                "order": order,
+                "attachment": "edge",
+                "quality": quality,
+                "status": "not_reached",
+            }
+            for order, quality in enumerate(SEQUENCE, start=1)
         ],
     }
     baseline = None
@@ -659,6 +735,8 @@ async def run_sm_attachment_probe(
                     != baseline["allowed_full_shown_owners"]
                 ):
                     raise RuntimeError("SM contrast: shown component owners differ")
+                phase = "quality_application"
+                _apply_quality(adapter, view, row)
                 phase = "native_and_observers"
                 returned, inventory_notes = _call_once(
                     adapter,
@@ -686,6 +764,18 @@ async def run_sm_attachment_probe(
                     allowed=allowed,
                     attachment=row["attachment"],
                 )
+                quality = row["pre_call_quality"]
+                if not (
+                    quality["facetted_hlr"] is (row["quality"] == "draft")
+                    and type(quality["display_mode"]) is int
+                    and quality["display_mode"] in (3, 7)
+                    and quality["use_parent"] is False
+                    and quality["shaded_edges"] is True
+                    and quality["precision_threads"] is True
+                ):
+                    row["quality_treatment_failures"].append(
+                        f"pre-call quality readback differs from requested {row['quality']}: {quality!r}"
+                    )
                 failures.extend(row["option_candidate_failures"])
                 expected = dict((item, stem) for stem, item in items)
                 indices, inventory_failures = _validate_snapshots(
@@ -719,7 +809,7 @@ async def run_sm_attachment_probe(
                 proof_started = time.perf_counter()
                 try:
                     finish_bounds(adapter, landings)
-                except SmAttachmentCandidateInvalid as error:
+                except SmQualityCandidateInvalid as error:
                     failures.append(f"layout: {error}")
                 finally:
                     row["bounds_observer_ms"] = (
@@ -755,11 +845,15 @@ async def run_sm_attachment_probe(
                 row["options_comparison_eligible"] = not row[
                     "option_comparison_failures"
                 ]
+                row["treatment_comparison_eligible"] = not row[
+                    "quality_treatment_failures"
+                ]
                 row["status"] = (
                     "invalid_candidate"
                     if failures
                     else "qualified"
                     if row["options_comparison_eligible"]
+                    and row["treatment_comparison_eligible"]
                     else "comparison_ineligible"
                 )
                 phase = "post_arm_identity"
@@ -845,8 +939,13 @@ async def run_sm_attachment_probe(
                 {
                     "order": row["order"],
                     "attachment": row["attachment"],
+                    "quality": row["quality"],
                     "status": row["status"],
                     "native_call_ms": row.get("native_call_ms"),
+                    "quality_setup_ms": row.get("quality_setup_ms"),
+                    "quality_pre_call_readback_ms": row.get(
+                        "quality_pre_call_readback_ms"
+                    ),
                     "post_call_observer_ms": (
                         sum(
                             stage["observer_ms"]
@@ -865,18 +964,18 @@ async def run_sm_attachment_probe(
                 }
                 for row in report["arms"]
             ],
-            "edge_native_call_mean_ms": sum(
+            "draft_native_call_mean_ms": sum(
                 row["native_call_ms"]
                 for row in report["arms"]
-                if row["attachment"] == "edge"
+                if row["quality"] == "draft"
             )
             / 2.0
             if qualified
             else None,
-            "face_native_call_mean_ms": sum(
+            "high_native_call_mean_ms": sum(
                 row["native_call_ms"]
                 for row in report["arms"]
-                if row["attachment"] == "face"
+                if row["quality"] == "high"
             )
             / 2.0
             if qualified
@@ -890,4 +989,4 @@ async def run_sm_attachment_probe(
             if primary is None:
                 raise
             primary.add_note(f"SM contrast final-report write failed: {error}")
-    raise SmAttachmentProbeStop(report)
+    raise SmQualityProbeStop(report)
