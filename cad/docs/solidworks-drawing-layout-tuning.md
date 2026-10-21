@@ -1576,12 +1576,15 @@ successful dimension creation.
 Relation creation and readback are separate native contracts. Record every
 returned relation kind and its actual definition entities before filtering for
 the requested kind; a non-null AddRelation result is not sufficient identity or
-semantic proof. R10 validated HORIZONTAL4 but omitted the different integer kind
-returned after the VERTPOINTS26 request, so no canonicalization is established.
-The official references name `swConstraintType_e` for both APIs: do not invent
-a25/26-to4/5 mapping from the unrecorded value. Classify actual definition
-entities before point identity or segment-key comparisons; an unrelated
-GetEntities/GetEntitiesType inventory is not the definition-entity inventory.
+semantic proof. R12 restored HORIZONTAL4 and exposed returned kind32/USEEDGE
+after a VERTPOINTS26 request, with definitions not two confirmed points.
+USEEDGE is not vertical alignment or a valid enum alias. A mismatched returned
+handle alone also does not prove the mutation had no effect: compare the actual
+owning line/endpoint relation inventory before and after the single mutation.
+Require the exact intended kind, actual source entities and native alignment,
+not a relaxed returned-kind check. Classify actual definition entities before
+identity comparisons; the separate GetEntities/GetEntitiesType inventory is
+not the definition-entity inventory.
 R11 regressed the already-passed HORIZONTAL4 check because mandatory runtime
 type information returned `Invalid index`; that optional metadata is not an
 interface-capability contract. Classify each actual definition with native

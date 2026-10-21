@@ -836,7 +836,7 @@ class _RelativeWitnessFixture:
         self.circle.GetSketch = lambda: self.sketch
         self.circle.GetCenterPoint2 = lambda: self.center
         self.circle.GetRadius = lambda: 0.00325
-        self.source_circle = object()
+        self.source_circle = SimpleNamespace(_oleobj_=_WitnessDispatch("IEdge"))
         self.circle.relations = [_WitnessRelation((self.source_circle,), 32)]
         self.circle.GetRelations = lambda: tuple(self.circle.relations)
         self.manager = SimpleNamespace(AddToDB=False, CreateLine=self.create_line)
@@ -1439,25 +1439,25 @@ def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch
     assert fixture.displays == []
 
 
-@pytest.mark.parametrize("returned_kind", (5, 17, 0, 999, None, True))
-def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without_alias(monkeypatch, returned_kind) -> None:
+@pytest.mark.parametrize("actual_kind", (5, 17, 32, 0, 999, None, True))
+def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without_alias(monkeypatch, actual_kind) -> None:
     import ast
 
     fixture = _RelativeWitnessFixture(monkeypatch)
     line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
     relation = fixture.relations[1]
-    relation.kind = returned_kind  # A discriminator, NOT a claim about R10's unknown value.
+    relation.kind = actual_kind  # Matching definition identities never authorize a kind alias.
     with pytest.raises(RuntimeError, match="actual kinds="):
         part._require_witness_relation(
             fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap),
-            stage="returned-kind-mismatch",
+            stage="owner-kind-mismatch",
         )
     message, fields = fixture.events[-1]
     assert fields["relation_kind"] == 26
-    assert fields["actual_relation_kinds"] == (returned_kind,)
+    assert fields["actual_relation_kinds"] == (actual_kind,)
     assert fields["relation_matches"] == 0
     row, = ast.literal_eval(fields["relation_definitions"])
-    assert row["kind"] == returned_kind and row["count"] == 2
+    assert row["kind"] == actual_kind and row["count"] == 2
     assert row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
     assert all(len(entity["id"]) == 2 for entity in row["definition_fields"])
     assert row["identity_matches"] is True
@@ -1466,7 +1466,7 @@ def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without
     assert "requested_kind=26" in message and "actual_kinds=" in message
 
 
-def test_all_returned_relation_kinds_are_captured_before_any_rejection(monkeypatch) -> None:
+def test_all_owner_relation_kinds_are_captured_before_any_rejection(monkeypatch) -> None:
     import ast
 
     fixture = _RelativeWitnessFixture(monkeypatch)
@@ -1679,3 +1679,170 @@ def test_bad_relation_handle_does_not_hide_later_actual_kinds(monkeypatch, mode)
     assert {"kind", "definitions", "suppressed", "internal_types", "internal_entities"} <= set(first["unavailable_fields"])
     assert first["definitions_available"] is False
     assert second["identity_matches"] is True and second["alignment"]["aligned"] is True
+
+
+@pytest.mark.parametrize("effect", (
+    "correct", "none", "wrong-kind", "wrong-definition", "suppressed",
+    "unaligned", "wrong-interface", "duplicate",
+))
+def test_constraint_effect_comes_from_owner_inventory_not_useedge_return(monkeypatch, effect) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    original_add = fixture.sketch.RelationManager.AddRelation
+    calls = []
+    # Match R12's returned USEEDGE definition classes and internal types,
+    # independently of whatever mutation actually happened on the endpoint.
+    reported = _WitnessRelation((fixture.circle, fixture.source_circle), 32)
+    reported.GetEntitiesType = lambda: (3, 3)
+
+    def add(entities, kind):
+        calls.append(kind)
+        if kind != 26:
+            return original_add(entities, kind)
+        if effect == "none":
+            return reported
+        actual = original_add(entities, kind)
+        if effect == "wrong-kind":
+            actual.kind = 32
+        elif effect == "wrong-definition":
+            actual.entities = (entities[0], _WitnessPoint(fixture.tap.owner, fixture.tap.X, fixture.tap.Y))
+        elif effect == "suppressed":
+            actual.Suppressed = True
+        elif effect == "unaligned":
+            # Top Y maps to model -Z, then Right X: this breaks VERTPOINTS.
+            # Top X maps to Right Z and does not change transverse alignment.
+            before = part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch)
+            fixture.tap.Y += 0.001
+            after = part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch)
+            assert after[0] - before[0] == pytest.approx(0.001)
+            assert after[1:] == pytest.approx(before[1:])
+        elif effect == "wrong-interface":
+            actual.entities = (entities[0], fixture.circle)
+        elif effect == "duplicate":
+            duplicate = _WitnessRelation(entities, kind)
+            for entity in entities:
+                entity.relations.append(duplicate)
+        return reported
+
+    fixture.sketch.RelationManager.AddRelation = add
+    if effect == "correct":
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        assert calls == [4, 26, 25, 9]
+        assert len(fixture.displays) == 1
+    else:
+        with pytest.raises(RuntimeError):
+            part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        assert calls == [4, 26]
+        assert fixture.displays == []
+    returned, = [
+        fields for _message, fields in fixture.events
+        if fields.get("operation_stage") == "ThumbTapToBoreRim.add-relation" and fields.get("relation_kind") == 26
+    ]
+    assert returned["returned_relation_kinds"] == (32,)
+    returned_row, = ast.literal_eval(returned["returned_relation_definitions"])
+    assert returned_row["count"] == 2
+    assert returned_row["definition_interfaces"] == [None, "ISketchSegment"]
+    assert returned_row["internal_entity_types"] == (3, 3)
+    assert returned_row["identity_matches"] is False
+    before, = [
+        fields for _message, fields in fixture.events
+        if fields.get("operation_stage") == "ThumbTapToBoreRim.before-constraint" and fields.get("relation_kind") == 26
+    ]
+    assert before["actual_relation_kinds"] == ()
+    after, = [
+        fields for _message, fields in fixture.events
+        if fields.get("operation_stage") == "ThumbTapToBoreRim.created-constraint" and fields.get("relation_kind") == 26
+    ]
+    if effect == "correct":
+        assert after["actual_relation_kinds"] == (26,)
+        assert after["relation_matches"] == 1
+        actual_row, = ast.literal_eval(after["relation_definitions"])
+        assert actual_row["identity_matches"] is True
+        assert actual_row["alignment"]["aligned"] is True
+        assert actual_row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
+    else:
+        assert after["relation_readback_error"] != "None"
+        assert after["relation_matches"] == (2 if effect == "duplicate" else 0)
+        if effect == "none":
+            assert after["actual_relation_kinds"] == ()
+        elif effect == "wrong-kind":
+            assert after["actual_relation_kinds"] == (32,)
+        elif effect == "unaligned":
+            actual_row, = ast.literal_eval(after["relation_definitions"])
+            assert actual_row["identity_matches"] is True
+            assert actual_row["alignment"]["axis"] == 0
+            assert abs(actual_row["alignment"]["delta_m"]) == pytest.approx(0.001)
+            assert actual_row["alignment"]["aligned"] is False
+            assert "native defining point alignment differs" in after["relation_readback_error"]
+
+
+@pytest.mark.parametrize("before", ("existing-kind", "null-handle", "unavailable"))
+def test_constraint_creation_requires_observed_absence_before_single_mutation(monkeypatch, before) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    original_create = fixture.manager.CreateLine
+    original_add = fixture.sketch.RelationManager.AddRelation
+    calls = []
+
+    def unavailable():
+        raise RuntimeError("native endpoint relation inventory unavailable")
+
+    def create(*coordinates):
+        line = original_create(*coordinates)
+        start = line.GetStartPoint2()
+        if before == "existing-kind":
+            start.relations.append(_WitnessRelation((start, fixture.tap), 26))
+        elif before == "null-handle":
+            start.relations.append(None)
+        else:
+            start.GetRelations = unavailable
+        return line
+
+    def add(entities, kind):
+        calls.append(kind)
+        return original_add(entities, kind)
+
+    fixture.manager.CreateLine = create
+    fixture.sketch.RelationManager.AddRelation = add
+    with pytest.raises(RuntimeError, match="already exists|pre-constraint relation inventory unavailable"):
+        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    assert calls == [4]  # Never retry or add an unobservably duplicate relation 26.
+    fields = fixture.events[-1][1]
+    assert fields["operation_stage"] == "ThumbTapToBoreRim.before-constraint"
+    assert fields["relation_kind"] == 26
+    assert fields["actual_relation_kinds"] == ((26,) if before == "existing-kind" else (None,) if before == "null-handle" else ())
+    if before == "unavailable":
+        assert "native endpoint relation inventory unavailable" in fields["relation_readback_error"]
+
+
+def test_constraint_return_cannot_replace_unavailable_native_poststate(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    original_create = fixture.manager.CreateLine
+    original_add = fixture.sketch.RelationManager.AddRelation
+    calls = []
+
+    def create(*coordinates):
+        line = original_create(*coordinates)
+        start = line.GetStartPoint2()
+
+        def relations():
+            if start.relations:
+                raise RuntimeError("native post-state unavailable")
+            return ()
+
+        start.GetRelations = relations
+        return line
+
+    def add(entities, kind):
+        calls.append(kind)
+        return original_add(entities, kind)
+
+    fixture.manager.CreateLine = create
+    fixture.sketch.RelationManager.AddRelation = add
+    with pytest.raises(RuntimeError, match="post-constraint relation inventory unavailable"):
+        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    assert calls == [4, 26]
+    fields = fixture.events[-1][1]
+    assert fields["operation_stage"] == "ThumbTapToBoreRim.constraint-poststate"
+    assert fields["relation_kind"] == 26
+    assert "native post-state unavailable" in fields["relation_readback_error"]
