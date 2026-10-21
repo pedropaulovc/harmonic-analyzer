@@ -258,16 +258,29 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> None:
         raise RuntimeError("native lever thread callout attachment census is incomplete")
     app = adapter.swApp
     self_comparisons = []
-    for label, obj in (("callout", note), ("owner", owner), *(("attachment", entity) for entity in entities)):
-        result = int(app.IsSame(obj, obj))
-        self_comparisons.append({"role": label, "code": result})
+    for label, identity_field, obj in (
+        ("callout", "before.note_self", note), ("owner", "before.owner_self", owner),
+        *(("attachment", f"before.entity_self[{index}]", entity) for index, entity in enumerate(entities)),
+    ):
+        try:
+            result = int(app.IsSame(obj, obj))
+        except Exception as exc:
+            raise RuntimeError(f"native lever ISldWorks.IsSame reader {identity_field} failed: {exc}") from exc
+        self_comparisons.append({"role": label, "field": identity_field, "code": result})
         if result != 1:
-            raise RuntimeError(f"native lever {label} identity comparison unsupported: self={result}")
-    owner_to_front = int(app.IsSame(owner, native)) if owner_type == 0 else None
+            raise RuntimeError(f"native lever {label} identity comparison unsupported: self={result} ({identity_field})")
+    try:
+        owner_to_front = int(app.IsSame(owner, native)) if owner_type == 0 else None
+    except Exception as exc:
+        raise RuntimeError(f"native lever ISldWorks.IsSame reader before.owner_to_front failed: {exc}") from exc
     if owner_type == 0 and owner_to_front != 1:
         raise RuntimeError("native lever thread callout belongs to another drawing view")
+    # R8 INote readback canonicalizes line endings to CRLF. Preserve every row
+    # and space; send and compare the same native payload, not normalized text.
+    native_text = PRINT_THREAD_CALLOUT.replace("\n", "\r\n")
     audit = {
-        "requested_text": PRINT_THREAD_CALLOUT,
+        "portable_text": PRINT_THREAD_CALLOUT,
+        "requested_text": native_text,
         "stage": "before_set_text",
         "before": {
             "text": original, "owner_type": owner_type, "owner_present": True,
@@ -282,82 +295,160 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> None:
         f"lever native thread callout audit: {evidence}",
         operation_stage=audit["stage"], auditJSON=evidence, failed_conditions="[]",
     )
-    audit["setter_result"] = bool(note.SetText(PRINT_THREAD_CALLOUT))
+    audit["setter_result"] = bool(note.SetText(native_text))
     if not audit["setter_result"]:
         raise RuntimeError("native lever thread drawing callout refused its print-only text")
     rebuild_drawing(adapter, label="omit title-block thread class from lever drawing callout")
     audit["stage"] = "readback"
+    audit["read_errors"] = []
+    audit["unavailable"] = {}
     after = audit["after"]
-    reading = "ICThread.ThreadCallout"
-    try:
-        current = _early_bound(thread.ThreadCallout, "INote")
+    missing = object()
+
+    def read_field(field: str, member: str, reader: Any, *, record: bool = True) -> Any:
+        """Collect independent native results; never invent a value on failure."""
+        try:
+            value = reader()
+        except Exception as exc:
+            audit["read_errors"].append({
+                "field": field, "member": member, "kind": "exception",
+                "type": type(exc).__name__, "message": str(exc),
+            })
+            return missing
+        if record:
+            after[field] = value
+        if value is None:
+            audit["read_errors"].append({
+                "field": field, "member": member, "kind": "returned_none", "value": None,
+            })
+        return value
+
+    annotation_fields = (
+        "owner_type", "owner_present", "owner_same", "owner_self", "entities_reported",
+        "attached_count", "attached_types", "entity_handles", "entity_same", "entity_self", "dangling",
+    )
+    current_entities = missing
+    current = read_field("note_handle", "ICThread.ThreadCallout", lambda: _early_bound(thread.ThreadCallout, "INote"), record=False)
+    if current is not missing:
         after["note_present"] = current is not None
-        if current is not None:
-            reading = "INote.GetText"
-            after["text"] = current.GetText()
-            if after["text"] is None:
-                raise RuntimeError("INote.GetText returned None; native text reader unavailable")
-            reading = "ISldWorks.IsSame(note,current)"
-            after["note_same"] = int(app.IsSame(note, current))
-            after["note_self"] = int(app.IsSame(current, current))
-            reading = "INote.GetAnnotation"
-            current_annotation = _early_bound(current.GetAnnotation(), "IAnnotation")
-            reading = "IAnnotation.OwnerType"
-            after["owner_type"] = int(current_annotation.OwnerType)
-            reading = "IAnnotation.Owner"
-            current_owner = current_annotation.Owner
-            after["owner_present"] = current_owner is not None
-            reading = "ISldWorks.IsSame(owner,current_owner)"
-            after["owner_same"] = int(app.IsSame(owner, current_owner)) if current_owner is not None else None
-            after["owner_self"] = int(app.IsSame(current_owner, current_owner)) if current_owner is not None else None
-            reading = "IAnnotation.GetAttachedEntities3"
-            current_entities = tuple(current_annotation.GetAttachedEntities3() or ())
-            after["entities_reported"] = len(current_entities)
-            reading = "IAnnotation.GetAttachedEntityCount3"
-            after["attached_count"] = int(current_annotation.GetAttachedEntityCount3())
-            reading = "IAnnotation.GetAttachedEntityTypes"
-            after["attached_types"] = tuple(current_annotation.GetAttachedEntityTypes() or ())
-            reading = "ISldWorks.IsSame(attached entities)"
-            after["entity_same"] = [int(app.IsSame(before, actual)) for before, actual in zip(entities, current_entities)]
-            after["entity_self"] = [int(app.IsSame(actual, actual)) for actual in current_entities]
-            reading = "IAnnotation.IsDangling"
-            after["dangling"] = current_annotation.IsDangling()
-            if after["dangling"] is None:
-                raise RuntimeError("IAnnotation.IsDangling returned None; native dangling-state reader unavailable")
-    except Exception as exc:
-        audit["stage"] = f"readback:{reading}"
-        audit["failed"] = ["reader_unavailable"]
-        audit["read_error"] = {"field": reading, "type": type(exc).__name__, "message": str(exc)}
-        evidence = json.dumps(audit, sort_keys=True, default=repr)
-        _telemetry.info(
-            f"lever native thread callout audit: {evidence}",
-            operation_stage=audit["stage"], auditJSON=evidence,
-            failed_conditions=json.dumps(audit["failed"]),
+    else:
+        audit["unavailable"]["note_present"] = "note_handle"
+    if current is not missing and current is not None:
+        read_field("text", "INote.GetText", lambda: current.GetText())
+        read_field("note_same", "ISldWorks.IsSame(note,current)", lambda: app.IsSame(note, current))
+        read_field("note_self", "ISldWorks.IsSame(current,current)", lambda: app.IsSame(current, current))
+        current_annotation = read_field(
+            "annotation_handle", "INote.GetAnnotation",
+            lambda: _early_bound(current.GetAnnotation(), "IAnnotation"), record=False,
         )
-        raise RuntimeError(f"lever native thread callout readback failed; audit={evidence}") from exc
-    # Evaluate every native readback before deciding; short-circuiting this
-    # inventory hid which actual R7 field changed after SetText/rebuild.
+        if current_annotation is not missing:
+            after["annotation_present"] = current_annotation is not None
+        else:
+            audit["unavailable"]["annotation_present"] = "annotation_handle"
+        if current_annotation is not missing and current_annotation is not None:
+            read_field("owner_type", "IAnnotation.OwnerType", lambda: current_annotation.OwnerType)
+            current_owner = read_field("owner_handle", "IAnnotation.Owner", lambda: current_annotation.Owner, record=False)
+            if current_owner is not missing:
+                after["owner_present"] = current_owner is not None
+            else:
+                audit["unavailable"]["owner_present"] = "owner_handle"
+            if current_owner is not missing and current_owner is not None:
+                read_field("owner_same", "ISldWorks.IsSame(owner,current_owner)", lambda: app.IsSame(owner, current_owner))
+                read_field("owner_self", "ISldWorks.IsSame(current_owner,current_owner)", lambda: app.IsSame(current_owner, current_owner))
+            else:
+                audit["unavailable"].update(dict.fromkeys(("owner_same", "owner_self"), "owner_handle"))
+            # Nullable native attachment arrays are a valid empty inventory.
+            current_entities = read_field(
+                "attached_entities", "IAnnotation.GetAttachedEntities3",
+                lambda: tuple(current_annotation.GetAttachedEntities3() or ()), record=False,
+            )
+            if current_entities is not missing:
+                after["entities_reported"] = len(current_entities)
+            else:
+                audit["unavailable"]["entities_reported"] = "attached_entities"
+            read_field("attached_count", "IAnnotation.GetAttachedEntityCount3", lambda: current_annotation.GetAttachedEntityCount3())
+            read_field(
+                "attached_types", "IAnnotation.GetAttachedEntityTypes",
+                lambda: tuple(current_annotation.GetAttachedEntityTypes() or ()),
+            )
+            if current_entities is not missing:
+                after["entity_same"], after["entity_self"] = [], []
+                after["entity_handles"] = [
+                    {"index": index, "present": entity is not None} for index, entity in enumerate(current_entities)
+                ]
+                # GetAttachedEntities3 can retain a null entry for an unavailable
+                # entity. Its slot/count remain real; IsSame needs actual handles.
+                for index, current_entity in enumerate(current_entities):
+                    if current_entity is None:
+                        dependency = f"attached_entities[{index}]"
+                        audit["read_errors"].append({
+                            "field": dependency, "member": "IAnnotation.GetAttachedEntities3",
+                            "kind": "missing_entity_handle", "index": index, "value": None,
+                            "reason": "native attachment array entry is None",
+                        })
+                        audit["unavailable"][f"entity_self[{index}]"] = dependency
+                        if index < len(entities):
+                            audit["unavailable"][f"entity_same[{index}]"] = dependency
+                for index, (before_entity, current_entity) in enumerate(zip(entities, current_entities)):
+                    if current_entity is None:
+                        after["entity_same"].append({"index": index, "unavailable": True})
+                        continue
+                    code = read_field(
+                        f"entity_same[{index}]", f"ISldWorks.IsSame(before_entity[{index}],current_entity[{index}])",
+                        lambda: app.IsSame(before_entity, current_entity), record=False,
+                    )
+                    after["entity_same"].append(
+                        {"index": index, "unavailable": True} if code is missing else {"index": index, "code": code}
+                    )
+                for index, current_entity in enumerate(current_entities):
+                    if current_entity is None:
+                        after["entity_self"].append({"index": index, "unavailable": True})
+                        continue
+                    code = read_field(
+                        f"entity_self[{index}]", f"ISldWorks.IsSame(current_entity[{index}],current_entity[{index}])",
+                        lambda: app.IsSame(current_entity, current_entity), record=False,
+                    )
+                    after["entity_self"].append(
+                        {"index": index, "unavailable": True} if code is missing else {"index": index, "code": code}
+                    )
+            else:
+                audit["unavailable"].update(dict.fromkeys(("entity_handles", "entity_same", "entity_self"), "attached_entities"))
+            read_field("dangling", "IAnnotation.IsDangling", lambda: current_annotation.IsDangling())
+        else:
+            audit["unavailable"].update(dict.fromkeys(annotation_fields, "annotation_handle"))
+    else:
+        audit["unavailable"].update(dict.fromkeys(
+            ("text", "note_same", "note_self", "annotation_present", *annotation_fields), "note_handle",
+        ))
+    # Only missing handles prevent dependent reads. A failed scalar/type reader
+    # cannot hide the remaining ownership, attachment, identity or dangling data.
     conditions = {
-        "note_present": after["note_present"],
+        "note_present": after.get("note_present", False),
         "note_identity": after.get("note_same") == 1,
-        "text": after.get("text") == PRINT_THREAD_CALLOUT,
+        "text": after.get("text") == native_text,
         "owner_type": after.get("owner_type") == owner_type,
         "owner_identity": after.get("owner_present", False) and after.get("owner_same") == 1,
         "attached_count": after.get("attached_count") == entity_count,
         "attached_types": after.get("attached_types") == entity_types,
         "entities_reported": after.get("entities_reported") == len(entities),
-        "entity_identity": all(code == 1 for code in after.get("entity_same", ())),
+        "entity_identity": current_entities is not missing and all(
+            entity is not None for entity in current_entities
+        ) and all(item.get("code") == 1 for item in after.get("entity_same", ())),
         "dangling": after.get("dangling") == dangling,
     }
     audit["stage"] = "readback_complete"
     audit["conditions"] = conditions
     audit["failed"] = [name for name, passed in conditions.items() if not passed]
+    if audit["read_errors"]:
+        audit["failed"].append("reader_unavailable")
     evidence = json.dumps(audit, sort_keys=True, default=repr)
     _telemetry.info(
         f"lever native thread callout audit: {evidence}",
         operation_stage=audit["stage"], auditJSON=evidence,
         failed_conditions=json.dumps(audit["failed"]),
     )
+    if audit["read_errors"]:
+        raise RuntimeError(f"lever native thread callout readback failed; audit={evidence}")
     if not conditions["note_present"] or not conditions["note_identity"]:
         raise RuntimeError(f"lever thread text mutation replaced its native drawing callout; audit={evidence}")
     if audit["failed"]:

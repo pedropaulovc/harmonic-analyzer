@@ -98,6 +98,12 @@ BORE_CUT_DEPTH = HEX_AC + 2.0
 # The corner radius is the flats over sqrt(3): the hex sketch's equation.
 _CORNER_PER_AF = 1.0 / math.sqrt(3.0)
 
+# swSelectType_e: both return ISketchPoint. A Hole Wizard placement point is
+# external (25) while the separate bore-location witness sketch is active.
+# Type alone is insufficient (25 can also denote an origin); IsSame must still
+# identify the actual expected point. The converted witness segment stays 10.
+_SKETCH_POINT_SELECTION_TYPES = (11, 25)  # swSelSKETCHPOINTS, swSelEXTSKETCHPOINTS
+
 # --- Analytic volumes (mm^3) ---------------------------------------------------
 V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * BLOCK_HEIGHT
 # The bore across the corners: over its cross-section the hex's chord along X
@@ -233,7 +239,7 @@ def _require_location_selection(
         error = "expected two selected objects"
     elif any(entity is None for entity in selected):
         error = "selected object unavailable"
-    elif types != (11, 10):  # swSelSKETCHPOINTS, swSelSKETCHSEGS
+    elif types[0] not in _SKETCH_POINT_SELECTION_TYPES or types[1] != 10:  # swSelSKETCHSEGS
         error = "expected native sketch point and sketch segment selection types"
     elif point is not None and self_codes[0] != 1:
         error = "native point identity positive control failed"
@@ -502,11 +508,12 @@ def _assert_relative_attachment(adapter: Any, display: Any, point: Any, circle: 
         attached = tuple(annotation.GetAttachedEntities3() or ())
         types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
         dangling = annotation.IsDangling()
-        if len(attached) != 2 or sorted(types) != [10, 11] or dangling is not False or any(entity is None for entity in attached):
+        point_indices = tuple(index for index, kind in enumerate(types) if kind in _SKETCH_POINT_SELECTION_TYPES)
+        if len(attached) != 2 or len(types) != 2 or len(point_indices) != 1 or types.count(10) != 1 or dangling is not False or any(entity is None for entity in attached):
             raise RuntimeError("invalid native point/circle attachments")
         application = _early_bound(adapter.swApp, "ISldWorks")
         point_self = application.IsSame(point, point)
-        point_code = application.IsSame(attached[types.index(11)], point)
+        point_code = application.IsSame(attached[point_indices[0]], point)
         expected_key = _segment_identity(adapter, circle, stage=stage, role="expected-attachment")
         actual_key = _segment_identity(adapter, attached[types.index(10)], stage=stage, role="actual-attachment")
         if type(point_self) is not int or point_self != 1 or type(point_code) is not int or point_code != 1 or actual_key != expected_key:
