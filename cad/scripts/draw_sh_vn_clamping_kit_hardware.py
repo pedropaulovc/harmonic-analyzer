@@ -425,6 +425,7 @@ def _installation_flag(
         )
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
         bounds = _note_text_box(annotation, label=label)
+        text_bounds_before_move = bounds
         position = tuple(
             float(value) for value in _read_member(annotation, "GetPosition")
         )
@@ -553,18 +554,61 @@ def _installation_flag(
         _assert_leader_lands(
             annotation, current_pick, what="installation flag", label=label
         )
-        bounds = _note_text_box(annotation, label=label)
-        current_outline = _box(view.GetOutline(), label=label)
-        if (
-            not _inside(bounds, cell)
-            or not _inside(_box(note.GetExtent(), label=label, kind="note"), cell)
-            or any(
-                not _inside((points[i], points[i + 1], points[i], points[i + 1]), cell)
-                for i in range(0, len(points), 3)
+        observed = {
+            "cell_m": tuple(cell),
+            "leader_xyz_m": points,
+            "requested_landing_xy_m": pick,
+            "current_landing_xy_m": current_pick,
+            "text_before_move_m": text_bounds_before_move,
+            "position_before_move_m": position,
+            "requested_position_m": target,
+            "requested_text_left_m": left,
+            "requested_text_center_y_m": center_y,
+        }
+        try:
+            observed["position_m"] = tuple(
+                float(value) for value in _read_member(annotation, "GetPosition")
             )
-            or Box(*bounds).gap(Box(*current_outline)) < 0.002
-        ):
-            raise RuntimeError(f"{label}: key leaves its cell or crowds the view")
+        except Exception as error:
+            observed["position_read_error"] = repr(error)[:160]
+        reading = "text_box_m"
+        try:
+            bounds = _note_text_box(annotation, label=label)
+            observed["text_box_m"] = bounds
+            reading = "native_extent_m"
+            raw_extent = tuple(float(value) for value in note.GetExtent() or ())
+            observed["native_extent_raw_m"] = raw_extent
+            extent = _box(raw_extent, label=label, kind="note")
+            observed["native_extent_m"] = extent
+            reading = "view_outline_m"
+            current_outline = _box(view.GetOutline(), label=label)
+            observed["view_outline_m"] = current_outline
+            gap = Box(*bounds).gap(Box(*current_outline))
+            observed["text_view_gap_m"] = gap
+            outside_vertices = tuple(
+                i // 3
+                for i in range(0, len(points), 3)
+                if not _inside(
+                    (points[i], points[i + 1], points[i], points[i + 1]), cell
+                )
+            )
+            observed["outside_leader_vertices"] = outside_vertices
+            failed = {
+                "text_outside_cell": not _inside(bounds, cell),
+                "extent_outside_cell": not _inside(extent, cell),
+                "leader_outside_cell": bool(outside_vertices),
+                "text_view_gap_below_2mm": gap < 0.002,
+            }
+            observed["failed_predicates"] = failed
+        except Exception as error:
+            observed["read_error"] = (reading, repr(error)[:160])
+            error.add_note(f"{label}: native placement observation {observed!r}")
+            raise
+        if any(failed.values()):
+            raise RuntimeError(
+                f"{label}: key leaves its cell or crowds the view; "
+                f"native placement observation {observed!r}"
+            )
         return Box(*bounds), points
 
     geometry()
