@@ -352,7 +352,7 @@ def _call_once(
             time.perf_counter() - observer_started
         ) * 1000
         row["observer_ms"] += row["pre_treatment_observer_ms"]
-        treatment_started = time.perf_counter()
+        row["treatment_ms"] = 0.0
         try:
             if row["arm"] == "view-update":
                 row["treatment_calls"] += 1
@@ -362,14 +362,18 @@ def _call_once(
                     arm_index=row["index"],
                 ):
                     # SDK VT_VOID: None means invocation returned, not failure.
-                    view.UpdateViewDisplayGeometry()
+                    treatment_started = time.perf_counter()
+                    try:
+                        view.UpdateViewDisplayGeometry()
+                    finally:
+                        row["treatment_ms"] = (
+                            time.perf_counter() - treatment_started
+                        ) * 1000
             elif row["arm"] != "control":
                 raise RuntimeError(f"unknown display-update arm: {row['arm']!r}")
         except BaseException as error:
             row["treatment_error"] = _error(error)
             raise
-        finally:
-            row["treatment_ms"] = (time.perf_counter() - treatment_started) * 1000
         observer_started = time.perf_counter()
         row["post_treatment_view_state"] = _view_state(view)
         row["post_treatment_observer_ms"] = (
@@ -528,6 +532,34 @@ def _interpret(rows: list[dict[str, Any]]) -> str:
         return "inconclusive: post-call options or observation comparability failed"
     if not all(row.get("association_verified", False) for row in rows):
         return "inconclusive: targeted post-call row association not verified"
+    if any(
+        sorted(
+            json.dumps((note["name"], note.get("annotation_name")))
+            for note in row["raw_notes"]
+        )
+        != sorted(
+            json.dumps((note["name"], note.get("annotation_name")))
+            for note in row["inventory"]
+        )
+        for row in rows
+    ):
+        return "inconclusive: raw/inventory note identities disagree"
+    if any(
+        set(row["raw_coverage"]["missing"])
+        != set(row["inventory_coverage"]["missing"])
+        or row["raw_coverage"]["correct_ten"]
+        != row["inventory_coverage"]["correct_ten"]
+        or sorted(
+            json.dumps(note, sort_keys=True)
+            for note in row["raw_coverage"]["incorrect"]
+        )
+        != sorted(
+            json.dumps(note, sort_keys=True)
+            for note in row["inventory_coverage"]["incorrect"]
+        )
+        for row in rows
+    ):
+        return "inconclusive: raw/inventory coverage disagreement"
     controls = [row for row in rows if row["arm"] == "control"]
     updates = [row for row in rows if row["arm"] == "view-update"]
     kinds = ("raw_coverage", "inventory_coverage")
