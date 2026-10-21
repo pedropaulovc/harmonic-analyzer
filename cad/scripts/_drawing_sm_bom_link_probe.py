@@ -24,6 +24,7 @@ from solidworks_mcp.adapters.com_variant import bstr_array
 
 import _drawing_balloons as balloons
 import _seat_forensics as forensics
+import _telemetry
 from _com import _early_bound
 from _drawing_selection import _activate_and_select_view
 from _session import discard_open_documents
@@ -288,6 +289,7 @@ def _options(
     row["comparison_ineligible"] = bool(failures)
 
 
+@_telemetry.traced("drawing.sm_bom_link.call_and_observe")
 def _call_once(
     adapter: Any,
     view: Any,
@@ -296,6 +298,7 @@ def _call_once(
     out_dir: Path,
     hwnd: int,
 ) -> None:
+    _telemetry.annotate(arm=row["arm"], arm_index=row["index"])
     _activate_and_select_view(adapter, view, label=LABEL)
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -323,13 +326,20 @@ def _call_once(
         for name, value in AUTHORED_OPTIONS.items():
             setattr(options, name, value)
         # No option getters, quality reads or refresh between setters and this call.
-        started = time.perf_counter()
         raw = None
         try:
-            row["native_calls"] += 1
-            raw = ddoc.AutoBalloon5(options)
+            with _telemetry.span(
+                "drawing.sm_bom_link.autoballoon_native",
+                arm=row["arm"],
+                arm_index=row["index"],
+            ):
+                started = time.perf_counter()
+                try:
+                    row["native_calls"] += 1
+                    raw = ddoc.AutoBalloon5(options)
+                finally:
+                    row["native_ms"] = (time.perf_counter() - started) * 1000
         finally:
-            row["native_ms"] = (time.perf_counter() - started) * 1000
             # Python-only metadata immediately; preserve collection until all reads.
             row["raw_return"] = {
                 "python_type": type(raw).__name__,
@@ -377,6 +387,7 @@ def _call_once(
         )
 
 
+@_telemetry.traced("drawing.sm_bom_link.row_association")
 def _row_components(
     table: Any, state: dict[str, Any], bom_column: Callable[..., int]
 ) -> list[dict[str, Any]]:
@@ -476,6 +487,7 @@ def _interpret(rows: list[dict[str, Any]]) -> str:
     return "inconclusive: split outcome or controls also pass; no production claim"
 
 
+@_telemetry.traced("drawing.sm_bom_link.abba_probe")
 async def run_probe(
     adapter: Any,
     prepare: Callable[[], Awaitable[tuple[Any, Any, Any]]],
