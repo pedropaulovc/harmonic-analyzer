@@ -315,16 +315,6 @@ class _Bom:
             for physical, column in enumerate(self.columns)
             if include_hidden or not column["hidden"]
         ]
-        if not include_hidden and indices and self.columns[indices[-1]]["kind"] == 203:
-            hidden_native = [
-                physical
-                for physical, column in enumerate(self.columns)
-                if column["hidden"] and column["kind"] == 201
-            ]
-            if hidden_native:
-                # Native2310's legacy projection replaces the last visible Qty
-                # slot with the hidden native PART NUMBER, not physical Qty.
-                indices[-1] = hidden_native[-1]
         return indices[index] if 0 <= index < len(indices) else None
 
     def GetColumnType3(self, index, include_hidden):
@@ -335,11 +325,18 @@ class _Bom:
         return column["kind"], column["property"], 0
 
     def ColumnHidden(self, index):
-        physical = self._column_index(index, True)
+        # Visibility PROPERTY indices are 1-based; typed/text indices are not.
+        physical = self._column_index(index - 1, True)
         return self.columns[physical]["hidden"] if physical is not None else False
 
+    def SetColumnHidden(self, index, hidden):
+        physical = self._column_index(index - 1, True)
+        if physical is None:
+            raise IndexError("invalid visibility property")
+        self.columns[physical]["hidden"] = hidden
+
     def GetColumnWidth(self, index):
-        physical = self._column_index(index, True)
+        physical = self._column_index(index, False)
         return self.columns[physical]["width"] if physical is not None else 0.0
 
     def GetColumnTitle2(self, index, include_hidden):
@@ -403,9 +400,9 @@ class _Bom:
         return True
 
     def SetColumnWidth(self, column, width, _options):
-        physical = self._column_index(column, True)
+        physical = self._column_index(column, False)
         if physical is None:
-            raise IndexError("invalid physical column width")
+            raise IndexError("invalid visible column width")
         self.columns[physical]["width"] = width
         return width
 
@@ -420,6 +417,10 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
 ):
     _unwrapped_com(monkeypatch, drawing)
     table = _Bom(drawing, member + " Simplified", advertised_excess=advertised_excess)
+    assert table.GetColumnType3(4, True)[0] == 201
+    assert table.ColumnHidden(4) is False
+    assert table.ColumnHidden(5) is True
+    assert table.GetColumnType3(5, True) == (-1, None, 0)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     items = dict(drawing._validate_bom(adapter, table))
     assert items == {
@@ -434,7 +435,9 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
     assert table.TotalColumnCount == len(table.columns) + advertised_excess
     native_column = len(table.columns) - 1
     assert table.GetColumnType3(native_column, True)[0] == 201
-    assert table.ColumnHidden(native_column) is True
+    assert native_column == 5
+    assert table.ColumnHidden(native_column + 1) is True
+    assert table.ColumnHidden(native_column) is False
     assert table.GetColumnWidth(native_column) == 0.0
     assert table.GetColumnType3(1, True) == (204, '$PRP:"Number"', 0)
     assert table.GetColumnCustomProperty(1) == "Number"
@@ -445,13 +448,15 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
         include_hidden is True for _column, _title, include_hidden in table.title_writes
     )
     assert table.GetColumnType3(quantity_column, True)[0] == 203
-    assert table.GetColumnType3(quantity_column, False)[0] == 201
+    assert table.GetColumnType3(quantity_column, False)[0] == 203
     assert table.DisplayedText2(0, quantity_column, True) == "QTY."
-    assert table.DisplayedText2(0, quantity_column, False) == "PART NUMBER"
-    assert table.DisplayedText(0, quantity_column) == "PART NUMBER"
+    assert table.DisplayedText2(0, quantity_column, False) == "QTY."
+    assert table.DisplayedText(0, quantity_column) == "QTY."
     wire_row = int(items[drawing.WIRE_ROW])
-    assert table.DisplayedText2(wire_row, quantity_column, False) == drawing.WIRE_ROW
-    assert table.DisplayedText(wire_row, quantity_column) == drawing.WIRE_ROW
+    assert table.DisplayedText2(wire_row, quantity_column, False) == str(
+        drawing.BOM_QUANTITIES[drawing.WIRE_ROW]
+    )
+    assert table.DisplayedText(wire_row, 1) == "MHA-SH-VN-56"
     snapshot = _drawing_tables.validate_bom_number_property(
         table,
         configuration="Default Simplified",
@@ -469,17 +474,23 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
         assert table.DisplayedText2(item, quantity_column, True) == str(
             drawing.BOM_QUANTITIES[logical]
         )
+        assert table.DisplayedText2(item, quantity_column, False) == str(
+            drawing.BOM_QUANTITIES[logical]
+        )
+        assert table.DisplayedText2(item, 1, False) == drawing.BOM_PART_NUMBERS[logical]
         assert table.cells[item][quantity_column] == str(
             drawing.BOM_QUANTITIES[logical]
         )
         assert table.DisplayedText2(item, sku_column, True) == drawing.BOM_SKUS[logical]
     table.cells[wire_row][native_column] = "999"
-    assert table.DisplayedText(wire_row, quantity_column) == "999"
+    assert table.DisplayedText(wire_row, quantity_column) == str(
+        drawing.BOM_QUANTITIES[drawing.WIRE_ROW]
+    )
     assert (
         _drawing_tables.validate_bom_number_property(
             table,
             configuration="Default Simplified",
-            label="changed legacy wire projection",
+            label="changed hidden native key",
             expected_rows=1 + len(drawing.BOM_COMPONENTS),
             occurrence_quantities=True,
         )
@@ -491,8 +502,74 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
             assert table.GetColumnTitle2(index, include_hidden) == ""
             assert table.DisplayedText2(0, index, include_hidden) == ""
         assert table.GetColumnWidth(index) == 0.0
-        assert table.ColumnHidden(index) is False
+        assert table.ColumnHidden(index + 1) is False
         assert table.GetColumnCustomProperty(index) == ""
+
+
+@pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+@pytest.mark.parametrize(
+    "fault", ("qty-hidden", "number-hidden", "qty-type", "qty-text", "number-text")
+)
+def test_bom_refuses_invisible_or_wrong_visible_projection_after_sku(
+    monkeypatch, drawing, member, _assembly, fault
+):
+    _unwrapped_com(monkeypatch, drawing)
+    table = _Bom(drawing, member + " Simplified")
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    drawing._validate_bom(adapter, table)
+    quantity_column = table.cells[0].index("QTY.")
+    native_column = len(table.columns) - 1
+    physical_cells = tuple(tuple(row) for row in table.cells)
+    native_members = dict(table.components)
+    if fault in ("qty-hidden", "number-hidden"):
+        # Model the real wrong-property mutation, not a fabricated False view.
+        hidden_column = quantity_column if fault == "qty-hidden" else 1
+        table.SetColumnHidden(hidden_column + 1, True)
+        table.SetColumnHidden(native_column + 1, False)
+        table.columns[native_column]["width"] = 0.02
+        assert table.GetColumnType3(hidden_column, True)[0] in (203, 204)
+        assert table.GetColumnTitle2(hidden_column, False) != (
+            table.GetColumnTitle2(hidden_column, True)
+        )
+        reason = "BOM visible columns are not a contiguous prefix"
+    elif fault == "qty-type":
+        native_type = table.GetColumnType3
+
+        def wrong_visible_type(column, include_hidden):
+            if not include_hidden and column == quantity_column:
+                return native_type(native_column, True)
+            return native_type(column, include_hidden)
+
+        monkeypatch.setattr(table, "GetColumnType3", wrong_visible_type)
+        assert table.GetColumnType3(quantity_column, False) != (
+            table.GetColumnType3(quantity_column, True)
+        )
+        reason = "BOM visible column projection disagrees"
+    else:
+        native_text = table.DisplayedText2
+        damaged_column = quantity_column if fault == "qty-text" else 1
+
+        def wrong_visible_text(row, column, include_hidden):
+            if not include_hidden and row == 1 and column == damaged_column:
+                return "999"
+            return native_text(row, column, include_hidden)
+
+        monkeypatch.setattr(table, "DisplayedText2", wrong_visible_text)
+        assert table.DisplayedText2(1, damaged_column, False) != (
+            table.DisplayedText2(1, damaged_column, True)
+        )
+        name = "quantity" if fault == "qty-text" else "Number"
+        reason = rf"BOM row 1: visible {name} .*does not match physical {name}"
+    with pytest.raises(RuntimeError, match=reason):
+        _drawing_tables.validate_bom_number_property(
+            table,
+            configuration="Default Simplified",
+            label="visible shared wire Number and Qty",
+            expected_rows=1 + len(drawing.BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+    assert tuple(tuple(row) for row in table.cells) == physical_cells
+    assert table.components == native_members
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)

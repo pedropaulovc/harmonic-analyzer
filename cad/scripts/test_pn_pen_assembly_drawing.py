@@ -194,14 +194,6 @@ class _PenBomTable:
             index for index, hidden in enumerate(self.hidden)
             if include_hidden or not hidden
         ]
-        # Native 2310 projected the retained hidden key at the legacy Qty index.
-        if not include_hidden and columns and self.column_types[columns[-1]][0] == 203:
-            retained = [
-                index for index, hidden in enumerate(self.hidden)
-                if hidden and self.column_types[index][0] == 201
-            ]
-            if retained:
-                columns[-1] = retained[-1]
         return columns[column] if 0 <= column < len(columns) else None
 
     def GetColumnType3(self, column, include_hidden):
@@ -209,10 +201,12 @@ class _PenBomTable:
         return (-1, None, 0) if physical is None else self.column_types[physical]
 
     def ColumnHidden(self, column):
-        return self.hidden[column] if 0 <= column < len(self.hidden) else False
+        # Visibility PROPERTY indices are 1-based; storage remains physical.
+        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
 
     def GetColumnWidth(self, column):
-        return self.widths[column] if 0 <= column < len(self.widths) else 0.0
+        physical = self._physical_column(column, False)
+        return self.widths[physical] if physical is not None else 0.0
 
     def GetColumnTitle2(self, column, include_hidden):
         return self.DisplayedText2(0, column, include_hidden)
@@ -269,9 +263,10 @@ class _PenBomTable:
         self.cells[row][physical] = text
 
     def SetColumnWidth(self, column, width, _options):
-        if not 0 <= column < len(self.widths):
+        physical = self._physical_column(column, False)
+        if physical is None:
             raise IndexError(column)
-        self.widths[column] = width
+        self.widths[physical] = width
         return width
 
     def SetRowHeight(self, row, height, _options):
@@ -489,9 +484,11 @@ def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
             (stem, str(item)) for item, stem in enumerate(drawing.BOM_COMPONENTS, 1)
         )
         assert table.DisplayedText2(0, 4, True) == "QTY."
-        assert table.DisplayedText(0, 4) == "PART NUMBER"
+        assert table.DisplayedText(0, 4) == "QTY."
         assert table.GetColumnType3(4, True)[0] == 203
-        assert table.GetColumnType3(4, False)[0] == 201
+        assert table.GetColumnType3(4, False)[0] == 203
+        assert table.ColumnHidden(6) is True
+        assert table.ColumnHidden(5) is False
         proof = drawing.validate_bom_number_property(
             table,
             configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
@@ -506,6 +503,10 @@ def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
         for row, stem in enumerate(drawing.BOM_COMPONENTS, 1):
             assert table.DisplayedText2(row, 4, True) == str(drawing.BOM_QUANTITIES[stem])
             assert table.DisplayedText2(row, 3, True) == drawing.BOM_SKUS[stem]
+            assert table.DisplayedText2(row, 4, False) == str(
+                drawing.BOM_QUANTITIES[stem]
+            )
+            assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[stem]
         assert table.title_writes == [(3, drawing.BOM_SKU_TITLE, True)]
         assert table.text_writes == [
             (row, 3, True, drawing.BOM_SKUS[stem])

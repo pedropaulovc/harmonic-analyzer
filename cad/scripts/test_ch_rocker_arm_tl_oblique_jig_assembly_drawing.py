@@ -795,15 +795,6 @@ class _Table:
             for index, hidden in enumerate(self.hidden)
             if include_hidden or not hidden
         ]
-        # Native 2310 projected the retained hidden key at the legacy Qty index.
-        if not include_hidden and columns and self.column_types[columns[-1]][0] == 203:
-            retained = [
-                index
-                for index, hidden in enumerate(self.hidden)
-                if hidden and self.column_types[index][0] == 201
-            ]
-            if retained:
-                columns[-1] = retained[-1]
         return columns[column] if 0 <= column < len(columns) else None
 
     def DisplayedText(self, row, column):
@@ -825,7 +816,8 @@ class _Table:
         return (-1, None, 0) if physical is None else self.column_types[physical]
 
     def ColumnHidden(self, column):
-        return self.hidden[column] if 0 <= column < len(self.hidden) else False
+        # Visibility PROPERTY indices are 1-based; storage remains physical.
+        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
 
     def GetColumnCustomProperty(self, column):
         if not 0 <= column < len(self.column_types):
@@ -843,9 +835,10 @@ class _Table:
 
     def SetColumnWidth(self, column, width, options):
         assert options == 0
-        if not 0 <= column < len(self.column_types):
+        physical = self._physical_column(column, False)
+        if physical is None:
             raise IndexError(column)
-        self.widths[column] = width
+        self.widths[physical] = width
         return width
 
     def SetRowHeight(self, row, height, options):
@@ -854,9 +847,10 @@ class _Table:
         return height
 
     def GetColumnWidth(self, column):
-        if not 0 <= column < len(self.column_types):
+        physical = self._physical_column(column, False)
+        if physical is None:
             return 0.0
-        return self.widths.get(column, 0.0 if self.hidden[column] else 0.02)
+        return self.widths.get(physical, 0.02)
 
     def GetRowHeight(self, row):
         return self.heights[row]
@@ -985,9 +979,11 @@ def test_bom_prints_registry_numbers_one_line_a_row(
     )
     assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]
     assert table.DisplayedText2(0, 3, True) == "QTY."
-    assert table.DisplayedText(0, 3) == "PART NUMBER"
+    assert table.DisplayedText(0, 3) == "QTY."
     assert table.GetColumnType3(3, True)[0] == 203
-    assert table.GetColumnType3(3, False)[0] == 201
+    assert table.GetColumnType3(3, False)[0] == 203
+    assert table.ColumnHidden(5) is True
+    assert table.ColumnHidden(4) is False
     proof = drawing.validate_bom_number_property(
         table,
         configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
@@ -999,6 +995,9 @@ def test_bom_prints_registry_numbers_one_line_a_row(
         (row, drawing.BOM_PART_NUMBERS[stem], str(spec.QUANTITIES[stem]))
         for row, stem in enumerate(spec.BOM_ORDER, 1)
     ]
+    for row, stem in enumerate(spec.BOM_ORDER, 1):
+        assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[stem]
+        assert table.DisplayedText2(row, 3, False) == str(spec.QUANTITIES[stem])
     for row, stem in zip(table.cells[1:], spec.BOM_ORDER, strict=True):
         assert row[1:] == [
             drawing.BOM_PART_NUMBERS[stem],

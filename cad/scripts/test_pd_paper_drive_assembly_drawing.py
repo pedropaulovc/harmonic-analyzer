@@ -2,7 +2,6 @@
 
 import asyncio
 from itertools import product
-import json
 import math
 import re
 from types import SimpleNamespace
@@ -2414,14 +2413,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             list(range(len(columns))) if include_hidden else
             [i for i, column in enumerate(columns) if not column.hidden]
         )
-        if not include_hidden and indices and columns[indices[-1]].kind == 203:
-            retained_native = [
-                i for i, column in enumerate(columns) if column.hidden and column.kind == 201
-            ]
-            if retained_native:
-                # Native 2310: the last visible Qty slot instead projects the
-                # retained PartNumber column. Physical True remains actual Qty.
-                indices[-1] = retained_native[-1]
         return indices[index] if 0 <= index < len(indices) else None
 
     def column_type(index, include_hidden):
@@ -2468,16 +2459,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
                     )
                 ).strip())
             cells[row][index] = "; ".join(sorted(values))
-        if property_name == "Number" and any(
-            column.kind == 201 and column.hidden for column in columns
-        ):
-            # Native 2375/2417: Number binding with a hidden retained 201
-            # clears physical Qty203 for T12/T18/T24, not native membership.
-            # Both binding APIs share this observed state; the cause is unproven.
-            row = state.row_keys.index("pd-transgear-removable") + 1
-            for quantity_column, column in enumerate(columns):
-                if column.kind == 203:
-                    cells[row][quantity_column] = ""
 
     def set_custom_property(index, property_name):
         if not 0 <= index < len(columns) or columns[index].kind != 204:
@@ -2519,9 +2500,11 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         return True
 
     def hide_column(index, hidden):
-        if not 0 <= index < len(columns):
+        if type(index) is not int or not 1 <= index <= len(columns):
             raise IndexError(index)
-        columns[index].hidden = bool(hidden)
+        if type(hidden) is not bool:
+            raise TypeError(hidden)
+        columns[index - 1].hidden = hidden
         # ITableAnnotation.SetColumnHidden is VOID, not a success flag.
         return None
 
@@ -2559,57 +2542,23 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             raise IndexError(index)
         cells[row][physical] = text
 
-    def width_index(index):
-        if not 0 <= index < len(columns):
-            return None
-        native_columns = [
-            position for position, column in enumerate(columns) if column.kind == 201
-        ]
-        if (
-            native_columns == [len(columns) - 1]
-            and columns[-1].hidden
-            and all(not column.hidden for column in columns[:-1])
-        ):
-            # Model native2437's width projection only for its observed retained
-            # trailing201 layout. Other fixture layouts keep physical widths.
-            return raw_index(index, False)
-        return index
 
     def get_width(index):
-        if not 0 <= index < len(columns) or columns[index].hidden:
-            return 0.0
-        physical = width_index(index)
-        return columns[physical].width if physical is not None else 0.0
+        physical = raw_index(index, False)
+        return 0.0 if physical is None else columns[physical].width
 
     def set_width(index, width, _options):
-        physical = width_index(index)
+        # Widths are a separate unversioned API, never PROPERTY1..N.
+        physical = raw_index(index, False)
         if physical is None:
             raise IndexError(index)
-        # ColumnHidden remains physical even in the retained trailing201 model.
         columns[physical].width = width
         return columns[physical].width
 
     def row_height(row):
         if type(row) is not int or not 0 <= row < len(cells):
             raise IndexError(row)
-        minimum = drawing.BOM_ROW_HEIGHT
-        for index, column in enumerate(columns):
-            if column.kind != 201:
-                continue
-            # Stateful wrap model informed by native2474's width-only A/B/A:
-            # retained native text constrains row minima even while hidden.
-            # This is not a native font/height or visible-extent qualification.
-            text_width = len(cells[row][index]) * 0.0016
-            original_lines = max(
-                1, math.ceil(text_width / drawing.BOM_COLUMN_WIDTHS["description"])
-            )
-            current_lines = max(1, math.ceil(text_width / max(column.width, 0.001)))
-            minimum = max(
-                minimum,
-                drawing.BOM_ROW_HEIGHT
-                + max(0, current_lines - original_lines) * 0.00452569499611854,
-            )
-        return max(minimum, state.requested_heights.get(row, 0.0))
+        return max(drawing.BOM_ROW_HEIGHT, state.requested_heights.get(row, 0.0))
 
     def set_row_height(row, height, _options):
         row_height(row)
@@ -2620,7 +2569,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.InsertColumn2.side_effect = insert_column
     table.SetColumnHidden.side_effect = hide_column
     table.ColumnHidden.side_effect = lambda index: (
-        columns[index].hidden if 0 <= index < len(columns) else False
+        columns[index - 1].hidden if 1 <= index <= len(columns) else False
     )
     table.GetColumnWidth.side_effect = get_width
     table.GetColumnType3.side_effect = column_type
@@ -2660,7 +2609,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         for row in cells:
             row.append(row[1])
         bind_property(1, "Number")
-        hide_column(len(columns) - 1, True)
+        hide_column(len(columns), True)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     return model, components, table, adapter, cells, keys
 
@@ -2914,125 +2863,62 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
     )
 
 
-def test_native_width_fixture_preserves_storage_and_legacy_projection(monkeypatch):
+def test_native_visibility_fixture_keeps_property_text_and_width_domains_distinct(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
     table = scene.insert()
     native = scene.state.columns[-1]
     quantity = scene.state.columns[3]
     assert (native.kind, native.hidden, native.width) == (201, True, _PD_NATIVE_PART_WIDTH)
     assert (quantity.kind, quantity.hidden, quantity.width) == (203, False, 0.045)
-    assert table.GetColumnWidth(3) == _PD_NATIVE_PART_WIDTH
+    assert table.GetColumnWidth(3) == quantity.width
     assert table.GetColumnWidth(4) == 0.0
-    assert table.ColumnHidden(3) is False
-    assert table.ColumnHidden(4) is True
+    assert table.ColumnHidden(4) is False
+    assert table.ColumnHidden(5) is True
 
-    assert table.SetColumnHidden(4, False) is None
+    assert table.SetColumnHidden(5, False) is None
     assert table.GetColumnWidth(3) == 0.045
     assert table.GetColumnWidth(4) == _PD_NATIVE_PART_WIDTH
     for index in range(5):
         assert table.GetColumnType3(index, True) == table.GetColumnType3(index, False)
         assert table.GetColumnTitle2(index, True) == table.GetColumnTitle2(index, False)
         assert table.DisplayedText2(0, index, True) == table.DisplayedText2(0, index, False)
-    assert table.SetColumnHidden(4, True) is None
-    assert native.width == table.GetColumnWidth(3) == _PD_NATIVE_PART_WIDTH
+    assert table.SetColumnHidden(5, True) is None
+    assert native.width == _PD_NATIVE_PART_WIDTH
     assert quantity.width == 0.045
 
-    # Insertions inherit their physical neighbour's stored width, not a fixed
-    # reset value or the hidden retained column's legacy-projected width.
+    # Insertions inherit their physical neighbour's stored width.
     assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
     assert scene.state.columns[3].width == scene.state.columns[2].width
     assert scene.state.columns[4] is quantity
     assert scene.state.columns[5] is native
-    assert table.GetColumnWidth(4) == _PD_NATIVE_PART_WIDTH
+    assert table.GetColumnWidth(4) == quantity.width
     assert table.GetColumnWidth(5) == 0.0
+    assert table.ColumnHidden(5) is False
+    assert table.ColumnHidden(6) is True
     for index in (6, 7, 8):
         assert table.GetColumnWidth(index) == 0.0
-        assert table.ColumnHidden(index) is False
+        assert table.ColumnHidden(index + 1) is False
         assert table.GetColumnType3(index, True) == (-1, None, 0)
 
 
-def test_retained_native_width_model_reversibly_constrains_hidden_row_minima(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
-    table = scene.insert()
+def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapshot(monkeypatch):
     configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
-    before_cells = tuple(tuple(row) for row in scene.cells)
-    before_members = tuple(tuple(group) for group in scene.state.native_rows)
-    before_snapshot = _drawing_tables.validate_bom_number_property(
-        table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
-    )
-
-    def heights_at(width):
-        # Only the physical retained width changes; hidden state and identical
-        # row-minimum requests are restored before observing the consumer.
-        assert table.SetColumnHidden(4, False) is None
-        assert table.SetColumnWidth(4, width, 0) == width
-        assert table.SetColumnHidden(4, True) is None
-        return tuple(
-            table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
-        )
-
-    narrow = heights_at(_PD_NATIVE_PART_WIDTH)
-    wide = heights_at(drawing.BOM_COLUMN_WIDTHS["description"])
-    restored = heights_at(_PD_NATIVE_PART_WIDTH)
-    assert any(after < before for before, after in zip(narrow, wide))
-    assert restored == narrow
-    assert tuple(tuple(row) for row in scene.cells) == before_cells
-    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
-    assert _drawing_tables.validate_bom_number_property(
-        table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
-    ) == before_snapshot
-    # This deliberately models causality, not native2474's exact 30 reduced
-    # rows, 220 cell/font observations, or native extent qualification.
-
-
-def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypatch):
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
-    old = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
-    old_table = old.insert()
-    before = _drawing_tables.validate_bom_number_property(
-        old_table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
-    )
     widths = tuple(enumerate(
         drawing.BOM_COLUMN_WIDTHS[key]
         for key in ("item", "part", "description", "quantity")
     ))
-    for index, width in widths:
-        assert old_table.SetColumnWidth(index, width, 0) == width
-    assert old_table.GetColumnType3(3, True) == (203, None, 0)
-    assert old_table.GetColumnType3(3, False) == (201, None, 0)
-    assert old.state.columns[3].width == 0.045
-    assert old.state.columns[4].width == old_table.GetColumnWidth(3) == 0.012
-    assert sum(old_table.GetColumnWidth(index) for index in range(4)) == pytest.approx(
-        sum(drawing.BOM_COLUMN_WIDTHS.values())
-    )
-    old_heights = tuple(
-        old_table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
-    )
-    assert max(old_heights) > drawing.BOM_ROW_HEIGHT * 3
-    assert old.adapter.currentModel.EditRebuild3() is True
-    assert tuple(old_table.GetRowHeight(row) for row in range(44)) == old_heights
-    assert _drawing_tables.validate_bom_number_property(
-        old_table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
-    ) == before
-    with pytest.raises(RuntimeError, match="complete paper-drive BOM does not fit"):
-        drawing._split_bom(old.adapter, old_table, configuration=configuration)
-
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
     table = scene.insert()
+    before = _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
     before_identities = tuple(
         (id(component), component.GetPathName(), component.ReferencedConfiguration,
          component.Name2, component.ComponentReference)
         for component in scene.components
     )
     before_cells = tuple(tuple(row) for row in scene.cells)
-    narrow_heights = tuple(
-        table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
-    )
-    assert max(narrow_heights) > drawing.BOM_ROW_HEIGHT
     items = dict(drawing._validate_bom(
         scene.adapter, table, drawing._source_family_counts(scene.model),
         configuration=configuration,
@@ -3067,13 +2953,13 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
         assert len(members) == count
         assert {component.ReferencedConfiguration for component in members} == configurations
         assert table.DisplayedText2(row, 3, True) == str(count)
+        assert table.DisplayedText2(row, 3, False) == str(count)
+        assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[key]
         assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], str(count))
         assert sum(identity[2] for identity in proof_by_row[row][1]) == count
     assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
     heights = tuple(table.GetRowHeight(row) for row in range(44))
     assert heights == (drawing.BOM_ROW_HEIGHT,) * 44
-    assert sum(heights) < sum(narrow_heights)
-    assert any(after < before for before, after in zip(narrow_heights, heights))
     split_after = drawing.bom_split_row(heights, 1)
     for anchor, height in (
         (drawing.BOM_ANCHOR, sum(heights[:split_after + 1])),
@@ -3082,11 +2968,9 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
         assert not drawing.bom_extent_violations(
             anchor, sum(drawing.BOM_COLUMN_WIDTHS.values()), height
         )
-    # Logical row fit is not native extent qualification. The legacy getter
-    # still projects the wide retained 201; only independent displayed-grid
-    # geometry can establish the split pieces' actual visible extent.
+    # Fixture row fit is not native displayed-grid or saved/reopened qualification.
     assert sum(table.GetColumnWidth(index) for index in range(4)) == pytest.approx(
-        0.012 + 0.048 + 0.118 + 0.118
+        sum(drawing.BOM_COLUMN_WIDTHS.values())
     )
 
 
@@ -3123,7 +3007,7 @@ def test_pd_width_authoring_sets_physical_columns_and_preserves_untargeted_width
     assert scene.state.columns[-1].width == drawing.BOM_COLUMN_WIDTHS["description"]
     assert scene.state.columns[-1].hidden is True
     assert scene.state.columns[quantity_column].width == 0.012
-    assert table.GetColumnWidth(quantity_column) == drawing.BOM_COLUMN_WIDTHS["description"]
+    assert table.GetColumnWidth(quantity_column) == 0.012
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
 
@@ -3275,7 +3159,7 @@ def test_pd_width_authoring_refuses_failed_restoration_without_a_primary_error(m
         if fault == "ignored":
             return None
         if fault == "wrong-column":
-            return native_hide(3, True)
+            return native_hide(4, True)
         native_hide(index, hidden)
         raise RuntimeError("native restore failed after taking effect")
 
@@ -3309,7 +3193,7 @@ def test_pd_width_authoring_does_not_mask_primary_exception_when_restoration_fai
         if not hidden:
             return native_hide(index, hidden)
         if restore_fault == "wrong-column":
-            return native_hide(3, True)
+            return native_hide(4, True)
         if restore_fault == "raises-after-effect":
             native_hide(index, hidden)
         raise RuntimeError("secondary native restoration failure")
@@ -3397,15 +3281,18 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         assert table.RowCount == table.TotalRowCount == len(scene.keys) + 1 == 44
         quantity_column = visible - 1
         assert table.GetColumnType3(quantity_column, True) == (203, None, 0)
-        assert table.GetColumnType3(quantity_column, False) == (201, None, 0)
+        assert table.GetColumnType3(quantity_column, False) == (203, None, 0)
         assert table.DisplayedText2(0, quantity_column, True) == "QTY."
-        assert table.DisplayedText2(0, quantity_column, False) == "PART NUMBER"
-        assert table.DisplayedText(0, quantity_column) == "PART NUMBER"
-        legacy_headers = tuple(table.DisplayedText(0, index) for index in range(visible))
-        # The old reader sees two Number headings and no Qty, despite the
-        # real physical Qty column and its three native gear occurrences.
-        assert legacy_headers.count("PART NUMBER") == 2
-        assert "QTY." not in legacy_headers
+        assert table.DisplayedText2(0, quantity_column, False) == "QTY."
+        assert table.DisplayedText(0, quantity_column) == "QTY."
+        visible_headers = tuple(table.DisplayedText(0, index) for index in range(visible))
+        assert visible_headers.count("PART NUMBER") == 1
+        assert visible_headers.count("QTY.") == 1
+        # PROPERTY of the last real column collides with the first typed-invalid
+        # physical integer. Its mapped beyond-prefix PROPERTY is still False.
+        assert table.ColumnHidden(visible + 1) is True
+        assert table.GetColumnType3(visible + 1, True) == (-1, None, 0)
+        assert table.ColumnHidden(visible + 2) is False
         snapshot = _drawing_tables.validate_bom_number_property(
             table, configuration=configuration, label="paper-drive", expected_rows=44,
             occurrence_quantities=True,
@@ -3426,7 +3313,7 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
             assert (snapshot, items) == baseline
         assert table.DisplayedText2(gear_row, 1, True) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
         assert table.DisplayedText2(gear_row, quantity_column, True) == scene.cells[gear_row][quantity_column] == "3"
-        assert table.DisplayedText(gear_row, quantity_column) != "3"
+        assert table.DisplayedText2(gear_row, quantity_column, False) == "3"
         assert tuple(table.GetComponents2(gear_row, configuration)) == gear_components
         assert {component.ReferencedConfiguration for component in gear_components} == {
             "T12 Simplified", "T18 Simplified", "T24 Simplified"
@@ -3438,6 +3325,8 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
             row = scene.keys.index(key) + 1
             assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
             assert table.DisplayedText2(row, quantity_column, True) == scene.cells[row][quantity_column] == quantity
+            assert table.DisplayedText2(row, quantity_column, False) == quantity
+            assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[key]
             assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], quantity)
             assert sum(identity[2] for identity in proof_by_row[row][1]) == int(quantity)
             members = table.GetComponents2(row, configuration)
@@ -3454,6 +3343,119 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         assert table.GetColumnCustomProperty(1) == "Description"
         with pytest.raises(RuntimeError, match="Number property binding did not persist"):
             drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+
+
+@pytest.mark.parametrize("with_sku", (False, True))
+@pytest.mark.parametrize("advertised_extra", (0, 1))
+def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_visible_qty(
+    monkeypatch, with_sku, advertised_extra
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=advertised_extra)
+    table = scene.insert()
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    if with_sku:
+        assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
+    before = _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
+    native_column = len(scene.state.columns) - 1
+    scene.state.columns[native_column].width = 0.0
+    assert table.GetColumnType3(native_column + 1, True) == (-1, None, 0)
+    assert table.ColumnHidden(native_column + 1) is True
+    assert table.ColumnHidden(native_column + 2) is False
+    assert _drawing_tables._bom_physical_columns(table, label="paper-drive")[-1] == (201, True)
+    assert _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    ) == before
+
+
+@pytest.mark.parametrize("with_sku", (False, True))
+@pytest.mark.parametrize("fault", ("qty-hidden", "visible-qty", "visible-number"))
+def test_pd_consumer_refuses_wrong_visible_projection_despite_unchanged_physical_snapshot(
+    monkeypatch, with_sku, fault
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()
+    if with_sku:
+        assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    counts = drawing._source_family_counts(scene.model)
+    drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+
+    def native_identities():
+        return tuple(
+            tuple(
+                (
+                    component.GetPathName(), component.ReferencedConfiguration,
+                    component.Name2, component.ComponentReference,
+                )
+                for component in group
+            )
+            for group in scene.state.native_rows
+        )
+
+    before_identities = native_identities()
+    gear_row = scene.keys.index("pd-transgear-removable") + 1
+    quantity_column = 4 if with_sku else 3
+    native_column = quantity_column + 1
+    retained_quantities = tuple(
+        (scene.keys.index(key) + 1, quantity)
+        for key, quantity in (
+            ("pd-transgear-removable", 3),
+            ("sh-vn-chain-link--InnerLink", 34),
+            ("sh-vn-chain-link--OuterLink", 33),
+        )
+    )
+    for row, quantity in retained_quantities:
+        assert len(table.GetComponents2(row, configuration)) == quantity
+        assert table.DisplayedText2(row, quantity_column, True) == str(quantity)
+        assert table.DisplayedText2(row, quantity_column, False) == str(quantity)
+    visible_width = sum(table.GetColumnWidth(index) for index in range(table.ColumnCount))
+    assert table.GetColumnWidth(quantity_column) == 0.012
+    assert table.GetColumnWidth(native_column) == 0.0
+    if not with_sku:
+        assert visible_width == pytest.approx(0.190)
+    if fault == "qty-hidden":
+        assert table.SetColumnHidden(native_column + 1, False) is None
+        assert table.SetColumnHidden(quantity_column + 1, True) is None
+        assert table.DisplayedText2(0, quantity_column, False) == "PART NUMBER"
+        assert table.DisplayedText2(gear_row, quantity_column, True) == "3"
+        assert table.GetColumnWidth(quantity_column) == 0.118
+        assert table.GetColumnWidth(native_column) == 0.0
+        assert sum(table.GetColumnWidth(index) for index in range(table.ColumnCount)) == pytest.approx(
+            visible_width - 0.012 + 0.118
+        )
+        if not with_sku:
+            assert sum(table.GetColumnWidth(index) for index in range(4)) == pytest.approx(0.296)
+        reason = "BOM widths need one hidden trailing native column"
+    else:
+        original_text = table.DisplayedText2.side_effect
+        damaged_column = quantity_column if fault == "visible-qty" else 1
+
+        def displayed(row, column, include_hidden):
+            if row == gear_row and column == damaged_column and include_hidden is False:
+                return "2" if fault == "visible-qty" else "WRONG-NUMBER"
+            return original_text(row, column, include_hidden)
+
+        table.DisplayedText2.side_effect = displayed
+        assert table.DisplayedText2(gear_row, damaged_column, False) != (
+            table.DisplayedText2(gear_row, damaged_column, True)
+        )
+        name = "quantity" if fault == "visible-qty" else "Number"
+        reason = f"visible {name} .*does not match physical {name}"
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert table.RowCount == table.TotalRowCount == 44
+    assert native_identities() == before_identities
+    for row, quantity in retained_quantities:
+        assert len(table.GetComponents2(row, configuration)) == quantity
+        assert table.DisplayedText2(row, quantity_column, True) == str(quantity)
 
 
 @pytest.mark.parametrize("fault", ("lost-spare", "changed-quantity"))
@@ -3493,95 +3495,6 @@ def test_bom_insertion_refuses_hidden_physical_rows_before_number_binding(monkey
     assert [vars(column) for column in scene.state.columns] == before_columns
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     assert scene.table.RowHidden(hidden_row) is True
-
-
-@pytest.mark.parametrize(
-    ("binding", "hidden_before_binding"),
-    (("dedicated", False), ("dedicated", True), ("generic", True)),
-    ids=("visible-Number", "hidden-Number", "hidden-generic-Number"),
-)
-def test_number_binding_visibility_boundary_preserves_members_and_refuses_blank_quantity(
-    monkeypatch, binding, hidden_before_binding
-):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
-    table = scene.table
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
-    counts = drawing._source_family_counts(scene.model)
-    before_members = tuple(tuple(group) for group in scene.state.native_rows)
-    before_quantities = tuple(row[3] for row in scene.cells)
-    gear_row = scene.keys.index("pd-transgear-removable") + 1
-    assert table.MoveColumn(1, 3, 3) is True
-    assert table.InsertColumn2(2, 1, "PART NUMBER", 0) is True
-    assert table.GetColumnType3(1, True) == (204, None, 0)
-    if hidden_before_binding:
-        assert table.SetColumnHidden(4, True) is None
-    else:
-        assert table.ColumnCount == 5
-    assert table.DisplayedText2(gear_row, 3, True) == "3"
-
-    if binding == "dedicated":
-        assert table.SetColumnCustomProperty(1, "Number") is True
-    else:
-        assert table.SetColumnType3(1, 204, True, "Number") == 0
-    quantity = "" if hidden_before_binding else "3"
-    # Native 2417 observes this immediately, before title writes or rebuilds.
-    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == quantity
-    if not hidden_before_binding:
-        assert table.SetColumnHidden(4, True) is None
-        assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == "3"
-    assert table.SetColumnTitle2(1, "PART NUMBER", True) is True
-    assert scene.adapter.currentModel.EditRebuild3() is True
-    assert table.RowCount == table.TotalRowCount == 44
-    assert table.GetColumnType3(3, True) == (203, None, 0)
-    assert table.GetColumnType3(4, True) == (201, None, 0)
-    assert table.ColumnHidden(4) is True
-    assert table.GetColumnCustomProperty(1) == "Number"
-    assert table.DisplayedText2(gear_row, 1, True) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
-    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == quantity
-    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
-    assert {component.ReferencedConfiguration for component in table.GetComponents2(
-        gear_row, configuration
-    )} == {"T12 Simplified", "T18 Simplified", "T24 Simplified"}
-    assert tuple(row[3] for index, row in enumerate(scene.cells) if index != gear_row) == (
-        before_quantities[:gear_row] + before_quantities[gear_row + 1:]
-    )
-    assert {"1", "2"}.issubset(before_quantities)
-    if hidden_before_binding:
-        with pytest.raises(RuntimeError, match="BOM quantity"):
-            drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
-    else:
-        items = dict(drawing._validate_bom(
-            scene.adapter, table, counts, configuration=configuration
-        ))
-        assert set(items) == set(drawing.BOM_PART_NUMBERS)
-
-
-def test_hidden_description_binding_fills_native_override_without_clearing_grouped_quantity(
-    monkeypatch,
-):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
-    table = scene.table
-    gear_row = scene.keys.index("pd-transgear-removable") + 1
-    before_members = tuple(tuple(group) for group in scene.state.native_rows)
-    before_quantities = tuple(row[3] for row in scene.cells)
-    for component in before_members[gear_row - 1]:
-        native = component.GetModelDoc2()
-        assert native.GetCustomInfoValue(component.ReferencedConfiguration, "Description") == ""
-        assert native.GetCustomInfoValue("", "Description") == ""
-    assert table.MoveColumn(1, 3, 3) is True
-    assert table.InsertColumn2(2, 1, "PART NUMBER", 0) is True
-    assert table.SetColumnHidden(4, True) is None
-
-    # Native 2417 filled the combined ANSI text despite absent Description CPs.
-    assert table.SetColumnCustomProperty(1, "Description") is True
-    assert table.GetColumnCustomProperty(1) == "Description"
-    assert table.Text2(gear_row, 1, True) == table.DisplayedText2(gear_row, 1, True) == (
-        drawing.BOM_DESCRIPTIONS["pd-transgear-removable"]
-    )
-    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == "3"
-    assert table.RowCount == table.TotalRowCount == 44
-    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
-    assert tuple(row[3] for row in scene.cells) == before_quantities
 
 
 def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number_binding(monkeypatch):
@@ -3652,6 +3565,8 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
     ):
         row = scene.keys.index(key) + 1
         assert table.Text2(row, 3, True) == table.DisplayedText2(row, 3, True) == str(quantity)
+        assert table.DisplayedText2(row, 3, False) == str(quantity)
+        assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[key]
         assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], str(quantity))
         assert sum(identity[2] for identity in proof_by_row[row][1]) == quantity
         members = table.GetComponents2(row, configuration)
@@ -3688,11 +3603,6 @@ def test_native_part_number_conversion_reproduces_consumer_visible_group_loss(mo
 )
 def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failure):
     scene = _pd_bom_insertion_fixture(monkeypatch)
-    attributes = {}
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "annotate",
-        lambda **values: attributes.update(values),
-    )
     if failure == "move":
         scene.table.MoveColumn.side_effect = lambda *_: False
     elif failure == "move-noop":
@@ -3715,9 +3625,6 @@ def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failu
         scene.table.SetColumnHidden.side_effect = lambda *_: None
     with pytest.raises(RuntimeError):
         scene.insert()
-    for stage in ("before", "after"):
-        assert attributes[f"number_bind_{stage}_row_count"] == len(scene.keys) + 1
-        assert json.loads(attributes[f"number_bind_{stage}_members"])
 
 
 
@@ -3860,7 +3767,7 @@ def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
             assert scene.table.GetColumnTitle2(index, include_hidden) == ""
             assert scene.table.DisplayedText2(0, index, include_hidden) == ""
         assert scene.table.GetColumnWidth(index) == 0.0
-        assert scene.table.ColumnHidden(index) is False
+        assert scene.table.ColumnHidden(index + 1) is False
         assert scene.table.GetColumnCustomProperty(index) == ""
     assert scene.insert() is scene.table
     assert len(_drawing_tables._bom_physical_columns(scene.table, label="paper-drive")) == 5
@@ -3890,9 +3797,9 @@ def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
         (4, "GetColumnWidth", None, -0.001),
         (4, "GetColumnWidth", None, float("nan")),
         (4, "GetColumnWidth", None, float("inf")),
-        (4, "ColumnHidden", None, True),
-        (4, "ColumnHidden", None, 1),
-        (4, "ColumnHidden", None, None),
+        (5, "ColumnHidden", None, True),
+        (5, "ColumnHidden", None, 1),
+        (5, "ColumnHidden", None, None),
         (4, "GetColumnCustomProperty", None, "Audit"),
         (4, "GetColumnType3", True, (-1, None, 1)),
         (5, "GetColumnType3", True, (-1, None, 1)),
@@ -4056,7 +3963,7 @@ def test_bom_column_census_refuses_bad_metadata_beyond_diagnostic_display_cap(
 
 def test_native_column_fixture_keeps_visible_and_physical_indices_distinct(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
-    assert scene.table.SetColumnHidden(1, True) is None
+    assert scene.table.SetColumnHidden(2, True) is None
     assert scene.table.ColumnCount == 3
     assert scene.table.TotalColumnCount == 5
     assert scene.table.GetColumnType3(1, True) == (201, None, 0)
@@ -4085,7 +3992,7 @@ def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
     assert scene.table.SetColumnCustomProperty(index, "Number") is False
     assert scene.table.SetColumnTitle2(index, "PART NUMBER", True) is False
     with pytest.raises(IndexError):
-        scene.table.SetColumnHidden(index, True)
+        scene.table.SetColumnHidden(index + 1, True)
     with pytest.raises(IndexError):
         scene.table.SetColumnWidth(index, 0.025, 0)
     with pytest.raises(IndexError):
@@ -4109,7 +4016,7 @@ def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
         ("custom_property", "GetColumnCustomProperty", None),
     ),
 )
-def test_bom_column_diagnostics_isolate_accessor_errors_without_bypassing_proof(
+def test_bom_column_census_refuses_accessor_errors_without_mutating(
     monkeypatch, failure, member, mode
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
@@ -4126,7 +4033,7 @@ def test_bom_column_diagnostics_isolate_accessor_errors_without_bypassing_proof(
             return original(row, column, include_hidden)
     elif mode is None:
         def read(column):
-            if column == 4:
+            if column == (5 if member == "ColumnHidden" else 4):
                 fail()
             return original(column)
     else:
@@ -4136,11 +4043,6 @@ def test_bom_column_diagnostics_isolate_accessor_errors_without_bypassing_proof(
             return original(column, include_hidden)
 
     accessor.side_effect = read
-    messages = []
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "info",
-        lambda message, **_fields: messages.append(message),
-    )
     before_columns = [vars(column).copy() for column in scene.state.columns]
     before_members = tuple(tuple(row) for row in scene.state.native_rows)
     before_cells = tuple(tuple(row) for row in scene.cells)
@@ -4149,40 +4051,6 @@ def test_bom_column_diagnostics_isolate_accessor_errors_without_bypassing_proof(
     assert [vars(column) for column in scene.state.columns] == before_columns
     assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
     assert tuple(tuple(row) for row in scene.cells) == before_cells
-    summaries = [
-        json.loads(message.removeprefix("drawing.bom_number_binding "))
-        for message in messages if message.startswith("drawing.bom_number_binding ")
-    ]
-    assert {summary["stage"] for summary in summaries} == {"before", "after"}
-    empty = {
-        "type_all": "(-1, None, 0)", "type_visible": "(-1, None, 0)",
-        "title_all": "''", "title_visible": "''",
-        "header_all": "''", "header_visible": "''",
-        "width": "0.0", "hidden": "False", "custom_property": "''",
-    }
-    for summary in summaries:
-        assert summary["visible_columns"] == 4
-        assert summary["total_columns"] == 5
-        assert summary["rows"] == summary["total_rows"] == 44
-        census = summary["column_census"]
-        assert census["table_type"]["value"] == census["bom_type"]["value"] == "2"
-        modes = census["configurations"]
-        assert {mode["only_visible"]: mode["count"]["value"] for mode in modes} == {
-            False: "2", True: "1"
-        }
-        all_configurations = next(mode for mode in modes if not mode["only_visible"])
-        assert all_configurations["names_and_visibility"]["value"] == repr((
-            ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION), (False, True)
-        ))
-        columns = {column["index"]: column for column in census["columns"]}
-        assert columns[1]["type_all"]["value"] == "(201, None, 0)"
-        assert columns[1]["header_all"]["value"] == repr("PART NUMBER")
-        assert "error" in columns[4][failure]
-        for key, value in empty.items():
-            if key != failure:
-                assert columns[4][key]["value"] == value
-            for control in (5, 6):
-                assert columns[control][key]["value"] == value
 
 
 @pytest.mark.parametrize("drop", ("transgear", "all"))
@@ -4301,52 +4169,8 @@ def test_number_binding_consumer_refuses_changed_native_bom_state(monkeypatch, e
             )
 
 
-@pytest.mark.parametrize("failure", ("configuration-metadata", "task-log"))
-@pytest.mark.parametrize("drop_row", (False, True))
-def test_number_binding_diagnostic_failure_preserves_consumer_proof(
-    monkeypatch, failure, drop_row
-):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
-    gear_row = scene.keys.index("pd-transgear-removable") + 1
-
-    def fail(*_args, **_kwargs):
-        raise RuntimeError("diagnostic-only-read-failure")
-
-    if failure == "configuration-metadata":
-        scene.state.native_rows[gear_row - 1][0].GetModelDoc2().GetConfigurationByName = fail
-    else:
-        original_info = _drawing_tables._telemetry.info
-
-        def log(message, **fields):
-            if message.startswith("drawing.bom_number_binding "):
-                fail()
-            return original_info(message, **fields)
-
-        monkeypatch.setattr(_drawing_tables._telemetry, "info", log)
-    changed = False
-
-    def rebuild():
-        nonlocal changed
-        if drop_row and scene.state.columns[1].property_name == "Number" and not changed:
-            scene.cells.pop(gear_row)
-            scene.state.native_rows.pop(gear_row - 1)
-            changed = True
-        return True
-
-    scene.adapter.currentModel.EditRebuild3 = rebuild
-    if drop_row:
-        with pytest.raises(RuntimeError, match="BOM table is.*expected"):
-            scene.insert()
-    else:
-        assert scene.insert() is scene.table
-        drawing._validate_bom(
-            scene.adapter, scene.table, drawing._source_family_counts(scene.model),
-            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
-        )
-
-
 @pytest.mark.parametrize("failure", ("row-association", "component-path"))
-def test_number_binding_census_isolates_bad_rows_and_components(monkeypatch, failure):
+def test_number_binding_refuses_bad_native_rows_and_components(monkeypatch, failure):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     native_components = scene.table.GetComponents2.side_effect
     if failure == "row-association":
@@ -4361,18 +4185,8 @@ def test_number_binding_census_isolates_bad_rows_and_components(monkeypatch, fai
         component = native_components(1, drawing.SIMPLIFIED_VIEW_CONFIGURATION)[0]
         component.GetPathName = lambda: ""
         message = "component has no native file path"
-    attributes = {}
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "annotate",
-        lambda **values: attributes.update(values),
-    )
     with pytest.raises(RuntimeError, match=message):
         scene.insert()
-    assert attributes["number_bind_before_member_read_errors"] == 1
-    assert "row 1" in attributes["number_bind_before_first_member_read_error"]
-    assert json.loads(attributes["number_bind_before_members"])
-    assert attributes["number_bind_before_grouping"] == 3
-    assert json.loads(attributes["number_bind_before_columns"])
 
 
 @pytest.mark.parametrize(
@@ -4520,7 +4334,7 @@ def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
     return pieces, association_reads, split_after, total_rows, expected_snapshot
 
 
-def test_split_bom_proves_global_native_numbers_and_physical_grid_despite_legacy_alias(monkeypatch):
+def test_split_bom_proves_global_native_numbers_and_grid_independently_of_width_getter(monkeypatch):
     pieces, association_reads, split_after, total_rows, expected_snapshot = (
         _pd_split_bom_fixture(monkeypatch)
     )
@@ -4530,8 +4344,12 @@ def test_split_bom_proves_global_native_numbers_and_physical_grid_despite_legacy
         )
         assert piece._pd_state.columns[-1].width == 0.118
         assert piece._pd_state.columns[-1].hidden is True
-        # The hidden legacy getter remains 296 mm. The independent displayed
-        # physical grid, not this alias or requested widths, proves 190 mm.
+        # An injected unversioned getter alias cannot replace the actual grid.
+        # This is a fault model, not a claim about native hidden-state widths.
+        original_width = piece.GetColumnWidth.side_effect
+        piece.GetColumnWidth.side_effect = lambda index, original=original_width: (
+            0.118 if index == 3 else original(index)
+        )
         assert sum(piece.GetColumnWidth(index) for index in range(4)) == pytest.approx(
             0.296
         )
@@ -4733,6 +4551,35 @@ def test_split_bom_refuses_second_piece_native_binding_damage(monkeypatch, fault
             configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
             expected_snapshot=expected_snapshot,
         )
+
+
+@pytest.mark.parametrize("fault", ("qty-hidden", "visible-qty", "visible-number"))
+def test_split_bom_refuses_visible_damage_with_unchanged_native_snapshot(monkeypatch, fault):
+    pieces, _reads, split_after, total_rows, expected_snapshot = _pd_split_bom_fixture(monkeypatch)
+    second = pieces[1]
+    before_cells = tuple(tuple(row) for row in second._pd_state.cells)
+    before_members = tuple(tuple(group) for group in second._pd_state.native_rows)
+    if fault == "qty-hidden":
+        assert second.SetColumnHidden(5, False) is None
+        assert second.SetColumnHidden(4, True) is None
+    else:
+        original_text = second.DisplayedText2.side_effect
+        damaged_column = 3 if fault == "visible-qty" else 1
+
+        def displayed(row, column, include_hidden):
+            if row == split_after + 1 and column == damaged_column and include_hidden is False:
+                return "WRONG-VISIBLE-CELL"
+            return original_text(row, column, include_hidden)
+
+        second.DisplayedText2.side_effect = displayed
+    with pytest.raises(RuntimeError):
+        drawing._assert_bom_pieces(
+            pieces, header_count=1, total_rows=total_rows,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            expected_snapshot=expected_snapshot,
+        )
+    assert tuple(tuple(row) for row in second._pd_state.cells) == before_cells
+    assert tuple(tuple(group) for group in second._pd_state.native_rows) == before_members
 
 
 @pytest.mark.parametrize("fault", ("same-number-chain-swap", "spare-quantity"))

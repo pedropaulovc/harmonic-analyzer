@@ -28,10 +28,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
-import hashlib
 import json
 import math
-from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -88,7 +86,9 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
     BomSnapshot,
+    _bom_column_hidden,
     _bom_physical_columns,
+    _set_bom_column_hidden,
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
@@ -1757,634 +1757,8 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
 
 
-def _observe_bom_display_text(display: Any) -> dict[str, Any]:
-    """Temporary raw text evidence; its display-origin offsets are not transformed."""
-    census: dict[str, Any] = {
-        "position_frame": "raw SDK offsets from display-data origin; sheet mapping unknown",
-        "height_units": "m", "angle_units": "radians CCW from X",
-        "record_cap": 512, "records": [],
-    }
-
-    def read(call: Callable[[], Any]) -> dict[str, Any]:
-        try:
-            value = repr(call())
-            return {"value": value[:256], "truncated": len(value) > 256}
-        except Exception as error:
-            return {"error": f"{type(error).__name__}: {error}"[:256]}
-
-    try:
-        count = display.GetTextCount()
-    except Exception as error:
-        census["count"] = {"error": f"{type(error).__name__}: {error}"[:256]}
-        return census
-    census["count"] = read(lambda: count)
-    if type(count) is not int or count < 0:
-        census["unsupported_count"] = True
-        return census
-    census["truncated"] = count > 512
-    for index in range(min(count, 512)):
-        census["records"].append({
-            "index": index,
-            "text": read(lambda: display.GetTextAtIndex(index)),
-            "position_offsets": read(lambda: display.GetTextPositionAtIndex(index)),
-            "reference": read(lambda: display.GetTextRefPositionAtIndex(index)),
-            "font": read(lambda: display.GetTextFontAtIndex(index)),
-            "height_m": read(lambda: display.GetTextHeightAtIndex(index)),
-            "angle_ccw_rad": read(lambda: display.GetTextAngleAtIndex(index)),
-        })
-    return census
-
-
-def _probe_bom_visibility_control(
-    adapter: Any, reference: Any, table: Any, *, configuration: str
-) -> None:
-    """Temporary fresh-five-column control; always stop before production hide/save."""
-    draw = _early_bound(adapter.currentModel, "IModelDoc2")
-    drawing_path = draw.GetPathName()
-    if int(draw.GetType()) != 3 or drawing_path != "":
-        raise RuntimeError("PD visibility control requires an owned unsaved drawing")
-    view = _early_bound(reference, "IView")
-    raw_source = view.ReferencedDocument
-    if raw_source is None:
-        raise RuntimeError("PD visibility control has no referenced source")
-    source = _early_bound(raw_source, "IModelDoc2")
-    if int(source.GetType()) != 2 or Path(source.GetPathName()).resolve() != SOURCE.resolve():
-        raise RuntimeError("PD visibility control reference is not SOURCE assembly")
-    counts = _source_family_counts(source)
-    if len(counts) != 43 or sum(counts.values()) != 145:
-        raise RuntimeError("PD visibility control requires 43 families / 145 occurrences")
-    for key, expected in (
-        ("pd-transgear-removable", 3),
-        ("sh-vn-chain-link--InnerLink", 34),
-        ("sh-vn-chain-link--OuterLink", 33),
-    ):
-        if counts[key] != expected:
-            raise RuntimeError(f"PD visibility control {key} count is not {expected}")
-    bom = _early_bound(table, "IBomTableAnnotation")
-    feature = _early_bound(bom.BomFeature, "IBomFeature")
-    widths = (0.012, 0.048, 0.118, 0.012, 0.118)
-    all_columns = (0, 1, 2, 3, 4)
-    # Retain every occurrence's document, not just one object per disk path.
-    documents: list[tuple[str, Any]] = [("assembly", source)]
-
-    def native_state(*, retain_documents: bool = False) -> tuple[Any, ...]:
-        if (
-            int(table.RowCount) != 44 or int(table.TotalRowCount) != 44
-            or any(table.RowHidden(row) is not False for row in range(44))
-            or int(feature.PartConfigurationGrouping) != 3
-            or feature.DisplayAsOneItem is not False
-            or str(bom.GetColumnCustomProperty(1) or "") != "Number"
-        ):
-            raise RuntimeError("PD visibility control row/grouping/Number binding changed")
-        native_rows = bom_row_identities(
-            table, configuration=configuration, component_identities=BOM_COMPONENT_IDENTITIES
-        )
-        if set(native_rows) != set(BOM_PART_NUMBERS) or len(set(native_rows.values())) != 43:
-            raise RuntimeError("PD visibility control native membership is not exactly 43 rows")
-        snapshot = []
-        names: set[str] = set()
-        for logical, row in sorted(native_rows.items()):
-            components = tuple(bom.GetComponents2(row, configuration) or ())
-            if len(components) != counts[logical]:
-                raise RuntimeError(f"PD visibility control {logical} occurrence multiplicity changed")
-            members = []
-            number = str(table.DisplayedText2(row, 1, True) or "")
-            quantity = str(table.DisplayedText2(row, 3, True) or "")
-            if number != BOM_PART_NUMBERS[logical] or quantity != str(len(components)):
-                raise RuntimeError(f"PD visibility control {logical} Number/Qty mismatch")
-            for raw in components:
-                component = _early_bound(raw, "IComponent2")
-                name = str(component.Name2)
-                if name in names:
-                    raise RuntimeError(f"PD visibility control repeats occurrence {name!r}")
-                names.add(name)
-                path = str(component.GetPathName() or "")
-                member = str(component.ReferencedConfiguration or "")
-                raw_model = component.GetModelDoc2()
-                if raw_model is None:
-                    raise RuntimeError(f"PD visibility control unresolved occurrence {name!r}")
-                model = _early_bound(raw_model, "IModelDoc2")
-                if (
-                    not path or Path(path).resolve() != Path(model.GetPathName()).resolve()
-                    or int(model.GetType()) != 1
-                ):
-                    raise RuntimeError(f"PD visibility control source identity changed: {name!r}")
-                native_number = str(
-                    model.GetCustomInfoValue(member, "Number")
-                    or model.GetCustomInfoValue("", "Number") or ""
-                ).strip()
-                if native_number != number:
-                    raise RuntimeError(f"PD visibility control native Number mismatch: {name!r}")
-                members.append((name, path, member, *component_identity(component), native_number))
-                if retain_documents:
-                    documents.append((name, model))
-            snapshot.append((logical, row, tuple(sorted(members)), number, quantity))
-        if len(names) != 145:
-            raise RuntimeError("PD visibility control lost installed occurrences")
-        return tuple(snapshot)
-
-    def source_state(expected_paths: Sequence[str] = ()) -> dict[str, Any]:
-        observations = []
-        hashes: dict[str, str] = {}
-        failures = []
-        paths = set(expected_paths)
-        # Independent source observations, including preexisting dirty=True.
-        for name, model in documents:
-            try:
-                path = str(model.GetPathName() or "")
-                flag = model.GetSaveFlag()  # METHOD, not a property.
-                kind = int(model.GetType())
-                if not path or type(flag) is not bool:
-                    raise RuntimeError("missing source path or non-boolean save flag")
-                observations.append((name, path, kind, flag))
-                paths.add(str(Path(path).resolve()))
-            except Exception as error:
-                failures.append(f"{name}: {type(error).__name__}: {error}")
-        try:
-            live_reference = _early_bound(view.ReferencedDocument, "IModelDoc2")
-            if (
-                str(live_reference.GetPathName() or "") != str(source.GetPathName() or "")
-                or int(live_reference.GetType()) != 2
-            ):
-                raise RuntimeError("drawing reference no longer points to the baseline assembly")
-        except Exception as error:
-            failures.append(f"assembly reference: {type(error).__name__}: {error}")
-        # Hash the original paths even if a live-path read failed or changed.
-        for path in sorted(paths):
-            try:
-                with Path(path).open("rb") as stream:
-                    hashes[path] = hashlib.file_digest(stream, "sha256").hexdigest()
-            except Exception as error:
-                failures.append(f"{path}: {type(error).__name__}: {error}")
-        if len(observations) != 146 or len(hashes) != 43:
-            failures.append(f"source census is {len(observations)} live / {len(hashes)} disk, not 146/43")
-        return {"observations": observations, "sha256": hashes, "errors": failures}
-
-    before_native = native_state(retain_documents=True)
-    before_source = source_state()
-    if before_source["errors"]:
-        raise RuntimeError(f"PD visibility control source baseline failed: {before_source['errors']!r}")
-    initial_flags = tuple(table.ColumnHidden(index) for index in range(7))
-    if any(flag is not False for flag in initial_flags):
-        raise RuntimeError(f"PD visibility control is not fresh all-visible: {initial_flags!r}")
-    before_cells = tuple(
-        tuple(str(table.DisplayedText2(row, col, True) or "") for col in all_columns)
-        for row in range(44)
-    )
-    baseline: dict[str, Any] | None = None
-    setup: dict[str, Any] = {"width_returns": [], "source_before_setup": before_source}
-
-    def observe(stage: str, projection: tuple[int, ...], *, rebuild: bool = True) -> dict[str, Any]:
-        record: dict[str, Any] = {"stage": stage, "configuration": configuration}
-        failure: BaseException | None = None
-        try:
-            if rebuild and draw.EditRebuild3() is not True:
-                raise RuntimeError(f"PD visibility control {stage} drawing rebuild failed")
-            record["column_flags_0_to_6"] = tuple(table.ColumnHidden(index) for index in range(7))
-            visible = int(table.ColumnCount)
-            record["visible_columns"] = visible
-            # Native2494 reports TotalColumnCount=6 for five typed columns.
-            # Retain this raw value, but never use it to invent physical indices.
-            record["total_columns_raw"] = int(table.TotalColumnCount)
-            if visible != len(projection):
-                raise RuntimeError(f"PD visibility control {stage} visible column count changed")
-            record["typed_true"] = tuple(table.GetColumnType3(index, True) for index in all_columns)
-            record["typed_false"] = tuple(table.GetColumnType3(index, False) for index in range(visible))
-            if any(len(value) != 3 or value[2] != 0 for value in record["typed_true"]):
-                raise RuntimeError(f"PD visibility control {stage} unsupported native type status")
-            if tuple(value[0] for value in record["typed_true"]) != (202, 204, 204, 203, 201):
-                raise RuntimeError(f"PD visibility control {stage} physical typed sequence changed")
-            if record["typed_false"] != tuple(record["typed_true"][index] for index in projection):
-                raise RuntimeError(f"PD visibility control {stage} visible typed projection failed")
-            record["cells_true"] = tuple(
-                tuple(str(table.DisplayedText2(row, col, True) or "") for col in all_columns)
-                for row in range(44)
-            )
-            record["cells_false"] = tuple(
-                tuple(str(table.DisplayedText2(row, col, False) or "") for col in range(visible))
-                for row in range(44)
-            )
-            if record["cells_true"] != before_cells or record["cells_false"] != tuple(
-                tuple(row[index] for index in projection) for row in before_cells
-            ):
-                raise RuntimeError(f"PD visibility control {stage} actual visible cell projection failed")
-            record["native_snapshot"] = native_state()
-            if record["native_snapshot"] != before_native:
-                raise RuntimeError(f"PD visibility control {stage} native associations changed")
-            annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
-            display = _early_bound(annotation.GetDisplayData(), "IDisplayData")
-            text = _observe_bom_display_text(display)
-            record["display_text"] = text
-            if (
-                text.get("truncated") is not False or text.get("unsupported_count")
-                or text["count"].get("truncated") is not False
-                or len(text["records"]) == 0
-            ):
-                raise RuntimeError(f"PD visibility control {stage} incomplete raw text census")
-            for item in text["records"]:
-                if any(value.get("truncated") is not False for key, value in item.items() if key != "index"):
-                    raise RuntimeError(f"PD visibility control {stage} unreadable/truncated raw text field")
-            rendered = Counter(item["text"]["value"] for item in text["records"])
-            # Compare raw repr records without coordinate transforms or text normalization.
-            render_signature = sorted(
-                json.dumps({key: value for key, value in item.items() if key != "index"}, sort_keys=True)
-                for item in text["records"]
-            )
-            line_count = display.GetLineCount()
-            record["line_count"] = line_count
-            if type(line_count) is not int or not 1 <= line_count <= 1024:
-                raise RuntimeError(f"PD visibility control {stage} unsupported native line count")
-            lines = []
-            record["lines"] = lines
-            horizontal, vertical = [], []
-            tolerance = 1e-7
-            for index in range(line_count):
-                raw_line = display.GetLineAtIndex3(index)
-                try:
-                    if len(raw_line) != 10:
-                        raise ValueError("native line record length is not ten")
-                    values = tuple(float(value) for value in raw_line)
-                except (TypeError, ValueError, OverflowError) as error:
-                    record["malformed_line"] = {"index": index, "raw": repr(raw_line)[:512]}
-                    raise RuntimeError(
-                        f"PD visibility control {stage} malformed native line {index}"
-                    ) from error
-                lines.append(values)
-                if any(not math.isfinite(value) for value in values):
-                    raise RuntimeError(f"PD visibility control {stage} malformed native line")
-                start, end = values[4:7], values[7:10]
-                if start == end:
-                    continue
-                if abs(start[2]) > tolerance or abs(end[2]) > tolerance:
-                    raise RuntimeError(f"PD visibility control {stage} unsupported grid Z")
-                dx, dy = abs(start[0] - end[0]), abs(start[1] - end[1])
-                if dx <= tolerance and dy <= tolerance:
-                    raise RuntimeError(f"PD visibility control {stage} ambiguous short grid line")
-                if dy <= tolerance:
-                    horizontal.append((start[1], min(start[0], end[0]), max(start[0], end[0])))
-                elif dx <= tolerance:
-                    vertical.append((start[0], min(start[1], end[1]), max(start[1], end[1])))
-                else:
-                    raise RuntimeError(f"PD visibility control {stage} non-axis-aligned grid")
-            # Same bounded clustering/coverage proof as _bom_piece_grid_bounds,
-            # but this unsplit diagnostic has five OR four columns and no sheet-fit test.
-            boundaries = []
-            for segments in (vertical, horizontal):
-                coordinates: list[float] = []
-                for value in sorted(segment[0] for segment in segments):
-                    if not coordinates or value - coordinates[-1] > tolerance:
-                        coordinates.append(value)
-                boundaries.append(tuple(coordinates))
-            xs, ys = boundaries
-            record["grid_boundaries_m"] = boundaries
-            if len(xs) != visible + 1 or len(ys) != 45:
-                raise RuntimeError(f"PD visibility control {stage} native grid boundary count failed")
-            for segments, coordinates, lower, upper in (
-                (horizontal, ys, xs[0], xs[-1]), (vertical, xs, ys[0], ys[-1]),
-            ):
-                if any(start < lower - tolerance or end > upper + tolerance for _, start, end in segments):
-                    raise RuntimeError(f"PD visibility control {stage} outlying grid segment")
-                for coordinate in coordinates:
-                    reached = lower
-                    for start, end in sorted(
-                        (start, end) for value, start, end in segments if abs(value - coordinate) <= tolerance
-                    ):
-                        if start > reached + tolerance:
-                            break
-                        reached = max(reached, end)
-                    if reached < upper - tolerance:
-                        raise RuntimeError(f"PD visibility control {stage} incomplete grid coverage")
-            actual_widths = tuple(right - left for left, right in zip(xs, xs[1:]))
-            record["grid_width_m"] = xs[-1] - xs[0]
-            record["grid_column_widths_m"] = actual_widths
-            if any(abs(actual - widths[index]) > 1e-6 for actual, index in zip(actual_widths, projection, strict=True)):
-                raise RuntimeError(f"PD visibility control {stage} actual native grid widths failed")
-            heights = tuple(float(table.GetRowHeight(row)) for row in range(44))
-            record["row_heights_m"] = heights
-            if any(
-                not math.isfinite(height) or height <= 0 or abs(height - (ys[44 - row] - ys[43 - row])) > 1e-6
-                for row, height in enumerate(heights)
-            ):
-                raise RuntimeError(f"PD visibility control {stage} grid/native row heights disagree")
-            geometry = sorted(horizontal), sorted(vertical)
-            if baseline is None:
-                required = Counter(repr(row[column]) for row in before_cells for column in (3, 4))
-                if sum(required.values()) != 88 or required - rendered:
-                    raise RuntimeError("PD visibility control baseline does not render all44 Qty and all44 native201 strings")
-                record["setup"] = setup
-                if record["column_flags_0_to_6"] != initial_flags:
-                    raise RuntimeError("PD visibility control baseline flags changed during width setup")
-                if stage != "baseline":
-                    raise RuntimeError("post-width baseline never established; full render restoration unproven")
-            else:
-                original = Counter(item["text"]["value"] for item in baseline["display_text"]["records"])
-                if projection == all_columns:
-                    if (
-                        record["column_flags_0_to_6"] != initial_flags
-                        or record["typed_true"] != baseline["typed_true"]
-                        or render_signature != baseline["render_signature"]
-                        or geometry != baseline["grid_geometry"]
-                    ):
-                        raise RuntimeError(f"PD visibility control {stage} full baseline restoration failed")
-                else:
-                    removed_column = 3 if projection == (0, 1, 2, 4) else 4
-                    removed = Counter(repr(row[removed_column]) for row in before_cells)
-                    if original - rendered != removed or rendered - original:
-                        raise RuntimeError(f"PD visibility control {stage} exact44 rendered-string removal failed")
-                    if record["typed_true"] != baseline["typed_true"]:
-                        raise RuntimeError(f"PD visibility control {stage} physical column metadata changed")
-                    if removed_column == 4 and Counter(repr(row[3]) for row in before_cells) - rendered:
-                        raise RuntimeError("PD visibility control candidate lost printed QTY / 3 / 34 / 33")
-            record["proof"] = "passed"
-            # Comparison keys are retained in memory; the raw records already
-            # carry their full evidence and need not be duplicated in the log.
-            record["render_signature"] = render_signature
-            record["grid_geometry"] = geometry
-            return record
-        except BaseException as error:
-            failure = error
-            record["error"] = f"{type(error).__name__}: {error}"
-            raise
-        finally:
-            try:
-                _telemetry.info("drawing.pd_bom_visibility_control " + json.dumps(
-                    {key: value for key, value in record.items() if key not in {"render_signature", "grid_geometry"}},
-                    separators=(",", ":"),
-                ))
-            except Exception as error:
-                if failure is None:
-                    raise
-                failure.add_note(f"PD visibility control {stage} evidence logging failed: {error}")
-
-    original_error: BaseException | None = None
-    cleanup_errors: list[str] = []
-    try:
-        # Prove the fresh visible index window before the ONLY width writes.
-        typed = tuple(table.GetColumnType3(index, True) for index in all_columns)
-        if (
-            int(table.ColumnCount) != 5
-            or tuple(value[0] for value in typed) != (202, 204, 204, 203, 201)
-            or typed != tuple(table.GetColumnType3(index, False) for index in all_columns)
-        ):
-            raise RuntimeError("PD visibility control setup lacks an all-visible typed window")
-        if tuple(
-            tuple(str(table.DisplayedText2(row, col, False) or "") for col in all_columns)
-            for row in range(44)
-        ) != before_cells:
-            raise RuntimeError("PD visibility control setup visible cells differ")
-        for index, width in enumerate(widths):
-            applied = float(table.SetColumnWidth(index, width, 0))
-            setup["width_returns"].append((index, width, applied))
-            if not math.isfinite(applied) or abs(applied - width) > 1e-6:
-                raise RuntimeError(f"PD visibility control width{index} refused {width}: {applied}")
-        readbacks = tuple(float(table.GetColumnWidth(index)) for index in all_columns)
-        setup["width_readbacks"] = readbacks
-        if any(not math.isfinite(value) or abs(value - width) > 1e-6 for value, width in zip(readbacks, widths, strict=True)):
-            raise RuntimeError(f"PD visibility control independent width readback failed: {readbacks!r}")
-        baseline = observe("baseline", all_columns)
-        table.SetColumnHidden(4, True)  # VT_VOID; restore even on setter failure.
-        observe("control4", (0, 1, 2, 4))
-        table.SetColumnHidden(4, False)
-        observe("restored4", all_columns)  # Candidate forbidden until baseline is proved.
-        table.SetColumnHidden(5, True)
-        observe("candidate5", (0, 1, 2, 3))
-        table.SetColumnHidden(5, False)
-        observe("restored5", all_columns)
-    except BaseException as error:
-        original_error = error
-        raise
-    finally:
-        # Independent attempts: a setter may raise AFTER taking effect. Neither
-        # setter, rebuild, baseline proof nor source proof can prevent the others.
-        for index in (4, 5):
-            try:
-                table.SetColumnHidden(index, initial_flags[index])
-            except BaseException as error:
-                cleanup_errors.append(f"restore property{index}: {type(error).__name__}: {error}")
-                cleanup_errors.extend(getattr(error, "__notes__", ()))
-        try:
-            if draw.EditRebuild3() is not True:
-                raise RuntimeError("drawing EditRebuild3 returned false")
-        except BaseException as error:
-            cleanup_errors.append(f"cleanup rebuild: {type(error).__name__}: {error}")
-            cleanup_errors.extend(getattr(error, "__notes__", ()))
-        try:
-            observe("finalcleanup", all_columns, rebuild=False)
-        except BaseException as error:
-            cleanup_errors.append(f"cleanup baseline proof: {type(error).__name__}: {error}")
-            cleanup_errors.extend(getattr(error, "__notes__", ()))
-        try:
-            after_source = source_state(tuple(before_source["sha256"]))
-            unchanged = after_source == before_source and not after_source["errors"]
-            if not unchanged:
-                cleanup_errors.append(f"source hashes/paths/live flags changed: {after_source['errors']!r}")
-            source_proof = {
-                "stage": "finalcleanup_source", "before": before_source, "after": after_source,
-                "unchanged": unchanged,
-                "scope": "disk SHA256 and every retained live save flag; not whole-memory cleanliness",
-            }
-            _telemetry.info("drawing.pd_bom_visibility_control " + json.dumps(source_proof, separators=(",", ":")))
-        except BaseException as error:
-            cleanup_errors.append(f"cleanup source proof: {type(error).__name__}: {error}")
-            cleanup_errors.extend(getattr(error, "__notes__", ()))
-        if cleanup_errors:
-            if original_error is not None:
-                for error in cleanup_errors:
-                    original_error.add_note(error)
-            else:
-                cleanup_failure = RuntimeError("PD visibility control cleanup failed")
-                for error in cleanup_errors:
-                    cleanup_failure.add_note(error)
-                raise cleanup_failure
-    raise RuntimeError(
-        "PD BOM VISIBILITY CONTROL DELIBERATE STOP: control4/candidate5 and restorations "
-        "proved; source disk/live flags unchanged; no production hide/split/save authorized"
-    )
-
-
-def _annotate_bom_width_boundary(
-    table: Any, *, configuration: str | None, stage: str,
-    outcome: dict[str, Any] | None = None,
-) -> None:
-    """Retain bounded raw measurements, never infer a hidden-column index map."""
-    def read(call: Callable[[], Any], *, cap: int = 192) -> dict[str, Any]:
-        try:
-            value = repr(call())
-            return {"value": value[:cap], "truncated": len(value) > cap}
-        except Exception as error:
-            return {"error": f"{type(error).__name__}: {error}"[:cap]}
-
-    try:
-        rows = int(table.RowCount)
-        visible = int(table.ColumnCount)
-        declared = int(table.TotalColumnCount)
-        summary = {
-            "stage": stage, "configuration": configuration, "outcome": outcome or {},
-            "visible_columns": visible, "declared_columns": declared, "rows": rows,
-            "raw_aggregate_width_index_space": "unversioned_getter_index_mapping_unproven",
-            "raw_aggregate_width_m": read(
-                lambda: sum(float(table.GetColumnWidth(index)) for index in range(visible))
-            ) if 0 <= visible <= 8 else {"error": "visible-column read cap exceeded"},
-            "columns": [
-                {
-                    "index": column,
-                    "type_include_hidden_true": read(lambda: table.GetColumnType3(column, True)),
-                    "type_include_hidden_false": read(lambda: table.GetColumnType3(column, False)),
-                    "header_include_hidden_true": read(lambda: table.DisplayedText2(0, column, True)),
-                    "header_include_hidden_false": read(lambda: table.DisplayedText2(0, column, False)),
-                    "column_hidden": read(lambda: table.ColumnHidden(column)),
-                    "width_no_include_hidden_parameter": read(lambda: table.GetColumnWidth(column)),
-                }
-                for column in range(max(0, min(declared, 8)))
-            ],
-            "row_heights_m": [
-                [row, read(lambda: table.GetRowHeight(row))]
-                for row in range(max(0, min(rows, 64)))
-            ],
-            "caps": {"columns": declared > 8, "rows": rows > 64},
-        }
-        # Temporary rendering discriminator at the existing mutation boundaries.
-        if stage in {
-            "all_visible_after_widths", "after_width_visibility_restore", "after_rebuild",
-        }:
-            display_census: dict[str, Any] = {
-                "cell_projection_contract": "raw IncludeHidden=True typed columns / False visible indices",
-                "cell_row_cap": 44, "cell_column_cap": 8, "line_cap": 1024,
-            }
-            summary["display_census"] = display_census
-            try:
-                physical_count = len(_bom_physical_columns(table, label="paper-drive display observation"))
-                display_census["physical_columns"] = physical_count
-                if not (0 <= rows <= 44 and 0 <= visible <= physical_count <= 8):
-                    raise RuntimeError("display cell observation cap exceeded")
-                display_census["cells"] = [
-                    {
-                        "global_row": row,
-                        "include_hidden_true": [
-                            read(lambda: table.DisplayedText2(row, column, True))
-                            for column in range(physical_count)
-                        ],
-                        "include_hidden_false": [
-                            read(lambda: table.DisplayedText2(row, column, False))
-                            for column in range(visible)
-                        ],
-                    }
-                    for row in range(rows)
-                ]
-            except Exception as error:
-                display_census["cell_read_error"] = f"{type(error).__name__}: {error}"[:256]
-            try:
-                raw_annotation = table.GetAnnotation()
-                if raw_annotation is None:
-                    raise RuntimeError("native annotation is unavailable")
-                annotation = _early_bound(raw_annotation, "IAnnotation")
-                display_census["annotation_position"] = read(lambda: annotation.GetPosition())
-                raw_display = annotation.GetDisplayData()
-                if raw_display is None:
-                    raise RuntimeError("native display data is unavailable")
-                display = _early_bound(raw_display, "IDisplayData")
-                try:
-                    count = display.GetLineCount()
-                except Exception as error:
-                    display_census["line_count"] = {"error": f"{type(error).__name__}: {error}"[:256]}
-                else:
-                    display_census["line_count"] = read(lambda: count)
-                    if type(count) is not int or count < 0:
-                        display_census["unsupported_line_count"] = True
-                    else:
-                        display_census["lines_truncated"] = count > 1024
-                        display_census["lines"] = [
-                            read(lambda: display.GetLineAtIndex3(index), cap=512)
-                            for index in range(min(count, 1024))
-                        ]
-                display_census["text"] = _observe_bom_display_text(display)
-            except Exception as error:
-                display_census["display_read_error"] = f"{type(error).__name__}: {error}"[:256]
-        if stage == "all_visible_after_widths":
-            try:
-                formats: list[dict[str, Any]] = []
-                format_ids: dict[str, int] = {}
-
-                def font_index(
-                    get_format: Callable[[], Any], get_use_document: Callable[[], Any]
-                ) -> int:
-                    record: dict[str, Any] = {"use_document_format": read(get_use_document)}
-                    try:
-                        raw_format = get_format()
-                        if raw_format is None:
-                            raise RuntimeError("native text format is unavailable")
-                        font = _early_bound(raw_format, "ITextFormat")
-                    except Exception as error:
-                        record["read_error"] = f"{type(error).__name__}: {error}"[:192]
-                    else:
-                        record["IsHeightSpecifiedInPts"] = read(
-                            lambda: font.IsHeightSpecifiedInPts()
-                        )
-                        for name in (
-                            "CharHeight", "CharHeightInPts", "TypeFaceName",
-                            "WidthFactor", "CharSpacingFactor", "LineSpacing", "Bold", "Italic",
-                        ):
-                            record[name] = read(lambda name=name: getattr(font, name))
-                    key = json.dumps(record, sort_keys=True, separators=(",", ":"))
-                    if key not in format_ids:
-                        format_ids[key] = len(formats)
-                        formats.append(record)
-                    return format_ids[key]
-
-                def cell_text(call: Callable[[], Any]) -> Any:
-                    observed = read(call)
-                    return observed["value"] if observed.get("truncated") is False else observed
-
-                # Cell font getters have no IncludeHidden argument. Read them
-                # only in the caller's already-proven all-visible index window.
-                table_format = font_index(
-                    lambda: table.GetTextFormat(), lambda: table.GetUseDocTextFormat()
-                )
-                cell_rows = []
-                for row in range(max(0, min(rows, 44))):
-                    cells = []
-                    for column in range(max(0, min(visible, 5))):
-                        cells.append({
-                            "column": column,
-                            "text": cell_text(
-                                lambda: table.Text2(row, column, True)
-                            ),
-                            "displayed": cell_text(
-                                lambda: table.DisplayedText2(row, column, True)
-                            ),
-                            "format_id": font_index(
-                                lambda: table.GetCellTextFormat(row, column),
-                                lambda: table.GetCellUseDocTextFormat(row, column),
-                            ),
-                        })
-                    cell_rows.append({
-                        "row": row, "height_m": read(lambda: table.GetRowHeight(row)),
-                        "cells": cells,
-                    })
-                summary["cell_census"] = {
-                    "index_space": "all-visible; text IncludeHidden=True; fonts unversioned",
-                    "text_representation": "repr; read errors and truncation retain metadata",
-                    "format_units": {
-                        "CharHeight": "m", "CharHeightInPts": "points",
-                        "LineSpacing": "raw; SDK units unspecified",
-                    },
-                    "table_format_id": table_format, "formats": formats, "rows": cell_rows,
-                    "caps": {"rows": rows > 44, "columns": visible > 5},
-                }
-            except Exception as error:
-                summary["cell_census"] = {
-                    "read_error": f"{type(error).__name__}: {error}"[:192]
-                }
-        _telemetry.info(
-            "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
-        )
-    except Exception:
-        pass  # Observational evidence cannot mask or weaken a guard.
-
-
 def _set_bom_column_widths(
-    table: Any, widths: Sequence[tuple[int, float]], *,
-    configuration: str | None = None,
+    table: Any, widths: Sequence[tuple[int, float]],
 ) -> None:
     """Author widths only while physical and legacy column indices agree."""
     physical = _bom_physical_columns(table, label="paper-drive widths")
@@ -2396,7 +1770,7 @@ def _set_bom_column_widths(
     ):
         raise RuntimeError("paper-drive BOM widths need one hidden trailing native column")
     native_column = len(physical) - 1
-    original_hidden = table.ColumnHidden(native_column)
+    original_hidden = _bom_column_hidden(table, native_column, label="paper-drive widths")
     if original_hidden is not True:
         raise RuntimeError("paper-drive BOM native column hidden state is not proven")
     if (
@@ -2407,8 +1781,8 @@ def _set_bom_column_widths(
     ):
         raise ValueError("paper-drive BOM width targets must be distinct visible columns")
 
-    # Native2494 showed property index4 hides QTY, not native201. The earlier
-    # hidden201 row-minimum explanation is unproven; do not infer an index fix.
+    # Keep the existing 118 mm native-key width for this production canary.
+    # Native2507 disproved the hidden201 row-minimum cause: Qty was hidden instead.
     targets = (*widths, (native_column, BOM_COLUMN_WIDTHS["description"]))
 
     def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
@@ -2432,16 +1806,12 @@ def _set_bom_column_widths(
 
     primary_error: BaseException | None = None
     try:
-        # Native2437's hidden-state SetColumnWidth(3) inflated row minima.
-        # The unversioned API has no IncludeHidden parameter: expose first.
-        table.SetColumnHidden(native_column, False)
+        # Width indices remain unversioned: author only in the all-visible window.
+        _set_bom_column_hidden(table, native_column, False, label="paper-drive widths")
         prove_all_visible()
         expected_widths = [float(table.GetColumnWidth(index)) for index in range(len(physical))]
         if any(not math.isfinite(width) or width <= 0.0 for width in expected_widths):
             raise RuntimeError("paper-drive BOM all-visible baseline widths are invalid")
-        _annotate_bom_width_boundary(
-            table, configuration=configuration, stage="all_visible_before_widths"
-        )
         for column, width in targets:
             returned = float(table.SetColumnWidth(column, width, 0))
             if not math.isfinite(returned) or abs(returned - width) > 1e-6:
@@ -2458,35 +1828,23 @@ def _set_bom_column_widths(
                     f"paper-drive BOM column {column} width readback or native key width changed"
                 )
         prove_all_visible()
-        _annotate_bom_width_boundary(
-            table, configuration=configuration, stage="all_visible_after_widths",
-            outcome={"requested_widths": targets, "verified_widths": tuple(expected_widths)},
-        )
     except BaseException as error:
         primary_error = error
         raise
     finally:
-        restore_error: BaseException | None = None
         try:
             # Also restore if exposing the native column raised after taking effect.
-            table.SetColumnHidden(native_column, original_hidden)
+            _set_bom_column_hidden(
+                table, native_column, original_hidden, label="paper-drive restored widths"
+            )
             if _bom_physical_columns(table, label="paper-drive restored widths") != physical:
                 raise RuntimeError("paper-drive BOM native column hidden state was not restored")
             if tuple(column_record(index, True) for index in range(len(physical))) != original_records:
                 raise RuntimeError("paper-drive BOM column identities changed while restoring visibility")
         except BaseException as error:
-            restore_error = error
             if primary_error is None:
                 raise
             primary_error.add_note(f"paper-drive BOM width visibility restoration also failed: {error!r}")
-        finally:
-            _annotate_bom_width_boundary(
-                table, configuration=configuration, stage="after_width_visibility_restore",
-                outcome={
-                    "primary_error": repr(primary_error)[:192],
-                    "restore_error": repr(restore_error)[:192],
-                },
-            )
 
 
 def _validate_bom(
@@ -2533,7 +1891,6 @@ def _validate_bom(
             (description_column, BOM_COLUMN_WIDTHS["description"]),
             (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
         ),
-        configuration=configuration,
     )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
@@ -2566,16 +1923,9 @@ def _validate_bom(
                 f"paper-drive BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {counts[stem]}"
             )
-    height_returns = []
     for row in range(rows):
-        height = table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
-        if row < 64:
-            height_returns.append([row, repr(height)[:192]])
+        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
     rebuilt = adapter.currentModel.EditRebuild3()
-    _annotate_bom_width_boundary(
-        table, configuration=configuration, stage="after_rebuild",
-        outcome={"rebuild_return": repr(rebuilt)[:192], "row_height_returns": height_returns},
-    )
     if not rebuilt:
         raise RuntimeError("paper-drive BOM rebuild failed")
     if int(table.RowCount) != rows or int(table.ColumnCount) != columns:
@@ -2708,10 +2058,6 @@ def _bom_piece_grid_bounds(
         if raw_display is None:
             raise RuntimeError("paper-drive BOM displayed grid display data is unavailable")
         display = _early_bound(raw_display, "IDisplayData")
-        try:
-            evidence["display_text"] = _observe_bom_display_text(display)
-        except Exception as error:
-            evidence["display_text"] = {"read_error": f"{type(error).__name__}: {error}"[:256]}
         count = display.GetLineCount()
         evidence["line_count"] = count
         if type(count) is not int or not 1 <= count <= 1024:
@@ -3210,9 +2556,6 @@ def _place_bom_sheet(
         part_number_property="Number",
         configuration_grouping="same-name",
         label="paper-drive",
-        _before_native_hide=lambda fresh_table, configuration: _probe_bom_visibility_control(
-            adapter, reference, fresh_table, configuration=configuration
-        ),
     )
     bom_configuration = str(reference.ReferencedConfiguration)
     items = dict(
