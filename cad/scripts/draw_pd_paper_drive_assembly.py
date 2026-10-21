@@ -1796,6 +1796,81 @@ def _annotate_bom_width_boundary(
             ],
             "caps": {"columns": declared > 8, "rows": rows > 64},
         }
+        if stage == "all_visible_after_widths":
+            try:
+                formats: list[dict[str, Any]] = []
+                format_ids: dict[str, int] = {}
+
+                def font_index(
+                    get_format: Callable[[], Any], get_use_document: Callable[[], Any]
+                ) -> int:
+                    record: dict[str, Any] = {"use_document_format": read(get_use_document)}
+                    try:
+                        raw_format = get_format()
+                        if raw_format is None:
+                            raise RuntimeError("native text format is unavailable")
+                        font = _early_bound(raw_format, "ITextFormat")
+                    except Exception as error:
+                        record["read_error"] = f"{type(error).__name__}: {error}"[:192]
+                    else:
+                        record["IsHeightSpecifiedInPts"] = read(
+                            lambda: font.IsHeightSpecifiedInPts()
+                        )
+                        for name in (
+                            "CharHeight", "CharHeightInPts", "TypeFaceName",
+                            "WidthFactor", "CharSpacingFactor", "LineSpacing", "Bold", "Italic",
+                        ):
+                            record[name] = read(lambda name=name: getattr(font, name))
+                    key = json.dumps(record, sort_keys=True, separators=(",", ":"))
+                    if key not in format_ids:
+                        format_ids[key] = len(formats)
+                        formats.append(record)
+                    return format_ids[key]
+
+                def cell_text(call: Callable[[], Any]) -> Any:
+                    observed = read(call)
+                    return observed["value"] if observed.get("truncated") is False else observed
+
+                # Cell font getters have no IncludeHidden argument. Read them
+                # only in the caller's already-proven all-visible index window.
+                table_format = font_index(
+                    lambda: table.GetTextFormat(), lambda: table.GetUseDocTextFormat()
+                )
+                cell_rows = []
+                for row in range(max(0, min(rows, 44))):
+                    cells = []
+                    for column in range(max(0, min(visible, 5))):
+                        cells.append({
+                            "column": column,
+                            "text": cell_text(
+                                lambda: table.Text2(row, column, True)
+                            ),
+                            "displayed": cell_text(
+                                lambda: table.DisplayedText2(row, column, True)
+                            ),
+                            "format_id": font_index(
+                                lambda: table.GetCellTextFormat(row, column),
+                                lambda: table.GetCellUseDocTextFormat(row, column),
+                            ),
+                        })
+                    cell_rows.append({
+                        "row": row, "height_m": read(lambda: table.GetRowHeight(row)),
+                        "cells": cells,
+                    })
+                summary["cell_census"] = {
+                    "index_space": "all-visible; text IncludeHidden=True; fonts unversioned",
+                    "text_representation": "repr; read errors and truncation retain metadata",
+                    "format_units": {
+                        "CharHeight": "m", "CharHeightInPts": "points",
+                        "LineSpacing": "raw; SDK units unspecified",
+                    },
+                    "table_format_id": table_format, "formats": formats, "rows": cell_rows,
+                    "caps": {"rows": rows > 44, "columns": visible > 5},
+                }
+            except Exception as error:
+                summary["cell_census"] = {
+                    "read_error": f"{type(error).__name__}: {error}"[:192]
+                }
         _telemetry.info(
             "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
         )
