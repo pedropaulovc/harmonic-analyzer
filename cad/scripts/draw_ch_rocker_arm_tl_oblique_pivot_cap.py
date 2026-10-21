@@ -5,6 +5,9 @@ the flange pocket and integral registers in solid lines. A-A shows the fitted
 pocket, B-B the head-seat entry reliefs, and the side view the register ends.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
 coordinates are ordinary native dimensions from the actual pocket axis.
+The circular-edge chamfer imports through its XZ (*Top) profile, then moves
+as the same native model dimension onto the mouth-depth side view; the empty
+donor view is deleted before export.
 """
 
 from __future__ import annotations
@@ -13,12 +16,12 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, delete_view, dimension_name, iter_views, place_view, view_name
 
 from _check import check
 from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, stamp_drawing_summary
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
@@ -234,6 +237,41 @@ def _assert_pocket_corner_callout(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("native chamber floor/wall corner instruction did not persist")
 
 
+def _curate_right_dimensions(adapter: Any, right: Any) -> list[Any]:
+    """Keep the open-mouth projection and transfer its native chamfer size.
+
+    The angle-distance chamfer on a Z-axis circular rim has its native size
+    in the XZ profile, as on the transgear front bushing. It does not import
+    directly into *Right. Keep that YZ view for the genuinely open X mouths;
+    import the chamfer in *Top, then move it, not a replacement dimension.
+    Both imports retain the strict required-name check.
+    """
+    chamfer_name = "RegisterEndChamfer"
+    annotations = curate_view_dimensions(
+        adapter, right,
+        keep={name: xy for name, xy in RIGHT_KEEP.items() if name != chamfer_name},
+        view_label="open-mouth depths and register projection",
+        dimensions_by_feature=part_spec.DRAWING_DIMENSIONS,
+    )
+    donor = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=VIEW_SCALE)
+    set_hidden_lines_removed(adapter, donor)
+    chamfers = curate_view_dimensions(
+        adapter, donor, keep={chamfer_name: RIGHT_KEEP[chamfer_name]},
+        view_label="register free-end chamfer donor",
+        dimensions_by_feature=part_spec.DRAWING_DIMENSIONS,
+    )
+    if len(chamfers) != 1:
+        raise RuntimeError(f"expected one native register end chamfer dimension, found {len(chamfers)}")
+    chamfer = move_model_dimension(
+        adapter, chamfers[0], right, RIGHT_KEEP[chamfer_name], source_view=donor,
+    )
+    donor_name = view_name(adapter, donor)
+    delete_view(adapter, donor)
+    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
+        raise RuntimeError("failed to delete the empty register chamfer donor view")
+    return [*annotations, chamfer]
+
+
 def _project(adapter, view, point, label):
     return model_point_in_view(adapter, view, tuple(value / 1000.0 for value in point), label=label)
 
@@ -257,8 +295,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, bottom, right, section, bolt_section, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = []
-    for view, keep, label in ((top, TOP_KEEP, "top head and wire access"), (bottom, BOTTOM_KEEP, "underside flange chamber and integral registers"), (right, RIGHT_KEEP, "open-mouth depths and register free ends"), (section, SECTION_KEEP, "A-A fitted flange chamber"), (bolt_section, BOLT_SECTION_KEEP, "B-B flat-bottom underhead entry relief")):
+    for view, keep, label in ((top, TOP_KEEP, "top head and wire access"), (bottom, BOTTOM_KEEP, "underside flange chamber and integral registers"), (section, SECTION_KEEP, "A-A fitted flange chamber"), (bolt_section, BOLT_SECTION_KEEP, "B-B flat-bottom underhead entry relief")):
         annotations.extend(curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=part_spec.DRAWING_DIMENSIONS))
+    annotations.extend(_curate_right_dimensions(adapter, right))
     assert_imported_precision(adapter, annotations, part_spec.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part_spec.DIMENSION_CALLOUTS, location="below")
     _assert_pocket_corner_callout(adapter, annotations)

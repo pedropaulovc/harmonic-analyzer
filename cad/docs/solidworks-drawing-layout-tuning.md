@@ -116,6 +116,28 @@ seat cases and requires full 4 mm padding for each.
 Text, wrapping, font, scales, geometry and native guards stay unchanged.
 Fresh exact-head native audit and printed-sheet acceptance remain necessary:
 these translations do not certify the Y260.5 output.
+### TL-22 pivot-block callout lanes
+
+The native drawing at `6dd691486` refused three enforced findings. On
+**Bearing and carriage**, the carriage-hole callout leader
+`(172.2,216.6) -> (158.1,238.8)` mm crossed both the removed-view **C**
+pointer's text box `[161.8,228.9]..[165.1,232.5]` mm and its leader
+`(165.6,230.9) -> (163.4,222.0)` mm. C is a view-owned viewing pointer,
+not a datum-feature symbol. Keep its tip and the callout's selected counterbore
+edge; move the callout text anchor from `(188,250)` to `(212,250)` mm.
+The projected text-end route is then right of C rather than through it.
+
+On **Register recesses**, the complete native `CapRegister2Dia` block's
+horizontal shoulder at Y233.9 mm crossed `CapRegisterUpperY` at X294.5 mm,
+whose offending line ended at Y238.0 mm. Raise the diameter text from model
+Y27 to Y33 mm: at 2:1 this allocates 12 mm more sheet height and projects the
+shoulder to Y245.9 mm, above the unchanged Y24 station. Keep the imported
+diameter, its source tolerance, both register locations and native leader style.
+
+The offline tests replay those measured conflicts and the requested text
+translations; they are not native after-fix proof. Parent validation must
+rebuild and inspect the full text blocks, leaders and border clearance on both
+sheets, with the existing layout enforcement unchanged.
 
 ### Rocker R19 regression and local placement contract
 

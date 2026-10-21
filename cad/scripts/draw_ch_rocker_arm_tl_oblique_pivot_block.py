@@ -155,7 +155,9 @@ REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     "CapRegisterLowerY": (35.0, -12.0, _H),
     "CapRegisterUpperY": (45.0, 12.0, _H),
     "CapRegister1Dia": (BLOCK_X0 - 17.0, -26.0, _H),
-    "CapRegister2Dia": (BLOCK_X1 + 10.0, 27.0, _H),
+    # At 2:1, raising the entire native block 12 mm puts its bottom shoulder
+    # above the upper-Y station's witness/line (native top Y238 mm).
+    "CapRegister2Dia": (BLOCK_X1 + 10.0, 33.0, _H),
 }
 REGISTER_SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "CapRegisterDepth": (BORE_X - 19.0, -24.0, _H + 5.0),
@@ -212,15 +214,14 @@ SIDE_KEEP: dict[str, tuple[float, float, float]] = {
     "BlockHeight": (BLOCK_X1 + 4.0, _HW, _H / 2.0),
 }
 
-# The screw holes' native callout over the plan, right of section B-B's
-# upper letter (x ~149..153) and under the top border: four rows (4X DRILL
-# Ø4.50 THRU ALL, the counterbore, the two mate rows), ~60 x 22 mm (x
-# ~158..218, y ~239..261, over the BlockWidth witness line at y 232).
-# ``callout_xy`` is the text block's centre (draw_mg_output_fixture). The
-# leader lands on the (+13, +13) counterbore's upper-right rim, inside the
-# outline and over the HoleRow2Y witness line (y 218), clear of every
-# witness line.
-SCREW_CALLOUT_XY = (0.188, 0.250)
+# The screw holes' native callout over the plan, under the top border:
+# four rows, ~60 x 22 mm, projected at x ~182..242, y ~239..261.
+# At X188 mm its native leader ran from (172.2,216.6) to (158.1,238.8)
+# through the removed-view C letter and its leader. Move only the text 24 mm
+# right: the leader now approaches the block to the right of C, whose pointer
+# tip and view ownership stay unchanged. ``callout_xy`` centres the block;
+# SCREW_CALLOUT_EDGE retains the same (+13,+13) counterbore rim selection.
+SCREW_CALLOUT_XY = (0.212, 0.250)
 _CBORE_R = part_spec.CBORE_DIA / 2.0
 SCREW_CALLOUT_EDGE = (
     BOLT_X + _CBORE_R * math.sqrt(0.5),

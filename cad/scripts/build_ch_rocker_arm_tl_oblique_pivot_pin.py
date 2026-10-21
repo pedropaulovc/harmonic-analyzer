@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -128,6 +129,20 @@ def _max_limit(adapter, feature: str, dimension_name: str) -> None:
     if int(tolerance.Type) != RADIUS_TOL_TYPE:
         raise RuntimeError(
             f"{dimension_name}@{feature}: MAX tolerance type did not persist"
+        )
+
+
+def _log_equation_targets(
+    adapter, drive_jobs: list[tuple[str, str]], phase: str
+) -> None:
+    """Identify an unintended reference driver without changing native state."""
+    for target, _ in drive_jobs:
+        name, feature = target.split("@", 1)
+        _, dimension = _named_dimension(adapter, feature, name)
+        _telemetry.info(
+            f"pin equation target {phase}: {target}; "
+            f"DrivenState={int(dimension.DrivenState)}; "
+            f"SystemValue_mm={float(dimension.SystemValue) * 1000.0:.12g}"
         )
 
 
@@ -441,8 +456,10 @@ async def build(adapter) -> dict[str, str]:
         removed += weight * area
     finished_volume = V_TOTAL - removed * step / 3.0
     await force_rebuild(adapter)
+    _log_equation_targets(adapter, drive_jobs, "before")
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
+    _log_equation_targets(adapter, drive_jobs, "after")
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven pivot pin (equations neutral)", finished_volume, 0.005 * V_TOTAL

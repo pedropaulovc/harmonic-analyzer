@@ -21,6 +21,7 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _drawing_leaders import distance_to_box, segments_cross
 from _paths import CAD_ROOT
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -263,6 +264,29 @@ def test_side_view_is_a_named_removed_view_with_a_point_reference() -> None:
         "\nasync def ", 1
     )[0]
     assert "add_line_chain" not in body and "_add_reference_point" in body
+
+
+def test_carriage_callout_routes_right_of_the_removed_view_c_pointer() -> None:
+    # Native 6dd691486 failure, sheet metres. Replaying the text-end movement
+    # is an offline route regression, not proof of a rebuilt native leader.
+    leader = ((0.1722, 0.2166), (0.1581, 0.2388))
+    c_text = (0.1618, 0.2289, 0.1651, 0.2325)
+    c_leader = ((0.1656, 0.2309), (0.1634, 0.2220))
+    assert distance_to_box(leader, c_text) == 0.0
+    assert segments_cross(leader, c_leader)
+
+    old_text_xy = (0.188, 0.250)
+    delta = tuple(
+        new - old
+        for new, old in zip(drawing.SCREW_CALLOUT_XY, old_text_xy, strict=True)
+    )
+    moved = (
+        leader[0],  # Retain the actual counterbore landing, not a free pointer.
+        tuple(value + shift for value, shift in zip(leader[1], delta, strict=True)),
+    )
+    assert min(point[0] for point in moved) > max(c_text[2], c_leader[0][0]) + 0.003
+    assert distance_to_box(moved, c_text) >= 0.003
+    assert not segments_cross(moved, c_leader)
 
 
 def test_side_screws_are_tl22_owned_and_aliased_by_the_leadscrew_spec() -> None:
@@ -952,3 +976,27 @@ def test_register_section_passes_through_both_flat_floors() -> None:
     assert end[1] > spec.WING_WIDTH / 2.0
     assert set(drawing.REGISTER_SECTION_KEEP) == {"CapRegisterDepth"}
     assert spec.CAP_REGISTER_PROFILE not in spec.REFERENCE_SKETCHES
+
+
+def test_upper_register_diameter_shoulder_sits_above_the_y_station() -> None:
+    # Native 6dd691486 failure, sheet metres: the complete diameter block's
+    # shoulder is 10.1 mm below its requested text anchor. Keep that block,
+    # its native diameter and its source tolerance; allocate room above Y24.
+    shoulder = ((0.2308, 0.2339), (0.2966, 0.2339))
+    upper_y_line = ((0.2945, 0.2380), (0.2945, 0.2168))
+    assert segments_cross(shoulder, upper_y_line)
+
+    old_model_xy = (spec.BLOCK_X1 + 10.0, 27.0)
+    scale = drawing.CAPTURE_SCALE[0] / drawing.CAPTURE_SCALE[1]
+    delta = tuple(
+        (new - old) * scale / 1000.0
+        for new, old in zip(
+            drawing.REGISTER_KEEP["CapRegister2Dia"][:2], old_model_xy, strict=True
+        )
+    )
+    moved = tuple(
+        tuple(value + shift for value, shift in zip(point, delta, strict=True))
+        for point in shoulder
+    )
+    assert min(point[1] for point in moved) > max(point[1] for point in upper_y_line) + 0.003
+    assert not segments_cross(moved, upper_y_line)

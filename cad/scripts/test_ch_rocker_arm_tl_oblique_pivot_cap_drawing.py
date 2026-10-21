@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+import _drawing_dimensions as dimension_tools
 import build_ch_rocker_arm_tl_oblique_pivot_cap as part
 import ch_rocker_arm_tl_oblique_pivot_cap_spec as spec
 import ch_rocker_arm_tl_oblique_retention_spec as retention
@@ -64,6 +65,112 @@ def test_integral_register_geometry_has_one_shared_owner() -> None:
     assert spec.REGISTER_LOCATION_PLACES == retention.CAP_REGISTER_LOCATION_PLACES == 3
     assert spec.REGISTER_PROJECTION_PLACES == retention.CAP_REGISTER_PROJECTION_PLACES == 3
     assert spec.REGISTER_END_CHAMFER_MAX == retention.CAP_REGISTER_END_CHAMFER_MAX == 0.20
+
+
+@pytest.mark.parametrize("failure", (None, "depth", "missing", "duplicate", "move", "delete"))
+def test_side_view_transfers_the_source_chamfer_and_removes_its_profile_donor(monkeypatch, failure) -> None:
+    right = SimpleNamespace(name="MouthSide", annotations=[])
+    donor = SimpleNamespace(name="ChamferDonor", annotations=[])
+    for view in (right, donor):
+        view.GetAnnotations = lambda current=view: list(current.annotations)
+    views, events, imports = [right], [], []
+    native = SimpleNamespace(
+        FullName="RegisterEndChamfer@RegisterEndChamfers@cap",
+        SystemValue=spec.REGISTER_END_CHAMFER_MAX / 1000.0,
+        Tolerance=SimpleNamespace(Type=6, lower=-spec.REGISTER_END_CHAMFER_MAX / 1000.0, upper=0.0),
+    )
+    display = SimpleNamespace(GetNameForSelection=lambda: native.FullName, GetDimension2=lambda _index: native)
+    chamfer = SimpleNamespace(name="RegisterEndChamfer", GetSpecificAnnotation=lambda: display)
+
+    def select(name, kind, *_args):
+        assert (name, kind) == (native.FullName, "DIMENSION")
+        events.append("select native")
+        return True
+
+    def drag(target, effect, x, y, z):
+        assert (target, effect, (x, y), z) == (right.name, 2, drawing.RIGHT_KEEP[chamfer.name], 0.0)
+        events.append("move native")
+        if failure != "move":
+            donor.annotations.remove(chamfer)
+            right.annotations.append(chamfer)
+
+    model = SimpleNamespace(
+        ActivateView=lambda name: name == donor.name,
+        ClearSelection2=lambda _all: None,
+        Extension=SimpleNamespace(SelectByID2=select),
+        DragModelDimension=drag,
+        EditRebuild3=lambda: None,
+    )
+    adapter = SimpleNamespace(currentModel=model)
+
+    def place(current, source, orientation, x, y, *, scale):
+        assert current is adapter and source == str(drawing.SOURCE)
+        assert (orientation, (x, y), scale) == ("*Top", drawing.RIGHT_CENTER, drawing.VIEW_SCALE)
+        views.append(donor)
+        events.append("place donor")
+        return donor
+
+    def curate(current, view, *, keep, view_label, dimensions_by_feature):
+        assert current is adapter and dimensions_by_feature is spec.DRAWING_DIMENSIONS
+        imports.append((view, keep))
+        if view is right:
+            assert keep == {name: xy for name, xy in drawing.RIGHT_KEEP.items() if name != chamfer.name}
+            if failure == "depth":
+                raise RuntimeError("missing model dimensions: ['CounterboreDepth']")
+            right.annotations[:] = [SimpleNamespace(name=name) for name in keep]
+            return list(right.annotations)
+        assert view is donor and keep == {chamfer.name: drawing.RIGHT_KEEP[chamfer.name]}
+        if failure == "missing":
+            raise RuntimeError("missing model dimensions: ['RegisterEndChamfer']")
+        donor.annotations[:] = [chamfer] * (2 if failure == "duplicate" else 1)
+        return list(donor.annotations)
+
+    def delete(current, view):
+        assert current is adapter and view is donor
+        assert not donor.annotations
+        events.append("delete donor")
+        if failure != "delete":
+            views.remove(donor)
+        return False  # EditDelete is void; the live view census proves deletion.
+
+    name_of_view = lambda _adapter, view: view.name
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda _adapter, view: events.append(("hidden removed", view)))
+    monkeypatch.setattr(drawing, "delete_view", delete)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: iter(views))
+    monkeypatch.setattr(drawing, "view_name", name_of_view)
+    monkeypatch.setattr(dimension_tools, "view_name", name_of_view)
+    monkeypatch.setattr(dimension_tools, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(dimension_tools, "_early_bound", lambda obj, _interface: obj)
+
+    if failure is None:
+        annotations = drawing._curate_right_dimensions(adapter, right)
+        assert {annotation.name for annotation in annotations} == set(drawing.RIGHT_KEEP)
+        assert len(annotations) == len(drawing.RIGHT_KEEP)
+        assert annotations[-1] is chamfer and chamfer in right.annotations
+        assert annotations[-1].GetSpecificAnnotation().GetDimension2(0) is native
+        assert views == [right] and not donor.annotations
+        assert events.index("move native") < events.index("delete donor")
+        assert len(imports) == 2
+    else:
+        message = {
+            "depth": "CounterboreDepth", "missing": "RegisterEndChamfer",
+            "duplicate": "expected one native register end chamfer",
+            "move": "native dimension did not move", "delete": "failed to delete",
+        }[failure]
+        with pytest.raises(RuntimeError, match=message):
+            drawing._curate_right_dimensions(adapter, right)
+        if failure in {"depth", "missing", "duplicate"}:
+            assert "move native" not in events
+        if failure in {"depth", "missing", "duplicate", "move"}:
+            assert "delete donor" not in events
+        if failure == "depth":
+            assert "place donor" not in events
+    assert native.SystemValue == spec.REGISTER_END_CHAMFER_MAX / 1000.0
+    assert (native.Tolerance.Type, native.Tolerance.lower, native.Tolerance.upper) == (
+        6, -spec.REGISTER_END_CHAMFER_MAX / 1000.0, 0.0,
+    )
 
 
 @pytest.mark.parametrize("persisted", (True, False))
