@@ -1675,10 +1675,27 @@ equality. Primary errors remain primary through later read/report failures,
 including emergency receipts; the existing C00 two-full-snapshot budget and C28
 source checkpoint remain unchanged.
 
-The actual-function inert before/after smoke and 417 focused tests pass. They
-do not establish native availability or acceptance: all 29 controls, setter
-effects/restoration, normal drawing and the complete 32-output package remain
-required.
+At `8748557ba`, native C00–04 and C28 passed. C05 refused the baseline visual
+oracle: the exported target sheet had no geometry in its four regions, while
+the sentinel sheet contained all four circles. Logical visibility and context
+readbacks matched; source/token hashes and empty-document cleanup passed.
+C06–27 were not executed. That run did not record drawing edit mode, so it
+does not establish why the target geometry was absent.
+
+Construction now follows production's existing sheet-mode invariant: one
+unconditional `EditSheet()` after drawing admission and current native identity
+validation, before sheet/view construction. The initial `GetEditSheet()` is
+diagnostic; post-normalization, both view insertions and every existing export
+require a strict sheet-mode result. E5 queries the newly admitted reopened
+drawing, not the disposed construction receiver. Mode receipts do not change
+context equality or add rebuilds, exports or FULL/SOURCE snapshots. Whole C00
+retains F2/S12; the readiness/mode slice adds no SOURCE observations.
+
+The actual-function inert smoke and 477 focused tests pass. Its replacement
+receiver has an explicit stable-title fixture policy, not proof of native saved
+drawing title behavior; a title-drift negative preserves the ownership refusal.
+All 29 native controls, setter effects/restoration, normal drawing and the
+complete 32-output package remain required. No performance gain is established.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible

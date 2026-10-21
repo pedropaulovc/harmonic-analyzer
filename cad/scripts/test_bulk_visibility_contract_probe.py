@@ -656,6 +656,15 @@ class OfflineDrawing(OfflineModel):
     def __init__(self, path=""):
         super().__init__("Draw - Sheet1", 3, path, readonly=False)
         self.sheet = "Sheet1"
+        self.edit_sheet_mode = False
+
+    def GetEditSheet(self):
+        self.assert_live("GetEditSheet")
+        return self.edit_sheet_mode
+
+    def EditSheet(self):
+        self.assert_live("EditSheet")
+        self.edit_sheet_mode = True
 
     def GetSheetNames(self):
         self.assert_live("GetSheetNames")
@@ -1387,6 +1396,863 @@ def test_sheet_scale_constructor_readback_reaches_complete_fixture(
     assert "fixture" in fixture.subject.receipt.data
     assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
     assert not hasattr(fixture.subject, "harness_flags")
+
+
+@pytest.fixture
+def sheet_mode_contract(sheet_scale_construction, monkeypatch):
+    """Actual admission/construction/export/guard with explicit inert native ports."""
+    fixture = sheet_scale_construction
+    subject = fixture.subject
+    fixture.mode_events = []
+    fixture.mode_results = []
+    fixture.edit_calls = []
+    fixture.saved_pdfs = []
+    fixture.rendered_exports = []
+    fixture.controls.edit_error = None
+    fixture.controls.edit_normalizes = True
+    fixture.controls.edit_return = None
+    fixture.controls.resume_error = None
+
+    inert_insert_note = fixture.drawing.InsertNote
+
+    class ModeDrawing(OfflineReadinessDrawing):
+        def GetEditSheet(self):
+            self.assert_live("GetEditSheet")
+            fixture.mode_events.append(
+                ("GetEditSheet", self.current, self.SelectionManager.suspended)
+            )
+            result = (
+                fixture.mode_results.pop(0)
+                if fixture.mode_results
+                else self.edit_sheet_mode
+            )
+            if isinstance(result, BaseException):
+                raise result
+            return result
+
+        def EditSheet(self):
+            self.assert_live("EditSheet")
+            fixture.mode_events.append(("EditSheet",))
+            fixture.edit_calls.append(self)
+            if fixture.controls.edit_error is not None:
+                raise fixture.controls.edit_error
+            if fixture.controls.edit_normalizes:
+                self.edit_sheet_mode = True
+            return fixture.controls.edit_return
+
+        @property
+        def Extension(self):
+            self.assert_live("Extension")
+            fixture.mode_events.append(("Extension", self.current))
+            return SimpleNamespace(SaveAs3=self.save_pdf)
+
+        def save_pdf(self, path, *arguments):
+            self.assert_live("SaveAs3")
+            assert arguments == (0, 1, None, None, 0, 0)
+            assert self.SelectionManager.suspended
+            assert self.current is probe.ViewId.A
+            fixture.mode_events.append(("SaveAs3", self.current))
+            fixture.saved_pdfs.append(Path(path))
+            Path(path).write_bytes(b"%PDF-inert-native-port-not-a-visual-oracle")
+            return True, 0, 0
+
+    class SelectionManager:
+        def __init__(self):
+            self.selected = []
+            self.suspended = False
+
+        def GetSelectedObjectCount2(self, mark):
+            assert mark == -1
+            return len(self.selected)
+
+        def GetSelectedObject6(self, index, mark):
+            assert mark == -1
+            return self.selected[index - 1][0]
+
+        def GetSelectedObjectType3(self, index, mark):
+            assert mark == -1
+            return 20
+
+        def GetSelectedObjectMark(self, index):
+            return self.selected[index - 1][2]
+
+        def GetSelectedObjectsDrawingView2(self, index, mark):
+            assert mark == -1
+            return self.selected[index - 1][1]
+
+        def SuspendSelectionList(self):
+            assert not self.suspended
+            fixture.mode_events.append(("SuspendSelectionList",))
+            self.original, self.selected = self.selected, []
+            self.suspended = True
+            return int(bool(self.original))
+
+        def ResumeSelectionList2(self, append):
+            assert append is False and self.suspended
+            fixture.mode_events.append(("ResumeSelectionList2",))
+            self.selected = self.original
+            self.suspended = False
+            if fixture.controls.resume_error is not None:
+                raise fixture.controls.resume_error
+
+    def install_receiver(drawing, *, sheet_qualified_titles=True):
+        """Install receiver-local ports; no closure retains an earlier generation."""
+        drawing.__class__ = ModeDrawing
+        drawing.sheet_qualified_titles = sheet_qualified_titles
+        drawing.SelectionManager = SelectionManager()
+        drawing.current = probe.ViewId.A
+        drawing.ActiveDrawingView = None
+        drawing.AutomaticViewUpdate = True
+        drawing.ActiveView = SimpleNamespace(EnableGraphicsUpdate=True)
+        drawing.FeatureManager = SimpleNamespace(
+            EnableFeatureTree=True, EnableFeatureTreeWindow=True
+        )
+        drawing.groups = [
+            fixture.groups[probe.ViewId.B],
+            fixture.groups[probe.ViewId.A],
+        ]
+        drawing.GetViews = lambda: (
+            tuple(tuple(group) for group in drawing.groups)
+            if len(fixture.created_views) == 2
+            else ((object(),),)
+        )
+        drawing.Sheet = lambda name: fixture.sheets[name]
+
+        def current_sheet():
+            drawing.assert_live("GetCurrentSheet")
+            fixture.mode_events.append(("GetCurrentSheet", drawing.current))
+            return fixture.sheets[drawing.current]
+
+        def activate_sheet(name):
+            drawing.assert_live("ActivateSheet")
+            fixture.mode_events.append(("ActivateSheet", name))
+            drawing.current, drawing.sheet = name, name
+            if drawing.sheet_qualified_titles:
+                drawing.title = f"Draw - {name}"
+            drawing.ActiveDrawingView = None
+            return True
+
+        def activate_view(name):
+            drawing.assert_live("ActivateView")
+            fixture.mode_events.append(("ActivateView", name))
+            drawing.ActiveDrawingView = next(
+                view for view in fixture.views.values() if view.Name == name
+            )
+            return True
+
+        def create_view(*arguments):
+            drawing.assert_live("CreateDrawViewFromModelView3")
+            fixture.mode_events.append(
+                ("CreateDrawViewFromModelView3", drawing.current)
+            )
+            view = fixture.views[drawing.current]
+            fixture.created_views.append(view)
+            return view
+
+        def clear_selection(all_selected):
+            drawing.assert_live("ClearSelection2")
+            assert all_selected is True
+            fixture.mode_events.append(("ClearSelection2", drawing.current))
+            drawing.SelectionManager.selected = []
+
+        drawing.GetCurrentSheet = current_sheet
+        drawing.ActivateSheet = activate_sheet
+        drawing.ActivateView = activate_view
+        drawing.CreateDrawViewFromModelView3 = create_view
+        drawing.ClearSelection2 = clear_selection
+        drawing.NewSheet4 = lambda *arguments: (
+            fixture.mode_events.append(("NewSheet4",)) or True
+        )
+        drawing.InsertNote = lambda text: (
+            fixture.mode_events.append(("InsertNote", drawing.current))
+            or inert_insert_note(text)
+        )
+        return drawing
+
+    fixture.install_mode_receiver = install_receiver
+    install_receiver(fixture.drawing)
+
+    def rename_sheet(name):
+        fixture.mode_events.append(("SetName", name))
+        fixture.drawing.current, fixture.drawing.sheet = name, name
+        if fixture.drawing.sheet_qualified_titles:
+            fixture.drawing.title = f"Draw - {name}"
+
+    for sheet in fixture.sheets.values():
+        sheet.SetName = rename_sheet
+    monkeypatch.setattr(subject, "model", probe.NativeProbe.model.__get__(subject))
+    monkeypatch.setattr(subject, "draw", probe.NativeProbe.draw.__get__(subject))
+    monkeypatch.setattr(
+        subject, "activate", probe.NativeProbe.activate.__get__(subject)
+    )
+    monkeypatch.setattr(
+        subject, "rebuild", lambda: fixture.mode_events.append(("rebuild",))
+    )
+
+    # Admit the source through the real owner/configuration path, not a model()
+    # shortcut that would mask an unadmitted or replaced drawing at export.
+    source_component = fixture.components[probe.ViewId.A][probe.NodeId.N].Component
+    configuration = SimpleNamespace(
+        Name="Default",
+        GetDisplayStates=lambda: ("Display State-1",),
+        GetDisplayStatesCount=lambda: 1,
+        GetDisplayStateComponentVisibility=lambda *arguments: (
+            (1,),
+            (source_component,),
+        ),
+    )
+    fixture.source.path = str(subject.paths[probe.Document.R])
+    fixture.source.GetComponents = lambda _top: (source_component,)
+    fixture.source.GetActiveConfiguration = lambda: configuration
+    fixture.source.GetConfigurationByName = lambda name: configuration
+    with subject.acquiring(probe.Document.R) as before:
+        subject.app.models.append(fixture.source)
+        subject.app.ActiveDoc = fixture.source
+        subject.acquired(probe.Document.R, fixture.source, before)
+        subject.claim(probe.Document.R, 2, subject.paths[probe.Document.R])
+    subject.expected = {
+        view_id: {key: True for key in probe.NodeId} for view_id in probe.ViewId
+    }
+
+    def render_export(export, pdf):
+        assert pdf in fixture.saved_pdfs
+        fixture.rendered_exports.append(export)
+
+    monkeypatch.setattr(subject, "render_export", render_export)
+    return fixture
+
+
+def sheet_mode_record(subject):
+    (record,) = [
+        row
+        for row in subject.receipt.data["ledger"]
+        if row["event"] == "drawing_sheet_mode_normalization"
+    ]
+    assert record is subject.drawing_mode_record
+    return record
+
+
+def prepare_sheet_mode_export(fixture):
+    """A marked sentinel context makes actual guard restoration observable."""
+    fixture.subject.activate_view(probe.ViewId.B, sheet_only=True)
+    fixture.drawing.SelectionManager.selected = [
+        (
+            fixture.components[probe.ViewId.B][probe.NodeId.P1],
+            fixture.views[probe.ViewId.B],
+            16,
+        )
+    ]
+    return fixture.subject.context(fixture.subject.views())
+
+
+def replace_sheet_mode_drawing(fixture):
+    """Real close/admission, keeping the construction receiver disconnected."""
+    subject, old = fixture.subject, fixture.drawing
+    subject.close(probe.Document.DRAWING)
+    assert not old.live
+    # Explicit inert title policy, not an assertion about native saved drawings.
+    replacement = fixture.install_mode_receiver(
+        OfflineDrawing(), sheet_qualified_titles=False
+    )
+    replacement.edit_sheet_mode = True
+    with subject.acquiring(probe.Document.DRAWING) as before:
+        subject.app.models.append(replacement)
+        subject.app.ActiveDoc = replacement
+        subject.acquired(probe.Document.DRAWING, replacement, before)
+        # The reopen branch has a persisted path and admits existing real views.
+        path = subject.paths[probe.Document.DRAWING]
+        replacement.path = str(path)
+        subject.claim(probe.Document.DRAWING, 3, path)
+    fixture.drawing = replacement
+    subject.activate(probe.Document.DRAWING)
+    return old, replacement
+
+
+@pytest.mark.parametrize("initial", [False, True])
+def test_sheet_mode_actual_construction_normalizes_once_before_any_geometry(
+    sheet_mode_contract, initial
+):
+    fixture = sheet_mode_contract
+    fixture.drawing.edit_sheet_mode = initial
+    fixture.subject.create_drawing()
+    record = sheet_mode_record(fixture.subject)
+    assert record["boundary"] == "admitted_new_drawing"
+    assert record["document"] is probe.Document.DRAWING
+    assert record["generation"] == 1
+    assert record["active_identity"]["native_identity"] == 1
+    assert record["pre"]["mode"] is (
+        probe.DrawingEditMode.SHEET if initial else probe.DrawingEditMode.FORMAT
+    )
+    assert record["post"]["mode"] is probe.DrawingEditMode.SHEET
+    assert all(
+        row["mode"] is probe.DrawingEditMode.SHEET
+        for row in record["before_views"].values()
+    )
+    assert fixture.edit_calls == [fixture.drawing]
+    names = [event[0] for event in fixture.mode_events]
+    assert names[:5] == [
+        "GetEditSheet",
+        "EditSheet",
+        "GetEditSheet",
+        "GetCurrentSheet",
+        "SetName",
+    ]
+    assert names.count("GetEditSheet") == 4
+    expected_mutators = Counter(
+        {
+            "EditSheet": 1,
+            "SetName": 1,
+            "NewSheet4": 1,
+            "ActivateSheet": 5,
+            "ActivateView": 1,
+            "CreateDrawViewFromModelView3": 2,
+            "ClearSelection2": 2,
+            "InsertNote": 2,
+            "rebuild": 1,
+        }
+    )
+    assert (
+        Counter(name for name in names if name in expected_mutators)
+        == expected_mutators
+    )
+    assert len(fixture.subject.app.activation_calls) == 1
+    assert fixture.scale_writes == [0, 0]
+    for index, event in enumerate(fixture.mode_events):
+        if event[0] == "CreateDrawViewFromModelView3":
+            assert fixture.mode_events[index - 1] == ("GetEditSheet", event[1], False)
+    assert len(fixture.created_views) == len(fixture.markers) == 2
+    assert fixture.saved_pdfs == []
+    assert fixture.subject.receipt.counts[probe.SnapshotKind.FULL] == 0
+    assert fixture.subject.receipt.counts[probe.SnapshotKind.SOURCE] == 0
+    assert not fixture.subject.receipt.data["observations"]
+    fixture.subject.receipt.checkpoint()
+    persisted = json.loads((fixture.subject.receipt.root / "report.json").read_text())
+    (saved,) = [
+        row
+        for row in persisted["ledger"]
+        if row["event"] == "drawing_sheet_mode_normalization"
+    ]
+    assert saved["pre"]["mode"] == ("sheet" if initial else "sheet_format")
+    assert saved["post"]["mode"] == "sheet"
+    assert all(row["mode"] == "sheet" for row in saved["before_views"].values())
+    assert all(
+        row["status"] == probe.ActiveObservation.NOT_OBSERVED
+        for row in saved["exports"].values()
+    )
+    assert "drawing_sheet_mode_normalization" not in persisted["fixture"]
+
+
+@pytest.mark.parametrize("pre", ["native_error", None, 0, 1, "sheet", 1.0])
+def test_sheet_mode_pre_getter_failure_is_only_diagnostic(sheet_mode_contract, pre):
+    fixture = sheet_mode_contract
+    value = InertWriteOnlyError() if pre == "native_error" else pre
+    fixture.mode_results[:] = [value, True, True, True]
+    fixture.subject.create_drawing()
+    row = sheet_mode_record(fixture.subject)["pre"]
+    assert row["status"] is probe.ActiveObservation.ERROR
+    assert "mode" not in row
+    if isinstance(value, Exception):
+        assert row["error"]["hresult"] == value.hresult
+        assert row["error"]["excepinfo"] == value.excepinfo
+    else:
+        assert row["raw_type"] == type(value).__name__
+        assert row["raw_repr"] == repr(value)
+        assert row["error"]["type"] == "ProbeFailure"
+    assert fixture.edit_calls == [fixture.drawing]
+    assert len(fixture.created_views) == len(fixture.markers) == 2
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["void_no_change", "post_false", "post_invalid", "post_error", "edit_error"],
+)
+def test_sheet_mode_failed_normalization_preserves_primary_and_owned_cleanup(
+    sheet_mode_contract, monkeypatch, failure
+):
+    fixture = sheet_mode_contract
+    native = InertWriteOnlyError()
+    if failure == "void_no_change":
+        fixture.controls.edit_normalizes = False
+    elif failure == "edit_error":
+        fixture.controls.edit_error = native
+    else:
+        fixture.mode_results[:] = [
+            False,
+            {"post_false": False, "post_invalid": 1, "post_error": native}[failure],
+        ]
+    reporting = OSError("mode failure case-final reporting failed")
+    fail_case_final_checkpoint_once(fixture.subject, monkeypatch, reporting)
+    primary = capture_and_cleanup_failure(
+        fixture.subject, fixture.subject.create_drawing
+    )
+    assert fixture.created_views == fixture.markers == fixture.saved_pdfs == []
+    assert fixture.edit_calls == [fixture.drawing]
+    assert fixture.drawing in fixture.subject.app.closed
+    assert fixture.subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+    record = sheet_mode_record(fixture.subject)
+    if failure == "edit_error":
+        assert primary is native
+        assert record["normalization"]["error"]["hresult"] == native.hresult
+        assert record["post"]["status"] is probe.ActiveObservation.NOT_OBSERVED
+        assert (
+            fixture.subject.receipt.data["primary_error"]["hresult"] == native.hresult
+        )
+        assert (
+            fixture.subject.receipt.data["primary_error"]["excepinfo"]
+            == native.excepinfo
+        )
+    else:
+        assert probe.failure_verdict(primary) is probe.Verdict.CONSTRUCTION
+        assert record["normalization"]["status"] is probe.Verdict.PASSED
+        if failure == "post_error":
+            assert primary is native
+            assert (
+                fixture.subject.receipt.data["primary_error"]["hresult"]
+                == native.hresult
+            )
+            assert record["post"]["error"]["excepinfo"] == native.excepinfo
+        elif failure == "post_invalid":
+            assert isinstance(primary, probe.ProbeFailure)
+            assert record["post"]["raw_type"] == "int"
+        else:
+            assert record["post"]["mode"] is probe.DrawingEditMode.FORMAT
+    assert any(
+        row["message"] == str(reporting)
+        for row in fixture.subject.receipt.data["secondary_errors"]
+    )
+    fixture.subject.receipt.checkpoint()
+    persisted = json.loads((fixture.subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(primary)
+    assert any(
+        row["event"] == "drawing_sheet_mode_normalization"
+        for row in persisted["ledger"]
+    )
+
+
+@pytest.mark.parametrize("active", ["foreign", "null"])
+def test_sheet_mode_active_receiver_refuses_before_getter_or_mutator(
+    sheet_mode_contract, monkeypatch, active
+):
+    fixture = sheet_mode_contract
+    claim = fixture.subject.claim
+
+    def claim_then_change_active(label, kind, path):
+        result = claim(label, kind, path)
+        if label is probe.Document.DRAWING:
+            fixture.subject.app.ActiveDoc = (
+                OfflineDrawing() if active == "foreign" else None
+            )
+        return result
+
+    monkeypatch.setattr(fixture.subject, "claim", claim_then_change_active)
+    with pytest.raises(probe.ProbeFailure) as caught:
+        fixture.subject.create_drawing()
+    assert caught.value.verdict is probe.Verdict.IDENTITY
+    assert fixture.mode_events == fixture.edit_calls == fixture.created_views == []
+    assert fixture.markers == []
+    assert fixture.subject.app.activation_calls == []
+    record = sheet_mode_record(fixture.subject)
+    assert record["active_identity"]["status"] is probe.ActiveObservation.ERROR
+    assert record["pre"]["status"] is probe.ActiveObservation.NOT_OBSERVED
+    assert record["normalization"]["status"] is probe.ActiveObservation.NOT_OBSERVED
+
+
+@pytest.mark.parametrize("view_id", tuple(probe.ViewId))
+@pytest.mark.parametrize("failure", ["format", "invalid", "native_error"])
+def test_sheet_mode_each_actual_insertion_gate_refuses_affected_geometry(
+    sheet_mode_contract, view_id, failure
+):
+    fixture = sheet_mode_contract
+    native = InertWriteOnlyError()
+    value = {"format": False, "invalid": 1, "native_error": native}[failure]
+    fixture.mode_results[:] = [False, True]
+    if view_id is probe.ViewId.B:
+        fixture.mode_results.append(True)
+    fixture.mode_results.append(value)
+    primary = capture_and_cleanup_failure(
+        fixture.subject, fixture.subject.create_drawing
+    )
+    assert probe.failure_verdict(primary) is probe.Verdict.CONSTRUCTION
+    row = sheet_mode_record(fixture.subject)["before_views"][view_id]
+    assert row["required_mode"] is probe.DrawingEditMode.SHEET
+    assert row["document"] is probe.Document.DRAWING
+    assert row["generation"] == 1
+    expected_count = int(view_id is probe.ViewId.B)
+    assert len(fixture.created_views) == len(fixture.markers) == expected_count
+    assert fixture.views[view_id] not in fixture.created_views
+    assert fixture.edit_calls == [fixture.drawing]
+    assert fixture.saved_pdfs == []
+    assert fixture.drawing in fixture.subject.app.closed
+    if failure == "native_error":
+        assert primary is native
+        assert (
+            fixture.subject.receipt.data["primary_error"]["hresult"] == native.hresult
+        )
+        assert row["error"]["hresult"] == native.hresult
+    elif failure == "invalid":
+        assert isinstance(primary, probe.ProbeFailure)
+        assert row["raw_type"] == "int" and "mode" not in row
+    else:
+        assert row["mode"] is probe.DrawingEditMode.FORMAT
+
+
+@pytest.mark.parametrize("boundary", ["pre", "post", "A", "B"])
+@pytest.mark.parametrize(
+    "interrupt_type",
+    [KeyboardInterrupt, SystemExit, GeneratorExit, probe.InjectedFailure],
+)
+def test_sheet_mode_construction_control_flow_is_never_diagnostic(
+    sheet_mode_contract, boundary, interrupt_type
+):
+    fixture = sheet_mode_contract
+    interruption = (
+        probe.InjectedFailure(probe.Case.CONSTRUCTION, probe.Injection.AFTER_SELECTION)
+        if interrupt_type is probe.InjectedFailure
+        else interrupt_type("stop mode read")
+    )
+    before = {"pre": [], "post": [False], "A": [False, True], "B": [False, True, True]}
+    fixture.mode_results[:] = [*before[boundary], interruption]
+    primary = capture_and_cleanup_failure(
+        fixture.subject, fixture.subject.create_drawing
+    )
+    assert primary is interruption
+    assert len(fixture.edit_calls) == int(boundary != "pre")
+    assert len(fixture.created_views) == int(boundary == "B")
+    assert fixture.drawing in fixture.subject.app.closed
+    record = sheet_mode_record(fixture.subject)
+    row = (
+        record[boundary]
+        if boundary in ("pre", "post")
+        else record["before_views"][probe.ViewId[boundary]]
+    )
+    assert row["status"] is probe.ActiveObservation.OBSERVING
+    assert "mode" not in row and "error" not in row
+
+
+def test_sheet_mode_observer_never_swallows_owner_or_evidence_errors(
+    sheet_mode_contract, monkeypatch
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    fixture.mode_events.clear()
+    owned = fixture.subject.documents.pop(probe.Document.DRAWING)
+    try:
+        with pytest.raises(probe.ProbeFailure, match="not admitted"):
+            fixture.subject._observe_drawing_edit_mode(
+                fixture.drawing, {}, verdict=probe.Verdict.CONSTRUCTION
+            )
+    finally:
+        fixture.subject.documents[probe.Document.DRAWING] = owned
+    assert fixture.mode_events == []
+    original = OSError("receipt row write failed")
+
+    class FailingRow(dict):
+        def update(self, **values):
+            if "raw_type" in values:
+                raise original
+            return super().update(**values)
+
+    with pytest.raises(OSError) as caught:
+        fixture.subject._observe_drawing_edit_mode(
+            fixture.drawing, FailingRow(), verdict=probe.Verdict.CONSTRUCTION
+        )
+    assert caught.value is original
+
+
+@pytest.mark.parametrize("export", tuple(probe.Export))
+def test_sheet_mode_actual_export_observes_inside_guard_and_restores_context(
+    sheet_mode_contract, export
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    original = prepare_sheet_mode_export(fixture)
+    before_counts = fixture.subject.receipt.counts.copy()
+    fixture.mode_events.clear()
+    fixture.subject.export(export)
+    events = fixture.mode_events
+    mode_index = next(i for i, event in enumerate(events) if event[0] == "GetEditSheet")
+    assert events[mode_index] == ("GetEditSheet", probe.ViewId.A, True)
+    assert events[mode_index - 2 : mode_index + 2] == [
+        ("ClearSelection2", probe.ViewId.A),
+        ("Extension", probe.ViewId.A),
+        ("GetEditSheet", probe.ViewId.A, True),
+        ("SaveAs3", probe.ViewId.A),
+    ]
+    assert (
+        next(
+            i
+            for i, event in enumerate(events)
+            if event == ("ActivateSheet", probe.ViewId.A)
+        )
+        < mode_index
+    )
+    assert events.index(("SuspendSelectionList",)) < mode_index
+    assert events.index(("ResumeSelectionList2",)) > mode_index
+    assert fixture.subject.context(fixture.subject.views()) == original
+    assert fixture.edit_calls == [fixture.drawing]
+    assert len(fixture.saved_pdfs) == 1
+    assert fixture.rendered_exports == [export]
+    row = sheet_mode_record(fixture.subject)["exports"][export]
+    assert row["mode"] is probe.DrawingEditMode.SHEET
+    assert row["document"] is probe.Document.DRAWING and row["generation"] == 1
+    assert (
+        fixture.subject.receipt.counts["pdf_export"] - before_counts["pdf_export"] == 1
+    )
+    assert (
+        fixture.subject.receipt.counts[probe.SnapshotKind.FULL]
+        - before_counts[probe.SnapshotKind.FULL]
+        == 3
+    )
+    assert (
+        fixture.subject.receipt.counts[probe.SnapshotKind.SOURCE]
+        == before_counts[probe.SnapshotKind.SOURCE]
+    )
+    assert [
+        event["label"] for event in fixture.subject.receipt.data["observations"]
+    ] == [
+        f"{export}-before-export",
+        "selection-guard-restored",
+        f"{export}-after-export",
+    ]
+
+
+@pytest.mark.parametrize("failure", ["format", "invalid", "native_error"])
+@pytest.mark.parametrize("restore_error", [False, True])
+def test_sheet_mode_export_failure_restores_guard_keeps_evidence_and_cleans_up(
+    sheet_mode_contract, failure, restore_error
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    original = prepare_sheet_mode_export(fixture)
+    native = InertWriteOnlyError()
+    fixture.mode_results[:] = [
+        {"format": False, "invalid": "True", "native_error": native}[failure]
+    ]
+    secondary = OSError("selection resume reported failure")
+    if restore_error:
+        fixture.controls.resume_error = secondary
+    fixture.mode_events.clear()
+    primary = capture_and_cleanup_failure(
+        fixture.subject, lambda: fixture.subject.export(probe.Export.BASELINE)
+    )
+    assert probe.failure_verdict(primary) is probe.Verdict.VISUAL
+    assert fixture.saved_pdfs == fixture.rendered_exports == []
+    assert not (fixture.subject.receipt.root / "E0.pdf").exists()
+    assert ("ResumeSelectionList2",) in fixture.mode_events
+    assert fixture.drawing.current is original["sheet"]
+    assert fixture.drawing.ActiveDrawingView is None
+    assert not fixture.drawing.SelectionManager.suspended
+    assert fixture.drawing.SelectionManager.selected[0][2] == 16
+    assert fixture.drawing in fixture.subject.app.closed
+    row = sheet_mode_record(fixture.subject)["exports"][probe.Export.BASELINE]
+    assert row["required_mode"] is probe.DrawingEditMode.SHEET
+    assert row["generation"] == 1
+    if failure == "native_error":
+        assert primary is native
+        assert (
+            fixture.subject.receipt.data["primary_error"]["hresult"] == native.hresult
+        )
+        assert (
+            fixture.subject.receipt.data["primary_error"]["excepinfo"]
+            == native.excepinfo
+        )
+        assert row["error"]["hresult"] == native.hresult
+    elif failure == "invalid":
+        assert isinstance(primary, probe.ProbeFailure)
+        assert row["raw_repr"] == "'True'" and "mode" not in row
+    else:
+        assert row["mode"] is probe.DrawingEditMode.FORMAT
+    if restore_error:
+        assert any(
+            row["message"] == str(secondary)
+            for row in fixture.subject.receipt.data["secondary_errors"]
+        )
+    assert fixture.subject.receipt.primary is primary
+    fixture.subject.receipt.checkpoint()
+    persisted = json.loads((fixture.subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(primary)
+    (record,) = [
+        item
+        for item in persisted["ledger"]
+        if item["event"] == "drawing_sheet_mode_normalization"
+    ]
+    assert record["exports"]["E0"]["required_mode"] == "sheet"
+
+
+@pytest.mark.parametrize(
+    "interrupt_type",
+    [KeyboardInterrupt, SystemExit, GeneratorExit, probe.InjectedFailure],
+)
+def test_sheet_mode_export_control_flow_propagates_after_guard_restoration(
+    sheet_mode_contract, interrupt_type
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    original = prepare_sheet_mode_export(fixture)
+    interruption = (
+        probe.InjectedFailure(probe.Case.CONSTRUCTION, probe.Injection.AFTER_SELECTION)
+        if interrupt_type is probe.InjectedFailure
+        else interrupt_type("stop export mode read")
+    )
+    fixture.mode_results[:] = [interruption]
+    with pytest.raises(interrupt_type) as caught:
+        fixture.subject.export(probe.Export.BASELINE)
+    assert caught.value is interruption
+    assert fixture.subject.context(fixture.subject.views()) == original
+    assert not fixture.drawing.SelectionManager.suspended
+    assert fixture.saved_pdfs == []
+    row = sheet_mode_record(fixture.subject)["exports"][probe.Export.BASELINE]
+    assert row["status"] is probe.ActiveObservation.OBSERVING
+
+
+@pytest.mark.parametrize("replacement_mode", [True, False])
+def test_sheet_mode_e5_consumes_current_admitted_generation_not_disposed_origin(
+    sheet_mode_contract, replacement_mode
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    old, replacement = replace_sheet_mode_drawing(fixture)
+    admitted_title = fixture.subject.documents[probe.Document.DRAWING].title
+    replacement.edit_sheet_mode = replacement_mode
+    original = prepare_sheet_mode_export(fixture)
+    assert replacement.GetTitle() == admitted_title
+    fixture.mode_events.clear()
+    if replacement_mode:
+        fixture.subject.export(probe.Export.REOPENED)
+        assert fixture.subject.context(fixture.subject.views()) == original
+        assert len(fixture.saved_pdfs) == 1
+    else:
+        with pytest.raises(probe.ProbeFailure) as caught:
+            fixture.subject.export(probe.Export.REOPENED)
+        assert caught.value.verdict is probe.Verdict.VISUAL
+        assert fixture.saved_pdfs == []
+        assert fixture.subject.context(fixture.subject.views()) == original
+    assert replacement.GetTitle() == admitted_title
+    assert fixture.subject.documents[probe.Document.DRAWING].title == admitted_title
+    assert not [
+        row
+        for row in fixture.subject.receipt.data["ledger"]
+        if row["event"] == "title_refresh" and row["generation"] == 2
+    ]
+    assert fixture.subject.model(probe.Document.DRAWING) is not old
+    assert (
+        fixture.subject.app.document(fixture.subject.model(probe.Document.DRAWING))
+        is replacement
+    )
+    assert old.disconnected_accesses == []
+    assert fixture.edit_calls == [old]
+    assert [event for event in fixture.mode_events if event[0] == "GetEditSheet"] == [
+        ("GetEditSheet", probe.ViewId.A, True)
+    ]
+    record = sheet_mode_record(fixture.subject)
+    assert record["generation"] == 1
+    assert record["post"]["generation"] == 1
+    row = record["exports"][probe.Export.REOPENED]
+    assert row["generation"] == 2 and row["document"] is probe.Document.DRAWING
+    assert row["mode"] is (
+        probe.DrawingEditMode.SHEET
+        if replacement_mode
+        else probe.DrawingEditMode.FORMAT
+    )
+
+
+def test_sheet_mode_saved_replacement_title_drift_refuses_before_e5_mode_gate(
+    sheet_mode_contract,
+):
+    fixture = sheet_mode_contract
+    subject = fixture.subject
+    subject.create_drawing()
+    old, replacement = replace_sheet_mode_drawing(fixture)
+    owned = subject.documents[probe.Document.DRAWING]
+    admitted_title, admitted_path = owned.title, owned.path
+    prepare_sheet_mode_export(fixture)
+    assert replacement.GetTitle() == admitted_title
+    replacement.title = "Inert unexpected post-admission title drift"
+    fixture.mode_events.clear()
+    with pytest.raises(
+        probe.ProbeFailure, match="owned inventory title changed: fixture_drawing"
+    ) as caught:
+        subject.export(probe.Export.REOPENED)
+    assert caught.value.verdict is probe.Verdict.PRESERVATION
+    assert owned.title == admitted_title and owned.path == admitted_path
+    assert admitted_path is not None and owned.generation == 2
+    assert not [
+        event
+        for event in fixture.mode_events
+        if event[0] in ("GetEditSheet", "SaveAs3")
+    ]
+    assert fixture.saved_pdfs == fixture.rendered_exports == []
+    assert subject.receipt.counts["selection_guard"] == 0
+    assert old.disconnected_accesses == []
+    assert fixture.edit_calls == [old]
+    assert (
+        sheet_mode_record(subject)["exports"][probe.Export.REOPENED]["status"]
+        is probe.ActiveObservation.NOT_OBSERVED
+    )
+    event = subject.receipt.data["observations"][-1]
+    assert event["label"] == "E5-before-export"
+    snapshot = subject.receipt.data["snapshots"][event["content"]]
+    assert snapshot["source"]["observation_error"]["message"] == str(caught.value)
+
+
+@pytest.mark.parametrize("state", ["absent", "pending"])
+def test_sheet_mode_e5_never_observes_an_unadmitted_replacement(
+    sheet_mode_contract, state
+):
+    fixture = sheet_mode_contract
+    fixture.subject.create_drawing()
+    old, replacement = replace_sheet_mode_drawing(fixture)
+    if state == "absent":
+        fixture.subject.documents.pop(probe.Document.DRAWING)
+    else:
+        fixture.subject.documents[
+            probe.Document.DRAWING
+        ].state = probe.AcquisitionState.PENDING
+    fixture.mode_events.clear()
+    with pytest.raises(probe.ProbeFailure, match="not admitted"):
+        fixture.subject.export(probe.Export.REOPENED)
+    assert fixture.mode_events == []
+    assert fixture.saved_pdfs == []
+    assert old.disconnected_accesses == replacement.disconnected_accesses == []
+    assert (
+        sheet_mode_record(fixture.subject)["exports"][probe.Export.REOPENED]["status"]
+        is probe.ActiveObservation.NOT_OBSERVED
+    )
+
+
+def test_sheet_mode_actual_c00_retains_two_full_and_no_source_observations(
+    sheet_mode_contract, monkeypatch
+):
+    fixture = sheet_mode_contract
+    subject = fixture.subject
+    monkeypatch.setattr(
+        subject, "case_checkpoint", probe.NativeProbe.case_checkpoint.__get__(subject)
+    )
+
+    def construct():
+        subject.create_drawing()
+        subject._constructed_drawing_checkpoint()
+
+    subject.run_case(probe.Case.CONSTRUCTION, construct)
+    assert subject.receipt.counts[probe.SnapshotKind.FULL] == 2
+    assert subject.receipt.counts[probe.SnapshotKind.SOURCE] == 0
+    assert [event["label"] for event in subject.receipt.data["observations"]] == [
+        "constructed-drawing",
+        "case-candidate-complete",
+    ]
+    assert len(subject.receipt.data["cases"]) == 29
+    assert subject.receipt.data["bounds"]["case_slots"] == 32
+    assert len(fixture.edit_calls) == 1
+    assert (
+        len([event for event in fixture.mode_events if event[0] == "GetEditSheet"]) == 4
+    )
+    context = subject.context(subject.views())
+    assert set(context) == {"sheet", "view", "selection", "flags"}
+    snapshots = dict(subject.receipt.data["snapshots"])
+    subject.drawing_mode_record["pre"]["raw_repr"] = "diagnostic-only changed"
+    assert subject.context(subject.views()) == context
+    subject.checkpoint("same-semantic-state-after-mode-diagnostic-change")
+    assert subject.receipt.data["snapshots"] == snapshots
 
 
 @pytest.fixture

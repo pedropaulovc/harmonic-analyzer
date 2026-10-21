@@ -125,6 +125,11 @@ class ActiveObservation(StrEnum):
     ERROR = "error"
 
 
+class DrawingEditMode(StrEnum):
+    SHEET = "sheet"
+    FORMAT = "sheet_format"
+
+
 class ViewId(StrEnum):
     A = "BulkTarget"
     B = "BulkSentinel"
@@ -2154,6 +2159,102 @@ class NativeProbe:
         self.create_drawing()
         self._constructed_drawing_checkpoint()
 
+    def _observe_drawing_edit_mode(
+        self, drawing: Any, row: dict[str, Any], *, verdict: Verdict
+    ) -> tuple[DrawingEditMode | None, Exception | None]:
+        self.model(Document.DRAWING)
+        row.update(
+            document=Document.DRAWING,
+            generation=self.documents[Document.DRAWING].generation,
+            status=ActiveObservation.OBSERVING,
+        )
+        mode, error = None, None
+        try:
+            raw = drawing.GetEditSheet()
+        except InjectedFailure:
+            raise
+        except Exception as caught:
+            error = caught
+        else:
+            row.update(raw_type=type(raw).__name__, raw_repr=repr(raw))
+            try:
+                mode = (
+                    DrawingEditMode.SHEET
+                    if api_bool(raw, "GetEditSheet", verdict)
+                    else DrawingEditMode.FORMAT
+                )
+            except InjectedFailure:
+                raise
+            except Exception as caught:
+                error = caught
+        if error is not None:
+            row.update(status=ActiveObservation.ERROR, error=error_record(error))
+        else:
+            row.update(status=Verdict.PASSED, mode=mode)
+        return mode, error
+
+    def _require_drawing_sheet_mode(
+        self,
+        drawing: Any,
+        row: dict[str, Any],
+        *,
+        verdict: Verdict = Verdict.CONSTRUCTION,
+    ) -> None:
+        row["required_mode"] = DrawingEditMode.SHEET
+        mode, error = self._observe_drawing_edit_mode(drawing, row, verdict=verdict)
+        if error is not None:
+            raise error
+        require(
+            mode is DrawingEditMode.SHEET,
+            verdict,
+            "drawing must be in edit sheet mode",
+        )
+
+    def _normalize_drawing_sheet_mode(self, drawing: Any) -> None:
+        model = self.model(Document.DRAWING)
+        record: dict[str, Any] = {
+            "event": "drawing_sheet_mode_normalization",
+            "boundary": "admitted_new_drawing",
+            "document": Document.DRAWING,
+            "generation": self.documents[Document.DRAWING].generation,
+            "active_identity": {"status": ActiveObservation.NOT_OBSERVED},
+            "pre": {"status": ActiveObservation.NOT_OBSERVED},
+            "normalization": {"status": ActiveObservation.NOT_OBSERVED},
+            "post": {"status": ActiveObservation.NOT_OBSERVED},
+            "before_views": {
+                view_id: {"status": ActiveObservation.NOT_OBSERVED}
+                for view_id in ViewId
+            },
+            "exports": {
+                export: {"status": ActiveObservation.NOT_OBSERVED} for export in Export
+            },
+        }
+        self.drawing_mode_record = record
+        self.receipt.data["ledger"].append(record)
+        record["active_identity"]["status"] = ActiveObservation.OBSERVING
+        try:
+            self.identical(self.app.ActiveDoc, model, "drawing sheet-mode receiver")
+        except BaseException as error:
+            record["active_identity"].update(
+                status=ActiveObservation.ERROR, error=error_record(error)
+            )
+            raise
+        record["active_identity"].update(status=Verdict.PASSED, native_identity=1)
+        self._observe_drawing_edit_mode(
+            drawing, record["pre"], verdict=Verdict.CONSTRUCTION
+        )
+        # Match new_project_drawing: this is a void mode normalizer, not a rebuild.
+        record["normalization"]["status"] = ActivationState.CALLING
+        try:
+            drawing.EditSheet()
+        except BaseException as error:
+            record["normalization"].update(
+                status=ActiveObservation.ERROR, error=error_record(error)
+            )
+            raise
+        record["normalization"]["status"] = Verdict.PASSED
+        self._require_drawing_sheet_mode(drawing, record["post"])
+
     def create_drawing(self) -> None:
         template = self.root / "cad/templates/harmonic-analyzer-landscape.DRWDOT"
         require(
@@ -2169,6 +2270,7 @@ class NativeProbe:
             )
             model = self.claim(Document.DRAWING, 3, None)
         drawing = self.draw()
+        self._normalize_drawing_sheet_mode(drawing)
         sheet = self.bind(drawing.GetCurrentSheet(), "ISheet")
         sheet.SetName(ViewId.A)
         require(
@@ -2215,6 +2317,9 @@ class NativeProbe:
                 and abs(float(props[6]) - 0.2794) <= 1e-9,
                 Verdict.CONSTRUCTION,
                 "fixture sheet name/size readback",
+            )
+            self._require_drawing_sheet_mode(
+                drawing, self.drawing_mode_record["before_views"][view_id]
             )
             view = self.bind(
                 drawing.CreateDrawViewFromModelView3(
@@ -3542,6 +3647,12 @@ class NativeProbe:
             with self.timed("export"):
                 extension = self.bind(
                     self.model(Document.DRAWING).Extension, "IModelDocExtension"
+                )
+                drawing = self.draw()
+                self._require_drawing_sheet_mode(
+                    drawing,
+                    self.drawing_mode_record["exports"][export],
+                    verdict=Verdict.VISUAL,
                 )
                 result = extension.SaveAs3(str(pdf), 0, 1, None, None, 0, 0)
                 require(
