@@ -82,11 +82,14 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Each pin-hole axis is inspected against the bottom-face normal over the
-functional engagement span, in every azimuth, before assembly. The sheet's
-PIN_AXIS_INSPECTION_NOTE states the direct acceptance; the part process row
-gives its surface-plate, fitted-arbor and indicator setup. This adds no
-flatness or orientation frames and changes none of the reamed fits.
+Each pin-hole axis is inspected against the underside-plane normal in every
+azimuth before assembly. PIN_AXIS_CALLOUT belongs to the native 4X REAM
+dimension: its resultant lateral shift per normal height bounds the actual
+vector angle by atan(0.05/10.50), not each projected component independently.
+Section A-A measures the actual straight land as a native reference (11.7
+nominal); PIN_LAND_CALLOUT separately requires 10.50 MIN of straight land.
+The process row gives the surface-plate, fitted-arbor and indicator setup.
+No geometric frame, reamed fit or chamfer geometry changes.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -174,6 +177,10 @@ PIN_CHAMFER = 0.3
 PIN_CHAMFER_BAND = (0.1, 0.0)
 PIN_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "0.3 MIN"
 PIN_CHAMFER_PLACES = 1
+# The modeled straight wall ends at the underside chamfer, not at an invented
+# 10.50 station. Section A-A displays this derived length as reference only.
+PIN_STRAIGHT_LAND = THICKNESS - PIN_CHAMFER
+DRAWING_REFERENCE_PRECISION = {"PinStraightLand": 1}
 # Against the hole edge the fillet's arc stands R (2 - sqrt 2) proud of a 45°
 # chamfer's leg, so the MIN leg reaches it with 0.1 to spare; the chamfered
 # mouth at its largest stays inside the collar.
@@ -371,8 +378,20 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
 # read as one spot).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
+# The full orientation acceptance is on the actual reamed diameter, never on
+# a separate leader note. "Resultant" controls the lateral vector magnitude;
+# normal height makes its bound exactly atan(deviation/span), in any azimuth.
+CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
+PIN_AXIS_CALLOUT = (
+    "AXES TO UNDERSIDE NORMAL:\n"
+    "RESULTANT LATERAL SHIFT:\n"
+    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX PER {PIN_AXIS_MEASUREMENT_SPAN:.2f}\n"
+    "NORMAL HEIGHT, ALL AZIMUTHS\n"
+    f"CLEARS {CAP_NUMBER} CAP"
+)
+PIN_LAND_CALLOUT = f"4X STRAIGHT\nLAND\n{PIN_AXIS_MEASUREMENT_SPAN:.2f} MIN"
 CALLOUTS_BELOW = {
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT}\n{PIN_AXIS_CALLOUT}",
     "PinSpacing": SPACING_CALLOUT,
     "A2DX": DX_CALLOUT,
     "B2DX": DX_CALLOUT,
@@ -391,23 +410,6 @@ CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}
 # unlocated in Y).
 CALLOUT_PREFIXES = {"RiserY1": "2X ", "RiserY2": "2X "}
 
-# A source-model property, linked by a leader to a representative pin-bore
-# rim on the drawing; it applies to all four bores' feature-schema notes.
-# Detailed shop setup belongs to the process.
-# The bore-axis tilt feeds the carrier underside's running clearance over the
-# MHA-CH-06-TL-30 capture cap (retention ``cap_clearance``), so the note names
-# that mate first (rule 4). The four bores are the one 4X Ø10.000 REAM
-# callout's, and the span is measured on the bore's straight land, clear of
-# both mouth chamfers (process row); the two limits are the retention proof's,
-# unchanged. Four rows of at most ~80 mm (Century Gothic at 3.5) keep the note
-# left of B1's extension line in its paper band (review 88c6d).
-CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
-PIN_AXIS_INSPECTION_NOTE = (
-    f"{CAP_NUMBER} CAP CLEARANCE:\n"
-    f"4X Ø{PIN_HOLE_DIA:.3f} AXES NORMAL TO\n"
-    f"BOTTOM FACE WITHIN {PIN_AXIS_DEVIATION_MAX:.2f} OVER\n"
-    f"{PIN_AXIS_MEASUREMENT_SPAN:.2f} STRAIGHT LAND, ALL AZIMUTHS"
-)
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_SCALE = (1, 8)
 ISOMETRIC_VIEW_NOTE = (

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import inspect
 import math
 import re
@@ -12,8 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-import _drawing_leader_notes
-import _drawing_marks
+import _drawing_edge_dimensions
 import build_ch_rocker_arm_tl_oblique_carrier as part
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
 import ch_rocker_arm_tl_oblique_retention_spec as retention
@@ -21,6 +19,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
@@ -625,7 +624,7 @@ def test_all_four_bore_axes_own_the_bottom_normal_inspection() -> None:
         assert feature["thru"] is True
         assert "note" in feature["requirements"]
         assert feature["note"] == " ".join(
-            (spec.PIN_HOLE_CALLOUT + "\n" + spec.PIN_AXIS_INSPECTION_NOTE).splitlines()
+            (spec.CALLOUTS_BELOW["PinHoleDia"] + "\n" + spec.PIN_LAND_CALLOUT).splitlines()
         )
         (face,) = requirements_for(drawing)[name].faces
         assert face.contains_x_mm == x
@@ -637,145 +636,9 @@ def test_all_four_bore_axes_own_the_bottom_normal_inspection() -> None:
     assert math.isclose(spec.PIN_CLEARANCE_MAX, 0.024)
 
 
-def test_native_part_writes_and_guards_the_axis_inspection_property(monkeypatch) -> None:
-    """Exercise the actual property-write call without executing geometry."""
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    call = next(
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "apply_drawing_properties"
-    )
-    written = {}
-    adapter = object()
-
-    def capture(actual_adapter, properties):
-        assert actual_adapter is adapter
-        written.update(properties)
-
-    monkeypatch.setattr(_drawing_marks, "apply_custom_properties", capture)
-    eval(
-        compile(ast.Expression(call), part.__file__, "eval"),
-        vars(part),
-        {"adapter": adapter},
-    )
-    assert written["Pin Axis Inspection"] == spec.PIN_AXIS_INSPECTION_NOTE
-    assert "Pin Axis Inspection" in part._SAVED_DRAWING_PROPERTIES
-
-
-@pytest.mark.parametrize("failure", (None, "wrong_bore", "missing_leader", "dangling"))
-def test_axis_inspection_callout_keeps_its_identified_bore_and_live_leader(
-    monkeypatch, failure
-) -> None:
-    """Exercise the production attached-note and settled attachment guards."""
-    def rim(point):
-        x, y = point
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            CircleParams=(
-                x / 1000.0, 0.0, -y / 1000.0,
-                0.0, 1.0, 0.0, spec.PIN_HOLE_DIA / 2000.0,
-            ),
-        )
-        return SimpleNamespace(GetCurve=lambda: curve)
-
-    bores = {name: rim(point) for name, point in spec.PIN_HOLES.items()}
-    expected = bores["B1"]
-    state = SimpleNamespace(attached=expected, leaders=0, dangling=False)
-    text_format = SimpleNamespace(CharHeight=0.005)
-    formats, inserted = [], []
-
-    def leader(*_args):
-        state.leaders = 1
-        return 0
-
-    def set_format(index, use_doc, value):
-        formats.append((index, use_doc, value.CharHeight))
-        return True
-
-    annotation = SimpleNamespace(
-        GetAttachedEntityCount3=lambda: 1,
-        GetAttachedEntities3=lambda: (state.attached,),
-        GetAttachedEntityTypes=lambda: (1,),
-        GetLeaderCount=lambda: state.leaders,
-        IsDangling=lambda: state.dangling,
-        SetLeader3=leader,
-        SetPosition2=lambda *_args: True,
-        GetTextFormat=lambda _index: text_format,
-        SetTextFormat=set_format,
-    )
-    note = SimpleNamespace(GetAnnotation=lambda: annotation)
-
-    def insert(text):
-        inserted.append(text)
-        return note
-
-    document = SimpleNamespace(InsertNote=insert, ClearSelection2=lambda _all: None)
-    adapter = SimpleNamespace(
-        currentModel=document,
-        _attempt=lambda call, **_kwargs: call(),
-        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
-    )
-    top = SimpleNamespace(GetVisibleComponents=lambda: (object(),))
-    selected = []
-
-    def select(_adapter, view, entity_type, xy, *, label, entity):
-        selected.append((view, entity_type, xy, entity))
-        return entity
-
-    monkeypatch.setattr(
-        drawing, "visible_component_entities", lambda *_args: tuple(bores.values())
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_select_view_entity", select)
-    monkeypatch.setattr(
-        _drawing_leader_notes._sw_type_info,
-        "early_bound_or_flag",
-        lambda value, *_args: value,
-    )
-    monkeypatch.setattr(
-        _drawing_leader_notes, "rebuild_drawing", lambda *_args, **_kwargs: None
-    )
-    settled = drawing._pin_axis_inspection_callout(adapter, top)
-    assert selected == [(top, "EDGE", None, expected)]
-    assert inserted == [drawing.property_link("Pin Axis Inspection")]
-    assert formats == [(0, False, drawing.INSPECTION_NOTE_CHAR_HEIGHT)]
-    if failure == "wrong_bore":
-        state.attached = bores["A1"]
-    elif failure == "missing_leader":
-        state.leaders = 0
-    elif failure == "dangling":
-        state.dangling = True
-    if failure is None:
-        settled()
-    else:
-        with pytest.raises(RuntimeError, match="lost its edge attachment"):
-            settled()
-
-
-def test_axis_inspection_note_and_relocated_b2dx_have_separate_paper_bands() -> None:
-    x, y = (value * 1000.0 for value in drawing.PIN_AXIS_NOTE_XY)
-    height = drawing.INSPECTION_NOTE_CHAR_HEIGHT * 1000.0
-    rows = spec.PIN_AXIS_INSPECTION_NOTE.splitlines()
-    note = (
-        x,
-        y - len(rows) * height * 1.6,
-        x + max(map(len, rows)) * height * 0.68,
-        y + height,
-    )
-    assert height >= 3.5
-    assert not _boxes_overlap(note, _TITLE_BLOCK)
-    assert _BORDER[0] + 3.0 < note[0] < note[2] < _BORDER[2] - 3.0
-    assert note[1] > _top_text("PinSpacing")[1] + 3.0
-    # RiserX1R's horizontal witness span ends at the +X inner riser axis;
-    # the note starts beyond it, rather than crossing a dimension line.
-    assert note[0] > _on_sheet(spec.RISER_SCREWS[1][0], 0.0)[0] + 3.0
-    assert note[3] < _top_text("RiserX2R")[1] - 3.0
+def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
     b2x, b2y = _top_text("B2DX")
-    assert b2y - 10.0 > note[3] + 3.0
     assert b2y + 10.0 < _on_sheet(0.0, spec.OUTLINE_Y[0])[1] - 3.0
-    assert note[2] + 3.0 < _on_sheet(*spec.PIN_HOLES["B1"])[0]
     # Review 88c6d: B2DX's rows (~28 wide, "SETS R816 ON") stand wholly
     # outboard of B2's extension line and the 520.0's at the plate's +X end,
     # so neither strikes the text, and above the isometric.
@@ -784,3 +647,430 @@ def test_axis_inspection_note_and_relocated_b2dx_have_separate_paper_bands() -> 
     assert b2x + half_width < _BORDER[2] - 3.0
     iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
     assert b2y - 8.0 - 3.0 > iso_top
+
+
+def _native_axis_fixture(monkeypatch):
+    """Replace only COM reads; retain the production vector and rim algorithms."""
+    model = object()
+    faces, geometries, rims, resolved = {}, {}, {}, []
+
+    def bore(name, axis=(0.0, -1.0, 0.0), land=11.7):
+        length = math.hypot(*axis)
+        axis = tuple(component / length for component in axis)
+        x, y = spec.PIN_HOLES[name]
+        origin = (x / 1000.0, 0.0, -y / 1000.0)
+        rims[name] = [
+            (*origin, *axis, 0.005),
+            (*(p + a * land / 1000.0 for p, a in zip(origin, axis)), *axis, 0.005),
+        ]
+        faces[name] = SimpleNamespace(
+            GetEdges=lambda: tuple(
+                SimpleNamespace(
+                    GetCurve=lambda circle=circle: SimpleNamespace(
+                        IsCircle=lambda: True, CircleParams=circle
+                    )
+                )
+                for circle in rims[name]
+            )
+        )
+        geometries[name] = FaceGeometry(
+            faces[name], SURFACE_CYLINDER, (*origin, *axis, 0.005), None, ()
+        )
+
+    def plane(normal=(0.0, -1.0, 0.0), offset=12.0, identity=SURFACE_PLANE):
+        faces["underside"] = object()
+        geometries["underside"] = FaceGeometry(
+            faces["underside"], identity,
+            (*normal, *(component * offset / 1000.0 for component in normal)),
+            normal, (),
+        )
+
+    def resolve(actual_model, requests):
+        assert actual_model is model
+        assert set(requests) == {"underside", "A1", "B1", "A2", "B2"}
+        resolved.append(requests)
+        return faces
+
+    def geometry(face):
+        return next(geometries[key] for key, value in faces.items() if value is face)
+
+    plane()
+    for name in spec.PIN_HOLES:
+        bore(name)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "face_geometry", geometry)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    return SimpleNamespace(
+        model=model, bore=bore, plane=plane, rims=rims,
+        geometries=geometries, resolved=resolved,
+    )
+
+
+def test_native_axes_return_all_four_actual_lands_with_one_resolution(monkeypatch):
+    native = _native_axis_fixture(monkeypatch)
+    for index, name in enumerate(spec.PIN_HOLES):
+        native.bore(name, land=10.5 + index * 0.3)
+    assert drawing._assert_pin_axis_geometry(native.model) == pytest.approx(
+        dict(zip(spec.PIN_HOLES, (10.5, 10.8, 11.1, 11.4)))
+    )
+    assert len(native.resolved) == 1
+
+
+@pytest.mark.parametrize("name", ("A1", "B1", "A2", "B2"))
+def test_each_native_bore_rejects_resultant_diagonal_tilt(monkeypatch, name):
+    native = _native_axis_fixture(monkeypatch)
+    component = 0.04 / 10.5
+    assert component < 0.05 / 10.5 < math.hypot(component, component)
+    native.bore(name, axis=(component, -1.0, component))
+    with pytest.raises(RuntimeError, match=f"{name}: native axis exceeds resultant"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize("azimuth", (0.0, 0.37, 1.19, 2.31, 4.81))
+@pytest.mark.parametrize("factor", (0.999, 1.0, 1.001))
+def test_native_axis_boundary_is_azimuth_independent(monkeypatch, azimuth, factor):
+    native = _native_axis_fixture(monkeypatch)
+    slope = factor * 0.05 / 10.5
+    # A reversed cylinder axis describes the same physical bore.
+    native.bore("B2", axis=(slope * math.cos(azimuth), 1.0, slope * math.sin(azimuth)))
+    if factor > 1.0:
+        with pytest.raises(RuntimeError, match="B2: native axis exceeds resultant"):
+            drawing._assert_pin_axis_geometry(native.model)
+    else:
+        assert drawing._assert_pin_axis_geometry(native.model)["B2"] == pytest.approx(11.7)
+
+
+def test_axes_use_native_underside_not_world_y(monkeypatch):
+    native = _native_axis_fixture(monkeypatch)
+    angle = 0.01  # Within the plane selector, outside the axis acceptance.
+    normal = (math.sin(angle), -math.cos(angle), 0.0)
+    native.plane(normal=normal)
+    with pytest.raises(RuntimeError, match="A1: native axis exceeds resultant"):
+        drawing._assert_pin_axis_geometry(native.model)
+    for name in spec.PIN_HOLES:
+        native.bore(name, axis=normal)
+    assert drawing._assert_pin_axis_geometry(native.model) == pytest.approx(
+        {name: 11.7 for name in spec.PIN_HOLES}
+    )
+
+
+@pytest.mark.parametrize(
+    "normal,offset,identity",
+    (
+        ((0.0, 1.0, 0.0), 12.0, SURFACE_PLANE),
+        ((0.0, -1.0, 0.0), 0.0, SURFACE_PLANE),
+        ((0.0, -1.0, 0.0), 12.0, SURFACE_CYLINDER),
+        ((0.1, -math.sqrt(0.99), 0.0), 12.0, SURFACE_PLANE),
+    ),
+)
+def test_native_underside_must_match_real_seating_plane(
+    monkeypatch, normal, offset, identity
+):
+    native = _native_axis_fixture(monkeypatch)
+    native.plane(normal=normal, offset=offset, identity=identity)
+    with pytest.raises(RuntimeError, match="native underside plane"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize("name", ("A1", "B1", "A2", "B2"))
+def test_actual_native_land_not_nominal_stock_controls_minimum(monkeypatch, name):
+    native = _native_axis_fixture(monkeypatch)
+    native.bore(name, land=10.49)
+    with pytest.raises(RuntimeError, match=f"{name}: native straight land"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ("missing", "duplicate", "third_station", "truncated", "nonfinite", "radius", "axis"),
+)
+def test_malformed_native_straight_land_rims_are_rejected(monkeypatch, failure):
+    native = _native_axis_fixture(monkeypatch)
+    circles = native.rims["A2"]
+    if failure == "missing":
+        circles.clear()
+    elif failure == "duplicate":
+        circles[1] = circles[0]
+    elif failure == "third_station":
+        circles.append((circles[0][0], -0.006, circles[0][2], 0.0, -1.0, 0.0, 0.005))
+    elif failure == "truncated":
+        circles[1] = circles[1][:-1]
+    elif failure == "nonfinite":
+        circles[1] = (math.nan, *circles[1][1:])
+    elif failure == "radius":
+        circles[1] = (*circles[1][:-1], 0.0053)
+    elif failure == "axis":
+        circles[1] = (*circles[1][:3], 1.0, 0.0, 0.0, 0.005)
+    with pytest.raises(RuntimeError, match="A2: .*straight-land rim"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+def _native_dimension_fixture(monkeypatch, *, land=False):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
+    vertices = (object(), object())
+    state = SimpleNamespace(attached=vertices, dangling=False, low=0.0, high=0.000015)
+    owner = SimpleNamespace(Name="PinHoleProfile")
+    tolerance = SimpleNamespace(
+        Type=0, GetMinValue=lambda: state.low, GetMaxValue=lambda: state.high
+    )
+    dimension = SimpleNamespace(
+        FullName="PinHoleDia@PinHoleProfile@carrier.SLDPRT",
+        SystemValue=spec.PIN_STRAIGHT_LAND / 1000.0 if land else 0.010,
+        Tolerance=tolerance, DrivenState=1, GetFeatureOwner=lambda: owner,
+    )
+    texts = {
+        1: "(" if land else "", 2: ")" if land else "",
+        4: spec.PIN_LAND_CALLOUT if land else spec.CALLOUTS_BELOW["PinHoleDia"],
+        8: spec.PIN_LAND_CALLOUT if land else spec.CALLOUTS_BELOW["PinHoleDia"],
+    }
+    annotation = SimpleNamespace(
+        Visible=1, IsDangling=lambda: state.dangling,
+        GetAttachedEntities3=lambda: state.attached,
+        GetAttachedEntityTypes=lambda: (3, 3),
+    )
+    state.precision = 1
+    display = SimpleNamespace(
+        Type2=2 if land else 6, ShowDimensionValue=True,
+        GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
+        GetText=lambda index: texts.get(index, ""),
+        GetPrimaryPrecision2=lambda: state.precision,
+    )
+    annotation.GetSpecificAnnotation = lambda: display
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    return SimpleNamespace(
+        adapter=adapter, annotation=annotation, display=display, dimension=dimension,
+        owner=owner, tolerance=tolerance, state=state, texts=texts, vertices=vertices,
+    )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        None, "owner", "name", "name_owner", "kind", "value", "low", "high",
+        "symmetric_band", "hidden_value", "hidden_annotation", "dangling",
+        "native_below", "resolved_below",
+    ),
+)
+def test_ream_control_rejects_native_manufacturing_mutations(monkeypatch, failure):
+    native = _native_dimension_fixture(monkeypatch)
+    if failure == "owner":
+        native.owner.Name = "SpotReference"
+    elif failure == "name":
+        native.dimension.FullName = "SpotDia@PinHoleProfile@carrier"
+    elif failure == "name_owner":
+        native.dimension.FullName = "PinHoleDia@SpotReference@carrier"
+    elif failure == "kind":
+        native.display.Type2 = 2
+    elif failure == "value":
+        native.dimension.SystemValue = 0.0101
+    elif failure == "low":
+        native.state.low = -0.000015
+    elif failure == "high":
+        native.state.high = 0.0
+    elif failure == "symmetric_band":
+        native.state.low, native.state.high = -0.000015, 0.000015
+    elif failure == "hidden_value":
+        native.display.ShowDimensionValue = False
+    elif failure == "hidden_annotation":
+        native.annotation.Visible = 0
+    elif failure == "dangling":
+        native.state.dangling = True
+    elif failure == "native_below":
+        native.texts[4] = spec.PIN_HOLE_CALLOUT
+    elif failure == "resolved_below":
+        native.texts[8] = spec.PIN_HOLE_CALLOUT
+    if failure is None:
+        drawing._assert_ream_control(native.adapter, native.annotation)
+    else:
+        with pytest.raises(RuntimeError, match="4X REAM lost"):
+            drawing._assert_ream_control(native.adapter, native.annotation)
+
+
+@pytest.mark.parametrize("kind", (2, 11, 12))
+def test_native_land_accepts_linear_reference_with_actual_endpoints(monkeypatch, kind):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    native.display.Type2 = kind
+    assert spec.PIN_STRAIGHT_LAND == pytest.approx(spec.THICKNESS - spec.PIN_CHAMFER)
+    assert spec.PIN_STRAIGHT_LAND == pytest.approx(11.7)
+    drawing._assert_land_control(native.adapter, native.display, native.vertices)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        "angular", "diameter", "wrong_endpoint", "duplicate_endpoint",
+        "extra_endpoint", "dangling", "fake_min_value", "chamfer_included",
+        "nonfinite_value", "banded", "driving", "hidden_value", "hidden_annotation",
+        "no_parentheses", "precision", "native_min", "resolved_min",
+    ),
+)
+def test_native_land_rejects_false_reference_and_minimum_controls(monkeypatch, failure):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    if failure in ("angular", "diameter"):
+        native.display.Type2 = 3 if failure == "angular" else 6
+        native.display.GetAnnotation = lambda: pytest.fail("kind guard ran too late")
+    elif failure == "wrong_endpoint":
+        native.state.attached = (native.vertices[0], object())
+    elif failure == "duplicate_endpoint":
+        native.state.attached = (native.vertices[0], native.vertices[0])
+    elif failure == "extra_endpoint":
+        native.state.attached = (*native.vertices, object())
+    elif failure == "dangling":
+        native.state.dangling = True
+    elif failure == "fake_min_value":
+        native.dimension.SystemValue = 0.0105
+    elif failure == "chamfer_included":
+        native.dimension.SystemValue = spec.THICKNESS / 1000.0
+    elif failure == "nonfinite_value":
+        native.dimension.SystemValue = math.nan
+    elif failure == "banded":
+        native.tolerance.Type = 2
+    elif failure == "driving":
+        native.dimension.DrivenState = 0
+    elif failure == "hidden_value":
+        native.display.ShowDimensionValue = False
+    elif failure == "hidden_annotation":
+        native.annotation.Visible = 0
+    elif failure == "no_parentheses":
+        native.texts[1], native.texts[2] = "", ""
+    elif failure == "precision":
+        native.state.precision = 2
+    elif failure == "native_min":
+        native.texts[4] = "4X STRAIGHT\nLAND"
+    elif failure == "resolved_min":
+        native.texts[8] = "4X STRAIGHT\nLAND"
+    with pytest.raises(RuntimeError, match="straight.land"):
+        drawing._assert_land_control(native.adapter, native.display, native.vertices)
+
+
+@pytest.mark.parametrize("section_sign", (-1.0, 1.0))
+@pytest.mark.parametrize(
+    "failure",
+    (
+        None, "endpoint_after_rebuild", "value_after_rebuild", "ref_after_rebuild",
+        "wrong_label_edge", "missing_leader", "dangling_label", "moved_landing",
+        "hidden_label", "changed_label",
+    ),
+)
+def test_native_land_authoring_and_settled_physical_underside(
+    monkeypatch, section_sign, failure
+):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    section = object()
+    wall_x = spec.PIN_HOLES["A1"][0] + spec.PIN_HOLE_DIA / 2.0
+    endpoints = (
+        (wall_x, 0.0, 0.0),
+        (wall_x, -spec.THICKNESS + spec.PIN_CHAMFER, 0.0),
+    )
+    underside_point = (
+        spec.PIN_HOLES["A1"][0] - section_sign * 7.0, -spec.THICKNESS, 0.0
+    )
+    underside = object()
+    picked = []
+
+    def vertex_at(point, *, label):
+        picked.append(point)
+        return native.vertices[endpoints.index(point)]
+
+    def line_through(point, *, label):
+        assert point == underside_point
+        return SimpleNamespace(edge=underside)
+
+    scanner = SimpleNamespace(exact_vertex_at=vertex_at, exact_line_through=line_through)
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_args, **_kwargs: scanner)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: [point[:2] for point in points],
+    )
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, _view, point, **_kwargs: point[:2],
+    )
+    monkeypatch.setattr(
+        drawing, "_section_axes",
+        lambda *_args: ((section_sign, 0.0, 0.0), (0.0, 1.0, 0.0)),
+    )
+
+    def add_dimension(adapter, view, **kwargs):
+        assert adapter is native.adapter and view is section
+        assert kwargs["entities"] == native.vertices
+        assert kwargs["entity_types"] == ("VERTEX", "VERTEX")
+        assert kwargs["orientation"] == "vertical"
+        assert kwargs["p0"] == tuple(value / 1000.0 for value in endpoints[0][:2])
+        assert kwargs["p1"] == tuple(value / 1000.0 for value in endpoints[1][:2])
+        return native.display
+
+    def reference(adapter, annotation, **_kwargs):
+        assert adapter is native.adapter and annotation is native.annotation
+        native.texts[1], native.texts[2] = "(", ")"
+
+    def precision(places, *_args):
+        native.state.precision = places
+        return True
+
+    def text(index, value):
+        assert index == 4
+        native.texts[4] = native.texts[8] = value
+        return True
+
+    native.dimension.DrivenState = 0
+    native.texts.update({1: "", 2: "", 4: "", 8: ""})
+    native.state.precision = 3
+    native.display.SetPrecision3 = precision
+    native.display.SetText = text
+    monkeypatch.setattr(drawing, "add_edge_dimension", add_dimension)
+    monkeypatch.setattr(drawing, "set_reference_dimension", reference)
+    under_xy = tuple(value / 1000.0 for value in underside_point[:2])
+    label_state = SimpleNamespace(
+        edge=underside, text="UNDERSIDE", leaders=1, dangling=False, landing=under_xy
+    )
+    label_annotation = SimpleNamespace(
+        Visible=1, GetAttachedEntities3=lambda: (label_state.edge,),
+        GetAttachedEntityCount3=lambda: 1, GetAttachedEntityTypes=lambda: (1,),
+        GetLeaderCount=lambda: label_state.leaders,
+        IsDangling=lambda: label_state.dangling,
+        GetLeaderPointsAtIndex=lambda _index: (0.0, 0.0, 0.0, *label_state.landing, 0.0),
+    )
+
+    def add_label(adapter, view, **kwargs):
+        assert adapter is native.adapter and view is section
+        assert kwargs["text"] == "UNDERSIDE"
+        assert kwargs["attached_to"] is underside
+        assert kwargs["entity_xy"] == under_xy
+        return SimpleNamespace(
+            GetAnnotation=lambda: label_annotation, GetText=lambda: label_state.text
+        )
+
+    monkeypatch.setattr(drawing, "add_attached_note", add_label)
+    settled = drawing._add_pin_land_control(native.adapter, section)
+    assert picked == list(endpoints)
+    settled()
+    # Model the final rebuild changing evaluated native state, not Python wiring.
+    if failure == "endpoint_after_rebuild":
+        native.state.attached = (native.vertices[0], object())
+    elif failure == "value_after_rebuild":
+        native.dimension.SystemValue = 0.0105
+    elif failure == "ref_after_rebuild":
+        native.dimension.DrivenState = 0
+    elif failure == "wrong_label_edge":
+        label_state.edge = object()
+    elif failure == "missing_leader":
+        label_state.leaders = 0
+    elif failure == "dangling_label":
+        label_state.dangling = True
+    elif failure == "moved_landing":
+        label_state.landing = (under_xy[0] + 0.005, under_xy[1])
+    elif failure == "hidden_label":
+        label_annotation.Visible = 0
+    elif failure == "changed_label":
+        label_state.text = "TOP"
+    if failure is None:
+        settled()
+    else:
+        with pytest.raises(RuntimeError, match="straight.land|underside.plane"):
+            settled()

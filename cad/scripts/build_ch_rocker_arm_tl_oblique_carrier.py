@@ -95,7 +95,6 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
     PIN_HOLES,
-    PIN_AXIS_INSPECTION_NOTE,
     PLATE_LENGTH,
     PLATE_WIDTH,
     POSITION_BAND,
@@ -126,7 +125,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
-    "Pin Axis Inspection",
 )
 
 AXIS_OVERRUN = 2.0  # the revolve axis centerline's free end above the top face
@@ -783,7 +781,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Pin Axis Inspection": PIN_AXIS_INSPECTION_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)

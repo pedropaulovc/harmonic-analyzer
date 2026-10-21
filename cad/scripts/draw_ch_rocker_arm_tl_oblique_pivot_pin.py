@@ -394,22 +394,64 @@ requirement(
 )
 
 
+def _stop_faces_in_view(
+    adapter: Any, profile: Any, model: Any, source_faces: dict[str, Any],
+) -> dict[str, Any]:
+    """Reacquire the Pin revolution's exact faces in drawing-view context.
+
+    SDK IEntity::Select4 requires active-document entities. A face resolved
+    from ReferencedDocument is not its drawing-context counterpart: the
+    695c4b02e native failure rejected that identity before any landing was set.
+    Reuse draw_mg_output_fixture._rod_bore_face's feature correspondence path;
+    direct IView::GetCorrespondingEntity(source_face) was null on its rotated
+    view. IView::GetCorresponding(IFeature) and IFeature::GetFaces supply the
+    selectable faces; source IModelDocExtension::GetCorrespondingEntity2 and
+    ISldWorks::IsSame prove which exact source face each one represents.
+    """
+    pin = _early_bound(model, "IPartDoc").FeatureByName("Pin")
+    if pin is None:
+        raise RuntimeError("pivot stop controls: source has no Pin revolution")
+    view_pin = _early_bound(profile, "IView").GetCorresponding(pin)
+    if view_pin is None:
+        raise RuntimeError("pivot stop controls: Pin has no profile-view correspondence")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    matches: dict[str, list[Any]] = {key: [] for key in source_faces}
+    for face in _early_bound(view_pin, "IFeature").GetFaces() or ():
+        source = extension.GetCorrespondingEntity2(face)
+        if source is None:
+            continue
+        for key, expected in source_faces.items():
+            if int(adapter.swApp.IsSame(source, expected)) == 1:
+                matches[key].append(face)
+    for key, candidates in matches.items():
+        if len(candidates) != 1:
+            raise RuntimeError(
+                f"{key}: expected one Pin profile-view face corresponding to "
+                f"the exact source face, found {len(candidates)}"
+            )
+    return {key: candidates[0] for key, candidates in matches.items()}
+
+
 def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
     """Attach A to its real cylinder and each native frame to its stop face.
 
-    Reuse the part-owned PMI/knob-shaft path. SDK IModelDoc2::InsertGtol
-    derives its attachment from the prior selection; the existing helpers
+    Reuse the existing native datum/FCF helpers with view-context faces.
+    SDK IModelDoc2::InsertGtol derives its attachment from the prior selection;
     set that landing before insertion and verify current-format frame XML.
     No coordinate hit-test, silhouette substitute or post-insertion setter.
     """
     datum = part_spec.PART_DATUMS[0]
     controls = part_spec.GEOMETRIC_CONTROLS
     model = _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2")
-    faces = resolve_faces(
+    source_faces = resolve_faces(
         model, {datum.key: datum.face, **{row.key: row.face for row in controls}}
     )
+    faces = _stop_faces_in_view(adapter, profile, model, source_faces)
     # The lower flank of the reachable k5 journal, well away from its chamfer
     # and shoulder. Stop tips lie on the Ø35 subset of the full annular faces.
+    # *Right looks along model X: these are a cylinder tangent and edge-on
+    # annular faces. Projection supplies only the landing, never ownership or
+    # a visibility/pick proof; the mapped topology and native readbacks do.
     points = (
         (0.0, -part_spec.BEARING_DIA / 2000.0, part_spec.BEARING_LENGTH / 2000.0),
         *(
@@ -439,6 +481,11 @@ def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
 
     def settled() -> None:
         assert_frame_datums_defined((profile,), label="pivot stop controls")
+        extension = _early_bound(model.Extension, "IModelDocExtension")
+        for key, face in faces.items():
+            source = extension.GetCorrespondingEntity2(face)
+            if source is None or int(adapter.swApp.IsSame(source, source_faces[key])) != 1:
+                raise RuntimeError(f"{key}: settled face lost its exact source correspondence")
         _assert_attached_to(
             adapter, _early_bound(tag.GetAnnotation(), "IAnnotation"), faces[datum.key],
             entity_type="FACE", what="datum feature", label=datum.key, expected_leaders=0,

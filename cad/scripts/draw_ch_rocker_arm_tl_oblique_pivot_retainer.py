@@ -10,9 +10,9 @@ from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, dimens
 
 from _check import check
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 from _drawing_finish import add_surface_finish
-from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -43,18 +43,16 @@ PROFILE_CENTER = (0.240, 0.175)
 ISO_CENTER = (0.365, 0.190)
 ISO_SCALE = (2, 1)
 ISO_NOTE_XY = (0.328, 0.235)
-# Review 88c6d: WasherBore's text ran over the left border (r1-r3 clarity.1);
-# it stands below-right of the face view, wholly inside the free paper left
-# of the profile view. Both diameters keep one arrow on the rim nearest their
-# text (set_near_side_diameter), so neither line runs through the centre or
-# crosses the other (r1/r2 clarity.2).
+# The bore callout stays below-right of the face view, inside the border.
+# Like the filing button, the OD imports on the circular face only as a
+# donor, then moves as a native diameter onto the lathe-oriented side view.
 FACE_KEEP = {"WasherDia": (0.050, 0.225), "WasherBore": (0.140, 0.120)}
-NEAR_SIDE_DIAMETERS = ("WasherDia", "WasherBore")
-# Review 88c6d (r1-r3 clarity.3/4): each thickness's text stood between its
-# own extension lines and the other's. The supply allowance's text stands
-# left of its extension lines, the reference thickness's right of the part
-# and below the Ra symbol; only their dimension lines run out to the text.
-PROFILE_KEEP = {"FinishedThickness": (0.303, 0.115), "SupplyThickness": (0.190, 0.230)}
+OD_ON_PROFILE = (0.210, 0.175)
+NEAR_SIDE_DIAMETERS = ("WasherBore",)
+# The actual fitted thickness is REF; its attached callout also owns the
+# supply allowance. No dimension reaches out to an undrawn supply blank.
+# Its text stays right of the real faces and below the Ra symbol.
+PROFILE_KEEP = {"FinishedThickness": (0.303, 0.115)}
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 requirement(
@@ -69,7 +67,7 @@ requirement(
 )
 requirement(
     "fitted_top", kind="face", faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.THICKNESS),), requirements=("note",),
-    fields={"normal": ([0.0, 0.0, 1.0], ("__frame__",)), "note": (part_spec.DIMENSION_CALLOUTS["FinishedThickness"], ("DIMENSION_CALLOUTS", "RUNNING_GAP_MIN", "RUNNING_GAP_MAX", "CROSS_HOLE_FROM_SEAT", "CROSS_HOLE_DIA", "CLEVIS_DIA", "CARRIER_THICKNESS", "THICKNESS"))},
+    fields={"normal": ([0.0, 0.0, 1.0], ("__frame__",)), "note": (part_spec.DIMENSION_CALLOUTS["FinishedThickness"], ("DIMENSION_CALLOUTS", "SUPPLY_MIN_THICKNESS", "RUNNING_GAP_MIN", "RUNNING_GAP_MAX", "CROSS_HOLE_FROM_SEAT", "CROSS_HOLE_DIA", "CLEVIS_DIA", "CARRIER_THICKNESS", "THICKNESS"))},
 )
 requirement(
     "carrier_running_face", kind="face", faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),), requirements=("finish_ra",),
@@ -92,8 +90,13 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (face, profile, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = []
-    for view, keep, label in ((face, FACE_KEEP, "washer face"), (profile, PROFILE_KEEP, "fitted profile and supply allowance")):
+    for view, keep, label in ((face, FACE_KEEP, "washer face"), (profile, PROFILE_KEEP, "fitted profile")):
         annotations.extend(curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=part_spec.DRAWING_DIMENSIONS))
+    od_donors = [annotation for annotation in annotations if dimension_name(adapter, annotation) == "WasherDia"]
+    if len(od_donors) != 1:
+        raise RuntimeError("expected one retainer OD donor dimension")
+    moved_od = move_model_dimension(adapter, od_donors[0], profile, OD_ON_PROFILE, source_view=face)
+    annotations = [annotation for annotation in annotations if dimension_name(adapter, annotation) != "WasherDia"] + [moved_od]
     assert_imported_precision(adapter, annotations, part_spec.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part_spec.DIMENSION_CALLOUTS, location="below")
     for name in NEAR_SIDE_DIAMETERS:
@@ -101,7 +104,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
         set_near_side_diameter(matches[0], f"retainer {name}")
-    rebuild_drawing(adapter, label="retainer diameters' near-side leaders")
+    rebuild_drawing(adapter, label="retainer bore's near-side leader")
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to mark the retainer bore centre")
     def projected(point, label):

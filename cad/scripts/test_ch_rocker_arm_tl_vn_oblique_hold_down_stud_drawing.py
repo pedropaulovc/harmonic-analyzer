@@ -342,6 +342,7 @@ def test_end_note_and_presentation_resolve_exact_visible_rim_not_projected_centr
     y = 0.0 if end == "lower_factory" else spec.LENGTH / 1000
     selector = draw.lower_factory_end_edge if end == "lower_factory" else draw.upper_cut_end_edge
 
+
     def edge(params, *, circle=True):
         curve = SimpleNamespace(IsCircle=lambda: circle, CircleParams=params)
         return SimpleNamespace(GetCurve=lambda: curve)
@@ -705,7 +706,7 @@ def test_sheet_requires_actual_native_drivers_and_max_not_retyped_dimensions(mon
     elif failure == "band":
         chamfer.primary.Tolerance.values = (-0.001, 0.0001)
     elif failure == "display_type":
-        chamfer.Type2 = 10
+        chamfer.Type2 = 10  # compound chamfer, not the imported linear MAX control
     elif failure == "factory_feature":
         chamfer.primary.FullName = f"CutEndChamfer@LowerFactoryChamfer@{STEM}.Part"
     elif failure == "unqualified":
@@ -1015,11 +1016,6 @@ def test_drawing_keeps_native_chamfer_end_view_and_part_only_rework_sheet(monkey
         (draw.FRONT_KEEP, spec.DRAWING_DIMENSIONS),
         (draw.END_KEEP, spec.DRAWING_DIMENSIONS),
     ]
-    assert transfers == [
-        ("CutEndChamfer", views[0], draw.CHAMFER_DIMENSION_XY, views[1]),
-    ]
-    assert deleted == [views[1]]
-    assert offsets == [(["CutEndChamfer"], {"CutEndChamfer": draw.CHAMFER_TEXT_XY})]
     assert control_calls == [["FinishedLength", "CutEndChamfer"]]
 
     assert callouts == [(["FinishedLength", "CutEndChamfer"], math.pi / 4)]

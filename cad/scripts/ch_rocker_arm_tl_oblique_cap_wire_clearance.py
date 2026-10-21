@@ -20,6 +20,11 @@ wire's round section. Exact dyadic subdivision permits different portions to
 use overlapping circular counterbores, connecting grooves, and full-width
 outward mouths. There is no fictitious closed-X counterbore wall. Actual
 head-bearing support at the X outline comes from the SAME retention proof.
+
+The native circular sweep uses these same controls with positive nonuniform
+knot spans that match the endpoint derivatives. Reparameterization changes
+neither the individual cubic images nor any envelope below; it cannot replace
+a missing physical bend or serve as a separately fitted clearance mask.
 """
 from __future__ import annotations
 

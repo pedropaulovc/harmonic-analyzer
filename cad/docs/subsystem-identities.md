@@ -498,6 +498,14 @@ a complete strictly positive matrix, the conditional result is
 Synthetic/CAD cases are never actual installed evidence, and no complete
 actual installation/tooling measurement has been supplied.
 
+A recognized normal-state witness whose best supplied radial/axial gap
+minus uncertainty is nonpositive remains **POTENTIAL_CONFLICT**, even if
+travel, guide-envelope basis, drive-float evidence or primary records are
+missing. In that case `min_clearance` is `None`: the full-upset allowance
+is unknown, not zero. `limiting_pair` and `authority` identify the measured
+normal witness. Unrecognized group, step or mode rows are not failure
+evidence, and a positive normal witness alone cannot verify the setup.
+
 
 ## Drawing package layout
 

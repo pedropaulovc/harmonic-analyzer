@@ -2,9 +2,11 @@
 
 Turn from 3/8-in steel, SUPPLY 7 MIN. This is a blank allowance, NOT a
 finished 7-mm washer: the native installed model uses the calculated fitted
-nominal. Face the underside to the actual loaded carrier/pin running gap
-with the headed clevis HELD AGAINST THE UPPER EDGE of the pin cross-hole.
-That loading direction includes the complete drilled-hole/clevis clearance.
+nominal. Its actual-thickness REF callout carries the supply allowance;
+there is no dimension to an undrawn blank. Face the marked underside to the
+actual loaded carrier/pin running gap with the headed clevis HELD AGAINST
+THE UPPER EDGE of the pin cross-hole, including the complete drilled-hole/
+clevis clearance.
 Both washers, headed clevis pins and fresh bent split cotters are installed
 in BOTH pass pairs. No top retainer is a permanent clamp.
 
@@ -47,8 +49,6 @@ if DRILLED_BAND != (0.10, 0.0):
 AXIS_NAME = "RetainerAxis"
 BOTTOM_PLANE = "Front Plane"
 TOP_PLANE = "RetainerTop"
-SUPPLY_REFERENCE = "SupplyReference"
-REFERENCE_SKETCHES = (SUPPLY_REFERENCE,)
 VOLUME_MM3 = math.pi / 4.0 * (OUTER_DIA**2 - BORE_DIA**2) * THICKNESS
 
 
@@ -74,23 +74,20 @@ NOMINAL_RUNNING_GAP = require_loaded_running_gap(THICKNESS)
 DRAWING_DIMENSIONS = {
     "WasherProfile": {"WasherDia", "WasherBore"},
     "Washer": {"FinishedThickness"},
-    SUPPLY_REFERENCE: {"SupplyThickness"},
 }
 DRAWING_PRECISION = {
     "WasherProfile": {"WasherDia": 1, "WasherBore": 2},
     "Washer": {"FinishedThickness": THICKNESS_PLACES},
-    SUPPLY_REFERENCE: {"SupplyThickness": 1},
 }
 DRAWING_PRECISION_BY_NAME = {name: places for row in DRAWING_PRECISION.values() for name, places in row.items()}
 DIMENSION_CALLOUTS = {
     "WasherBore": "DRILL THRU; CLEARS TL-23 JOURNAL",
     "FinishedThickness": (
-        f"REF; FACE Ra {MACHINED_UM:.1f} UNDERSIDE TO ACTUAL\n"
-        f"LOADED RUNNING GAP {RUNNING_GAP_MIN:.2f}-{RUNNING_GAP_MAX:.2f}\n"
+        f"REF; SUPPLY {SUPPLY_MIN_THICKNESS:.1f} MIN THICK; FACE MARKED SIDE\n"
+        f"TO ACTUAL LOADED RUNNING GAP {RUNNING_GAP_MIN:.2f}-{RUNNING_GAP_MAX:.2f}\n"
         "ON MHA-CH-06-TL-21 CARRIER / TL-23 PIN;\n"
         "HOLD CLEVIS AGAINST UPPER CROSS-HOLE EDGE"
     ),
-    "SupplyThickness": "SUPPLY; FINISH TO LOADED GAP",
 }
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -1035,8 +1035,8 @@ def _label_side_view(adapter: Any, plan: Any, on_plan: Any) -> None:
         raise RuntimeError("failed to cross-reference the removed side view")
 
 
-def _register_recess_sheet(adapter: Any) -> None:
-    """Native register XY ordinates; the depth section is on sheet 4."""
+def _register_recess_sheet(adapter: Any) -> Any:
+    """Native register XY ordinates; return the independent note-bearing root."""
     plan = place_view(
         adapter, str(SOURCE), "*Front", *REGISTER_PLAN_CENTER, scale=CAPTURE_SCALE
     )
@@ -1067,6 +1067,7 @@ def _register_recess_sheet(adapter: Any) -> None:
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
     if add_note(adapter, "REGISTER DEPTH: SECTION D-D ON SHEET 4", 0.025, 0.080) is None:
         raise RuntimeError("failed to cross-reference the register-depth sheet")
+    return plan
 
 
 def _fit_register_section(adapter: Any, section: Any) -> None:
@@ -1093,8 +1094,8 @@ def _fit_register_section(adapter: Any, section: Any) -> None:
     raise RuntimeError("aligned register-depth section cannot fit its reserved region")
 
 
-def _register_section_sheet(adapter: Any) -> None:
-    """An unrotated native D-D and its cutting-line parent, free of XY callouts."""
+def _register_section_sheet(adapter: Any) -> Any:
+    """Native D-D; return its independent cutting-line parent for the note census."""
     plan = place_view(
         adapter, str(SOURCE), "*Front", *REGISTER_SECTION_PLAN_CENTER, scale=CAPTURE_SCALE
     )
@@ -1124,10 +1125,11 @@ def _register_section_sheet(adapter: Any) -> None:
     position_section_caption(adapter, section, REGISTER_CAPTION_XY, label="pivot block D")
     if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
         raise RuntimeError("failed to identify the register-ordinate sheet")
+    return plan
 
 
-def _side_screw_sheet(adapter: Any) -> None:
-    """The removed nut-bracket interface, no longer under section B-B."""
+def _side_screw_sheet(adapter: Any) -> Any:
+    """Removed nut-bracket interface; return its orthographic note-bearing root."""
     side = place_view(adapter, str(SOURCE), "*Top", *SIDE_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, iso):
@@ -1157,6 +1159,7 @@ def _side_screw_sheet(adapter: Any) -> None:
     if add_note(adapter, "VIEWING DIRECTION C ON SHEET 1", 0.025, 0.260) is None:
         raise RuntimeError("failed to cross-reference the side viewing direction")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    return side
 
 
 
@@ -1226,6 +1229,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
+    # Census the independent orthographic view families, not the eventual
+    # annotation owners: model-item import can attach a feature note to a
+    # section within its family. Splitting D-D onto its own sheet adds its
+    # *Front cutting-line parent; A/B and D are not independent roots, and
+    # the pictorials import no model items. Native 695c4b02eebe removed five
+    # notes in aggregate; keep exact missing/extra cleanup, not observed count.
+    thread_note_views = [plan]
     on_plan = _view_mapper(adapter, plan)
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -1280,6 +1290,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate captured-wing sheet")
     capture = place_view(adapter, str(SOURCE), "*Front", 0.195, 0.160, scale=CAPTURE_SCALE)
+    thread_note_views.append(capture)
     capture_iso = place_view(adapter, str(SOURCE), "*Isometric", 0.385, 0.230, scale=ISO_SCALE)
     for view in (capture, capture_iso):
         set_hidden_lines_removed(adapter, view)
@@ -1312,13 +1323,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("cannot activate register-recess sheet")
-    _register_recess_sheet(adapter)
+    thread_note_views.append(_register_recess_sheet(adapter))
     if not ddoc.ActivateSheet(SHEET_NAMES[3]):
         raise RuntimeError("cannot activate register-depth sheet")
-    _register_section_sheet(adapter)
+    thread_note_views.append(_register_section_sheet(adapter))
     if not ddoc.ActivateSheet(SHEET_NAMES[4]):
         raise RuntimeError("cannot activate nut-bracket interface sheet")
-    _side_screw_sheet(adapter)
+    thread_note_views.append(_side_screw_sheet(adapter))
 
     return await finalize_drawing(
         adapter,
@@ -1336,7 +1347,7 @@ async def build(adapter: Any) -> dict[str, str]:
             SHEET_NAMES[4]: SHEET_SCALE,
         },
         redundant_note_substrings=("5/16-18 Tapped Hole",),
-        expected_redundant_notes=4,
+        expected_redundant_notes=len(thread_note_views),
     )
 
 

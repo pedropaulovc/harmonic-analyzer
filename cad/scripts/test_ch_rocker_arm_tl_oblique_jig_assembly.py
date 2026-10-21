@@ -1095,14 +1095,28 @@ def test_lower_bracket_separates_an_actual_cut_free_cap_prism() -> None:
 def test_actual_wire_tail_tube_obstruction_is_material_but_installed_tubes_clear_lower_top() -> None:
     """Current representative route and bracket, with one test-only wire translation."""
     segments = pivot_wire.installed_wire_segments()
-    # Cubic endpoints are attained curve points, unlike interior controls.
-    # Identify the outer tail station geometrically, never by segment index.
+    # Identify attained outer tail points geometrically, never by segment
+    # index or the former, now tangent-trimmed Y=0 station.
     endpoints = {point for segment in segments for point in (segment[0], segment[-1])}
     outer_x = max(point[0] for point in endpoints)
+    # The maximum is attained, not an interior control masquerading as tube
+    # material. The Bezier hull proves no point between endpoints exceeds it.
+    assert all(point[0] <= outer_x + 1e-9 for segment in segments for point in segment)
+    straight_tail_segments = [
+        segment for segment in segments
+        if all(math.isclose(point[0], outer_x, abs_tol=1e-9) for point in segment)
+        and segment == pivot_wire._line(segment[0], segment[-1])
+        and math.dist(segment[0], segment[-1]) > 0.0
+    ]
+    assert straight_tail_segments
+    outer_endpoints = {
+        point for point in endpoints if math.isclose(point[0], outer_x, abs_tol=1e-9)
+    }
+    # The two tail-strand Z extrema are actual attained points. Their number
+    # does not depend on how many endpoints a tangent blend introduces.
     tail_points = {
-        point for point in endpoints
-        if math.isclose(point[0], outer_x, abs_tol=1e-9)
-        and math.isclose(point[1], 0.0, abs_tol=1e-9)
+        min(outer_endpoints, key=lambda point: point[2]),
+        max(outer_endpoints, key=lambda point: point[2]),
     }
     assert len(tail_points) == 2
     assert max(p[2] for p in tail_points) - min(p[2] for p in tail_points) == pytest.approx(
@@ -1131,15 +1145,9 @@ def test_actual_wire_tail_tube_obstruction_is_material_but_installed_tubes_clear
 
     # The former tail/retired-bracket witness does not describe this route:
     # translate the actual negative-row wire into TODAY'S bracket material.
-    # Select a real straight tail span by its native cubic controls, not a
-    # control-hull point or invented historical route/placement.
-    straight_tail_segments = [
-        segment for segment in segments
-        if any(point in tail_points for point in (segment[0], segment[-1]))
-        and segment == pivot_wire._line(segment[0], segment[-1])
-        and math.dist(segment[0], segment[-1]) > 0.0
-    ]
-    assert straight_tail_segments
+    # Use one of those actual straight outer tail spans, not a control-hull
+    # point or invented historical route/placement. Its entire finite tube is
+    # real material even though tangent blending removed the old Y=0 endpoint.
     segment = max(straight_tail_segments, key=lambda item: math.dist(item[0], item[-1]))
     length = math.dist(segment[0], segment[-1])
     tangent = tuple((b - a) / length for a, b in zip(segment[0], segment[-1], strict=True))
@@ -3833,6 +3841,108 @@ def test_known_nonpositive_gap_is_reported_despite_other_missing_witnesses() -> 
     )
     assert report.status == "POTENTIAL_CONFLICT"
     assert report.min_clearance == pytest.approx(-first.uncertainty_mm)
+
+
+@pytest.mark.parametrize("missing", (
+    {"travel": None},
+    {"guide_envelope_basis": ("", "")},
+    {"drive_float_evidence": ""},
+))
+@pytest.mark.parametrize("margin,status", (
+    (-0.5, "POTENTIAL_CONFLICT"),
+    (0.0, "POTENTIAL_CONFLICT"),
+    (0.5, "UNVERIFIED"),
+))
+@pytest.mark.parametrize("axis", ("radial", "axial"))
+def test_known_normal_gap_survives_missing_upset_bound_without_inventing_clearance(
+    missing, margin, status, axis,
+) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first = actual.gaps[0]
+    measured_gap = first.uncertainty_mm + margin
+    witness = replace(
+        first,
+        radial_gap_mm=measured_gap if axis == "radial" else None,
+        axial_gap_mm=measured_gap if axis == "axial" else None,
+    )
+    report = spec.installed_tooling_clearance(
+        replace(actual, gaps=(witness,), **missing), primary_measurements=records,
+    )
+    assert report.status == status
+    assert report.min_clearance is None
+    if status == "POTENTIAL_CONFLICT":
+        assert report.limiting_pair == (first.group, 0)
+        assert report.authority == actual.source
+    else:
+        assert report.limiting_pair is None
+
+
+def test_known_normal_failure_survives_missing_primary_records_without_an_upset_number() -> None:
+    actual, _records, _limits = _synthetic_normal_tooling_measurement()
+    first = actual.gaps[0]
+    witness = replace(first, radial_gap_mm=None, axial_gap_mm=first.uncertainty_mm)
+    report = spec.installed_tooling_clearance(replace(actual, gaps=(witness,)))
+    assert report.status == "POTENTIAL_CONFLICT"
+    assert report.min_clearance is None
+    assert report.limiting_pair == (first.group, 0)
+    assert report.authority == actual.source
+
+
+@pytest.mark.parametrize("change", (
+    {"group": "UNREGISTERED TEST GROUP"},
+    {"group": "REMOVED FROM FIXTURE"},
+    {"tool_step": "UNCENSUSED TEST STEP"},
+    {"feed_mode": "uninspected"},
+))
+def test_unrecognized_normal_gap_is_not_failure_evidence_with_unknown_upset(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    witness = replace(actual.gaps[0], radial_gap_mm=-1.0, axial_gap_mm=None, **change)
+    report = spec.installed_tooling_clearance(
+        replace(actual, travel=None, gaps=(witness,)), primary_measurements=records,
+    )
+    assert report.status == "UNVERIFIED"
+    assert report.min_clearance is None
+    assert report.limiting_pair is None
+
+
+@pytest.mark.parametrize("missing", (
+    {"travel": None},
+    {"guide_envelope_basis": ("", "")},
+    {"drive_float_evidence": ""},
+))
+@pytest.mark.parametrize("malformed", (
+    {"axial_gap_mm": math.nan},
+    {"uncertainty_mm": -0.25},
+))
+def test_known_normal_failure_does_not_mask_later_malformed_recognized_gap(
+    missing, malformed,
+) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    failed = replace(actual.gaps[0], radial_gap_mm=-1.0, axial_gap_mm=None)
+    invalid = replace(actual.gaps[1], **malformed)
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, gaps=(failed, invalid), **missing), primary_measurements=records,
+        )
+
+
+@pytest.mark.parametrize("census_fault", ("missing-source", "unknown-mode", "duplicate"))
+def test_normal_failure_requires_an_identified_valid_tool_census(census_fault) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, *remaining = actual.tool_steps
+    if census_fault == "missing-source":
+        steps = (replace(first, source=""), *remaining)
+    elif census_fault == "unknown-mode":
+        steps = (replace(first, feed_mode="uninspected"), *remaining)
+    else:
+        steps = (*actual.tool_steps, first)
+    witness = replace(actual.gaps[0], radial_gap_mm=-1.0, axial_gap_mm=None)
+    report = spec.installed_tooling_clearance(
+        replace(actual, tool_steps=steps, travel=None, gaps=(witness,)),
+        primary_measurements=records,
+    )
+    assert report.status == "UNVERIFIED"
+    assert report.limiting_pair is None
 
 
 def test_normal_gap_uses_complete_secondary_envelope_not_one_clocked_pose() -> None:

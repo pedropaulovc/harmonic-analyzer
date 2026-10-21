@@ -141,31 +141,49 @@ def test_stock_drills_publish_six_radial_openings_at_actual_hole_height():
     assert socket_floor < hardware.SCREW_WIRE_HEIGHT - hardware.SCREW_WIRE_HOLE_DIA/2
 
 
-def test_native_stock_authors_consume_certified_drill_and_wire_paths():
-    recipe = ast.parse((SCRIPTS / "diagnostics" / "diag_build_NAS1352N5H12.py").read_text(encoding="utf-8"))
-    build = next(node for node in recipe.body
-                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build_NAS1352N5H12")
-    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
-    socket = next(node for node in calls if isinstance(node.func, ast.Name)
-                  and node.func.id == "build_socket_head")
-    assert isinstance(socket.args[1], ast.Name) and socket.args[1].id == "SCREW_DIMS"
-    loop = next(node for node in ast.walk(build) if isinstance(node, ast.For))
-    assert any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-               and node.func.id == "drilled_head_segments" for node in ast.walk(loop.iter))
-    cut = next(node for node in calls if isinstance(node.func, ast.Name)
-               and node.func.id == "circular_sweep")
-    assert isinstance(cut.args[1], ast.Tuple)
-    assert [node.id for node in cut.args[1].elts] == ["segment"]
-    assert isinstance(cut.args[2], ast.Name) and cut.args[2].id == "SCREW_WIRE_HOLE_DIA"
-    assert any(item.arg == "cut" and isinstance(item.value, ast.Constant)
-               and item.value.value is True for item in cut.keywords)
-    author = ast.parse((SCRIPTS / "diagnostics" / "diag_build_05_02685.py").read_text(encoding="utf-8"))
-    sweep = next(node for node in ast.walk(author) if isinstance(node, ast.Call)
-                 and isinstance(node.func, ast.Name) and node.func.id == "circular_sweep")
-    assert isinstance(sweep.args[1], ast.Call)
-    assert isinstance(sweep.args[1].func, ast.Name)
-    assert sweep.args[1].func.id == "installed_wire_segments"
-    assert isinstance(sweep.args[2], ast.Name) and sweep.args[2].id == "WIRE_DIA"
+def test_native_wire_spline_preserves_every_cubic_in_the_sdk_knot_domain():
+    from _pivot_retention_stock_geometry import bezier_spline_parameters
+
+    segments = wire.installed_wire_segments()
+    _, knots = bezier_spline_parameters(segments)
+    breaks = [0.0, *(knots[4 + 3 * index] for index in range(len(segments) - 1)), 1.0]
+    assert all(a < b for a, b in zip(breaks, breaks[1:]))
+    for index, (previous, following) in enumerate(zip(segments, segments[1:]), start=1):
+        before = breaks[index] - breaks[index - 1]
+        after = breaks[index + 1] - breaks[index]
+        incoming = tuple(3 * (b - a) / before for a, b in zip(previous[-2], previous[-1]))
+        outgoing = tuple(3 * (b - a) / after for a, b in zip(following[0], following[1]))
+        assert incoming == pytest.approx(outgoing, rel=1e-8, abs=1e-8)
+    assert all(0.0 <= value <= 1.0 for value in knots)
+    assert all(a <= b for a, b in zip(knots, knots[1:]))
+    # The single straight drilled-hole cut uses the same SDK conversion.
+    drill = screw.drilled_head_segments()[0]
+    assert bezier_spline_parameters((drill,)) == (list(drill), [0.0] * 4 + [1.0] * 4)
+    with pytest.raises(ValueError, match="nonempty"):
+        bezier_spline_parameters(())
+    disconnected = (segments[0], tuple((x + 1, y, z) for x, y, z in segments[1]))
+    with pytest.raises(ValueError, match="disconnected"):
+        bezier_spline_parameters(disconnected)
+
+
+def test_native_spline_unequal_handles_set_c1_spans_without_refitting():
+    from _pivot_retention_stock_geometry import bezier_spline_parameters, line_bezier
+
+    first = line_bezier((0.0, 0.0, 0.0), (3.0, 0.0, 0.0))
+    second = line_bezier((3.0, 0.0, 0.0), (9.0, 0.0, 0.0))
+    controls, knots = bezier_spline_parameters((first, second))
+    assert controls == [*first, *second[1:]]
+    assert knots == [0.0] * 4 + [1.0 / 3.0] * 3 + [1.0] * 4
+    before, after = knots[4], 1.0 - knots[4]
+    assert tuple(3 * (b - a) / before for a, b in zip(first[-2], first[-1])) == pytest.approx(
+        tuple(3 * (b - a) / after for a, b in zip(second[0], second[1]))
+    )
+    zero_tangent = (*first[:2], first[-1], first[-1])
+    with pytest.raises(ValueError, match="nonzero"):
+        bezier_spline_parameters((zero_tangent, second))
+    nonfinite_tangent = (second[0], (math.nan, 0.0, 0.0), *second[2:])
+    with pytest.raises(ValueError, match="finite"):
+        bezier_spline_parameters((first, nonfinite_tangent))
 
 
 def test_clevis_actual_shank_and_split_cotter_fit_not_rounded_nominal():
@@ -249,6 +267,39 @@ def test_modeled_bends_have_room_for_the_round_wire_section():
                       for segment in segments)
     assert not all(_certify_hull(segment,_curvature_clears_round_section)
                    for segment in tightened)
+
+def _wire_tangents_are_continuous(segments):
+    for previous, following in zip(segments, segments[1:]):
+        incoming = tuple(b - a for a, b in zip(previous[-2], previous[-1]))
+        outgoing = tuple(b - a for a, b in zip(following[0], following[1]))
+        lengths = math.hypot(*incoming) * math.hypot(*outgoing)
+        if lengths == 0:
+            return False
+        if sum(a * b for a, b in zip(incoming, outgoing)) <= 0:
+            return False
+        cross = (
+            incoming[1] * outgoing[2] - incoming[2] * outgoing[1],
+            incoming[2] * outgoing[0] - incoming[0] * outgoing[2],
+            incoming[0] * outgoing[1] - incoming[1] * outgoing[0],
+        )
+        if math.hypot(*cross) > 1e-9 * lengths:
+            return False
+    return True
+
+
+def test_complete_native_wire_has_no_unrounded_endpoint_joins():
+    segments = wire.installed_wire_segments()
+    assert _wire_tangents_are_continuous(segments)
+    # Continuity of positions alone did not catch the old helix/leg kinks.
+    changed = [list(segment) for segment in segments]
+    x, y, z = changed[1][1]
+    changed[1][1] = (x, y + hardware.WIRE_DIA, z)
+    changed = tuple(tuple(segment) for segment in changed)
+    assert all(a[-1] == pytest.approx(b[0]) for a, b in zip(changed, changed[1:]))
+    assert not _wire_tangents_are_continuous(changed)
+    from _pivot_retention_stock_geometry import bezier_spline_parameters
+    with pytest.raises(ValueError, match="tangent-continuous"):
+        bezier_spline_parameters(changed)
 
 
 def test_representative_normal_wire_is_continuous_and_fits_fitted_depth_window():
@@ -386,16 +437,16 @@ def test_wire_drilled_legs_and_bridge_follow_the_shared_cap_pair():
             and max(p[0] for p in segment) > center + head_radius
             for segment in segments
         )
-    # The twisted bridge must leave the same physical approach length at
-    # both heads when their shared X span changes.
+    # The nominal bridge span follows the shared head axes. The physical
+    # tangent blends replace its former sharp endpoint joins, not its core.
     for center in cartridge.CAP_BOLT_X_OFFSETS:
         bridge_end = math.copysign(wire.BRIDGE_HALF_LENGTH, center)
         assert abs(center - bridge_end) == pytest.approx(wire.OUTER_BEND_RADIUS + 1.0)
-        for side in (-1, 1):
-            assert any(
-                endpoint == pytest.approx((bridge_end, side * wire.TWIST_RADIUS, wire.WIRE_AXIS_Z))
-                for segment in segments for endpoint in (segment[0], segment[-1])
-            )
+    for phase in (0.0, math.pi):
+        core = wire._helix(-wire.BRIDGE_HALF_LENGTH, wire.BRIDGE_HALF_LENGTH,
+                           phase, wire.BRIDGE_TURNS)[2:-2]
+        for segment in core:
+            assert segment in segments or tuple(reversed(segment)) in segments
 
 
 def test_wire_crosses_heads_only_through_the_real_diametral_drills():

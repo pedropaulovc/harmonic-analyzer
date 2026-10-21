@@ -7,6 +7,8 @@ interpolating spline that may wander outside the receiving channel.
 
 from __future__ import annotations
 
+import math
+
 from _com import _early_bound
 from _feature_tree import name_last_feature
 
@@ -16,6 +18,61 @@ def line_bezier(a, b):
             tuple((x + 2 * y) / 3 for x, y in zip(a, b)), b)
 
 
+def bezier_spline_parameters(segments):
+    """Preserve the cubic route in the SDK's required [0, 1] knot domain.
+
+    Each interior knot has multiplicity three, so no fitting or smoothing can
+    move a head passage or a bend outside its certified Bezier control hull.
+    Positive collinear endpoint handles set adjacent parameter-span ratios.
+    This makes the first derivative continuous without moving any control.
+    Shared endpoints must have a common forward tangent: a circular sweep
+    cannot supply an unspecified physical bend at a sharp cubic join.
+    """
+    if not segments:
+        raise ValueError("a spline needs nonempty Bezier segments")
+    controls = list(segments[0])
+    spans = [1.0]
+    for segment in segments[1:]:
+        if any(abs(a - b) > 1e-9 for a, b in zip(controls[-1], segment[0])):
+            raise ValueError("disconnected Bezier segments")
+        incoming = tuple(b - a for a, b in zip(controls[-2], controls[-1]))
+        outgoing = tuple(b - a for a, b in zip(segment[0], segment[1]))
+        incoming_length, outgoing_length = math.hypot(*incoming), math.hypot(*outgoing)
+        if not all(math.isfinite(length) and length > 0
+                   for length in (incoming_length, outgoing_length)):
+            raise ValueError("circular sweep needs finite nonzero join tangents")
+        incoming = tuple(value / incoming_length for value in incoming)
+        outgoing = tuple(value / outgoing_length for value in outgoing)
+        cross = (
+            incoming[1] * outgoing[2] - incoming[2] * outgoing[1],
+            incoming[2] * outgoing[0] - incoming[0] * outgoing[2],
+            incoming[0] * outgoing[1] - incoming[1] * outgoing[0],
+        )
+        if (sum(a * b for a, b in zip(incoming, outgoing)) <= 0
+                or math.hypot(*cross) > 1e-9):
+            raise ValueError("circular sweep needs tangent-continuous Bezier segments")
+        # A cubic's endpoint derivative is 3 * handle / parameter_span.
+        # Match that derivative across this join, then normalize all spans.
+        span = spans[-1] * (outgoing_length / incoming_length)
+        if not math.isfinite(span) or span <= 0:
+            raise ValueError("circular sweep needs finite positive knot spans")
+        spans.append(span)
+        controls.extend(segment[1:])
+    total = sum(spans)
+    if not math.isfinite(total):
+        raise ValueError("circular sweep knot spans overflow their parameter domain")
+    knots = [0.0] * 4
+    cumulative = 0.0
+    for span in spans[:-1]:
+        cumulative += span
+        knot = cumulative / total
+        if not knots[-1] < knot < 1.0:
+            raise ValueError("circular sweep knot span collapses in the SDK parameter domain")
+        knots.extend([knot] * 3)
+    knots.extend([1.0] * 4)
+    return controls, knots
+
+
 def circular_sweep(adapter, segments, diameter, name, *, cut=False):
     import pythoncom
     from win32com.client import VARIANT
@@ -23,15 +80,7 @@ def circular_sweep(adapter, segments, diameter, name, *, cut=False):
 
     if not segments or diameter <= 0:
         raise ValueError("a circular sweep needs a path and positive diameter")
-    controls = list(segments[0])
-    for segment in segments[1:]:
-        if any(abs(a - b) > 1e-9 for a, b in zip(controls[-1], segment[0])):
-            raise ValueError(f"{name}: disconnected Bezier segments")
-        controls.extend(segment[1:])
-    knots = [0.0] * 4
-    for i in range(1, len(segments)):
-        knots.extend([float(i)] * 3)
-    knots.extend([float(len(segments))] * 4)
+    controls, knots = bezier_spline_parameters(segments)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.SketchManager, "ISketchManager")
     model.ClearSelection2(True)
@@ -65,7 +114,7 @@ def circular_sweep(adapter, segments, diameter, name, *, cut=False):
     sweep.AdvancedSmoothing = False
     sweep.StartTangencyType = 0
     sweep.EndTangencyType = 0
-    sweep.PathAlignmentType = 10
+    sweep.PathAlignmentType = 10  # swTangencyType_e.swMinimumTwist; 3D paths
     sweep.Direction = -1
     sweep.ThinFeature = False
     sweep.Merge = False

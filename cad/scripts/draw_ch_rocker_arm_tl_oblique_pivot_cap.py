@@ -9,10 +9,11 @@ free-end chamfer's native dimension; it cannot transfer into the YZ view.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
 coordinates remain ordinary native dimensions from the actual pocket axis.
 
-Paper-layout repair measured from the 20261021T085834832Z native PDF/audit:
-keep full callout blocks inside the border and off their own witnesses, the
-section-sheet heading/context, and the register side-view edge. Coordinates
-below are requested placements, not a claim of native after-fix acceptance.
+Paper-layout repair uses the 20261021T192326153Z native PDF/audit: the
+isometric and caption translate independently from their measured bounds;
+the overall length stays left of the fitted-head callout lane, and the upper
+register X callout stays right of its own witnesses. Requested placements
+are not a claim of native after-fix acceptance.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name,
 from _check import check
 from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, offset_dimension_text, set_dimension_callouts
 from _drawing_leaders import set_near_side_diameter
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -69,22 +70,26 @@ REGISTER_RIGHT_CENTER = (0.205, REGISTER_FRONT_CENTER[1])
 # The native circular-rim chamfer imports in XZ, not the YZ side view.
 # Its undimensioned *Front parent context keeps this a true third-angle set.
 REGISTER_END_CENTER = (REGISTER_FRONT_CENTER[0], 0.235)
-ISO_CENTER = (0.080, 0.059)
+# The native outline was Y5.524..112.476 mm at Y59; lift it 15 mm.
+ISO_CENTER = (0.080, 0.074)
 ISO_SCALE = (1, 1)
-ISO_NOTE_XY = (0.025, 0.110)
+# Its native caption's lower edge was Y105.864 mm; a separate 30 mm lift
+# leaves more than 8 mm above the translated pictorial's padded outline.
+ISO_NOTE_XY = (0.025, 0.140)
 SHEET_HEADING_XY = (0.025, 0.260)
 # The long head and aperture callouts fan out left of their rims.
 # Ordinary centre coordinates and the mouth-width lane occupy the right/bottom.
 TOP_KEEP = {
-    "CapWidth": (0.180, 0.110), "CapLength": (0.285, 0.190),
+    "CapWidth": (0.180, 0.110), "CapLength": (0.235, 0.190),
     "CounterboreDia": (0.065, 0.175), "ApertureDia": (0.080, 0.245),
     "ApertureCenterX": (0.1675, 0.140), "ApertureCenterY": (0.225, 0.175),
     "WireWidth": (0.265, 0.105),
 }
 # Keep the head-diameter leader on its near rim, away from the bore centre.
-# Four fitted-head acceptance lines use the existing left shoulder, below
-# the heading and above the access views; native extents remain the gate.
-RIGHT_KEEP = {"CounterboreDepth": (0.280, 0.240), "WireDepth": (0.370, 0.145)}
+# The complete fitted-head block has an 80 x 52.5 mm lane, left of the
+# measured X328.7/337.1 depth witnesses. The 86 overall's upper extension
+# now ends at X236 mm, before this lane; native extents remain the gate.
+RIGHT_KEEP = {"CounterboreDepth": (0.284, 0.225), "WireDepth": (0.370, 0.145)}
 # A dedicated underside owns the corner-to-pocket coordinates and fitted
 # sections; neither bolt nor register callout shoulders share these lanes.
 BOTTOM_KEEP = {
@@ -115,6 +120,9 @@ REGISTER_KEEP = {
     "Register1X": (0.370, 0.095), "Register2X": (0.310, 0.240),
     "Register1Y": (0.350, 0.135), "Register2Y": (0.240, 0.232),
 }
+# Keep the narrow native dimension line at its original anchor; OffsetText
+# moves only the complete upper X callout to the lower X block's text lane.
+REGISTER_TEXT_POSITIONS = {"Register2X": (0.370, 0.240)}
 REGISTER_PROJECTION_KEEP = {"RegisterProjection": (0.160, 0.110)}
 REGISTER_END_KEEP = {"RegisterEndChamfer": (0.220, 0.252)}
 SECTION_LINE_MODEL = ((-part_spec.WIDTH / 2.0 - 4.0, 0.0, 0.0), (part_spec.WIDTH / 2.0 + 4.0, 0.0, 0.0))
@@ -283,6 +291,8 @@ def _annotate_views(adapter: Any, views: tuple[tuple[Any, dict[str, tuple[float,
     set_dimension_callouts(adapter, annotations, {
         name: text for name, text in part_spec.DIMENSION_CALLOUTS.items() if name in names
     }, location="below")
+    if "Register2X" in names:
+        offset_dimension_text(adapter, annotations, REGISTER_TEXT_POSITIONS)
     if "PocketDia" in names:
         _assert_pocket_corner_callout(adapter, annotations)
     if "CounterboreDia" in names:

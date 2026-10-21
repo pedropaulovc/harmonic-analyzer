@@ -153,6 +153,7 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "assert_imported_precision", precision)
     monkeypatch.setattr(drawing, "set_dimension_callouts", set_callouts)
+    monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_assert_pocket_corner_callout", lambda *_args: None)
     monkeypatch.setattr(drawing, "_assert_template_center_marks", centres)
     monkeypatch.setattr(drawing, "add_surface_finish", lambda *_args, **_kwargs: None)
@@ -1179,6 +1180,44 @@ def _cap_paper_box(box_mm, old_anchor_mm, new_anchor):
     return (box_mm[0] + dx, box_mm[1] + dy, box_mm[2] + dx, box_mm[3] + dy)
 
 
+def test_cap_isometric_and_caption_clear_the_measured_native_border_and_each_other() -> None:
+    # Actual 20261021T192326153Z native outline and caption extent, in mm.
+    # These translations allocate space; parent native export proves the ink.
+    pictorial = _cap_paper_box(
+        (52.2796, 5.524, 107.7204, 112.476), (80.0, 59.0), drawing.ISO_CENTER,
+    )
+    caption = _cap_paper_box(
+        (24.796, 105.8636, 84.3671, 110.1527), (25.0, 110.0), drawing.ISO_NOTE_XY,
+    )
+    for box in (pictorial, caption):
+        assert box[0] > 12.7 + 5.0
+        assert box[1] > 12.7 + 5.0
+        assert box[2] < 419.1 - 5.0
+        assert box[3] < 266.7 - 5.0
+    assert caption[1] - pictorial[3] > 5.0
+
+
+def test_cap_head_acceptance_lane_clears_the_overall_and_native_depth_witnesses() -> None:
+    # Reserve the whole folded block, not a translation of its obsolete text.
+    x, y = (value * 1000.0 for value in drawing.RIGHT_KEEP["CounterboreDepth"])
+    left, bottom, right, top = x - 40.0, y - 27.5, x + 40.0, y + 25.0
+    overall_extension_end = drawing.TOP_KEEP["CapLength"][0] * 1000.0 + 1.0
+    assert left - overall_extension_end > 5.0
+    assert 328.7 - right > 3.0  # actual native depth witness, not view padding
+    assert left > 210.588 + 5.0  # actual access-view padded right edge
+    assert bottom > 190.0 + 5.0
+    assert top < 266.7 - 5.0
+
+
+def test_cap_upper_register_x_block_clears_both_native_extension_lines() -> None:
+    block = _cap_paper_box(
+        (277.9, 231.6, 342.1, 246.4), (310.0, 240.0), drawing.REGISTER_TEXT_POSITIONS["Register2X"],
+    )
+    assert block[0] - max(317.5, 320.0) > 5.0
+    assert block[2] < 419.1 - 5.0
+    assert block[3] < 255.05 - 5.0  # heading's lower ink edge
+
+
 def test_cap_full_bolt_callouts_fit_paper_and_have_separate_rows() -> None:
     # Actual 20261021T085834832Z PDF/audit, sheet 3, mm from bottom-left.
     # The old anchors were on paper while both complete left Y blocks were not.
@@ -1237,8 +1276,7 @@ def test_cap_section_and_register_complete_blocks_clear_context_and_heading() ->
 
 
 @pytest.mark.parametrize(("keep", "name", "old", "row", "witness_x", "side"), [
-    ("RIGHT_KEEP", "WireDepth", (340.0, 145.0), (325.0, 140.4, 354.9, 143.9), 335.25, "right"),
-    ("RIGHT_KEEP", "CounterboreDepth", (310.0, 245.0), (264.9, 237.3, 354.9, 241.2), 328.75, "left"),
+    ("RIGHT_KEEP", "WireDepth", (370.0, 145.0), (342.4424, 131.1094, 397.5576, 134.6094), 335.25, "right"),
     ("REGISTER_PROJECTION_KEEP", "RegisterProjection", (175.0, 110.0), (138.1, 107.8, 211.7, 111.7), 210.25, "left"),
     ("REGISTER_KEEP", "RegisterDia", (295.0, 115.0), (248.2, 108.3, 341.7, 112.2), 320.0, "left"),
 ])

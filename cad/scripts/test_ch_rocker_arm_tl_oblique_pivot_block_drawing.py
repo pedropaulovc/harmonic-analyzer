@@ -1038,3 +1038,5 @@ def test_register_section_fits_native_outline_without_rotation_or_breaking_align
             drawing._fit_register_section(object(), native)
         assert len(moves) == (0 if failure == "oversized" else 1 if failure == "rejected" else 4)
     assert native.Angle == 0.19 and native.ScaleDecimal == 2.0
+
+

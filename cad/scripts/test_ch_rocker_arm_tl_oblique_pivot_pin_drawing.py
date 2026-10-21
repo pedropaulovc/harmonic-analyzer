@@ -31,6 +31,7 @@ from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "ch_rocker_arm_tl_oblique_pivot_pin"
 DASHED = "ch-rocker-arm-tl-oblique-pivot-pin"
+_STOP_CONTROL_KEYS = tuple(row.key for row in (*spec.PART_DATUMS, *spec.GEOMETRIC_CONTROLS))
 
 
 def _features() -> dict:
@@ -314,9 +315,29 @@ def test_full_face_runout_does_not_accept_radial_dish_hidden_by_one_circle() -> 
 
 @pytest.fixture
 def native_stop_controls(monkeypatch):
-    """Native readback doubles; production attachment and XML guards stay live."""
-    faces = {row.key: object() for row in (*spec.PART_DATUMS, *spec.GEOMETRIC_CONTROLS)}
-    state = SimpleNamespace(tag=None, frames={}, faces=faces)
+    """Distinct source/view topology; native attachment/XML guards stay live.
+
+    Model selection returning the drawing-context counterpart, not the source
+    object. The native log proves the identity mismatch, not which face the
+    seat returned. Distinct contexts exercise the real pre-insertion guard.
+    """
+    keys = [row.key for row in (*spec.PART_DATUMS, *spec.GEOMETRIC_CONTROLS)]
+    source_faces = {key: object() for key in keys}
+    faces = {key: object() for key in keys}
+    source_to_view = {source_faces[key]: faces[key] for key in keys}
+    neighbour = object()
+    state = SimpleNamespace(
+        tag=None, frames={}, faces=faces, source_faces=source_faces,
+        source_by_view={faces[key]: source_faces[key] for key in keys},
+        view_faces=[neighbour, *reversed(tuple(faces.values()))],
+        source_pin=object(), unknown_source_ids=set(),
+    )
+    state.source_by_view[neighbour] = object()
+    state.view_pin = SimpleNamespace(GetFaces=lambda: tuple(state.view_faces))
+
+    def selected_face(entity):
+        # Model the native source/view remap, not identity across contexts.
+        return source_to_view.get(entity, entity)
 
     def annotation(face, landing, leaders):
         item = SimpleNamespace(face=face, landing=landing, leaders=leaders, dangling=False)
@@ -330,9 +351,14 @@ def native_stop_controls(monkeypatch):
         return item
 
     def datum(_adapter, _view, **kwargs):
+        selected = selected_face(kwargs["entity"])
+        expected = _drawing_gdt._expected_pick(
+            _adapter, selected, kwargs["entity"], entity_type="FACE",
+            what=f"datum {kwargs['datum']}", label=kwargs["label"],
+        )
         item = SimpleNamespace(
             letter=kwargs["datum"],
-            annotation=annotation(kwargs["entity"], kwargs["leader_attach_xy"], 0),
+            annotation=annotation(expected, kwargs["leader_attach_xy"], 0),
         )
         item.GetLabel = lambda: item.letter
         item.GetAnnotation = lambda: item.annotation
@@ -345,7 +371,7 @@ def native_stop_controls(monkeypatch):
                 kwargs["characteristic"], kwargs["tolerance"],
                 datums=kwargs["datums"], diameter=kwargs["diameter"],
             ),
-            annotation=annotation(kwargs["entity"], kwargs["leader_attach_xy"], 1),
+            annotation=annotation(selected_face(kwargs["entity"]), kwargs["leader_attach_xy"], 1),
         )
         item.GetFrameCount = lambda: 1
         item.GetFrame = lambda _index: SimpleNamespace(GetSymbolXml=lambda: item.xml)
@@ -358,7 +384,7 @@ def native_stop_controls(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", identity)
     monkeypatch.setattr(_drawing_gdt, "_early_bound", identity)
     monkeypatch.setattr(_drawing_gdt._sw_type_info, "early_bound_or_flag", identity)
-    monkeypatch.setattr(drawing, "resolve_faces", lambda _model, _requests: faces)
+    monkeypatch.setattr(drawing, "resolve_faces", lambda _model, _requests: source_faces)
     monkeypatch.setattr(
         drawing, "model_points_in_view",
         lambda _adapter, _view, points, **_kwargs: [
@@ -372,18 +398,73 @@ def native_stop_controls(monkeypatch):
         _drawing_layout_audit, "annotation_display",
         lambda _adapter, item: ({"arrows": [(*item.landing, 0.0)]}, []),
     )
+    model = SimpleNamespace(
+        FeatureByName=lambda name: state.source_pin if name == "Pin" else None,
+        Extension=SimpleNamespace(
+            GetCorrespondingEntity2=lambda face: state.source_by_view.get(face),
+        ),
+    )
     profile = SimpleNamespace(
-        ReferencedDocument=object(),
+        ReferencedDocument=model,
+        GetCorresponding=lambda feature: state.view_pin if feature is state.source_pin else None,
         GetDatumTags=lambda: (state.tag,),
         GetGTols=lambda: tuple(state.frames.values()),
     )
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
-    state.settled = drawing._add_stop_face_controls(adapter, profile)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            IsSame=lambda left, right: (
+                -1 if id(left) in state.unknown_source_ids else int(left is right)
+            ),
+        ),
+    )
+    state.add_controls = lambda: drawing._add_stop_face_controls(adapter, profile)
+    state.settled = state.add_controls()
     return state
 
 
 def test_settled_native_controls_accept_the_two_faces_and_reachable_datum(native_stop_controls) -> None:
     native_stop_controls.settled()
+
+
+@pytest.mark.parametrize("key", _STOP_CONTROL_KEYS)
+@pytest.mark.parametrize("correspondence", ("missing", "neighbour", "unknown"))
+def test_native_controls_refuse_faces_without_exact_source_correspondence(
+    native_stop_controls, key, correspondence,
+) -> None:
+    face = native_stop_controls.faces[key]
+    if correspondence == "unknown":
+        native_stop_controls.unknown_source_ids.add(id(native_stop_controls.source_faces[key]))
+    else:
+        native_stop_controls.source_by_view[face] = (
+            None if correspondence == "missing" else object()
+        )
+    with pytest.raises(RuntimeError, match="expected one Pin profile-view face"):
+        native_stop_controls.add_controls()
+
+
+@pytest.mark.parametrize("key", _STOP_CONTROL_KEYS)
+def test_native_controls_refuse_ambiguous_view_faces(native_stop_controls, key) -> None:
+    duplicate = object()
+    native_stop_controls.view_faces.append(duplicate)
+    native_stop_controls.source_by_view[duplicate] = native_stop_controls.source_faces[key]
+    with pytest.raises(RuntimeError, match="exact source face, found 2"):
+        native_stop_controls.add_controls()
+
+
+@pytest.mark.parametrize("feature", ("source_pin", "view_pin"))
+def test_native_controls_require_the_actual_pin_feature_in_both_contexts(
+    native_stop_controls, feature,
+) -> None:
+    setattr(native_stop_controls, feature, None)
+    with pytest.raises(RuntimeError, match="source has no Pin|Pin has no profile-view"):
+        native_stop_controls.add_controls()
+
+
+@pytest.mark.parametrize("key", _STOP_CONTROL_KEYS)
+def test_settled_controls_reprove_source_ownership_after_rebuild(native_stop_controls, key) -> None:
+    native_stop_controls.source_by_view[native_stop_controls.faces[key]] = object()
+    with pytest.raises(RuntimeError, match="settled face lost its exact source correspondence"):
+        native_stop_controls.settled()
 
 
 @pytest.mark.parametrize("key", ("datum", "flange_lower_stop", "flange_upper_stop"))

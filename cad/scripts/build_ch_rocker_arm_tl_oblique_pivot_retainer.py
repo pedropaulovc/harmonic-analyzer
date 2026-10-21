@@ -1,8 +1,8 @@
 """Build MHA-CH-06-TL-31 as a real annular steel fitted retainer.
 
 Installed nominal thickness comes from the UPPER-edge-loaded clevis stack.
-The separate hidden supply-allowance sketch prints SUPPLY 7 MIN without
-misrepresenting that supply blank as the installed washer geometry.
+The native actual-thickness REF callout carries the SUPPLY 7 MIN blank
+allowance; only the fitted annulus is modelled and dimensioned.
 """
 
 from __future__ import annotations
@@ -23,11 +23,10 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _sketch import SketchDims, anchor_point_to_origin, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
+from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 import ch_rocker_arm_tl_oblique_pivot_retainer_spec as spec
-from ch_rocker_arm_tl_oblique_pivot_retainer_spec import REFERENCE_SKETCHES
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-retainer"
 MATERIAL = "Plain Carbon Steel"
@@ -40,7 +39,7 @@ async def build(adapter) -> dict[str, str]:
     check("create retainer part", await adapter.create_part())
     for name, value in (
         ("WasherDia", spec.OUTER_DIA), ("WasherBore", spec.BORE_DIA),
-        ("FinishedThickness", spec.THICKNESS), ("SupplyThickness", spec.SUPPLY_MIN_THICKNESS),
+        ("FinishedThickness", spec.THICKNESS),
     ):
         await set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
@@ -55,28 +54,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Washer")
     jobs.append((name_dimensions(adapter, "Washer", ["FinishedThickness"])[0], '"FinishedThickness"'))
 
-    # Right-plane coordinates (-Z,Y): one construction line carries the
-    # supplied MIN allowance, independent of the installed thickness.
-    dims = SketchDims()
-    check("supply allowance sketch", await adapter.create_sketch("Right"))
-    radius = spec.OUTER_DIA / 2.0
-    set_sketch_direct_db(adapter, True)
-    line = check("supply allowance line", await adapter.add_line(0.0, radius, -spec.SUPPLY_MIN_THICKNESS, radius))
-    set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("supply allowance is not construction geometry")
-    check("horizontal supply line", await adapter.add_sketch_constraint(line, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{line}.start", 0.0, radius, "supply line")
-    dims.record("SupplyRadius", '"WasherDia"/2')
-    await dimension_between(adapter, f"{line}.start", f"{line}.end", "horizontal_distance", spec.SUPPLY_MIN_THICKNESS, "supply minimum")
-    dims.record("SupplyThickness", '"SupplyThickness"')
-    await ensure_fully_defined(adapter, "supply reference")
-    check("exit supply reference", await adapter.exit_sketch())
-    name_last_feature(adapter, spec.SUPPLY_REFERENCE)
-    jobs += dims.apply(adapter, spec.SUPPLY_REFERENCE)
-    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     check("retainer top plane", await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=spec.THICKNESS)))
     name_last_feature(adapter, spec.TOP_PLANE)
     jobs.append((name_dimensions(adapter, spec.TOP_PLANE, ["RetainerTopOffset"])[0], '"FinishedThickness"'))
@@ -105,11 +82,6 @@ async def build(adapter) -> dict[str, str]:
     display.SetText(2, ")")
     if str(display.GetText(1)) != "(" or str(display.GetText(2)) != ")" or int(tolerance.Type) != 0:
         raise RuntimeError("finished-thickness reference notation did not persist")
-    _, dimension = _named_dimension(adapter, spec.SUPPLY_REFERENCE, "SupplyThickness")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 5  # swTolMIN; model value IS the supply limit
-    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != 5:
-        raise RuntimeError("SUPPLY MIN tolerance did not persist")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)

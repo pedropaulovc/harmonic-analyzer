@@ -10,6 +10,10 @@ route, not authority for every received six-hole head clock. Accept the actual
 formed route only through real straight holes, pulling toward tightening, with
 the installed whole-route clearances; never loosen or over-torque a seated head
 to obtain its clock. Tuck cut ends; discard wire on opening the cartridge.
+
+Every bridge, head-leg, tail and hook interface has an explicit tangent blend.
+Exact cubic trimming preserves the remaining route and real straight drilled
+passages; a native sweep is not asked to invent a bend at a sharp endpoint.
 """
 from __future__ import annotations
 
@@ -104,6 +108,44 @@ def _reverse(segments):
     return [tuple(reversed(segment)) for segment in reversed(segments)]
 
 
+def _split_segment(segment, t):
+    """Exact de Casteljau restriction, not a fitted replacement curve."""
+    def mix(a, b):
+        return tuple((1.0-t)*x+t*y for x,y in zip(a,b))
+    a,b,c,d = segment
+    ab,bc,cd = mix(a,b),mix(b,c),mix(c,d)
+    abc,bcd = mix(ab,bc),mix(bc,cd)
+    middle = mix(abc,bcd)
+    return (a,ab,abc,middle),(middle,bcd,cd,d)
+
+
+def _tangent_join(left, right, trim_left, trim_right, handle_left, handle_right):
+    """Trim end spans and join their exact forward tangent rays.
+
+    Trims count cubic spans at this named route interface, not millimetres.
+    Handles are physical lengths in millimetres. Untouched spans and both
+    straight head passages remain exact. Every resulting blend remains subject
+    to the same whole-tube curvature, head-passage and cap-clearance guards.
+    """
+    stop = len(left)-trim_left
+    last, last_t = math.floor(stop), stop-math.floor(stop)
+    prefix = list(left[:last])
+    if last_t:
+        prefix.append(_split_segment(left[last],last_t)[0])
+    first, first_t = math.floor(trim_right), trim_right-math.floor(trim_right)
+    suffix = list(right[first:])
+    if first_t:
+        suffix[0] = _split_segment(suffix[0],first_t)[1]
+    p,q = prefix[-1][-1],suffix[0][0]
+    incoming = tuple(b-a for a,b in zip(prefix[-1][-2],p))
+    outgoing = tuple(b-a for a,b in zip(q,suffix[0][1]))
+    length_in,length_out = math.hypot(*incoming),math.hypot(*outgoing)
+    blend = (p,tuple(x+handle_left*v/length_in for x,v in zip(p,incoming)),
+             tuple(x-handle_right*v/length_out for x,v in zip(q,outgoing)),q)
+    return prefix+[blend]+suffix
+
+
+
 def installed_wire_segments():
     """Continuous wire, two twisted bridge strands, drilled-head loops and tail.
 
@@ -156,9 +198,17 @@ def installed_wire_segments():
         end = tail[-1][-1]
         hooks.append(_round_path([end, (end[0],side*1.4,end[2]),
                                   (end[0]-1.5,side*1.4,end[2])], trim=0.6))
-    path_a = bridge_a + right_a + tail_a + hooks[0]
-    path_b = bridge_b + right_b + tail_b + hooks[1]
-    return tuple(_reverse(path_a) + left_loop + path_b)
+    # Explicit physical bends at every independently authored route interface.
+    # Mirrored interfaces share trims/handles; no global span indices or fitted
+    # clearance mask can drift independently from this native sweep route.
+    path_a = _tangent_join(bridge_a,right_a,0.935,0.476,0.192,0.194)
+    path_a = _tangent_join(path_a,tail_a,0.598,0.865,0.191,0.191)
+    path_a = _tangent_join(path_a,hooks[0],0.586,0.252,0.113,0.165)
+    path_b = _tangent_join(bridge_b,right_b,1.476,0.603,0.285,0.287)
+    path_b = _tangent_join(path_b,tail_b,0.313,0.559,0.369,0.108)
+    path_b = _tangent_join(path_b,hooks[1],0.586,0.252,0.113,0.165)
+    joined = _tangent_join(_reverse(path_a),left_loop,1.476,0.603,0.285,0.287)
+    return tuple(_tangent_join(joined,path_b,0.476,0.935,0.194,0.192))
 
 
 def swept_wire_z_bounds(segments=None, *, hardware_limits=False):

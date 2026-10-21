@@ -1739,7 +1739,7 @@ CARTRIDGE_STEPS = (
     "PULLING EACH HEAD TOWARD TIGHTENING. ROUTE SINGLE STRANDS THROUGH "
     "DRILLED HEADS; KEEP TWISTED PAIRS AND TURNED-IN TAILS IN THE CHANNELS. "
     f"NORMAL SEATED POSE: WHOLE ACTUAL WIRE/TAIL ROUTE {cap_wire_clearance.NORMAL_WIRE_RECESS_MIN:.2f} MIN "
-    "BELOW ACTUAL CAP ROOF, UNFORCED. NEVER LOOSEN OR OVER-TORQUE TO ALIGN "
+    "BELOW ACTUAL CAP TOP FACE, UNFORCED. NEVER LOOSEN OR OVER-TORQUE TO ALIGN "
     "HEAD HOLES. ACTUAL CLOCK/FORM NEEDS FULL-CAPTURE SWEPT-VOID QUALIFICATION; "
     "NORMAL RECESS ALONE DOES NOT QUALIFY IT. UNKNOWN IS UNVERIFIED.",
 )
@@ -4541,7 +4541,7 @@ def installed_tooling_clearance(
 ) -> tooling.ToolingClearanceReport:
     """Conditional intact rigid-tool geometry only; never strength/overall safety."""
     unknown = tooling.ToolingClearanceReport("UNVERIFIED", None, None, None)
-    if actual is None or primary_measurements is None:
+    if actual is None:
         return unknown
     if not isinstance(actual, InstalledNormalToolingMeasurement):
         raise ValueError("installed tooling acceptance requires actual normal-gap measurements")
@@ -4579,52 +4579,70 @@ def installed_tooling_clearance(
         if _actual_number(radius, "actual normal guide-envelope radius", nonnegative=True) <= 0.0:
             raise ValueError("actual normal guide-envelope radius must be positive")
     _actual_number(actual.drive_axial_float_mm, "actual drive axial float", nonnegative=True)
-    if (not isinstance(actual.guide_envelope_basis, tuple)
-            or len(actual.guide_envelope_basis) != 2
-            or any(not isinstance(text, str) or not text.strip()
-                   for text in (*actual.guide_envelope_basis, actual.drive_float_evidence))):
-        return unknown
-    motion = _stopped_tooling_motion(actual.travel, modes)
-    if motion is None:
-        return unknown
-    primary = qualify_primary_capture_measurements(primary_measurements)
-    coverage_complete = (
-        actual.tool_step_census == "complete" and actual.wire_contour_state == "qualified"
-        and _bearing_enclosure_qualified(actual.bearing_enclosure, primary)
-        and _wire_capture_qualified(actual.wire_capture, primary)
-    )
-    limits = _normal_tooling_allowances(actual, primary, motion)
     ownership = {mode: _tooling_motion_groups(mode) for mode in modes}
     expected = {
         (group, step, mode) for step, mode in step_keys
         for group in (*ownership[mode], "WORK/BLANK STACK")
         if group != "REMOVED FROM FIXTURE"
     }
-    if any(group not in limits for group, _step, _mode in expected):
-        raise ValueError("tooling motion ownership has no corresponding allowance")
     if (not isinstance(actual.gaps, tuple)
             or any(not isinstance(gap, NormalToolingGap)
                    or any(not isinstance(text, str) for text in
                           (gap.group, gap.tool_step, gap.feed_mode)) for gap in actual.gaps)):
         return unknown
-    coverage_complete = (
-        coverage_complete
-        and {(gap.group, gap.tool_step, gap.feed_mode) for gap in actual.gaps} == expected
+    gap_coverage_complete = (
+        {(gap.group, gap.tool_step, gap.feed_mode) for gap in actual.gaps} == expected
         and len(actual.gaps) == len(expected)
     )
-    minimum, limiting = math.inf, None
+    normal_minimum, normal_limiting = math.inf, None
+    witnesses = []
     for gap in actual.gaps:
         if (gap.group, gap.tool_step, gap.feed_mode) not in expected:
-            coverage_complete = False
+            gap_coverage_complete = False
             continue
         values = [value for value in (gap.radial_gap_mm, gap.axial_gap_mm) if value is not None]
         uncertainty = _actual_number(gap.uncertainty_mm, "gap uncertainty", nonnegative=True)
         if not values:
-            coverage_complete = False
+            gap_coverage_complete = False
             continue
         for value in values:
             _actual_number(value, "normal gap")
-        clearance = max(values) - uncertainty - limits[gap.group]
+        margin = max(values) - uncertainty
+        witnesses.append((gap, margin))
+        if margin < normal_minimum:
+            normal_minimum, normal_limiting = (
+                margin, (gap.group, step_keys.index((gap.tool_step, gap.feed_mode))),
+            )
+    primary = (qualify_primary_capture_measurements(primary_measurements)
+               if primary_measurements is not None else None)
+    motion = _stopped_tooling_motion(actual.travel, modes)
+    guide_evidence_complete = (
+        isinstance(actual.guide_envelope_basis, tuple)
+        and len(actual.guide_envelope_basis) == 2
+        and all(isinstance(text, str) and text.strip()
+                for text in (*actual.guide_envelope_basis, actual.drive_float_evidence))
+    )
+    if primary is None or motion is None or not guide_evidence_complete:
+        if normal_minimum <= 0.0:
+            # This recognized measured NORMAL witness already cannot clear.
+            # Unknown upset N cannot erase it, but supplies no numeric bound
+            # for the full-upset clearance; do not silently substitute N=0.
+            return tooling.ToolingClearanceReport(
+                "POTENTIAL_CONFLICT", None, normal_limiting, actual.source,
+            )
+        return unknown
+    limits = _normal_tooling_allowances(actual, primary, motion)
+    if any(group not in limits for group, _step, _mode in expected):
+        raise ValueError("tooling motion ownership has no corresponding allowance")
+    coverage_complete = (
+        gap_coverage_complete and actual.tool_step_census == "complete"
+        and actual.wire_contour_state == "qualified"
+        and _bearing_enclosure_qualified(actual.bearing_enclosure, primary)
+        and _wire_capture_qualified(actual.wire_capture, primary)
+    )
+    minimum, limiting = math.inf, None
+    for gap, margin in witnesses:
+        clearance = margin - limits[gap.group]
         if clearance < minimum:
             minimum, limiting = clearance, (gap.group, step_keys.index((gap.tool_step, gap.feed_mode)))
     if minimum > 0.0 and not coverage_complete:

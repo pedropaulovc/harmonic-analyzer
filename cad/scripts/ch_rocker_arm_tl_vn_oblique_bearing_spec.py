@@ -24,9 +24,12 @@ Sources:
   recipe is ``diagnostics/diag_build_5972K41.py``.  The vendor SLDPRT/STEP
   (downloaded 2026-10-17) is read for dimensions only and NOT replica-gated
   (user ruling 2026-10-17); the recipe's standalone run is catalog-only.
-* RECEIVING: the VN-52 purchased drawing owns the catalogue OD/width limits
-  and the required intact full-circumference cylindrical OD land including
-  its axial mid-plane. Actual identity traceable to valid SKU-specific
+* RECEIVING: the VN-52 purchased drawing owns the catalogue OD/width limits.
+  The purchased 9 mm nominal bearing width controls the bearing stack in
+  pivot block MHA-CH-06-TL-22, which seats two bearings; this does not model
+  the complete internal axial endplay or retention geometry.
+  The drawing also requires an intact full-circumference cylindrical OD land
+  including its axial mid-plane. Actual identity traceable to valid SKU-specific
   supplier dimensional authority can establish the catalogue size bands;
   redundant micrometer records are not required. Physical OD-land inspection
   before pressing remains necessary: vendor CAD is not its acceptance.

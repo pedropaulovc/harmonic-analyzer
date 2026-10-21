@@ -239,6 +239,22 @@ sheets and the full audit, not only the formerly enforced pair. Requested
 coordinates and offline routing tests are not zero-collision native evidence;
 all existing audit kinds, fit guards and model-owned tolerance controls remain.
 
+### Stock allowances and local drawing-number fit
+
+When the native model shows a fitted part rather than its supply blank,
+attach `SUPPLY n.n MIN THICK` to the real thickness's REF callout (TL-31).
+Do not dimension an undrawn blank or retain an annotation-only sketch that
+leaves a witness in empty paper. Keep the actual fitted acceptance and its
+running-face finish; the stock allowance is not a finished-size band.
+For a round washer, the filing-button convention moves the genuine imported
+OD from the circular face to `*Right` with `move_model_dimension`.
+
+A purchased drawing whose Number overruns the REV divider opts into
+`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52). This measures and fits
+the linked native note locally; do not change the shared template or rename
+the part. Inspect the fresh native witnesses, callouts and Number/REV gap:
+source positions alone are not after-fix evidence.
+
 ### Rocker R19 regression and local placement contract
 
 R19 at `81ac56b26598b63c0c9a11a467208ac4176ce646`, farm run
