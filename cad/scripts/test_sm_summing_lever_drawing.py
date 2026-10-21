@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import math
-import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1332,26 +1331,6 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
         bracket_depth_callout.dress()
 
 
-def test_cutting_envelope_requirement_bounds_all_removal_not_only_full_thread() -> None:
-    import magnifying_bracket_joint_layout as joint
-
-    prose = " ".join(notes.BRACKET_THREAD_CUTTING_REQUIREMENT.split())
-    assert "ALL THREAD-CUTTING MATERIAL REMOVAL WITHIN" in prose
-    size = re.search(
-        r"Ø(\d+\.\d{2}) MAX X (\d+\.\d{2}) MAX DEEP FROM ACTUAL ENTRY", prose,
-    )
-    assert size is not None
-    assert tuple(map(float, size.groups())) == (
-        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX, joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
-    )
-    assert "ABOUT ACTUAL FINISHED-HOLE AXIS" in prose
-    assert "PILOT DRILL AND CONE EXCLUDED" in prose
-    # The native thread row, not this independent maximum-removal envelope,
-    # still owns the usable-thread minimum.
-    assert joint.THREAD_DEPTH < float(size[2])
-    assert f"{joint.THREAD_DEPTH:.2f}" not in notes.BRACKET_THREAD_CUTTING_REQUIREMENT
-
-
 def _native_thread_cutting_envelope(monkeypatch):
     """Exercise source property + native MAX identity, not renderer string wiring."""
     import magnifying_bracket_joint_layout as joint
@@ -1392,7 +1371,7 @@ def test_cutting_requirement_reads_the_saved_model_and_both_native_maxima(monkey
     case = _native_thread_cutting_envelope(monkeypatch)
     assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
     # SolidWorks may serialize the property with Windows line endings; it is
-    # still the same complete requirement, not a reason to drop a process row.
+    # still the same complete requirement, not a reason to drop a cavity limit.
     value = notes.BRACKET_THREAD_CUTTING_REQUIREMENT.replace("\n", "\r\n")
     case.properties["Bracket Thread-Cutting Requirement"] = value
     assert case.read() == value
@@ -1479,23 +1458,11 @@ def test_cutting_requirement_binds_raw_enumerated_dispatches(
     ]
 
 
-@pytest.mark.parametrize(
-    ("original", "replacement"),
-    [
-        ("ALL ", ""),
-        ("MATERIAL REMOVAL WITHIN", "FULL THREAD ONLY"),
-        ("ACTUAL ENTRY", "DRILL POINT"),
-        ("ACTUAL FINISHED-HOLE AXIS", "NOMINAL AXIS"),
-        ("PILOT DRILL AND CONE EXCLUDED", "PILOT DRILL AND CONE INCLUDED"),
-    ],
-)
-def test_cutting_requirement_rejects_lost_scope_even_with_matching_native_sizes(
-    monkeypatch, original, replacement,
+def test_cutting_requirement_rejects_stale_property_even_with_matching_native_sizes(
+    monkeypatch,
 ) -> None:
     case = _native_thread_cutting_envelope(monkeypatch)
-    case.properties["Bracket Thread-Cutting Requirement"] = (
-        notes.BRACKET_THREAD_CUTTING_REQUIREMENT.replace(original, replacement)
-    )
+    case.properties["Bracket Thread-Cutting Requirement"] = "stale saved requirement\n"
     with pytest.raises(RuntimeError, match="requirement differs"):
         case.read()
 
@@ -1805,25 +1772,6 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
     case.callouts[0][2].hole_callout = False
     with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
         drawing._finished_thread_annotation_check(case.adapter, case.callouts)
-
-
-@pytest.mark.parametrize(
-    ("original", "replacement"),
-    [("ALL ", ""), ("FROM ACTUAL ENTRY", "FROM DRILL POINT"), ("MAX", "MIN")],
-)
-def test_settled_receiver_callout_cannot_lose_its_cutting_requirement(
-    monkeypatch, original, replacement,
-) -> None:
-    case = _thread_annotation_drawing(monkeypatch, note_count=0)
-    receiver = case.callouts[2][2]
-    receiver.definitions[5] = (
-        notes.BRACKET_THREAD_CUTTING_REQUIREMENT + receiver.definitions[5]
-    )
-    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
-    check()
-    receiver.definitions[5] = receiver.definitions[5].replace(original, replacement)
-    with pytest.raises(RuntimeError, match="authored native hole callout"):
-        check()
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):

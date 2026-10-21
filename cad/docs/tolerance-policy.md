@@ -541,10 +541,12 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 - **Summing-lever receiver process qualification.** The owner-approved **9.00 mm**
   receiver on the uniform **7.00 mm** slab retains ordinary bands and pilot
-  dimensions. The new model-owned **Ø2.40 MAX × 6.00 MAX** envelope bounds
-  **all thread-cutting removal**, including partial threads, lead, chamfer,
-  tip, runout and deflection, about each **actual finished-hole axis** and
-  from its **actual entry**. Separate pilot drilling is excluded.
+  dimensions. The model-owned **Ø2.40 MAX × 6.00 MAX** finished-hole cavity
+  acceptance retains the rib walls. It bounds **all thread-cutting removal**,
+  including partial threads, lead, chamfer, tip, runout and deflection, about
+  each **actual finished-hole axis** and from its **actual entry**. Only the
+  separately dimensioned pilot bore and cone are excluded; this is not a
+  full-thread-only limit or a prescribed machining method.
   `receiver_pilot_step_wall_budget` / `RECEIVER_PILOT_STEP_WALL_MIN` retain
   the **≥2 mm pilot-only** sharp-step wall (about **2.103 mm**, with printed
   pilot limits and one 0.3° wander charge).

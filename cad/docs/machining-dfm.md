@@ -318,15 +318,19 @@ MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
 **two decimal places**, hence the ordinary **±0.51 mm** band; printing 9.0
 would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
-callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum:
-the owner-approved, separately printed **Ø2.40 MAX × 6.00 MAX thread-cutting
-material-removal envelope** supplies the missing bound. All removal caused by
-thread cutting—including partial threads, lead, chamfer, tip, runout and
-deflection—must fit about the **actual finished-hole axis**, from the
-**actual entry face**. It excludes the separately specified deeper pilot.
-The two printed ±0.05 axis-position bands are unchanged; this is not a new,
-tighter location tolerance. The native model still contains only the Hole
-Wizard pilot and cosmetic threads, not an exact physical thread cut.
+callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
+The owner-approved **Ø2.40 MAX × 6.00 MAX** bound is printed as finished-part
+acceptance: **ENTIRE FINISHED HOLE CAVITY WITHIN** the cylinder, **FROM ACTUAL
+ENTRY ABOUT ACTUAL FINISHED-HOLE AXIS; PILOT BORE/CONE EXCLUDED; RETAINS RIB
+WALLS**. Only the separately dimensioned pilot bore and cone are excluded.
+Every other part of the finished hole cavity must lie inside the cylinder:
+full and partial threads, lead/chamfer/tip recesses, reliefs, and any extra
+void left by runout or deflection. This is geometrically equivalent to bounding
+all thread-cutting material removal, not merely the full-thread profile; it
+neither selects a cutting method nor qualifies a tool. The two printed ±0.05
+axis-position bands are unchanged; this is not a new, tighter location
+tolerance. The native model still contains only the Hole Wizard pilot and
+cosmetic threads, not an exact physical thread cut.
 
 The **6.00−4.95 = 1.05 mm** axial budget must accommodate every non-usable
 thread-cutting portion. A two-pitch lead design allowance is **0.907143 mm**,
@@ -375,6 +379,13 @@ The native trimmed-face comparison now subtracts the **1.20 mm required
 envelope radius**, not a basic external screw radius. Together these bounds
 guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
 step wall** remains controlling at the approved geometry.
+
+The callout names retained rib walls without inventing a single global wall
+minimum. The **1.29 mm** radial separation to the extended top-face plane
+is not the finite sharp-step distance above, nor is it a claim that every
+surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
+proofs remain independent; the finished-cavity acceptance preserves their
+required thread-cutting bound.
 
 The hidden `BracketThreadCuttingEnvelope` construction sketch owns the two
 MAX-only native dimensions `BracketThreadCuttingEnvelopeDiameter` and

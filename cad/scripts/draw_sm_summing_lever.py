@@ -174,9 +174,10 @@ DETAIL_CENTER = (0.115, 0.150)
 DETAIL_SCALE = (10.0, 1.0)
 DETAIL_RADIUS_MM = 6.0
 DETAIL_LABEL_XY = (0.115, 0.071)
-# The parent circle's letter sits above the -Z knife vertex in VIEW F,
-# away from the receiver stations to its left.
-DETAIL_LETTER_OFFSET = (0.0, 0.016)
+# The parent D identifier and native leader shoulder stand above VIEW F's
+# profile, right of ReceiverX0's callout (r10 underline ends near X355 mm).
+# SetLabelPosition moves only the label, not the source circle or datum A.
+DETAIL_LETTER_OFFSET = (0.050, 0.030)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 
@@ -1521,7 +1522,7 @@ BACK_KEEP = {
     "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
 # R8's complete four-row receiver block measured about 110 x 47 mm including
-# its leader at (360,115). The bounded-cutting requirement adds two text rows,
+# its leader at (360,115). The finished-cavity requirement adds two text rows,
 # not width; reserve 11 mm more below it. Fresh native ink must still be checked.
 MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
 # Lower the caption below that six-row callout. Its predicted bottom is Y80.4,
@@ -1566,9 +1567,9 @@ FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 def _bracket_thread_cutting_requirement(source_model: Any) -> str:
     """Admit the saved source requirement only with its native bounded envelope.
 
-    The hidden reference sketch describes a manufacturing limit, not a solid
-    cut or a qualification of any particular tap. Read both owned dimensions
-    and MAX limits; a matching string alone cannot prove the source contract.
+    The hidden reference sketch describes a finished-hole acceptance limit,
+    not a solid cut or qualification of any particular tap. Read both owned
+    dimensions and MAX limits; a matching string cannot prove the contract.
     """
     property_name = "Bracket Thread-Cutting Requirement"
     properties = read_required_properties(

@@ -135,19 +135,20 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "PlateLength": "BODY\nEND FACES",
 }
 
-# This is a manufacturing limit, not a claim that the Hole Wizard's pilot and
-# cosmetic thread model every removed crest. ALL includes partial threads,
-# tap lead, chamfer, tip, runout and deflection. The cylindrical envelope is
-# about each actual finished-hole axis, from its actual entry, independently
-# of the deeper pilot drill and drill cone. The builder saves this complete
+# This finished-hole acceptance limit retains the receiver rib walls; it is
+# not a claim that the Hole Wizard's pilot and cosmetic thread model the
+# complete cavity. ENTIRE includes partial threads and every void left by
+# lead, chamfer, tip, runout or deflection. Only the separately dimensioned
+# pilot bore and cone are excluded. The cylinder is about each actual
+# finished-hole axis, from its actual entry. The builder saves the complete
 # requirement on the SLDPRT; the drawing checks its two native MAX dimensions
 # before placing the source property ahead of the native pilot/thread rows.
 BRACKET_THREAD_CUTTING_REQUIREMENT = (
-    "ALL THREAD-CUTTING MATERIAL REMOVAL WITHIN\n"
+    "ENTIRE FINISHED HOLE CAVITY WITHIN\n"
     f"Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
     f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY\n"
     "ABOUT ACTUAL FINISHED-HOLE AXIS;\n"
-    "PILOT DRILL AND CONE EXCLUDED\n"
+    "PILOT BORE/CONE EXCLUDED; RETAINS RIB WALLS\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
