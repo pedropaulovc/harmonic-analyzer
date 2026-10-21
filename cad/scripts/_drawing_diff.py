@@ -254,8 +254,8 @@ def _nearby_darkest(gray: np.ndarray) -> np.ndarray:
 
 
 def _overlay(
-    old: _Raster | None, new: _Raster | None
-) -> tuple[bytes | None, bool]:
+    old: _Raster | None, new: _Raster | None, *, include_unchanged: bool = False
+) -> tuple[bytes | None, bool, bool]:
     available = [r for r in (old, new) if r is not None]
     height = max(r.gray.shape[0] for r in available)
     width = max(r.gray.shape[1] for r in available)
@@ -298,8 +298,8 @@ def _overlay(
         or text_changed
         or bool(np.any(removed | added))
     )
-    if not changed:
-        return None, False
+    if not changed and not include_unchanged:
+        return None, False, False
 
     # White paper; shared ink fades to light gray; changed ink retains its
     # source coverage against white. Fixed arithmetic gives deterministic PNGs.
@@ -317,7 +317,7 @@ def _overlay(
     try:
         with io.BytesIO() as stream:
             image.save(stream, format="PNG", dpi=(DPI, DPI), compress_level=6)
-            return stream.getvalue(), text_changed
+            return stream.getvalue(), text_changed, changed
     finally:
         image.close()
 
@@ -383,6 +383,11 @@ def _index(summary: dict[str, Any]) -> bytes:
             f'alt="{escape(title, quote=True)}"></a></article>'
         )
     content = "\n".join(articles) or "<p>No effective drawing changes.</p>"
+    unchanged_note = (
+        "included"
+        if any(page["status"] == "unchanged" and page["image"] for page in summary["pages"])
+        else "omitted"
+    )
     return (
         "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -396,7 +401,7 @@ def _index(summary: dict[str, Any]) -> bytes:
         '<strong class="removed">Red: removed ink</strong> · '
         '<span class="shared">Light gray: shared ink</span></p>'
         f"<p>Pages: {counts['changed']} changed, {counts['added']} added, "
-        f"{counts['removed']} removed, {counts['unchanged']} unchanged (omitted).</p>"
+        f"{counts['removed']} removed, {counts['unchanged']} unchanged ({unchanged_note}).</p>"
         "<p>Only geometrically identified title-block BUILD/REV values are masked. "
         f"At {summary['dpi']} dpi, ink is matched in both directions within "
         f"{summary['spatial_tolerance_pixels']} pixel along each axis "
@@ -422,6 +427,7 @@ def create_drawing_diff(
     *,
     old_label: str,
     new_label: str,
+    include_unchanged: bool = False,
 ) -> dict[str, Any]:
     """Write an overlay ZIP, including index/summary even when nothing changed.
 
@@ -432,6 +438,8 @@ def create_drawing_diff(
     ordinal within each paired PDF, never by extracted text. ``asset_path`` is a
     string so the returned facts are JSON serializable.
     Corrupt/unrenderable inputs raise, without replacing a previous output ZIP.
+    With ``include_unchanged``, every page has an RGB overlay, including shared
+    gray ink on unchanged pages. Image presence does not affect classifications.
     """
     old_files = {} if old_pdf_dir is None else _pdfs(old_pdf_dir)
     new_files = _pdfs(new_pdf_dir)
@@ -486,19 +494,21 @@ def create_drawing_diff(
                     for index in range(max(old_count, new_count)):
                         old = _raster(old_doc, index, old_path) if index < old_count else None
                         new = _raster(new_doc, index, new_path) if index < new_count else None
-                        png, text_changed = _overlay(old, new)
+                        png, text_changed, changed = _overlay(
+                            old, new, include_unchanged=include_unchanged
+                        )
                         if old is None:
                             status = "added"
                         elif new is None:
                             status = "removed"
                         else:
-                            status = "changed" if png is not None else "unchanged"
+                            status = "changed" if changed else "unchanged"
                         member = None
                         if png is not None:
                             member = f"images/{name}/page-{index + 1:04d}.png"
                             _member(archive, member, png)
                             summary["images"].append(member)
-                            drawing_changed = True
+                        drawing_changed |= changed
                         summary["page_counts"][status] += 1
                         summary["pages"].append(
                             {

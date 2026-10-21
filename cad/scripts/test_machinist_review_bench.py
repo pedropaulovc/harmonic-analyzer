@@ -757,6 +757,7 @@ def test_review_main_uses_registry_pdf_basename(
                 case["package"],
                 "--pdf-dir",
                 str(pdf_dir),
+                "--force",
                 "--report-dir",
                 str(report_dir),
                 "--reviewer",
@@ -774,6 +775,8 @@ def test_review_main_uses_registry_pdf_basename(
     assert package.sources == (
         pdf_dir / mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name,
     )
+    assert package.before_sources == ()
+    assert controls["force"] is True
     assert controls["report_dir"] == report_dir
     assert controls["reviewer"] == "claude"
     assert controls["runs"] == 3
@@ -1030,6 +1033,17 @@ def test_run_without_baseline_never_loads_or_reviews_old_skill(
     iteration = evaluation.run_iteration(args, [case])
     assert composed == [(case["kind"], None)]
     assert len(reviewed) == 1
+    command = reviewed[0]
+    assert command.count("--force") == 1
+    assert "--before-pdf" not in command
+    assert "--before-pdf-dir" not in command
+    assert "--png" not in command
+    assert command[:4] == [
+        evaluation.sys.executable,
+        str(evaluation.mr.SCRIPTS_DIR / "machinist_review.py"),
+        case["package"],
+        "--pdf-dir",
+    ]
     assert len(graded) == 1
     assert graded[0][0] == iteration
     manifest = json.loads((iteration / "iteration.json").read_text(encoding="utf-8"))
@@ -1038,8 +1052,9 @@ def test_run_without_baseline_never_loads_or_reviews_old_skill(
     assert not (iteration / case["name"] / "old_skill").exists()
 
 
+@pytest.mark.parametrize("baseline_ref", ["none", "main"])
 def test_release_pdf_override_reads_the_renamed_release_pdf(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, baseline_ref: str
 ) -> None:
     """A drawing renamed after its release keeps reading the release's PDF:
     import hashes it, and run stages it under the registry name."""
@@ -1073,6 +1088,9 @@ def test_release_pdf_override_reads_the_renamed_release_pdf(
     staged = []
 
     def review(command, **kwargs):
+        assert command.count("--force") == 1
+        assert "--before-pdf" not in command
+        assert "--before-pdf-dir" not in command
         pdf_dir = Path(command[command.index("--pdf-dir") + 1])
         staged.append((pdf_dir / registry_pdf).read_bytes())
         _report(Path(command[command.index("--report-dir") + 1]), case)
@@ -1082,11 +1100,11 @@ def test_release_pdf_override_reads_the_renamed_release_pdf(
     monkeypatch.setattr(evaluation.subprocess, "run", review)
     monkeypatch.setattr(evaluation, "grade_iteration", lambda iteration, **kwargs: {})
     args = evaluation._parse_args(
-        ["run", "--workspace", str(tmp_path / "run"), "--baseline-ref", "none",
+        ["run", "--workspace", str(tmp_path / "run"), "--baseline-ref", baseline_ref,
          "--runs", "1", "--jobs", "1"]
     )
     evaluation.run_iteration(args, [case])
-    assert staged == [b"renamed release PDF"]
+    assert staged == [b"renamed release PDF"] * (1 if baseline_ref == "none" else 2)
 
 
 def test_failure_records_preserve_metadata_and_exclude_passing_entries() -> None:

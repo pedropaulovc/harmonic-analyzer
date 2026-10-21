@@ -3216,10 +3216,10 @@ def task_verify():
     }
 
 
-# Review inputs are deliberately independent of the draw recipe and registry.
-# The CLI receives its PDF, package name and kind explicitly; only the PDF's
-# bytes, the package's exceptions and the review implementation/rubric matter.
-# Keep the non-inert local-import closure pinned in test_machinist_review_leaf.
+# Review inputs are independent of the draw recipe and registry. The CLI
+# receives its PDF, package name and kind explicitly and forces a full review.
+# The lazy PDF diff and identity pairing are unreachable under --force.
+# Keep the non-inert forced-review import closure pinned in the leaf tests.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
@@ -3240,13 +3240,16 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
     # Selecting this kind's reviewer and severity contract also keys --kind
     # without hashing the registry. Judge instructions and schemas are shared.
     other_kind = "assembly" if spec.source_kind == "part" else "part"
-    other_prompts = {
+    excluded_prompts = {
         f"machinist_review_{other_kind}.md",
         f"machinist_review_{other_kind}_severity.md",
+        # --force bypasses the PDF diff precheck and its judge inputs.
+        "machinist_review_precheck.md",
+        "machinist_review_precheck_schema.json",
     }
     prompts = [
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
-        if path.is_file() and path.name not in other_prompts
+        if path.is_file() and path.name not in excluded_prompts
     ]
     return sorted({
         str(path.resolve())
@@ -3301,7 +3304,7 @@ def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
-        "--kind", spec.source_kind, "--runs", "3",
+        "--kind", spec.source_kind, "--force", "--runs", "3",
         "--report-dir", str(_machinist_review_dir(stem)),
         "--reviewer", profile.backend, "--model", profile.model,
         "--effort", profile.effort,

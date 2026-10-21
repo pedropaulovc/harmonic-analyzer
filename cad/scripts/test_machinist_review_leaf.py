@@ -103,9 +103,10 @@ def _local_import_closure(entry: Path) -> set[str]:
                 names = [node.module.split(".")[0]]
             for name in names:
                 local = scripts / f"{name}.py"
-                # Registry is only used by the interactive name/--all selectors.
-                # The leaf supplies PDF/kind/name and never calls those paths.
-                if local.is_file() and name != "_drawing_registry":
+                # Registry is only used by interactive name/--all selectors.
+                # The leaf supplies PDF/kind/name and always passes --force,
+                # so the lazy _drawing_diff precheck import is unreachable too.
+                if local.is_file() and name not in {"_drawing_registry", "_drawing_diff"}:
                     pending.append(local)
     return found
 
@@ -114,6 +115,57 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     assert _local_import_closure(dodo.SCRIPTS_DIR / "machinist_review.py") == set(
         dodo._MACHINIST_REVIEW_MODULES
     )
+
+
+def test_forced_leaf_never_imports_or_calls_diff(inputs, monkeypatch):
+    import builtins
+    import sys
+
+    original_import = builtins.__import__
+
+    def no_diff_import(name, *args, **kwargs):
+        assert name != "_drawing_diff", "forced leaf imported PDF diff implementation"
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_diff_import)
+    spec = importlib.util.spec_from_file_location(
+        "_forced_leaf_review", REPO_ROOT / "cad" / "scripts" / "machinist_review.py"
+    )
+    review = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, review)
+    spec.loader.exec_module(review)
+    calls = []
+
+    def clean_review(package, **kwargs):
+        calls.append(package)
+        return SimpleNamespace(
+            verdict={
+                "verdict": "SHIP",
+                "summary": "No findings.",
+                **{category: [] for category in review.FINDING_KEYS},
+            },
+            error=None,
+            blind=True,
+            passed=True,
+            sheet_count=1,
+            extra={"inspection_proven": True},
+        )
+
+    def no_precheck(*args, **kwargs):
+        pytest.fail("forced leaf invoked precheck despite --force")
+
+    monkeypatch.setattr(review, "review_package", clean_review)
+    monkeypatch.setattr(review, "_review_session", no_precheck)
+    command = inputs.module._machinist_review_command(
+        "probe", inputs.module._machinist_review_profile()
+    )
+    assert review.main(command[2:]) == 0
+    assert len(calls) == 3
+    assert all(package.before_sources == () for package in calls)
+    aggregate = inputs.module._read_machinist_aggregate("probe")
+    assert aggregate["precheck"]["forced"] is True
+    assert aggregate["precheck"]["skipped"] is False
+    assert aggregate["error"] is None
 
 
 def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
@@ -127,6 +179,7 @@ def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
         stem,
         "--kind",
         "part",
+        "--force",
         "--runs",
         "3",
         "--report-dir",
@@ -154,6 +207,10 @@ def inputs(dodo, tmp_path, monkeypatch):
     prompts.mkdir(parents=True)
     for name in dodo._MACHINIST_REVIEW_MODULES:
         (scripts / name).write_text("# review code\n", encoding="utf-8")
+    (scripts / "_drawing_diff.py").write_text("# unused PDF diff\n", encoding="utf-8")
+    pairing = root / "cad" / "comparisons" / "tools" / "release_diff.py"
+    pairing.parent.mkdir(parents=True)
+    pairing.write_text("# release identity pairing\n", encoding="utf-8")
     for name in (
         "machinist_review_part.md",
         "machinist_review_assembly.md",
@@ -162,6 +219,8 @@ def inputs(dodo, tmp_path, monkeypatch):
         "machinist_review_schema.json",
         "machinist_review_judge.md",
         "machinist_review_judge_schema.json",
+        "machinist_review_precheck.md",
+        "machinist_review_precheck_schema.json",
     ):
         (prompts / name).write_text("{}", encoding="utf-8")
     guidelines = root / "cad" / "docs" / "drawing-guidelines.md"
@@ -170,6 +229,8 @@ def inputs(dodo, tmp_path, monkeypatch):
     config = root / "cad" / "config"
     (config / "parts").mkdir(parents=True)
     (config / "assemblies").mkdir()
+    for name in ("current-identity-map.json", "identity-migration-map.json"):
+        (config / name).write_text("{}", encoding="utf-8")
     exception = config / "parts" / "probe.yaml"
     exception.write_text("probe: {}\n", encoding="utf-8")
     pdf = root / "cad" / "out" / "pdf" / "probe.pdf"
@@ -231,6 +292,28 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "cad/scripts/_drawing_diff.py",
+        "cad/comparisons/tools/release_diff.py",
+        "cad/config/current-identity-map.json",
+        "cad/config/identity-migration-map.json",
+        "cad/scripts/prompts/machinist_review_precheck.md",
+        "cad/scripts/prompts/machinist_review_precheck_schema.json",
+    ],
+)
+def test_bypassed_precheck_inputs_do_not_invalidate_forced_review_cache(
+    inputs, relative_path
+):
+    dodo = inputs.module
+    path = inputs.root / relative_path
+    assert str(path.resolve()) not in dodo._machinist_review_file_deps("probe")
+    initial = _review_key(dodo)
+    path.write_bytes(path.read_bytes() + b"\nchanged precheck dependency\n")
+    assert _review_key(dodo) == initial
 
 
 def test_key_tracks_only_selected_kind_severity_contract(inputs):
@@ -490,7 +573,7 @@ def test_standalone_cli_ignores_registered_selector(
 ):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-for-registered-gate")
     assert review_sessions.module.main([
-        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part",
+        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part", "--force",
         "--report-dir", str(tmp_path / "standalone"), *flags,
     ]) == 0
     assert sorted(review_sessions.seen) == sorted([

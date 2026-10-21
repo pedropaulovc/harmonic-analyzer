@@ -10,6 +10,12 @@ metadata:
 
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
+> Current CLI: use `machinist_review.py <names> --before-pdf-dir <baseline>`
+> (optionally `--pdf-dir <after>`) for PDF-overlay triage, or add `--force`
+> for unconditional after-only review. `--png` is removed. Commands and isolation
+> mechanics below describe the historical workflow; see the
+> [current review gate](../cad/docs/drawing-simplicity-policy.md#the-gate).
+
 
 **Current reviewer (2026-10-13): Claude Opus 5.5 by default**, the script's
 default (`--reviewer claude`, `claude-opus-5-5`, medium). The machinist review is
