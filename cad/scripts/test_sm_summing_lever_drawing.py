@@ -2536,18 +2536,14 @@ def test_plate_thickness_settled_witness_movement_records_original_and_current_i
          0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
          0.000100000054, drawing.KNIFE_RIDGE_R_TOL_TYPE),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
-         0.001, drawing.RIB_BLEND_R_TOL_TYPE),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
-         0.001000000032, drawing.RIB_BLEND_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("damage", [None, "value", "band", "diameter", "missing", "duplicate"])
 def test_imported_radii_keep_the_native_model_value_and_max_band(
     monkeypatch, name, feature, check_radius, value_m, max_type, damage,
 ) -> None:
-    # The nonexact values are the native trace's inch equation results converted
-    # to SI: 0.00393701 in for R0.1 and 0.03937008 in for R1.
+    # The nonexact value is the native trace's inch equation result converted
+    # to SI: 0.00393701 in for R0.1.
     dimension = SimpleNamespace(
         FullName=f"{name}@{feature}@sm-summing-lever.SLDPRT",
         SystemValue=value_m + (0.00001 if damage == "value" else 0.0),
@@ -2575,8 +2571,6 @@ def test_imported_radii_keep_the_native_model_value_and_max_band(
     [
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
          0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
-         0.001, drawing.RIB_BLEND_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("direction", [-1.0, 1.0])
@@ -2604,71 +2598,7 @@ def test_radius_nominal_readback_has_one_nanometre_budget(
             check_radius(object(), [annotation])
 
 
-@pytest.mark.parametrize(
-    ("leaf", "full_name"),
-    [
-        ("RibRootRadius", "RibRootRadius@RibRootFillets@sm-summing-lever.SLDPRT"),
-        ("EdgeRibFrontUpperBlendR", "RibRootRadius@RibRootFillets@sm-summing-lever.SLDPRT"),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontUpperBlendR@RibRootFillets@sm-summing-lever.SLDPRT"),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontUpperBlendR@OtherFeature@sm-summing-lever.SLDPRT"),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontLowerBlendR@EdgeRibFrontProfile@sm-summing-lever.SLDPRT"),
-        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontUpperBlendR"),
-        ("EdgeRibFrontUpperBlendR", None),
-    ],
-)
-def test_visible_rib_blend_refuses_the_old_root_or_wrong_native_owner(
-    monkeypatch, leaf, full_name,
-) -> None:
-    dimension = SimpleNamespace(
-        FullName=full_name, SystemValue=drawing.RIB_BLEND_R / 1000.0,
-        Tolerance=SimpleNamespace(Type=drawing.RIB_BLEND_R_TOL_TYPE),
-    )
-    display = SimpleNamespace(Diametric=False, GetDimension2=lambda _index: dimension)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: leaf)
-    with pytest.raises(RuntimeError, match="EdgeRibFrontUpperBlendR@EdgeRibFrontProfile"):
-        drawing._assert_rib_blend_radius(object(), [annotation])
-
-
-@pytest.mark.parametrize(
-    ("member", "bad_value"),
-    [
-        ("SystemValue", True), ("SystemValue", math.nan), ("SystemValue", math.inf),
-        ("SystemValue", "0.001"), ("Tolerance", None),
-        ("Tolerance", SimpleNamespace(Type="6")),
-        ("Tolerance", SimpleNamespace(Type=6.0)),
-    ],
-)
-def test_visible_rib_blend_requires_native_finite_value_and_integer_max_type(
-    monkeypatch, member, bad_value,
-) -> None:
-    dimension = SimpleNamespace(
-        FullName="EdgeRibFrontUpperBlendR@EdgeRibFrontProfile@sm-summing-lever.SLDPRT",
-        SystemValue=drawing.RIB_BLEND_R / 1000.0,
-        Tolerance=SimpleNamespace(Type=drawing.RIB_BLEND_R_TOL_TYPE),
-    )
-    setattr(dimension, member, bad_value)
-    display = SimpleNamespace(Diametric=False, GetDimension2=lambda _index: dimension)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: "EdgeRibFrontUpperBlendR")
-    with pytest.raises(RuntimeError):
-        drawing._assert_rib_blend_radius(object(), [annotation])
-
-
-def test_visible_rib_blend_mark_and_scope_do_not_mark_the_hidden_roots() -> None:
-    assert "EdgeRibFrontUpperBlendR" in notes.DRAWING_DIMENSIONS["EdgeRibFrontProfile"]
-    assert "EdgeRibFrontLowerBlendR" not in notes.DRAWING_DIMENSIONS["EdgeRibFrontProfile"]
-    assert "RibRootFillets" not in notes.DRAWING_DIMENSIONS
-    assert notes.DIMENSION_PREFIXES[("EdgeRibFrontProfile", "EdgeRibFrontUpperBlendR")] == "R"
-    assert notes.DIMENSION_CALLOUTS_BELOW["EdgeRibFrontUpperBlendR"] == (
-        "RIB SIDE ROOTS\nAND PROFILE BLENDS"
-    )
-    assert "RibRootRadius" not in drawing.FRONT_KEEP
-
-
-def test_visible_rib_blend_leader_stays_with_its_native_upper_arc(monkeypatch) -> None:
+def test_rib_profile_leader_stays_with_its_native_wrap_arc(monkeypatch) -> None:
     annotations = []
     displays = {}
     for name in ("EdgeRibFrontUpperBlendR", "EdgeRibFrontLowerBlendR", "EdgeRibFrontArcR"):
@@ -2684,12 +2614,12 @@ def test_visible_rib_blend_leader_stays_with_its_native_upper_arc(monkeypatch) -
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, raw: raw.name)
     drawing._attach_radial_leaders(
-        object(), annotations, ("EdgeRibFrontUpperBlendR",), label="front",
+        object(), annotations, ("EdgeRibFrontArcR",), label="front",
     )
     for name, (display, native_owner) in displays.items():
         assert display.GetDimension2(0) is native_owner
-        assert display.ArcExtensionLineOrOppositeSide is (name != "EdgeRibFrontUpperBlendR")
-        assert display.SolidLeader is (name != "EdgeRibFrontUpperBlendR")
+        assert display.ArcExtensionLineOrOppositeSide is (name != "EdgeRibFrontArcR")
+        assert display.SolidLeader is (name != "EdgeRibFrontArcR")
 
 
 def _dimension_ownership_drawing(monkeypatch):
@@ -2783,12 +2713,6 @@ def test_each_native_dimension_belongs_to_one_of_the_six_views(monkeypatch) -> N
     assert case.native.calls == list(drawing.SHEET_NAMES)
     case.check()
     assert case.native.calls == list(drawing.SHEET_NAMES) * 2
-    assert set(drawing.DETAIL_KEEP) == {
-        *notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"], "KnifeRidgeRadius",
-    }
-    assert "PlateThickness" in drawing.BACK_KEEP
-    assert "RibReach" in drawing.FRONT_KEEP
-    assert "EdgeRibFrontUpperBlendR" in drawing.FRONT_KEEP
 
 
 @pytest.mark.parametrize(

@@ -22,8 +22,9 @@ from sm_summing_lever_spec import COEFFICIENT_T, HOLE_SPEC
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
 # Every cast contour is sized on the views: the uniform coefficient plate,
-# the counter web's side radius, the common positive rib profile and its root
-# blend, the boss, and the trunnion envelope, length and knife-edge radius.
+# the counter web's side radius, the common positive rib profile, the boss,
+# and the trunnion envelope, length and knife-edge radius. The title block
+# controls inside-corner R1 MAX; modeled rib blends remain native controls.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateThickness"},
     "CoefficientsPlate": {"PlateLength"},
@@ -32,7 +33,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationAnchor": {"AnchorHeight"},
     "SummationPlateProfile": {"SummationArcRadius"},
     "SummationPlate": {"WebThickness"},
-    "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach", "EdgeRibFrontUpperBlendR"},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach"},
     "EdgeRibFront": {"EdgeRibThickness"},
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
@@ -63,7 +64,6 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("KnifeEnvelopeReference", "FlankToSide"): "4X ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
-    ("EdgeRibFrontProfile", "EdgeRibFrontUpperBlendR"): "R",
 }
 
 # The pivot cylinder's diameter is sized in the plan, across the band its
@@ -123,7 +123,6 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromRight": f"KNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
-    "EdgeRibFrontUpperBlendR": "RIB SIDE ROOTS\nAND PROFILE BLENDS",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",

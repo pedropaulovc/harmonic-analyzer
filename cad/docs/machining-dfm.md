@@ -425,12 +425,14 @@ validation must still qualify the rib/nut and installed-neighbour clearances.
 
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
 **R1** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
-the negative-X middle-rib contour is unchanged. The bounded **R1 MAX**
-control is narrowly labeled **RIB SIDE ROOTS AND PROFILE BLENDS**: it covers
-the modeled profile transitions and rib inner-cap side roots against the
-plate, pivot cylinder and counter web, without tangent propagation onto
-receiver entry caps or knife shoulders. It is not a general body-fillet
-claim. The following unchanged sharp junctions remain outside that proof:
+the negative-X middle-rib contour is unchanged. The title block's
+**INSIDE CORNERS R1.0 MAX** row controls the roots and blends; no local
+callout repeats that ceiling (drawing-guidelines rule 2). The bounded native
+R1 controls and geometry proofs still cover the modeled profile transitions
+and rib inner-cap side roots against the plate, pivot cylinder and counter
+web, without tangent propagation onto receiver entry caps or knife shoulders.
+They are not a general body-fillet claim. The following unchanged sharp
+junctions remain outside that proof:
 
 - Longitudinal coefficient-plate top/bottom-to-pivot-cylinder junctions
   between rib caps (near X=+12.44/+11.89 mm).
@@ -442,7 +444,7 @@ claim. The following unchanged sharp junctions remain outside that proof:
 
 Only these unchanged junctions retain the existing **RV-02** authorization
 from **b2c8d954**: the owner's **2026-10-18 R1.0 MAX** inside-corner ceiling,
-with the shop-wide default still pending #1625. This is carried-forward
+now carried by the shop-wide title-block row. This is carried-forward
 authorization within the baseline's rib/web/boss/cylinder/plate-junction and
 stub-shoulder scope, not a new exception or a waiver for the changed rib roots.
 
