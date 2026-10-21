@@ -11,9 +11,10 @@ mg-magnifying-clamp:
     envelope 15.00 MAX over the full height; flats as supplied. Face both ends
     square to the nominal hex axis; the bottom is the MHA-MG-04 shoulder seat.
     Drill Ø6.50 +0.10/0 through the corners at 19.95 from the bottom, sliding
-    on the MHA-MG-03 quarter-inch body. Locate each #4-40 entry from its actual
-    diagonal stock flat and directly from the actual bore rim; the transverse
-    rim-to-entry-axis dimension is 3.25 ±1.02, not an assumed common stock axis.
+    on the MHA-MG-03 quarter-inch body. Locate the bore axis and both #4-40
+    axes independently 6.35 from the same actual full-height Z flat at the
+    ordinary .XX ±0.51 band; also locate each #4-40 entry 6.35 from its actual
+    diagonal stock flat. Do not assume a perfect common stock axis.
     Tap the top into the bore (6.30 REF thread, 9.55 drill); retain the blind
     bottom rod tap at 8.55 full thread and 12.75 drill at the .XX band.
     Inspect 2.0 MIN finished net wall at the bore and both taps throughout
