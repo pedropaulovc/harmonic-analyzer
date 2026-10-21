@@ -13,7 +13,7 @@ side-view details of the wheel axle print one stack setting each:
 - LEVER TIP DETAIL (4:1) shows the flat threaded tip beyond the far bracket
   face, with the single imported ThreadProjection setting.
 
-Each detail is an ordinary model view (*Right for the axle, *Front for the
+Each detail is an ordinary model view (*Right for the axle, *Back for the
 lever tip), dimensioned while uncropped and cropped after. On a native detail,
 the targeted import delivered nothing (the ch-amplitude-bar finding). The
 dimensions belong to construction chains the assembly saves blanked. Each
@@ -41,12 +41,13 @@ import sys
 import textwrap
 from typing import Any, Callable
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import double_array, null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
     place_view,
     view_name,
+    visible_component_entities,
 )
 
 import _config
@@ -62,6 +63,7 @@ from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
+    PLACE_SETTLE_M,
     callout_ink,
     boxes_clear,
     move_annotation,
@@ -107,6 +109,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _layout_geometry import estimate_text_box
 from _layout_audit import arrowhead_segments
 from _session import run_build
+from mg_lever_thread_joint import NECK_HALF_X, NOSE_R, ROD_LENGTH, TIP_CHAMFER
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
@@ -599,10 +602,10 @@ class StackDetail:
 
 @dataclass(frozen=True)
 class LeverTipDetail:
-    """The real tip/far-face interface in a cropped Front view, not a section."""
+    """The actual tip/far-face interface, viewed from the nose side of the flange."""
 
     title: str = notes.THREAD_PROJECTION_DETAIL_TITLE
-    orientation: str = "*Front"
+    orientation: str = "*Back"
     scale: tuple[int, int] = (4, 1)
     centre: tuple[float, float] = (0.100, 0.053)
     crop_radius: float = 0.020  # 5 mm of model radius at 4:1
@@ -619,13 +622,13 @@ class LeverTipDetail:
 
     @property
     def label_text(self) -> str:
-        return f"{self.title}\nVIEW FROM THE BACK\nSCALE {self.scale[0]} : {self.scale[1]}"
+        return f"{self.title}\nVIEW FROM THE FRONT\nSCALE {self.scale[0]} : {self.scale[1]}"
 
 
 LEVER_TIP = LeverTipDetail()
-# R23's back caption starts at y=76.7929 mm; the isometric starts at
-# x=188.3131 mm. Native neighbour readbacks below, not these observations,
-# decide whether the new detail fits. No existing view or caption is moved.
+# The opposite (*Front) direction sees the flange, whose footprint completely
+# covers this crop. Only this detail changes direction; the assembled views
+# stay put. Their back caption is fitted against the actual padded outline.
 LEVER_TIP_FIELD = (0.025, 0.014, 0.180, 0.075)
 
 
@@ -780,13 +783,19 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    manager.AddToDB = False
+    # R24's native fence drifted from the requested circle; inference was not
+    # independently proved. Bypass it here, leaving the two axle crops unchanged.
+    manager.AddToDB = isinstance(detail, LeverTipDetail)
     try:
         circle = manager.CreateCircle(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if circle is None:
         raise RuntimeError(f"failed to sketch the {detail.title} crop circle")
+    if isinstance(detail, LeverTipDetail):
+        segment = _early_bound(circle, "ISketchSegment")
+        if not segment.Select4(False, null_callout()):
+            raise RuntimeError(f"{detail.title}: cannot select the authored crop circle")
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
@@ -801,6 +810,27 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
         raise RuntimeError(
             f"{detail.title} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
+    if isinstance(detail, LeverTipDetail):
+        _projection_crop_box(view)
+
+
+def _projection_crop_box(view: Any) -> tuple[float, float, float, float]:
+    """Read the persisted native fence, not a nominal circle reconstructed in Python."""
+    raw = tuple(float(value) for value in _early_bound(view, "IView").GetDetailCircleInfo2())
+    # SDK: count, layer, centre[3], start[3], end[3], line type, ...
+    # R24's retained native census independently matches these points to its PDF.
+    if len(raw) < 17 or not all(math.isfinite(value) for value in raw) or raw[0] != 1:
+        raise RuntimeError(f"{LEVER_TIP.title}: invalid native crop fence {raw!r}")
+    centre = raw[2:4]
+    radius = math.dist(centre, raw[5:7])
+    _telemetry.info(f"{LEVER_TIP.title}: native crop centre={centre}, radius={radius}")
+    if (
+        raw[11] != 3  # swLF_DETAIL
+        or math.dist(centre, LEVER_TIP.centre) > DETAIL_POSITION_TOL_M
+        or abs(radius - LEVER_TIP.crop_radius) > DETAIL_POSITION_TOL_M
+    ):
+        raise RuntimeError(f"{LEVER_TIP.title}: native crop fence moved: {raw!r}")
+    return centre[0] - radius, centre[1] - radius, centre[0] + radius, centre[1] + radius
 
 
 def _dimensioned_detail(
@@ -1160,6 +1190,204 @@ def _unique_projection(adapter: Any, view: Any, *, stage: str) -> Any:
     return matches[0][1]
 
 
+def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
+    """Decode GetPolylines7's (model edges, out-polylines), excluding sketch ink."""
+    if not isinstance(result, (tuple, list)) or len(result) != 2:
+        raise RuntimeError("GetPolylines7 did not return its edge/OUT-polyline pair")
+    edges, data = tuple(result[0] or ()), tuple(result[1] or ())
+    rendered = []
+    offset = index = 0
+    while offset < len(data):
+        if offset + 9 > len(data):
+            raise RuntimeError("GetPolylines7 returned a truncated primitive")
+        kind, size = data[offset:offset + 2]
+        if kind not in (0, 1) or size != (0 if kind == 0 else 12):
+            raise RuntimeError(f"GetPolylines7 invalid geometry header {(kind, size)!r}")
+        size = int(size)
+        count_index = offset + 8 + size
+        if count_index >= len(data):
+            raise RuntimeError("GetPolylines7 returned truncated geometry")
+        count = data[count_index]
+        if count != int(count) or count < 0:
+            raise RuntimeError(f"GetPolylines7 invalid point count {count!r}")
+        end = count_index + 1 + 3 * int(count)
+        if end > len(data) or index >= len(edges):
+            raise RuntimeError("GetPolylines7 edge/primitive cardinality mismatch")
+        record = tuple(float(value) for value in data[offset:end])
+        if not all(math.isfinite(value) for value in record):
+            raise RuntimeError("GetPolylines7 returned non-finite model ink")
+        points = data[count_index + 1:end]
+        ink = any(points[i:i + 3] != points[:3] for i in range(3, len(points), 3))
+        if kind == 1:
+            ink |= math.dist(record[2:5], record[5:8]) > 0
+        if ink and edges[index] is not None:
+            rendered.append(edges[index])
+        offset, index = end, index + 1
+    if index != len(edges):
+        raise RuntimeError("GetPolylines7 edge/primitive cardinality mismatch")
+    return tuple(rendered)
+
+
+@_telemetry.traced("drawing.mg_projection_model_ink", label_param="stage")
+def _projection_model_ink(
+    adapter: Any, view: Any, *, stage: str,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Prove the actual flat tip and outer far-face arc, not the assembly sketch.
+
+    The bracket mouth may legitimately be hidden by the major diameter. Its
+    R5.5 outer nose arc owns the far-face plane instead. Component-local curve
+    points go through the full component's native transform, then the view.
+    GetPolylines7 coordinates are NOT claimed to be exact sheet/PDF coordinates.
+    Only its model-edge identities and nonempty primitives are used here.
+    """
+    label = f"{LEVER_TIP.title} {stage}"
+    _telemetry.info(f"{label}: reading native physical boundaries")
+    view = _early_bound(view, "IView")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    values, errors, evidence = {}, [], {"stage": stage}
+    # Independent readers leave a discriminating trace even if one is refused.
+    # Zoom is the documented GetPolylines7 generation prerequisite, not a retry.
+    for name, reader in (
+        ("zoom", lambda: model.ViewZoomtofit2()),
+        ("refresh", lambda: view.UpdateViewDisplayGeometry()),
+        ("drawing_components", lambda: view.GetVisibleDrawingComponents()),
+        ("visible_components", lambda: view.GetVisibleComponents()),
+        ("polylines", lambda: view.GetPolylines7(1)),  # exclude crosshatch
+    ):
+        try:
+            values[name] = reader()
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+    full = {}
+    evidence["drawing_components"] = []
+    for raw in values.get("drawing_components") or ():
+        try:
+            drawing_component = _early_bound(raw, "IDrawingComponent")
+            component = _early_bound(drawing_component.Component, "IComponent2")
+            name = str(component.Name2).rsplit("/", 1)[-1]
+            stem = _component_stem(component)
+            shown = bool(drawing_component.Visible)
+            evidence["drawing_components"].append((name, stem, shown))
+            if stem in LEVER_TIP.stems:
+                if name in full:
+                    raise RuntimeError(f"duplicate drawing component {name}")
+                full[name] = (stem, component, shown)
+        except Exception as exc:
+            errors.append(f"drawing component: {type(exc).__name__}: {exc}")
+    rendered = ()
+    try:
+        rendered = tuple(
+            _early_bound(edge, "IEdge")
+            for edge in _projection_rendered_edges(values.get("polylines"))
+        )
+    except Exception as exc:
+        errors.append(f"model polylines: {type(exc).__name__}: {exc}")
+    evidence["rendered_model_edges"] = len(rendered)
+    evidence["visible_components"] = []
+    targets = {
+        "mg-magnifying-lever": (ROD_LENGTH / 1000, (LEVER_ROD_DIA / 2 - TIP_CHAMFER) / 1000, 1),
+        "mg-magnifying-bracket": (-NECK_HALF_X / 1000, NOSE_R / 1000, -1),
+    }
+    found = {}
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    utility = _early_bound(app.GetMathUtility(), "IMathUtility")
+    for raw in values.get("visible_components") or ():
+        diagnostic = {}
+        evidence["visible_components"].append(diagnostic)
+        try:
+            visible = _early_bound(raw, "IComponent2")
+            name = str(visible.Name2).rsplit("/", 1)[-1]
+            diagnostic["name"] = name
+            if name not in full:
+                continue
+            stem, component, shown = full[name]
+            diagnostic["stem"], diagnostic["visible"] = stem, shown
+            x, radius, z_sign = targets[stem]
+            candidates, circles = [], []
+            edges = visible_component_entities(view, visible, 1)  # swViewEntityType_Edge
+            diagnostic["edge_count"] = len(edges)
+            diagnostic["circles"] = circles
+            for raw_edge in edges:
+                edge = _early_bound(raw_edge, "IEdge")
+                curve = _early_bound(edge.GetCurve(), "ICurve")
+                if not curve.IsCircle():
+                    continue
+                params = tuple(float(value) for value in curve.CircleParams)
+                circles.append(params)
+                if len(params) != 7 or not all(math.isfinite(value) for value in params):
+                    raise RuntimeError("invalid native circular edge parameters")
+                if (
+                    math.dist(params[:3], (x, 0.0, 0.0)) <= DETAIL_POSITION_TOL_M
+                    and abs(params[6] - radius) <= DETAIL_POSITION_TOL_M
+                ):
+                    candidates.append((edge, params))
+            diagnostic["target_count"] = len(candidates)
+            if not shown or len(candidates) != 1 or stem in found:
+                raise RuntimeError("expected one shown physical boundary for this component")
+            edge, params = candidates[0]
+            # Both arguments are the same supported IEdge interface. Retain the
+            # self-positive-control and every native comparison code on refusal.
+            diagnostic["identity_self"] = app.IsSame(edge, edge)
+            diagnostic["identity_rendered"] = [app.IsSame(edge, other) for other in rendered]
+            pick = (params[0], params[1], params[2] + z_sign * params[6])
+            closest = tuple(float(value) for value in edge.GetClosestPointOn(*pick))
+            diagnostic["boundary_point"] = closest[:4]
+            if (
+                len(closest) != 5 or not all(math.isfinite(value) for value in closest[:4])
+                or math.dist(closest[:3], pick) > DETAIL_POSITION_TOL_M
+            ):
+                raise RuntimeError("physical boundary point is not on the expected trimmed edge")
+            transform = _early_bound(component.Transform2, "IMathTransform")
+            world = []
+            for point in (params[:3], closest[:3]):
+                native = _early_bound(utility.CreatePoint(double_array(list(point))), "IMathPoint")
+                moved = _early_bound(native.MultiplyTransform(transform), "IMathPoint")
+                actual = tuple(float(value) for value in moved.ArrayData)
+                if len(actual) != 3 or not all(math.isfinite(value) for value in actual):
+                    raise RuntimeError("invalid transformed physical boundary point")
+                world.append(actual)
+            diagnostic["assembly_points"] = world
+            found[stem] = world
+            if (
+                type(diagnostic["identity_self"]) is not int or diagnostic["identity_self"] != 1
+                or not any(type(code) is int and code == 1 for code in diagnostic["identity_rendered"])
+            ):
+                raise RuntimeError("physical boundary has no native solid-model polyline")
+        except Exception as exc:
+            errors.append(f"visible component: {type(exc).__name__}: {exc}")
+    evidence["errors"] = errors
+    _telemetry.info(f"{label}: physical model evidence={evidence!r}")
+    if errors or set(found) != set(targets):
+        raise RuntimeError(f"{label}: physical model proof failed; {evidence!r}")
+    points = tuple(point for stem in targets for point in found[stem])
+    paper = model_points_in_view(adapter, view, points, label=label)
+    if len(paper) != 4 or any(len(point) != 2 or not all(map(math.isfinite, point)) for point in paper):
+        raise RuntimeError(f"{label}: invalid projected physical boundary points {paper!r}")
+    centres, boundary_points = (paper[0], paper[2]), (paper[1], paper[3])
+    chain = model_points_in_view(
+        adapter, view,
+        ((stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+         (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0)),
+        label=label,
+    )
+    if len(chain) != 2 or any(len(point) != 2 or not all(map(math.isfinite, point)) for point in chain):
+        raise RuntimeError(f"{label}: invalid projected installation chain {chain!r}")
+    midpoint = tuple((a + b) / 2 for a, b in zip(*centres, strict=True))
+    _telemetry.info(f"{label}: physical centres={centres}, edge points={boundary_points}, chain={chain}")
+    if (
+        any(math.dist(actual, source) > DETAIL_POSITION_TOL_M
+            for actual, source in zip(centres, chain, strict=True))
+        or math.dist(midpoint, LEVER_TIP.centre) > DETAIL_POSITION_TOL_M
+    ):
+        raise RuntimeError(f"{label}: actual model boundaries disagree with the installation chain")
+    if view.IsCropped():
+        crop = _projection_crop_box(view)
+        centre = ((crop[0] + crop[2]) / 2, (crop[1] + crop[3]) / 2)
+        if any(math.dist(point, centre) > (crop[2] - crop[0]) / 2 for point in boundary_points):
+            raise RuntimeError(f"{label}: physical boundary points are outside the actual crop")
+    return centres
+
+
 def _projection_note_box(note: Any) -> tuple[float, float, float, float]:
     extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
     if (
@@ -1168,6 +1396,31 @@ def _projection_note_box(note: Any) -> tuple[float, float, float, float]:
     ):
         raise RuntimeError(f"lever tip detail: invalid native note extent {extent!r}")
     return extent[0], extent[1], extent[3], extent[4]
+
+
+def _fit_projection_back_caption(
+    adapter: Any, view: Any, neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
+) -> None:
+    """One measured leftward move of the existing back caption, if necessary."""
+    outline = _view_outline(view, label=LEVER_TIP.title)
+    if not all(math.isfinite(value) for value in outline):
+        raise RuntimeError(f"{LEVER_TIP.title}: non-finite native view outline {outline!r}")
+    for note in neighbour_notes:
+        note = _early_bound(note, "INote")
+        if str(note.GetText() or "") != ASSEMBLED_VIEW_CAPTIONS["*Front"]:
+            continue
+        box = _projection_note_box(note)
+        if not boxes_clear(box, outline):
+            dx = outline[0] - CLEAR_GAP_M - PLACE_SETTLE_M - box[2]
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            move_annotation(adapter, annotation, dx, 0.0, label="assembled back caption")
+            box = _projection_note_box(note)
+        require_inside("assembled back caption", box, sheet_region(adapter))
+        if not boxes_clear(box, outline) or any(
+            not boxes_clear(box, _view_outline(other, label="back-caption neighbour"))
+            for other in neighbour_views
+        ):
+            raise RuntimeError(f"assembled back caption {box!r} crowds an actual native view outline")
 
 
 def _projection_layout(
@@ -1180,11 +1433,11 @@ def _projection_layout(
     view.UpdateViewDisplayGeometry()
     if not view.IsCropped() or tuple(view.ScaleRatio) != LEVER_TIP.scale:
         raise RuntimeError(f"{label}: crop or 4:1 scale changed")
-    x, y = model_point_in_view(adapter, view, LEVER_TIP.model_centre_m, label=label)
-    if max(abs(x - LEVER_TIP.centre[0]), abs(y - LEVER_TIP.centre[1])) > DETAIL_POSITION_TOL_M:
-        raise RuntimeError(f"{label}: physical crop centre moved to {(x, y)!r}")
-    r = LEVER_TIP.crop_radius
-    crop_box = (x - r, y - r, x + r, y + r)
+    _projection_model_ink(adapter, view, stage="settled drawing")
+    crop_box = _projection_crop_box(view)
+    outline = _view_outline(view, label=label)
+    if not all(math.isfinite(value) for value in outline):
+        raise RuntimeError(f"{label}: non-finite native view outline {outline!r}")
     text_box = _thread_projection_text_box(adapter, annotation, include_shoulder=False)
     full_box = _thread_projection_text_box(adapter, annotation)
     ink = callout_ink(adapter, annotation, label=stack.THREAD_PROJECTION_DIMENSION)
@@ -1218,11 +1471,19 @@ def _projection_layout(
         max(box[2] for box in boxes), max(box[3] for box in boxes),
     )
     caption_box = _projection_note_box(caption)
+    if str(_early_bound(caption, "INote").GetText() or "").replace("\r\n", "\n") != LEVER_TIP.label_text:
+        raise RuntimeError(f"{label}: native direction/scale caption changed")
+    note_boxes = tuple(_projection_note_box(note) for note in neighbour_notes)
+    if any(not boxes_clear(outline, box) for box in note_boxes):
+        raise RuntimeError(f"{label}: neighbouring caption crowds the actual native view outline")
     region = sheet_region(adapter)
+    for note, box in zip(neighbour_notes, note_boxes, strict=True):
+        if str(_early_bound(note, "INote").GetText() or "") == ASSEMBLED_VIEW_CAPTIONS["*Front"]:
+            require_inside("assembled back caption", box, region)
     neighbours = [
         TITLE_BLOCK,
         *(_view_outline(other, label="lever-tip neighbour") for other in neighbour_views),
-        *(_projection_note_box(note) for note in neighbour_notes),
+        *note_boxes,
     ]
     for kind, box in (("crop", crop_box), ("dimension", dimension_box), ("caption", caption_box)):
         require_inside(f"{label} {kind}", box, region)
@@ -1238,23 +1499,18 @@ def _projection_layout(
     if not boxes_clear(caption_box, crop_box) or not boxes_clear(caption_box, dimension_box):
         raise RuntimeError(f"{label}: caption crowds the crop or dimension ink")
     _telemetry.info(
-        f"{label}: crop={crop_box}, full dimension ink={dimension_box}, caption={caption_box}"
+        f"{label}: crop={crop_box}, outline={outline}, full dimension ink={dimension_box}, caption={caption_box}"
     )
 
 
 def _thread_projection_detail(
     adapter: Any, neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
 ) -> Callable[[], None]:
-    """Import the existing control once on the enlarged, isolated Front view."""
+    """Import the existing control once on the enlarged, isolated Back view."""
     detail = LEVER_TIP
     view = _placed_detail(adapter, detail)
+    tip, face = _projection_model_ink(adapter, view, stage="uncropped physical boundaries")
     _show_base_view_sketches(adapter, view, (stack.THREAD_FEATURE,), label=detail.title)
-    tip, face = model_points_in_view(
-        adapter, view,
-        ((stack.THREADED_TIP_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0),
-         (stack.THREAD_FAR_FACE_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0)),
-        label=detail.title, names=("flat threaded tip", "far bracket face"),
-    )
     name = stack.THREAD_PROJECTION_DIMENSION
     annotations = curate_view_dimensions(
         adapter, view,
@@ -1279,6 +1535,7 @@ def _thread_projection_detail(
     if str(caption.GetText() or "").replace("\r\n", "\n") != detail.label_text:
         raise RuntimeError(f"{detail.title}: native caption text changed")
     rebuild_drawing(adapter, label=f"settle {detail.title} caption")
+    _fit_projection_back_caption(adapter, view, neighbour_views, neighbour_notes)
 
     def settled() -> None:
         _activate_sheet(adapter, SHEET_NAMES[0])

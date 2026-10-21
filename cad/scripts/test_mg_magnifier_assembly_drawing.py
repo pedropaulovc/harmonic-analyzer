@@ -735,6 +735,11 @@ def test_base_lever_import_excludes_projection_and_preserves_other_settings(monk
         settled()
 
 
+def _native_crop_fence(centre=(0.100, 0.053), radius=0.020):
+    x, y = centre
+    return [1, -1, x, y, 0, x + radius, y, 0, x + radius, y, 0, 3, 0, 0, 0, 0.0035, 0]
+
+
 @pytest.fixture
 def lever_tip_native(monkeypatch, projection_native):
     """Execute the real detail construction and guards with native boundary doubles."""
@@ -749,17 +754,91 @@ def lever_tip_native(monkeypatch, projection_native):
     native.drop_on_crop = False
     native.arrow_x = None
     native.line_x = None
+    native.fence = _native_crop_fence()
+    # Retained R24 padding is deliberately independent of the corrected fence.
+    native.outline = [0.0649122, 0.020412, 0.130088, 0.085588]
+    native.transform_dx = 0.0
+    native.boundary_paper_dy = 0.0
+    native.projected = []
     native.caption_extent = [0.0836475, 0.0151, 0.0, 0.132, 0.0293289, 0.0]
     native.view = SimpleNamespace(
         name="lever tip detail", GetAnnotations=lambda: native.annotations,
         ScaleRatio=(4, 1), IsCropped=lambda: native.cropped,
         UpdateViewDisplayGeometry=lambda: None,
+        GetOutline=lambda: native.outline,
+        GetDetailCircleInfo2=lambda: native.fence,
     )
     native.base = SimpleNamespace(name="base", GetAnnotations=lambda: [])
     native.sheet_view = SimpleNamespace(name="sheet", GetAnnotations=lambda: [])
     native.sheets = [[native.sheet_view, native.base, native.view]]
     native.adapter.currentModel.GetViews = lambda: native.sheets
-    native.adapter.swApp = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = tuple(values)
+
+        def MultiplyTransform(self, transform):
+            native.events.append(("component-transform", self.ArrayData))
+            return Point(transform(self.ArrayData))
+
+    native.adapter.swApp = SimpleNamespace(
+        IsSame=lambda a, b: int(a is b),
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+    )
+    native.adapter.currentModel.ViewZoomtofit2 = lambda: native.events.append(("zoom",))
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    native.drawing_components = []
+    native.visible_components = []
+    native.edges = []
+    native.component_edges = {}
+    for stem, x, radius in (
+        ("mg-magnifying-lever", drawing.ROD_LENGTH / 1000,
+         (drawing.LEVER_ROD_DIA / 2 - drawing.TIP_CHAMFER) / 1000),
+        ("mg-magnifying-bracket", -drawing.NECK_HALF_X / 1000, drawing.NOSE_R / 1000),
+    ):
+        name = f"{stem}-1"
+        curve = SimpleNamespace(IsCircle=lambda: True, CircleParams=(x, 0, 0, 1, 0, 0, radius))
+        edge = SimpleNamespace(
+            GetCurve=lambda curve=curve: curve,
+            GetClosestPointOn=lambda *point: (*point, 0.0, 0.0),
+        )
+        native.edges.append(edge)
+        native.component_edges[name] = [edge]
+
+        def transform(point, stem=stem):
+            x, y, z = point
+            if stem == "mg-magnifying-lever":
+                return (
+                    assembly.LEVER_X0 / 1000 - x + native.transform_dx,
+                    assembly.LEVER_ROD_Y / 1000 + y, assembly.LEVER_ROD_Z / 1000 - z,
+                )
+            return (
+                assembly.BRACKET_X / 1000 + x + native.transform_dx,
+                assembly.LEVER_ROD_Y / 1000 + y, assembly.LEVER_ROD_Z / 1000 + z,
+            )
+
+        full = SimpleNamespace(
+            Name2=name, GetPathName=lambda stem=stem: f"C:/parts/{stem}.SLDPRT",
+            Transform2=transform,
+        )
+        native.drawing_components.append(SimpleNamespace(Component=full, Visible=True))
+        native.visible_components.append(SimpleNamespace(Name2=name))
+    native.rendered_edges = list(native.edges)
+    # SDK geometry/metadata/point payload. Coordinates are intentionally NOT sheet
+    # coordinates; topology correspondence is the native ink positive control.
+    native.polyline = (0, 0, 0, 0, 0, 0, -1, 0, 2, 100, 200, 300, 101, 200, 300)
+    native.view.GetVisibleDrawingComponents = lambda: native.drawing_components
+    native.view.GetVisibleComponents = lambda: native.visible_components
+    native.view.GetPolylines7 = lambda cross: (
+        tuple(native.rendered_edges), native.polyline * len(native.rendered_edges)
+    )
+
+    def entities(view, component, kind):
+        assert view is native.view and kind == 1
+        native.events.append(("visible-edges", component.Name2))
+        return native.component_edges[component.Name2]
+
+    monkeypatch.setattr(drawing, "visible_component_entities", entities)
     native.annotation.Owner = native.view
     native.annotation.OwnerType = 0
     native.annotation.GetAttachedEntities3 = lambda: native.annotation.endpoints
@@ -771,8 +850,25 @@ def lever_tip_native(monkeypatch, projection_native):
         GetExtent=lambda: native.caption_extent,
     )
     native.neighbour = SimpleNamespace(GetOutline=lambda: (0.035, 0.085, 0.105, 0.215))
+    native.back_extent = [0.0486244, 0.0767929, 0.0, 0.0972344, 0.0815586, 0.0]
+
+    def move_back(x, y, z):
+        dx, dy = x - native.back_extent[0], y - native.back_extent[4]
+        native.events.append(("caption-move", dx, dy, z))
+        for index in (0, 3):
+            native.back_extent[index] += dx
+        for index in (1, 4):
+            native.back_extent[index] += dy
+        return True
+
+    native.back_annotation = SimpleNamespace(
+        GetPosition=lambda: (native.back_extent[0], native.back_extent[4], 0.0),
+        SetPosition2=move_back,
+    )
     native.back_caption = SimpleNamespace(
-        GetExtent=lambda: (0.0486244, 0.0767929, 0.0, 0.0972344, 0.0815586, 0.0)
+        GetText=lambda: drawing.ASSEMBLED_VIEW_CAPTIONS["*Front"],
+        GetExtent=lambda: native.back_extent,
+        GetAnnotation=lambda: native.back_annotation,
     )
     monkeypatch.setattr(drawing, "view_name", lambda _a, view: view.name)
     name = stack.THREAD_PROJECTION_DIMENSION
@@ -788,19 +884,20 @@ def lever_tip_native(monkeypatch, projection_native):
         drawing, "_show_base_view_sketches",
         lambda _a, _v, features, **_k: native.shown.append(features),
     )
-    monkeypatch.setattr(
-        drawing, "model_point_in_view", lambda *_a, **_k: drawing.LEVER_TIP.centre
-    )
 
     def projected(_adapter, view, points, **_kwargs):
         assert view is native.view
-        assert points == (
-            (stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
-            (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+        native.projected.append(tuple(points))
+        cx, cy = drawing.LEVER_TIP.centre
+        mx = (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000
+        my = stack.LEVER_AXIS_Y / 1000
+        # Actual *Back orientation: reverse X, retain Y; component Z is real,
+        # whereas the authored dimension chain is in the assembly's Z=0 plane.
+        return tuple(
+            (cx - 4 * (x - mx), cy + 4 * (y - my)
+             + (native.boundary_paper_dy if len(points) == 4 and index % 2 else 0))
+            for index, (x, y, _z) in enumerate(points)
         )
-        x, y = drawing.LEVER_TIP.centre
-        half_gap = stack.THREAD_PROJECTION / 1000 * 4 / 2
-        return (x - half_gap, y), (x + half_gap, y)
 
     monkeypatch.setattr(drawing, "model_points_in_view", projected)
 
@@ -876,7 +973,7 @@ def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lev
     assert native.annotation.endpoints is native.endpoints
     assert native.source.SystemValue == pytest.approx(0.00125)
     assert native.source.Tolerance.Type == 0
-    assert "VIEW FROM THE BACK" in native.caption.GetText()
+    assert "VIEW FROM THE FRONT" in native.caption.GetText()
     assert native.caption.GetText().count("\n") == 2
     settled()
     native.rows[1]["position"] = (-0.100, -0.003, 0.0)
@@ -884,6 +981,227 @@ def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lev
     with pytest.raises(RuntimeError, match="crosses the zone frame"):
         settled()
     assert sum(event[0] == "move" for event in native.events) == moves
+
+
+def test_detail_direction_exposes_the_nose_instead_of_the_occluding_flange():
+    import magnifying_bracket_joint_layout as joint
+
+    detail = drawing.LEVER_TIP
+    radius_mm = detail.crop_radius * 1000 * detail.scale[1] / detail.scale[0]
+    x = (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2
+    y = stack.LEVER_AXIS_Y
+    # The entire former Front crop lies inside the nearer flange's footprint.
+    assert joint.SIDE_PLATE_MACHINE_X[0] < x - radius_mm < x + radius_mm < joint.SIDE_PLATE_MACHINE_X[1]
+    assert joint.BRACKET_ORIGIN[1] + joint.SIDE_PLATE_Y[0] < y - radius_mm
+    assert y + radius_mm < joint.BRACKET_ORIGIN[1] + joint.SIDE_PLATE_Y[1]
+    flange_near_z = joint.BRACKET_ORIGIN[2] + joint.SIDE_PLATE_Z[0]
+    assert flange_near_z > assembly.LEVER_ROD_Z + drawing.LEVER_ROD_DIA / 2
+    # Reverse only the detail's viewing direction, not the installation.
+    assert detail.orientation == "*Back"
+    assert detail.scale == (4, 1)
+    assert assembly.LEVER_ROD_Z - drawing.NOSE_R < flange_near_z
+    assert drawing.ASSEMBLED_VIEW_CAPTIONS["*Front"] == "VIEW FROM THE BACK"
+
+
+def test_detail_proves_transformed_physical_edges_before_import_and_after_crop(lever_tip_native):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    physical = next(points for points in native.projected if len(points) == 4)
+    assert physical[0] == pytest.approx((
+        stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, assembly.LEVER_ROD_Z / 1000,
+    ))
+    assert physical[2] == pytest.approx((
+        stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, assembly.LEVER_ROD_Z / 1000,
+    ))
+    assert physical[1][2] < physical[0][2]
+    assert physical[3][2] == pytest.approx((assembly.LEVER_ROD_Z - drawing.NOSE_R) / 1000)
+    assert native.events.index(("visible-edges", "mg-magnifying-lever-1")) < native.events.index(("crop",))
+    previous = sum(event[0] == "component-transform" for event in native.events)
+    settled()
+    assert sum(event[0] == "component-transform" for event in native.events) == previous + 4
+    assert native.annotation.source is native.source
+    assert native.annotation.endpoints is native.endpoints
+
+
+@pytest.mark.parametrize("failure", [
+    "sketch-only", "hidden-component", "missing-component", "no-visible-edge",
+    "wrong-boundary", "duplicate-boundary", "different-rendered-edge",
+    "wrong-transform", "boundary-outside-crop", "inferred-crop", "nonfinite-projection",
+])
+def test_detail_refuses_missing_physical_interface_after_rebuild(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    if failure == "sketch-only":
+        native.rendered_edges.clear()
+    elif failure == "hidden-component":
+        native.drawing_components[0].Visible = False
+    elif failure == "missing-component":
+        native.visible_components.pop()
+    elif failure == "no-visible-edge":
+        native.component_edges["mg-magnifying-lever-1"].clear()
+    elif failure == "wrong-boundary":
+        curve = native.edges[1].GetCurve()
+        curve.CircleParams = (*curve.CircleParams[:6], 0.003)  # not the outer far-face arc
+    elif failure == "duplicate-boundary":
+        native.component_edges["mg-magnifying-bracket-1"].append(native.edges[1])
+    elif failure == "different-rendered-edge":
+        native.rendered_edges[0] = object()
+    elif failure == "wrong-transform":
+        native.transform_dx = 0.001
+    elif failure == "boundary-outside-crop":
+        native.boundary_paper_dy = 0.030
+    elif failure == "inferred-crop":
+        native.fence[:] = _native_crop_fence((0.0975, 0.053), 0.0225)
+    else:
+        native.boundary_paper_dy = float("nan")
+    moves = sum(event[0] in ("move", "caption-move") for event in native.events)
+    with pytest.raises(RuntimeError):
+        settled()
+    assert sum(event[0] in ("move", "caption-move") for event in native.events) == moves
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0
+    assert native.annotation.endpoints is native.endpoints
+
+
+def test_physical_reader_failure_still_collects_independent_visibility_and_ink(
+    lever_tip_native, monkeypatch,
+):
+    native = lever_tip_native
+    calls, messages = [], []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda text, **_kw: messages.append(text))
+
+    def drawing_components():
+        calls.append("drawing")
+        raise RuntimeError("drawing component reader refused")
+
+    def visible_components():
+        calls.append("visible")
+        return native.visible_components
+
+    def polylines(cross):
+        assert cross == 1
+        calls.append("polylines")
+        return native.rendered_edges, native.polyline * len(native.rendered_edges)
+
+    native.view.GetVisibleDrawingComponents = drawing_components
+    native.view.GetVisibleComponents = visible_components
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._projection_model_ink(native.adapter, native.view, stage="independent reader regression")
+    assert calls == ["drawing", "visible", "polylines"]
+    assert "drawing component reader refused" in messages[-1]
+    assert "'rendered_model_edges': 2" in messages[-1]
+    assert "mg-magnifying-lever-1" in messages[-1] and "mg-magnifying-bracket-1" in messages[-1]
+
+
+def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_native):
+    native = lever_tip_native
+    before = tuple(native.back_extent)
+    box = drawing._projection_note_box(native.back_caption)
+    assert drawing.boxes_clear(box, drawing._projection_crop_box(native.view))
+    assert not drawing.boxes_clear(box, tuple(native.outline))
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,),
+    )
+    assert drawing.boxes_clear(drawing._projection_note_box(native.back_caption), tuple(native.outline))
+    assert native.back_extent[1] == before[1] and native.back_extent[4] == before[4]
+    assert native.back_caption.GetText() == "VIEW FROM THE BACK"
+    assert native.back_extent[3] == pytest.approx(
+        native.outline[0] - drawing.CLEAR_GAP_M - drawing.PLACE_SETTLE_M
+    )
+    assert native.back_extent[0] >= native.margins[3]
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+    native.outline[0] -= 0.010
+    with pytest.raises(RuntimeError, match="actual native view outline"):
+        settled()
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+
+
+def test_moved_back_caption_must_still_clear_live_border_after_rebuild(lever_tip_native):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,),
+    )
+    native.back_extent[0] -= 0.002
+    native.back_extent[3] -= 0.002
+    with pytest.raises(RuntimeError, match="assembled back caption.*zone frame"):
+        settled()
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+
+
+@pytest.mark.parametrize("code", [0, 2, True, None])
+def test_physical_topology_identity_requires_native_integer_positive_control(
+    lever_tip_native, monkeypatch, code,
+):
+    native = lever_tip_native
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda text, **_kw: messages.append(text))
+
+    def identity(left, right):
+        if left is native.edges[0] and right is native.edges[0]:
+            return code
+        return int(left is right)
+
+    native.adapter.swApp.IsSame = identity
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._projection_model_ink(native.adapter, native.view, stage="identity control")
+    assert f"'identity_self': {code!r}" in messages[-1]
+    assert "'identity_rendered':" in messages[-1]
+    assert "'assembly_points':" in messages[-1]
+
+
+def test_back_caption_fit_never_moves_from_an_invalid_native_outline(lever_tip_native):
+    native = lever_tip_native
+    native.outline[0] = float("nan")
+    with pytest.raises(RuntimeError, match="non-finite native view outline"):
+        drawing._fit_projection_back_caption(
+            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
+        )
+    assert not any(event[0] == "caption-move" for event in native.events)
+
+
+@pytest.mark.parametrize("failure", ["refused-move", "ignored-move", "border"])
+def test_back_caption_fit_requires_actual_native_readback(lever_tip_native, failure):
+    native = lever_tip_native
+    if failure == "refused-move":
+        native.back_annotation.SetPosition2 = lambda *_args: False
+    elif failure == "ignored-move":
+        native.back_annotation.SetPosition2 = lambda *_args: True
+    else:
+        native.margins[3] = 0.020
+    with pytest.raises(RuntimeError):
+        drawing._fit_projection_back_caption(
+            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
+        )
+
+
+@pytest.mark.parametrize("fence", [
+    [], _native_crop_fence((0.0975, 0.053), 0.0225),
+    _native_crop_fence(radius=0), _native_crop_fence((float("nan"), 0.053)),
+])
+def test_native_crop_readback_refuses_nominal_only_or_shifted_fence(lever_tip_native, fence):
+    native = lever_tip_native
+    native.fence[:] = fence
+    with pytest.raises(RuntimeError, match="native crop fence"):
+        drawing._projection_crop_box(native.view)
+
+
+@pytest.mark.parametrize("failure", ["missing-out", "truncated", "cardinality", "nonfinite"])
+def test_model_polyline_reader_refuses_unproven_ink(lever_tip_native, failure):
+    native = lever_tip_native
+    result = (native.rendered_edges, native.polyline * 2)
+    if failure == "missing-out":
+        result = (native.rendered_edges,)
+    elif failure == "truncated":
+        result = (native.rendered_edges, native.polyline[:-1])
+    elif failure == "cardinality":
+        result = (native.rendered_edges, native.polyline)
+    else:
+        data = list(native.polyline * 2)
+        data[9] = float("nan")
+        result = (native.rendered_edges, data)
+    with pytest.raises(RuntimeError, match="GetPolylines7"):
+        drawing._projection_rendered_edges(result)
 
 
 @pytest.mark.parametrize("failure", [
@@ -1008,7 +1326,7 @@ def test_projection_source_collects_all_identity_codes_before_reader_failure(
 @pytest.mark.parametrize("failure", [
     "arrow-border", "witness-border", "caption-border", "caption-crop",
     "neighbour-caption", "neighbour-view", "scale", "uncropped", "missing-arrows",
-    "nonfinite-witness",
+    "nonfinite-witness", "direction-caption", "nonfinite-outline",
 ])
 def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native, failure):
     native = lever_tip_native
@@ -1021,6 +1339,10 @@ def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native
         native.line_x = 0.012
     elif failure == "nonfinite-witness":
         native.line_x = float("nan")
+    elif failure == "direction-caption":
+        native.caption.GetText = lambda: drawing.LEVER_TIP.label_text.replace("FRONT", "BACK")
+    elif failure == "nonfinite-outline":
+        native.outline[0] = float("nan")
     elif failure == "caption-border":
         native.caption_extent[1] = 0.012
     elif failure == "caption-crop":
@@ -1050,7 +1372,7 @@ def test_step_seven_uses_the_actual_detail_and_attached_qualifier():
     assert "1.25" not in step
 
 
-def test_lever_tip_placement_uses_physical_front_transform_and_native_isolation(monkeypatch):
+def test_lever_tip_placement_uses_opposite_native_view_and_isolation(monkeypatch):
     events = []
     detail = drawing.LEVER_TIP
     view = SimpleNamespace(Position=detail.centre)
@@ -1093,7 +1415,7 @@ def test_lever_tip_placement_uses_physical_front_transform_and_native_isolation(
         lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])),
     )
     assert drawing._placed_detail(adapter, detail) is view
-    assert events[0] == ("place", str(drawing.SOURCE), "*Front", detail.centre, (4, 1))
+    assert events[0] == ("place", str(drawing.SOURCE), "*Back", detail.centre, (4, 1))
     assert view.Position == pytest.approx((0.060, 0.070))
     assert events[-2:] == [
         ("HLR",), ("isolate", frozenset({"mg-magnifying-lever", "mg-magnifying-bracket"})),
@@ -1104,8 +1426,11 @@ def test_lever_tip_placement_uses_physical_front_transform_and_native_isolation(
     assert math.hypot(half_span_m, drawing._LEVER_R * 0.004) < detail.crop_radius
 
 
+@pytest.mark.parametrize("previous_direct", [False, True])
 @pytest.mark.parametrize("status,cropped", [(drawing.CROP_NO_ERROR, True), (0, False)])
-def test_lever_tip_reuses_native_crop_sketch_transform(monkeypatch, status, cropped):
+def test_lever_tip_reuses_native_crop_sketch_transform(
+    monkeypatch, status, cropped, previous_direct,
+):
     events = []
     transform = object()
 
@@ -1118,13 +1443,26 @@ def test_lever_tip_reuses_native_crop_sketch_transform(monkeypatch, status, crop
             x, y, z = self.ArrayData
             return Point((x / 4, y / 4, z))
 
-    manager = SimpleNamespace(AddToDB=True)
-    manager.CreateCircle = lambda *points: events.append(("circle", points)) or object()
+    manager = SimpleNamespace(AddToDB=previous_direct)
+    fence = []
+
+    def circle(*points):
+        events.append(("circle", points, manager.AddToDB))
+        cx, cy, _cz, rx, ry, _rz = (value * 4 for value in points)
+        if not manager.AddToDB:
+            cx -= 0.0025  # R24's witness inference, not a native layout acceptance.
+        fence[:] = _native_crop_fence((cx, cy), math.hypot(rx - cx, ry - cy))
+        return SimpleNamespace(
+            Select4=lambda append, data: events.append(("select", append, data)) or True
+        )
+
+    manager.CreateCircle = circle
     view = SimpleNamespace(
         GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=transform),
         Crop2=lambda *args: events.append(("Crop2", args)) or status,
         IsCropped=lambda: cropped,
         UpdateViewDisplayGeometry=lambda: events.append(("refresh",)),
+        GetDetailCircleInfo2=lambda: fence,
     )
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(
@@ -1136,6 +1474,7 @@ def test_lever_tip_reuses_native_crop_sketch_transform(monkeypatch, status, crop
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
     monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
     if cropped:
         drawing._crop(adapter, view, drawing.LEVER_TIP)
@@ -1144,10 +1483,45 @@ def test_lever_tip_reuses_native_crop_sketch_transform(monkeypatch, status, crop
             drawing._crop(adapter, view, drawing.LEVER_TIP)
     cx, cy = drawing.LEVER_TIP.centre
     radius = drawing.LEVER_TIP.crop_radius
-    assert events[0] == ("circle", (cx / 4, cy / 4, 0.0, (cx + radius) / 4, cy / 4, 0.0))
-    assert events[1] == ("Crop2", (False, False, 1))
+    assert events[0] == (
+        "circle", (cx / 4, cy / 4, 0.0, (cx + radius) / 4, cy / 4, 0.0), True,
+    )
+    assert events[1:3] == [("select", False, None), ("Crop2", (False, False, 1))]
     assert events[-1] == ("refresh",)
-    assert manager.AddToDB is True
+    assert manager.AddToDB is previous_direct
+
+
+@pytest.mark.parametrize("failure", ["creation", "selection"])
+def test_deterministic_crop_restores_database_mode_on_native_refusal(monkeypatch, failure):
+    manager = SimpleNamespace(AddToDB=False)
+    calls = []
+
+    def create(*_args):
+        assert manager.AddToDB is True
+        if failure == "creation":
+            raise RuntimeError("native circle creation refused")
+        return SimpleNamespace(Select4=lambda *_args: False)
+
+    manager.CreateCircle = create
+    view = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
+        Crop2=lambda *_args: calls.append("crop"),
+    )
+    utility = SimpleNamespace(CreatePoint=lambda values: SimpleNamespace(
+        MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=values),
+    ))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(SketchManager=manager),
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    with pytest.raises(RuntimeError, match="circle"):
+        drawing._crop(adapter, view, drawing.LEVER_TIP)
+    assert manager.AddToDB is False
+    assert calls == []
 
 
 def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(monkeypatch):

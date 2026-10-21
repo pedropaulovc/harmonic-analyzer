@@ -885,13 +885,14 @@ def _create_tap_projection(adapter: Any, point: Any, circle: Any, name: str) -> 
     return line
 
 
-def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str) -> tuple[str, str, int, int]:
-    """Read actual point/flat attachments and prove the exact common datum segment."""
+def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str, drawing_view: Any | None = None) -> tuple[str, str, int, int]:
+    """Prove model point/flat keys, explicitly mapping view-context attachments."""
     import _telemetry
 
     attached = types = ()
     point_key = flat_key = expected_flat = error = None
     dangling = None
+    mappings = []
     try:
         annotation = _early_bound(_early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
         attached = tuple(annotation.GetAttachedEntities3() or ())
@@ -903,6 +904,100 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str)
         segments = [entity for entity, kind in zip(attached, types, strict=True) if kind == 10]
         if len(points) != 1 or len(segments) != 1:
             raise RuntimeError("invalid native point/flat attachment types")
+        if drawing_view is not None:
+            import pythoncom
+            from solidworks_mcp.adapters._generated.sldworks_2026 import ISketchPoint, ISketchSegment
+
+            model = _early_bound(adapter.currentModel, "IModelDoc2")
+            extension = _early_bound(model.Extension, "IModelDocExtension")
+            view = _early_bound(drawing_view, "IView")
+            application = _early_bound(adapter.swApp, "ISldWorks")
+            mapped_entities = []
+            previous_owners = None
+            for role, entity, interface in (("point", points[0], "ISketchPoint"), ("flat", segments[0], "ISketchSegment")):
+                row = {"role": role, "interface": interface, "mapped_present": None, "contexts": {}, "shared_model_owner": None, "view_owner_present": None, "view_owner_self": None, "view_owner_match": None}
+                mappings.append(row)
+                owners = {}
+                for context in ("drawing", "model"):
+                    if context == "drawing":
+                        candidate = entity
+                    else:
+                        _telemetry.info(
+                            f"clamp attachment correspondence before: stage={stage}, role={role}, input={row!r}",
+                            operation_stage=f"{stage}.correspondence-before", attachment_role=role,
+                            correspondence_method="IModelDocExtension.GetCorresponding2", correspondence=repr(row),
+                        )
+                        candidate = extension.GetCorresponding2(entity)
+                        row["mapped_present"] = candidate is not None
+                        _telemetry.info(
+                            f"clamp attachment correspondence returned: stage={stage}, role={role}, present={candidate is not None}",
+                            operation_stage=f"{stage}.correspondence-returned", attachment_role=role,
+                            mapped_present=candidate is not None,
+                        )
+                        if candidate is None:
+                            raise RuntimeError(f"{role}: drawing attachment has no corresponding model object")
+                    evidence = {"queries": [], "self": None, "owner_self": None}
+                    row["contexts"][context] = evidence
+                    for name, cls in (("ISketchPoint", ISketchPoint), ("ISketchSegment", ISketchSegment)):
+                        query = {"interface": name, "iid": str(cls.CLSID), "supported": None, "hresult": None, "error": None}
+                        evidence["queries"].append(query)
+                        try:
+                            pointer = candidate._oleobj_.QueryInterface(cls.CLSID, pythoncom.IID_IUnknown)
+                            if pointer is None:
+                                raise RuntimeError("native QueryInterface returned no interface pointer")
+                            query.update(supported=True, hresult=0)
+                        except pythoncom.com_error as exc:
+                            query["hresult"] = exc.hresult
+                            if exc.hresult == -2147467262:
+                                query["supported"] = False
+                            else:
+                                query["error"] = repr(exc)
+                        except Exception as exc:
+                            query["error"] = repr(exc)
+                    if any(query["supported"] is not (query["interface"] == interface) for query in evidence["queries"]):
+                        raise RuntimeError(f"{role}: {context} attachment interface differs or is ambiguous")
+                    native = _early_bound(candidate, interface)
+                    evidence["self"] = application.IsSame(native, native)
+                    owner = _early_bound(native.GetSketch(), "ISketch")
+                    if owner is None:
+                        raise RuntimeError(f"{role}: {context} attachment has no owning sketch")
+                    evidence["owner_self"] = application.IsSame(owner, owner)
+                    if any(type(code) is not int or code != 1 for code in (evidence["self"], evidence["owner_self"])):
+                        raise RuntimeError(f"{role}: {context} attachment positive control failed")
+                    owners[context] = owner
+                # IDs need not survive context translation. Compare keys ONLY on
+                # the mapped model objects; prove the originating view separately.
+                if previous_owners is not None:
+                    row["shared_model_owner"] = application.IsSame(owners["model"], previous_owners[0])
+                    if type(row["shared_model_owner"]) is not int or row["shared_model_owner"] not in (0, 1):
+                        raise RuntimeError(f"{role}: model owner comparison unavailable")
+                # Reuse only this annotation's already-proven same-context owner;
+                # never retain a correspondence across calls or rebuilds.
+                if row["shared_model_owner"] == 1:
+                    view_owner = previous_owners[1]
+                else:
+                    _telemetry.info(
+                        f"clamp attachment owner correspondence before: stage={stage}, role={role}",
+                        operation_stage=f"{stage}.view-owner-correspondence-before", attachment_role=role,
+                        correspondence_method="IView.GetCorresponding", correspondence=repr(row),
+                    )
+                    view_owner = view.GetCorresponding(owners["model"])
+                row["view_owner_present"] = view_owner is not None
+                _telemetry.info(
+                    f"clamp attachment owner correspondence returned: stage={stage}, role={role}, present={view_owner is not None}, reused={row['shared_model_owner'] == 1}",
+                    operation_stage=f"{stage}.view-owner-correspondence-returned", attachment_role=role,
+                    mapped_present=view_owner is not None, reused_owner=row["shared_model_owner"] == 1,
+                )
+                if view_owner is None:
+                    raise RuntimeError(f"{role}: model owner has no correspondence in the requested view")
+                view_owner = _early_bound(view_owner, "ISketch")
+                row["view_owner_self"] = application.IsSame(view_owner, view_owner)
+                row["view_owner_match"] = application.IsSame(owners["drawing"], view_owner)
+                if any(type(code) is not int or code != 1 for code in (row["view_owner_self"], row["view_owner_match"])):
+                    raise RuntimeError(f"{role}: attachment does not belong to the requested drawing view")
+                mapped_entities.append(candidate)
+                previous_owners = owners["model"], view_owner
+            points, segments = [mapped_entities[0]], [mapped_entities[1]]
         point_key = _point_identity(adapter, points[0], stage=stage, role="attached-location-point")
         flat_key = _segment_identity(adapter, segments[0], stage=stage, role="attached-flat")
         expected_flat = _segment_identity(adapter, flat, stage=stage, role="expected-common-flat")
@@ -911,10 +1006,11 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str)
     except Exception as exc:
         error = exc
     _telemetry.info(
-        f"clamp native point/flat attachment: stage={stage}, types={types!r}, point={point_key!r}, flat={flat_key!r}, expected_flat={expected_flat!r}, dangling={dangling!r}, error={error!r}",
+        f"clamp native point/flat attachment: stage={stage}, types={types!r}, point={point_key!r}, flat={flat_key!r}, expected_flat={expected_flat!r}, dangling={dangling!r}, correspondence={mappings!r}, error={error!r}",
         operation_stage=stage, attachment_count=len(attached), attached_types=types,
         attached_point_identity=repr(point_key), attached_flat_identity=repr(flat_key),
         expected_flat_identity=repr(expected_flat), dangling=dangling, attachment_readback_error=repr(error),
+        attachment_correspondence=repr(mappings),
     )
     if error is not None:
         raise RuntimeError(f"{stage}: {error}") from error

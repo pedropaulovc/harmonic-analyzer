@@ -56,7 +56,9 @@ DETAIL_RADIUS_MM = 12.5
 # Four thread/shape rows fit between the native length witnesses. The upper
 # lane keeps the descending leader outside the mate text and below the 18 line.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
-FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.118, 0.150)}
+# R24: end the diameter witnesses left of the unchanged finish symbol/leader;
+# keep the qualifier above the screw-seat note and below the free-end note.
+FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
 DETAIL_THREAD_NOTE_XY = (0.2926, 0.245)
 DETAIL_THREAD_CALLOUT = PRINT_THREAD_CALLOUT.replace(" BRACKET", "\nBRACKET")
 CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
