@@ -6,6 +6,9 @@ pictorial clarity without replacing either manufacturing view.
 The property-linked tooth-system block comes from the rebuilt part: configured
 DP/PA, standard root/depth and the count-specific reference cutter, never the
 retired shallow chord-floor description.
+The owner-approved presentation uses 0.13 mm visible model edges in all three
+views of this drawing, not only the isometric. This drawing-component override
+does not alter the shared template, model appearance, geometry or other prints.
 """
 
 from __future__ import annotations
@@ -34,7 +37,6 @@ from _drawing_common import (
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
@@ -78,8 +80,8 @@ SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
 # The actual 1:1 trial struck the border and tooth note. At 1:2 the complete
-# pictorial fits the upper-right field. Request fine edges on that view only;
-# native PDF inspection must prove readable shading and unchanged orthographics.
+# pictorial fits the upper-right field. Owner-approved fine model-edge ink
+# across all three views keeps the full-length teeth and brass shading readable.
 ISO_SCALE = (1, 2)
 # The side view is the lathe view at the sheet scale; the end view projects
 # to its left (third angle) at 2:1 so the teeth and bore read, and says so
@@ -260,42 +262,65 @@ def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
         )
 
 
-def _set_isometric_edge_weight(adapter: Any, view: Any) -> None:
-    """Batch-override selected edges in the pictorial, not the part component.
+def _set_drawing_model_edge_weight(adapter: Any, view: Any) -> float:
+    """Use the owner-approved Thin model-edge ink across this part's views.
 
-    Native proof showed a root-component font change also thins both orthographic
-    views. Select model edges through IView instead, and use the drawing's
-    selected-edge API. No edge is hidden and no document default is changed.
-    Run after the final display-mode regeneration: the earlier HLR-view
-    formatting trial exported unchanged Thick ink. The actual exported PDF
-    must still prove the width and view scope.
+    Native trial 6d6b635 proved the part root's override affects all three views.
+    The owner explicitly accepted that scope for this print after inspecting
+    the complete thin-ink and thick-ink sheets side by side.
     """
     bound = _early_bound(view, "IView")
-    edges = visible_view_entities(bound, 1, label="alignment pictorial edge weight")
-    if not edges:
-        raise RuntimeError("alignment isometric has no visible edges")
-    model = adapter.currentModel
-    drawing = _early_bound(model, "IDrawingDoc")
-    model.ClearSelection2(True)
-    try:
-        for edge in edges:
-            if not bound.SelectEntity(_early_bound(edge, "IEntity"), True):
-                raise RuntimeError("failed to select alignment isometric edge")
-        selected = int(model.SelectionManager.GetSelectedObjectCount2(-1))
-        if selected != len(edges):
-            raise RuntimeError(
-                f"alignment isometric edge selection incomplete: {selected}/{len(edges)}"
-            )
-        # IDrawingDoc.SetLineWidthCustom applies to selected drawing edges;
-        # its documented unit is metres. One setter for the complete selection.
-        drawing.SetLineWidthCustom(0.00013)
-        _telemetry.event(
-            "alignment.isometric_selected_edges",
-            edges=selected,
-            thickness_m=0.00013,
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment drawing has no part drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"),
+            _sw_type_info.constant("swDetailingNoOptionSpecified"),
         )
-    finally:
-        model.ClearSelection2(True)
+    )
+    if abs(thin_width - 0.00013) > 1e-9:
+        raise RuntimeError(
+            f"alignment template Thin slot is not the approved 0.13 mm: {thin_width}"
+        )
+    component.UseDocumentDefaults = False
+    # Visible edges=1, swLW_THIN=0. The third argument is unused for a
+    # standard weight; no custom-width or document-default setter is involved.
+    component.SetLineThickness(1, 0, 0.0)
+    _assert_drawing_model_edge_weight(adapter, view, thin_width)
+    return thin_width
+
+
+def _assert_drawing_model_edge_weight(
+    adapter: Any, view: Any, expected_width: float
+) -> None:
+    # Reacquire after display regeneration/rebuild rather than retain a root
+    # wrapper from the authoring stage.
+    bound = _early_bound(view, "IView")
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment drawing lost its part drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
+    weight, _custom_thickness = component.GetLineThickness(1)
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"),
+            _sw_type_info.constant("swDetailingNoOptionSpecified"),
+        )
+    )
+    if (
+        bool(component.UseDocumentDefaults)
+        or int(weight) != 0
+        or abs(thin_width - expected_width) > 1e-9
+    ):
+        raise RuntimeError(
+            "alignment drawing Thin model edges did not persist: "
+            f"default={component.UseDocumentDefaults}, "
+            f"weight={weight}, thin_width={thin_width}, expected={expected_width}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -422,6 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
+    model_edge_width = _set_drawing_model_edge_weight(adapter, iso)
 
     return await finalize_drawing(
         adapter,
@@ -429,7 +455,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(lambda: _set_isometric_edge_weight(adapter, iso),),
+        settled_checks=(
+            lambda: _assert_drawing_model_edge_weight(adapter, iso, model_edge_width),
+        ),
     )
 
 
