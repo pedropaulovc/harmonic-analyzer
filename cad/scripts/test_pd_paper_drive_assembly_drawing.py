@@ -2408,14 +2408,28 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     )
 
     def set_configurations(only_visible, flags, names):
-        if only_visible is not True or tuple(flags) != (True,) or len(names) != 1:
+        flags, names = tuple(flags), tuple(names)
+        if (
+            type(only_visible) is not bool
+            or len(flags) != len(names)
+            or any(type(flag) is not bool for flag in flags)
+            or sum(flags) != 1
+        ):
             return False
-        selected = names[0]
-        if selected not in members_by_configuration:
+        if only_visible:
+            # Split fixtures may select a single visible configuration directly.
+            if len(names) != 1 or names[0] not in available:
+                return False
+        elif len(names) != len(available) or set(names) != set(available):
             return False
-        if selected != state.configuration:
-            native_rows[:] = members_by_configuration[selected]
-            state.configuration = selected
+        selected = next(name for name, visible in zip(names, flags, strict=True) if visible)
+        native_rows[:] = members_by_configuration[selected]
+        state.configuration = selected
+        # Native quantities follow eligible occurrences, not a caller's cell writes.
+        for index, column in enumerate(columns):
+            if column.kind == 203:
+                for row, group in enumerate(native_rows, 1):
+                    cells[row][index] = str(len(group))
         return True
 
     table.BomFeature = SimpleNamespace(

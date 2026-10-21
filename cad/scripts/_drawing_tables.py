@@ -675,9 +675,27 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
                 or status != 0
                 or projected != metadata[physical_index]
             ):
+                observations = ""
+                try:
+                    columns = tuple(
+                        (
+                            index, index + 1, kind, hidden,
+                            repr(metadata[index][0])[:192],
+                            str(metadata[index][1])[:96],
+                            str(metadata[index][2])[:96],
+                        )
+                        for index, (kind, hidden) in enumerate(physical)
+                    )
+                    observations = (
+                        f"; ColumnCount={visible}, TotalColumnCount={declared}; "
+                        f"columns(physical,visibility_property,kind,hidden,type,title,header)"
+                        f"={columns!r}; visible_read={repr(projected)[:512]}"
+                    )
+                except Exception:
+                    pass  # Failure evidence must not replace the strict refusal.
                 raise RuntimeError(
                     f"{label} BOM visible column projection disagrees at "
-                    f"{visible_index} (physical {physical_index})"
+                    f"{visible_index} (physical {physical_index}){observations}"
                 )
         return tuple(physical)
     except RuntimeError:
@@ -1049,10 +1067,9 @@ def insert_bom_table(
     draw.ClearSelection2(True)
     if bom is None:
         raise RuntimeError(f"SolidWorks failed to create the {label} BOM table")
-    # A COM-inserted top-level BOM starts with NO configuration bound (a
-    # header-only table without even its per-configuration QTY column) --
-    # IBomFeature::SetConfigurations is the documented binding path for
-    # top-level tables, so bind the selected configuration before formatting.
+    # Top-level membership is selected through IBomFeature, not the insertion
+    # Configuration argument. Set every available configuration's visibility
+    # explicitly, rather than relying on the drawing-creation selection.
     bom = _sw_type_info.early_bound_or_flag(bom, "IBomTableAnnotation", "BomFeature")
     feature = adapter._get_attr_or_call(bom, "BomFeature")
     if feature is None:
@@ -1061,15 +1078,55 @@ def insert_bom_table(
         feature,
         "IBomFeature",
         "SetConfigurations",
+        "GetConfigurations",
         "PartConfigurationGrouping",
         "DisplayAsOneItem",
     )
+    names, _visibility = feature.GetConfigurations(False, None)
+    names = tuple(names or ())
+    if (
+        not names
+        or any(type(name) is not str or not name for name in names)
+        or len(set(names)) != len(names)
+        or configuration not in names
+    ):
+        raise RuntimeError(
+            f"{label} BOM requested configuration {configuration!r} is not "
+            f"uniquely available: {repr(names)[:512]}"
+        )
+    # Use the complete available-name/visibility contract, including explicit
+    # false flags for every other configuration, before authoring any columns.
     if feature.SetConfigurations(
-        True, bool_array([True]), bstr_array([configuration])
+        False,
+        bool_array([name == configuration for name in names]),
+        bstr_array(names),
     ) is not True:
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
         )
+    settled_names, settled_visibility = feature.GetConfigurations(False, None)
+    settled_names = tuple(settled_names or ())
+    settled_visibility = tuple(settled_visibility or ())
+    if (
+        len(settled_names) != len(names)
+        or any(type(name) is not str for name in settled_names)
+        or set(settled_names) != set(names)
+        or len(settled_visibility) != len(settled_names)
+        or any(type(visible) is not bool for visible in settled_visibility)
+        or any(
+            visible is not (name == configuration)
+            for name, visible in zip(settled_names, settled_visibility, strict=True)
+        )
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration selection did not persist for "
+            f"{configuration!r}: names={repr(settled_names)[:512]}, "
+            f"visibility={repr(settled_visibility)[:256]}"
+        )
+    _telemetry.annotate(
+        bom_configuration_names=settled_names,
+        bom_configuration_visibility=settled_visibility,
+    )
     # swDisplay_ConfigurationWithSameName_AsOneItem=3 groups the internal BOM
     # names, not the displayed released Number custom property. Retain the
     # established setter order and materialize grouped rows before binding it.

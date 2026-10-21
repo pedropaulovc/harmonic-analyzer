@@ -657,10 +657,8 @@ class _NumberTable:
         return self.components
 
 
-@pytest.mark.parametrize("override,quantity,item", [(None, 1, "*"), ("Default", 3, "1")])
-def test_bom_configuration_selects_native_members_independently_of_rendered_view(
-    unwrapped_com, monkeypatch, override, quantity, item,
-):
+@pytest.fixture
+def configuration_bom(unwrapped_com, monkeypatch):
     members = {
         configuration: tuple(_component(
             f"native-wire-{ordinal}", configuration=member,
@@ -671,21 +669,66 @@ def test_bom_configuration_selects_native_members_independently_of_rendered_view
         )
     }
     table = _NumberTable(())
-    table.configuration = None
 
-    def select(only_visible, flags, names):
-        if only_visible is not True or tuple(flags) != (True,) or len(names) != 1:
-            return False
-        table.configuration = names[0]
-        table.components = members[table.configuration]
-        table.cells[1][2] = str(len(table.components))
-        return True
+    class ConfigurationFeature:
+        def __init__(self):
+            self.available = ("Default Simplified", "Default")
+            self.selected = ("Default Simplified",)
+            self.selection_override = None
+            self.malformed_readback = False
+            self.selection_attempted = False
+            self.PartConfigurationGrouping = 1
+            self.DisplayAsOneItem = False
+            self.update_members()
 
-    table.BomFeature = SimpleNamespace(
-        SetConfigurations=select, PartConfigurationGrouping=1, DisplayAsOneItem=False,
-    )
+        def update_members(self):
+            table.components = tuple(
+                component
+                for configuration in self.selected
+                for component in members[configuration]
+            )
+            table.cells[1][2] = str(len(table.components))
+
+        def GetConfigurations(self, only_visible, _visible):
+            names = self.selected if only_visible else self.available
+            flags = tuple(name in self.selected for name in names)
+            if self.malformed_readback and self.selection_attempted:
+                flags = tuple("True" if flag else False for flag in flags)
+            return tuple(names), flags
+
+        def SetConfigurations(self, only_visible, flags, names):
+            names = tuple(names)
+            if only_visible:
+                if flags is not None and (
+                    len(flags) != len(names) or any(flag is not True for flag in flags)
+                ):
+                    return False
+                flags = (True,) * len(names)
+            elif (
+                len(names) != len(self.available)
+                or set(names) != set(self.available)
+                or len(flags) != len(names)
+                or any(type(flag) is not bool for flag in flags)
+            ):
+                return False
+            if len(set(names)) != len(names) or any(
+                name not in self.available for name in names
+            ):
+                return False
+            self.selection_attempted = True
+            self.selected = (
+                self.selection_override
+                if self.selection_override is not None
+                else tuple(name for name, flag in zip(names, flags) if flag)
+            )
+            self.update_members()
+            return True
+
+    table.BomFeature = ConfigurationFeature()
     table.GetComponents2 = lambda row, configuration: (
-        table.components if configuration in ("", table.configuration) else ()
+        table.components if configuration == "" else (
+            members[configuration] if configuration in table.BomFeature.selected else ()
+        )
     )
     view = SimpleNamespace(
         ReferencedConfiguration="Default Simplified", InsertBomTable6=lambda *_: table,
@@ -702,6 +745,14 @@ def test_bom_configuration_selects_native_members_independently_of_rendered_view
     monkeypatch.setattr(tables, "rebuild_drawing", lambda *_, **__: None)
     monkeypatch.setattr(tables._sw_type_info, "early_bound", lambda obj, *_: obj)
     monkeypatch.setattr(tables._sw_type_info, "is_early_bound", lambda *_: True)
+    return adapter, view, table, members
+
+
+@pytest.mark.parametrize("override,quantity,item", [(None, 1, "*"), ("Default", 3, "1")])
+def test_bom_configuration_selects_native_members_independently_of_rendered_view(
+    configuration_bom, override, quantity, item,
+):
+    adapter, view, table, members = configuration_bom
     tables.insert_bom_table(
         adapter, view, anchor_xy=(0.1, 0.2), expected_components=(WIRE,),
         component_identities={WIRE: (WIRE, "LeverWire")}, part_number_property="Number",
@@ -719,10 +770,55 @@ def test_bom_configuration_selects_native_members_independently_of_rendered_view
     note = SimpleNamespace(GetBomBalloonText=lambda _upper: (
         "1" if any(
             (c.Name2, c.ReferencedConfiguration) == (selected.Name2, selected.ReferencedConfiguration)
-            for c in table.GetComponents2(1, table.configuration)
+            for c in table.GetComponents2(1, override or view.ReferencedConfiguration)
         ) else "*"
     ))
     assert note.GetBomBalloonText(True) == item
+
+
+@pytest.mark.parametrize(
+    "selection_override,malformed_readback",
+    [
+        pytest.param(("Default Simplified",), False, id="wrong-configuration"),
+        pytest.param(("Default", "Default Simplified"), False, id="extra-configuration"),
+        pytest.param(None, True, id="non-boolean-readback"),
+    ],
+)
+def test_bom_refuses_successful_selection_that_did_not_settle(
+    configuration_bom, selection_override, malformed_readback,
+):
+    adapter, view, table, _members = configuration_bom
+    feature = table.BomFeature
+    feature.selection_override = selection_override
+    feature.malformed_readback = malformed_readback
+    with pytest.raises(RuntimeError, match="BOM configuration selection did not persist"):
+        tables.insert_bom_table(
+            adapter, view, anchor_xy=(0.1, 0.2), expected_components=(WIRE,),
+            component_identities={WIRE: (WIRE, "LeverWire")}, part_number_property="Number",
+            configuration_grouping="same-name", configuration="Default", label="wire",
+        )
+    # A shared Number must not disguise the wrong native membership. Refusal
+    # leaves grouping and the native table untouched by Number projection.
+    assert feature.PartConfigurationGrouping == 1
+    assert feature.DisplayAsOneItem is False
+    assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "QTY."]
+    assert view.ReferencedConfiguration == "Default Simplified"
+
+
+def test_bom_refuses_unavailable_requested_configuration(configuration_bom):
+    adapter, view, table, members = configuration_bom
+    table.BomFeature.available = ("Default Simplified",)
+    with pytest.raises(RuntimeError, match="BOM requested configuration"):
+        tables.insert_bom_table(
+            adapter, view, anchor_xy=(0.1, 0.2), expected_components=(WIRE,),
+            component_identities={WIRE: (WIRE, "LeverWire")}, part_number_property="Number",
+            configuration_grouping="same-name", configuration="Default", label="wire",
+        )
+    assert table.GetComponents2(1, "") == members["Default Simplified"]
+    assert table.DisplayedText2(1, 2, True) == "1"
+    assert table.BomFeature.PartConfigurationGrouping == 1
+    assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "QTY."]
+    assert view.ReferencedConfiguration == "Default Simplified"
 
 
 @pytest.mark.parametrize("configuration", ["", "   "])
