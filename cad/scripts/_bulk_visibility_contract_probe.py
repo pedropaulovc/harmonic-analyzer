@@ -2250,7 +2250,8 @@ class NativeProbe:
 
     def views(self) -> dict[ViewId, tuple[Any, dict[NodeId, DrawingNode]]]:
         result = {}
-        sheet_arrays = array(self.draw().GetViews(), "all sheet views")
+        drawing = self.draw()
+        sheet_arrays = array(drawing.GetViews(), "all sheet views")
         require(
             len(sheet_arrays) == 2, Verdict.PRESERVATION, "all-view sheet count changed"
         )
@@ -2262,11 +2263,17 @@ class NativeProbe:
                 "extra/missing real fixture view",
             )
             sheet_view = self.bind(raw_views[0], "IView")
-            sheet = self.bind(sheet_view.Sheet, "ISheet")
-            name = sheet.GetName()
+            # The sheet/pseudo-view names its sheet; only real views own .Sheet.
+            name = api_string(sheet_view.Name, "fixture sheet view name")
             require(name in tuple(ViewId), Verdict.PRESERVATION, "unexpected sheet ID")
             view_id = ViewId(name)
             require(view_id not in result, Verdict.PRESERVATION, "duplicate sheet ID")
+            sheet = self.bind(drawing.Sheet(name), "ISheet")
+            require(
+                api_string(sheet.GetName(), "fixture named sheet name") == name,
+                Verdict.PRESERVATION,
+                "named-sheet lookup mismatch",
+            )
             view = self.bind(raw_views[1], "IView")
             require(
                 self.bind(view.Sheet, "ISheet").GetName() == view_id,

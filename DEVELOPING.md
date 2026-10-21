@@ -1634,8 +1634,21 @@ The probe now resolves the byte-pinned file inside its source checkout.
 `dodo.BULK_VISIBILITY_PROBE_TEMPLATE` adds the actual binary to the shared
 channel-drawing freshness/cache dependencies. Exact-commit Git acquisition
 delivers the input without changing installed templates or worker settings.
-Missing or changed bytes still fail closed. Cross-worker native construction,
-all 29 controls and the complete 32-output acceptance remain separate proof.
+Missing or changed bytes still fail closed. On worker 4, `09a8c3d` admitted this
+repository input twice, saved both fixture assemblies and completed two drawing
+activations with the actual result `(<COMObject ActivateDoc3>, 0)` and matching
+native identities. Its title refresh passed; C00 then failed because the sheet's
+own pseudoview returned `None` from `IView.Sheet`. C28 passed, source hashes
+remained unchanged and final owned-document inventory was empty.
+
+All-sheet inventory now reads each pseudoview's strict `Name`, resolves it through
+the owned drawing's indexed `Sheet(name)` getter and requires matching
+`ISheet.GetName()`. This follows the existing production layout collector; a
+pseudoview is not a model view. Real-view `Sheet` ownership, exact group counts
+and all downstream identity/layout/component guards remain required. No active
+sheet substitution, fallback or additional activation is used. The inert
+before/after smoke and 315 focused tests pass; the repaired native route, all
+29 controls and complete 32-output acceptance remain unproved.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible

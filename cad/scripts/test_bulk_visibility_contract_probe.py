@@ -870,6 +870,359 @@ class OfflineProbe(probe.NativeProbe):
         )
 
 
+@pytest.fixture
+def sheet_inventory(tmp_path, monkeypatch):
+    """Complete views() inventory through explicit inert native boundary ports."""
+    subject = OfflineProbe(tmp_path)
+    source = OfflineModel("R", 2, tmp_path / "R.sldasm")
+    sheets = {
+        key: SimpleNamespace(GetName=lambda key=key: str(key)) for key in probe.ViewId
+    }
+    sheet_calls, pseudo_sheet_reads, context_calls = [], [], []
+    controls = SimpleNamespace(pseudo_sheet_error=None, lookup_error=None)
+
+    class SheetPseudoView:
+        def __init__(self, name):
+            self.Name = str(name)
+
+        @property
+        def Sheet(self):
+            pseudo_sheet_reads.append(self.Name)
+            if controls.pseudo_sheet_error is not None:
+                raise controls.pseudo_sheet_error
+            return None
+
+    views, components, groups = {}, {}, {}
+    states = fixture_nodes()
+    subject.component_names = {
+        state.component_path: key for key, state in states.items()
+    }
+    subject.view_baselines = {}
+    for view_id in probe.ViewId:
+        view = OfflineModel(f"view-{view_id}", 0, "")
+        view.Name = f"view-{view_id}"
+        view.Sheet = sheets[view_id]
+        view.ReferencedDocument = source
+        view.ReferencedConfiguration = "Default"
+        view.GetOrientationName = lambda: "*Front"
+        view.ScaleRatio = (5.0, 1.0)
+        view.UseSheetScale = 0
+        view.Position = (0.1, 0.2, 0.0)
+        view.ModelToViewTransform = SimpleNamespace(ArrayData=probe.translation(0.0))
+        nodes = {}
+        for key, state in states.items():
+            node = OfflineModel(f"dc-{view_id}-{key}", 0, "")
+            node.IsRoot = lambda: False
+            node.View = view
+            node.Visible = state.own
+            node.Component = SimpleNamespace(
+                state={
+                    "path": state.component_path,
+                    "source": state.source_path,
+                    "configuration": state.configuration,
+                    "transform": state.transform,
+                }
+            )
+            nodes[key] = node
+        for key, node in nodes.items():
+            node.GetChildren = lambda key=key, nodes=nodes: tuple(
+                nodes[child] for child in probe.NodeId if probe.PARENTS[child] is key
+            )
+        root = SimpleNamespace(
+            IsRoot=lambda: True,
+            GetChildren=lambda nodes=nodes: tuple(
+                nodes[key] for key in probe.NodeId if probe.PARENTS[key] is None
+            ),
+        )
+        view.RootDrawingComponent2 = lambda _resolve, root=root: root
+        views[view_id], components[view_id] = view, nodes
+        groups[view_id] = [SheetPseudoView(view_id), view]
+
+    drawing = SimpleNamespace(
+        groups=[groups[probe.ViewId.B], groups[probe.ViewId.A]],
+        current=probe.ViewId.A,
+        ActiveDrawingView=None,
+    )
+    drawing.GetViews = lambda: tuple(tuple(group) for group in drawing.groups)
+
+    def named_sheet(name):
+        sheet_calls.append(name)
+        if controls.lookup_error is not None:
+            raise controls.lookup_error
+        return sheets[name]
+
+    def current_sheet():
+        context_calls.append(("GetCurrentSheet",))
+        return sheets[drawing.current]
+
+    def activate_sheet(name):
+        context_calls.append(("ActivateSheet", name))
+        drawing.current = name
+        drawing.ActiveDrawingView = None
+        return True
+
+    def activate_view(name):
+        context_calls.append(("ActivateView", name))
+        drawing.ActiveDrawingView = next(
+            view for view in views.values() if view.Name == name
+        )
+        return True
+
+    drawing.Sheet = named_sheet
+    drawing.GetCurrentSheet = current_sheet
+    drawing.ActivateSheet = activate_sheet
+    drawing.ActivateView = activate_view
+    monkeypatch.setattr(subject, "draw", lambda: drawing)
+    monkeypatch.setattr(subject, "model", lambda label: source)
+    monkeypatch.setattr(subject, "component_state", lambda component: component.state)
+    monkeypatch.setattr(
+        subject,
+        "activate",
+        lambda label: context_calls.append(("activate", label)) or drawing,
+    )
+    return SimpleNamespace(
+        subject=subject,
+        source=source,
+        drawing=drawing,
+        sheets=sheets,
+        groups=groups,
+        views=views,
+        components=components,
+        controls=controls,
+        sheet_calls=sheet_calls,
+        pseudo_sheet_reads=pseudo_sheet_reads,
+        context_calls=context_calls,
+    )
+
+
+def test_sheet_inventory_resolves_distinct_named_groups(sheet_inventory):
+    fixture = sheet_inventory
+    result = fixture.subject.views()
+    assert set(result) == set(probe.ViewId)
+    for key, (view, nodes) in result.items():
+        assert view is fixture.views[key]
+        assert set(nodes) == set(probe.NodeId)
+        assert all(
+            node.drawing_component is fixture.components[key][name]
+            for name, node in nodes.items()
+        )
+    assert fixture.sheet_calls == [group[0].Name for group in fixture.drawing.groups]
+    assert fixture.pseudo_sheet_reads == []
+    assert fixture.context_calls == []
+    assert fixture.drawing.current is probe.ViewId.A
+
+
+def test_sheet_inventory_order_is_not_active_sheet_order(sheet_inventory):
+    fixture = sheet_inventory
+    fixture.drawing.groups.reverse()
+    fixture.controls.pseudo_sheet_error = AssertionError("pseudo Sheet is not an owner")
+    result = fixture.subject.views()
+    assert {key: view for key, (view, _nodes) in result.items()} == fixture.views
+    assert fixture.sheet_calls == [str(probe.ViewId.A), str(probe.ViewId.B)]
+    assert fixture.context_calls == []
+    assert fixture.drawing.current is probe.ViewId.A
+    # A fresh full read must retain real view and drawing-component generations.
+    assert set(fixture.subject.views()) == set(probe.ViewId)
+    assert fixture.pseudo_sheet_reads == []
+
+
+@pytest.mark.parametrize("name", [None, "", 17, "UnexpectedSheet"])
+def test_sheet_inventory_rejects_invalid_pseudo_name(sheet_inventory, name):
+    fixture = sheet_inventory
+    fixture.drawing.groups[0][0].Name = name
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.views()
+    assert fixture.sheet_calls == []
+    assert fixture.context_calls == []
+
+
+@pytest.mark.parametrize("fault", ["null", "wrong_name", "invalid_name"])
+def test_sheet_inventory_named_lookup_fails_closed(sheet_inventory, fault):
+    fixture = sheet_inventory
+    fixture.sheets[probe.ViewId.B] = {
+        "null": None,
+        "wrong_name": SimpleNamespace(GetName=lambda: str(probe.ViewId.A)),
+        "invalid_name": SimpleNamespace(GetName=lambda: None),
+    }[fault]
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.views()
+    assert fixture.sheet_calls == [str(probe.ViewId.B)]
+    assert fixture.context_calls == []
+    assert fixture.pseudo_sheet_reads == []
+
+
+def test_sheet_inventory_preserves_named_lookup_exception(sheet_inventory):
+    fixture = sheet_inventory
+    original = OSError("named sheet lookup failed")
+    fixture.controls.lookup_error = original
+    with pytest.raises(OSError) as caught:
+        fixture.subject.views()
+    assert caught.value is original
+    assert fixture.sheet_calls == [str(probe.ViewId.B)]
+    assert fixture.context_calls == []
+
+
+@pytest.mark.parametrize("fault", ["null", "wrong_name"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_sheet_inventory_retains_real_view_owner_check(sheet_inventory, fault, reverse):
+    fixture = sheet_inventory
+    if reverse:
+        fixture.drawing.groups.reverse()
+    first, last = (probe.ViewId(group[0].Name) for group in fixture.drawing.groups)
+    fixture.views[last].Sheet = None if fault == "null" else fixture.sheets[first]
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.views()
+    # The first group passed, but failure in the second is not skipped.
+    assert fixture.sheet_calls == [str(first), str(last)]
+    assert fixture.context_calls == []
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "missing_group",
+        "extra_group",
+        "empty_group",
+        "sheet_only",
+        "extra_real_view",
+        "null_pseudo",
+        "duplicate_name",
+    ],
+)
+def test_sheet_inventory_rejects_incomplete_or_ambiguous_groups(sheet_inventory, fault):
+    fixture = sheet_inventory
+    groups = fixture.drawing.groups
+    if fault == "missing_group":
+        groups.pop()
+    elif fault == "extra_group":
+        groups.append(groups[0])
+    elif fault == "empty_group":
+        groups[1] = []
+    elif fault == "sheet_only":
+        groups[1] = groups[1][:1]
+    elif fault == "extra_real_view":
+        groups[1].append(groups[1][1])
+    elif fault == "null_pseudo":
+        groups[1][0] = None
+    else:
+        groups[1][0].Name = str(probe.ViewId.B)
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.views()
+    assert fixture.context_calls == []
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "source",
+        "orientation",
+        "configuration",
+        "scale",
+        "component_path",
+        "component_owner",
+        "duplicate_component",
+        "missing_component",
+    ],
+)
+def test_sheet_inventory_keeps_downstream_contracts(sheet_inventory, fault):
+    fixture = sheet_inventory
+    view = fixture.views[probe.ViewId.A]
+    if fault == "source":
+        view.ReferencedDocument = OfflineModel("foreign R", 2, "foreign.sldasm")
+    elif fault == "orientation":
+        view.GetOrientationName = lambda: "*Back"
+    elif fault == "configuration":
+        view.ReferencedConfiguration = "Other"
+    elif fault == "scale":
+        view.ScaleRatio = (1.0, 1.0)
+    else:
+        node = fixture.components[probe.ViewId.A][probe.NodeId.Q2]
+        if fault == "component_path":
+            node.Component.state["path"] = "foreign"
+        elif fault == "duplicate_component":
+            nodes = fixture.components[probe.ViewId.A]
+            nodes[probe.NodeId.P2].Component.state["path"] = nodes[
+                probe.NodeId.P1
+            ].Component.state["path"]
+        elif fault == "missing_component":
+            root = view.RootDrawingComponent2(False)
+            children = root.GetChildren()
+            root.GetChildren = lambda: tuple(
+                child for child in children if child is not node
+            )
+        else:
+            node.View = fixture.views[probe.ViewId.B]
+    expected = (
+        "unmapped/duplicate full drawing component path"
+        if fault == "duplicate_component"
+        else None
+    )
+    with pytest.raises(probe.ProbeFailure, match=expected):
+        fixture.subject.views()
+    assert fixture.sheet_calls == [str(probe.ViewId.B), str(probe.ViewId.A)]
+    assert fixture.context_calls == []
+
+
+@pytest.mark.parametrize(
+    "fault", ["view_generation", "component_generation", "transform", "position"]
+)
+def test_sheet_inventory_retains_generation_and_layout_baselines(
+    sheet_inventory, fault
+):
+    from copy import copy
+
+    fixture = sheet_inventory
+    fixture.subject.views()
+    fixture.sheet_calls.clear()
+    view = fixture.views[probe.ViewId.A]
+    if fault == "view_generation":
+        fixture.groups[probe.ViewId.A][1] = copy(view)
+    elif fault == "component_generation":
+        nodes = fixture.components[probe.ViewId.A]
+        nodes[probe.NodeId.Q2] = copy(nodes[probe.NodeId.Q2])
+    elif fault == "transform":
+        view.ModelToViewTransform.ArrayData = probe.translation(0.01)
+    else:
+        view.Position = (0.11, 0.2, 0.0)
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.views()
+    assert fixture.sheet_calls == [str(probe.ViewId.B), str(probe.ViewId.A)]
+    assert fixture.context_calls == []
+
+
+def test_activate_view_consumes_full_named_sheet_inventory(sheet_inventory):
+    fixture = sheet_inventory
+    fixture.subject.activate_view(probe.ViewId.A)
+    assert fixture.sheet_calls == [str(probe.ViewId.B), str(probe.ViewId.A)]
+    assert fixture.context_calls == [
+        ("activate", probe.Document.DRAWING),
+        ("ActivateSheet", probe.ViewId.A),
+        ("ActivateView", fixture.views[probe.ViewId.A].Name),
+        ("GetCurrentSheet",),
+    ]
+    assert fixture.drawing.ActiveDrawingView is fixture.views[probe.ViewId.A]
+    assert fixture.pseudo_sheet_reads == []
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_activate_view_refuses_late_group_failure_before_view_activation(
+    sheet_inventory, reverse
+):
+    fixture = sheet_inventory
+    if reverse:
+        fixture.drawing.groups.reverse()
+    names = [group[0].Name for group in fixture.drawing.groups]
+    fixture.views[probe.ViewId(names[-1])].Sheet = None
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.activate_view(probe.ViewId.A)
+    assert fixture.sheet_calls == names
+    assert fixture.context_calls == [
+        ("activate", probe.Document.DRAWING),
+        ("ActivateSheet", probe.ViewId.A),
+    ]
+    assert fixture.drawing.ActiveDrawingView is None
+
+
 class TemplateString(str):
     pass
 
