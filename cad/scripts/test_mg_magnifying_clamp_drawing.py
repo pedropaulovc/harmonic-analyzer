@@ -2674,57 +2674,108 @@ def test_common_flat_cutover_changes_the_accepted_set_without_tightening_dot_xx(
 
 
 def _flat_group_fixture(monkeypatch):
+    import sys
+
     fixture = _TapProjectionFixture(monkeypatch)
     points = dict(zip(spec.Z_FLAT_DIMENSIONS[1:], (fixture.tap, _WitnessPoint(fixture.tap.owner, 0.0, 0.0)), strict=True))
     for name, point in points.items():
         part._measure_tap_from_flat(fixture.adapter, point, fixture.circle, fixture.flat, name)
+    # R26 bd160ae task.log 158–161, 295–337, 355–410: the observed bore
+    # source/view IDs are (0,2), flat line (1,2). Other members remain stateful
+    # synthetic regressions, NOT claims of native forward success for those taps.
+    fixture.center.identifiers = (0, 2)
+    fixture.flat.GetID = lambda: (1, 2)
+    for index, line in enumerate(fixture.lines):
+        line.GetStartPoint2().identifiers = (5 + 3 * index, 6 + 3 * index)
+        line.GetEndPoint2().identifiers = (6 + 3 * index, 7 + 3 * index)
     dimensions = fixture.install_rebuild(monkeypatch, points)
-    # The view's sketch deliberately has the SAME feature name, but a distinct
-    # native identity. Part inventory lookup on these drawing objects must fail.
-    fixture.drawing_sketch = _NativeSketch("drawing-right", fixture.sketch.feature_name)
-    fixture.view_owners = [
-        (fixture.sketch, fixture.drawing_sketch),
-        (fixture.tap.GetSketch(), _NativeSketch("drawing-top", fixture.tap.GetSketch().feature_name)),
-    ]
-    fixture.correspondence, fixture.mapping_calls, fixture.view_mapping_calls = {}, [], []
+    fixture.source_displays = dimensions
+    wrapper = sys.modules["solidworks_mcp.adapters._generated.sldworks_2026"]
+    sys.modules["pythoncom"].IID_IDispatch = "fixture-IDispatch"
+    for interface in ("IAnnotation", "IDimension", "IFeature", "IModelDoc2", "ISketch", "IView"):
+        setattr(wrapper, interface, SimpleNamespace(CLSID=f"fixture-{interface}-IID"))
 
-    def corresponding_model(entity):
-        fixture.mapping_calls.append(entity)
-        return fixture.correspondence.get(id(entity))
+    def tag(value, interface):
+        if not hasattr(value, "_oleobj_"):
+            value._oleobj_ = _WitnessDispatch(interface)
+        value._oleobj_.capabilities[getattr(wrapper, interface).CLSID] = True
+        value._oleobj_.capabilities["fixture-IDispatch"] = True
+        return value
 
-    def corresponding_view(owner):
-        fixture.view_mapping_calls.append(owner)
-        return next((view_owner for model_owner, view_owner in fixture.view_owners if _native_same(owner, model_owner) == 1), None)
+    fixture.tag = tag
+    fixture.drawing_sketch = tag(_NativeSketch("drawing-right", fixture.sketch.feature_name), "ISketch")
+    fixture.forward_sketch = tag(_NativeSketch("drawing-right", fixture.sketch.feature_name), "ISketch")
+    tag(fixture.sketch, "ISketch")
+    tag(fixture.model, "IModelDoc2")
+    fixture.model.GetType = lambda: 1
+    # R26 411=0, 412=1: GetFeatureOwner's sketch is deliberately NOT part
+    # authority, even though the feature name and native dimension agree.
+    fixture.dimension_feature = tag(_NativeFeature(fixture.drawing_sketch), "IFeature")
+    fixture.forward_feature = tag(_NativeFeature(fixture.forward_sketch), "IFeature")
+    fixture.forward_entities, fixture.source_by_import = {}, {}
+    fixture.mapping_calls, fixture.inverse_calls = [], []
 
-    def import_entity(source):
+    def source_key(entity):
+        kind = "ISketchPoint" if isinstance(entity, _WitnessPoint) else entity.GetType()
+        return entity.GetSketch().token, kind, *entity.GetID()
+
+    fixture.source_key = source_key
+
+    def drawing_entity(source, owner):
         if isinstance(source, _WitnessPoint):
             proxy = _point_proxy(source)
-            proxy.owner = fixture.drawing_sketch
-            proxy.X += 0.125  # Drawing coordinates are not model identity.
-        else:
-            proxy = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=source.GetType(), identifiers=source.GetID())
-            proxy.owner_sketch = fixture.drawing_sketch
-            proxy.GetSketch = lambda: fixture.drawing_sketch
-        fixture.correspondence[id(proxy)] = source
+            proxy.owner = owner
+            proxy.X += 0.125
+            return tag(proxy, "ISketchPoint")
+        proxy = _native_sketch_segment(owner=owner.feature_name, kind=source.GetType(), identifiers=source.GetID())
+        proxy.owner_sketch = owner
+        proxy.GetSketch = lambda: owner
+        return tag(proxy, "ISketchSegment")
+
+    def import_entity(source):
+        tag(source, "ISketchPoint" if isinstance(source, _WitnessPoint) else "ISketchSegment")
+        proxy = drawing_entity(source, fixture.drawing_sketch)
+        fixture.source_by_import[id(proxy)] = source
+        key = source_key(source)
+        if key not in fixture.forward_entities:
+            fixture.forward_entities[key] = drawing_entity(source, fixture.forward_sketch)
         return proxy
 
+    def corresponding_view(entity):
+        fixture.mapping_calls.append(entity)
+        if entity is fixture.dimension_feature:
+            return fixture.forward_feature
+        # Only actual source entities are accepted; owner-only mapping is not
+        # an alternative. Source IDs identify the fake API input, not the view.
+        assert entity.GetSketch() is fixture.sketch
+        return fixture.forward_entities.get(source_key(entity))
+
+    def inverse_forbidden(entity):
+        fixture.inverse_calls.append(entity)
+        raise AssertionError("reverse correspondence is not part of attachment acceptance")
+
     fixture.import_entity = import_entity
-    fixture.model.Extension = SimpleNamespace(GetCorresponding2=corresponding_model)
-    view = SimpleNamespace(ReferencedDocument=fixture.model, GetCorresponding=corresponding_view)
+    fixture.model.Extension = SimpleNamespace(GetCorresponding2=inverse_forbidden)
+    view = tag(SimpleNamespace(ReferencedDocument=fixture.model, GetCorresponding=corresponding_view), "IView")
     annotations = []
     for name, source_display in dimensions.items():
-        source_dimension = source_display.GetDimension2(0)
-        dimension = SimpleNamespace(
+        source_dimension = tag(source_display.GetDimension2(0), "IDimension")
+        source_dimension.dimension_token = name
+        source_dimension.GetFeatureOwner = lambda: fixture.dimension_feature
+        source_annotation = tag(source_display.GetAnnotation(), "IAnnotation")
+        source_annotation.OwnerType, source_annotation.Owner = 3, fixture.model
+        dimension = tag(SimpleNamespace(
             Name=name, FullName=source_dimension.FullName, DrivenState=1,
             SystemValue=source_dimension.SystemValue, Tolerance=SimpleNamespace(Type=0),
-        )
+            dimension_token=name, GetFeatureOwner=lambda: fixture.dimension_feature,
+        ), "IDimension")
         text = {}
-        attached = tuple(import_entity(entity) for entity in source_display.GetAnnotation().GetAttachedEntities3())
-        annotation = SimpleNamespace(
+        attached = tuple(import_entity(entity) for entity in source_annotation.GetAttachedEntities3())
+        annotation = tag(SimpleNamespace(
             GetAttachedEntities3=lambda value=attached: value,
-            GetAttachedEntityTypes=source_display.GetAnnotation().GetAttachedEntityTypes,
-            IsDangling=lambda: False, Visible=1,
-        )
+            GetAttachedEntityTypes=source_annotation.GetAttachedEntityTypes,
+            IsDangling=lambda: False, Visible=1, OwnerType=0, Owner=view,
+        ), "IAnnotation")
         display = SimpleNamespace(
             GetDimension2=lambda _index, value=dimension: value,
             GetPrimaryPrecision2=lambda: 2, ShowParenthesis=False,
@@ -2734,6 +2785,14 @@ def _flat_group_fixture(monkeypatch):
         )
         annotation.GetSpecificAnnotation = lambda value=display: value
         annotations.append(annotation)
+
+    def native_same(left, right):
+        if hasattr(left, "dimension_token") and hasattr(right, "dimension_token"):
+            return int(left.dimension_token == right.dimension_token)
+        return _native_same(left, right)
+
+    fixture.same = native_same
+    fixture.adapter.swApp.IsSame = native_same
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_named_dimension", part._named_dimension)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetDimension2(0).Name)
@@ -2754,10 +2813,12 @@ def test_grouping_retains_three_distinct_source_measurements_and_one_real_visibl
     assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
     assert len(spec.DRAWING_PRECISION_BY_NAME) == 9 and len(spec.VISIBLE_DIMENSIONS) == 7
     assert spec.DIMENSION_GROUPS == {"LeverBoreFromZFlat": spec.Z_FLAT_DIMENSIONS}
-    # Two complete readbacks, three annotations each, two attachments each.
-    assert len(fixture.mapping_calls) == 12
-    assert len(fixture.view_mapping_calls) == 6  # Shared owner round-trips once.
-    assert all(entity.GetSketch() is fixture.drawing_sketch for entity in fixture.mapping_calls)
+    # Two readbacks, three dimensions, a feature and two actual entities each.
+    assert len(fixture.mapping_calls) == 18
+    assert sum(entity is fixture.dimension_feature for entity in fixture.mapping_calls) == 6
+    assert all(entity.GetSketch() is fixture.sketch for entity in fixture.mapping_calls if entity is not fixture.dimension_feature)
+    assert fixture.inverse_calls == []
+    assert _native_same(fixture.dimension_feature.GetSpecificFeature2(), fixture.sketch) == 0
     fields = fixture.events[-1][1]
     assert fields["source_dimension_count"] == 3 and fields["visible_dimension_count"] == 1
     drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
@@ -2811,33 +2872,30 @@ def test_grouping_refuses_unproved_native_members_before_hiding_any_dimension(mo
     assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in original_annotations)
 
 
-def test_grouping_accepts_documented_model_keys_after_mapping_distinct_dispatches(monkeypatch) -> None:
+def test_grouping_matches_distinct_drawing_proxies_without_equating_model_ids(monkeypatch) -> None:
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
-    proxy_flat = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=0, identifiers=fixture.flat.GetID())
-    proxy_flat.owner_sketch = fixture.sketch
-    proxy_flat.GetSketch = lambda: fixture.sketch
-    assert _native_same(proxy_flat, fixture.flat) == 0
-    for annotation in annotations:
+    for index, annotation in enumerate(annotations):
         flat, point = annotation.GetAttachedEntities3()
-        model_point = fixture.correspondence[id(point)]
-        proxy_point = _point_proxy(model_point)
-        assert _native_same(proxy_point, model_point) == 0
-        fixture.correspondence[id(point)] = proxy_point
-        fixture.correspondence[id(flat)] = proxy_flat
-        # Neither drawing coordinates nor drawing IDs are compared with model
-        # IDs. The actual correspondence supplies independently validated keys.
-        point.identifiers = (9001, 9002)
-        flat.GetID = lambda: (9003, 9004)
+        model_point = fixture.source_by_import[id(point)]
+        mapped_point = fixture.forward_entities[fixture.source_key(model_point)]
+        mapped_flat = fixture.forward_entities[fixture.source_key(fixture.flat)]
+        assert _native_same(mapped_point, point) == 0
+        assert _native_same(mapped_flat, flat) == 0
+        point.identifiers = mapped_point.identifiers = (9000 + 2 * index, 9001 + 2 * index)
+        flat.GetID = mapped_flat.GetID = lambda: (9900, 9901)
+        assert point.GetID() != model_point.GetID()
+        assert flat.GetID() != fixture.flat.GetID()
         annotation.GetAttachedEntities3 = lambda flat=flat, point=point: (point, flat)
         annotation.GetAttachedEntityTypes = lambda: (11, 10)
     drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert fixture.inverse_calls == []
 
 
 def test_view_attachment_is_not_a_part_object_even_with_same_name_and_ids(monkeypatch) -> None:
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     annotation = annotations[0]
     _flat, point = annotation.GetAttachedEntities3()
-    model_point = fixture.correspondence[id(point)]
+    model_point = fixture.source_by_import[id(point)]
     assert point.GetID() == model_point.GetID()
     assert point.GetSketch().feature_name == model_point.GetSketch().feature_name
     assert _native_same(point.GetSketch(), model_point.GetSketch()) == 0
@@ -2845,32 +2903,42 @@ def test_view_attachment_is_not_a_part_object_even_with_same_name_and_ids(monkey
         part._point_flat_attachment(fixture.adapter, annotation.GetSpecificAnnotation(), fixture.flat, stage="unmapped-view")
     assert not fixture.mapping_calls
     drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert fixture.inverse_calls == []
 
 
 @pytest.mark.parametrize("failure", (
     "missing-point", "missing-flat", "wrong-point-type", "wrong-flat-type",
     "ambiguous-point", "unavailable-point-capability", "null-point-capability",
-    "invalid-point-id", "reversed-point-id", "wrong-flat-id", "wrong-flat-kind",
-    "known-other-owner", "unknown-owner", "wrong-view", "missing-view-owner",
-    "unknown-view-identity", "drawing-owner-self", "mapped-owner-self",
-    "drawing-point-self", "wrong-drawing-type", "mapping-error",
+    "invalid-point-id", "bool-point-id", "reversed-point-id", "wrong-flat-id", "wrong-flat-kind",
+    "wrong-drawing-type", "drawing-point-self", "mapped-point-self", "drawing-owner-self",
+    "mapped-owner-self", "unknown-owner-comparison", "wrong-view-sketch", "null-owner", "wrong-owner-interface",
+    "wrong-view", "owner-type", "unknown-view-identity", "wrong-dimension", "dimension-self",
+    "wrong-feature", "missing-feature-map", "wrong-feature-map-interface", "wrong-feature-type",
+    "wrong-feature-name", "missing-feature-sketch", "wrong-feature-sketch-interface", "wrong-feature-sketch",
+    "feature-sketch-self", "missing-attached", "null-attached", "wrong-types", "unknown-dangling", "mapping-error",
 ))
-def test_grouping_rejects_unproved_drawing_model_correspondence(monkeypatch, failure) -> None:
+def test_grouping_rejects_unproved_forward_correspondence_before_hiding(monkeypatch, failure) -> None:
     import ast
+    import sys
 
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "ThumbTapFromZFlat")
     flat, point = annotation.GetAttachedEntities3()
-    mapped = _point_proxy(fixture.correspondence[id(point)])
-    fixture.correspondence[id(point)] = mapped
+    model_point = fixture.source_by_import[id(point)]
+    point_key = fixture.source_key(model_point)
+    flat_key = fixture.source_key(fixture.flat)
+    mapped = fixture.forward_entities[point_key]
+    mapped_flat = fixture.forward_entities[flat_key]
+    dimension = annotation.GetSpecificAnnotation().GetDimension2(0)
+    wrapper = sys.modules["solidworks_mcp.adapters._generated.sldworks_2026"]
     if failure == "missing-point":
-        fixture.correspondence[id(point)] = None
+        fixture.forward_entities[point_key] = None
     elif failure == "missing-flat":
-        fixture.correspondence[id(flat)] = None
+        fixture.forward_entities[flat_key] = None
     elif failure == "wrong-point-type":
-        fixture.correspondence[id(point)] = fixture.flat
+        fixture.forward_entities[point_key] = mapped_flat
     elif failure == "wrong-flat-type":
-        fixture.correspondence[id(flat)] = mapped
+        fixture.forward_entities[flat_key] = mapped
     elif failure == "ambiguous-point":
         mapped._oleobj_.capabilities[_WitnessDispatch.segment_iid] = True
     elif failure == "unavailable-point-capability":
@@ -2879,68 +2947,182 @@ def test_grouping_rejects_unproved_drawing_model_correspondence(monkeypatch, fai
         mapped._oleobj_.capabilities[_WitnessDispatch.point_iid] = None
     elif failure == "invalid-point-id":
         mapped.identifiers = (1,)
+    elif failure == "bool-point-id":
+        mapped.identifiers = (True, 2)
     elif failure == "reversed-point-id":
-        mapped.identifiers = mapped.identifiers[::-1]
-    elif failure in ("wrong-flat-id", "wrong-flat-kind"):
-        other = _native_sketch_segment(kind=1 if failure == "wrong-flat-kind" else 0, identifiers=fixture.flat.GetID() if failure == "wrong-flat-kind" else (99, 2))
-        other.GetSketch = lambda: fixture.sketch
-        fixture.correspondence[id(flat)] = other
-    elif failure == "known-other-owner":
-        mapped.owner = fixture.tap.GetSketch()
-        point.owner = fixture.view_owners[1][1]
-    elif failure == "unknown-owner":
-        mapped.owner = _NativeSketch("unknown-model-owner", fixture.sketch.feature_name)
-        # Even a successful view round-trip cannot substitute for part inventory.
-        view.GetCorresponding = lambda _owner: fixture.drawing_sketch
-    elif failure == "wrong-view":
-        point.owner = _NativeSketch("another-drawing-view", fixture.sketch.feature_name)
-    elif failure == "missing-view-owner":
-        view.GetCorresponding = lambda _owner: None
-    elif failure == "unknown-view-identity":
-        view_owner = _NativeSketch(fixture.drawing_sketch.token, fixture.sketch.feature_name)
-        view.GetCorresponding = lambda _owner: view_owner
-        fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is fixture.drawing_sketch and right is view_owner else _native_same(left, right)
-    elif failure in ("drawing-owner-self", "mapped-owner-self", "drawing-point-self"):
-        if failure == "mapped-owner-self":
-            mapped.owner = _NativeSketch(fixture.sketch.token, fixture.sketch.feature_name)
-            broken = mapped.owner
-        else:
-            broken = point if failure == "drawing-point-self" else fixture.drawing_sketch
-        fixture.adapter.swApp.IsSame = lambda left, right: 0 if left is broken and right is broken else _native_same(left, right)
+        mapped.identifiers = point.GetID()[::-1]
+        assert (mapped.X, mapped.Y, mapped.Z) == (point.X, point.Y, point.Z)
+    elif failure == "wrong-flat-id":
+        mapped_flat.GetID = lambda: (999, 2)
+    elif failure == "wrong-flat-kind":
+        mapped_flat.GetType = lambda: 1
     elif failure == "wrong-drawing-type":
-        point._oleobj_ = _WitnessDispatch("ISketchSegment")
+        point._oleobj_.capabilities[_WitnessDispatch.point_iid] = False
+        point._oleobj_.capabilities[_WitnessDispatch.segment_iid] = True
+    elif failure in ("drawing-point-self", "mapped-point-self", "drawing-owner-self", "mapped-owner-self", "dimension-self", "feature-sketch-self"):
+        broken = {
+            "drawing-point-self": point, "mapped-point-self": mapped,
+            "drawing-owner-self": point.GetSketch(), "mapped-owner-self": mapped.GetSketch(),
+            "dimension-self": dimension, "feature-sketch-self": fixture.forward_feature.GetSpecificFeature2(),
+        }[failure]
+        fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is broken and right is broken else fixture.same(left, right)
+    elif failure == "unknown-owner-comparison":
+        fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is mapped.GetSketch() and right is point.GetSketch() else fixture.same(left, right)
+    elif failure == "wrong-view-sketch":
+        point.owner = fixture.tag(_NativeSketch("other-view", fixture.sketch.feature_name), "ISketch")
+    elif failure == "null-owner":
+        mapped.owner = None
+    elif failure == "wrong-owner-interface":
+        mapped.owner._oleobj_.capabilities[wrapper.ISketch.CLSID] = False
+    elif failure == "wrong-view":
+        annotation.Owner = fixture.tag(SimpleNamespace(), "IView")
+    elif failure == "owner-type":
+        annotation.OwnerType = False  # bool is not the native view-owner enum 0.
+    elif failure == "unknown-view-identity":
+        owner = fixture.tag(SimpleNamespace(), "IView")
+        annotation.Owner = owner
+        fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is owner and right is view else fixture.same(left, right)
+    elif failure == "wrong-dimension":
+        dimension.dimension_token = "different-native-dimension"
+    elif failure == "wrong-feature":
+        other = fixture.tag(_NativeFeature(fixture.drawing_sketch), "IFeature")
+        dimension.GetFeatureOwner = lambda: other
+    elif failure == "missing-feature-map":
+        fixture.forward_feature = None
+    elif failure == "wrong-feature-map-interface":
+        fixture.forward_feature._oleobj_.capabilities[wrapper.IFeature.CLSID] = False
+    elif failure == "wrong-feature-type":
+        fixture.forward_feature.kind = "Boss"
+    elif failure == "wrong-feature-name":
+        fixture.forward_feature.Name = "OtherProfile"
+    elif failure == "missing-feature-sketch":
+        fixture.forward_feature.sketch = None
+    elif failure == "wrong-feature-sketch-interface":
+        fixture.forward_feature.sketch._oleobj_.capabilities[wrapper.ISketch.CLSID] = False
+    elif failure == "wrong-feature-sketch":
+        fixture.forward_feature.sketch = fixture.tag(_NativeSketch("wrong-feature-view", fixture.sketch.feature_name), "ISketch")
+    elif failure == "missing-attached":
+        annotation.GetAttachedEntities3 = lambda: (point,)
+    elif failure == "null-attached":
+        annotation.GetAttachedEntities3 = lambda: (flat, None)
+    elif failure == "wrong-types":
+        annotation.GetAttachedEntityTypes = lambda: (10, True)
+    elif failure == "unknown-dangling":
+        annotation.IsDangling = lambda: None
     else:
-        original = fixture.model.Extension.GetCorresponding2
+        original = view.GetCorresponding
 
         def unavailable(entity):
-            if entity is point:
+            if entity is model_point:
                 raise _WitnessComError(-2147418111)
             return original(entity)
 
-        fixture.model.Extension.GetCorresponding2 = unavailable
-    with pytest.raises(_WitnessComError if failure == "mapping-error" else RuntimeError) as refused:
+        view.GetCorresponding = unavailable
+    with pytest.raises(_WitnessComError if failure == "mapping-error" else RuntimeError):
         drawing._group_flat_locations(fixture.adapter, view, annotations)
     assert all(a.Visible == 1 for a in annotations)
     assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in annotations)
-    records = [fields for _message, fields in fixture.events if fields.get("operation_stage", "").endswith(".drawing-import") and "attachment_correspondence" in fields]
-    assert records
-    mapping = ast.literal_eval(records[-1]["attachment_correspondence"])
-    assert mapping and mapping[0]["role"] == "point"
-    if failure in ("reversed-point-id", "known-other-owner"):
-        # These are valid model objects, but NOT this dimension's source point.
-        assert "imported native point identity differs" in str(refused.value)
-    else:
-        assert records[-1]["attachment_readback_error"] != "None"
+    assert fixture.inverse_calls == []
+    records = [fields for _message, fields in fixture.events if "attachment_forward" in fields]
+    assert records and records[-1]["attachment_readback_error"] != "None"
+    audit = ast.literal_eval(records[-1]["attachment_forward"])
+    assert audit["step"]
+    if failure == "wrong-feature-sketch":
+        assert audit["attachments"][-1]["owner_match"] == 1
+        assert audit["attachments"][-1]["feature_owner_match"] == 0
+    if failure == "wrong-dimension":
+        assert audit["full_names"][0] == audit["full_names"][1]
+        assert audit["dimension_match"] == 0
+    if failure == "wrong-feature":
+        assert audit["feature_names"][0] == audit["feature_names"][1]
+        assert audit["feature_match"] == 0
+    if failure == "missing-attached":
+        assert audit["attachment_count"] == 1 and audit["attached_types"] == (10, 11)
+    if failure == "null-attached":
+        assert audit["attachment_count"] == 2
     if failure == "unavailable-point-capability":
-        queries = mapping[0]["contexts"]["model"]["queries"]
-        assert len(queries) == 2
+        queries = audit["native"]["point.forward"]["queries"]
+        assert len(queries) == 3
         assert queries[0]["hresult"] == -2147418111 and queries[0]["supported"] is None
-        assert queries[1]["supported"] is False
-    if failure == "wrong-view":
-        assert mapping[0]["view_owner_self"] == 1 and mapping[0]["view_owner_match"] == 0
+        assert queries[-1]["supported"] is False
     if failure == "mapping-error":
-        assert mapping[0]["mapped_present"] is None
-        assert any(fields.get("operation_stage") == "ThumbTapFromZFlat.drawing-import.correspondence-before" for _message, fields in fixture.events)
+        assert audit["attachments"][-1]["mapped_present"] is None
+        assert any(fields.get("operation_stage") == "ThumbTapFromZFlat.drawing-import.forward-before" for _message, fields in fixture.events)
+
+
+
+def test_forward_mapping_cannot_substitute_for_unknown_source_part_owner(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    source_display = fixture.source_displays["ThumbTapFromZFlat"]
+    source_annotation = source_display.GetAnnotation()
+    flat, point = source_annotation.GetAttachedEntities3()
+    proxy = _point_proxy(point)
+    proxy.owner = fixture.tag(_NativeSketch("unknown-source", point.GetSketch().feature_name), "ISketch")
+    fixture.tag(proxy, "ISketchPoint")
+    source_annotation.GetAttachedEntities3 = lambda: (flat, proxy)
+    # Even if the view API could give a plausible object, part ownership must
+    # refuse first. No accepting fake mapping is installed in production.
+    with pytest.raises(RuntimeError):
+        drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert fixture.mapping_calls == [] and fixture.inverse_calls == []
+    assert all(annotation.Visible == 1 for annotation in annotations)
+
+
+@pytest.mark.parametrize("fault", ("logger", "original-repr"))
+@pytest.mark.parametrize("boundary", ("model-attachment", "feature-forward", "point-forward"))
+def test_attachment_refusal_preserves_original_exception_and_traceback(monkeypatch, fault, boundary) -> None:
+    import _telemetry
+
+    class UnprintableOriginal(RuntimeError):
+        def __repr__(self):
+            raise ValueError("original repr unavailable")
+
+    original = UnprintableOriginal("native attachment refusal") if fault == "original-repr" else RuntimeError("native attachment refusal")
+    native_tracebacks = []
+
+    def refuse(*_args):
+        try:
+            raise original
+        except RuntimeError:
+            native_tracebacks.append(original.__traceback__)
+            raise
+
+    def logger(_message, **fields):
+        if fault == "logger" and "attachment_readback_error" in fields:
+            raise ValueError("secondary telemetry failure")
+
+    if boundary == "model-attachment":
+        annotation = SimpleNamespace(GetAttachedEntities3=refuse)
+        display = SimpleNamespace(GetAnnotation=lambda: annotation)
+        monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+
+        def invoke():
+            return part._point_flat_attachment(SimpleNamespace(), display, object(), stage="original-refusal")
+    else:
+        fixture, view, annotations = _flat_group_fixture(monkeypatch)
+        annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
+        source_display = fixture.source_displays["LeverBoreFromZFlat"]
+        source_annotation = source_display.GetAnnotation()
+        entities, types = source_annotation.GetAttachedEntities3(), source_annotation.GetAttachedEntityTypes()
+        key = part._point_identity(fixture.adapter, fixture.center, stage="fixture-source", role="source")
+        original_mapping = view.GetCorresponding
+        target = fixture.dimension_feature if boundary == "feature-forward" else fixture.center
+
+        def mapping(entity):
+            return refuse(entity) if entity is target else original_mapping(entity)
+
+        view.GetCorresponding = mapping
+
+        def invoke():
+            return drawing._require_flat_import(fixture.adapter, view, source_display, annotation.GetSpecificAnnotation(), entities, types, key, stage="original-refusal")
+    monkeypatch.setattr(_telemetry, "info", logger)
+    with pytest.raises(RuntimeError, match="native attachment refusal") as refused:
+        invoke()
+    assert refused.value is original
+    current = refused.value.__traceback__
+    while current is not None and current is not native_tracebacks[0]:
+        current = current.tb_next
+    assert current is native_tracebacks[0]
 
 
 def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(monkeypatch) -> None:
@@ -2948,9 +3130,11 @@ def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(mo
     drawing._group_flat_locations(fixture.adapter, view, annotations)
     annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "ThumbTapFromZFlat")
     _flat, point = annotation.GetAttachedEntities3()
-    fixture.correspondence[id(point)] = fixture.lines[1].GetStartPoint2()
-    with pytest.raises(RuntimeError, match="imported native point identity differs"):
+    key = fixture.source_key(fixture.source_by_import[id(point)])
+    fixture.forward_entities[key].identifiers = (500, 501)
+    with pytest.raises(RuntimeError, match="imported native drawing identity differs"):
         drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+    assert fixture.inverse_calls == []
 
 
 @pytest.mark.parametrize("failure", ("hide-refused", "unknown-visible", "prefix-lost", "source-constraint-lost"))
@@ -3023,333 +3207,10 @@ def test_ordinary_location_readback_reports_actual_metadata_before_refusal(monke
         assert "places" not in actual and "native precision unavailable" in fields["measurement_readback_error"]
 
 
-@pytest.mark.parametrize("observer_raises", (False, True))
-def test_correspondence_failure_observer_retains_exact_handles_and_original_refusal(monkeypatch, observer_raises) -> None:
-    fixture, view, annotations = _flat_group_fixture(monkeypatch)
-    annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
-    actual = annotation.GetAttachedEntities3()
-    _flat, point = actual
-    fixture.correspondence[id(point)] = None
-    reads, observed = [], []
-
-    def attachment_reader():
-        reads.append(True)
-        assert len(reads) == 1, "observer must not acquire replacement attachment proxies"
-        return actual
-
-    def observer(_adapter, _view, _source_display, _display, _source_entities, _source_types, attached, types, attempted, *, name):
-        observed.append((attached, types, attempted, name))
-        if observer_raises:
-            raise ValueError("optional diagnostic reader failed")
-        return True  # Even an erroneous observer result cannot accept the part.
-
-    annotation.GetAttachedEntities3 = attachment_reader
-    monkeypatch.setattr(drawing, "_audit_flat_correspondence", observer)
-    with pytest.raises(RuntimeError, match="point: drawing attachment has no corresponding model object") as refused:
-        drawing._group_flat_locations(fixture.adapter, view, annotations)
-    assert len(observed) == 1 and len(reads) == 1
-    assert all(actual_entity is observed_entity for actual_entity, observed_entity in zip(actual, observed[0][0], strict=True))
-    assert observed[0][1] == (10, 11) and observed[0][3] == "LeverBoreFromZFlat"
-    assert observed[0][2][0]["mapping_attempted"] is True
-    assert observed[0][2][0]["mapped_present"] is False
-    assert sum(entity is point for entity in fixture.mapping_calls) == 1
-    assert refused.value.__cause__ is None  # Preserve the actual guard, not a replacement wrapper.
-    assert all(a.Visible == 1 for a in annotations)
-    if observer_raises:
-        assert any("optional diagnostic reader failed" in fields.get("diagnostic_error", "") for _message, fields in fixture.events)
 
 
-def test_successful_grouping_does_not_run_failure_census(monkeypatch) -> None:
-    fixture, view, annotations = _flat_group_fixture(monkeypatch)
-
-    def forbidden(*_args, **_kwargs):
-        pytest.fail("failure census must not run on successful attachment proof")
-
-    monkeypatch.setattr(drawing, "_audit_flat_correspondence", forbidden)
-    drawing._group_flat_locations(fixture.adapter, view, annotations)
 
 
-@pytest.mark.parametrize("fault", (
-    "none", "path-reader", "point-interface", "app-bind", "reader-unprintable",
-    "logger-once", "logger-all", "getfaces-null", "getfaces-error",
-    "empty-tuple", "empty-list", "geometry-error", "geometry-null",
-    "selector-error", "two-face-errors",
-))
-def test_failure_census_collects_independent_controls_without_repeating_raw_point(monkeypatch, fault) -> None:
-    import json
-    import sys
-    import _telemetry
-
-    class UnprintableDiagnosticError(Exception):
-        def __repr__(self):
-            raise ValueError("diagnostic repr failed")
-
-        def __str__(self):
-            raise ValueError("diagnostic str failed")
-
-    fixture, view, annotations = _flat_group_fixture(monkeypatch)
-    generated = sys.modules["solidworks_mcp.adapters._generated.sldworks_2026"]
-    com = sys.modules["pythoncom"]
-    monkeypatch.setattr(com, "IID_IDispatch", "fixture-IDispatch", raising=False)
-    for interface in ("IAnnotation", "IDimension", "IFace2", "IFeature", "IModelDoc2", "IModelDocExtension", "ISketch", "IView"):
-        monkeypatch.setattr(generated, interface, SimpleNamespace(CLSID=f"fixture-{interface}"), raising=False)
-    interface_names = ("IAnnotation", "IDimension", "IFace2", "IFeature", "IModelDoc2", "IModelDocExtension", "ISketch", "IView", "ISketchPoint", "ISketchSegment")
-
-    def equip(value, interface):
-        dispatch = _WitnessDispatch(interface)
-        dispatch.capabilities.update({getattr(generated, name).CLSID: name == interface for name in interface_names})
-        dispatch.capabilities[com.IID_IDispatch] = True
-        value._oleobj_ = dispatch
-        return value
-
-    annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
-    display = annotation.GetSpecificAnnotation()
-    source_display, source_dimension = part._named_dimension(fixture.adapter, "LeverBoreLocationProfile", "LeverBoreFromZFlat")
-    source_annotation = source_display.GetAnnotation()
-    source_entities = source_annotation.GetAttachedEntities3()
-    attached = annotation.GetAttachedEntities3()
-    flat, point = attached
-    source_flat, source_point = source_entities
-    for value, interface in (
-        (fixture.model, "IModelDoc2"), (view, "IView"),
-        (fixture.sketch, "ISketch"), (fixture.drawing_sketch, "ISketch"),
-        (flat, "ISketchSegment"), (point, "ISketchPoint"),
-        (source_flat, "ISketchSegment"), (source_point, "ISketchPoint"),
-        (annotation, "IAnnotation"), (source_annotation, "IAnnotation"),
-        (display.GetDimension2(0), "IDimension"), (source_dimension, "IDimension"),
-    ):
-        equip(value, interface)
-    drawing_document = equip(SimpleNamespace(), "IModelDoc2")
-    save_reads = []
-
-    def save_flag(path):
-        save_reads.append(path)
-        return False
-
-    for document, kind, path in ((fixture.model, 1, "Clamp.Part"), (drawing_document, 3, "Clamp.Drawing")):
-        document.GetType = lambda kind=kind: kind
-        document.GetTitle = lambda path=path: path
-        document.GetPathName = lambda path=path: path
-        document.GetSaveFlag = lambda path=path: save_flag(path)
-    fixture.adapter.swApp.ActiveDoc = drawing_document
-    adapter = SimpleNamespace(currentModel=drawing_document, swApp=fixture.adapter.swApp)
-    annotation.OwnerType, annotation.Owner = 0, view
-    source_annotation.OwnerType, source_annotation.Owner = 3, fixture.model
-    feature = equip(_NativeFeature(fixture.sketch), "IFeature")
-    view_feature = equip(_NativeFeature(fixture.drawing_sketch), "IFeature")
-    source_dimension.GetFeatureOwner = lambda: feature
-    display.GetDimension2(0).GetFeatureOwner = lambda: feature
-    source_face, view_face = equip(SimpleNamespace(), "IFace2"), equip(SimpleNamespace(), "IFace2")
-    block = equip(SimpleNamespace(), "IFeature")
-    view_block = equip(SimpleNamespace(GetFaces=lambda: (view_face,)), "IFeature")
-    fixture.model.FeatureByName = lambda name: block if name == "Block" else feature
-    canonical_calls = []
-
-    def canonical_face(entity):
-        canonical_calls.append(entity)
-        return source_face if entity is view_face else None
-
-    fixture.model.Extension.GetCorrespondingEntity2 = canonical_face
-    monkeypatch.setattr(drawing, "resolve_faces", lambda _model, _selectors: {"flat": source_face})
-    bad_face, other_bad_face = object(), object()
-
-    def geometry(face):
-        if face is bad_face and fault in ("geometry-error", "two-face-errors"):
-            raise UnprintableDiagnosticError()
-        if face is bad_face and fault == "geometry-null":
-            return None
-        return face
-
-    def selected(geometry):
-        if (geometry is bad_face and fault == "selector-error") or (geometry is other_bad_face and fault == "two-face-errors"):
-            raise UnprintableDiagnosticError()
-        return True
-
-    monkeypatch.setattr(drawing, "face_geometry", geometry)
-    monkeypatch.setattr(drawing, "PlanarFace", lambda *_args: SimpleNamespace(matches=selected))
-    forward = {
-        id(source_point): point, id(source_flat): flat, id(fixture.sketch): fixture.drawing_sketch,
-        id(feature): view_feature, id(block): view_block,
-    }
-    view.GetCorresponding = lambda entity: forward.get(id(entity))
-    bound_point = equip(SimpleNamespace(GetID=point.GetID, GetSketch=point.GetSketch), "ISketchPoint")
-
-    def bind(value, interface):
-        if interface == "ISldWorks" and fault == "app-bind":
-            raise UnprintableDiagnosticError()
-        return bound_point if value is point and interface == "ISketchPoint" else value
-
-    monkeypatch.setattr(drawing, "_early_bound", bind)
-    fixture.correspondence[id(point)] = None
-    fixture.correspondence[id(bound_point)] = source_point
-    fixture.correspondence[id(fixture.drawing_sketch)] = fixture.sketch
-    equip(fixture.model.Extension, "IModelDocExtension")
-    fixture.model.Extension.GetPersistReference3 = lambda entity: b"\x01" if entity is source_point else b"\x02" if entity is source_flat else None
-    drawing_document.Extension = equip(SimpleNamespace(
-        GetPersistReference3=lambda entity: b"\x03" if entity is point or entity is bound_point else b"\x04" if entity is flat else None,
-    ), "IModelDocExtension")
-    if fault in ("path-reader", "reader-unprintable"):
-        def unavailable_path():
-            if fault == "reader-unprintable":
-                raise UnprintableDiagnosticError()
-            raise RuntimeError("path reader unavailable")
-        fixture.model.GetPathName = unavailable_path
-    elif fault == "point-interface":
-        point._oleobj_.capabilities[_WitnessDispatch.point_iid] = _WitnessComError(-2147418111)
-    elif fault in ("logger-once", "logger-all"):
-        sink = _telemetry.info
-
-        def failing_logger(message, **fields):
-            if fault == "logger-all" or fields.get("census_reader") == "source.GetPathName":
-                raise UnprintableDiagnosticError()
-            sink(message, **fields)
-
-        monkeypatch.setattr(_telemetry, "info", failing_logger)
-    elif fault == "getfaces-null":
-        view_block.GetFaces = lambda: None
-    elif fault == "getfaces-error":
-        def unavailable_faces():
-            raise UnprintableDiagnosticError()
-        view_block.GetFaces = unavailable_faces
-    elif fault == "empty-tuple":
-        view_block.GetFaces = lambda: ()
-    elif fault == "empty-list":
-        view_block.GetFaces = lambda: []
-    elif fault in ("geometry-error", "geometry-null", "selector-error"):
-        view_block.GetFaces = lambda: (view_face, bad_face)
-    elif fault == "two-face-errors":
-        view_block.GetFaces = lambda: (view_face, bad_face, other_bad_face)
-    result = drawing._audit_flat_correspondence(
-        adapter, view, source_display, display, source_entities, (10, 11), attached, (10, 11),
-        [{"role": "point", "mapping_attempted": True, "mapped_present": False}],
-        name="LeverBoreFromZFlat",
-    )
-    assert result is None  # Diagnostics never return an accepted attachment.
-    assert all(entity is not point for entity in fixture.mapping_calls)
-    assert save_reads.count("Clamp.Part") == 2
-    assert save_reads.count("Clamp.Drawing") == (2 if fault == "app-bind" else 4)
-    if fault == "logger-all":
-        assert canonical_calls == [view_face]  # Later independent native control still ran.
-        return
-    records = {row["reader"]: row for _message, fields in fixture.events if "census_row" in fields for row in [json.loads(fields["census_row"])]}
-    assert records["reverse.point.raw-already-attempted"]["value"] == {"mapped_present": False, "repeated": False}
-    assert records["reverse.flat.raw.GetCorresponding2"]["status"] == "read"
-    assert records["forward.dimension-feature.GetCorresponding"]["status"] == "read"
-    inventory = records["control.view-flat-inventory"]["value"]
-    if fault in ("getfaces-null", "getfaces-error"):
-        assert inventory == {"status": "unavailable", "face_count": None, "known_matching_faces": None, "unique_match_proven": False}
-        assert records["control.view-flat-count"]["status"] == "skipped"
-        assert "value" not in records["control.view-flat-count"]
-        assert records["control.view-block.GetFaces"]["status"] == ("null" if fault == "getfaces-null" else "unavailable")
-        assert not canonical_calls and "control.canonical-same-source" not in records
-    elif fault in ("empty-tuple", "empty-list"):
-        assert inventory == {"status": "complete", "face_count": 0, "known_matching_faces": 0, "unique_match_proven": False}
-        assert records["control.view-block.GetFaces"]["status"] == "read"
-        assert records["control.view-flat-count"]["status"] == "read"
-        assert records["control.view-flat-count"]["value"] == 0
-        assert not canonical_calls
-    elif fault in ("geometry-error", "geometry-null", "selector-error", "two-face-errors"):
-        assert inventory["status"] == "incomplete" and inventory["known_matching_faces"] == 1
-        assert inventory["unique_match_proven"] is False
-        assert records["control.view-flat-count"]["status"] == "skipped"
-        assert "value" not in records["control.view-flat-count"]
-        assert not canonical_calls and "control.canonical-same-source" not in records
-        if fault == "two-face-errors":
-            assert inventory["face_count"] == 3
-            assert records["control.face[1].geometry"]["status"] == "unavailable"
-            assert records["control.face[2].selector"]["status"] == "unavailable"
-        else:
-            reader = "control.face[1].selector" if fault == "selector-error" else "control.face[1].geometry"
-            assert records[reader]["status"] == ("null" if fault == "geometry-null" else "unavailable")
-    elif fault == "app-bind":
-        assert records["application.bind.ISldWorks"]["status"] == "unavailable"
-        assert records["application.ActiveDoc"]["status"] == "skipped"
-        assert records["source.GetPathName"]["status"] == "read"
-        assert records["source.FullName"]["status"] == "read"
-        assert records["control.GetCorrespondingEntity2"]["status"] == "read"
-        assert records["control.canonical-same-source"]["status"] == "skipped"
-    else:
-        assert inventory["status"] == "complete" and inventory["unique_match_proven"] is True
-        assert records["control.canonical-same-source"]["value"] == 1
-    assert records["source.GetSaveFlag.after"]["value"] is False
-    assert records["drawing.GetSaveFlag.after"]["value"] is False
-    assert records["point.drawing-in-source.GetPersistReference3"]["status"] == "null"
-    assert records["point.drawing-native.persistent-reference"]["value"] == {"length": 1, "hex": "03"}
-    if fault in ("path-reader", "reader-unprintable"):
-        assert records["source.GetPathName"]["status"] == "unavailable"
-        assert records["source.FullName"]["status"] == "read"
-        if fault == "reader-unprintable":
-            assert records["source.GetPathName"]["error"] == "<unprintable diagnostic value>"
-    elif fault == "logger-once":
-        assert "source.GetPathName" not in records
-        assert records["source.FullName"]["status"] == "read"
-        summary = next(fields for _message, fields in reversed(fixture.events) if "diagnostic_logging_failures" in fields)
-        failures = json.loads(summary["diagnostic_logging_failures"])
-        assert len(failures) == 1 and failures[0]["reader"] == "source.GetPathName"
-        assert failures[0]["status"] == "read" and failures[0]["logging_error"] == "<unprintable diagnostic value>"
-    elif fault == "point-interface":
-        assert records["drawing.point.QI.ISketchPoint"]["value"]["supported"] is None
-        assert "reverse.point.bound.GetCorresponding2" not in records
-    else:
-        assert records["reverse.point.bound.GetCorresponding2"]["status"] == "read"
-        if fault == "app-bind":
-            assert records["forward.point.owner-same-drawing"]["status"] == "skipped"
-        else:
-            assert records["forward.point.owner-same-drawing"]["value"] == 1
 
 
-@pytest.mark.parametrize("fault", (
-    "observer", "observer-repr", "primary-logger", "fallback-logger",
-    "both-loggers", "original-repr",
-))
-def test_attachment_failure_preserves_original_object_and_native_traceback(monkeypatch, fault) -> None:
-    import _telemetry
 
-    class UnprintableDiagnosticError(Exception):
-        def __repr__(self):
-            raise ValueError("secondary repr failed")
-
-        def __str__(self):
-            raise ValueError("secondary str failed")
-
-    class UnprintableOriginal(RuntimeError):
-        def __repr__(self):
-            raise ValueError("original repr failed")
-
-    original = UnprintableOriginal("native attachment refusal") if fault == "original-repr" else RuntimeError("native attachment refusal")
-    native_tracebacks, observations, logs = [], [], []
-
-    def native_reader():
-        try:
-            raise original
-        except RuntimeError:
-            native_tracebacks.append(original.__traceback__)
-            raise
-
-    def observer(attached, types, mappings):
-        observations.append((attached, types, mappings))
-        if fault in ("observer-repr", "both-loggers"):
-            raise UnprintableDiagnosticError()
-        if fault in ("observer", "fallback-logger"):
-            raise ValueError("optional observer failed")
-
-    def logger(message, **fields):
-        primary = "attachment_readback_error" in fields
-        if fault == "both-loggers" or (primary and fault == "primary-logger") or (not primary and fault == "fallback-logger"):
-            raise UnprintableDiagnosticError()
-        logs.append((message, fields))
-
-    annotation = SimpleNamespace(GetAttachedEntities3=native_reader)
-    display = SimpleNamespace(GetAnnotation=lambda: annotation)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_telemetry, "info", logger)
-    with pytest.raises(RuntimeError, match="native attachment refusal") as refused:
-        part._point_flat_attachment(SimpleNamespace(), display, object(), stage="original-refusal", failure_observer=observer)
-    assert refused.value is original
-    assert observations == [((), (), [])]
-    current = refused.value.__traceback__
-    while current is not None and current is not native_tracebacks[0]:
-        current = current.tb_next
-    assert current is native_tracebacks[0]  # Retain the actual native-raise frame.
-    if fault == "observer-repr":
-        assert logs[-1][1]["diagnostic_error"] == "<unprintable failure-observer exception>"

@@ -1235,6 +1235,415 @@ def test_native_crop_readback_refuses_nominal_only_or_shifted_fence(lever_tip_na
         drawing._projection_crop_box(native.view)
 
 
+@pytest.fixture
+def r26_native_polylines():
+    """Real R26 numeric payload; opaque tokens stand in only for live COM slots."""
+    import struct
+
+    # Worker 9, SW 34.4.0, 2026-10-21T20:51:17Z, source bd160ae0f2994f5018c187279d41cd00f1fe7ab9.
+    # capture.json SHA-256: 6f5f28a29ed45a89b8155b89bc6278990bea9c8bba6c4d8182bbcb74d2685ea5.
+    # Exact IEEE-754 bytes from original_return.items[1], including all residual zeros.
+    # Raw-byte SHA-256: db5e94d05e3503007f29ef3da528701d17f006c62f79fa9ecc61facdbc58eaef.
+    # Original retval: 36 CDispatch slots. Their persisted reprs cannot recreate COM
+    # identity: tokens test ordinal correspondence only, NEVER native IsSame proof.
+    raw = bytes.fromhex(
+        "000000000000f03f00000000000028409e6dc5feb27bb6bf24464b8638d6cb3fd4119ab9f3c5a73f9e6dc5feb27bb6bf"
+        "505ee05a423ecc3fd4119ab9f3c5a73f9e6dc5feb27bb6bff82db6b12e6ecb3fd4119ab9f3c5a73f205d67cece72ffbc"
+        "0000000000000000000000000000f03f00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf000000000000000000000000000024409e6dc5feb27bb6bf505ee05a423ecc3fd4119ab9f3c5a73f"
+        "a2c7b19bddc2b6bfb02d7323fc37cc3fd4119ab9f3c5a73f807b9dc97201b7bfccc7ec38eb25cc3fd0119ab9f3c5a73f"
+        "00e88424e62fb7bf38d295703d0acc3fd0119ab9f3c5a73f82d589669d48b7bf04acd17049e8cb3fd0119ab9f3c5a73f"
+        "82d589669d48b7bf44e0c49b27c4cb3fd0119ab9f3c5a73ffee78424e62fb7bf0cba009c33a2cb3fd0119ab9f3c5a73f"
+        "7e7b9dc97201b7bf78c4a9d38586cb3fd0119ab9f3c5a73fa0c7b19bddc2b6bf985e23e97474cb3fd4119ab9f3c5a73f"
+        "9e6dc5feb27bb6bff82db6b12e6ecb3fd4119ab9f3c5a73f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "9e6dc5feb27bb6bff82db6b12e6ecb3fd4119ab9f3c5a73f10510e4e6210b03ff82db6b12e6ecb3fd8119ab9f3c5a73f"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000000040f8c4ca809543b33ff82db6b12e6ecb3fd8119ab9f3c5a73f"
+        "d82555946588b33ff82db6b12e6ecb3fd8119ab9f3c5a73f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "d82555946588b33f505ee05a423ecc3fd8119ab9f3c5a73ff8c4ca809543b33f505ee05a423ecc3fd8119ab9f3c5a73f"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000004010510e4e6210b03f505ee05a423ecc3fd8119ab9f3c5a73f"
+        "9e6dc5feb27bb6bf505ee05a423ecc3fd4119ab9f3c5a73f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "d82555946588b33ff82db6b12e6ecb3fdc119ab9f3c5a73f467341068195b33fb054ac6abc74cb3fd8119ab9f3c5a73f"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000000040467341068195b33f9837eaa1b437cc3fd8119ab9f3c5a73f"
+        "d82555946588b33f505ee05a423ecc3fdc119ab9f3c5a73f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "0f510e4e6210b03f5cc5652eff21cb3fd4119ab9f3c5a73ff6c4ca809543b33f5cc5652eff21cb3fd4119ab9f3c5a73f"
+        "000000000000f03f00000000000028400f510e4e6210b03f24464b8638d6cb3fd4119ab9f3c5a73f0f510e4e6210b03f"
+        "5cc5652eff21cb3fd4119ab9f3c5a73f0f510e4e6210b03fecc630de718acc3fd4119ab9f3c5a73f000000000000f0bf"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000002a400f510e4e6210b03f5cc5652eff21cb3fd4119ab9f3c5a73f"
+        "0f510e4e6210b03f885de9452328cb3fa00e1b9e8880a83f0f510e4e6210b03f0888c669243acb3f64136569662ea93f"
+        "0f510e4e6210b03fbc9c097fc856cb3f70b7a0d6b3c3a93f0f510e4e6210b03fc08558da1b7ccb3f400aad2b4436aa3f"
+        "0f510e4e6210b03ff0062b4d93a7cb3f3cb421bb487eaa3f0f510e4e6210b03f24464b8638d6cb3ff4143019d996aa3f"
+        "0f510e4e6210b03f58856bbfdd04cc3f3cb421bb487eaa3f0f510e4e6210b03f88063e325530cc3f3c0aad2b4436aa3f"
+        "0f510e4e6210b03f8cef8c8da855cc3f6cb7a0d6b3c3a93f0f510e4e6210b03f4004d0a24c72cc3f60136569662ea93f"
+        "0f510e4e6210b03fc02eadc64d84cc3f9c0e1b9e8880a83f0f510e4e6210b03fecc630de718acc3fd4119ab9f3c5a73f"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf000000000000000000000000000000400f510e4e6210b03fecc630de718acc3fd4119ab9f3c5a73f"
+        "f6c4ca809543b33fecc630de718acc3fd4119ab9f3c5a73f000000000000f03f0000000000002840f6c4ca809543b33f"
+        "24464b8638d6cb3fd4119ab9f3c5a73ff6c4ca809543b33f5cc5652eff21cb3fd4119ab9f3c5a73ff6c4ca809543b33f"
+        "ecc630de718acc3fd4119ab9f3c5a73f000000000000f0bf000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000002a40"
+        "f6c4ca809543b33f5cc5652eff21cb3fd4119ab9f3c5a73ff6c4ca809543b33f885de9452328cb3fa00e1b9e8880a83f"
+        "f6c4ca809543b33f0888c669243acb3f64136569662ea93ff6c4ca809543b33fbc9c097fc856cb3f70b7a0d6b3c3a93f"
+        "f6c4ca809543b33fc08558da1b7ccb3f400aad2b4436aa3ff6c4ca809543b33ff0062b4d93a7cb3f3cb421bb487eaa3f"
+        "f6c4ca809543b33f24464b8638d6cb3ff4143019d996aa3ff6c4ca809543b33f58856bbfdd04cc3f3cb421bb487eaa3f"
+        "f6c4ca809543b33f88063e325530cc3f3c0aad2b4436aa3ff6c4ca809543b33f8cef8c8da855cc3f6cb7a0d6b3c3a93f"
+        "f6c4ca809543b33f4004d0a24c72cc3f60136569662ea93ff6c4ca809543b33fc02eadc64d84cc3f9c0e1b9e8880a83f"
+        "f6c4ca809543b33fecc630de718acc3fd4119ab9f3c5a73f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "69f1d24d6210b03fc03f1a05a392cc3fb4084cfc3401aabfa0b69dcef753b33fc03f1a05a392cc3fb4084cfc3401aabf"
+        "0000000000000000000000000000314000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000002440f6c4ca809543b33fecc630de718acc3f6025a66070e0a9bf"
+        "bad25739d543b33fcc4d77ba918acc3fb263450b21e6a9bfe7f058739244b33fe4dc7757f08acc3ff6675073a5eba9bf"
+        "5c5ceb6ec745b33fa01241d58a8bcc3f0a1779aed2f0a9bf1090a8c86a47b33f78ac1f825c8ccc3f96aa877880f5a9bf"
+        "06f4acc26f49b33f74de21ff5e8dcc3f8072906c8af9a9bfcb3db4a7c64bb33f5483a5718a8ecc3fe8d90a20d1fca9bf"
+        "569548455d4eb33f1caf6fc0d58fcc3fd2b02f173bffa9bf77174e791f51b33f2c7072da3691cc3f2aed318bb500aabf"
+        "a0b69dcef753b33fc03f1a05a392cc3fb4084cfc3401aabf000000000000f03f00000000000028400f510e4e6210b03f"
+        "c03f1a05a392cc3f6025a66070e0a9bf0f510e4e6210b03fecc630de718acc3f6025a66070e0a9bf69f1d24d6210b03f"
+        "c03f1a05a392cc3fb4084cfc3401aabf000000000000f03f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000002240"
+        "0f510e4e6210b03fecc630de718acc3f6025a66070e0a9bf0f510e4e6210b03fccba032a9a8acc3f5ae8ece9d4e6a9bf"
+        "0f510e4e6210b03fa02a0e81118bcc3fa0f70f8ffaeca9bf0f510e4e6210b03ff0e3404dd38bcc3f88c5a3d6a4f2a9bf"
+        "0f510e4e6210b03ff43f0a1cd88ccc3f9424e6049cf7a9bf0f510e4e6210b03fb8d79ae7158ecc3f9a940b40affba9bf"
+        "0f510e4e6210b03f30cb7f79808fcc3fe479d670b6fea9bf0f510e4e6210b03f008fc8e20991cc3f303900cd9300aabf"
+        "69f1d24d6210b03fc03f1a05a392cc3fb4084cfc3401aabf000000000000000000000000000031400000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000002240"
+        "f6c4ca809543b33f5cc5652eff21cb3f6025a66070e0a9bfb6ac7018e643b33f7cd192e2d621cb3f5ce8ece9d4e6a9bf"
+        "5c8c85c6d444b33fac61888b5f21cb3fa2f70f8ffaeca9bf02ffea5e5846b33f58a855bf9d20cb3f8ac5a3d6a4f2a9bf"
+        "04b77dfc6148b33f544c8cf0981fcb3f9824e6049cf7a9bf8be69e93dd4ab33f94b4fb245b1ecb3f9e940b40affba9bf"
+        "7fcd68b7b24db33f18c11693f01ccb3fe879d670b6fea9bf2255fa89c550b33f48fdcd29671bcb3f343900cd9300aabf"
+        "a0b69dcef753b33f884c7c07ce19cb3fb4084cfc3401aabf000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "a0b69dcef753b33f884c7c07ce19cb3fb4084cfc3401aabf69f1d24d6210b03f884c7c07ce19cb3fb4084cfc3401aabf"
+        "000000000000f03f00000000000028400f510e4e6210b03f884c7c07ce19cb3f6025a66070e0a9bf69f1d24d6210b03f"
+        "884c7c07ce19cb3fb4084cfc3401aabf0f510e4e6210b03f5cc5652eff21cb3f6025a66070e0a9bf000000000000f03f"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000224069f1d24d6210b03f884c7c07ce19cb3fb4084cfc3401aabf"
+        "7815d44d6210b03f48fdcd29671bcb3f343900cd9300aabf6a76d74d6210b03f18c11693f01ccb3fe879d670b6fea9bf"
+        "04f3dc4d6210b03f94b4fb245b1ecb3f9e940b40affba9bf4855e44d6210b03f544c8cf0981fcb3f9824e6049cf7a9bf"
+        "9654ed4d6210b03f58a855bf9d20cb3f8ac5a3d6a4f2a9bf6898f74d6210b03fac61888b5f21cb3fa2f70f8ffaeca9bf"
+        "c1bb024e6210b03f7cd192e2d621cb3f5ce8ece9d4e6a9bf0f510e4e6210b03f5cc5652eff21cb3f6025a66070e0a9bf"
+        "000000000000f03f00000000000028408ef753e3a59bbc3fa4fd8b081b9ecc3fb4084cfc3401aabf38e9263108acbc3f"
+        "a4fd8b081b9ecc3fb4084cfc3401aabf8cf753e3a59bbc3f7876752f4ca6cc3fb4084cfc3401aabf0000000000000000"
+        "0000000000000000000000000000f03f00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000224038e9263108acbc3fa4fd8b081b9ecc3fb4084cfc3401aabf"
+        "77018199b7abbc3f64aedd2ab49fcc3fb4084cfc3401aabfd2216cebc8aabc3f347226943da1cc3fb4084cfc3401aabf"
+        "2caf065345a9bc3fb0650b26a8a2cc3fb4084cfc3401aabf29f773b53ba7bc3f70fd9bf1e5a3cc3fb4084cfc3401aabf"
+        "a2c7521ec0a4bc3f745965c0eaa4cc3fb4084cfc3401aabfaee088faeaa1bc3fc812988caca5cc3fb4084cfc3401aabf"
+        "0a59f727d89ebc3f9882a2e323a6cc3fb4084cfc3401aabf8cf753e3a59bbc3f7876752f4ca6cc3fb4084cfc3401aabf"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000004038e9263108acbc3fa4fd8b081b9ecc3fb4084cfc3401aabf"
+        "38e9263108acbc3fa48e0a04560ecb3fb4084cfc3401aabf000000000000f03f00000000000028408ef753e3a59bbc3f"
+        "a48e0a04560ecb3fb4084cfc3401aabf8cf753e3a59bbc3fd01521dd2406cb3fb4084cfc3401aabf38e9263108acbc3f"
+        "a48e0a04560ecb3fb4084cfc3401aabf00000000000000000000000000000000000000000000f03f0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000002240"
+        "8cf753e3a59bbc3fd01521dd2406cb3fb4084cfc3401aabf0a59f727d89ebc3fb009f4284d06cb3fb4084cfc3401aabf"
+        "ade088faeaa1bc3f8479fe7fc406cb3fb4084cfc3401aabfa1c7521ec0a4bc3fd432314c8607cb3fb4084cfc3401aabf"
+        "27f773b53ba7bc3fd88efa1a8b08cb3fb4084cfc3401aabf2aaf065345a9bc3f9c268be6c809cb3fb4084cfc3401aabf"
+        "d0216cebc8aabc3f141a7078330bcb3fb4084cfc3401aabf75018199b7abbc3fe4ddb8e1bc0ccb3fb4084cfc3401aabf"
+        "38e9263108acbc3fa48e0a04560ecb3fb4084cfc3401aabf000000000000f03f00000000000028409b4603780b24b83f"
+        "24464b8638d6cb3fb4084cfc3401aabf96e5a5acf078b83f24464b8638d6cb3fb4084cfc3401aabf96e5a5acf078b83f"
+        "24464b8638d6cb3fb4084cfc3401aabf00000000000000000000000000000000000000000000f03f0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000003140"
+        "96e5a5acf078b83f24464b8638d6cb3fb4084cfc3401aabf439b27557a72b83fc86852fe76e6cb3fb4084cfc3401aabf"
+        "0ae1752a1360b83f5c93845f3cf4cb3fb4084cfc3401aabfe68b11688844b83f7870ddf46ffdcb3fb4084cfc3401aabf"
+        "9b4603780b24b83fa0959c20ab00cc3fb4084cfc3401aabf5001f5878e03b83f7870ddf46ffdcb3fb4084cfc3401aabf"
+        "2cac90c503e8b73f5c93845f3cf4cb3fb4084cfc3401aabff3f1de9a9cd5b73fc86852fe76e6cb3fb4084cfc3401aabf"
+        "a0a7604326cfb73f24464b8638d6cb3fb4084cfc3401aabff4f1de9a9cd5b73f8023440efac5cb3fb4084cfc3401aabf"
+        "2dac90c503e8b73fecf811ad34b8cb3fb4084cfc3401aabf5101f5878e03b83fd01bb91701afcb3fb4084cfc3401aabf"
+        "9c4603780b24b83fa8f6f9ebc5abcb3fb4084cfc3401aabfe88b11688844b83fd01bb91701afcb3fb4084cfc3401aabf"
+        "0ae1752a1360b83fecf811ad34b8cb3fb4084cfc3401aabf449b27557a72b83f8023440efac5cb3fb4084cfc3401aabf"
+        "96e5a5acf078b83f24464b8638d6cb3fb4084cfc3401aabf000000000000f03f000000000000284098cef753e3a5bb3f"
+        "24464b8638d6cb3fb4084cfc3401aabf936d9a88c8fabb3f24464b8638d6cb3fb4084cfc3401aabf936d9a88c8fabb3f"
+        "24464b8638d6cb3fb4084cfc3401aabf00000000000000000000000000000000000000000000f03f0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000003140"
+        "936d9a88c8fabb3f24464b8638d6cb3fb4084cfc3401aabf40231c3152f4bb3fc86852fe76e6cb3fb4084cfc3401aabf"
+        "06696a06ebe1bb3f5c93845f3cf4cb3fb4084cfc3401aabfe313064460c6bb3f7870ddf46ffdcb3fb4084cfc3401aabf"
+        "98cef753e3a5bb3fa0959c20ab00cc3fb4084cfc3401aabf4c89e9636685bb3f7870ddf46ffdcb3fb4084cfc3401aabf"
+        "293485a1db69bb3f5c93845f3cf4cb3fb4084cfc3401aabff079d3767457bb3fc86852fe76e6cb3fb4084cfc3401aabf"
+        "9d2f551ffe50bb3f24464b8638d6cb3fb4084cfc3401aabff079d3767457bb3f8023440efac5cb3fb4084cfc3401aabf"
+        "2a3485a1db69bb3fecf811ad34b8cb3fb4084cfc3401aabf4e89e9636685bb3fd01bb91701afcb3fb4084cfc3401aabf"
+        "99cef753e3a5bb3fa8f6f9ebc5abcb3fb4084cfc3401aabfe413064460c6bb3fd01bb91701afcb3fb4084cfc3401aabf"
+        "07696a06ebe1bb3fecf811ad34b8cb3fb4084cfc3401aabf40231c3152f4bb3f8023440efac5cb3fb4084cfc3401aabf"
+        "936d9a88c8fabb3f24464b8638d6cb3fb4084cfc3401aabf000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "b942e19bc420b03f7876752f4ca6cc3fb4084cfc3401aabf8cf753e3a59bbc3f7876752f4ca6cc3fb4084cfc3401aabf"
+        "000000000000f03f0000000000002840b942e19bc420b03fa48e0a04560ecb3fb4084cfc3401aabf69f1d24d6210b03f"
+        "a48e0a04560ecb3fb4084cfc3401aabfb942e19bc420b03fd01521dd2406cb3fb4084cfc3401aabf0000000000000000"
+        "0000000000000000000000000000f03f00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000224069f1d24d6210b03fa48e0a04560ecb3fb4084cfc3401aabf"
+        "38fd79e5b210b03f4013b3e1bc0ccb3fb4084cfc3401aabfd03d9293a111b03fc0bd6478330bcb3fb4084cfc3401aabf"
+        "0e2dfd2b2513b03f5ca87ae6c809cb3fb4084cfc3401aabf574797c92e15b03ff490e51a8b08cb3fb4084cfc3401aabf"
+        "2b76c160aa17b03fd083184c8607cb3fb4084cfc3401aabff0a095847f1ab03f300ce37fc406cb3fb4084cfc3401aabf"
+        "ee4b3257921db03fe4ebd6284d06cb3fb4084cfc3401aabfb942e19bc420b03fd01521dd2406cb3fb4084cfc3401aabf"
+        "000000000000f03f0000000000002840b942e19bc420b03fa4fd8b081b9ecc3fb4084cfc3401aabfb942e19bc420b03f"
+        "7876752f4ca6cc3fb4084cfc3401aabf69f1d24d6210b03fa4fd8b081b9ecc3fb4084cfc3401aabf0000000000000000"
+        "0000000000000000000000000000f03f00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000002240b942e19bc420b03f7876752f4ca6cc3fb4084cfc3401aabf"
+        "3ce13d57921db03f9882a2e323a6cc3fb4084cfc3401aabf9859ac847f1ab03fc412988caca5cc3fb4084cfc3401aabf"
+        "a572e260aa17b03f745965c0eaa4cc3fb4084cfc3401aabf1f43c1c92e15b03f70fd9bf1e5a3cc3fb4084cfc3401aabf"
+        "1c8b2e2c2513b03fac650b26a8a2cc3fb4084cfc3401aabf7618c993a111b03f347226943da1cc3fb4084cfc3401aabf"
+        "d138b4e5b210b03f64aedd2ab49fcc3fb4084cfc3401aabf69f1d24d6210b03fa4fd8b081b9ecc3fb4084cfc3401aabf"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000000040b942e19bc420b03fd01521dd2406cb3fb4084cfc3401aabf"
+        "8cf753e3a59bbc3fd01521dd2406cb3fb4084cfc3401aabf000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "69f1d24d6210b03f884c7c07ce19cb3fb4084cfc3401aabf69f1d24d6210b03fa48e0a04560ecb3fb4084cfc3401aabf"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf0000000000000000000000000000004069f1d24d6210b03fa4fd8b081b9ecc3fb4084cfc3401aabf"
+        "69f1d24d6210b03fc03f1a05a392cc3fb4084cfc3401aabf000000000000f03f0000000000002840d82555946588b33f"
+        "24464b8638d6cb3fd8119ab9f3c5a73fd82555946588b33f24464b8638d6cb3f8072ee0b1b66a93fd82555946588b33f"
+        "505ee05a423ecc3fd8119ab9f3c5a73f000000000000f0bf0000000000000000075c143326a6a1bc0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000001840"
+        "d82555946588b33f24464b8638d6cb3f8072ee0b1b66a93fd82555946588b33f2473c1d4cdf9cb3ffcaf392e024da93f"
+        "d82555946588b33f144db76b1819cc3f78182084be04a93fd82555946588b33f54032b195230cc3f2c42c4620796a83f"
+        "d82555946588b33f147a2dbaad3ccc3f58a9b363370ea83fd82555946588b33f505ee05a423ecc3fd8119ab9f3c5a73f"
+        "000000000000f03f0000000000002840d82555946588b33f24464b8638d6cb3fd8119ab9f3c5a73fd82555946588b33f"
+        "f82db6b12e6ecb3fd8119ab9f3c5a73fd82555946588b33f24464b8638d6cb3f8072ee0b1b66a93f000000000000f0bf"
+        "0000000000000000075c143326a6a1bc00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000001840d82555946588b33ff82db6b12e6ecb3fd8119ab9f3c5a73f"
+        "d82555946588b33f34126952c36fcb3f60a9b363370ea83fd82555946588b33ff4886bf31e7ccb3f3042c4620796a83f"
+        "d82555946588b33f343fdfa05893cb3f7c182084be04a93fd82555946588b33f2419d537a3b2cb3ffcaf392e024da93f"
+        "d82555946588b33f24464b8638d6cb3f8072ee0b1b66a93f000000000000f03f0000000000002840467341068195b33f"
+        "24464b8638d6cb3fd8119ab9f3c5a73f467341068195b33f24464b8638d6cb3fa4d71528e44ba93f467341068195b33f"
+        "9837eaa1b437cc3fd8119ab9f3c5a73f000000000000f0bf0000000000000000075c143326a6a1bc0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000001840"
+        "467341068195b33f24464b8638d6cb3fa4d71528e44ba93f467341068195b33fd8b0240490f7cb3fa047b9016034a93f"
+        "467341068195b33f48086400e214cc3f8c1f15ada9f0a83f467341068195b33ff073e325a52acc3fbcf4d7f0eb88a83f"
+        "467341068195b33ffc723d7e3936cc3fec393e0eaa09a83f467341068195b33f9837eaa1b437cc3fd8119ab9f3c5a73f"
+        "000000000000f03f0000000000002840467341068195b33f24464b8638d6cb3fd8119ab9f3c5a73f467341068195b33f"
+        "b054ac6abc74cb3fd8119ab9f3c5a73f467341068195b33f24464b8638d6cb3fa4d71528e44ba93f000000000000f0bf"
+        "0000000000000000075c143326a6a1bc00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000001840467341068195b33fb054ac6abc74cb3fd8119ab9f3c5a73f"
+        "467341068195b33f4c19598e3776cb3ff0393e0eaa09a83f467341068195b33f5818b3e6cb81cb3fc4f4d7f0eb88a83f"
+        "467341068195b33f0084320c8f97cb3f901f15ada9f0a83f467341068195b33f74db7108e1b4cb3fa447b9016034a93f"
+        "467341068195b33f24464b8638d6cb3fa4d71528e44ba93f000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000000040"
+        "a0b69dcef753b33fc03f1a05a392cc3fb4084cfc3401aabfa0b69dcef753b33f505ee05a423ecc3fb4084cfc3401aabf"
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf00000000000000000000000000000040a0b69dcef753b33ff82db6b12e6ecb3fb4084cfc3401aabf"
+        "a0b69dcef753b33f884c7c07ce19cb3fb4084cfc3401aabf000000000000f03f00000000000028409e6dc5feb27bb6bf"
+        "24464b8638d6cb3fd4119ab9f3c5a73f9e6dc5feb27bb6bf24464b8638d6cb3f8072ee0b1b66a93f9e6dc5feb27bb6bf"
+        "505ee05a423ecc3fd4119ab9f3c5a73f000000000000f0bf0000000000000000075c143326a6a1bc0000000000000000"
+        "0000000000000000000000000000f0bf0000000000000040000000000000f0bf00000000000000000000000000001840"
+        "9e6dc5feb27bb6bf24464b8638d6cb3f8072ee0b1b66a93f9e6dc5feb27bb6bf2473c1d4cdf9cb3ffcaf392e024da93f"
+        "9e6dc5feb27bb6bf144db76b1819cc3f78182084be04a93f9e6dc5feb27bb6bf54032b195230cc3f2842c4620796a83f"
+        "9e6dc5feb27bb6bf147a2dbaad3ccc3f54a9b363370ea83f9e6dc5feb27bb6bf505ee05a423ecc3fd4119ab9f3c5a73f"
+        "000000000000f03f00000000000028409e6dc5feb27bb6bf24464b8638d6cb3fd4119ab9f3c5a73f9e6dc5feb27bb6bf"
+        "f82db6b12e6ecb3fd4119ab9f3c5a73f9e6dc5feb27bb6bf24464b8638d6cb3f8072ee0b1b66a93f000000000000f0bf"
+        "0000000000000000075c143326a6a1bc00000000000000000000000000000000000000000000f0bf0000000000000040"
+        "000000000000f0bf000000000000000000000000000018409e6dc5feb27bb6bff82db6b12e6ecb3fd4119ab9f3c5a73f"
+        "9e6dc5feb27bb6bf34126952c36fcb3f5ca9b363370ea83f9e6dc5feb27bb6bff4886bf31e7ccb3f3042c4620796a83f"
+        "9e6dc5feb27bb6bf343fdfa05893cb3f7c182084be04a93f9e6dc5feb27bb6bf2419d537a3b2cb3ffcaf392e024da93f"
+        "9e6dc5feb27bb6bf24464b8638d6cb3f8072ee0b1b66a93f000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000"
+    )
+    return SimpleNamespace(
+        data=struct.unpack("<1201d", raw),
+        edges=tuple(object() for _ in range(36)),
+        starts=(
+            0, 51, 66, 81, 96, 111, 126, 141, 156, 216, 231, 291,
+            306, 345, 393, 429, 444, 492, 540, 555, 603, 675, 747, 762,
+            810, 858, 873, 888, 903, 942, 981, 1020, 1059, 1074, 1089, 1128,
+        ),
+        end=1167,
+    )
+
+
+def test_r26_native_payload_preserves_all_edge_slot_correspondence(r26_native_polylines):
+    native = r26_native_polylines
+    decoded = drawing._projection_rendered_edges((native.edges, native.data))
+    assert len(decoded) == 36
+    assert all(actual is expected for actual, expected in zip(decoded, native.edges, strict=True))
+
+
+@pytest.mark.parametrize("ignored_size", [1.0, 7.0, 1024.0])
+def test_type_zero_ignores_geometry_size_field_generally(r26_native_polylines, ignored_size):
+    native = r26_native_polylines
+    data = list(native.data)
+    for start in native.starts:
+        if data[start] == 0:
+            data[start + 1] = ignored_size
+    assert drawing._projection_rendered_edges((native.edges, data)) == native.edges
+
+
+@pytest.mark.parametrize("size", [0.0, 11.0, 17.0, float("nan")])
+def test_arc_geometry_still_requires_documented_twelve_doubles(r26_native_polylines, size):
+    native = r26_native_polylines
+    data = list(native.data)
+    data[1] = size
+    with pytest.raises(RuntimeError, match="invalid geometry header.*primitive 0, offset 0"):
+        drawing._projection_rendered_edges((native.edges, data))
+
+
+@pytest.mark.parametrize("value", [-1.0, 0.5, float("nan"), float("inf"), object()])
+def test_ignored_geometry_size_still_requires_nonnegative_integer_field(r26_native_polylines, value):
+    native = r26_native_polylines
+    data = list(native.data)
+    data[307] = value
+    with pytest.raises(RuntimeError, match="primitive 12, offset 306"):
+        drawing._projection_rendered_edges((native.edges, data))
+
+
+@pytest.mark.parametrize("count", [0.0, 1.0, -1.0, 2.5, float("nan"), float("inf"), "unreadable"])
+def test_type_zero_requires_an_integral_count_of_at_least_two_points(r26_native_polylines, count):
+    native = r26_native_polylines
+    data = list(native.data)
+    data[314] = count
+    with pytest.raises(RuntimeError, match="point count.*primitive 12, offset 306"):
+        drawing._projection_rendered_edges((native.edges, data))
+
+
+def test_r26_native_payload_rejects_every_incomplete_active_prefix(r26_native_polylines):
+    native = r26_native_polylines
+    ends = (*native.starts[1:], native.end)
+    for cut in range(native.end):
+        index = next(index for index, end in enumerate(ends) if cut < end)
+        with pytest.raises(RuntimeError, match=rf"primitive {index}, offset {native.starts[index]}"):
+            drawing._projection_rendered_edges((native.edges, native.data[:cut]))
+
+
+@pytest.mark.parametrize("padding_length", [0, 1, 34, 128])
+def test_zero_residual_data_never_becomes_another_primitive(r26_native_polylines, padding_length):
+    native = r26_native_polylines
+    data = (*native.data[:native.end], *((0.0,) * padding_length))
+    assert drawing._projection_rendered_edges((native.edges, data)) == native.edges
+
+
+@pytest.mark.parametrize("offset", [1167, 1184, 1200])
+@pytest.mark.parametrize("value", [1.0, -1.0, float("nan"), float("inf"), "unreadable"])
+def test_nonzero_or_unreadable_residual_data_is_not_silently_dropped(
+    r26_native_polylines, offset, value,
+):
+    native = r26_native_polylines
+    data = list(native.data)
+    data[offset] = value
+    with pytest.raises(RuntimeError, match="primitive 36, offset 1167"):
+        drawing._projection_rendered_edges((native.edges, data))
+
+
+def test_r26_native_payload_requires_every_edge_aligned_record(r26_native_polylines):
+    native = r26_native_polylines
+    with pytest.raises(RuntimeError, match="primitive 35, offset 1128"):
+        drawing._projection_rendered_edges((native.edges[:-1], native.data))
+    with pytest.raises(RuntimeError, match="primitive 36, offset 1167"):
+        drawing._projection_rendered_edges(((*native.edges, object()), native.data[:native.end]))
+    with pytest.raises(RuntimeError, match="primitive 36, offset 1167"):
+        drawing._projection_rendered_edges(((*native.edges, object()), native.data))
+
+
+@pytest.mark.parametrize("silhouette_index", [0, 12, 35])
+def test_null_silhouette_slots_preserve_later_native_record_alignment(
+    r26_native_polylines, silhouette_index,
+):
+    native = r26_native_polylines
+    edges = list(native.edges)
+    edges[silhouette_index] = None
+    expected = tuple(edge for index, edge in enumerate(native.edges) if index != silhouette_index)
+    assert drawing._projection_rendered_edges((edges, native.data)) == expected
+
+
+def test_nonzero_ignored_field_does_not_make_degenerate_points_into_ink(r26_native_polylines):
+    native = r26_native_polylines
+    data = list(native.data)
+    # Actual primitive 12: type 0, ignored field 17, ten XYZ triplets at 315:345.
+    data[315:345] = data[315:318] * 10
+    expected = (*native.edges[:12], *native.edges[13:])
+    assert drawing._projection_rendered_edges((native.edges, data)) == expected
+
+
+def test_real_numeric_payload_cannot_replace_native_physical_edge_identity(
+    lever_tip_native, r26_native_polylines,
+):
+    native = lever_tip_native
+    captured = r26_native_polylines
+    calls = []
+
+    def polylines(cross):
+        calls.append(cross)
+        # These offline ordinal tokens deliberately do NOT identify either live
+        # physical target in lever_tip_native. Numeric success cannot prove it.
+        return captured.edges, captured.data
+
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert calls == [1]
+    assert native.failure_captures == []  # Valid G7 decode, not a decoder failure.
+    assert native.imports == [] and not native.cropped
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0
+    assert native.annotation.endpoints is native.endpoints
+
+
+def test_truncated_real_native_payload_keeps_original_failure_and_complete_snapshot(
+    lever_tip_native, r26_native_polylines,
+):
+    import struct
+
+    native = lever_tip_native
+    captured = r26_native_polylines
+    payload = captured.data[:captured.end - 1]
+    calls = []
+
+    def polylines(cross):
+        calls.append(cross)
+        return captured.edges, payload
+
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match="primitive 35, offset 1128") as caught:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert calls == [1]
+    assert len(native.failure_captures) == 1
+    _label, message, capture = native.failure_captures[0]
+    assert capture["exception"] is caught.value and message == str(caught.value)
+    assert capture["sheet_png"] is True
+    probe = capture["native_polyline_probe"]
+    assert probe["return_observed"] is True
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    edge_slots, buffer = probe["original_return"]["items"]
+    assert edge_slots["length"] == 36
+    assert [slot["python_id"] for slot in edge_slots["items"]] == [id(edge) for edge in captured.edges]
+    assert buffer["length"] == len(payload)
+    assert [bytes.fromhex(item["ieee754_le"]) for item in buffer["items"]] == [
+        struct.pack("<d", value) for value in payload
+    ]
+    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["reader_errors"] == {}
+    assert native.imports == [] and not native.cropped
+
+
+def test_native_arc_keeps_analytic_ink_without_tessellation_points(r26_native_polylines):
+    native = r26_native_polylines
+    # First captured arc: header, twelve geometric doubles, six style/layer
+    # fields, then its point count. Retain actual centre/start/end/normal.
+    arc = list(native.data[:21])
+    arc[20] = 0.0
+    assert drawing._projection_rendered_edges(((native.edges[0],), arc)) == (native.edges[0],)
+    arc[5:8] = arc[2:5]
+    assert drawing._projection_rendered_edges(((native.edges[0],), arc)) == ()
+
+
+def test_real_native_late_record_still_rejects_nonfinite_geometry(r26_native_polylines):
+    native = r26_native_polylines
+    data = list(native.data)
+    data[1149] = float("nan")
+    with pytest.raises(RuntimeError, match="non-finite model ink.*primitive 35, offset 1128"):
+        drawing._projection_rendered_edges((native.edges, data))
+
+
 @pytest.mark.parametrize("failure", ["missing-out", "truncated", "cardinality", "nonfinite"])
 def test_model_polyline_reader_refuses_unproven_ink(lever_tip_native, failure):
     native = lever_tip_native
@@ -1257,11 +1666,11 @@ def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failur
     import struct
 
     native = lever_tip_native
-    # Only (0.0,17.0) was retained from R25, not the complete buffer. This
-    # constructed remainder tests preservation; it is NOT an alternate format.
+    # Deliberately unsupported type; the arbitrary remainder tests complete
+    # failure-payload preservation, not the format of native R26 records.
     nan_bits = bytes.fromhex("010000000000f87f")
     payload = (
-        0.0, 17.0, *(float(i) / 7 for i in range(128)), -0.0,
+        2.0, 0.0, *(float(i) / 7 for i in range(128)), -0.0,
         struct.unpack("<d", nan_bits)[0],
     )
     original_return = (tuple(native.edges), payload)
@@ -1272,7 +1681,7 @@ def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failur
         return original_return
 
     native.view.GetPolylines7 = polylines
-    with pytest.raises(RuntimeError, match=r"invalid geometry header \(0.0, 17.0\).*offset 0") as caught:
+    with pytest.raises(RuntimeError, match=r"invalid geometry header \(2.0, 0.0\).*offset 0") as caught:
         drawing._thread_projection_detail(native.adapter, (), ())
     assert calls == [1]
     assert len(native.failure_captures) == 1
@@ -1492,7 +1901,7 @@ def test_every_later_polyline_refusal_names_primitive_and_buffer_position(lever_
     elif failure == "unreadable-record":
         second[9] = object()
     else:
-        second[1] = 17.0
+        second[0] = 2.0
     with pytest.raises(RuntimeError, match=rf"primitive 1, offset {len(first)}"):
         drawing._projection_rendered_edges((edges, (*first, *second)))
 
