@@ -911,6 +911,229 @@ def test_paper_feed_cleanup_remains_visible_after_gate_conversion(monkeypatch, t
     assert bool(report.failed) == failed
 
 
+@pytest.mark.parametrize(
+    "case",
+    [
+        "normal", "missing", "manifest", "parameter", "offstation",
+        "write_error", "write_cancel", "read_error", "read_cancel",
+        "force_swallowed", "force_cancel", "edit_swallowed", "edit_cancel",
+        "remate_cancel", "prepare_cancel",
+    ],
+)
+def test_jig_aggregate_envelopes_publish_actual_partial_work(
+    monkeypatch, tmp_path, case
+):
+    """Four distinct fake native costs prove disjoint, reached-operation totals."""
+    import json
+
+    adapter = _phase_case(
+        monkeypatch, tmp_path, manifest=case != "manifest",
+        parameter=case != "parameter",
+    )
+    now = [0]
+    events = []
+    clocks = []
+    publications = []
+
+    def clock():
+        clocks.append(now[0])
+        return now[0]
+
+    monkeypatch.setattr(verify, "time", types.SimpleNamespace(perf_counter_ns=clock))
+
+    def port(name, cost, error=None):
+        events.append(name)
+        now[0] += cost
+        if error is not None:
+            raise error
+
+    class Parameter:
+        @property
+        def SystemValue(self):
+            return 0.0
+
+        @SystemValue.setter
+        def SystemValue(self, value):
+            error = None
+            if case == "write_error":
+                error = RuntimeError("write failed")
+            elif case == "write_cancel":
+                error = asyncio.CancelledError("write cancelled")
+            port("write", 3, error)
+
+    model = adapter.currentModel
+    if case != "parameter":
+        model.Parameter = lambda _: Parameter()
+
+    def force(_):
+        error = None
+        if case == "force_swallowed":
+            error = RuntimeError("force failed")
+        elif case == "force_cancel":
+            error = asyncio.CancelledError("force cancelled")
+        port("force", 5, error)
+
+    model.ForceRebuild3 = force
+
+    def edit():
+        error = None
+        if case == "edit_swallowed":
+            error = RuntimeError("edit failed")
+        elif case == "edit_cancel":
+            error = asyncio.CancelledError("edit cancelled")
+        port("edit", 7, error)
+
+    model.EditRebuild3 = edit
+
+    def transform(*_):
+        error = None
+        if case == "read_error":
+            error = RuntimeError("read failed")
+        elif case == "read_cancel":
+            error = asyncio.CancelledError("read cancelled")
+        port("read", 11, error)
+        return [1., 0., 0., 0., 1., 0., 0., 0., 1.,
+                1. if case == "offstation" else 0., 0., 0.]
+
+    async def author(*_):
+        port(
+            "prepare", 29,
+            asyncio.CancelledError("prepare cancelled") if case == "prepare_cancel" else None,
+        )
+        return ["phase-drive"]
+
+    async def suppress(_):
+        port(
+            "suppress", 13,
+            asyncio.CancelledError("remate cancelled") if case == "remate_cancel" else None,
+        )
+        return _Result(True)
+
+    async def mate(*_, **__):
+        port("mate", 17)
+
+    original_annotate = _telemetry.annotate
+
+    def annotate(**attributes):
+        publications.append((
+            _telemetry.trace.get_current_span().get_span_context().span_id,
+            dict(attributes),
+        ))
+        original_annotate(**attributes)
+
+    monkeypatch.setattr(verify, "component_transform", transform)
+    monkeypatch.setattr(verify, "author_dof_drives", author)
+    monkeypatch.setattr(verify, "named_ref", lambda name, kind: (name, kind))
+    monkeypatch.setattr(verify, "coincident_mate", mate)
+    monkeypatch.setattr(verify, "check_no_interference", lambda *_, **__: port("check", 19))
+    monkeypatch.setattr(verify, "log", lambda *_: port("log", 23))
+    monkeypatch.setattr(_telemetry, "annotate", annotate)
+    adapter.suppress_mate = suppress
+
+    def pose(i):
+        return {
+            "drive_mm": i, "theta_rad": 0., "carriages": {"carriage": [0, 0, 0]},
+            "check": i == 0,
+        }
+
+    if case != "missing":
+        verify._sweep_sidecar_path(verify.SWEEP_OWNER).write_text(json.dumps({
+            "drive_key": "slide", "pose_tolerance_mm": .01,
+            "passes": [
+                {"pass": "inner", "remate": None, "poses": [pose(0), pose(1)]},
+                {
+                    "pass": "outer",
+                    "remate": {
+                        "suppress": ["old"],
+                        "coaxial": [{"hole": "hole", "pin": "pin", "label": "pair"}],
+                    },
+                    "poses": [pose(2)],
+                },
+            ],
+        }), encoding="utf-8")
+    capture = _attach_capture()
+    report = verify.Report()
+
+    def operation():
+        return verify._verify_pass_sweep(adapter, verify.SWEEP_OWNER, report)
+
+    if case.endswith("cancel"):
+        with pytest.raises(asyncio.CancelledError):
+            _run_phase(capture, operation)
+    else:
+        _run_phase(capture, operation)
+    spans = capture.get_finished_spans()
+    (walk,) = _by_name(spans, "verify.pass_sweep.walk")
+    (prepare,) = _by_name(spans, "verify.pass_sweep.prepare")
+    assert len(publications) == 1
+    span_id, attributes = publications[0]
+    assert span_id == walk.context.span_id
+    assert prepare.parent.span_id == span_id
+    keys = ("drive_write", "force_rebuild", "edit_rebuild", "transform_readback")
+    costs = (3, 5, 7, 11)
+    if case in ("missing", "manifest", "parameter", "prepare_cancel"):
+        counts = (0, 0, 0, 0)
+    elif case in ("write_error", "write_cancel"):
+        counts = (1, 0, 0, 0)
+    elif case == "force_cancel":
+        counts = (1, 1, 0, 0)
+    elif case == "edit_cancel":
+        counts = (1, 1, 1, 0)
+    elif case in ("offstation", "read_error", "read_cancel"):
+        counts = (1, 1, 1, 1)
+    elif case == "remate_cancel":
+        counts = (3, 3, 3, 2)
+    else:
+        counts = (4, 5, 5, 3)
+    expected = {}
+    for key, count, cost in zip(keys, counts, costs):
+        expected[f"jig.{key}_attempts"] = count
+        expected[f"jig.{key}_elapsed_ns"] = count * cost
+    assert attributes == expected
+    assert {k: v for k, v in walk.attributes.items() if k.startswith("jig.")} == expected
+    assert not any(k.startswith("jig.") for k in prepare.attributes)
+    assert all(type(value) is int for value in attributes.values())
+    # Each start/end pair encloses exactly one operation, never a rebuild inside
+    # a write or any preparation/remate/log/interference work.
+    assert len(clocks) == 2 * sum(counts)
+    deltas = [end - start for start, end in zip(clocks[::2], clocks[1::2])]
+    assert sum(deltas) == sum(count * cost for count, cost in zip(counts, costs))
+    for previous_end, next_start in zip(clocks[1::2], clocks[2::2]):
+        assert previous_end <= next_start
+    if case in ("normal", "force_swallowed", "edit_swallowed"):
+        assert events == [
+            "log", "prepare",
+            "write", "force", "edit", "read", "log", "check",
+            "write", "force", "edit", "read", "log",
+            "write", "force", "edit", "suppress", "mate", "force", "edit",
+            "write", "force", "edit", "read", "log",
+        ]
+        assert report.failed == []
+    elif not case.endswith("cancel"):
+        assert report.failed
+    assert len(_by_name(spans, "verify.cleanup")) == 1
+    assert len(spans) < 45
+
+
+def test_non_jig_rebuild_has_no_clock_reads_and_keeps_two_native_attempts(monkeypatch):
+    events = []
+
+    def unexpected_clock():
+        pytest.fail("non-jig rebuild must not read the clock")
+
+    monkeypatch.setattr(
+        verify, "time", types.SimpleNamespace(perf_counter_ns=unexpected_clock)
+    )
+    model = types.SimpleNamespace(
+        ForceRebuild3=lambda quiet: events.append(("force", quiet)),
+        EditRebuild3=lambda: events.append(("edit",)),
+    )
+    adapter = types.SimpleNamespace(currentModel=model)
+    adapter._attempt = types.MethodType(MockAdapter._attempt, adapter)
+    verify._rebuild(adapter)
+    assert events == [("force", False), ("edit",)]
+
+
 # --------------------------------------------------------------------------- #
 # Standalone demo: print the REAL console span tree for a realistic pass.       #
 # --------------------------------------------------------------------------- #

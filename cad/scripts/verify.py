@@ -65,6 +65,7 @@ import math
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -1213,11 +1214,25 @@ async def _verify_static_one(
         await _verify_pass_sweep(adapter, name, report)
 
 
-def _rebuild(adapter: Any) -> None:
+def _rebuild(adapter: Any, *, timings: dict[str, int] | None = None) -> None:
     """Re-solve after a CrankDeg change so the pen-driver equation re-evaluates
     the whole partial-sum chain and the mate-driven pose updates."""
-    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+    if timings is not None:
+        timings["jig.force_rebuild_attempts"] += 1
+        started = time.perf_counter_ns()
+    try:
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    finally:
+        if timings is not None:
+            timings["jig.force_rebuild_elapsed_ns"] += time.perf_counter_ns() - started
+    if timings is not None:
+        timings["jig.edit_rebuild_attempts"] += 1
+        started = time.perf_counter_ns()
+    try:
+        adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+    finally:
+        if timings is not None:
+            timings["jig.edit_rebuild_elapsed_ns"] += time.perf_counter_ns() - started
 
 
 def _sweep_sidecar_path(name: str) -> Path:
@@ -1238,90 +1253,115 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
     are mated on the pins' (coincident named axes, picked by name)."""
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
-    with _telemetry.span("verify.pass_sweep.prepare") as sp:
-        path = _sweep_sidecar_path(name)
-        if not path.exists():
-            sp.set_status(
-                _telemetry.Status(
-                    _telemetry.StatusCode.ERROR,
-                    f"no sweep sidecar {path.name} -- rebuild {name}",
-                )
-            )
-            return [f"no sweep sidecar {path.name} -- rebuild {name}"]
-        sweep = json.loads(path.read_text(encoding="utf-8"))
-        key = sweep["drive_key"]
-        specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
-        if len(specs) != 1:
-            sp.set_status(
-                _telemetry.Status(
-                    _telemetry.StatusCode.ERROR,
-                    f"expected exactly 1 recorded {key} drive spec, found {len(specs)}",
-                )
-            )
-            return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
-        (mate,) = await author_dof_drives(adapter, specs)
-        param = adapter._attempt(
-            lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
-        )
-        if param is None:
-            sp.set_status(
-                _telemetry.Status(
-                    _telemetry.StatusCode.ERROR,
-                    f"cannot read D1@{mate} on the transient {key} drive",
-                )
-            )
-            return [f"cannot read D1@{mate} on the transient {key} drive"]
-        tolerance = float(sweep["pose_tolerance_mm"])
-
-    def _drive(drive_mm: float) -> None:
-        param.SystemValue = drive_mm / 1000.0
-        _rebuild(adapter)
-
-    failures: list[str] = []
-    for walk in sweep["passes"]:
-        remate = walk["remate"]
-        if remate:
-            _drive(walk["poses"][0]["drive_mm"])
-            for old in remate["suppress"]:
-                check(
-                    f"suppress {old}",
-                    await adapter.suppress_mate(
-                        SuppressMateParameters(name=old, suppress=True)
-                    ),
-                )
-            for pair in remate["coaxial"]:
-                await coincident_mate(
-                    adapter,
-                    named_ref(pair["hole"], "AXIS"),
-                    named_ref(pair["pin"], "AXIS"),
-                    label=pair["label"],
-                )
-            _rebuild(adapter)
-        for pose in walk["poses"]:
-            _drive(pose["drive_mm"])
-            where = (
-                f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
-                f"(slide {pose['drive_mm']:.3f} mm)"
-            )
-            for carriage, origin in pose["carriages"].items():
-                at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
-                off = math.dist(at, origin)
-                if off > tolerance:
-                    failures.append(
-                        f"{where}: {carriage} at {[round(v, 3) for v in at]}, "
-                        f"{off:.3f} mm off its station (> {tolerance} mm)"
+    timings: dict[str, int] = {
+        "jig.drive_write_attempts": 0,
+        "jig.drive_write_elapsed_ns": 0,
+        "jig.force_rebuild_attempts": 0,
+        "jig.force_rebuild_elapsed_ns": 0,
+        "jig.edit_rebuild_attempts": 0,
+        "jig.edit_rebuild_elapsed_ns": 0,
+        "jig.transform_readback_attempts": 0,
+        "jig.transform_readback_elapsed_ns": 0,
+    }
+    try:
+        with _telemetry.span("verify.pass_sweep.prepare") as sp:
+            path = _sweep_sidecar_path(name)
+            if not path.exists():
+                sp.set_status(
+                    _telemetry.Status(
+                        _telemetry.StatusCode.ERROR,
+                        f"no sweep sidecar {path.name} -- rebuild {name}",
                     )
-            if failures:
-                return failures
-            log(f"{name}: {where}")
-            if pose["check"]:
-                try:
-                    check_no_interference(
-                        adapter, allowed_pairs=allowed_interference_pairs(name)
+                )
+                return [f"no sweep sidecar {path.name} -- rebuild {name}"]
+            sweep = json.loads(path.read_text(encoding="utf-8"))
+            key = sweep["drive_key"]
+            specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
+            if len(specs) != 1:
+                sp.set_status(
+                    _telemetry.Status(
+                        _telemetry.StatusCode.ERROR,
+                        f"expected exactly 1 recorded {key} drive spec, found {len(specs)}",
                     )
-                except Exception as exc:  # noqa: BLE001 -- collect, gate below
-                    failures.append(f"{where}: {exc}")
-    return failures
+                )
+                return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
+            (mate,) = await author_dof_drives(adapter, specs)
+            param = adapter._attempt(
+                lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
+            )
+            if param is None:
+                sp.set_status(
+                    _telemetry.Status(
+                        _telemetry.StatusCode.ERROR,
+                        f"cannot read D1@{mate} on the transient {key} drive",
+                    )
+                )
+                return [f"cannot read D1@{mate} on the transient {key} drive"]
+            tolerance = float(sweep["pose_tolerance_mm"])
+
+        def _drive(drive_mm: float) -> None:
+            timings["jig.drive_write_attempts"] += 1
+            started = time.perf_counter_ns()
+            try:
+                param.SystemValue = drive_mm / 1000.0
+            finally:
+                timings["jig.drive_write_elapsed_ns"] += time.perf_counter_ns() - started
+            _rebuild(adapter, timings=timings)
+
+        failures: list[str] = []
+        for walk in sweep["passes"]:
+            remate = walk["remate"]
+            if remate:
+                _drive(walk["poses"][0]["drive_mm"])
+                for old in remate["suppress"]:
+                    check(
+                        f"suppress {old}",
+                        await adapter.suppress_mate(
+                            SuppressMateParameters(name=old, suppress=True)
+                        ),
+                    )
+                for pair in remate["coaxial"]:
+                    await coincident_mate(
+                        adapter,
+                        named_ref(pair["hole"], "AXIS"),
+                        named_ref(pair["pin"], "AXIS"),
+                        label=pair["label"],
+                    )
+                _rebuild(adapter, timings=timings)
+            for pose in walk["poses"]:
+                _drive(pose["drive_mm"])
+                where = (
+                    f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
+                    f"(slide {pose['drive_mm']:.3f} mm)"
+                )
+                for carriage, origin in pose["carriages"].items():
+                    timings["jig.transform_readback_attempts"] += 1
+                    started = time.perf_counter_ns()
+                    try:
+                        at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
+                    finally:
+                        timings["jig.transform_readback_elapsed_ns"] += (
+                            time.perf_counter_ns() - started
+                        )
+                    off = math.dist(at, origin)
+                    if off > tolerance:
+                        failures.append(
+                            f"{where}: {carriage} at {[round(v, 3) for v in at]}, "
+                            f"{off:.3f} mm off its station (> {tolerance} mm)"
+                        )
+                if failures:
+                    return failures
+                log(f"{name}: {where}")
+                if pose["check"]:
+                    try:
+                        check_no_interference(
+                            adapter, allowed_pairs=allowed_interference_pairs(name)
+                        )
+                    except Exception as exc:  # noqa: BLE001 -- collect, gate below
+                        failures.append(f"{where}: {exc}")
+        return failures
+    finally:
+        _telemetry.annotate(**timings)
 
 
 async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
