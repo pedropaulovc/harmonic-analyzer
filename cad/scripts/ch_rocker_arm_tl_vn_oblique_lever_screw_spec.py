@@ -61,3 +61,47 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     raise AssertionError(
         f"{SKU}: major {DIMS.major_dia}, the row's thread is {ROW.major_mm}"
     )
+
+# Exact-current product table and engineering drawing read 2026-10-21.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# The table's exact head Ø15/32 and height5/16 remain .46875/.3125 in
+# natively; only the engineering drawing's ink rounds them to .469/.313.
+# Length/head Ø/head height have three places, major Ø four; drive is 1/4.
+# Standard-only socket depth/length tolerances are not supplier references.
+SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A583/"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/14BDCFCB/"
+    "91251A583_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
+    ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierThreadDiameter": "bottom",
+    "SupplierDriveWidth": "bottom",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierThreadDiameter": (4, "diameter", None, '5/16"-18'),
+    "SupplierDriveWidth": (0, "length", 4, None),
+}

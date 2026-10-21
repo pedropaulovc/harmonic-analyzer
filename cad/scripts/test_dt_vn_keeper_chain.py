@@ -210,3 +210,9 @@ def test_purchased_parts_name_their_skus() -> None:
     assert _config.parts("dt-vn-keeper-chain")["supplier_skus"] == [chain.CHAIN_SKU]
     assert _config.parts("dt-vn-keeper-chain-link")["supplier_skus"] == [chain.LINK_SKU]
     assert int(_config.parts("dt-vn-keeper-chain-link")["quantity"]) == 1
+
+
+def test_catalogue_bead_diameter_preserves_the_installed_sphere() -> None:
+    assert chain.BEAD_DIA == pytest.approx(2.38125, abs=1e-12)
+    assert chain.BEAD_DIA / chain.MM_PER_IN == pytest.approx(3 / 32, abs=1e-12)
+    assert 2 * chain.BEAD_R == pytest.approx(chain.BEAD_DIA, abs=1e-12)

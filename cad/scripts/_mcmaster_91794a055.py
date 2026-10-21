@@ -19,3 +19,30 @@ PITCH = IN / 80.0  # "Pitch@Sketch1" 0.3175
 # tip-seeded thread), so diag_build_91794A055 builds it, not
 # build_fillister.
 FILLISTER_SIZE = (1.524, 6.35, 1.397, 2.4384, 25.4 / 80.0)
+
+# Supplier engineering drawing inspected 2026-10-19. Production is cut at
+# assembly, so its 1/4 in stock-length witness is a SEPARATE construction
+# line to the left of the installed solid, explicitly labelled as stock.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/1437E659/"
+    "91794A055_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierStockLength", -SHANK_LEN, "vertical"),
+    ("SupplierHeadHeight", HEAD_H, "vertical"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
+    ("SupplierThreadDiameter", SHANK_DIA, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierStockLength": (-HEAD_DIA, 0.0),
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierThreadDiameter": (-SHANK_DIA / 2.0, -SHANK_LEN / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierStockLength": (2, "length", None, "AS-SUPPLIED STOCK LENGTH"),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierThreadDiameter": (2, "diameter", None, "0-80"),
+}

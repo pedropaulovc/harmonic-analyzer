@@ -1,7 +1,7 @@
-"""Draw both installed link forms of shared McMaster-Carr 6261K171.
+"""Supplier-family nominal diagrams beside both installed ANSI #25 members.
 
-Two explicitly configured four-view panels retain the purchased identification
-content. Installed member counts are distinct from chain ordered by the foot.
+The supplier sizes belong to a zero-body construction-only reference state,
+not the installed clearance pins/bushes. Both original members remain visible.
 """
 
 from __future__ import annotations
@@ -11,26 +11,41 @@ import sys
 from typing import Any
 
 import _telemetry
+from _config import parts
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_variant_drawing import build_purchased_variant_drawing
+from _supplier_chain_dimensions import (
+    SUPPLIER_MARGINS,
+    annotate_chain_stock,
+    prepare_chain_diagrams,
+)
+from _supplier_chain_stock import SUPPLIER_REFERENCE_CONFIGURATION
+from _supplier_spring_drawing import build_supplier_spring_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_chain_link"]
 PART_STEM = SPEC.artifact_stem
-# The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "ANSI #25 ROLLER CHAIN (1/4 PITCH)"
-VARIANTS = (("InnerLink", "INNER LINK"), ("OuterLink", "OUTER LINK"))
-PURCHASE_UNIT = "CHAIN BY THE FOOT"
+# Pitch is a native model dimension on the nominal supplier diagram.
+ITEM = "ANSI #25 ROLLER CHAIN"
+_MEMBER_QUANTITIES = parts(PART_STEM)["configuration_quantities"]
+VARIANTS = (
+    ("InnerLink", f"INSTALLED INNER LINK, QTY {_MEMBER_QUANTITIES['InnerLink']}"),
+    ("OuterLink", f"INSTALLED OUTER LINK, QTY {_MEMBER_QUANTITIES['OuterLink']}"),
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_variant_drawing(
-        adapter,
-        SPEC,
-        variants=VARIANTS,
-        item=ITEM,
-        purchase_unit=PURCHASE_UNIT,
+    return await build_supplier_spring_drawing(
+        adapter, SPEC, item=ITEM,
+        supplier_dimensions=annotate_chain_stock,
+        supplier_margins=SUPPLIER_MARGINS,
+        stock_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
+        prepare_views=prepare_chain_diagrams,
+        include_right=False,
+        installed_variants=VARIANTS,
+        installed_configuration="InnerLink",
+        stock_caption="SUPPLIER FAMILY NOMINAL DIAGRAM — NOT INSTALLED",
+        spring_metadata=True,
         cut_to_suit=True,
     )
 

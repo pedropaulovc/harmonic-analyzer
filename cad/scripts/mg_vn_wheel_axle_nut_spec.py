@@ -9,9 +9,9 @@ Catalogue (mcmaster.com/92671A005, checked live 2026-10-10 for the rev 10
 design): brass hex nut, ASME B18.2.2, #4-40, 1/4 in across flats, 3/32 in
 thick.
 
-Part frame: thread axis local +Z; the nut runs z 0..THICKNESS.  The thread
-is not modelled: the bore is the #4-40 basic major diameter, line-to-line
-with the pin's modelled thread.
+Part frame: thread axis local +Z; the nut runs z 0..THICKNESS. The thread
+is not modelled: the bore retains the rounded #4-40 major envelope,
+line-to-line with the pin's modelled thread.
 """
 
 from __future__ import annotations
@@ -32,6 +32,18 @@ THICKNESS_MIN = 0.087 * MM_PER_IN  # 2.2098
 THICKNESS_MAX = 0.098 * MM_PER_IN  # 2.4892
 BORE_DIA = THREAD_MAJOR_MM[THREAD]  # 2.845
 ACROSS_CORNERS = ACROSS_FLATS / math.cos(math.radians(30.0))  # 7.332
+
+# Source drawing: 1/4 in AF and 0.094 in height; exact 3/32 in stays native.
+# The existing 2.845 mm bore is rounded; do not label it as exact .112 in.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3, "ThreadNominalMajor": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 4
+SUPPLIER_NOMINAL_MAJOR_MM = 0.112 * MM_PER_IN
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("ThreadNominalMajor", SUPPLIER_NOMINAL_MAJOR_MM, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "ThreadNominalMajor": (-SUPPLIER_NOMINAL_MAJOR_MM / 2.0, 0.0),
+}
 
 
 def nut_volume() -> float:

@@ -1,9 +1,10 @@
 """Four-view purchased-part reference sheets, linked to the native source part.
 
-Every view is hidden-lines-removed: the sheets carry no dimensions, so a dashed
-edge never names a feature (drawing-guidelines rule 9).  Front/Top/Right share
-the largest standard scale that fits their cells, which is the sheet scale; the
-Isometric takes its own largest fitting scale, printed in its caption.
+Every view is hidden-lines-removed. Optional native supplier references use
+explicit annotation margins reserved before fitting. Front/Top/Right share
+the largest fitting standard scale; Isometric has its own fitting scale and
+stays unannotated. All supplier dimensions are reference-only, not fabrication
+controls or claims that nominal envelopes survive every physical feature.
 
 The footer, bottom-left above the border and left of the title block, reads
 top to bottom: the part's own notes (installation, or a spring's acceptance
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -44,6 +46,7 @@ from _drawing_common import (
 )
 from _drawing_layout_audit import annotation_display
 from _drawing_notes import add_property_linked_note, property_link
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
 from _drawing_scan import _zoomed_on
 from _drawing_sheet_region import sheet_drawable_region
@@ -95,6 +98,11 @@ _CAPTION_CLEARANCE = 0.011
 # A caption's top edge sits this far under its cell; its text hangs below.
 _CAPTION_TO_CELL = 0.004
 _CAPTION_BELOW = 0.006
+
+# Synchronous annotation hook, after fitting; keys include the leading "*".
+SupplierDimensions = Callable[[Any, dict[str, Any]], None]
+# Per orthographic view: left, bottom, right, top in sheet metres.
+SupplierMargins = Mapping[str, tuple[float, float, float, float]]
 
 
 class NumberFit(StrEnum):
@@ -177,17 +185,43 @@ def check_item(item: str, *, label: str) -> str:
     return text
 
 
-def footer_top(notes: str, *, label: str) -> float:
-    """The footer's top edge: its notes' first line, or the general line."""
+def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
+    """Source operating/suitability data, not free-text fabrication dimensions."""
+    if isinstance(data, str):
+        raise ValueError(f"{label}: supplier_data must contain separate lines")
+    lines = tuple(data)
+    if any(
+        not isinstance(line, str)
+        or not line.strip()
+        or "\n" in line
+        or "\r" in line
+        or len(line) > MAX_ITEM_CHARS
+        for line in lines
+    ):
+        raise ValueError(f"{label}: supplier operating data must fit single footer lines")
+    return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
+
+
+def footer_top(
+    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+) -> float:
+    """The top edge of installation notes and separate supplier operating data."""
     lines = note_lines(notes, label=label)
-    if not lines:
+    data = _supplier_data_lines(supplier_data, label=label)
+    if not lines and not data:
         return _GENERAL_Y
-    return _NOTES_BOTTOM + len(lines) * _LINE_PITCH + 0.001
+    gap = _LINE_PITCH if lines and data else 0.0
+    return _NOTES_BOTTOM + (len(lines) + len(data)) * _LINE_PITCH + gap + 0.001
 
 
-def view_band_bottom(notes: str, *, label: str) -> float:
-    """The bottom view row's caption height: clear of the footer and title block."""
-    return max(footer_top(notes, label=label) + _CAPTION_CLEARANCE, _LOWEST_CAPTION_Y)
+def view_band_bottom(
+    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+) -> float:
+    """Bottom-row captions clear the complete footer and title block."""
+    return max(
+        footer_top(notes, label=label, supplier_data=supplier_data) + _CAPTION_CLEARANCE,
+        _LOWEST_CAPTION_Y,
+    )
 
 
 def _cell(
@@ -223,6 +257,140 @@ def spring_view_cells(caption_y: float) -> tuple:
         _cell("*Right", 0.212, bottom, 0.262, 0.150),
         _cell(_ISOMETRIC, 0.270, bottom, 0.418, 0.262),
     )
+
+
+def supplier_fit_cells(cells: tuple, margins: SupplierMargins, *, label: str) -> tuple:
+    """Reserve annotation lanes before measuring native candidate scales."""
+    orientations = {name for name, _, _ in cells}
+    if not margins or set(margins) - orientations or _ISOMETRIC in margins:
+        raise ValueError(
+            f"{label}: supplier margins must name actual annotated orthographic cells"
+        )
+    fitted = []
+    for name, center, cell in cells:
+        if name not in margins:
+            fitted.append((name, center, cell))
+            continue
+        padding = tuple(float(value) for value in margins[name])
+        if (
+            len(padding) != 4
+            or not all(math.isfinite(value) and value >= 0.0 for value in padding)
+            or not any(padding)
+        ):
+            raise ValueError(
+                f"{label} {name}: supplier margins must be four nonnegative metre values"
+            )
+        left, bottom, right, top = padding
+        inset = (cell[0] + left, cell[1] + bottom, cell[2] - right, cell[3] - top)
+        if inset[0] >= inset[2] or inset[1] >= inset[3]:
+            raise ValueError(f"{label} {name}: supplier margins leave no geometry space")
+        fitted.append(_cell(name, *inset))
+    return tuple(fitted)
+
+
+@_telemetry.traced("drawing.supplier_view_cell", label_param="label")
+def assert_supplier_view_fits(
+    adapter: Any, view: Any, cell: tuple[float, float, float, float], *, label: str
+) -> None:
+    """Read settled native view/dimension/note ink inside its outer cell."""
+    from _layout_audit import display_box
+
+    view = _early_bound(view, "IView")
+    outline = _box(view.GetOutline(), label=label)
+    if not _inside(outline, cell):
+        raise RuntimeError(f"{label}: settled supplier view leaves its cell: {outline!r}")
+    display = view.GetFirstDisplayDimension6()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError(f"{label}: supplier annotation lost its native dimension")
+        native = _early_bound(raw_dimension, "IDimension")
+        identity = str(native.FullName)
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if (
+            int(annotation.OwnerType) != 0
+            or annotation.Owner is None
+            or int(adapter.swApp.IsSame(annotation.Owner, view)) != 1
+            or int(annotation.Visible) != 1
+            or annotation.IsDangling()
+            or display.GetOverride()
+            or not display.ShowDimensionValue
+        ):
+            raise RuntimeError(f"{label} {identity}: unsound supplier annotation owner/value")
+        geometry, refused = annotation_display(adapter, annotation)
+        if refused or not geometry.get("texts"):
+            raise RuntimeError(
+                f"{label} {identity}: unreadable settled native dimension ink: {refused!r}"
+            )
+        ink = display_box(geometry)
+        if ink is None:
+            raise RuntimeError(f"{label} {identity}: supplier dimension draws no ink")
+        bounds = (ink.xmin, ink.ymin, ink.xmax, ink.ymax)
+        if not _inside(bounds, cell):
+            raise RuntimeError(
+                f"{label} {identity}: supplier dimension leaves its cell/caption space: "
+                f"ink={bounds!r}, cell={cell!r}"
+            )
+        display = display.GetNext5()
+    for raw_annotation in view.GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 6:  # swNote
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        bounds = _box(note.GetExtent(), label=f"{label} note", kind="note")
+        if not _inside(bounds, cell):
+            raise RuntimeError(f"{label}: supplier note leaves its cell: {bounds!r}")
+
+
+@_telemetry.traced("drawing.purchased_supplier_layout", label_param="label")
+def _assert_supplier_layout(
+    adapter: Any,
+    cells: tuple,
+    *,
+    label: str,
+    margins: SupplierMargins,
+    scales: dict[str, tuple[int, int]],
+    origins: dict[str, tuple[float, float]],
+    sources: dict[str, tuple[str, str]],
+    sheet_notes: Sequence[tuple],
+) -> None:
+    """Reacquire after the final rebuild; no refitting or repair in this guard."""
+    actual = list(iter_views(adapter))
+    views = {str(view.GetOrientationName()): _early_bound(view, "IView") for view in actual}
+    if len(actual) != len(cells) or set(views) != {name for name, _, _ in cells}:
+        raise RuntimeError(f"{label}: supplier layout lost its four native view cells")
+    for name, _, cell in cells:
+        view = views[name]
+        source = (str(Path(view.GetReferencedModelName()).resolve()), str(view.ReferencedConfiguration))
+        if source != sources[name]:
+            raise RuntimeError(f"{label} {name}: supplier view changed source/configuration")
+        if tuple(view.ScaleRatio) != scales[name] or view.UseSheetScale != 0:
+            raise RuntimeError(f"{label} {name}: supplier callback changed fitted scale")
+        view.UpdateViewDisplayGeometry()
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} settled origin"
+        )
+        if not all(map(math.isfinite, origin + origins[name])) or any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(origin, origins[name], strict=True)
+        ):
+            raise RuntimeError(f"{label} {name}: supplier callback moved the fitted view")
+        if (view.GetFirstDisplayDimension6() is not None) != (name in margins):
+            raise RuntimeError(
+                f"{label} {name}: actual supplier dimensions do not match reserved views"
+            )
+        assert_supplier_view_fits(adapter, view, cell, label=f"{label} {name}")
+    for note, text, resolved, cell in sheet_notes:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        bounds = _box(note.GetExtent(), label=f"{label} {text}", kind="note")
+        if (
+            int(annotation.OwnerType) != 1
+            or note.PropertyLinkedText != text
+            or note.GetText().replace("\r\n", "\n") != resolved
+            or not _inside(bounds, cell)
+        ):
+            raise RuntimeError(f"{label}: settled caption/footer changed owner/text/space: {text!r}")
 
 
 def _fit_group(draw: Any, members: list[tuple[Any, tuple]]) -> tuple[int, int]:
@@ -625,6 +793,7 @@ def add_purchased_footer(
     notes: str = "",
     cut_to_suit: bool = False,
     label: str,
+    supplier_data: Sequence[str] = (),
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
@@ -634,6 +803,7 @@ def add_purchased_footer(
     """
     item = check_item(item, label=label)
     lines = note_lines(notes, label=label)
+    data = _supplier_data_lines(supplier_data, label=label)
     placed = []
     if lines:
         # The part's own requirements are drawing-local, like purchased
@@ -651,6 +821,14 @@ def add_purchased_footer(
                 text,
                 (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, top + 0.001),
             )
+        )
+    if data:
+        text = "\n".join(data)
+        top = footer_top(notes, label=label, supplier_data=supplier_data)
+        bottom = footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+        note = _literal_note(adapter, text, _NOTE_X, top)
+        placed.append(
+            (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
     general = _GENERAL_TEXT[cut_to_suit]
     note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y)
@@ -687,6 +865,11 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
+    supplier_dimensions: SupplierDimensions | None = None,
+    supplier_margins: SupplierMargins | None = None,
+    configuration: str | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -696,6 +879,10 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.  ``number_fit`` opts a sheet whose registry number overruns the
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
+    Supplier hooks import native reference sizes after fitting; explicit margins
+    reserve their annotation space before scale selection. Pass the same mutable
+    settled-check list the hook populates, or a predeclared read-only assertion.
+    Final checks run after the finalizer's last rebuild, without refitting.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -742,11 +929,24 @@ async def build_purchased_fastener_drawing(
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),
         number_fit=number_fit,
+        supplier_dimensions=supplier_dimensions,
+        supplier_margins=supplier_margins,
+        configuration=configuration,
+        settled_checks=settled_checks,
+        supplier_data=supplier_data,
     )
 
 
 async def build_purchased_spring_drawing(
-    adapter: Any, spec: DrawingSpec, *, item: str
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    item: str,
+    supplier_dimensions: SupplierDimensions | None = None,
+    supplier_margins: SupplierMargins | None = None,
+    configuration: str | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     """Use spring metadata without treating the part as a catalogued fastener.
 
@@ -771,6 +971,11 @@ async def build_purchased_spring_drawing(
         material_property="Material Specification",
         notes=properties["Manufacturing Notes"],
         spring=True,
+        supplier_dimensions=supplier_dimensions,
+        supplier_margins=supplier_margins,
+        configuration=configuration,
+        settled_checks=settled_checks,
+        supplier_data=supplier_data,
     )
 
 
@@ -787,6 +992,11 @@ async def _build_reference_sheet(
     document_title: str | None = None,
     spring: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
+    supplier_dimensions: SupplierDimensions | None = None,
+    supplier_margins: SupplierMargins | None = None,
+    configuration: str | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -795,8 +1005,22 @@ async def _build_reference_sheet(
     check_item(item, label=label)
     if not isinstance(number_fit, NumberFit):
         raise TypeError(f"{label}: number_fit must be a NumberFit: {number_fit!r}")
-    caption_y = view_band_bottom(notes, label=label)
+    if configuration is not None and (
+        not isinstance(configuration, str) or not configuration.strip()
+    ):
+        raise ValueError(f"{label}: source configuration must be a nonempty name")
+    caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
     cells = (spring_view_cells if spring else fastener_view_cells)(caption_y)
+    if supplier_dimensions is None:
+        if supplier_margins is not None:
+            raise ValueError(f"{label}: supplier margins require an annotation hook")
+        fit_cells = cells
+    else:
+        if not callable(supplier_dimensions):
+            raise TypeError(f"{label}: supplier annotation hook must be callable")
+        if supplier_margins is None:
+            raise ValueError(f"{label}: supplier annotations require explicit pre-fit margins")
+        fit_cells = supplier_fit_cells(cells, supplier_margins, label=label)
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
         adapter,
@@ -819,7 +1043,11 @@ async def _build_reference_sheet(
                 1: "Harmonic Analyzer purchased-part identification; reference only",
                 2: "Harmonic Analyzer Project",
                 3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
-                4: "Front, Top, Right and Isometric; no fabrication dimensions or PMI",
+                4: (
+                    "Front, Top, Right and Isometric; supplier sizes are reference only"
+                    if supplier_dimensions is not None
+                    else "Front, Top, Right and Isometric; no fabrication dimensions or PMI"
+                ),
             },
         )
 
@@ -829,14 +1057,35 @@ async def _build_reference_sheet(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
+            if configuration is not None:
+                view.ReferencedConfiguration = configuration
             set_hidden_lines_removed(adapter, view)
             views.append(view)
+        if configuration is not None:
+            _rebuild(draw, phase="select supplier source configuration")
+            for view in views:
+                if str(view.ReferencedConfiguration) != configuration:
+                    raise RuntimeError(
+                        f"{view.GetOrientationName()}: supplier configuration did not persist"
+                    )
         # Later insertions may auto-adjust the sheet scale. Pin all views only
         # after insertion so the measurement pass is genuinely at native 1:1.
         for view in views:
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
-    scales = _fit_views(draw, views, cells)
+    scales = _fit_views(draw, views, fit_cells)
+    fitted_origins: dict[str, tuple[float, float]] = {}
+    fitted_sources: dict[str, tuple[str, str]] = {}
+    if supplier_dimensions is not None:
+        for view, (name, _, _) in zip(views, cells, strict=True):
+            view.UpdateViewDisplayGeometry()
+            fitted_origins[name] = model_point_in_view(
+                adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} fitted origin"
+            )
+            fitted_sources[name] = (
+                str(Path(view.GetReferencedModelName()).resolve()),
+                str(view.ReferencedConfiguration),
+            )
     center_marks = _center_marks_without_lines(views, cells)
     scale = scales["*Front"]
 
@@ -882,6 +1131,16 @@ async def _build_reference_sheet(
 
     placed = []
     with _telemetry.span("drawing.purchased_annotations"):
+        if supplier_dimensions is not None:
+            supplier_dimensions(
+                adapter,
+                {name: view for view, (name, _, _) in zip(views, cells, strict=True)},
+            )
+            # Import leaves a model view active. Footer/captions are sheet-owned.
+            drawing = _early_bound(draw, "IDrawingDoc")
+            drawing.ActivateView("")
+            if not drawing.GetEditSheet() or drawing.ActiveDrawingView is not None:
+                raise RuntimeError(f"{label}: cannot restore sheet context for footer")
         for view, (name, center, cell) in zip(views, cells, strict=True):
             view_scale = scales[name]
             caption = f"{name[1:].upper()}  {view_scale[0]}:{view_scale[1]}"
@@ -895,7 +1154,11 @@ async def _build_reference_sheet(
             # reaches past the outline and struck lifted captions (r5, 8:1
             # pins, rule 14).
             floor = cell[1]
-            if not center_marks[name]:
+            annotated = (
+                supplier_dimensions is not None
+                and view.GetFirstDisplayDimension6() is not None
+            )
+            if not center_marks[name] and not annotated:
                 floor = max(_box(view.GetOutline(), label=name)[1], floor)
             caption_at = floor - _CAPTION_TO_CELL
             note = _literal_note(adapter, caption, center[0], caption_at)
@@ -921,6 +1184,7 @@ async def _build_reference_sheet(
                 notes=notes,
                 cut_to_suit=cut_to_suit,
                 label=label,
+                supplier_data=supplier_data,
             )
         )
     with _telemetry.span("drawing.purchased_native_contract"):
@@ -936,9 +1200,15 @@ async def _build_reference_sheet(
                 )
         # The links resolve at the rebuild above; an opted-in DWG. NO. is
         # measured and fitted here, then re-proved after the final rebuild.
-        settled_checks: tuple[Callable[[], None], ...] = ()
+        supplier_checks = tuple(settled_checks)
+        if any(not callable(verify) for verify in supplier_checks):
+            raise TypeError(f"{label}: settled checks must be callable")
+        if supplier_dimensions is not None and not supplier_checks:
+            raise RuntimeError(f"{label}: supplier annotations require final settled native checks")
+        final_checks = supplier_checks
         if number_fit is NumberFit.SHRINK_TO_CELL:
-            settled_checks = (
+            final_checks = (
+                *final_checks,
                 _fit_number(
                     adapter, draw, layout=spec.layout, number=properties["Number"]
                 ),
@@ -961,6 +1231,8 @@ async def _build_reference_sheet(
             view = views_by_orientation[name]
             if Path(view.GetReferencedModelName()).resolve() != source.resolve():
                 raise RuntimeError(f"{name}: purchased view references the wrong model")
+            if configuration is not None and str(view.ReferencedConfiguration) != configuration:
+                raise RuntimeError(f"{name}: final purchased configuration changed")
             if tuple(view.ScaleRatio) != scales[name]:
                 raise RuntimeError(f"{name}: final purchased view scale changed")
             box = _box(view.GetOutline(), label=name)
@@ -987,6 +1259,15 @@ async def _build_reference_sheet(
                     f"purchased note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
 
+    if supplier_dimensions is not None:
+        final_checks = (
+            *final_checks,
+            lambda: _assert_supplier_layout(
+                adapter, cells, label=label, margins=supplier_margins,
+                scales=scales, origins=fitted_origins, sources=fitted_sources,
+                sheet_notes=placed,
+            ),
+        )
     paths = spec.outputs
     return await finalize_drawing(
         adapter,
@@ -994,5 +1275,5 @@ async def _build_reference_sheet(
         layout=spec.layout,
         pdf_title=title,
         scale=scale,
-        settled_checks=settled_checks,
+        settled_checks=final_checks,
     )

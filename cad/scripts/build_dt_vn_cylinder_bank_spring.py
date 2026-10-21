@@ -26,6 +26,9 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_9714K392 import build_9714K392
 from dt_vn_cylinder_bank_spring_spec import SKU
+import dt_vn_cylinder_bank_spring_spec as supplier_spec
+from _part_save import save_part_and_images
+from vn_disc_spring_supplier_stock import add_supplier_disc_diagram
 
 PART_NAME = "dt-vn-cylinder-bank-spring"
 SPEC = fastener(PART_NAME)
@@ -34,6 +37,11 @@ MATERIAL = SPEC.material
 # Rx(+90 deg) takes the recipe's +Y axis to +Z; the south bearing face
 # (recipe y = 0) stays on z = 0.
 TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
+
+
+async def _save_supplier_reference_part(adapter, part_name: str) -> dict[str, str]:
+    await add_supplier_disc_diagram(adapter, spec=supplier_spec)
+    return await save_part_and_images(adapter, part_name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -45,6 +53,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),
+        save_unthreaded_part=_save_supplier_reference_part,
     )
 
 

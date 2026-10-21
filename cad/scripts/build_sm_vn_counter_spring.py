@@ -27,7 +27,8 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _saved_part_guard import require_saved_drawing_properties
 from _stock_fastener import _blank_recipe_references
 from sm_vn_counter_spring_notes import DRAWING_NOTES
-from sm_vn_counter_spring_spec import INSTALLED_LENGTH_MM
+import sm_vn_counter_spring_spec as spec
+from _supplier_extension_spring import add_extension_spring_references
 from diagnostics.diag_build_1330K524 import build_1330K524
 
 
@@ -44,7 +45,7 @@ STOCK_PROPERTIES = {
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
     try:
-        await build_1330K524(adapter, None, length_mm=INSTALLED_LENGTH_MM)
+        await build_1330K524(adapter, None, length_mm=spec.INSTALLED_LENGTH_MM)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
             delattr(adapter, "_mcm_com_map")
@@ -63,6 +64,11 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
         },
+    )
+    await add_extension_spring_references(
+        adapter, free_length_mm=spec.FREE_LENGTH_MM, max_length_mm=spec.MAX_LENGTH_MM,
+        coil_od_mm=spec.SUPPLIER_COIL_OD_MM, wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
+        body_count=2,
     )
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)

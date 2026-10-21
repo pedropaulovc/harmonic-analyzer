@@ -16,12 +16,18 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from functools import partial
 
 from _appearance import PANEL_BLACK
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from _simplified_part import save_simplified_part
+from _supplier_screw_save import save_supplier_reference_part
+from _mcmaster_91375a942 import (
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_REFERENCE_PLANES,
+    SUPPLIER_REFERENCE_STARTS,
+)
 from diagnostics.diag_build_91375A942 import HALF, LENGTH, build_91375A942
 
 PART_NAME = "ch-vn-fulcrum-set-screw"
@@ -43,7 +49,12 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=partial(
+            save_supplier_reference_part,
+            dimensions=SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=SUPPLIER_REFERENCE_STARTS,
+            planes=SUPPLIER_REFERENCE_PLANES,
+        ),
         color=PANEL_BLACK,
     )
 

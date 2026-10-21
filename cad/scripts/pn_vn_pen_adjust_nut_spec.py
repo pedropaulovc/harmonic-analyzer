@@ -22,12 +22,29 @@ from _mcmaster_92671a115 import (
     nut_volume,
 )
 
+# Source drawing: 5/32 in AF and 0.047 in height; exact 3/64 in stays native.
+# The thread carrier is the basic nominal major, not a measured thread profile.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3, "ThreadNominalMajor": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 32
+SUPPLIER_NOMINAL_MAJOR_MM = 0.060 * 25.4
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("ThreadNominalMajor", SUPPLIER_NOMINAL_MAJOR_MM, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "ThreadNominalMajor": (-SUPPLIER_NOMINAL_MAJOR_MM / 2.0, 0.0),
+}
+
 __all__ = [
     "ACROSS_CORNERS",
     "ACROSS_FLATS",
     "BORE_DIA",
+    "DRAWING_REFERENCE_PRECISION",
     "MASS_G",
     "SKU",
+    "SUPPLIER_FRACTION_DENOMINATOR",
+    "SUPPLIER_NOMINAL_MAJOR_MM",
+    "SUPPLIER_REFERENCE_DIMENSIONS",
+    "SUPPLIER_REFERENCE_STARTS",
     "THICKNESS",
     "THREAD",
     "nut_volume",

@@ -9,13 +9,15 @@ face at the unchanged stock length; consumers read dimensions from the pure
 from __future__ import annotations
 
 import sys
+from functools import partial
 
 from _appearance import PANEL_BLACK
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from _simplified_part import save_simplified_part
+from _supplier_screw_save import save_supplier_reference_part
 from diagnostics.diag_build_91375A106 import HALF, build_91375A106
+import sh_vn_arbor_set_screw_spec as supplier
 
 PART_NAME = "sh-vn-arbor-set-screw"
 SPEC = fastener(PART_NAME)
@@ -34,7 +36,12 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=partial(
+            save_supplier_reference_part,
+            dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=supplier.SUPPLIER_REFERENCE_STARTS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        ),
         color=PANEL_BLACK,
     )
 

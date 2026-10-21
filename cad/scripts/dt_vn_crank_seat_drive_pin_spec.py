@@ -23,6 +23,7 @@ from _mcmaster_98381a434 import (
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
 from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD
+from _supplier_pin_data import SupplierPinReference
 
 SKU = "98381A434"
 DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 6.35
@@ -31,3 +32,18 @@ DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 6.35
 PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 3.95
 if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError(f"{SKU} is not the seat interface's drive pin")
+
+# McMaster engineering drawing inspected 2026-10-19. Its .0937 nominal
+# differs from exact 3/32 stock geometry: print equivalent .0938/.0940
+# native reference limits rather than rounding or moving the cylinder.
+# The catalogue-derived DIA_BAND_IN and all fit controls remain unchanged.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="in",
+    diameter_mm=DIA,
+    length_mm=LENGTH,
+    diameter_nominal=0.0937,
+    diameter_precision=4,
+    length_precision=2,
+    diameter_band=(0.0001, 0.0003),
+)

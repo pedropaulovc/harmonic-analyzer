@@ -67,6 +67,48 @@ HOLE_BAND = carrier.CL_HOLE_BAND  # N7
 INTERFERENCE = carrier.CL_DOWEL_INTERFERENCE  # diametral (min, max)
 DIA_MAX = DIA + max(DIA_BAND)  # 6.012
 DIA_MIN = DIA + min(DIA_BAND)  # 6.004
+
+# Exact-current product table and engineering image inspected 2026-10-21.
+# The print shows 6.000 mm +0.012/+0.004 and 20 mm tip-to-tip; it supplies
+# no length tolerance. These are nominal purchasing references, independent
+# of the unchanged installation/press controls below and model end forms.
+# In particular, DIA_BAND above is (upper, lower); the source native
+# tolerance tuple below is deliberately (lower, upper), both positive.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260107/03FA1557/"
+    "91595A452_Dowel%20PinX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierDowelDiameter", DIA, "horizontal"),
+    ("SupplierDowelLength", LENGTH, "vertical"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierDowelDiameter": (-DIA / 2.0, 0.0),
+    "SupplierDowelLength": (0.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierDowelDiameter": "Top",
+    "SupplierDowelLength": "Front",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierDowelDiameter": "bottom",
+    "SupplierDowelLength": "left",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierDowelDiameter": (3, "diameter", None, "NOMINAL PIN DIAMETER"),
+    "SupplierDowelLength": (0, "length", None, "NOMINAL TIP-TO-TIP"),
+}
+SUPPLIER_REFERENCE_UNITS = {
+    "SupplierDowelDiameter": "mm",
+    "SupplierDowelLength": "mm",
+}
+SUPPLIER_REFERENCE_TOLERANCES_MM = {
+    "SupplierDowelDiameter": (0.004, 0.012),
+}
+SUPPLIER_DATA = (
+    "NOMINAL SUPPLIER REFERENCES; ROUND / CHAMFER-ROUND ENDS.",
+    "LENGTH IS TIP-TO-TIP; SUPPLIER LENGTH TOLERANCE NOT STATED.",
+)
 # The lead-in that grips nothing: the crown and the chamfer.
 LEAD_IN = CROWN_H + CHAMFER_LEN  # 1.95
 

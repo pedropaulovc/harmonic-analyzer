@@ -3807,6 +3807,11 @@ def task_check():
         # Finite stock-cutter geometry is a production design contract.
         SCRIPTS_DIR / "test_stock_form_cutter.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
+        # Supplier configuration isolation, exact source inventory and final
+        # native readback; layout contracts use test_*_drawing.py discovery.
+        SCRIPTS_DIR / "test_supplier_configured_references.py",
+        SCRIPTS_DIR / "test_supplier_spring_reference.py",
+        SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.

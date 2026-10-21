@@ -12,8 +12,8 @@ height 0.047 in (free); compressed height 0.027 in and deflection 0.020 in at
 the 9 lb working load; high-carbon steel; disc spring type "Curved"; pack of
 10, $10.11.  The page states no flat load and no rate, says the spring has
 "only two contact points" and that these springs cannot be stacked to raise
-the working load.  A 3-D SolidWorks model is offered but none was fetched, so
-the part is catalogue-only.
+the working load. Read-only source inspection recorded 2026-10-19 establishes
+nominal dimension datums, not a physical free-stock recipe.
 
 Part frame: spring axis local +Z.  The model shows the spring as installed
 at the nominal room under the screw head: the OD rim's bearing face (on the
@@ -50,6 +50,25 @@ RATE_N_PER_MM = WORKING_LOAD_N / WORKING_DEFLECTION  # 78.81
 INSTALLED_HEIGHT = 0.80
 # The model shows the installed state.
 MODEL_HEIGHT = INSTALLED_HEIGHT
+
+# The inspected drawing prints .011, but native strip thickness remains .0113 in.
+SHAFT_DIA = 0.190 * MM_PER_IN
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260115/90C63C6C/"
+    "9715K43_Curved%20Disc%20SpringsX.GIF"
+)
+SUPPLIER_DRAWING_UNITS = "in"
+# Read-only source provenance; no vendor asset is downloaded or loaded by the build.
+SUPPLIER_NATIVE_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260115/0FAE8731/"
+    "9715K43_Curved%20Disc%20Springs.SLDPRT"
+)
+SUPPLIER_NATIVE_SHA256 = "30ffa536a8a0b2531d8f1711fddbd8089ed58caee40448ff34addd8d4a9f8822"
+SUPPLIER_DRAWING_PRECISION = {
+    "ID": 1, "OD": 3, "FREE_HEIGHT": 3, "THICKNESS": 3,
+    "WORKING_HEIGHT": 3, "SHAFT_DIA": 2,
+}
+SUPPLIER_APPLICATION_DIMENSIONS = ("WORKING_HEIGHT", "SHAFT_DIA")
 
 if not math.isclose(FREE_HEIGHT - WORKING_DEFLECTION, WORKING_HEIGHT):
     raise AssertionError("9715K43 free height, deflection and working height disagree")

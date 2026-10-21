@@ -19,8 +19,8 @@ recipes:
 | 3606T118 | `dt-vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | `ch-rocker-arm-tl-vn-oblique-bearing` (MHA-CH-06-TL-VN-52; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
-| 6261K108 | `pd-vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
-| 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` configurations, cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
+| 6261K108 | `pd-vn-chain-connecting-link` (installed clearance stand-in; separate native supplier reference diagram) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
+| 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` installed configurations; separate family reference diagram) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
@@ -1348,6 +1348,11 @@ Catalog specifications checked on September 10, 2026:
   in 1 ft straight lengths, was rejected: the lever wire's straight rest run
   alone is about 353, longer than 304.8. McMaster offers no metric 0.8 music
   wire. No vendor solid is used; the wire is a plain cylinder.
+  The supplier drawing's exact .0310-in nominal is shown separately as a
+  .7874-mm model-owned construction circle in zero-body `SUPPLIER_REFERENCE`.
+  It does not dimension either installed .8-mm cylinder. Both sheets retain
+  their configuration-qualified native `Depth@Wire` straight-run references;
+  package length is ordering metadata, not a developed cut length.
 - [90114A124](https://www.mcmaster.com/90114A124/)
   (`ms-vn-stop-plate-screw`, MHA-MS-VN-51, two) retains the MHA-MS-03 plate
   on MHA-MS-02. The product table and 2-D PDF were read live on October 9,
@@ -1371,13 +1376,15 @@ Catalog specifications checked on September 10, 2026:
   and the ring. Both product pages were read on September 29, 2026. 3606T118 is
   unfinished brass bead chain, trade size 3, 3/32 in beads, 20 lbf, not for
   lifting. 3606T811 is the brass loop link that joins the cut ends into a loop.
-  McMaster publishes no CAD for either item, and no dimension beyond the bead
-  diameter. The 3.2426 mm pitch is the trade-size-3 average of 94 beads per foot
-  (Ball Chain Mfg. and Frank Winne size charts). The link's 9 mm length is the
-  listed #3 connector size, and its proportions (domed capsule, crimps, a side
-  mouth over each dome narrower than a bead, rod slot along the top) are read
-  off McMaster's 3606T811 photograph. The rod and the link's wall and openings are assumptions named in
-  `dt_vn_keeper_chain_spec.py`, so neither part has a replica gate.
+  The October 19 source audit found no engineering drawing/CAD for either
+  item and no numeric supplier size beyond the bead diameter. The sheet
+  imports the exact 3/32-in native diameter driving `SeedProfile`, not the
+  smaller sphere/rod intersection circle. The 3.2426-mm pitch is a trade-size-3
+  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts),
+  not a McMaster manufacturing dimension. The 9-mm generic capsule, rod, wall,
+  crimps and mouths are project clearance assumptions in
+  `dt_vn_keeper_chain_spec.py`, not verified dimensions of 3606T811's pictured
+  loop link. Its supplier numeric coverage correctly remains empty.
 
 - [6261K171](https://www.mcmaster.com/6261K171/) (`sh-vn-chain-link`,
   MHA-SH-VN-50, in its `InnerLink` and `OuterLink` configurations; the
@@ -1395,9 +1402,82 @@ Catalog specifications checked on September 10, 2026:
   6261K108, the connecting link, closes the loop as its last outer link. The
   cut is the only modification, so both identities stay vendor (`-vn-`) parts
   (`cad/docs/subsystem-identities.md`). The modelled links are the clearance
-  stand-ins in `_chain.py`, not vendor replicas. McMaster offers CAD for both
-  items, but none was downloaded and no replica equivalence is claimed. Evidence:
-  `C:/src/dt-logs/chain-links/mcmaster-skus.md`.
+  stand-ins in `_chain.py`, not vendor replicas. An October 19 source audit
+  inspected the supplier native/STEP files without adding their solids to the
+  project. The 6261K171 page's engineering graphic is an eleven-foot
+  **6261K401 family example**, not a drawing of the two-foot purchase.
+  [6261K171-6261K281](https://www.mcmaster.com/6261K171-6261K281/) is the verified
+  **one-foot** native/STEP selection used only for the same-family pitch and
+  cross-sections. Its exact pin is 2.2987 mm (.0905 in), displayed .091 in;
+  rounded ink is not exact geometry. Zero-body `SUPPLIER_REFERENCE` contains
+  hidden construction-only pitch/pin/roller/width diagrams, not revised
+  installed pins or bushes. The connector additionally has its own .030-in
+  plate and .335-in overall-pin references; `FOR ROLLER` references are
+  application gauges, not rollers physically present on the connector.
+  Original member geometry, path axes, quantities, export identities and the
+  two-foot cut instructions are retained. Evidence and immutable source hashes:
+  `C:/src/dt-logs/vn-supplier-dimensions-20261019/SupplierSpringsChains/chain-audit.md`.
+
+### Tooling-only oblique-trammel source references (2026-10-21)
+
+The fourteen current `ch-rocker-arm-tl-vn-oblique-*` targets below now import
+model-owned supplier references. Live Firecrawl product fetches returned HTTP
+200 for every McMaster SKU and Olander 4C50BHCA; the exact McMaster engineering
+`X.GIF` drawings were downloaded from those pages. This supersedes the earlier
+login-wall observations above for source access, not their historical CAD or
+replica-gate provenance. No supplier models or engineering images are tracked.
+
+| target suffix | exact current SKU | primary size coverage |
+|---|---|---|
+| `rail-screw` | [91251A197](https://www.mcmaster.com/91251A197/) | 0.750-in length; 0.270-in head diameter, 0.164-in height; 0.1640-in major; 9/64-in drive |
+| `bracket-screw` | [91251A196](https://www.mcmaster.com/91251A196/) | 0.625-in length; same published head, major and drive as the rail screw |
+| `block-screw` | [91251A188](https://www.mcmaster.com/91251A188/) | 1.875-in length; 0.875-in minimum thread length; 0.270/0.164-in head; 0.164-in major; 9/64-in drive |
+| `carriage-screw` | [91290A168](https://www.mcmaster.com/91290A168/) | M4 x 0.7; 20-mm length; 7-mm head diameter, 4-mm height; 3-mm drive |
+| `kp08-screw` | [91251A150](https://www.mcmaster.com/91251A150/) | 0.625-in length; 0.226/0.138-in head; 0.1380-in major; 7/64-in drive |
+| `nut-screw` | [Olander 4C50BHCA](https://www.olander.com/items/4C50BHCA) | #4-40 x 1/2 in; head diameter 0.201–0.213 in, height 0.051–0.059 in; published 0.063-in drive |
+| `riser-screw` | [91771A112](https://www.mcmaster.com/91771A112/) | 0.625-in overall length; 0.212-in head diameter, 0.067-in height; 0.112-in major; 82-degree head; Phillips No. 1 designation |
+| `clamp-screw` | [91251A541](https://www.mcmaster.com/91251A541/) | 0.875-in length; 0.375/0.2500-in head; 0.2500-in major; 3/16-in drive |
+| `lever-screw` | [91251A583](https://www.mcmaster.com/91251A583/) | 1.000-in length; 15/32-in head diameter, 5/16-in height (drawn 0.469/0.313); 0.3125-in major; 1/4-in drive |
+| `cl-dowel` | [91595A452](https://www.mcmaster.com/91595A452/) | nominal 6.000-mm diameter, +0.004/+0.012 mm; 20-mm tip-to-tip length |
+| `block-washer` | [91812A215](https://www.mcmaster.com/91812A215/) | 0.170-in ID, 0.300-in OD, 0.080–0.100-in thickness interval |
+| `lever-washer` | [91812A230](https://www.mcmaster.com/91812A230/) | 0.340-in ID, 0.530-in OD, 0.070–0.090-in thickness interval |
+| `leadscrew` | ZYLtech HW-SC-T8x2-600 | 600-mm purchased length, 8-mm nominal major diameter, 2-mm pitch; single-start right-hand Tr8x2 |
+| `leadscrew-nut` | ZYLtech HW-SC-T8x2-NUT | 22/10.2-mm flange/body diameters; four 3.5-mm holes on 16-mm PCD; 1.5/3.5/10-mm axial spans |
+
+Both ZYLtech identities were confirmed by live primary-page variant selection:
+the [pre-cut screw page](https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/)
+displays `HW-SC-T8x2-600` after selecting 600 mm, and the
+[replacement-nut page](https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/)
+displays `HW-SC-T8x2-NUT` after selecting T8x2. The screw kit's current front
+and side engineering images supply the regular nut's dimensions. The
+replacement page also contains unrelated larger/inch-size gallery drawings;
+their R12, 3.30-mm hole and inch-size data were not applied to this T8x2 nut.
+
+The dowel's crowned/domed ends have no end circles: its length is an explicit
+nominal tip-to-tip construction witness, not an invented rim measurement.
+Washer drawings preserve the maximum-thickness plain-annulus representations;
+their source intervals do not assert modelled split pairs, cams or serrations,
+and the existing receipt/pair-package caveat remains. The nut's plain 6-mm
+thread-minor bore is a modelling contract, not an unpublished supplier size.
+No standard-only socket depths, Phillips-recess dimensions, nut bore limits,
+or omitted edge details were promoted to supplier evidence.
+
+The screw's `SUPPLIER_REFERENCE_STOCK` configuration contains only native
+construction gauges for the purchased length, nominal major and pitch. Its
+separately labelled drawing inset is not a replacement solid, helix or
+manufacturing control. The installed 410-mm cut length and five flats retain
+their existing native fabrication dimensions. All fourteen targets retain
+their prior solids, materials and installation geometry.
+
+Raw primary responses, current-variant selections, source engineering images,
+URLs, scrape IDs, retrieval errors and immutable SHA-256 hashes are preserved
+outside the repository at
+`C:/src/dt-logs/vn-supplier-dimensions-20261021/tooling-vn-primary/`.
+`manifest.json`, `drawing-downloads.json`, the two ZYLtech image manifests and
+`mcmaster-skus.md` distinguish sources used from mixed-gallery images rejected.
+The Firecrawl 2-D-PDF interaction timed out at the transport layer; no PDF URL
+was guessed, and the exact primary engineering GIFs supplied the evidence.
+Native execution/rendering is not claimed by this source record.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
@@ -1407,10 +1487,22 @@ opened read-only and NEVER saved or modified; everything derived from them
 ## Reference drawings
 
 Each production part identity above has a registered `drawing:`
-task, including identities that share a supplier SKU. The sheets show front,
-top, right and isometric views, with the stock description and ordering SKU.
-They are purchased-part identification sheets; their general tolerance and
-edge-break notes do not apply.
+task, including identities that share a supplier SKU. Most identification
+sheets use front, top, right and isometric views with stock and ordering data.
+Supplier dimensions are associative native reference annotations, never typed
+numeric replacements. When the installed clearance model differs from the
+catalogue, explicitly labelled construction-only stock/application diagrams
+live in zero-body `SUPPLIER_REFERENCE*` configurations; original installed
+members and their export identities are unchanged. Music-wire sheets retain
+both straight-run `Depth` references and their DO NOT RELEASE limitations.
+These are purchased-part reference sheets; general fabrication tolerance and
+edge-break notes do not apply to supplier references.
+Extension-spring free/maximum inside-hook spans and coil/wire sizes use
+explicitly nominal construction diagrams, not new free/extended solid variants.
+Disc-spring stock diagrams separate ID/OD, free-height envelopes and nominal
+strip gauges from compressed-height/deflection/shaft application gauges.
+Neither diagram asserts an unmodelled loaded shape or a force derived from
+the installed stand-in.
 
 For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
 `cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,

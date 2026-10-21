@@ -35,6 +35,7 @@ import ch_anchor_jam_nut_spec as jam_nut
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 from stock_anchor_geom import ANCHOR_9489T111, trim
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
 
 _PITCH = ANCHOR_9489T111.thread_pitch_mm
 
@@ -175,6 +176,44 @@ DRAWING_NOTES = (
     "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 3:1"
+
+# McMaster 9489T111 engineering drawing (2026-04-08):
+# https://www.mcmaster.com/mvC/Library/CAD2/20260408/6323B365/9489T111_Routing%20Eyebolt%20with%20Nut%20-%20Not%20for%20LiftingX.GIF
+# Eye contours survive the trim. Original source lengths belong only to the
+# as-supplied bolt-body configuration; wire diameter is not a source size.
+SUPPLIER_EYE_MM = {
+    "EyeOD": ANCHOR_9489T111.eye_od_mm,
+    "EyeID": ANCHOR_9489T111.eye_id_mm,
+}
+SUPPLIER_REFERENCE_PRECISION = {
+    "EyeOD": 1, "EyeID": 2,
+    "SupplierStockShank": 2, "SupplierStockThread": 3, "SupplierStockOverall": 2,
+    "SupplierThreadMajor": 3,
+}
+SUPPLIER_STOCK_CONFIGURATION = "AsSuppliedStock"
+SUPPLIER_STOCK_FEATURE = "SupplierStockAxis"
+SUPPLIER_STOCK_AXIS_MM = (
+    (0.0, ANCHOR_9489T111.eye_od_mm / 2.0),
+    (0.0, ANCHOR_9489T111.advertised_shank_start_y_mm),
+    (0.0, ANCHOR_9489T111.thread_start_y_mm),
+    (0.0, ANCHOR_9489T111.shank_end_y_mm),
+)
+SUPPLIER_STOCK_MM = {
+    "SupplierStockShank": ANCHOR_9489T111.shank_length_mm,
+    "SupplierStockThread": ANCHOR_9489T111.thread_length_mm,
+    "SupplierStockOverall": ANCHOR_9489T111.overall_length_mm,
+}
+SUPPLIER_STOCK_DIMENSIONS = {SUPPLIER_STOCK_FEATURE: set(SUPPLIER_STOCK_MM)}
+SUPPLIER_THREAD = ANCHOR_9489T111.thread_size
+SUPPLIER_THREAD_MAJOR_MM = ANCHOR_9489T111.thread_major_dia_mm
+SUPPLIER_THREAD_FEATURE = FEATURE_BY_PLANE["Front"]
+SUPPLIER_THREAD_DIMENSIONS = {SUPPLIER_THREAD_FEATURE: {"SupplierThreadMajor"}}
+SUPPLIER_THREAD_START_MM = (
+    -SUPPLIER_THREAD_MAJOR_MM / 2.0,
+    (ANCHOR_9489T111.thread_start_y_mm + TRIM.shank_end_y_mm) / 2.0,
+)
+# Saved hidden; reference views explicitly reveal only the owner they dimension.
+REFERENCE_SKETCHES = (SUPPLIER_STOCK_FEATURE, SUPPLIER_THREAD_FEATURE)
 
 _ANCHOR_NUMBER = _config.parts("ch-vn-spring-hook")["number"]
 _LEVER_NUMBER = _config.parts("sm-summing-lever")["number"]

@@ -56,6 +56,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
+from _supplier_wire_stock import author_nominal_stock_cross_section
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 PART_NAME = "sh-vn-music-wire"
@@ -355,6 +356,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimensions in pen_spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimensions)
+    # Keep both straight-run Depth references. The supplier's .7874-mm stock
+    # circle lives only in its own zero-body construction reference state.
+    await author_nominal_stock_cross_section(adapter)
     row = _config.parts(PART_NAME)
     apply_custom_properties(
         adapter,

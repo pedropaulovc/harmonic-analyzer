@@ -5309,3 +5309,375 @@ def test_kit_installation_refuses_unplaceable_measured_ink_before_custom_move(
     assert state.active == state.prior_view
     assert state.sheet == "KitSheet"
     assert state.selected is None
+
+
+def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
+    import _supplier_dimensions as supplier
+
+    monkeypatch.setattr(supplier, "_early_bound", lambda obj, _interface: obj)
+    view = SimpleNamespace()
+    native = SimpleNamespace(
+        SystemValue=value,
+        FullName="Length@SupplierReference@stock.SLDPRT",
+        GetSystemValue3=lambda _which, _configuration: (value,),
+    )
+    annotation = SimpleNamespace(
+        Visible=1,
+        OwnerType=0,
+        Owner=view,
+        entities=(object(), object()),
+        IsDangling=lambda: False,
+        GetType=lambda: 4,
+    )
+    annotation.GetAttachedEntities3 = lambda: annotation.entities
+    annotation.GetAttachedEntityCount3 = lambda: len(annotation.entities)
+    annotation.GetAttachedEntityTypes = lambda: (11,) * len(annotation.entities)
+    text = {}
+    state = SimpleNamespace(unit=0, fraction=1, denominator=0, precision=2, rounding=False)
+    display = SimpleNamespace(
+        Type2=kind,
+        ShowDimensionValue=True,
+        ShowParenthesis=False,
+        GetDimension2=lambda _index: native,
+        GetAnnotation=lambda: annotation,
+        GetOverride=lambda: False,
+        GetUseDocUnits=lambda: False,
+        GetUnits=lambda: state.unit,
+        GetPrimaryPrecision2=lambda: state.precision,
+        GetFractionBase=lambda: state.fraction,
+        GetFractionValue=lambda: state.denominator,
+        GetRoundToFraction=lambda: state.rounding,
+        GetText=lambda index: text.get(index, ""),
+        SetText=lambda index, value: text.__setitem__(index, value),
+    )
+
+    def units(_use_document, unit, fraction, denominator, rounding, _decimal_rounding):
+        state.unit, state.fraction = unit, fraction
+        state.denominator, state.rounding = denominator, rounding
+        return 0
+
+    def precision(primary, _dual, _tolerance, _dual_tolerance):
+        state.precision = primary
+        return 0
+
+    display.SetUnits2 = units
+    display.SetPrecision3 = precision
+    annotation.GetSpecificAnnotation = lambda: display
+    return SimpleNamespace(
+        helper=supplier, display=display, native=native, annotation=annotation,
+        view=view, state=state, text=text,
+    )
+
+
+def test_supplier_native_size_preserves_exact_fraction_not_rounded_catalogue_ink(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="7/16 supplier length", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    assert case.native.SystemValue == 0.0111125
+    assert case.text == {1: "(", 2: " in)", 4: ""}
+    with pytest.raises(RuntimeError, match="!= exact expected"):
+        case.helper.assert_supplier_reference_dimension(
+            None, case.display, **{**settings, "expected_mm": 0.438 * 25.4},
+        )
+
+
+def test_supplier_value_uses_referenced_configuration_not_active_model_configuration(monkeypatch):
+    case = _supplier_native(monkeypatch, value=0.008)
+    case.native.GetSystemValue3 = lambda _which, configuration: (
+        0.0111125 if configuration == "Supplier" else 0.008,
+    )
+    case.helper.supplier_reference_dimension(
+        None, case.display, label="supplier length", units="in", precision=3,
+        expected_mm=11.1125, configuration="Supplier",
+    )
+    assert case.native.SystemValue == 0.008
+    with pytest.raises(RuntimeError, match="!= exact expected"):
+        case.helper.assert_supplier_reference_dimension(
+            None, case.display, label="supplier length", units="in", precision=3,
+            expected_mm=11.1125, configuration="Installed",
+        )
+
+
+@pytest.mark.parametrize("kind", (1, 3, 4, 5, 7, 8, 13, 16))
+def test_supplier_linear_size_rejects_other_native_dimension_types(monkeypatch, kind):
+    case = _supplier_native(monkeypatch, kind=kind)
+    with pytest.raises(RuntimeError, match="dimension type"):
+        case.helper.supplier_reference_dimension(
+            None, case.display, label="supplier length", units="in", precision=3,
+            expected_mm=11.1125,
+        )
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf")))
+def test_supplier_native_size_rejects_nonfinite_values(monkeypatch, value):
+    case = _supplier_native(monkeypatch, value=value)
+    with pytest.raises(RuntimeError, match="native value"):
+        case.helper.supplier_reference_dimension(
+            None, case.display, label="supplier length", units="in", precision=3,
+            expected_mm=11.1125,
+        )
+
+
+@pytest.mark.parametrize(
+    "drift", ("override", "hidden-value", "hidden-annotation", "dangling", "half-detached", "sheet-owner", "missing-owner"),
+)
+def test_supplier_settled_reference_rejects_unsound_native_ink(monkeypatch, drift):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier length", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    if drift == "override":
+        case.display.GetOverride = lambda: True
+    elif drift == "hidden-value":
+        case.display.ShowDimensionValue = False
+    elif drift == "hidden-annotation":
+        case.annotation.Visible = 3
+    elif drift == "dangling":
+        case.annotation.IsDangling = lambda: True
+    elif drift == "half-detached":
+        case.annotation.entities = (case.annotation.entities[0], None)
+    elif drift == "sheet-owner":
+        case.annotation.OwnerType = 1
+    else:
+        case.annotation.Owner = None
+    with pytest.raises(RuntimeError, match="supplier"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
+
+def test_supplier_thread_identification_keeps_native_nominal_major_value(monkeypatch):
+    case = _supplier_native(monkeypatch, value=0.0028448)
+    settings = dict(
+        label="nominal thread major", units="in", precision=3, expected_mm=2.8448,
+        presentation="diameter", callout="4-40 THREAD\nNOMINAL MAJOR",
+    )
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    assert case.native.SystemValue == 0.0028448
+    assert case.display.ShowDimensionValue
+    assert case.text[1] == "(<MOD-DIAM>"
+    assert case.text[4] == "4-40 THREAD\nNOMINAL MAJOR"
+    case.text[4] = "8-32 THREAD"
+    with pytest.raises(RuntimeError, match="presentation differs"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
+
+@pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
+def test_supplier_fraction_requires_an_exact_integer_power_of_two(monkeypatch, denominator):
+    case = _supplier_native(monkeypatch, value=0.00238125)
+    with pytest.raises(ValueError, match="power of two"):
+        case.helper.supplier_reference_dimension(
+            None, case.display, label="supplier head height", units="in",
+            precision=3, expected_mm=2.38125, fraction_denominator=denominator,
+        )
+
+
+def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypatch):
+    case = _supplier_native(monkeypatch, value=0.003)
+    with pytest.raises(ValueError, match="cannot display that inch fraction"):
+        case.helper.supplier_reference_dimension(
+            None, case.display, label="supplier head height", units="in",
+            precision=3, expected_mm=3.0, fraction_denominator=32,
+        )
+
+
+@pytest.mark.parametrize(
+    "drift", ("missing", "duplicate", "unknown", "view-owner", "feature-owner", "model-dimension", "attachment-owner", "configuration", "orientation"),
+)
+def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_drift(monkeypatch, drift):
+    import _supplier_screw_dimensions as screws
+
+    case = _supplier_native(monkeypatch)
+    monkeypatch.setattr(screws, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_binding", lambda _adapter, view: view.binding)
+    monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(screws, "iter_views", lambda adapter: adapter.views)
+    source_sketch = object()
+    source_feature = SimpleNamespace(GetSpecificFeature2=lambda: source_sketch)
+    case.annotation.entities = (
+        SimpleNamespace(GetSketch=lambda: source_sketch),
+        SimpleNamespace(GetSketch=lambda: source_sketch),
+    )
+    model = SimpleNamespace(
+        Parameter=lambda _name: case.native,
+        FeatureByName=lambda _name: source_feature,
+    )
+    case.native.GetFeatureOwner = lambda: source_feature
+    case.view.name = "Drawing View1"
+    case.view.binding = (case.view.name, "stock.SLDPRT", "Default")
+    case.view.ReferencedDocument = model
+    case.view.GetOrientationName = lambda: "*Front"
+    annotations = [case.annotation]
+    case.view.GetAnnotations = lambda: annotations
+    adapter = SimpleNamespace(
+        views=[case.view], swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+    )
+    settings = dict(
+        dimensions=(("Length", 11.1125, "horizontal"),),
+        formats={"Length": (3, "length", None, None)},
+        _bindings={"*Front": case.view.binding},
+    )
+    case.helper.supplier_reference_dimension(
+        adapter, case.display, label="Length@SupplierReference", units="in",
+        precision=3, expected_mm=11.1125, configuration="Default",
+    )
+    assert set(screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)) == {"Length"}
+    if drift == "missing":
+        annotations.clear()
+    elif drift == "duplicate":
+        annotations.append(case.annotation)
+    elif drift == "unknown":
+        case.native.FullName = "Unrequested@SupplierReference@stock.SLDPRT"
+    elif drift == "view-owner":
+        case.annotation.Owner = object()
+    elif drift == "feature-owner":
+        case.native.GetFeatureOwner = lambda: object()
+    elif drift == "model-dimension":
+        model.Parameter = lambda _name: object()
+    elif drift == "attachment-owner":
+        case.annotation.entities[0].GetSketch = lambda: object()
+    elif drift == "configuration":
+        case.view.binding = (case.view.name, "stock.SLDPRT", "Other")
+    else:
+        case.view.GetOrientationName = lambda: "*Top"
+    with pytest.raises(RuntimeError, match="supplier"):
+        screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)
+
+
+def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
+    from _supplier_screw_layout import supplier_screw_lane_plan, supplier_screw_margins
+
+    rows = (("Head", 9.525, "horizontal"), ("Thread", 2.8448, "horizontal"))
+    sides = {"Head": "top", "Thread": "top"}
+    plan = supplier_screw_lane_plan(rows, sides=sides)
+    margins = supplier_screw_margins(rows, sides=sides)
+    assert plan["Thread"][1] < plan["Head"][1]
+    cells = purchased.fastener_view_cells(purchased.view_band_bottom("", label="test"))
+    fitted = purchased.supplier_fit_cells(cells, margins, label="test")
+    original = {name: cell for name, _center, cell in cells}
+    actual = {name: cell for name, _center, cell in fitted}
+    assert original["*Top"] == actual["*Top"]
+    assert original["*Isometric"] == actual["*Isometric"]
+    assert actual["*Front"][3] == pytest.approx(original["*Front"][3] - margins["*Front"][3])
+    with pytest.raises(ValueError, match="orthographic"):
+        purchased.supplier_fit_cells(cells, {"*Isometric": (0.01,) * 4}, label="test")
+
+
+def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
+    import math
+
+    case = _supplier_native(monkeypatch, value=math.radians(82.0), kind=3)
+    case.helper.supplier_reference_dimension(
+        None, case.display, label="included angle", units="deg", precision=0,
+        expected_degrees=82.0, presentation="angle",
+    )
+    assert case.native.SystemValue == math.radians(82.0)
+    assert case.text[2] == ")"
+
+
+@pytest.mark.parametrize(
+    "start,end",
+    (((0.0, 0.0), (-6.35, 0.0)), ((1.0, 0.0), (7.35, 0.0))),
+)
+def test_supplier_chord_rejects_same_length_in_wrong_final_frame(monkeypatch, start, end):
+    import _supplier_screw_reference as reference
+
+    monkeypatch.setattr(reference, "_early_bound", lambda obj, _interface: obj)
+
+    def point(coordinates):
+        return SimpleNamespace(X=coordinates[0] / 1000.0, Y=coordinates[1] / 1000.0, Z=0.0)
+
+    line = SimpleNamespace(
+        GetStartPoint2=lambda: point(start), GetEndPoint2=lambda: point(end),
+    )
+    adapter = SimpleNamespace(_sketch_entities={"chord": line})
+    reference._assert_line_frame(adapter, "chord", start, end)
+    with pytest.raises(RuntimeError, match="final-frame coordinates"):
+        reference._assert_line_frame(adapter, "chord", (0.0, 0.0), (6.35, 0.0))
+
+
+def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(monkeypatch):
+    case = _supplier_native(monkeypatch, value=0.00238125)
+    settings = dict(
+        label="supplier head height", units="in", precision=3, expected_mm=2.38125,
+        fraction_denominator=32,
+    )
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    assert case.native.SystemValue == 0.00238125
+    assert case.state.denominator == 32
+    case.state.rounding = True
+    with pytest.raises(RuntimeError, match="exact supplier fraction"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
+
+@pytest.mark.parametrize("units,unit_code", [("in", 3), ("mm", 0)])
+def test_supplier_row_units_survive_annotation_and_final_reacquisition(
+    monkeypatch, units, unit_code,
+):
+    import _supplier_screw_dimensions as screws
+
+    case = _supplier_native(monkeypatch, value=0.006)
+    case.native.FullName = "Length@SupplierReference@stock.SLDPRT"
+    case.view.GetOrientationName = lambda: "*Front"
+    case.view.GetOutline = lambda: (0.05, 0.10, 0.10, 0.15)
+    case.view.UpdateViewDisplayGeometry = lambda: None
+    case.view.GetAnnotations = lambda: [case.annotation]
+    monkeypatch.setattr(screws, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_binding", lambda *_args: ("Front", "stock.SLDPRT", "Default"))
+    monkeypatch.setattr(screws, "_assert_source", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(screws, "iter_views", lambda _adapter: [case.view])
+    monkeypatch.setattr(screws, "view_name", lambda *_args: "Front")
+    monkeypatch.setattr(screws, "dimension_name", lambda *_args: "Length")
+    monkeypatch.setattr(
+        screws, "model_points_in_view", lambda *_args, **_kwargs: [(0.075, 0.125)],
+    )
+    monkeypatch.setattr(
+        screws, "curate_view_dimensions", lambda *_args, **_kwargs: [case.annotation],
+    )
+    checks = []
+    found = screws.annotate_supplier_screw(
+        None, {"*Front": case.view}, dimensions=(("Length", 6.0, "vertical"),),
+        formats={"Length": (3, "length", None, None)},
+        units={"Length": units}, settled_checks=checks,
+    )
+    assert found == {"Length": case.display}
+    assert case.native.SystemValue == 0.006
+    assert case.state.unit == unit_code
+    assert case.text[2] == f" {units})"
+    assert len(checks) == 1
+    checks[0]()
+    case.state.unit = 3 if units == "mm" else 0
+    with pytest.raises(RuntimeError, match="presentation differs"):
+        checks[0]()
+
+
+@pytest.mark.parametrize("units", [{"Alien": "mm"}, {"Length": "cm"}])
+def test_supplier_unknown_or_unsupported_row_units_fail_before_native_access(units):
+    from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+
+    options = dict(
+        dimensions=(("Length", 6.0, "vertical"),),
+        formats={"Length": (3, "length", None, None)}, units=units,
+    )
+    for operation in (annotate_supplier_screw, assert_supplier_screw):
+        with pytest.raises(ValueError, match="supplier reference units"):
+            operation(None, {}, **options)
+
+
+def test_metric_flange_nut_supplier_lanes_leave_a_fittable_end_view():
+    import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    margins = supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+    cells = purchased.fastener_view_cells(purchased.view_band_bottom(
+        supplier.DRAWING_NOTES, label="metric flange nut",
+        supplier_data=("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",),
+    ))
+    fitted = purchased.supplier_fit_cells(cells, margins, label="metric flange nut")
+    end_cell = next(bounds for name, _center, bounds in fitted if name == "*Top")
+    # A positive cell alone is insufficient: even the smallest permitted scale
+    # must retain the real flange envelope plus native-view padding.
+    smallest_ratio = min(numerator / denominator for numerator, denominator in purchased._SCALES)
+    required_span = supplier.FLANGE_DIA / 1000.0 * smallest_ratio + 0.002
+    assert min(end_cell[2] - end_cell[0], end_cell[3] - end_cell[1]) >= required_span

@@ -135,6 +135,28 @@ def test_unthreaded_save_never_calls_part_simplification(saves) -> None:
     )
 
 
+def test_unthreaded_supplier_references_use_one_final_save(monkeypatch):
+    adapter = _part(False)
+    saved = {"part": "nut.SLDPRT"}
+    calls = []
+
+    async def default_save(*_args):
+        raise AssertionError("supplier part was saved a second time")
+
+    async def supplier_save(actual_adapter, name):
+        assert actual_adapter is adapter
+        assert name == "nut"
+        calls.append(name)
+        return saved
+
+    monkeypatch.setattr(_stock_fastener, "save_part_and_images", default_save)
+    result = asyncio.run(_stock_fastener._save_stock_part(
+        adapter, "nut", threaded=False, save_unthreaded_part=supplier_save,
+    ))
+    assert result is saved
+    assert calls == ["nut"]
+
+
 def _author(sku: str = "TEST123"):
     async def author(_adapter, _truth=None):
         return None

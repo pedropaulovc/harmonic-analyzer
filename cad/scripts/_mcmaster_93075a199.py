@@ -15,3 +15,33 @@ HX_HH = 2.794
 HX_PITCH = 0.79375
 HX_UNDERSIDE = (HX_LEN - HX_HH) / 2.0  # vendor origin sits mid-overall
 HX_TIP_CHAMFER = HX_PITCH * 0.851  # the family's 45 deg x P*0.851 tip chamfer
+
+# Engineering drawing inspected 2026-10-19: AF is fractional; the supplier
+# rounds the existing 0.110 in native head height to 0.11 in, not 7/64 in.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260107/D2669D01/"
+    "93075A199_Low-Strength%20Zinc-Plated%20Steel%20Hex%20Head%20ScrewsX.GIF"
+)
+# Production frame: head +Z, shank -Z, bearing face Z=0.
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "top"}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", HX_LEN, "vertical"),
+    ("SupplierHeadHeight", -HX_HH, "vertical"),
+    ("SupplierHeadWidth", HX_HW, "horizontal"),
+    ("SupplierThreadDiameter", 2.0 * HX_MAJOR_R, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierHeadWidth": (-HX_HW / 2.0, 0.0),
+    "SupplierThreadDiameter": (-HX_MAJOR_R, HX_LEN / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierLength": "Top",
+    "SupplierHeadHeight": "Top",
+    "SupplierThreadDiameter": "Top",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (0, "length", None, None),
+    "SupplierHeadHeight": (2, "length", None, None),
+    "SupplierHeadWidth": (0, "length", 4, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "8-32"),
+}

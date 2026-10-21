@@ -80,6 +80,8 @@ def _package(
     views = []
     notes = []
     annotations = []
+    stock_calls = []
+    stock_settled_calls = []
 
     class Sheet:
         def __init__(self, name):
@@ -540,6 +542,32 @@ def _package(
         annotations.append(annotation)
         return [annotation]
 
+    def stock_cross_section(target_adapter, model_source, *, member):
+        # This suite owns configured installed Depth/readback behavior, not
+        # native supplier-stock parity. Isolate only this collaborator while
+        # proving its per-member ordering and settled-sheet activation.
+        assert target_adapter is adapter
+        assert model_source == source
+        assert adapter.currentModel is document
+        assert document.active.name == member
+        member_views = tuple(view for view in views if view.sheet is document.active)
+        assert {view.orientation for view in member_views} == {"*Front", "*Isometric"}
+        assert len(member_views) == 2
+        assert all(view.ReferencedConfiguration == member for view in member_views)
+        assert len([item for item in annotations if item.view in member_views]) == 1
+        assert member not in [call[0] for call in stock_calls]
+        stock_calls.append((member, len(views)))
+
+        def settled_stock():
+            assert adapter.currentModel is document
+            assert document.active.name == member
+            assert all(view.sheet is document.active for view in member_views)
+            assert all(view.ReferencedConfiguration == member for view in member_views)
+            assert member not in stock_settled_calls
+            stock_settled_calls.append(member)
+
+        return settled_stock
+
     async def finalize(_adapter, _outputs, **kwargs):
         for sheet in document.sheets:
             sheet.scale = kwargs["sheet_scales"][sheet.name]
@@ -614,6 +642,7 @@ def _package(
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
     monkeypatch.setattr(dimensions, "rebuild_drawing", rebuild)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "add_nominal_stock_cross_section", stock_cross_section)
     monkeypatch.setattr(
         drawing, "add_property_linked_note",
         lambda _adapter, key, x, y: Note(properties[key], x, y),
@@ -625,6 +654,7 @@ def _package(
     return SimpleNamespace(
         adapter=adapter, document=document, views=views,
         annotations=annotations, notes=notes,
+        stock_calls=stock_calls, stock_settled_calls=stock_settled_calls,
     )
 
 
@@ -634,6 +664,8 @@ def test_wire_package_recenters_real_member_geometry_before_dimensioning(
     package = _package(monkeypatch, tmp_path)
     assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
     assert package.document.GetSheetNames() == ("LeverWire", "PenWire")
+    assert package.stock_calls == [("LeverWire", 2), ("PenWire", 4)]
+    assert package.stock_settled_calls == ["LeverWire", "PenWire"]
     assert len(package.views) == 4
     for view in package.views:
         box = view.GetOutline()

@@ -77,6 +77,11 @@ CHAIN_SKU = "3606T118"
 LINK_SKU = "3606T811"
 BEAD_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125, the catalogue bead diameter
 BEAD_R = BEAD_DIA / 2.0
+# Only this catalogue-backed size is exposed; pitch, rod and coupler inputs
+# remain installed-clearance assumptions, not supplier numeric references.
+CATALOGUE_BEAD_DIMENSION = "CatalogueBeadDiameter"
+DRAWING_DIMENSIONS = {"SeedProfile": {CATALOGUE_BEAD_DIMENSION}}
+DRAWING_REFERENCE_PRECISION = {CATALOGUE_BEAD_DIMENSION: 0}  # exact 3/32 in fraction
 PITCH = 12.0 * MM_PER_IN / 94.0  # 3.2426, trade size 3 average
 # Assumption: the connecting rod. It is hidden inside the beads except for
 # the ~0.9 mm between them.

@@ -44,6 +44,7 @@ from _purchased_part_variants import (
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _visibility import assert_reference_geometry_hidden
+from _supplier_chain_stock import add_chain_stock_references
 from sh_vn_chain_link_spec import (
     CONFIGURATIONS,
     INNER_LINK,
@@ -164,6 +165,10 @@ async def build(adapter: Any) -> dict[str, str]:
             member_properties[configuration],
         )
         await report_mass_properties(adapter)
+
+    # Reference-only construction state; existing member solids and suppression
+    # matrices are independently compared before returning to the active member.
+    await add_chain_stock_references(adapter)
 
     return await save_member_part(
         adapter,

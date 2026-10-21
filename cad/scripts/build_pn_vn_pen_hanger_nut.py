@@ -24,7 +24,13 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_90480A009 import build_90480A009
-from pn_vn_pen_hanger_nut_spec import SKU
+from _part_save import save_part_and_images
+from _supplier_screw_reference import add_supplier_reference_sketch
+from pn_vn_pen_hanger_nut_spec import (
+    SKU,
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_REFERENCE_STARTS,
+)
 
 PART_NAME = "pn-vn-pen-hanger-nut"
 SPEC = fastener(PART_NAME)
@@ -33,6 +39,16 @@ MATERIAL = SPEC.material
 # Rx(+90 deg) takes the recipe's +Y axis to +Z; the recipe's y = 0 face
 # stays on z = 0.
 TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
+
+
+async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
+    # Construction only, authored in the final +Z stock frame before saving.
+    await add_supplier_reference_sketch(
+        adapter,
+        SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=SUPPLIER_REFERENCE_STARTS,
+    )
+    return await save_part_and_images(adapter, part_name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -44,6 +60,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),
+        save_unthreaded_part=_save_supplier_part,
     )
 
 

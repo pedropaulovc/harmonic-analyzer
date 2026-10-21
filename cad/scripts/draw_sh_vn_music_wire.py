@@ -44,6 +44,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import arrowhead_segments, display_box
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_wire_stock_drawing import add_nominal_stock_cross_section
 import sh_vn_music_wire_lever_geom as lever_geom
 import sh_vn_music_wire_lever_spec as lever_spec
 import sh_vn_music_wire_pen_geom as pen_geom
@@ -383,6 +384,7 @@ async def build(adapter: Any) -> dict[str, str]:
     configured_views = []
     references = []
     linked_notes = []
+    stock_checks = []
     for configuration in SHEET_NAMES:
         if not draw.ActivateSheet(configuration):
             raise RuntimeError(f"cannot activate music-wire sheet {configuration!r}")
@@ -453,6 +455,10 @@ async def build(adapter: Any) -> dict[str, str]:
         if note is None:
             raise RuntimeError(f"{configuration}: cannot add installed-quantity note")
         linked_notes.append((configuration, note, caption))
+        stock_checks.append((
+            configuration,
+            add_nominal_stock_cross_section(adapter, SOURCE, member=configuration),
+        ))
 
     def assert_configured_sheets() -> None:
         for configuration, view, layout in configured_views:
@@ -484,6 +490,10 @@ async def build(adapter: Any) -> dict[str, str]:
             if any(_overlaps(box, other) for other in note_boxes[configuration]):
                 raise RuntimeError(f"{configuration}: native note blocks overlap")
             note_boxes[configuration].append(box)
+        for configuration, check_stock in stock_checks:
+            if not draw.ActivateSheet(configuration):
+                raise RuntimeError(f"cannot read back stock diagram on {configuration!r}")
+            check_stock()
 
     return await finalize_drawing(
         adapter,

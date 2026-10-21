@@ -46,6 +46,7 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import name_dimensions
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -57,13 +58,16 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _drawing_marks import apply_drawing_properties
+from _drawing_marks import apply_drawing_properties, mark_dimensions_for_drawing
 from _saved_part_guard import require_saved_drawing_properties
 from dt_vn_keeper_chain_spec import (
     CHAIN_PART_BEADS as BEAD_CENTRES,
     BEAD_COUNT,
+    BEAD_DIA,
     BEAD_R,
     CHAIN_DRAWING_NOTES,
+    CATALOGUE_BEAD_DIMENSION,
+    DRAWING_DIMENSIONS,
     PITCH,
     ROD_DIA,
     ROD_R,
@@ -132,7 +136,11 @@ async def _seed_bead(adapter) -> None:
     )
     set_sketch_direct_db(adapter, False)
     await anchor_point_to_origin(adapter, f"{arc}.center", x0, y0, "seed centre")
-    check("seed radius", await adapter.add_sketch_dimension(arc, None, "radial", BEAD_R))
+    # A true diameter on the same source semicircle preserves the sphere.
+    check(
+        "seed bead diameter",
+        await adapter.add_sketch_dimension(arc, None, "diameter", BEAD_DIA),
+    )
     check("seed chord vertical", await adapter.add_sketch_constraint(closer, None, "vertical"))
     check(
         "seed arc start under centre",
@@ -141,6 +149,8 @@ async def _seed_bead(adapter) -> None:
     await ensure_fully_defined(adapter, "seed bead")
     check("exit_sketch seed bead", await adapter.exit_sketch())
     name_last_feature(adapter, "SeedProfile")
+    name_dimensions(adapter, "SeedProfile", [CATALOGUE_BEAD_DIMENSION])
+    mark_dimensions_for_drawing(adapter, "SeedProfile", DRAWING_DIMENSIONS["SeedProfile"])
     check("revolve seed bead", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "SeedBead")
     await volume_check(adapter, "seed bead", V_BEAD, 0.001 * V_BEAD)

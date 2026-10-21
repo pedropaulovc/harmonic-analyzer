@@ -33,3 +33,32 @@ POINT_LENGTH = MM_PER_IN / 40.0
 
 if POINT_LENGTH >= LENGTH:
     raise AssertionError("set-screw point overruns its length")
+
+# Supplier references use the replica's exact nominal, not the rounded fit
+# table value above. They do not change the purchased solid or its placement.
+REPLICA_MAJOR_DIA = 0.112 * MM_PER_IN
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260925/2DE2B046/"
+    "91375A106_Alloy%20Steel%20Cup-Tip%20Set%20ScrewX.GIF"
+)
+# Final frame: cup end Y=0, socket face Y=LENGTH. Top is end-on.
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", LENGTH, "vertical"),
+    ("SupplierThreadDiameter", REPLICA_MAJOR_DIA, "horizontal"),
+    ("SupplierDriveWidth", HEX_AF, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (REPLICA_MAJOR_DIA / 2.0, 0.0),
+    "SupplierThreadDiameter": (-REPLICA_MAJOR_DIA / 2.0, 0.0),
+    "SupplierDriveWidth": (-HEX_AF / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierThreadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "4-40"),
+    "SupplierDriveWidth": (2, "length", None, None),
+}

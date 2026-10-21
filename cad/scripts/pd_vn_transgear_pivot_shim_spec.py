@@ -39,6 +39,38 @@ THICKNESS_MAX = DIMS.thickness_max
 BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
 
+# Supplier nominal design dimensions may lie outside their unilateral stock
+# bands: these are reference annotations, not measured-specimen assertions.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/1F378AF1/"
+    "98055A098_Spring%20Steel%20ShimX.GIF"
+)
+SUPPLIER_UNITS = "mm"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 2,
+    "supplier bore diameter": 2,
+    "supplier thickness": 2,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier outer diameter": (OD_MIN, OD_MAX, "bilateral"),
+    "supplier bore diameter": (ID_MIN, ID_MAX, "bilateral"),
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "bilateral"),
+}
+
+REFERENCE_SKETCHES = (
+    "SupplierWasherFaceReference",
+    "SupplierWasherThicknessReference",
+)
+DRAWING_PRECISION = {
+    "SupplierWasherFaceReference": {
+        "SupplierOuterDiameter": DRAWING_REFERENCE_PRECISION["supplier outer diameter"],
+        "SupplierBoreDiameter": DRAWING_REFERENCE_PRECISION["supplier bore diameter"],
+    },
+    "SupplierWasherThicknessReference": {
+        "SupplierThickness": DRAWING_REFERENCE_PRECISION["supplier thickness"],
+    },
+}
+
 
 def shim_volume() -> float:
     """Nominal annulus volume, mm^3."""

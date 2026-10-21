@@ -145,3 +145,45 @@ if not STAND_OUT_MAX < trammel.CARRIER_TO_RAIL_GAP:
     raise AssertionError(f"{SKU}: the tip reaches rail 2")
 if ROW.tip_clearance_mm != trammel.CARRIER_TO_RAIL_GAP:
     raise AssertionError(f"{SKU}: the fastener table's tip clearance is not the rails'")
+
+# Exact-current product table and engineering drawing read 2026-10-21.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# Drawing precision: length/head Ø .XXX, head height/major Ø .XXXX,
+# drive an exact 3/16 fraction. The standard-only socket depth is omitted.
+SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A541/"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/B9FA8D18/"
+    "91251A541_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
+    ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierThreadDiameter": "bottom",
+    "SupplierDriveWidth": "bottom",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierHeadHeight": (4, "length", None, None),
+    "SupplierThreadDiameter": (4, "diameter", None, '1/4"-20'),
+    "SupplierDriveWidth": (0, "length", 16, None),
+}

@@ -34,3 +34,33 @@ HEAD_STACK_LEN = COLLAR_H + HEAD_H
 SHANK_DIA = 2.0 * THUMB_SPEC["major_r"]
 SHANK_LEN = THUMB_SPEC["length"]
 OVERALL_LEN = HEAD_STACK_LEN + SHANK_LEN
+
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260707/5003FE53/"
+    "91882A221_Steel%20Raised%20Knurled-Head%20Thumb%20ScrewX.GIF"
+)
+# Supplier .438/.094 are rounded display spellings, never replacement values:
+# thread length remains exactly 7/16 inch; both heights remain 3/32 inch.
+SUPPLIER_UNITS = "in"
+SUPPLIER_PRECISION = {
+    "thread_length": 3,
+    "head_height": 3,
+    "collar_height": 3,
+    "head_diameter": 3,
+    "collar_diameter": 2,
+    "thread_diameter": 3,
+}
+SUPPLIER_THREAD = "4-40"
+
+# A knurled/chamfered rim is not the nominal envelope diameter. Import these
+# construction-only model references; axial spans attach to physical rims.
+DIAMETER_REFERENCES = (
+    ("SupplierHeadDiameter", HEAD_DIA, "vertical"),
+    ("SupplierCollarDiameter", COLLAR_DIA, "vertical"),
+    ("SupplierThreadDiameter", SHANK_DIA, "vertical"),
+)
+DIAMETER_REFERENCE_STARTS = {
+    "SupplierHeadDiameter": (HEAD_H / 2.0, -HEAD_DIA / 2.0),
+    "SupplierCollarDiameter": (HEAD_H + COLLAR_H / 2.0, -COLLAR_DIA / 2.0),
+    "SupplierThreadDiameter": (HEAD_STACK_LEN + SHANK_LEN / 2.0, -SHANK_DIA / 2.0),
+}

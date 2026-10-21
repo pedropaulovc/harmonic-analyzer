@@ -48,3 +48,48 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     raise AssertionError(
         f"{SKU}: major {DIMS.major_dia}, the row's thread is {ROW.major_mm}"
     )
+
+# Exact-current product table and engineering drawing read 2026-10-21.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# The drawing uses whole millimetres for every size and M4 x 0.7 metadata.
+# Socket depth is a standard-only model choice and is intentionally omitted.
+SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91290A168/"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260302/12D8C87B/"
+    "91290A168_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
+    ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierThreadDiameter": "bottom",
+    "SupplierDriveWidth": "bottom",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (0, "length", None, None),
+    "SupplierHeadDiameter": (0, "diameter", None, None),
+    "SupplierHeadHeight": (0, "length", None, None),
+    "SupplierThreadDiameter": (0, "diameter", None, "M4 x 0.7"),
+    "SupplierDriveWidth": (0, "length", None, None),
+}
+SUPPLIER_REFERENCE_UNITS = {
+    name: "mm" for name, _value, _orientation in SUPPLIER_REFERENCE_DIMENSIONS
+}

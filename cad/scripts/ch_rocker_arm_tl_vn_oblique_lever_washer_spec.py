@@ -18,9 +18,14 @@ Sources:
   washer, reusable up to 15 times, comparable to NORD-LOCK; 316 stainless
   steel, Rockwell C51, case hardened; for 5/16" / M8; ID 0.340 in, OD
   0.530 in, thickness 0.070 to 0.090 in; 5 per package, $12.40.
-* UNVERIFIED: the listing does not say whether the thickness is the pair's
-  stack or one washer's, nor whether a package is 5 pairs.  The model takes
-  it as the pair's stack at its 0.090 in maximum (``_mcmaster_91812a230``),
+* EXACT-CURRENT PRIMARY, https://www.mcmaster.com/91812A230/ read 2026-10-21:
+  the product table repeats those dimensions. Its engineering drawing
+  (``SUPPLIER_DRAWING_URL``) spans the depicted two-piece stack, not an
+  individual half. References below describe only the unchanged plain
+  envelope; they do not assert that the model contains a physical pair.
+* RETAINED RECEIPT CAVEAT: the 2026-10-17 listing alone did not identify a
+  pair stack or a single half, nor whether a package is 5 pairs. The model
+  keeps the pair's stack at its 0.090 in maximum (``_mcmaster_91812a230``),
   the worst case for the screw's engagement and its head's height; the C4
   fastener table carries the same stack as a literal
   (``fasteners.LEVER_LOCK_STACK``), pinned here.  Verify on receipt.
@@ -89,6 +94,38 @@ PACK_QUANTITY = PACKAGE_QTY  # UNVERIFIED: pairs or single washers
 THICKNESS = PAIR_THICKNESS  # the modelled pair's stack, 2.286
 BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
+
+# Exact-current engineering image inspected 2026-10-21. Use its two-place
+# inch precision (.34 ID, .53 OD, .07-.09 stack), not the product table's
+# three-place typography (.340, .530, .070-.090); the values agree exactly.
+# No diameter band is supplied. Keep the existing maximum-stack envelope
+# and receipt caveat; neither the pair split nor its locking faces are added.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260617/385104C2/"
+    "91812A230_Extreme-Vibration-Resistant%20Wedge%20Lock%20WasherX.GIF"
+)
+SUPPLIER_UNITS = "in"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 2,
+    "supplier bore diameter": 2,
+    "supplier thickness": 2,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
+}
+SUPPLIER_BORE_CALLOUT = "FOR 5/16 / M8 SCREW SIZE"
+SUPPLIER_DATA = (
+    "SUPPLIER DRAWING SHOWS A TWO-PIECE WEDGE-LOCK STACK.",
+    "MODEL IS THE MAXIMUM-THICKNESS PLAIN ENVELOPE.",
+    "SPLIT, CAMS AND SERRATIONS ARE NOT MODELLED.",
+    "PAIR / PACKAGE INTERPRETATION: VERIFY ON RECEIPT.",
+)
+REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)
+DRAWING_PRECISION = {
+    "SupplierWasherThicknessReference": {
+        "SupplierThickness": DRAWING_REFERENCE_PRECISION["supplier thickness"],
+    },
+}
 
 # --- Engagement and stand-out in TL-21, worst case ------------------------------
 _THICK_BAND = printed_band_mm(feed_lever.THICK_PLACES)

@@ -21,6 +21,7 @@ from _visibility import FeatureWalk
 
 
 type ThreadedPartSaver = Callable[[Any, str, Sequence[str]], Awaitable[dict[str, str]]]
+type UnthreadedPartSaver = Callable[[Any, str], Awaitable[dict[str, str]]]
 type Vector3 = tuple[float, float, float]
 
 # The helical groove every threaded stock recipe cuts
@@ -349,6 +350,7 @@ async def build_stock_fastener(
     color: tuple[float, float, float] | None = None,
     screw_axis_planes: tuple[str, str] | None = None,
     save_threaded_part: ThreadedPartSaver | None = None,
+    save_unthreaded_part: UnthreadedPartSaver | None = None,
 ) -> dict[str, str]:
     """Create, normalize, finish, and save one production stock part.
 
@@ -356,8 +358,9 @@ async def build_stock_fastener(
     assemblies whose normalized stock body axis is not represented by a
     transformed recipe reference.
 
-    Threaded callers supply their statically imported simplified saver through
-    ``save_threaded_part``. Unthreaded leaves never import that part machinery.
+    Callers may supply a statically imported saver to add model-owned supplier
+    references after normalization. Unthreaded leaves need no simplified-part
+    machinery; either path still performs exactly one save.
     """
 
     check("create_part", await adapter.create_part())
@@ -454,7 +457,11 @@ async def build_stock_fastener(
     apply_custom_properties(adapter, properties)
     await report_mass_properties(adapter)
     return await _save_stock_part(
-        adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part
+        adapter,
+        part_name,
+        threaded=threaded,
+        save_threaded_part=save_threaded_part,
+        save_unthreaded_part=save_unthreaded_part,
     )
 
 
@@ -464,6 +471,7 @@ async def _save_stock_part(
     *,
     threaded: bool,
     save_threaded_part: ThreadedPartSaver | None = None,
+    save_unthreaded_part: UnthreadedPartSaver | None = None,
 ) -> dict[str, str]:
     """Save a finished stock part; a threaded one with its simplified views.
 
@@ -488,4 +496,8 @@ async def _save_stock_part(
             )
         # "<cfg> Simplified" suppresses the helical cut for assembly views.
         return await save_threaded_part(adapter, part_name, (THREAD_FEATURE,))
+    if save_unthreaded_part is not None:
+        if not callable(save_unthreaded_part):
+            raise TypeError(f"{part_name}: unthreaded stock saver must be callable")
+        return await save_unthreaded_part(adapter, part_name)
     return await save_part_and_images(adapter, part_name)

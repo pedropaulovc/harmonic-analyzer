@@ -16,16 +16,25 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from functools import wraps
 
 from _appearance import POLISHED_STEEL
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _supplier_pin_model import author_supplier_spring_pin_references
 from diagnostics.diag_build_98296A027 import build_98296A027
+from dt_vn_pinion_strap_pin_spec import SUPPLIER_REFERENCE
 
 PART_NAME = "dt-vn-pinion-strap-pin"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
+
+
+@wraps(build_98296A027)
+async def _build_pin_with_supplier_references(adapter, truth=None):
+    await build_98296A027(adapter, truth)
+    await author_supplier_spring_pin_references(adapter, SUPPLIER_REFERENCE)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -35,7 +44,7 @@ async def build(adapter) -> dict[str, str]:
         components=(
             StockComponent(
                 sku="98296A027",
-                author=build_98296A027,
+                author=_build_pin_with_supplier_references,
                 transform=RigidTransform(),
             ),
         ),

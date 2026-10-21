@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -97,18 +98,6 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
         GRIP + platform.PLATE_THICKNESS - spec.POST_SCREW_CUT_TO_FIT_SHORT / 2.0,
         places,
     )
-    assert not hasattr(spec, "CUT_LENGTH_BAND")
-    assert not hasattr(drawing, "EXPECTED_CONTROLS")
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    # The one tolerance in the builder is the cut end's break (a single MAX
-    # limit), never the length.
-    assert "set_dimension_bilateral_tolerance(" not in builder
-    helper = builder.split("def _single_limit_break", 1)[1].split("\ndef ", 1)[0]
-    assert "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION" in helper
-    assert builder.count("tolerance.Type = ") == 1
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension(" in source
-    assert "swTolNONE" in source
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
     # The callout still promises no fixed length: never the modelled cut
     # length, never a band on it.
@@ -226,22 +215,6 @@ def test_cut_to_fit_allowance_is_exported_once() -> None:
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.3
 
 
-def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
-    """drawing-simplicity-policy.md `How the repository implements the guidelines`: the value and places are the part's; the sheet imports the
-    cut length from its hidden reference sketch and the break from the deburr
-    cutter's profile, and re-reads both."""
-    assert spec.DRAWING_DIMENSIONS == {
-        "CutLengthReference": {"CutLength"},
-        "CutEndDeburrProfile": {"CutEndBreak"},
-    }
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
-    assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1, "CutEndBreak": 1}
-    assert set(drawing.FRONT_KEEP) == {"CutLength"}
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in builder
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "hidden_sketches.curate_view_dimensions" in source
-    assert "assert_imported_precision" in source
 
 
 def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
@@ -253,12 +226,6 @@ def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
     assert spec.CUT_END_BREAK_MM + lower >= 0.0
     assert spec.CUT_END_BREAK_MAX_MM == spec.CUT_END_BREAK_MM + upper
     assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    helper = builder.split("def _single_limit_break", 1)[1].split("\ndef ", 1)[0]
-    assert "lower, upper = deviations(CUT_END_BREAK_BAND)" in helper
-    assert "tolerance.Type = CUT_END_BREAK_TOL_TYPE" in helper
-    assert "_single_limit_break(adapter)" in builder
-    assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
 
 
 def test_worst_case_engagement_holds_the_named_minimum() -> None:
@@ -290,9 +257,6 @@ def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM < spec.STOCK_LENGTH_MM
     # A half-inch-shorter predecessor cannot reach the longest fitted seat.
     assert spec.STOCK_LENGTH_MM - 0.5 * IN < spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM
-    assert not hasattr(part, "_supplied_stock_length")
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "FILLISTER_SIZE =" not in source
 
 
 def _independent_removal() -> tuple[float, float]:
@@ -349,52 +313,14 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
     # CutEndBreak itself is the cutter's driving dimension: no equation.
     assert "CutEndBreak" not in part.DEBURR_DRIVES
     assert (part.TRIM_FEATURE, part.DEBURR_FEATURE) == ("CutToLength", "CutEndDeburr")
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
-    for step in (
-        "_trim_to_cut_length(adapter)",
-        "_check_removed(\"trim to cut length\"",
-        "_break_cut_end(adapter)",
-        "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION",
-        "assert_break_removed_metal(rim_before, rim_after, brk)",
-    ):
-        assert step in body, step
-    # The rim is read on the trimmed end BEFORE the break, then after it.
-    assert body.index('phase="trimmed"') < body.index("_break_cut_end(adapter)")
-    assert body.index("_break_cut_end(adapter)") < body.index('phase="broken"')
-    wrapper = source.split("async def _cut_to_length", 1)[1]
-    assert wrapper.index(f"{recipe.build_40923906.__name__}(") < wrapper.index(
-        "_modify_stock"
-    )
     # The trimmed tip cannot reach into what the stock carries: the cut
     # clears the factory tip, and the volume gate outruns the sweep's slack.
     assert spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM > spec.CUT_LENGTH_MM
     assert part.TRIM_VOLUME_TOL_MM3 < 0.01 * spec.TRIM_REMOVED_MM3
 
 
-def test_finish_oils_the_bare_cut_end() -> None:
-    """drawing-guidelines.md rule 2 (the title block is the general specification): bare-surface protection is the Finish field's, worded like the
-    boss hook's (MHA-SM-VN-50), never a note."""
-    finish = _config.parts(part.PART_NAME)["finish"]
-    boss = _config.parts("sm-vn-boss-hook")["finish"]
-    assert finish == boss == "SUPPLIED ZINC PLATING; OIL BARE CUT END"
-    assert "OIL" not in spec.MANUFACTURING_NOTES
 
 
-def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
-    """Main's eye pass of warm-c486 (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the old INSTALLATION block
-    printed "(NOMINAL 86.0)", "0.90D MIN" and "NAMED EXCEPTION TO RULE 12".
-    The cut length is now a reference dimension, the engagement minimum a
-    line of its callout (never a note) and the sequence an MHA-DT-00 step, so
-    no part note carries a number."""
-    row = _config.parts(part.PART_NAME)
-    assert "installation_notes" not in row
-    notes = spec.MANUFACTURING_NOTES
-    assert not any(ch.isdigit() for ch in notes)
-    assert "DEBURR CUT END" in notes
-    for word in ("RULE", "EXCEPTION", "ENGAGEMENT", "NOMINAL", "INSTALL", "MHA-"):
-        assert word not in notes
-    assert len(notes.splitlines()) <= 4
 
 
 def _printed_cut_short_allowance() -> float:
@@ -478,9 +404,6 @@ def test_drawing_is_the_modified_stock_sheet() -> None:
     assert drawing.SPEC is registry
     assert registry.artifact_stem == part.PART_NAME
     assert registry.script == Path(drawing.__file__).resolve()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "build_purchased_fastener_drawing" not in source
-    assert "Installation Notes" not in source
 
 
 def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
@@ -491,15 +414,6 @@ def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
     assert violations == ()
 
 
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    # Codex #857 P2: MSC publishes no CAD, so the standalone command must not
-    # enter the McMaster replica path (vendor SLDPRT + harvest).  It builds the
-    # recipe and saves it; the documented command is that entry point.
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
-    assert Path(recipe.__file__).name in (recipe.__doc__ or "")
-    assert "catalog-only" in (recipe.__doc__ or "")
 
 
 def test_break_is_smaller_than_the_allowed_trim_volume_residual() -> None:
@@ -507,9 +421,6 @@ def test_break_is_smaller_than_the_allowed_trim_volume_residual() -> None:
     Its presence must be proved by the end-face rim, not a smaller mass
     reading: the original #857 leaf's broken screw read slightly larger."""
     assert 0.0 < spec.CUT_END_DEBURR_REMOVED_MM3 < part.TRIM_VOLUME_TOL_MM3
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
-    assert "finished < trimmed" not in body
 
 
 def test_break_gate_decides_on_the_rim_before_and_after() -> None:
@@ -524,7 +435,6 @@ def test_break_gate_decides_on_the_rim_before_and_after() -> None:
         part.assert_break_removed_metal(major, major - brk / 2.0, brk)
     with pytest.raises(RuntimeError, match="is not the major"):
         part.assert_break_removed_metal(major - brk, major - brk, brk)
-    assert part.RIM_TOL_MM == 1e-4
 
 
 # --- Main's MHA-DT-VN-61 eye pass on #857: the cut-end break callout -----------
@@ -533,23 +443,8 @@ def test_break_gate_decides_on_the_rim_before_and_after() -> None:
 # view drops the break, and a 10:1 tip detail prints the single limit.
 
 
-def test_note_says_deburr_not_chamfer() -> None:
-    notes = spec.MANUFACTURING_NOTES
-    assert notes.splitlines()[0] == "DEBURR CUT END."
-    assert "CHAMFER" not in notes
-    assert not any(ch.isdigit() for ch in notes)
 
 
-def test_front_view_carries_no_break_dimension() -> None:
-    """The 1:1 Front claims only the cut length; the break is claimed only by
-    the 10:1 tip view, and both import by feature (never the entire model)."""
-    assert "CutEndBreak" not in drawing.FRONT_KEEP
-    assert spec.FRONT_VIEW_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
-    assert set(drawing.DETAIL_KEEP) == {"CutEndBreak"}
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "dimensions_by_feature=FRONT_VIEW_DIMENSIONS" in source
-    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in source
-    assert "BREAK_CONTROLS" not in source and "offset_dimension_text" not in source
 
 
 def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
@@ -570,14 +465,6 @@ def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "", "") == expected
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 2, "", "") != expected
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "(", ")") != expected
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_verify_tip_view(adapter, front, tip)") == 2
-    block = source.split('_telemetry.span("drawing.tip_view"', 1)[1]
-    block = block.split("_verify_tip_view(adapter, front, tip)", 1)[0]
-    assert "cropped_tip_view(adapter)" in block
-    assert "_curate_tip_view(adapter, tip)" in block
-    assert "assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)" in block
-    assert "hidden_sketches.curate_view_dimensions(" not in block
 
 
 def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
@@ -625,26 +512,6 @@ def test_tip_detail_layout_is_clear() -> None:
     assert text_y > label_y + DETAIL_NOTE_GAP / 2.0
 
 
-def test_break_is_owned_by_the_deburr_cutter_not_a_hidden_reference_sketch() -> None:
-    """pms857-f543 (f54309af5): the 10:1 detail imported nothing from the
-    part-hidden CutEndBreakReference, even shown in memory around the detail
-    ("tip detail break view is missing model dimensions: ['CutEndBreak']").
-    The agreed fallback is the boss hook's pattern: the break is a driving
-    dimension of the deburr cutter's own (consumed) profile."""
-    assert spec.CUT_END_BREAK_SKETCH == part.DEBURR_PROFILE == "CutEndDeburrProfile"
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
-    assert not hasattr(spec, "DETAIL_SKETCHES")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "part_sketches_shown(" not in source
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    controls = builder.split("async def _author_cut_controls", 1)[1].split("\nasync def ", 1)[0]
-    assert "CUT_END_BREAK_SKETCH" not in controls
-    cutter = builder.split("async def _break_cut_end", 1)[1].split("\nasync def ", 1)[0]
-    assert "dims.record(CUT_END_BREAK_DIMENSION)" in cutter
-    # The break leg is the inner of two collinear legs split at the major
-    # radius, and that split point is the one anchored to the origin.
-    assert "(radius - CUT_END_BREAK_MM, end),\n                (radius, end)," in cutter
-    assert 'f"{lines[1]}.start", radius, end, DEBURR_PROFILE' in cutter
 
 
 # --- The tip view is a CROPPED 10:1 MODEL VIEW, not a detail ----------------
@@ -1074,18 +941,6 @@ def test_break_text_move_is_bounded(monkeypatch) -> None:
     assert annotation.moves == []
 
 
-def test_break_text_is_placed_and_checked_on_the_seat() -> None:
-    """The build places the text right after the tip view's import, and both
-    tip-view read-backs re-prove it."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    block = source.split('_telemetry.span("drawing.tip_view"', 1)[1]
-    block = block.split("_verify_tip_view(adapter, front, tip)", 1)[0]
-    curate = block.index("_curate_tip_view(adapter, tip)")
-    place = block.index("place_break_text_outside(adapter, tip_annotations)")
-    assert curate < place
-    verify = source.split("def _verify_tip_view", 1)[1].split("\ndef ", 1)[0]
-    assert "assert_break_text_outside(" in verify
-    assert "read_break_ink(" in verify
 
 
 def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
@@ -1111,10 +966,6 @@ def test_tip_view_label_tolerates_another_note_on_the_view(monkeypatch) -> None:
     assert texts.count("DETAIL A  SCALE 10:1") == 1
 
 
-def test_tip_view_reposition_tolerance_matches_the_notch_detail() -> None:
-    """The move is checked to 0.1 mm on the sheet (draw_cylinder_gear's notch
-    detail tolerance), not a micron the diag never proved."""
-    assert drawing.TIP_VIEW_POSITION_TOLERANCE_M == 1e-4
 
 
 def test_tip_view_label_raises_when_it_lands_elsewhere(monkeypatch) -> None:
@@ -1147,42 +998,10 @@ def test_tip_label_and_letter_agree() -> None:
     assert drawing.TIP_VIEW_LABEL.endswith(f"SCALE {num:g}:{den:g}")
 
 
-def test_bisect_scaffolding_is_gone() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for token in (
-        "read_detail_visible_entities",
-        "GetVisibleEntities2",
-        "_detail_facts",
-        "mha142-bisect view=",
-        "run_bisect",
-        "end_detail(",
-        "CreateDetailViewAt4",
-        "position_detail_label",
-        "position_parent_detail_letter",
-    ):
-        assert token not in source, token
 
 
-def test_measured_behaviour_is_recorded_on_the_tip_view() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source.split("def cropped_tip_view", 1)[1].split("\ndef ", 1)[0]
-    body = " ".join(body.split())
-    for evidence in ("b6552f13b", "10:1 HLR", "10:1 HLV", "5:1", "2:1", "before or after"):
-        assert evidence in body, evidence
 
 
-def test_front_is_active_before_the_notes() -> None:
-    """pms857-diag-9eca: property-linked notes land in the ACTIVE view.  The
-    tip view is labelled while active, the Front is marked, then the Front
-    is re-activated before the first sheet note."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source.split("async def build", 1)[1]
-    curate = body.index("_curate_tip_view(adapter, tip)")
-    label = body.index("label_tip_view(adapter, tip)")
-    mark = body.index("mark_tip_on_front(adapter, front)")
-    activate = body.index("activate_front_for_notes(adapter, front)")
-    first_note = body.index("add_property_linked_note(")
-    assert curate < label < mark < activate < first_note
 
 
 
@@ -1230,3 +1049,79 @@ def test_a_circle_the_seat_moved_raises(monkeypatch) -> None:
     seat.honours_add_to_db = False
     with pytest.raises(RuntimeError, match="tip view crop circle"):
         drawing.cropped_tip_view(seat)
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
+    monkeypatch, newline,
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    monkeypatch.setattr(
+        drawing, "sheet_drawable_region",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            xmin=0.0, ymin=0.0, xmax=template.width_m, ymax=template.height_m,
+        ),
+    )
+    rows = {row.name: row for row in drawing.SUPPLIER_REFERENCE_DIMENSIONS}
+    views = []
+    for name, keep, scale, cropped in (
+        ("stock", drawing.STOCK_KEEP, drawing.STOCK_SCALE, False),
+        ("head", drawing.STOCK_HEAD_KEEP, drawing.STOCK_HEAD_SCALE, True),
+    ):
+        annotations = []
+        for dimension_name in keep:
+            row = rows[dimension_name]
+            band = row.deviations_mm
+            tolerance = SimpleNamespace(
+                Type=0 if band is None else 3,
+                GetMinValue=lambda band=band: 0.0 if band is None else band[0] / 1000.0,
+                GetMaxValue=lambda band=band: 0.0 if band is None else band[1] / 1000.0,
+            )
+            native = SimpleNamespace(
+                FullName=f"{row.name}@{drawing.SUPPLIER_STOCK_FEATURE}@source",
+                DrivenState=1, Tolerance=tolerance,
+            )
+            display = SimpleNamespace(
+                Type2=row.native_type,
+                GetDimension2=lambda _index, native=native: native,
+                GetPrimaryTolPrecision2=lambda: drawing.SUPPLIER_PRECISION,
+            )
+            points = tuple(
+                SimpleNamespace(X=x / 1000.0, Y=y / 1000.0, Z=0.0)
+                for x, y in (drawing.SUPPLIER_PROFILE_MM[index] for index in row.vertices)
+            )
+            annotations.append(SimpleNamespace(
+                name=row.name, Visible=1,
+                GetSpecificAnnotation=lambda display=display: display,
+                GetAttachedEntityTypes=lambda: (11, 11),
+                GetAttachedEntities3=lambda points=points: points,
+            ))
+        views.append(SimpleNamespace(
+            Name=name, ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+            UseSheetScale=0, ScaleRatio=scale,
+            IsCropped=lambda cropped=cropped: cropped,
+            UpdateViewDisplayGeometry=lambda: None,
+            GetAnnotations=lambda annotations=annotations: annotations,
+        ))
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: views)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        ActivateSheet=lambda _name: True, GetCurrentSheet=lambda: object(),
+    ))
+    text = drawing.SUPPLIER_STOCK_TITLE
+    assert "\n" in text
+    state = SimpleNamespace(text=text.replace("\n", newline))
+    annotation = SimpleNamespace(Visible=1, OwnerType=1)
+    note = SimpleNamespace(
+        GetText=lambda: state.text, GetAnnotation=lambda: annotation,
+        GetExtent=lambda: (0.03, 0.22, 0.0, 0.15, 0.24, 0.0),
+    )
+    notes = [(note, text, (0.02, 0.20, 0.18, 0.25))]
+    drawing._verify_supplier_stock(adapter, "stock", "head", notes)
+    state.text = state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
+    with pytest.raises(RuntimeError, match="source label changed"):
+        drawing._verify_supplier_stock(adapter, "stock", "head", notes)

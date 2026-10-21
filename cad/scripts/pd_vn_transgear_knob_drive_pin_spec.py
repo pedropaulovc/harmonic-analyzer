@@ -22,6 +22,7 @@ from _mcmaster_98381a433 import (
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
 from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD, PLATE, PLATE_BAND
+from _supplier_pin_data import SupplierPinReference
 
 SKU = "98381A433"
 DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 4.7625
@@ -60,3 +61,19 @@ def checked_tip_inset(proud_max: float, plate_min: float) -> float:
 
 
 TIP_INSET_WORST = checked_tip_inset(max(PROUD_RANGE), THINNEST_PLATE)  # 0.20
+
+# Inspected McMaster engineering drawing, 2026-10-19. Exact 3/16 length
+# remains .1875 in; supplier presentation is .188 at three decimal places.
+# The .0937 source nominal uses equivalent .0938/.0940 native limits
+# because exact 3/32 geometry must not be rounded to a print literal.
+# The catalogue-derived DIA_BAND_IN and all fit controls remain unchanged.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="in",
+    diameter_mm=DIA,
+    length_mm=LENGTH,
+    diameter_nominal=0.0937,
+    diameter_precision=4,
+    length_precision=3,
+    diameter_band=(0.0001, 0.0003),
+)

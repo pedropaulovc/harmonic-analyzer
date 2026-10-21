@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import sys
 from typing import Any
 
@@ -10,16 +11,58 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _supplier_nut_drawing import add_supplier_nut_dimensions
+from _supplier_screw_layout import supplier_screw_margins
+import pn_vn_pen_adjust_nut_spec as supplier
 
 
 SPEC = DRAWINGS_BY_NAME["pn_vn_pen_adjust_nut"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "#0-80 HEX NUT, 5/32 ACROSS FLATS"
+ITEM = "#0-80 HEX NUT"
+# Shared Front budget includes the bottom nominal-major/thread callout and
+# the physical AF fraction above Front. Margins are (left, bottom, right, top).
+SUPPLIER_MARGINS = supplier_screw_margins(
+    supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+    sides={"ThreadNominalMajor": "bottom"},
+)
+SUPPLIER_MARGINS["*Right"] = (0.011, 0.018, 0.011, 0.0)
+
+
+def _supplier_dimensions(
+    adapter: Any, views_by_orientation: dict[str, Any]
+) -> Callable[[], None]:
+    return add_supplier_nut_dimensions(
+        adapter,
+        views_by_orientation,
+        across_flats_mm=supplier.ACROSS_FLATS,
+        thickness_mm=supplier.THICKNESS,
+        bore_diameter_mm=supplier.BORE_DIA,
+        thread=supplier.THREAD,
+        precision=supplier.DRAWING_REFERENCE_PRECISION,
+        fraction_denominator=supplier.SUPPLIER_FRACTION_DENOMINATOR,
+        reference_dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        reference_starts=supplier.SUPPLIER_REFERENCE_STARTS,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    authored_checks: list[Callable[[], None]] = []
+
+    def supplier_dimensions(target: Any, views: dict[str, Any]) -> None:
+        authored_checks.append(_supplier_dimensions(target, views))
+
+    def assert_settled() -> None:
+        if len(authored_checks) != 1:
+            raise RuntimeError("supplier nut annotations must be authored exactly once")
+        authored_checks[0]()
+
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM
+        adapter,
+        SPEC,
+        item=ITEM,
+        supplier_dimensions=supplier_dimensions,
+        supplier_margins=SUPPLIER_MARGINS,
+        settled_checks=(assert_settled,),
     )
 
 

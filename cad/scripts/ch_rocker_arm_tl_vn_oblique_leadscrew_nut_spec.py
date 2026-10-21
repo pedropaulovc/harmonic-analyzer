@@ -72,6 +72,7 @@ LEAD = feed.SCREW_LEAD  # 2, single start
 BORE_DIA = 6.0  # Tr8x2 thread minor (contract), as a plain bore
 OOZNEST_CREST_DIA = 6.6  # cross-reference only: the superseded nut's crest bore
 
+
 _BORE_R = BORE_DIA / 2.0
 _BODY_R = BODY_DIA / 2.0
 _FLANGE_R = FLANGE_DIA / 2.0
@@ -96,6 +97,67 @@ HOLE_CENTRES: tuple[tuple[float, float], ...] = tuple(
     )
     for a in HOLE_ANGLES_DEG
 )
+# Exact current replacement identity was selected on the primary supplier's
+# T8x2 variant on 2026-10-21. Its mixed-size gallery also contains unrelated
+# R12 / inch-size nut drawings; those are not this nut's engineering evidence.
+# The current T8x2 screw-kit page's dedicated front/side drawings supply these
+# nominal sizes and agree with the unchanged installed envelope above.
+SUPPLIER_PRODUCT_URL = (
+    "https://www.zyltech.com/"
+    "zyltech-brass-nut-only-various-diameters-and-pitches-available/"
+)
+SUPPLIER_KIT_URL = (
+    "https://www.zyltech.com/"
+    "8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
+)
+SUPPLIER_DRAWING_URLS = (
+    "https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/500x659/"
+    "products/197/16129/"
+    "s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2",
+    "https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/500x659/"
+    "products/197/16130/"
+    "s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2",
+)
+# Construction-only source chords are nominal size references, not measurements
+# of the omitted internal thread. No source bore diameter or tolerance is given.
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierSpigotLength", SPIGOT_LENGTH, "vertical"),
+    ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),
+    ("SupplierBodyLength", BODY_LONG, "vertical"),
+    ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
+    ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
+    ("SupplierHolePitchDiameter", HOLE_PCD, "horizontal"),
+    ("SupplierMountingHoleDiameter", HOLE_DIA, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierSpigotLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
+    "SupplierFlangeThickness": (FLANGE_DIA / 2.0, 0.0),
+    "SupplierBodyLength": (BODY_DIA / 2.0, FLANGE_THICK),
+    "SupplierBodyDiameter": (-BODY_DIA / 2.0, 0.0),
+    "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
+    "SupplierHolePitchDiameter": (-HOLE_PCD / 2.0, 0.0),
+    "SupplierMountingHoleDiameter": (
+        HOLE_CENTRES[0][0] - HOLE_DIA / 2.0,
+        -HOLE_CENTRES[0][1],
+    ),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHolePitchDiameter": "Top",
+    "SupplierMountingHoleDiameter": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierSpigotLength": (1, "length", None, None),
+    "SupplierFlangeThickness": (1, "length", None, None),
+    "SupplierBodyLength": (0, "length", None, None),
+    "SupplierBodyDiameter": (1, "diameter", None, None),
+    "SupplierFlangeDiameter": (0, "diameter", None, None),
+    "SupplierHolePitchDiameter": (0, "diameter", None, "PCD"),
+    "SupplierMountingHoleDiameter": (1, "diameter", None, "4X"),
+}
+SUPPLIER_REFERENCE_UNITS = {
+    name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
+}
 
 
 def revolved_volume(profile: tuple[tuple[float, float], ...]) -> float:

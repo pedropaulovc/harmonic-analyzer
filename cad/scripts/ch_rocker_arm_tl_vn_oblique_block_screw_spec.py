@@ -12,7 +12,7 @@ Sources:
 
 * SOURCED, https://www.mcmaster.com/91251A188/ read live 2026-10-17 from
   the #8-32 black-oxide listing: #8-32 coarse, 1-7/8 in under the head,
-  partly threaded (7/8 in thread), head Ø0.27 x 0.164 in, 9/64 in hex drive,
+  partly threaded (7/8 in minimum thread), head Ø0.27 x 0.164 in, 9/64 in hex drive,
   170,000 psi, US origin, $11.00 per pack of 10.  It replaced the 1-3/4 in
   91251A screw (Codex review: with the TL-VN-70 pair under the head, the 1-3/4 in
   screw engaged 5.67 in TL-29 at the worst case, under 1.5 D).
@@ -63,3 +63,56 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 # shank, so the engagement (length - grip) stays inside the thread.
 if DIMS.threaded_length < ROW.engagement_mm:
     raise AssertionError(f"{SKU}: the engagement reaches the plain shank")
+
+# Exact-current product table and engineering drawing read 2026-10-21.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# All drawing decimals have three places; drive is exactly 9/64 in.
+# The product table qualifies the drawing's .875 thread span as a MINIMUM.
+# Its native MIN semantics belong to the new model carrier, not drawing text.
+# Standard-only socket depth/length tolerances are not supplier references.
+SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A188/"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/019A5E97/"
+    "91251A188_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
+    ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
+    ("SupplierThreadLength", -DIMS.threaded_length, "vertical"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierThreadDiameter": (
+        -DIMS.major_dia / 2.0, -DIMS.length + DIMS.threaded_length / 2.0
+    ),
+    "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
+    "SupplierThreadLength": (
+        DIMS.major_dia / 2.0, -DIMS.length + DIMS.threaded_length
+    ),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierThreadDiameter": "bottom",
+    "SupplierDriveWidth": "bottom",
+    "SupplierThreadLength": "right",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "8-32"),
+    "SupplierDriveWidth": (0, "length", 64, None),
+    "SupplierThreadLength": (3, "length", None, "THREAD LENGTH"),
+}
+SUPPLIER_REFERENCE_MINIMUMS = frozenset({"SupplierThreadLength"})
