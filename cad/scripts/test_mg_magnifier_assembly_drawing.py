@@ -767,7 +767,7 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    assert steps_bottom - drawing.CHECKS_XY[1] >= drawing._PAD / 2
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(

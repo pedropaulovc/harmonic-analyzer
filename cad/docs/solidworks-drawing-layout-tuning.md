@@ -42,6 +42,14 @@ measured.
 4. **Export once**, at the end, and eyeball the render for what geometry cannot
    judge (balance, emphasis, readability).
 
+For the magnifier's ASSEMBLY STEPS sheet, the `25539a6ac` native report
+measured the checks note at Y62.0..84.4 mm, the preceding sequence's bottom
+at Y95.4 mm, and the title-block top at Y66 mm. The recipe raises only
+`CHECKS_XY` by 6 mm: the expected native extent then clears the title block
+by 2.0 mm (the audit's default move clearance) and the sequence by 5.0 mm.
+This is a coordinate prediction, not native after-fix evidence; retain the
+audit and confirm the exported sheet after rebuilding.
+
 Standalone, on a built drawing, without touching a recipe:
 
 ```bash
@@ -288,10 +296,12 @@ call time and guard overhead (`native_call_ms`, `preference_guard_ms`).
 `drawing.auto_balloon_native` isolates the native call, including failures.
 [Issue #1667](https://github.com/pedropaulovc/harmonic-analyzer/issues/1667)'s
 same-seat w5/PID 8256 THICK/NORMAL/NORMAL/THICK experiment returned 6/11/11/6
-native balloons, but applied the mapping **before creating views**. It does
-not prove the narrower call-local guard: that still requires a farm-produced
-MG drawing/PDF with complete coverage, correct native EDGE owners and the
-original final drawing appearance. No retry or additional rebuild is implied.
+native balloons, but applied the mapping **before creating views**. The later
+R3 production run on w15 at source `25539a6ac` exercised the call-local guard:
+the MG wheel view produced 11/11 correct native EDGE owners, the mapping
+returned from slot 1 to its original slot 2 before the existing rebuild, and
+all four PDF pages exported. This is evidence for that exact view/run, not
+a general reliability claim. No retry or additional rebuild is implied.
 
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when

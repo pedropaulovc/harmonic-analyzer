@@ -476,9 +476,12 @@ ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+# Source 25539a6ac's native report measured checks at Y62.0..84.4 mm and sequence
+# bottom at Y95.4 mm. Raise only the checks 6 mm: 2 mm above the title
+# block and 5 mm below the sequence, without changing text or line pitch.
 CHECKS_XY = (
     STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
+    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - _PAD / 2,
 )
 if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
     raise AssertionError("the assembly sequence and checks overrun the sheet")

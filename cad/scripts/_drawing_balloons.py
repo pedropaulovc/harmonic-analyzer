@@ -379,10 +379,12 @@ def _auto_balloon_edges_with_normal_weight(
 
     Issue #1667's same-seat w5/PID 8256 THICK/NORMAL/NORMAL/THICK experiment
     returned 6/11/11/6 native balloons with the mapping set BEFORE view creation.
-    That proves the preference's effect, not this narrower call-local lifetime;
-    the latter still needs native production-drawing/PDF proof. Preserve the
-    template and its physical slot widths, and restore before the existing
-    rebuild, ownership/layout checks and save. There is no retry or extra rebuild.
+    That establishes the preference's effect. The call-local guard then produced
+    11/11 correct wheel-view owners on w15 at source 25539a6ac (R3), restored
+    slot 2 after borrowing slot 1, and exported all four MG PDF pages. This is
+    evidence for that view/run, not a general reliability claim. Preserve the
+    template and physical slot widths; restore before the existing rebuild,
+    ownership/layout checks and save. There is no retry or extra rebuild.
     """
     started = time.perf_counter()
     native_ms = 0.0
