@@ -533,22 +533,226 @@ def test_walked_entry_limit_and_nested_directory_refusal_are_fail_closed(
         receipt.limits()
 
 
-def test_deadlines_distinguish_work_stage_and_reserved_cleanup(tmp_path) -> None:
-    clock = [0.0]
-    receipt = probe.Receipt(tmp_path, clock=lambda: clock[0])
-    clock[0] = 100.0
-    receipt.deadline()
-    clock[0] = 100.001
+@pytest.mark.parametrize(
+    ("stage", "former_local_limit"),
+    [
+        (probe.Stage.CONSTRUCTION, 100.0),
+        (probe.Stage.FUNDAMENTAL, 50.0),
+        (probe.Stage.VISUAL, 130.0),
+        (probe.Stage.EXTENDED, 130.0),
+    ],
+)
+def test_normal_stage_can_spend_unused_shared_time(
+    tmp_path, stage, former_local_limit
+) -> None:
+    origin = 2048.0
+    clock = [origin]
+    subject = OfflineProbe(tmp_path, clock=lambda: clock[0])
+    clock[0] = origin + 7.0
+    subject.stage(stage)
+    row = subject.receipt.data["stages"][stage]
+    assert row["started_seconds"] == 7.0
+    assert subject.receipt.stage_started == origin + 7.0
+    clock[0] += former_local_limit + 1.0
+    subject.tick()
+    subject.stage_passed()
+    assert row["status"] is probe.Verdict.PASSED
+    assert row["seconds"] == former_local_limit + 1.0
+    assert subject.receipt.primary is None
+
+
+def test_stage_transitions_keep_total_normal_time_and_allow_exact_completion(
+    tmp_path,
+) -> None:
+    origin = 2048.0
+    clock = [origin]
+    subject = OfflineProbe(tmp_path, clock=lambda: clock[0])
+    clock[0] = origin + 3.0
+    with subject.stage_scope(probe.Stage.CONSTRUCTION):
+        clock[0] = origin + 200.0
+        subject.run_case(probe.Case.CONSTRUCTION, subject.tick)
+    with subject.stage_scope(probe.Stage.FUNDAMENTAL):
+        clock[0] = origin + 300.0
+        subject.tick()
+    with subject.stage_scope(probe.Stage.VISUAL):
+        clock[0] = origin + 410.0
+        subject.run_case(probe.Case.PERSISTENCE, subject.tick)
+    for stage, started, seconds in (
+        (probe.Stage.CONSTRUCTION, 3.0, 197.0),
+        (probe.Stage.FUNDAMENTAL, 200.0, 100.0),
+        (probe.Stage.VISUAL, 300.0, 110.0),
+    ):
+        row = subject.receipt.data["stages"][stage]
+        assert row["status"] is probe.Verdict.PASSED
+        assert row["started_seconds"] == started
+        assert row["seconds"] == seconds
+    assert (
+        subject.receipt.data["cases"][probe.Case.PERSISTENCE]["status"]
+        is probe.Verdict.PASSED
+    )
     with pytest.raises(probe.ProbeFailure) as caught:
-        receipt.deadline()
-    assert caught.value.verdict is probe.Verdict.DEADLINE
-    receipt.stage = probe.Stage.CLEANUP
-    receipt.stage_started = 410.0
-    clock[0] = 480.0
-    receipt.deadline(cleanup=True)
-    clock[0] = 480.001
-    with pytest.raises(probe.ProbeFailure):
-        receipt.deadline(cleanup=True)
+        with subject.stage_scope(probe.Stage.EXTENDED):
+            subject.tick()
+            clock[0] = math.nextafter(clock[0], math.inf)
+            subject.tick()
+    error = caught.value
+    elapsed = clock[0] - origin
+    stage_elapsed = clock[0] - (origin + 410.0)
+    assert error.verdict is probe.Verdict.DEADLINE
+    assert f"{probe.Stage.EXTENDED}/{probe.Case.PERSISTENCE}" in str(error)
+    assert "binding=normal_global;" in str(error)
+    assert f"global_elapsed={elapsed!r}s" in str(error)
+    assert "global_limit=410.0s" in str(error)
+    assert f"stage_elapsed={stage_elapsed!r}s" in str(error)
+    assert "cleanup_stage_limit" not in str(error)
+    failed = subject.receipt.data["stages"][probe.Stage.EXTENDED]
+    assert failed["status"] is probe.Verdict.DEADLINE
+    assert failed["started_seconds"] == 410.0
+    assert failed["seconds"] == stage_elapsed
+    assert failed["reason"] == str(error)
+    assert subject.receipt.started == origin
+
+
+@pytest.mark.parametrize(
+    ("started", "boundary", "binding"),
+    [
+        (300.0, 370.0, "cleanup_stage"),
+        (430.0, 480.0, "cleanup_global"),
+        (410.0, 480.0, "cleanup_global,cleanup_stage"),
+    ],
+)
+@pytest.mark.parametrize("overrun", [False, True])
+def test_cleanup_enforces_global_and_local_time_independently(
+    tmp_path, started, boundary, binding, overrun
+) -> None:
+    origin = 2048.0
+    clock = [origin]
+    samples = []
+
+    def now():
+        samples.append(clock[0])
+        return clock[0]
+
+    subject = OfflineProbe(tmp_path, clock=now)
+    subject.mode = probe.RunMode.CLEANUP
+    clock[0] = origin + started
+
+    def finish_cleanup():
+        clock[0] = origin + boundary
+        if overrun:
+            clock[0] = math.nextafter(clock[0], math.inf)
+        before = len(samples)
+        try:
+            subject.receipt.deadline(cleanup=True)
+        finally:
+            assert len(samples) == before + 1
+        subject.cleanup()
+
+    expected = pytest.raises(probe.ProbeFailure) if overrun else nullcontext()
+    with expected as caught:
+        with subject.stage_scope(probe.Stage.CLEANUP):
+            subject.run_case(probe.Case.CLEANUP, finish_cleanup)
+    elapsed = clock[0] - origin
+    stage_elapsed = clock[0] - (origin + started)
+    row = subject.receipt.data["stages"][probe.Stage.CLEANUP]
+    assert row["started_seconds"] == started
+    assert row["seconds"] == stage_elapsed
+    if overrun:
+        error = caught.value
+        assert error.verdict is probe.Verdict.DEADLINE
+        assert f"{probe.Stage.CLEANUP}/{probe.Case.CLEANUP}" in str(error)
+        assert f"binding={binding};" in str(error)
+        assert f"global_elapsed={elapsed!r}s" in str(error)
+        assert "global_limit=480.0s" in str(error)
+        assert f"stage_elapsed={stage_elapsed!r}s" in str(error)
+        assert "cleanup_stage_limit=70.0s" in str(error)
+        assert row["status"] is probe.Verdict.DEADLINE
+        assert row["reason"] == str(error)
+        assert subject.receipt.primary is error
+        assert (
+            subject.receipt.data["cases"][probe.Case.CLEANUP]["status"]
+            is probe.Verdict.DEADLINE
+        )
+    else:
+        assert row["status"] is probe.Verdict.PASSED
+        assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+        assert subject.receipt.counts[probe.SnapshotKind.SOURCE] == 1
+        assert subject.receipt.primary is None
+        assert not subject.app.models and not subject.acquisitions
+
+
+@pytest.mark.parametrize("restore_error", [False, True])
+@pytest.mark.parametrize("restored_elapsed", [410.125, 480.125])
+def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
+    tmp_path, monkeypatch, restore_error, restored_elapsed
+) -> None:
+    origin = 2048.0
+    clock = [origin]
+    fixture = sheet_inventory.__wrapped__(tmp_path, monkeypatch, clock=lambda: clock[0])
+    fixture = sheet_scale_construction.__wrapped__(fixture, monkeypatch)
+    fixture = sheet_mode_contract.__wrapped__(fixture, monkeypatch)
+    subject = fixture.subject
+    subject.create_drawing()
+    original = prepare_sheet_mode_export(fixture)
+    secondary = OSError("inert late selection restoration")
+    if restore_error:
+        fixture.controls.resume_error = secondary
+    manager = fixture.drawing.SelectionManager
+    resume = manager.ResumeSelectionList2
+
+    def late_resume(append):
+        clock[0] = origin + restored_elapsed
+        return resume(append)
+
+    monkeypatch.setattr(manager, "ResumeSelectionList2", late_resume)
+    fixture.mode_events.clear()
+
+    def expire_inside_guard():
+        with subject.selection_guard():
+            clock[0] = origin + 410.125
+            subject.tick()
+
+    primary = capture_and_cleanup_failure(subject, expire_inside_guard)
+    assert primary.verdict is probe.Verdict.DEADLINE
+    assert "binding=normal_global;" in str(primary)
+    assert f"{probe.Stage.CONSTRUCTION}/{probe.Case.CONSTRUCTION}" in str(primary)
+    assert fixture.drawing.current is original["sheet"]
+    assert fixture.drawing.ActiveDrawingView is None
+    assert not manager.suspended
+    assert manager.selected[0][2] == 16
+    assert ("ResumeSelectionList2",) in fixture.mode_events
+    restoration = subject.receipt.data["cases"][probe.Case.CONSTRUCTION]["operations"]
+    (restoration,) = [row for row in restoration if row["bucket"] == "restore"]
+    assert restoration["status"] is (
+        probe.Verdict.RESTORATION if restore_error else probe.Verdict.PASSED
+    )
+    assert any(
+        row["label"] == "selection-guard-restored"
+        for row in subject.receipt.data["observations"]
+    )
+    secondary_errors = subject.receipt.data["secondary_errors"]
+    assert any(row["message"] == str(secondary) for row in secondary_errors) is (
+        restore_error
+    )
+    cleanup = subject.receipt.data["cleanup"]
+    if restored_elapsed > 480.0:
+        assert cleanup["status"] is probe.Verdict.RESTORATION
+        assert set(cleanup["remaining_owned"]) == {
+            probe.Document.DRAWING,
+            probe.Document.R,
+        }
+        assert not subject.app.close_calls
+        assert any(
+            "binding=cleanup_global;" in row["message"] for row in secondary_errors
+        )
+    else:
+        assert cleanup["status"] is probe.Verdict.PASSED
+        assert not subject.acquisitions and not subject.app.models
+        assert subject.app.closed == [fixture.drawing, fixture.source]
+        assert subject.receipt.counts[probe.SnapshotKind.SOURCE] == 1
+    assert subject.receipt.primary is primary
+    assert subject.mode is probe.RunMode.CLEANUP
+    assert subject.receipt.data["handoff_allowed"] is False
 
 
 def test_failure_classification_does_not_rename_native_error_objects() -> None:
@@ -835,12 +1039,16 @@ class OfflineApplication:
 class OfflineProbe(probe.NativeProbe):
     """Run production orchestration with explicit offline COM/telemetry ports."""
 
-    def __init__(self, root):
+    def __init__(self, root, *, clock=None):
         # Deliberately do not invoke NativeProbe.__init__ or import its SDK.
         reports = root / "reports"
         reports.mkdir()
         self.root = root
-        self.receipt = probe.Receipt(reports)
+        self.receipt = (
+            probe.Receipt(reports)
+            if clock is None
+            else probe.Receipt(reports, clock=clock)
+        )
         self.adapter = SimpleNamespace(currentModel=None)
         self.app = OfflineApplication(root)
         self.telemetry = SimpleNamespace(span=lambda *args, **kwargs: nullcontext())
@@ -880,9 +1088,9 @@ class OfflineProbe(probe.NativeProbe):
 
 
 @pytest.fixture
-def sheet_inventory(tmp_path, monkeypatch):
+def sheet_inventory(tmp_path, monkeypatch, *, clock=None):
     """Complete views() inventory through explicit inert native boundary ports."""
-    subject = OfflineProbe(tmp_path)
+    subject = OfflineProbe(tmp_path, clock=clock)
     source = OfflineModel("R", 2, tmp_path / "R.sldasm")
     sheets = {
         key: SimpleNamespace(GetName=lambda key=key: str(key)) for key in probe.ViewId

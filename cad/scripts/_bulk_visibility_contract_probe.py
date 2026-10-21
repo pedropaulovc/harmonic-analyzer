@@ -241,13 +241,9 @@ MARKED_CASES = frozenset(
         Case.BETWEEN_DISABLED,
     )
 )
-STAGE_LIMITS = {
-    Stage.CONSTRUCTION: 100.0,
-    Stage.FUNDAMENTAL: 50.0,
-    Stage.VISUAL: 130.0,
-    Stage.EXTENDED: 130.0,
-    Stage.CLEANUP: 70.0,
-}
+OVERALL_BUDGET_SECONDS = 480.0
+CLEANUP_BUDGET_SECONDS = 70.0
+NORMAL_BUDGET_SECONDS = OVERALL_BUDGET_SECONDS - CLEANUP_BUDGET_SECONDS
 PAGE_SIZE = (5100, 3300)
 DPI = 300
 MAX_IMAGE_BYTES = 256 * 1024 * 1024
@@ -646,9 +642,9 @@ class Receipt:
             "primary_error": None,
             "secondary_errors": [],
             "bounds": {
-                "seconds": 480,
-                "cleanup_reserve_seconds": 70,
-                "stage_seconds": STAGE_LIMITS,
+                "seconds": OVERALL_BUDGET_SECONDS,
+                "cleanup_reserve_seconds": CLEANUP_BUDGET_SECONDS,
+                "normal_seconds": NORMAL_BUDGET_SECONDS,
                 "F": 192,
                 "S": 16,
                 "case_slots": 32,
@@ -667,13 +663,27 @@ class Receipt:
         self.checkpoint()
 
     def deadline(self, *, cleanup: bool = False) -> None:
-        elapsed = self.clock() - self.started
-        limit = 480.0 if cleanup else 410.0
-        require(
-            elapsed <= limit
-            and self.clock() - self.stage_started <= STAGE_LIMITS[self.stage],
+        now = self.clock()
+        elapsed = now - self.started
+        stage_elapsed = now - self.stage_started
+        limit = OVERALL_BUDGET_SECONDS if cleanup else NORMAL_BUDGET_SECONDS
+        global_allowed = elapsed <= limit
+        cleanup_allowed = not cleanup or stage_elapsed <= CLEANUP_BUDGET_SECONDS
+        if global_allowed and cleanup_allowed:
+            return
+        binding = ""
+        if not global_allowed:
+            binding = "cleanup_global" if cleanup else "normal_global"
+        if not cleanup_allowed:
+            binding += ("," if binding else "") + "cleanup_stage"
+        cleanup_limit = (
+            f"; cleanup_stage_limit={CLEANUP_BUDGET_SECONDS!r}s" if cleanup else ""
+        )
+        raise ProbeFailure(
             Verdict.DEADLINE,
-            f"deadline before {self.stage}/{self.case}: {elapsed:.3f}s",
+            f"deadline before {self.stage}/{self.case}: binding={binding}; "
+            f"global_elapsed={elapsed!r}s; global_limit={limit!r}s; "
+            f"stage_elapsed={stage_elapsed!r}s{cleanup_limit}",
         )
 
     def path(self, name: str) -> Path:
@@ -3931,7 +3941,7 @@ class NativeProbe:
                     self.receipt.failure(report_error, secondary=True)
 
     def stage(self, stage: Stage) -> None:
-        self.receipt.stage, self.receipt.stage_started = stage, time.monotonic()
+        self.receipt.stage, self.receipt.stage_started = stage, self.receipt.clock()
         self.receipt.data["stages"][stage] = {
             "status": Verdict.RUNNING,
             "started_seconds": self.receipt.stage_started - self.receipt.started,
@@ -3943,7 +3953,7 @@ class NativeProbe:
         row = self.receipt.data["stages"][self.receipt.stage]
         row["status"], row["seconds"] = (
             Verdict.PASSED,
-            time.monotonic() - self.receipt.stage_started,
+            self.receipt.clock() - self.receipt.stage_started,
         )
         self.receipt.checkpoint()
 
@@ -3958,7 +3968,7 @@ class NativeProbe:
             self.receipt.data["stages"][stage].update(
                 status=failure_verdict(error),
                 reason=str(error),
-                seconds=time.monotonic() - self.receipt.stage_started,
+                seconds=self.receipt.clock() - self.receipt.stage_started,
             )
             raise
 

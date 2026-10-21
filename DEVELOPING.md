@@ -1691,7 +1691,23 @@ drawing, not the disposed construction receiver. Mode receipts do not change
 context equality or add rebuilds, exports or FULL/SOURCE snapshots. Whole C00
 retains F2/S12; the readiness/mode slice adds no SOURCE observations.
 
-The actual-function inert smoke and 477 focused tests pass. Its replacement
+At `aa50824dc`, native mode readback changed from sheet-format to sheet mode,
+and both views passed their insertion preconditions. C00–C03 and cleanup passed.
+C04 was refused before its candidate: C01–C03 had consumed 51.19 seconds against
+the unvalidated 50-second fundamental-stage allocation. No export ran, so the
+earlier missing target ink remains unresolved. Original source/token identities
+and empty-document cleanup were preserved.
+
+Normal stages now share the existing 410-second allowance from receipt creation,
+rather than each having an independent estimated ceiling. The overall
+480-second envelope and cleanup's own 70-second limit remain unchanged; cleanup
+must satisfy both limits. Stage transitions do not replenish time, and stage
+timing uses the receipt's monotonic clock consistently. All setup, observations,
+reporting and restoration time still counts. These cooperative bounds cannot
+interrupt a synchronous COM call. The full workload may still exceed 410 seconds;
+that remains a failed experiment, not permission to retry or drop controls.
+
+The actual-function inert smoke and 491 focused tests pass. Its replacement
 receiver has an explicit stable-title fixture policy, not proof of native saved
 drawing title behavior; a title-drift negative preserves the ownership refusal.
 All 29 native controls, setter effects/restoration, normal drawing and the
