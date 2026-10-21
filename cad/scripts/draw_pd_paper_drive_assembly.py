@@ -2574,9 +2574,6 @@ def _place_bom_sheet(
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
     # on sheet 2 cannot alter this reference or the logical parts list.
-    # Temporary Native2564 pristine raw-p control: stops before formatting/save.
-    from _pd_bom_visibility_probe import probe_visibility_domain
-
     table = insert_bom_table(
         adapter,
         reference,
@@ -2588,17 +2585,6 @@ def _place_bom_sheet(
         configuration_grouping="same-name",
         configuration=BOM_CONFIGURATION,
         label="paper-drive",
-        _visibility_probe=lambda actual_table, native_column: (
-            probe_visibility_domain(
-                actual_table,
-                native_column,
-                reference=reference,
-                configuration=BOM_CONFIGURATION,
-                component_identities=BOM_COMPONENT_IDENTITIES,
-                counts=counts,
-                part_numbers=BOM_PART_NUMBERS,
-            )
-        ),
     )
     bom_configuration = BOM_CONFIGURATION
     items = dict(
