@@ -1701,6 +1701,8 @@ the existing write **attempt**, not persisted-scale readback. The SDK's existing
 false-result error, not an original COM exception already swallowed by `_attempt`.
 The dependency-free SDK context factory is installed when the drawing module is
 already loaded; aliases imported before build startup still use it.
+Span names include source, orientation and available float-coordinate placement
+hints; `phase_kind` supports aggregation without treating those hints as sheet IDs.
 
 Finalization separates setup, grouped sheet-property checks, requested note
 cleanup, display updates, optional settled checks, precision readback and close
