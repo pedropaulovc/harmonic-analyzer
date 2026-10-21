@@ -1,6 +1,7 @@
 """Purchased dimensions only for the captured-pivot cartridge (millimetres).
 
-Primary pages read 2026-10-20; evidence: C:/temp/pivot-retention/hardware-sources.md.
+Primary pages read 2026-10-20; evidence: the *_SOURCE_URL constants below
+(see cad/references/mcmaster/README.md, "Non-McMaster captured-pivot hardware").
 No cartridge dimensions/imports belong here: the cartridge imports this provider.
 Catalogue geometry is representative, not vendor-CAD replication or a load rating.
 """

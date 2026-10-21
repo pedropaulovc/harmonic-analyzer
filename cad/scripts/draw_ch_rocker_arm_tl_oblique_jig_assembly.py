@@ -25,8 +25,8 @@ joint acceptance and wiring (C1-C3C). Sheet 9 carries the pre-bearing underside
 inspection (C2A) and qualifies the actual top capture fit (C4-C5D), with a signed
 functional inspection schematic, not a manufacturing view or dimension. These
 three instruction sheets retain a small, visible collapsed reference isometric
-at 1:20 below the right-column text: their native model views supply the live
-``$PRPSHEET`` title-block links, just as the other seven sheets' views do.
+at the largest measured fit from 1:20, 1:25 and 1:30 below the right-column text:
+their native model views supply the live ``$PRPSHEET`` title-block links.
 Sheet 10 carries operation/service (C6-C7) and machine acceptance, with the
 finished isometric below the right-column checks at 1:15. Every view is one the
 builder named in the machine frame (``spec.VIEW_AXES``), its mapping proven on
@@ -230,12 +230,17 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
-# finished isometric on the capture sheet, 1:20 for the instruction sheets'
+# finished isometric on the capture sheet, at most 1:20 for the instruction
 # references, and 1:6 for the BOM's collapsed reference right of the table.
 ASSEMBLED_SCALE = (1.0, 4.0)
 REFERENCE_SCALE = (1.0, 6.0)
 ISOMETRIC_SCALE = (1.0, 15.0)
 NOTES_REFERENCE_SCALE = (1.0, 20.0)
+NOTES_REFERENCE_SCALE_LADDER = (
+    NOTES_REFERENCE_SCALE,
+    (1.0, 25.0),
+    (1.0, 30.0),
+)
 # The exploded clusters' scales, largest first. Every one is at most 1:2, so
 # every rung references the simplified configuration (the view policy) and
 # re-scaling a cluster never switches its configuration or its explode.
@@ -1814,9 +1819,10 @@ def _place_reference_view(
     sheet_name: str = BOM_SHEET,
     region: tuple[float, float, float, float] = REFERENCE_REGION,
     scale: tuple[float, float] = REFERENCE_SCALE,
+    smaller_scales: tuple[tuple[float, float], ...] = (),
     label: str = "jig reference",
 ) -> Any:
-    """A visible collapsed source-assembly view, on the BOM or a notesheet."""
+    """A visible collapsed source view, fitted from rebuilt native outlines."""
     _activate_sheet(adapter, sheet_name)
     center = _region_center(region)
     view = _place_named_view(
@@ -1827,14 +1833,23 @@ def _place_reference_view(
     set_view_exploded_state(
         adapter, view, False, configuration=configuration, label=label
     )
+    # Native outline padding need not shrink with model geometry. Measure each
+    # permitted scale rather than assuming the first outline scales in proportion.
+    for candidate in (scale, *smaller_scales):
+        if candidate != scale:
+            _set_view_scale(adapter, view, candidate, label=label)
+            scale = candidate
+        x0, y0, x1, y1 = _view_outline(view, label=label)
+        if x1 - x0 <= region[2] - region[0] and y1 - y0 <= region[3] - region[1]:
+            break
     _center_view_outline(adapter, view, center, label=label)
     _assert_view_on_sheet(view, bounds=region, label=label)
     return view
 
 
-def _place_notes_reference_views(adapter: Any) -> None:
-    """Keep every instruction sheet's title block linked to the live assembly."""
-    caption = f"REFERENCE {_scale_text(NOTES_REFERENCE_SCALE)}"
+def _place_notes_reference_views(adapter: Any) -> dict[str, tuple[float, float]]:
+    """Keep each instruction sheet linked to the live assembly at its fitted scale."""
+    scales = {}
     for sheet_name, region in NOTES_REFERENCE_REGIONS.items():
         label = f"jig {sheet_name.lower()} reference"
         view = _place_reference_view(
@@ -1842,8 +1857,12 @@ def _place_notes_reference_views(adapter: Any) -> None:
             sheet_name=sheet_name,
             region=region,
             scale=NOTES_REFERENCE_SCALE,
+            smaller_scales=NOTES_REFERENCE_SCALE_LADDER[1:],
             label=label,
         )
+        scale = tuple(float(value) for value in _early_bound(view, "IView").ScaleRatio)
+        scales[sheet_name] = scale
+        caption = f"REFERENCE {_scale_text(scale)}"
         x0, y0, x1, _y1 = _view_outline(view, label=label)
         _add_note_block(
             adapter,
@@ -1852,6 +1871,7 @@ def _place_notes_reference_views(adapter: Any) -> None:
             ((x0 + x1 - len(caption) * NOTE_CHAR_M) / 2.0, y0 - VIEW_LABEL_GAP),
             label=f"{label} caption",
         )
+    return scales
 
 
 def _place_pin_tip_inspection(adapter: Any) -> None:
@@ -2268,7 +2288,7 @@ def _place_package(
     cl_tip_settled = _place_assembled_sheet(adapter)
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
-    _place_notes_reference_views(adapter)
+    notes_scales = _place_notes_reference_views(adapter)
     placed = [(cluster, *_place_cluster_view(adapter, cluster)) for cluster in CLUSTERS]
     _activate_sheet(adapter, BOM_SHEET)
     table = insert_bom_table(
@@ -2314,6 +2334,7 @@ def _place_package(
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )
+    scales.update(notes_scales)
 
     def bom_settled() -> None:
         retained = validate_bom_number_property(

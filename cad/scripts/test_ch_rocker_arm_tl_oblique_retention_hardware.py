@@ -29,7 +29,7 @@ PARTS = (
 def test_purchased_identity_quantity_and_native_recipe(suffix, number, quantity, sku):
     module = PREFIX + suffix
     stem = module.replace("_", "-")
-    row = yaml.safe_load((SCRIPTS.parent / "config" / "parts" / f"{stem}.yaml").read_text())[stem]
+    row = yaml.safe_load((SCRIPTS.parent / "config" / "parts" / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
     spec = importlib.import_module(module + "_spec")
     assert row["number"] == f"MHA-CH-06-TL-VN-{number}"
     assert row["supplier_skus"] == [sku]
@@ -86,7 +86,7 @@ def test_head_bearing_uses_nas_edge_break_and_asme_runout_not_whole_head_od():
 def test_cap_screw_purchasing_matches_live_cbs_identity_not_material_surrogate():
     from _fastener_catalog import fastener
     stem = (PREFIX + "cap_screw").replace("_", "-")
-    row = yaml.safe_load((SCRIPTS.parent / "config" / "parts" / f"{stem}.yaml").read_text())[stem]
+    row = yaml.safe_load((SCRIPTS.parent / "config" / "parts" / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
     assert hardware.SCREW_SUPPLIER_SKU == screw.SKU == "NAS1352N5H12"
     assert row["supplier"] == fastener(stem).supplier == hardware.SCREW_SUPPLIER == "CBS Fasteners"
     assert hardware.SCREW_SOURCE_URL == "https://cbsfasteners.com/nas-fastener-inventory/"
@@ -116,7 +116,7 @@ def test_stock_drills_publish_six_radial_openings_at_actual_hole_height():
 
 
 def test_native_stock_authors_consume_certified_drill_and_wire_paths():
-    recipe = ast.parse((SCRIPTS / "diagnostics" / "diag_build_NAS1352N5H12.py").read_text())
+    recipe = ast.parse((SCRIPTS / "diagnostics" / "diag_build_NAS1352N5H12.py").read_text(encoding="utf-8"))
     build = next(node for node in recipe.body
                  if isinstance(node, ast.AsyncFunctionDef) and node.name == "build_NAS1352N5H12")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
@@ -133,7 +133,7 @@ def test_native_stock_authors_consume_certified_drill_and_wire_paths():
     assert isinstance(cut.args[2], ast.Name) and cut.args[2].id == "SCREW_WIRE_HOLE_DIA"
     assert any(item.arg == "cut" and isinstance(item.value, ast.Constant)
                and item.value.value is True for item in cut.keywords)
-    author = ast.parse((SCRIPTS / "diagnostics" / "diag_build_05_02685.py").read_text())
+    author = ast.parse((SCRIPTS / "diagnostics" / "diag_build_05_02685.py").read_text(encoding="utf-8"))
     sweep = next(node for node in ast.walk(author) if isinstance(node, ast.Call)
                  and isinstance(node.func, ast.Name) and node.func.id == "circular_sweep")
     assert isinstance(sweep.args[1], ast.Call)
@@ -395,7 +395,7 @@ def test_strand_clearance_rejects_old_bridge_and_collapsed_twist(monkeypatch, na
 
 
 def test_hardware_provider_does_not_import_its_cartridge_consumer():
-    tree = ast.parse(Path(hardware.__file__).read_text())
+    tree = ast.parse(Path(hardware.__file__).read_text(encoding="utf-8"))
     modules = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
     assert "ch_rocker_arm_tl_oblique_retention_spec" not in modules
     assert all(not module.startswith("build_") for module in modules if module)

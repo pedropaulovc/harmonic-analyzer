@@ -116,6 +116,20 @@ seat cases and requires full 4 mm padding for each.
 Text, wrapping, font, scales, geometry and native guards stay unchanged.
 Fresh exact-head native audit and printed-sheet acceptance remain necessary:
 these translations do not certify the Y260.5 output.
+### TL-00 instruction-sheet source references
+
+The oblique-jig assembly's `ASSEMBLY STEPS` reference at source `a0ba383f2b70`
+measured 45.422 mm high at 1:20 in a 42.250 mm reserved region. A projected
+model box is not the native view outline, and native outline padding need not
+shrink in proportion to the view scale.
+
+Keep the instruction text, caption reservation and title-block clearance.
+Try only the reference's bounded 1:20, 1:25 and 1:30 scale ladder, rebuilding
+and measuring both native outline dimensions at every rung. Centre the actual
+outline and retain the strict final region/title-block check; exhausting the
+ladder still refuses the drawing. The reference caption and finalizer's
+per-sheet scale both report the measured-fit scale. The visible collapsed
+model view remains the live source of the instruction sheet's properties.
 ### TL-22 pivot-block callout lanes
 
 The native drawing at `6dd691486` refused three enforced findings. On
