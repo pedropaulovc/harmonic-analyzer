@@ -7,9 +7,9 @@ symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; none is
 restated here.
 
 The near-face setting remains a controlled native model dimension. Its
-attached callout identifies the clamped setting without a graduation/REF
-qualifier: STOP_MARK still locates the assembly, not a second acceptance
-criterion on the print.
+attached callout names the stick-mark/thumbscrew-axis alignment it establishes,
+without a REF qualifier on that controlled setting. STOP_MARK still owns the
+nominal alignment; the callout does not add a second acceptance criterion.
 """
 
 from __future__ import annotations
@@ -75,7 +75,8 @@ ASSEMBLY_STEPS = (
     "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
+    f"5. SET {SETTING_CRITERION} TO INDEX THE {spec.STICK.upper()} SETUP MARK "
+    "ON THE THUMBSCREW AXIS; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
     "ITS TIP CLAMPS THE PLAIN FACE; THUMBSCREW ABOVE THE STICK.",
 )
 ASSEMBLY_CHECKS = (
@@ -90,9 +91,9 @@ CLAMPED_SETUP_NOTE = (
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# Label the controlled native setting, not the reference graduation: a REF
-# qualifier on this callout could be read as waiving the assembly setting band.
-STOP_POSITION_CALLOUT = "CLAMPED SETTING"
+# Name the source-owned index relationship without a REF qualifier that could
+# be read as waiving the controlled near-face setting's acceptance band.
+STOP_POSITION_CALLOUT = f"{spec.STICK.upper()} SETUP MARK\nON THUMBSCREW AXIS"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)
