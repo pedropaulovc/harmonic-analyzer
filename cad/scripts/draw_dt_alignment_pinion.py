@@ -43,7 +43,6 @@ from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _simplified_names import simplified_name
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_alignment_pinion_spec import (
@@ -243,16 +242,13 @@ def _prefix_diameter_symbol(adapter: Any, annotations: list[Any], name: str) -> 
         raise RuntimeError(f"{name}: diameter prefix did not persist ({applied!r})")
 
 
-def _show_side_view_simplified(adapter: Any, view: Any) -> None:
-    """Draw the side view by the simplified gear convention: the OD outline.
+def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
+    """Keep the actual teeth in the manufacturing profile.
 
-    Every tooth edge along the 143 mm drum printed as a dense block of lines
-    (machinist review r5 of 6d23cf234, minor).  The part's derived
-    ``Default Simplified`` configuration suppresses only the tooth cut and
-    pattern (``_simplified_part``), so the side view shows the blank at the tip
-    diameter; the end view and the isometric keep every tooth.
+    Owner review of the v43-to-rolling drawing diff requested full tooth detail
+    back. The blank-only simplified configuration must not stand in for it.
     """
-    configuration = simplified_name("Default")
+    configuration = "Default"
     bound = _early_bound(view, "IView")
     bound.ReferencedConfiguration = configuration
     rebuild_drawing(adapter, label="side view configuration")
@@ -320,7 +316,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE
     )
-    _show_side_view_simplified(adapter, right)
+    _show_full_tooth_profile(adapter, right)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _verify_title_material_specification(drawing_model, material_binding)

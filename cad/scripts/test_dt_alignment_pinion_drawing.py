@@ -25,6 +25,27 @@ def test_isometric_scale_matches_the_saved_caption() -> None:
     )
 
 
+def test_profile_restores_full_teeth_before_rebuild(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    import draw_dt_alignment_pinion as drawing
+
+    view = SimpleNamespace(ReferencedConfiguration="Default Simplified")
+    rebuilt = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        drawing,
+        "rebuild_drawing",
+        lambda _adapter, *, label: rebuilt.append(view.ReferencedConfiguration),
+    )
+
+    drawing._show_full_tooth_profile(object(), view)
+
+    assert view.ReferencedConfiguration == "Default"
+    assert rebuilt == ["Default"]
+
 
 def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
     data = spec.GEAR_DATA
