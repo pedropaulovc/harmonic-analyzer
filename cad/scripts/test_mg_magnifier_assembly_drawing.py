@@ -789,16 +789,33 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
         assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
-    steps_bottom = drawing.STEPS_XY[1] - len(
-        drawing.ASSEMBLY_STEPS.splitlines()
-    ) * drawing.NOTE_LINE_PITCH
     checks_bottom = drawing.CHECKS_XY[1] - len(
         drawing.ASSEMBLY_CHECKS.splitlines()
     ) * drawing.NOTE_LINE_PITCH
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    # Measured 0fb89 and 86bc envelopes/ink, translated from their insertions.
+    # Preserve 4 mm native padding on every known seat, not just PDF air.
+    for (
+        steps_y, checks_y, steps_bottom, steps_top, checks_bottom, checks_top,
+        steps_ink_bottom, checks_ink_top,
+    ) in (
+        (0.258, 0.0844, 0.0953983, 0.2584113, 0.0618495, 0.0846455,
+         0.0960089, 0.0843736),
+        (0.2595, 0.0926, 0.0968088, 0.2597953, 0.0701210, 0.0929963,
+         0.0975090, 0.0925736),
+    ):
+        steps_dy = drawing.STEPS_XY[1] - steps_y
+        checks_dy = drawing.CHECKS_XY[1] - checks_y
+        assert steps_bottom + steps_dy - (checks_top + checks_dy) >= drawing._PAD
+        assert steps_top + steps_dy <= drawing.INNER_BORDER[3] - drawing._PAD
+        assert checks_bottom + checks_dy >= drawing.TITLE_BLOCK[3] + drawing._PAD
+        # Matched PDF ink sets separation, rather than nominal font size.
+        assert (
+            steps_ink_bottom + steps_dy - (checks_ink_top + checks_dy)
+            >= min(0.0038733, 0.0038734)
+        )
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
