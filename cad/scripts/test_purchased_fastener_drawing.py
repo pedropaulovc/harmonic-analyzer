@@ -5489,7 +5489,11 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     monkeypatch.setattr(screws, "_binding", lambda _adapter, view: view.binding)
     monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(screws, "iter_views", lambda adapter: adapter.views)
-    source_sketch = object()
+    attachment_sketch_wrapper = object()
+    source_sketch = SimpleNamespace(
+        GetSketchPoints2=lambda: source_points,
+        GetSketchSegments=lambda: (),
+    )
     raw_source_display = object()
     source_display = SimpleNamespace(GetDimension2=lambda _index: case.native)
     source_feature = SimpleNamespace(
@@ -5500,16 +5504,21 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         GetNextDisplayDimension=lambda _display: None,
     )
 
+    bind = screws._bind
+
     def bind_source_display(raw, interface):
-        assert raw is raw_source_display
-        assert interface == "IDisplayDimension"
-        return source_display
+        if raw is raw_source_display:
+            assert interface == "IDisplayDimension"
+            return source_display
+        return bind(raw, interface)
 
     monkeypatch.setattr(screws, "_bind", bind_source_display)
-    case.annotation.entities = (
-        SimpleNamespace(GetSketch=lambda: source_sketch),
-        SimpleNamespace(GetSketch=lambda: source_sketch),
+    # Sketch wrapper equality is not the source-entity membership proof.
+    source_points = (
+        SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
+        SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
     )
+    case.annotation.entities = source_points
     model = SimpleNamespace(
         Parameter=lambda _name: case.native,
         FeatureByName=lambda _name: source_feature,
@@ -5553,7 +5562,11 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
     elif drift == "attachment-owner":
-        case.annotation.entities[0].GetSketch = lambda: object()
+        # A different native point cannot borrow the same claimed sketch owner.
+        case.annotation.entities = (
+            SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
+            source_points[1],
+        )
     elif drift == "configuration":
         case.view.binding = (case.view.name, "stock.SLDPRT", "Other")
     else:

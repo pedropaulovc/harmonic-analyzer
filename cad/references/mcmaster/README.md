@@ -1516,6 +1516,19 @@ never automatic configuration-comment folders. Body-Delete ownership retains
 both known names until rename readback succeeds, so a committed rename followed
 by a transient read failure still permits original-member restoration.
 
+Supplier source ownership is proved through native source membership, not
+equality of COM feature or sketch wrappers. The displayed `IDimension` must
+compare `IsSame == 1` both with the referenced model's named `Parameter` and
+with a dimension enumerated from the intended source feature. Every non-null
+attached point or segment must have a non-null `GetSketch()` and compare `IsSame == 1`
+with an actual same-kind member of the named source sketch's
+`GetSketchPoints2()` or `GetSketchSegments()` inventory. Empty, unreadable or
+nonmatching inventories refuse the drawing; matching names, coordinates,
+local IDs, persistent IDs or wrapper identity cannot replace this proof.
+Source path/configuration, annotation ownership/type/count, final value,
+dangling/override, inventory and layout guards remain in force. Source-only
+regressions do not by themselves qualify this COM behavior on a native seat.
+
 For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
 `cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,
 `cad/out/pdf/sm-vn-knife-mount-dowel.pdf` and

@@ -223,18 +223,78 @@ def _assert_source(
             allow_nan=False,
         )
     )
-    source_sketch = _early_bound(source_feature, "IFeature").GetSpecificFeature2()
+    raw_sketch = _early_bound(source_feature, "IFeature").GetSpecificFeature2()
+    source_sketch = _early_bound(_bind(raw_sketch, "ISketch"), "ISketch")
     entities = tuple(annotation.GetAttachedEntities3() or ())
     types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
     if source_sketch is None or not entities or len(entities) != len(types):
         raise RuntimeError(f"{name}: supplier reference lost its source sketch attachments")
-    for entity, kind in zip(entities, types, strict=True):
-        if entity is None or kind not in (10, 11):  # swSelSKETCHSEGS / swSelSKETCHPOINTS
-            raise RuntimeError(f"{name}: nominal supplier reference is not sketch-attached")
-        interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
-        sketch = _early_bound(entity, interface).GetSketch()
-        if sketch is None or int(adapter.swApp.IsSame(sketch, source_sketch)) != 1:
-            raise RuntimeError(f"{name}: nominal supplier attachment changed source sketch")
+    source_entities: dict[int, tuple[Any, ...]] = {}
+    attachment_proofs: list[dict[str, Any]] = []
+    try:
+        for index, (entity, kind) in enumerate(zip(entities, types, strict=True)):
+            proof: dict[str, Any] = {"index": index, "kind": kind}
+            attachment_proofs.append(proof)
+            if entity is None or kind not in (10, 11):
+                raise RuntimeError(
+                    f"{name}: nominal supplier reference is not sketch-attached"
+                )
+            interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
+            entity = _early_bound(_bind(entity, interface), interface)
+            sketch = entity.GetSketch()
+            proof["sketch_present"] = sketch is not None
+            proof["sketch_is_same"] = (
+                None
+                if sketch is None
+                else int(adapter.swApp.IsSame(sketch, source_sketch))
+            )
+            if kind not in source_entities:
+                raw_members = (
+                    source_sketch.GetSketchSegments()
+                    if kind == 10
+                    else source_sketch.GetSketchPoints2()
+                )
+                source_entities[kind] = tuple(
+                    _early_bound(_bind(member, interface), interface)
+                    for member in (raw_members or ())
+                )
+            comparisons = [
+                int(adapter.swApp.IsSame(entity, member))
+                for member in source_entities[kind]
+            ]
+            proof["source_entity_is_same"] = comparisons
+            if sketch is None or 1 not in comparisons:
+                raise RuntimeError(
+                    f"{name}: nominal supplier attachment changed source sketch"
+                )
+    except Exception as exc:
+        context = _source_owner_context(
+            adapter,
+            view,
+            model,
+            native,
+            source_dimension,
+            source_feature,
+            feature_owner,
+            dimension_same,
+            feature_same,
+            feature_dimensions,
+            feature_dimensions_error,
+        )
+        context["attachment_proofs"] = attachment_proofs
+        context["attachment_error"] = {
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
+        _telemetry.info(
+            f"supplier_source_attachment_failure {name}@{feature}: "
+            + json.dumps(context, sort_keys=True, allow_nan=False)
+        )
+        raise
+    _telemetry.info(
+        f"supplier_source_attachment_proof {name}@{feature}: "
+        + json.dumps(attachment_proofs, sort_keys=True, allow_nan=False)
+    )
 
 
 @_telemetry.traced("drawing.supplier_screw_settled_check")
