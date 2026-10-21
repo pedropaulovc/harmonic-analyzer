@@ -1827,6 +1827,26 @@ from historical logs; behavioral regressions alone disable synthetic sleeps.
 Its CLI exits 0 only when the real report has no failures, and nonzero when any
 gate fails, even though it still prints the complete span histogram.
 
+Successful balloon attachment readbacks emit
+`drawing.balloon_attachment_verified` as an event on the active span and as a
+structured DEBUG log with the same message. Fields are `stem`, `drawing_label`
+(not the farm leaf's `label`), `expected_instance` and `actual_instance` (full
+component instance paths, preserving the readback's spelling), `entity_count`
+and `entity_kinds`. The existing telemetry serializer represents `entity_kinds`
+as a Python tuple string, for example `"(1,)"` for an edge. Each receipt reuses
+the strict verifier's already-read attachment entities, kinds and owners: exactly
+one edge whose owner matches the expected full path case-insensitively. It adds
+no native calls and emits no successful receipt when that guard fails.
+
+Placement and settled landing checks can emit repeated receipts for a component.
+The DEBUG copy in `logs.jsonl`/OTLP avoids the span-event retention cap (128 by
+default, possibly configured lower), so a busy drawing's later events do not
+evict its only owner evidence. Warning-level consoles omit these DEBUG records.
+Export, sampling, retention and attribute limits still apply; absence of a
+receipt is not proof of a failed attachment. This is owner evidence **at the
+verification readback**, not a balloon item-number/position observation, a
+subsequent leader-landing result, or automatically a post-save/reopen certificate.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on
