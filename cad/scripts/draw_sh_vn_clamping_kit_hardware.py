@@ -418,24 +418,12 @@ def _installation_flag(
                 entity=edge,
                 note_xy=(left, center_y),
                 attached_to=edge,
+                leader_attach_xy=pick,
                 label=label,
             ),
             "INote",
         )
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-        if (
-            annotation.SetLeaderAttachmentPointAtIndex(0, pick[0], pick[1], 0.0)
-            is not True
-        ):
-            raise RuntimeError(f"{label}: native installation landing refused")
-        _assert_attached_to(
-            adapter,
-            annotation,
-            edge,
-            entity_type="EDGE",
-            what="installation flag after native landing",
-            label=label,
-        )
         bounds = _note_text_box(annotation, label=label)
         position = tuple(
             float(value) for value in _read_member(annotation, "GetPosition")

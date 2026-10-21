@@ -320,17 +320,35 @@ def _close_drawing(app: Any, drawing: Any, title: str, errors: list[Exception]) 
             "owned_drawing.close_log",
         )
 
-    # Absence is an independent native-identity census even if CloseDoc raised.
+    # CloseDoc disconnects its document proxy. Compare only fresh live records
+    # against the unique signature whose native identity was proved above.
     def absence() -> dict[str, Any]:
+        if "error" in safe:
+            raise RuntimeError("owned drawing absence lacks pre-close native proof")
         documents = tuple(app.GetDocuments() or ())
-        identity = [app.IsSame(raw, drawing) for raw in documents]
-        if any(value != 0 for value in identity):
-            raise RuntimeError(
-                f"owned diagnostic drawing absence is unproven: {identity!r}"
-            )
+        drawings = []
+        for raw in documents:
+            live = _early_bound(raw, "IModelDoc2")
+            if int(live.GetType()) != 3:
+                continue
+            signature = {
+                "title": str(live.GetTitle()),
+                "path": str(live.GetPathName()),
+                "document_type": 3,
+            }
+            if (
+                signature["title"].casefold() == title.casefold()
+                and not signature["path"]
+            ):
+                raise RuntimeError(
+                    f"owned diagnostic drawing remains live: {signature!r}"
+                )
+            drawings.append(signature)
         return {
-            "owned_native_identity_absent": True,
-            "remaining_identity": identity,
+            "preclose_native_identity_verified": True,
+            "owned_live_signature_absent": True,
+            "remaining_drawings": drawings[:16],
+            "remaining_drawings_capped": len(drawings) > 16,
             "remaining_count": len(documents),
         }
 
@@ -646,9 +664,48 @@ def _delete_feature(
             raise RuntimeError(
                 f"{arm}: owned feature selection count is {count!r}, not 1"
             )
+        selected_type = manager.GetSelectedObjectType3(1, -1)
         raw_selected = manager.GetSelectedObject6(1, -1)
-        # Do not cast a selected object to a guessed interface to manufacture identity.
-        same = app.IsSame(raw_selected, feature)
+        raw_same = None if raw_selected is None else app.IsSame(raw_selected, feature)
+        _fact(
+            lambda: _emit(
+                f"{arm}_selection_object",
+                selected_count=count,
+                selected_type=selected_type,
+                wrapper_type=type(raw_selected).__name__,
+                raw_selected_owned_IsSame=raw_same,
+            ),
+            errors,
+            f"{arm}.cleanup.raw_selection_log",
+        )
+        if raw_selected is None:
+            raise RuntimeError(f"{arm}: selected native object is unavailable")
+        if selected_type == 97:  # swSelBOMFEATURES returns IBomFeature.
+            selected_bom = _early_bound(raw_selected, "IBomFeature")
+        elif selected_type == 98:  # swSelANNOTATIONTABLES requires a BOM subtype.
+            selected_table = _early_bound(raw_selected, "ITableAnnotation")
+            if int(selected_table.Type) != 2:  # swTableAnnotation_BillOfMaterials
+                raise RuntimeError(f"{arm}: selected table is not a native BOM")
+            selected_annotation = _early_bound(raw_selected, "IBomTableAnnotation")
+            selected_bom = _early_bound(selected_annotation.BomFeature, "IBomFeature")
+        else:
+            raise RuntimeError(
+                f"{arm}: unsupported selected native type {selected_type!r}"
+            )
+        selected_feature = selected_bom.GetFeature()
+        if selected_feature is None:
+            raise RuntimeError(f"{arm}: selected BOM has no native feature")
+        same = app.IsSame(selected_feature, feature)
+        _fact(
+            lambda: _emit(
+                f"{arm}_selection_feature",
+                selected_type=selected_type,
+                feature_name=str(_early_bound(selected_feature, "IFeature").Name),
+                selected_owned_IsSame=same,
+            ),
+            errors,
+            f"{arm}.cleanup.selected_feature_log",
+        )
         if same != 1:
             raise RuntimeError(
                 f"{arm}: selected/owned native feature identity is {same!r}"
