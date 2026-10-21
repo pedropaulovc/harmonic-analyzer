@@ -3240,13 +3240,16 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
     # Selecting this kind's reviewer and severity contract also keys --kind
     # without hashing the registry. Judge instructions and schemas are shared.
     other_kind = "assembly" if spec.source_kind == "part" else "part"
-    other_prompts = {
+    excluded_prompts = {
         f"machinist_review_{other_kind}.md",
         f"machinist_review_{other_kind}_severity.md",
+        # --force bypasses the PDF diff precheck and its judge inputs.
+        "machinist_review_precheck.md",
+        "machinist_review_precheck_schema.json",
     }
     prompts = [
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
-        if path.is_file() and path.name not in other_prompts
+        if path.is_file() and path.name not in excluded_prompts
     ]
     return sorted({
         str(path.resolve())

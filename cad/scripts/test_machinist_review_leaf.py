@@ -301,14 +301,18 @@ def test_key_changes_only_with_review_inputs(inputs):
         "cad/comparisons/tools/release_diff.py",
         "cad/config/current-identity-map.json",
         "cad/config/identity-migration-map.json",
+        "cad/scripts/prompts/machinist_review_precheck.md",
+        "cad/scripts/prompts/machinist_review_precheck_schema.json",
     ],
 )
-def test_diff_pairing_changes_do_not_invalidate_forced_review_cache(inputs, relative_path):
+def test_bypassed_precheck_inputs_do_not_invalidate_forced_review_cache(
+    inputs, relative_path
+):
     dodo = inputs.module
     path = inputs.root / relative_path
     assert str(path.resolve()) not in dodo._machinist_review_file_deps("probe")
     initial = _review_key(dodo)
-    path.write_bytes(path.read_bytes() + b"\nchanged diff dependency\n")
+    path.write_bytes(path.read_bytes() + b"\nchanged precheck dependency\n")
     assert _review_key(dodo) == initial
 
 
