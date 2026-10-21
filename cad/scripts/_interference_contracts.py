@@ -64,6 +64,8 @@ from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from dt_vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from dt_vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
 from dt_vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as _JIG_CAP_HARDWARE
+import ch_rocker_arm_tl_oblique_retention_spec as _JIG_CAP_RETENTION
 
 
 def _smooth_annulus_limit_mm3(
@@ -934,7 +936,12 @@ JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into the nut bracket
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.401409)  # #4-40 into the carrier
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 12.0)  # 1/4-20 through the carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
-JIG_PIVOT_CAP_SCREW_THREAD = (7.9375, 6.528, 19.05 - (11.50 - 8.500))
+JIG_PIVOT_CAP_SCREW_THREAD = (
+    _JIG_CAP_HARDWARE.SCREW_MAJOR_DIA,
+    TAP_DRILL_MM[_JIG_CAP_HARDWARE.SCREW_THREAD],
+    _JIG_CAP_HARDWARE.SCREW_LENGTH
+    - (_JIG_CAP_RETENTION.CAP_HEIGHT - _JIG_CAP_RETENTION.CAP_COUNTERBORE_DEPTH),
+)
 # Only the actual 5/16-18 major-envelope/tap-drill annulus is necessary
 # overlap; cap, screw heads and safety wire receive no blanket exception.
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut

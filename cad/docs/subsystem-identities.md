@@ -114,8 +114,14 @@ The capture stack raises the carrier/work setup by **12.5 mm**, including the
 1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
 end is nominally **4 mm above the finished work**. The cap is 50 × 74 ×
 11.50 mm, with the ordinary ±0.51 mm thickness band, not a new precision
-control. The block wing is 66 mm wide, spans −54.5 to −9 mm, and uses 5/8 in
-raw stock; the physical nut-bracket location is unchanged.
+control, machined from 5/8 in stock. The block wing is 66 mm wide, spans
+−54.5 to −9 mm, and is machined from 1 × 3 in flat bar; the physical
+nut-bracket location is unchanged.
+
+The fitter package separates cartridge manufacture, pressing, joint acceptance
+and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) from operation, pass changes and machine
+acceptance (C4–C7, **CAPTUREANDOPERATION**). The operation sheet retains the finished
+isometric at 1:15 without competing with the cartridge assembly instructions.
 
 Source B supplies direct functional inspections, not new GD&T controls:
 inspect the pivot-pin functional face variation ≤0.05 mm over Ø35 mm and

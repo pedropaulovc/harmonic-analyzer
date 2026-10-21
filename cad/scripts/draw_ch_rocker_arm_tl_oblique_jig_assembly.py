@@ -1,4 +1,4 @@
-r"""Create the eight-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
+r"""Create the nine-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
@@ -20,11 +20,11 @@ their own 56 mm column. Sheets 3 to 6 each show the builder-owned
 pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
 ring fits the sheet, each family ballooned once on one ring, on no other sheet.
 Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
-in two columns, and the checks. Sheet 8 carries capture and machine-acceptance
-instructions, with the finished isometric below the right-column checks at
-1:15. Every view is one the builder named in the machine frame
-(``spec.VIEW_AXES``), its mapping proven on the sheet before anything is placed
-by it. Every text,
+in two columns, and the checks. Sheet 8 carries cartridge manufacture/pressing,
+joint acceptance and wiring. Sheet 9 carries operation and machine acceptance,
+with the finished isometric below the right-column checks at 1:15. Every view
+is one the builder named in the machine frame (``spec.VIEW_AXES``), its mapping
+proven on the sheet before anything is placed by it. Every text,
 pose and reference value comes from
 ``ch_rocker_arm_tl_oblique_jig_assembly_spec`` (and through it the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``) or the part registry; this recipe
@@ -111,6 +111,7 @@ PNG = OUTPUTS.png
 ASSEMBLED_SHEET = "ASSEMBLED AT INNER PASS"
 BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
+CARTRIDGE_SHEET = "CARTRIDGEASSEMBLY"
 CAPTURE_SHEET = "CAPTUREANDOPERATION"
 
 
@@ -211,6 +212,7 @@ SHEET_NAMES = (
     BOM_SHEET,
     *(cluster.sheet for cluster in CLUSTERS),
     STEPS_SHEET,
+    CARTRIDGE_SHEET,
     CAPTURE_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
@@ -253,6 +255,7 @@ def package_sheet_scales(
         ASSEMBLED_SHEET: ASSEMBLED_SCALE,
         BOM_SHEET: REFERENCE_SCALE,
         STEPS_SHEET: (1.0, 1.0),
+        CARTRIDGE_SHEET: (1.0, 1.0),
         CAPTURE_SHEET: ISOMETRIC_SCALE,
     }
     return {
@@ -393,8 +396,8 @@ TITLE_BLOCK_KEEP_OUT = (
 # Sheet 7: the assembly sequence in two columns of one width, the heading and
 # as many whole steps as fit the left column, which runs down beside the
 # title block; the rest atop the right column, the checks under them.
-# Sheet 8 reuses that text layout for capture and operation, with the finished
-# isometric in its free bottom-right room. Default-format text uses a measured
+# Sheet 8 reuses that layout for cartridge assembly; sheet 9 separates operation
+# and acceptance, leaving real bottom-right room for the finished isometric.
 # 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
@@ -599,7 +602,7 @@ ALIGNMENT_NOTE = _wrapped(
 
 
 def _note_height(text: str) -> float:
-    return (text.count("\n") + 1) * NOTE_LINE_M
+    return (text.count("\n") + 1) * NOTE_LINE_M if text else 0.0
 
 
 @dataclass(frozen=True)
@@ -641,8 +644,11 @@ ASSEMBLY_STEPS = STEPS_LAYOUT.steps
 ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
+CARTRIDGE_LAYOUT = steps_sheet_layout(
+    spec.CARTRIDGE_STEPS, (), heading="CARTRIDGE ASSEMBLY: C1-C3C"
+)
 CAPTURE_LAYOUT = steps_sheet_layout(
-    spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="CAPTURE AND MACHINE ACCEPTANCE"
+    spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="OPERATION AND ACCEPTANCE: C4-C7"
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -1988,28 +1994,18 @@ def _place_steps_notes(adapter: Any) -> None:
 
 
 def _place_capture_notes(adapter: Any) -> None:
-    _add_note_block(
-        adapter,
-        CAPTURE_SHEET,
-        CAPTURE_LAYOUT.steps,
-        STEPS_XY,
-        label="captured cartridge and pass change",
-    )
-    if CAPTURE_LAYOUT.continued:
-        _add_note_block(
-            adapter,
-            CAPTURE_SHEET,
-            CAPTURE_LAYOUT.continued,
-            STEPS_CONTINUED_XY,
-            label="capture instructions, continued",
-        )
-    _add_note_block(
-        adapter,
-        CAPTURE_SHEET,
-        CAPTURE_LAYOUT.checks,
-        CAPTURE_LAYOUT.checks_xy,
-        label="capture and installed-machine acceptance",
-    )
+    for sheet, layout, label in (
+        (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT, "cartridge assembly"),
+        (CAPTURE_SHEET, CAPTURE_LAYOUT, "operation and installed-machine acceptance"),
+    ):
+        _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
+        if layout.continued:
+            _add_note_block(
+                adapter, sheet, layout.continued, STEPS_CONTINUED_XY,
+                label=f"{label}, continued",
+            )
+        if layout.checks:
+            _add_note_block(adapter, sheet, layout.checks, layout.checks_xy, label=f"{label} checks")
 
 
 def _activate_package(adapter: Any, target: Any) -> None:

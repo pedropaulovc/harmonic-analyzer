@@ -243,21 +243,14 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 
 def test_sheets_are_landscape_with_their_scales() -> None:
-    assert drawing.SHEET_NAMES == (
-        "ASSEMBLED AT INNER PASS",
-        "BILL OF MATERIALS",
-        "RAIL BARS EXPLODED",
-        "PIVOTCAPTUREEXPLODED",
-        "LEADSCREW FEED EXPLODED",
-        "CARRIER EXPLODED",
-        "ASSEMBLY STEPS",
-        drawing.CAPTURE_SHEET,
-    )
+    assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
+    assert {drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET, drawing.CAPTURE_SHEET} <= set(drawing.SHEET_NAMES)
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
     assert drawing.SHEET_SCALES[drawing.BOM_SHEET] == drawing.REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.CAPTURE_SHEET] == drawing.ISOMETRIC_SCALE
+    assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == (1.0, 1.0)
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -336,6 +329,10 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
     def words(text: str) -> list[str]:
         return text.split()
 
+    def instruction_words(layout) -> list[str]:
+        # Preserve every source instruction once, independent of heading text.
+        return words(layout.steps.partition("\n")[2] + " " + layout.continued)
+
     assert words(drawing.ASSEMBLED_CAPTION) == words(spec.ASSEMBLED_CAPTION)
     assert words(drawing.ALIGNMENT_NOTE) == words(
         " ".join((*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE))
@@ -345,21 +342,22 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
     if drawing.ASSEMBLY_STEPS_CONTINUED:
         label = drawing.ASSEMBLY_STEPS_CONTINUED.split(". ", 1)[0]
         assert drawing._STEP_LABEL.fullmatch(label)
-    assert words(drawing.ASSEMBLY_STEPS + " " + drawing.ASSEMBLY_STEPS_CONTINUED) == (
-        words("ASSEMBLY SEQUENCE " + " ".join(spec.ASSEMBLY_STEPS))
-    )
+    assert instruction_words(drawing.STEPS_LAYOUT) == words(" ".join(spec.ASSEMBLY_STEPS))
     assert words(drawing.ASSEMBLY_CHECKS) == words(" ".join(spec.ASSEMBLY_CHECKS))
-    capture = drawing.CAPTURE_LAYOUT
-    assert words(capture.steps + " " + capture.continued) == words(
-        "CAPTURE AND MACHINE ACCEPTANCE " + " ".join(spec.CAPTURE_STEPS)
-    )
+    cartridge, capture = drawing.CARTRIDGE_LAYOUT, drawing.CAPTURE_LAYOUT
+    assert instruction_words(cartridge) == words(" ".join(spec.CARTRIDGE_STEPS))
+    assert instruction_words(capture) == words(" ".join(spec.CAPTURE_STEPS))
     assert words(capture.checks) == words(" ".join(spec.CAPTURE_CHECKS))
+    labels = [step.partition(". ")[0] for step in (*spec.CARTRIDGE_STEPS, *spec.CAPTURE_STEPS)]
+    assert len(labels) == len(set(labels))
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
         (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
         (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
+        (cartridge.steps, drawing.STEPS_LINE_WIDTH),
+        (cartridge.continued, drawing.STEPS_LINE_WIDTH),
         (capture.steps, drawing.STEPS_LINE_WIDTH),
         (capture.continued, drawing.STEPS_LINE_WIDTH),
         (capture.checks, drawing.STEPS_LINE_WIDTH),
@@ -656,10 +654,9 @@ def test_keep_out_overshoot_measures_the_low_balloons() -> None:
 
 
 def _steps_sheet_boxes(layout):
-    boxes = [
-        _note_box(layout.steps, drawing.STEPS_XY),
-        _note_box(layout.checks, layout.checks_xy),
-    ]
+    boxes = [_note_box(layout.steps, drawing.STEPS_XY)]
+    if layout.checks:
+        boxes.append(_note_box(layout.checks, layout.checks_xy))
     if layout.continued:
         boxes.append(_note_box(layout.continued, drawing.STEPS_CONTINUED_XY))
     return boxes
@@ -684,6 +681,7 @@ def _lines(text: str) -> int:
 
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
+    _assert_steps_sheet_fits(drawing.CARTRIDGE_LAYOUT)
 
 
 def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
@@ -763,7 +761,7 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
     assert configurations == [(False, drawing.ASSEMBLY_VIEW_CONFIGURATION)]
 
 
-def test_capture_notes_are_placed_only_on_the_capture_operation_sheet(monkeypatch) -> None:
+def test_cartridge_and_operation_notes_are_placed_once_on_their_own_sheets(monkeypatch) -> None:
     placed = []
     monkeypatch.setattr(
         drawing, "_add_note_block",
@@ -771,14 +769,19 @@ def test_capture_notes_are_placed_only_on_the_capture_operation_sheet(monkeypatc
         placed.append((sheet, text, xy, label)),
     )
     drawing._place_capture_notes(_ADAPTER)
-    layout = drawing.CAPTURE_LAYOUT
-    assert [text for _sheet, text, _xy, _label in placed] == [
-        layout.steps, *([layout.continued] if layout.continued else []),
-        layout.checks,
-    ]
-    assert {sheet for sheet, _text, _xy, _label in placed} == {
-        drawing.CAPTURE_SHEET
-    }
+    expected = []
+    for sheet, layout in (
+        (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
+        (drawing.CAPTURE_SHEET, drawing.CAPTURE_LAYOUT),
+    ):
+        for text, xy in (
+            (layout.steps, drawing.STEPS_XY),
+            (layout.continued, drawing.STEPS_CONTINUED_XY),
+            (layout.checks, layout.checks_xy),
+        ):
+            if text:
+                expected.append((sheet, text, xy))
+    assert [(sheet, text, xy) for sheet, text, xy, _label in placed] == expected
 
 
 def test_every_bom_row_carries_one_balloon() -> None:

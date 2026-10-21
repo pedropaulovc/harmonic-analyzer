@@ -34,7 +34,7 @@ Captured pivots retain both supports during both passes. The integral flange
 is trapped between the unchanged block top and a safety-wired cap; a removable
 washer, headed clevis pin and fresh split cotter capture the carrier above.
 The original k5/N6 bearing fits support rotation, not axial safety. The raised
-carrier seat adds 11.5 mm to the former work height, with no skid or rail change.
+carrier seat adds 12.5 mm to the former work height, with no skid or rail change.
 Heights alone do not prove spindle/toolholder clearance: installed-machine
 acceptance needs the actual stepped tooling envelope over both complete sweeps.
 

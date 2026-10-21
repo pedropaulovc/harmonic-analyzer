@@ -126,9 +126,20 @@ PROJECTION_ANGLE_SLOP = 1e-6
 # Every dimension's text position is a MODEL point (mm) off the part, mapped
 # onto its view at run time (2 sheet mm per model mm).
 _H = BRACKET_HEIGHT
+_PLAN_LEFT_X = FRONT_CENTER[0] + FACE_X * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
+_NUT_FACE_RIGHT_X = LEFT_CENTER[0] + _H * VIEW_SCALE[0] / VIEW_SCALE[1] / 2000.0
 FRONT_KEEP: dict[str, tuple[float, float, float]] = {
-    # Left of the plan, in the gap to the nut-face view.
-    "BracketDepth": (FACE_X - 5.0, -part_spec.BRACKET_DEPTH / 2.0, _H),
+    # Centre the depth text in the actual gap between the nut face and plan.
+    # At 2:1 the 9.2 mm text has 2.85 mm clearance on each side; a fixed
+    # 5 model-mm offset from the plan crowds the taller nut face.
+    "BracketDepth": (
+        ((_NUT_FACE_RIGHT_X + _PLAN_LEFT_X) / 2.0 - FRONT_CENTER[0])
+        * 1000.0
+        * VIEW_SCALE[1]
+        / VIEW_SCALE[0],
+        -part_spec.BRACKET_DEPTH / 2.0,
+        _H,
+    ),
 }
 # The block face: +X up, +Z right; the -X face is its bottom edge, the
 # bottom face (Z 0) its left edge, as in the nut face under it.

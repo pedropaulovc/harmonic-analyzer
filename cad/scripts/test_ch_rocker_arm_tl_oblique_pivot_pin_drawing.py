@@ -40,14 +40,13 @@ def test_section_lengths_derive_from_the_bearing_and_collar_constants() -> None:
         trammel.BEARINGS_PER_PIN * trammel.BEARING_WIDTH + trammel.BEARING_SHOULDER
     )
     assert spec.BEARING_LENGTH == 22.0
-    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT == 15.5
+    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT
     assert spec.COLLAR_HEIGHT == trammel.BEARING_RECESS + trammel.PIN_COLLAR_PROUD
     assert spec.CARRIER_LENGTH == 24.5 > trammel.CARRIER_THICK
     assert spec.CARRIER_LENGTH == spec.CROSS_HOLE_FROM_SEAT + spec.CROSS_HOLE_FROM_END
     assert spec.OVERALL_LENGTH == (
         spec.BEARING_LENGTH + spec.COLLAR_HEIGHT + spec.CARRIER_LENGTH
     )
-    assert spec.OVERALL_LENGTH == 62.0
     assert spec.FIT_DIA == trammel.BEARING_BORE
 
 

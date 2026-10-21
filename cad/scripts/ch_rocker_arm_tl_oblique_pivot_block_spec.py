@@ -134,6 +134,7 @@ import math
 
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_spec as retention
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
 from _fit_deviations import deviations
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
@@ -160,7 +161,7 @@ WING_WIDTH = 2.0 * retention.BLOCK_WING_HALF_WIDTH
 WING_LENGTH = WING_X1 - BLOCK_X0
 BEARING_AXIS_NAME = "BearingAxis"
 CAP_TAP_REFERENCE = "CapTapReference"
-CAP_TAP_HOLE_SPEC = HoleSpec("tapped", "5/16-18")
+CAP_TAP_HOLE_SPEC = HoleSpec("tapped", retention_hardware.SCREW_THREAD)
 CAP_TAP_DRILL_DIA = TAP_DRILL_MM[CAP_TAP_HOLE_SPEC.size]
 CAP_TAP_POINTS = tuple(
     (trammel.PIN_OFFSET + dx, dy) for dx, dy in retention.CAP_BOLT_CENTERS

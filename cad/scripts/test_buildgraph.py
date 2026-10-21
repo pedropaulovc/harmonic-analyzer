@@ -314,7 +314,7 @@ def test_positive_capture_interference_contract_has_only_exact_thread_pairs() ->
     vendor = "ch-rocker-arm-tl-vn-oblique"
     major, tap, engagement = interference.JIG_PIVOT_CAP_SCREW_THREAD
     assert major == hardware.SCREW_MAJOR_DIA
-    assert tap == TAP_DRILL_MM["1/4-20"]
+    assert tap == TAP_DRILL_MM[hardware.SCREW_THREAD]
     assert engagement == pytest.approx(
         hardware.SCREW_LENGTH - (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH)
     )

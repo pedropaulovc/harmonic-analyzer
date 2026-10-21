@@ -54,10 +54,12 @@ BOLT_SECTION_CENTER = (0.360, 0.095)
 ISO_CENTER = (0.095, 0.052)
 ISO_SCALE = (1, 1)
 ISO_NOTE_XY = (0.052, 0.095)
+# Keep separate width and aperture-location lanes below the top-view outline,
+# with positive clearance beyond the 6 mm annotation keep-out on both sides.
 TOP_KEEP = {
-    "CapWidth": (0.090, 0.118), "CapLength": (0.145, 0.170),
+    "CapWidth": (0.090, 0.114), "CapLength": (0.145, 0.170),
     "CounterboreDia": (0.035, 0.250), "ApertureDia": (0.055, 0.225),
-    "ApertureCenterX": (0.078, 0.127), "ApertureCenterY": (0.052, 0.151),
+    "ApertureCenterX": (0.078, 0.124), "ApertureCenterY": (0.052, 0.151),
     "WireWidth": (0.137, 0.092),
     "EntryReliefDia": (0.170, 0.115),
 }

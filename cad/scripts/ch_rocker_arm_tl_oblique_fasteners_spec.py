@@ -234,7 +234,7 @@ LEVER_TO_CARRIER = Fastener(
 )
 CAP_TO_BLOCK = Fastener(
     "TL-30 capture cap to TL-22 pivot block",
-    "5/16-18",
+    retention_hardware.SCREW_THREAD,
     SHCS,
     "3/4",
     len(retention.CAP_BOLT_CENTERS) * RAILS,

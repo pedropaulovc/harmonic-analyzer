@@ -15,6 +15,7 @@ SCREW_SKU = "NAS1352N5H12"
 SCREW_SUPPLIER = "CBS Fasteners"
 SCREW_SUPPLIER_SKU = SCREW_SKU
 SCREW_SUPPLIER_DESCRIPTION = "5/16-18 X 3/4 SHC A286 DRLD"
+SCREW_THREAD = "5/16-18"
 SCREW_SOURCE_URL = "https://cbsfasteners.com/nas-fastener-inventory/"
 SCREW_STANDARD_URL = "https://www.aaestore.com.au/media/specs/NAS1352.pdf"
 SCREW_ASME_SOURCE_URL = "https://www.finesz.com/pic/ASME%20B18.3.pdf"
