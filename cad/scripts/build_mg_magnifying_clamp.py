@@ -886,11 +886,12 @@ def _create_tap_projection(adapter: Any, point: Any, circle: Any, name: str) -> 
 
 
 def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str, drawing_view: Any | None = None, failure_observer: Callable[[tuple[Any, ...], tuple[Any, ...], list[dict[str, Any]]], None] | None = None) -> tuple[str, str, int, int]:
-    """Prove model point/flat keys, explicitly mapping view-context attachments."""
+    """Prove model attachments; optional diagnostics preserve the original refusal."""
     import _telemetry
 
     attached = types = ()
     point_key = flat_key = expected_flat = error = None
+    error_traceback = None
     dangling = None
     mappings = []
     try:
@@ -1006,26 +1007,36 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str,
             raise RuntimeError("native location is not attached to the exact common flat")
     except Exception as exc:
         error = exc
-    _telemetry.info(
-        f"clamp native point/flat attachment: stage={stage}, types={types!r}, point={point_key!r}, flat={flat_key!r}, expected_flat={expected_flat!r}, dangling={dangling!r}, correspondence={mappings!r}, error={error!r}",
-        operation_stage=stage, attachment_count=len(attached), attached_types=types,
-        attached_point_identity=repr(point_key), attached_flat_identity=repr(flat_key),
-        expected_flat_identity=repr(expected_flat), dangling=dangling, attachment_readback_error=repr(error),
-        attachment_correspondence=repr(mappings),
-    )
-    if error is not None:
-        if failure_observer is not None:
-            try:
-                # Preserve the EXACT failing native handles, not a second
-                # GetAttachedEntities3 result. Observer output cannot accept,
-                # retry, or replace this failure.
-                failure_observer(attached, types, mappings)
-            except Exception as diagnostic_error:
-                _telemetry.info(
-                    f"clamp correspondence failure observer unavailable: {diagnostic_error!r}",
-                    operation_stage=f"{stage}.failure-observer", diagnostic_error=repr(diagnostic_error),
-                )
-        raise RuntimeError(f"{stage}: {error}") from error
+        error_traceback = exc.__traceback__
+    try:
+        try:
+            _telemetry.info(
+                f"clamp native point/flat attachment: stage={stage}, types={types!r}, point={point_key!r}, flat={flat_key!r}, expected_flat={expected_flat!r}, dangling={dangling!r}, correspondence={mappings!r}, error={error!r}",
+                operation_stage=stage, attachment_count=len(attached), attached_types=types,
+                attached_point_identity=repr(point_key), attached_flat_identity=repr(flat_key),
+                expected_flat_identity=repr(expected_flat), dangling=dangling, attachment_readback_error=repr(error),
+                attachment_correspondence=repr(mappings),
+            )
+        finally:
+            if error is not None and failure_observer is not None:
+                try:
+                    # Retain exact handles even if the preceding log/formatter
+                    # failed. The observer cannot accept or replace the refusal.
+                    failure_observer(attached, types, mappings)
+                except Exception as diagnostic_error:
+                    try:
+                        detail = repr(diagnostic_error)
+                    except Exception:
+                        detail = "<unprintable failure-observer exception>"
+                    _telemetry.info(
+                        f"clamp correspondence failure observer unavailable: {detail}",
+                        operation_stage=f"{stage}.failure-observer", diagnostic_error=detail,
+                    )
+    finally:
+        # The entire optional sequence, including fallback logging/formatting,
+        # must preserve the native/guard exception object and original frames.
+        if error is not None:
+            raise error.with_traceback(error_traceback)
     return point_key
 
 

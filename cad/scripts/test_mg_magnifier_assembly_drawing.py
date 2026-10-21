@@ -1395,6 +1395,217 @@ def test_payload_snapshot_failure_cannot_mask_original_or_skip_view_readers(
     assert probe["view_state"]["model_to_view"]["length"] == 16
 
 
+@pytest.mark.parametrize("result", [(None, None), (None, []), ([], None)])
+def test_null_polyline_channels_are_unavailable_and_captured(lever_tip_native, result):
+    native = lever_tip_native
+    calls = []
+
+    def polylines(cross):
+        calls.append(cross)
+        return result
+
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match="channel is unavailable at primitive 0, offset 0") as caught:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert calls == [1]
+    capture = native.failure_captures[0][2]
+    assert capture["exception"] is caught.value and capture["sheet_png"] is True
+    probe = capture["native_polyline_probe"]
+    assert probe["return_observed"] is True
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    assert probe["original_return"] == drawing._projection_polyline_snapshot(result)
+
+
+def test_actual_empty_polyline_arrays_remain_measured_empty(lever_tip_native, monkeypatch):
+    native = lever_tip_native
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda text, **_kw: messages.append(text))
+    native.view.GetPolylines7 = lambda _cross: ([], [])
+    assert drawing._projection_rendered_edges(([], [])) == ()
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert native.failure_captures == []
+    assert "'rendered_model_edges': 0" in messages[-1]
+    assert native.imports == [] and not native.cropped
+
+
+@pytest.mark.parametrize("failure", [
+    "truncated-primitive", "truncated-geometry", "negative-count", "fractional-count",
+    "nan-count", "infinite-count", "unreadable-count", "short-points",
+    "missing-edge", "unmatched-edge", "nonfinite-record", "unreadable-record", "header",
+])
+def test_every_later_polyline_refusal_names_primitive_and_buffer_position(lever_tip_native, failure):
+    native = lever_tip_native
+    first = tuple(native.polyline)
+    second = list(first)
+    edges = tuple(native.edges)
+    if failure == "truncated-primitive":
+        second = [0.0, 0.0]
+    elif failure == "truncated-geometry":
+        second = [1.0, 12.0, *([0.0] * 7)]
+    elif failure in ("negative-count", "fractional-count", "nan-count", "infinite-count", "unreadable-count"):
+        second[8] = {
+            "negative-count": -1, "fractional-count": 1.5, "nan-count": float("nan"),
+            "infinite-count": float("inf"), "unreadable-count": "not a count",
+        }[failure]
+    elif failure == "short-points":
+        second.pop()
+    elif failure == "missing-edge":
+        edges = edges[:1]
+    elif failure == "unmatched-edge":
+        second = []
+    elif failure == "nonfinite-record":
+        second[9] = float("nan")
+    elif failure == "unreadable-record":
+        second[9] = object()
+    else:
+        second[1] = 17.0
+    with pytest.raises(RuntimeError, match=rf"primitive 1, offset {len(first)}"):
+        drawing._projection_rendered_edges((edges, (*first, *second)))
+
+
+@pytest.mark.parametrize("result", [None, (), ([],), (object(), [])])
+def test_initial_polyline_shape_refusals_name_start_position(result):
+    with pytest.raises(RuntimeError, match="primitive 0, offset 0"):
+        drawing._projection_rendered_edges(result)
+
+
+@pytest.mark.parametrize("failure", ["snapshot", "reader", "binding"])
+def test_unprintable_secondary_error_keeps_independent_readers_and_forensic_attempt(
+    lever_tip_native, monkeypatch, failure,
+):
+    native = lever_tip_native
+    original = RuntimeError("original decoder refusal")
+    try:
+        raise original
+    except RuntimeError:
+        original_traceback = original.__traceback__
+    raw = object()
+    snapshot = drawing._projection_polyline_snapshot
+
+    class UnprintableError(Exception):
+        def __str__(self):
+            raise ValueError("secondary formatter failed")
+
+    def snapshot_failure(value):
+        if value is raw:
+            raise UnprintableError()
+        return snapshot(value)
+
+    def reader_failure():
+        raise UnprintableError()
+
+    def binding_failure(obj, interface):
+        if interface == "ISldWorks":
+            raise UnprintableError()
+        return obj
+
+    if failure == "snapshot":
+        monkeypatch.setattr(drawing, "_projection_polyline_snapshot", snapshot_failure)
+        failed_field = "original_return"
+    elif failure == "reader":
+        native.view.GetDisplayMode2 = reader_failure
+        failed_field = "display_mode"
+    else:
+        monkeypatch.setattr(drawing, "_early_bound", binding_failure)
+        failed_field = "revision"
+    with pytest.raises(RuntimeError) as caught:
+        drawing._capture_projection_polyline_failure(
+            native.adapter, native.view, stage="unprintable secondary",
+            result=raw, observed=True, exception=original, evidence={},
+        )
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not original_traceback:
+        trace = trace.tb_next
+    assert trace is original_traceback
+    capture = native.failure_captures[0][2]
+    assert capture["exception"] is original and capture["sheet_png"] is True
+    probe = capture["native_polyline_probe"]
+    assert probe["reader_errors"][failed_field] == "UnprintableError: <diagnostic text unavailable>"
+    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["view_state"]["facetted_hlr"]["value"] is False
+    assert probe["view_state"]["model_to_view"]["length"] == 16
+
+
+@pytest.mark.parametrize("failure", ["capture", "logger", "capture-return"])
+def test_entire_optional_capture_sequence_always_reraises_original_traceback(
+    lever_tip_native, monkeypatch, failure,
+):
+    native = lever_tip_native
+    original = RuntimeError("original decoder refusal")
+    try:
+        raise original
+    except RuntimeError:
+        original_traceback = original.__traceback__
+    attempts = []
+
+    def logger_failure(*_args, **_kwargs):
+        raise ValueError("optional logger refused")
+
+    def capture_failure(*_args, **kwargs):
+        attempts.append(kwargs)
+        if failure == "capture":
+            raise ValueError("optional capture refused")
+        if failure == "logger":
+            drawing._telemetry.info("optional failure-only log")
+
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture_failure)
+    monkeypatch.setattr(drawing._telemetry, "info", logger_failure)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._capture_projection_polyline_failure(
+            native.adapter, native.view, stage="optional capture refusal",
+            result=(None, None), observed=True, exception=original, evidence={},
+        )
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not original_traceback:
+        trace = trace.tb_next
+    assert trace is original_traceback
+    assert len(attempts) == 1 and attempts[0]["exception"] is original
+    assert attempts[0]["sheet_png"] is True
+
+
+@pytest.mark.parametrize("failure", ["prelude-format", "capture-entry"])
+def test_decoder_failure_is_preserved_before_optional_capture_entry(
+    lever_tip_native, monkeypatch, failure,
+):
+    native = lever_tip_native
+    original = RuntimeError("retained decoder refusal")
+    tracebacks = []
+    format_error = drawing._projection_error_text
+
+    def refuse_decode(_result):
+        try:
+            raise original
+        except RuntimeError:
+            tracebacks.append(original.__traceback__)
+            raise
+
+    def refuse_format(error):
+        if error is original:
+            raise ValueError("pre-capture formatter refused")
+        return format_error(error)
+
+    def refuse_capture(*_args, **_kwargs):
+        raise ValueError("capture entry refused")
+
+    monkeypatch.setattr(drawing, "_projection_rendered_edges", refuse_decode)
+    if failure == "prelude-format":
+        monkeypatch.setattr(drawing, "_projection_error_text", refuse_format)
+    else:
+        monkeypatch.setattr(drawing, "_capture_projection_polyline_failure", refuse_capture)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not tracebacks[0]:
+        trace = trace.tb_next
+    assert trace is tracebacks[0]
+    assert native.imports == [] and not native.cropped
+
+
 @pytest.mark.parametrize("failure", [
     "source", "value", "nonfinite-value", "band", "precision", "owner",
     "dangling", "null-point", "entity-type", "replacement", "bool-identity",

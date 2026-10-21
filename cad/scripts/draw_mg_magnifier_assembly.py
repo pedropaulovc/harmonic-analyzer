@@ -1192,35 +1192,55 @@ def _unique_projection(adapter: Any, view: Any, *, stage: str) -> Any:
     return matches[0][1]
 
 
+def _projection_error_text(exception: Exception) -> str:
+    """Readable diagnostic text without trusting a secondary exception's formatter."""
+    try:
+        message = str(exception)
+    except Exception:
+        message = "<diagnostic text unavailable>"
+    return f"{type(exception).__name__}: {message}"
+
+
 def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
     """Decode GetPolylines7's (model edges, out-polylines), excluding sketch ink."""
-    if not isinstance(result, (tuple, list)) or len(result) != 2:
-        raise RuntimeError("GetPolylines7 did not return its edge/OUT-polyline pair")
-    edges, data = tuple(result[0] or ()), tuple(result[1] or ())
-    rendered = []
     offset = index = 0
+    location = "at primitive 0, offset 0"
+    if not isinstance(result, (tuple, list)) or len(result) != 2:
+        raise RuntimeError(f"GetPolylines7 did not return its edge/OUT-polyline pair {location}")
+    if result[0] is None or result[1] is None:
+        raise RuntimeError(f"GetPolylines7 retval/OUT channel is unavailable {location}")
+    try:
+        edges, data = tuple(result[0]), tuple(result[1])
+    except Exception as exc:
+        raise RuntimeError(f"GetPolylines7 unreadable arrays {location}: {_projection_error_text(exc)}") from exc
+    rendered = []
     while offset < len(data):
+        location = f"at primitive {index}, offset {offset}"
         if offset + 9 > len(data):
-            raise RuntimeError("GetPolylines7 returned a truncated primitive")
+            raise RuntimeError(f"GetPolylines7 returned a truncated primitive {location}")
         kind, size = data[offset:offset + 2]
         if kind not in (0, 1) or size != (0 if kind == 0 else 12):
-            raise RuntimeError(
-                f"GetPolylines7 invalid geometry header {(kind, size)!r}"
-                f" at primitive {index}, offset {offset}"
-            )
+            raise RuntimeError(f"GetPolylines7 invalid geometry header {(kind, size)!r} {location}")
         size = int(size)
         count_index = offset + 8 + size
         if count_index >= len(data):
-            raise RuntimeError("GetPolylines7 returned truncated geometry")
+            raise RuntimeError(f"GetPolylines7 returned truncated geometry {location}")
         count = data[count_index]
-        if count != int(count) or count < 0:
-            raise RuntimeError(f"GetPolylines7 invalid point count {count!r}")
+        try:
+            valid_count = math.isfinite(count) and count == int(count) and count >= 0
+        except Exception as exc:
+            raise RuntimeError(f"GetPolylines7 unreadable point count {location}: {_projection_error_text(exc)}") from exc
+        if not valid_count:
+            raise RuntimeError(f"GetPolylines7 invalid point count {count!r} {location}")
         end = count_index + 1 + 3 * int(count)
         if end > len(data) or index >= len(edges):
-            raise RuntimeError("GetPolylines7 edge/primitive cardinality mismatch")
-        record = tuple(float(value) for value in data[offset:end])
+            raise RuntimeError(f"GetPolylines7 edge/primitive cardinality mismatch {location}")
+        try:
+            record = tuple(float(value) for value in data[offset:end])
+        except Exception as exc:
+            raise RuntimeError(f"GetPolylines7 unreadable primitive {location}: {_projection_error_text(exc)}") from exc
         if not all(math.isfinite(value) for value in record):
-            raise RuntimeError("GetPolylines7 returned non-finite model ink")
+            raise RuntimeError(f"GetPolylines7 returned non-finite model ink {location}")
         points = data[count_index + 1:end]
         ink = any(points[i:i + 3] != points[:3] for i in range(3, len(points), 3))
         if kind == 1:
@@ -1229,7 +1249,9 @@ def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
             rendered.append(edges[index])
         offset, index = end, index + 1
     if index != len(edges):
-        raise RuntimeError("GetPolylines7 edge/primitive cardinality mismatch")
+        raise RuntimeError(
+            f"GetPolylines7 edge/primitive cardinality mismatch at primitive {index}, offset {offset}"
+        )
     return tuple(rendered)
 
 
@@ -1257,14 +1279,14 @@ def _projection_polyline_snapshot(value: Any) -> dict[str, Any]:
             attributes = vars(value)
         except Exception as exc:
             attributes = {}
-            record["attributes_error"] = f"{type(exc).__name__}: {exc}"
+            record["attributes_error"] = _projection_error_text(exc)
         dispatch = attributes.get("_oleobj_")
         try:
             record["dispatch_repr" if dispatch is not None else "opaque_repr"] = repr(
                 dispatch if dispatch is not None else value
             )
         except Exception as exc:
-            record["repr_error"] = f"{type(exc).__name__}: {exc}"
+            record["repr_error"] = _projection_error_text(exc)
     return record
 
 
@@ -1273,23 +1295,24 @@ def _capture_projection_polyline_failure(
     exception: Exception, evidence: dict[str, Any],
 ) -> NoReturn:
     """Preserve a refused G7 decode, its native frame and partial drawing."""
-    probe: dict[str, Any] = {
-        "stage": stage,
-        "call": "early-bound IView.GetPolylines7(1); optional OUT argument omitted",
-        "return_observed": observed,
-        "rendered_status": "UNAVAILABLE",
-        "component_readback": evidence,
-        "view_state": {},
-        "reader_errors": {},
-    }
+    original_traceback = exception.__traceback__
     try:
-        # This is the unchanged object returned by the one original call, not a
-        # second getter, a cast, a sliced buffer or an alternative interpretation.
-        probe["original_return"] = _projection_polyline_snapshot(result)
-    except Exception as exc:
-        probe["reader_errors"]["original_return"] = f"{type(exc).__name__}: {exc}"
-    try:
-        view = _early_bound(view, "IView")
+        probe: dict[str, Any] = {
+            "stage": stage,
+            "call": "early-bound IView.GetPolylines7(1); optional OUT argument omitted",
+            "return_observed": observed,
+            "rendered_status": "UNAVAILABLE",
+            "component_readback": evidence,
+            "view_state": {},
+            "reader_errors": {},
+        }
+        try:
+            # The unchanged original return, not a second getter or interpretation.
+            probe["original_return"] = _projection_polyline_snapshot(result)
+        except Exception as exc:
+            probe["reader_errors"]["original_return"] = _projection_error_text(exc)
+        # The caller already owns an IView. Optional application binding belongs
+        # to its own reader; a refused bind must not skip available view readers.
         for name, reader in (
             ("view", lambda: view_name(adapter, view)),
             ("revision", lambda: _early_bound(adapter.swApp, "ISldWorks").RevisionNumber()),
@@ -1308,14 +1331,18 @@ def _capture_projection_polyline_failure(
             try:
                 probe["view_state"][name] = _projection_polyline_snapshot(reader())
             except Exception as exc:
-                probe["reader_errors"][name] = f"{type(exc).__name__}: {exc}"
-    except Exception as exc:
-        probe["probe_error"] = f"{type(exc).__name__}: {exc}"
-    _seat_forensics.capture_com_failure(
-        adapter, "mg-magnifier-thread-projection-polylines", str(exception),
-        api="IView.GetPolylines7", exception=exception, sheet_png=True,
-        native_polyline_probe=probe,
-    )
+                probe["reader_errors"][name] = _projection_error_text(exc)
+        try:
+            message = str(exception)
+        except Exception:
+            message = f"{type(exception).__name__}: <original message unavailable>"
+        _seat_forensics.capture_com_failure(
+            adapter, "mg-magnifier-thread-projection-polylines", message,
+            api="IView.GetPolylines7", exception=exception, sheet_png=True,
+            native_polyline_probe=probe,
+        )
+    finally:
+        raise exception.with_traceback(original_traceback)
 
 
 @_telemetry.traced("drawing.mg_projection_model_ink", label_param="stage")
@@ -1348,7 +1375,7 @@ def _projection_model_ink(
         try:
             values[name] = reader()
         except Exception as exc:
-            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+            errors.append(f"{name}: {_projection_error_text(exc)}")
             reader_exceptions[name] = exc
     full = {}
     evidence["drawing_components"] = []
@@ -1365,7 +1392,7 @@ def _projection_model_ink(
                     raise RuntimeError(f"duplicate drawing component {name}")
                 full[name] = (stem, component, shown)
         except Exception as exc:
-            errors.append(f"drawing component: {type(exc).__name__}: {exc}")
+            errors.append(f"drawing component: {_projection_error_text(exc)}")
     rendered = ()
     try:
         rendered = tuple(
@@ -1374,17 +1401,21 @@ def _projection_model_ink(
         )
     except Exception as exc:
         original = reader_exceptions.get("polylines", exc)
-        evidence["errors"] = [*errors, f"model polylines: {type(original).__name__}: {original}"]
-        evidence["rendered_model_edges"] = None
-        components = values.get("visible_components")
-        evidence["visible_components_observed"] = "visible_components" in values
-        evidence["visible_component_count"] = (
-            len(components) if isinstance(components, (tuple, list)) else None
-        )
-        _capture_projection_polyline_failure(
-            adapter, view, stage=stage, result=values.get("polylines"),
-            observed="polylines" in values, exception=original, evidence=evidence,
-        )
+        original_traceback = original.__traceback__
+        try:
+            evidence["errors"] = [*errors, f"model polylines: {_projection_error_text(original)}"]
+            evidence["rendered_model_edges"] = None
+            components = values.get("visible_components")
+            evidence["visible_components_observed"] = "visible_components" in values
+            evidence["visible_component_count"] = (
+                len(components) if isinstance(components, (tuple, list)) else None
+            )
+            _capture_projection_polyline_failure(
+                adapter, view, stage=stage, result=values.get("polylines"),
+                observed="polylines" in values, exception=original, evidence=evidence,
+            )
+        finally:
+            raise original.with_traceback(original_traceback)
     evidence["rendered_model_edges"] = len(rendered)
     evidence["visible_components"] = []
     targets = {

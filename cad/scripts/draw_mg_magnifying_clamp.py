@@ -586,7 +586,7 @@ def _add_stock_note(adapter: Any, view: Any) -> None:
 
 
 def _audit_flat_correspondence(adapter, view, source_display, display, source_entities, source_types, attached, types, attempted, *, name):
-    """Read-only failure census; no result can supply or replace an attachment."""
+    """Read-only census; unavailable or partial inventories cannot prove uniqueness."""
     import pythoncom
     from solidworks_mcp.adapters._generated.sldworks_2026 import (
         IAnnotation, IDimension, IFace2, IFeature, IModelDoc2, IModelDocExtension,
@@ -600,8 +600,13 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
         "ISketchPoint": ISketchPoint, "ISketchSegment": ISketchSegment, "IView": IView,
     }
     stage = f"{name}.correspondence-diagnostic"
-    app = _early_bound(adapter.swApp, "ISldWorks")
     rows = []
+
+    def diagnostic_text(value):
+        try:
+            return repr(value)
+        except Exception:
+            return "<unprintable diagnostic value>"
 
     def capture(reader, callback, *, objects=False, requires=()):
         row = {"reader": reader, "status": "skipped", "error": None}
@@ -613,12 +618,20 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
                 row["status"] = "null" if result is None else "read"
                 row["value"] = {"present": result is not None, "python_type": type(result).__name__} if objects else result
             except Exception as exc:
-                row.update(status="unavailable", error=repr(exc))
-        _telemetry.info(
-            f"clamp correspondence census reader: {reader}: {json.dumps(row, default=repr)}",
-            operation_stage=stage, census_reader=reader, census_row=json.dumps(row, default=repr),
-        )
+                row.update(status="unavailable", error=diagnostic_text(exc), error_type=type(exc).__name__)
+        try:
+            encoded = json.dumps(row, default=diagnostic_text)
+            _telemetry.info(
+                f"clamp correspondence census reader: {reader}: {encoded}",
+                operation_stage=stage, census_reader=reader, census_row=encoded,
+            )
+        except Exception as logging_error:
+            # Keep the native result/error separate from its transport failure;
+            # later independent readers must still run.
+            row["logging_error"] = diagnostic_text(logging_error)
         return result
+
+    app = capture("application.bind.ISldWorks", lambda: _early_bound(adapter.swApp, "ISldWorks"), objects=True)
 
     def native(label, raw, interface):
         if raw is None:
@@ -642,7 +655,7 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
         if interface in ("ISketchPoint", "ISketchSegment") and (queries[other] is None or queries[other]["supported"] is not False):
             return None
         bound = capture(f"{label}.bind.{interface}", lambda: _early_bound(raw, interface), objects=True)
-        capture(f"{label}.self", lambda: app.IsSame(bound, bound), requires=(bound,))
+        capture(f"{label}.self", lambda: app.IsSame(bound, bound), requires=(app, bound))
         capture(f"{label}.parameter-form", lambda: {
             "raw_wrapper": type(raw).__name__, "bound_wrapper": type(bound).__name__,
             "raw_dispatch": type(raw._oleobj_).__name__, "bound_dispatch": type(bound._oleobj_).__name__,
@@ -653,15 +666,15 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
     source = capture("view.ReferencedDocument", lambda: view.ReferencedDocument, objects=True)
     source = native("source-document", source, "IModelDoc2")
     drawing = native("drawing-document", adapter.currentModel, "IModelDoc2")
-    active = capture("application.ActiveDoc", lambda: app.ActiveDoc, objects=True)
+    active = capture("application.ActiveDoc", lambda: app.ActiveDoc, objects=True, requires=(app,))
     active = native("active-document", active, "IModelDoc2")
     for role, document in (("source", source), ("drawing", drawing), ("active", active)):
         capture(f"{role}.GetPathName", lambda document=document: document.GetPathName(), requires=(document,))
         capture(f"{role}.GetTitle", lambda document=document: document.GetTitle(), requires=(document,))
         capture(f"{role}.GetType", lambda document=document: document.GetType(), requires=(document,))
         capture(f"{role}.GetSaveFlag.before", lambda document=document: document.GetSaveFlag(), requires=(document,))
-    capture("active.same-drawing", lambda: app.IsSame(active, drawing), requires=(active, drawing))
-    capture("active.same-source", lambda: app.IsSame(active, source), requires=(active, source))
+    capture("active.same-drawing", lambda: app.IsSame(active, drawing), requires=(app, active, drawing))
+    capture("active.same-source", lambda: app.IsSame(active, source), requires=(app, active, source))
     extension = capture("source.Extension", lambda: source.Extension, objects=True, requires=(source,))
     extension = native("source.Extension", extension, "IModelDocExtension")
     drawing_extension = capture("drawing.Extension", lambda: drawing.Extension, objects=True, requires=(drawing,))
@@ -686,9 +699,9 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
         if type(owner_type) is int and owner_type in (0, 3, 4):
             owner = native(f"{role}.annotation-owner", owner, "IView" if owner_type == 0 else "IModelDoc2")
             expected_owner = view if owner_type == 0 else source
-            capture(f"{role}.annotation-owner.expected", lambda owner=owner, expected_owner=expected_owner: app.IsSame(owner, expected_owner), requires=(owner, expected_owner))
-    capture("dimension.source-vs-imported", lambda: app.IsSame(dimensions["source"], dimensions["drawing"]), requires=tuple(dimensions.values()))
-    capture("dimension.feature-source-vs-imported", lambda: app.IsSame(features["source"], features["drawing"]), requires=tuple(features.values()))
+            capture(f"{role}.annotation-owner.expected", lambda owner=owner, expected_owner=expected_owner: app.IsSame(owner, expected_owner), requires=(app, owner, expected_owner))
+    capture("dimension.source-vs-imported", lambda: app.IsSame(dimensions["source"], dimensions["drawing"]), requires=(app, *dimensions.values()))
+    capture("dimension.feature-source-vs-imported", lambda: app.IsSame(features["source"], features["drawing"]), requires=(app, *features.values()))
 
     def entity_owner(label, entity, interface):
         bound = native(label, entity, interface)
@@ -733,19 +746,19 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
             capture(f"reverse.{role}.bound-not-probed", lambda: {"distinct_bound": distinct_bound})
         mapped_owner = capture(f"reverse.{role}.owner.GetCorresponding2", lambda: extension.GetCorresponding2(view_owner), objects=True, requires=(extension, view_owner))
         mapped_owner = native(f"reverse.{role}.owner-result", mapped_owner, "ISketch")
-        capture(f"reverse.{role}.owner-same-source", lambda: app.IsSame(mapped_owner, model_owner), requires=(mapped_owner, model_owner))
+        capture(f"reverse.{role}.owner-same-source", lambda: app.IsSame(mapped_owner, model_owner), requires=(app, mapped_owner, model_owner))
         forward = capture(f"forward.{role}.GetCorresponding", lambda: view.GetCorresponding(model_entity), objects=True, requires=(model_entity,))
         forward, forward_owner = entity_owner(f"forward.{role}.result", forward, interface)
-        capture(f"forward.{role}.owner-same-drawing", lambda: app.IsSame(forward_owner, view_owner), requires=(forward_owner, view_owner))
+        capture(f"forward.{role}.owner-same-drawing", lambda: app.IsSame(forward_owner, view_owner), requires=(app, forward_owner, view_owner))
         # IDs are recorded independently, never equated across model/view frames.
         capture(f"forward.{role}.same-context-IDs", lambda: (tuple(forward.GetID() or ()), tuple(view_entity.GetID() or ())), requires=(forward, view_entity))
     if "point" in owners:
         for role, owner in zip(("source", "drawing"), owners["point"], strict=True):
             feature_sketch = feature_sketches.get(role)
-            capture(f"{role}.point-owner-same-dimension-feature", lambda owner=owner, feature_sketch=feature_sketch: app.IsSame(owner, feature_sketch), requires=(owner, feature_sketch))
+            capture(f"{role}.point-owner-same-dimension-feature", lambda owner=owner, feature_sketch=feature_sketch: app.IsSame(owner, feature_sketch), requires=(app, owner, feature_sketch))
         forward_owner = capture("forward.source-sketch.GetCorresponding", lambda: view.GetCorresponding(owners["point"][0]), objects=True, requires=(owners["point"][0],))
         forward_owner = native("forward.source-sketch.result", forward_owner, "ISketch")
-        capture("forward.source-sketch.same-drawing", lambda: app.IsSame(forward_owner, owners["point"][1]), requires=(forward_owner, owners["point"][1]))
+        capture("forward.source-sketch.same-drawing", lambda: app.IsSame(forward_owner, owners["point"][1]), requires=(app, forward_owner, owners["point"][1]))
     view_feature = capture("forward.dimension-feature.GetCorresponding", lambda: view.GetCorresponding(features["source"]), objects=True, requires=(features["source"],))
     view_feature = native("forward.dimension-feature.result", view_feature, "IFeature")
     feature_type = capture("forward.dimension-feature.GetTypeName2", lambda: view_feature.GetTypeName2(), requires=(view_feature,))
@@ -753,37 +766,57 @@ def _audit_flat_correspondence(adapter, view, source_display, display, source_en
         feature_sketch = capture("forward.dimension-feature.GetSpecificFeature2", lambda: view_feature.GetSpecificFeature2(), objects=True)
         feature_sketch = native("forward.dimension-feature.sketch", feature_sketch, "ISketch")
         if "point" in owners:
-            capture("forward.dimension-feature.sketch-same-drawing", lambda: app.IsSame(feature_sketch, owners["point"][1]), requires=(feature_sketch, owners["point"][1]))
+            capture("forward.dimension-feature.sketch-same-drawing", lambda: app.IsSame(feature_sketch, owners["point"][1]), requires=(app, feature_sketch, owners["point"][1]))
 
     # Existing stock-note topology control, WITHOUT selecting or adding a note.
     block = capture("control.part.FeatureByName", lambda: _early_bound(source, "IPartDoc").FeatureByName("Block"), objects=True, requires=(source,))
     block = native("control.block", block, "IFeature")
     view_block = capture("control.view.GetCorresponding", lambda: view.GetCorresponding(block), objects=True, requires=(block,))
     view_block = native("control.view-block", view_block, "IFeature")
-    faces = capture("control.view-block.GetFaces", lambda: tuple(view_block.GetFaces() or ()), objects=True, requires=(view_block,))
+    faces = capture("control.view-block.GetFaces", lambda: view_block.GetFaces(), objects=True, requires=(view_block,))
+    inventory = capture("control.view-block.face-inventory", lambda: tuple(faces), objects=True, requires=(faces,))
     selector = PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)
     source_face = capture("control.source-flat", lambda: resolve_faces(source, {"flat": selector})["flat"], objects=True, requires=(source,))
     source_face = native("control.source-flat", source_face, "IFace2")
     matches = []
-    for index, face in enumerate(faces or ()):
-        geometry = capture(f"control.face[{index}].geometry", lambda face=face: face_geometry(face), objects=True)
-        if geometry is not None and capture(f"control.face[{index}].selector", lambda geometry=geometry: selector.matches(geometry)):
-            matches.append(face)
-    capture("control.view-flat-count", lambda: len(matches))
-    if len(matches) == 1:
+    complete = inventory is not None
+    if inventory is not None:
+        for index, face in enumerate(inventory):
+            geometry = capture(f"control.face[{index}].geometry", lambda face=face: face_geometry(face), objects=True)
+            if geometry is None:
+                complete = False
+                continue
+            selected = capture(f"control.face[{index}].selector", lambda geometry=geometry: selector.matches(geometry))
+            if type(selected) is not bool:
+                complete = False
+            elif selected:
+                matches.append(face)
+    capture("control.view-flat-inventory", lambda: {
+        "status": "unavailable" if inventory is None else "complete" if complete else "incomplete",
+        "face_count": len(inventory) if inventory is not None else None,
+        "known_matching_faces": len(matches) if inventory is not None else None,
+        "unique_match_proven": complete and len(matches) == 1,
+    })
+    capture("control.view-flat-count", lambda: len(matches), requires=(inventory if complete else None,))
+    if complete and len(matches) == 1:
         view_face = native("control.view-flat", matches[0], "IFace2")
         canonical = capture("control.GetCorrespondingEntity2", lambda: extension.GetCorrespondingEntity2(view_face), objects=True, requires=(extension, view_face))
         canonical = native("control.canonical-face", canonical, "IFace2")
-        capture("control.canonical-same-source", lambda: app.IsSame(canonical, source_face), requires=(canonical, source_face))
+        capture("control.canonical-same-source", lambda: app.IsSame(canonical, source_face), requires=(app, canonical, source_face))
     for role, document in (("source", source), ("drawing", drawing), ("active", active)):
         capture(f"{role}.GetSaveFlag.after", lambda document=document: document.GetSaveFlag(), requires=(document,))
-    _telemetry.info(
-        f"clamp correspondence failure census complete: name={name}, readers={len(rows)}; original attachment refusal retained",
-        operation_stage=stage, diagnostic_reader_count=len(rows),
-        diagnostic_unavailable_count=sum(row["status"] == "unavailable" for row in rows),
-        diagnostic_null_count=sum(row["status"] == "null" for row in rows),
-        diagnostic_only=True, original_refusal_retained=True,
-    )
+    try:
+        _telemetry.info(
+            f"clamp correspondence failure census complete: name={name}, readers={len(rows)}; original attachment refusal retained",
+            operation_stage=stage, diagnostic_reader_count=len(rows),
+            diagnostic_unavailable_count=sum(row["status"] == "unavailable" for row in rows),
+            diagnostic_null_count=sum(row["status"] == "null" for row in rows),
+            diagnostic_logging_failures=json.dumps([row for row in rows if "logging_error" in row], default=diagnostic_text),
+            diagnostic_only=True, original_refusal_retained=True,
+        )
+    except Exception:
+        # Diagnostic transport failure cannot stop the caller's original refusal.
+        pass
 
 
 def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> dict[str, Any]:
