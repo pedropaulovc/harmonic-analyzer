@@ -641,6 +641,42 @@ def test_unreadable_center_mark_ink_is_not_treated_as_an_empty_caption_lane(monk
         drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
 
 
+@pytest.mark.parametrize("line, intersects", (
+    ((0.310, 0.170, 0.310, 0.190), True),
+    ((0.310, 0.190, 0.310, 0.170), True),
+    ((0.295, 0.170, 0.295, 0.190), False),
+    ((0.305, 0.180, 0.315, 0.180), True),
+))
+def test_retained_mark_dimension_line_intersection_is_independent_of_text_clearance(monkeypatch, line, intersects):
+    adapter, section, iso, annotation, caption = _annotation_layout_fixture(monkeypatch)
+    mark = SimpleNamespace(display=lambda _view: {
+        "lines": [_native_line(0.300, 0.180, 0.320, 0.180)],
+    })
+    section.marks = [mark]
+    original_display = annotation.display
+
+    def display(view):
+        native = original_display(view)
+        native["lines"].append(_native_line(*line))
+        return native
+
+    annotation.display = display
+    if intersects:
+        with pytest.raises(RuntimeError, match="dimension line intersects section centre mark"):
+            drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+    else:
+        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+    # Both text blocks are clear in EVERY case. Only the extra dimension
+    # segment changes the verdict; a text/mark collision cannot mask the bug.
+    mark_box = Box(0.300, 0.180, 0.320, 0.180)
+    ink = drawing._dimension_layout_ink(adapter, annotation, label="mouth")
+    extent = caption.GetExtent()
+    caption_box = Box(extent[0], extent[1], extent[3], extent[4])
+    assert Box(*ink.text).gap(mark_box) >= 0.002
+    assert caption_box.gap(mark_box) >= 0.002
+    assert section.marks == [mark]
+
+
 def _tap_name_adapter(monkeypatch, *, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
     """Model distinct returned dispatch metadata and concrete string interfaces."""
     from win32com.client import dynamic

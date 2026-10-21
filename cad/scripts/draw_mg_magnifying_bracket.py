@@ -37,8 +37,8 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sections import create_section_view
 from _hole_callout_thread_class import omit_title_block_thread_class
-from _layout_audit import _display_segments
-from _layout_geometry import estimate_text_box, union_boxes
+from _layout_audit import _collinear_overlap, _display_segments, _segment_crossing
+from _layout_geometry import Segment, estimate_text_box, union_boxes
 from _paths import CAD_ROOT
 from _session import run_build
 from _section_axis import position_section_caption
@@ -278,6 +278,7 @@ def _layout_mouth_annotations(adapter: Any, section: Any, iso: Any, annotations:
     # Keep them: screen position alone does not prove removable attachments.
     # The wrapped qualifier sits right of their arms; the caption sits below.
     mark_lines = {}
+    mark_segments = []
     for index, mark in enumerate(_early_bound(section, "IView").GetAnnotationsByType(13) or ()):
         display, errors = annotation_display(adapter, mark)
         lines = display.get("lines", ())
@@ -285,9 +286,16 @@ def _layout_mouth_annotations(adapter: Any, section: Any, iso: Any, annotations:
             raise RuntimeError(f"thread-mouth centre mark {index} has unreadable native ink: {errors}")
         for line_index, line in enumerate(_display_segments(display)):
             mark_lines[f"section centre mark {index}/{line_index}"] = (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1))
+            mark_segments.append((f"section centre mark {index}/{line_index}", line))
     require_clear("mouth callout", ink.text, mark_lines)
     require_clear("mouth caption", caption, mark_lines)
-    require_leader_clear(ink, mark_lines)
+    # Text clearance accepts zero-area line bounds; box-interior crossing
+    # does not. Keep the actual segments for dimension-line/mark crossings.
+    for line in ink.leader:
+        segment = Segment(line.x0, line.y0, line.x1, line.y1)
+        for label, mark_segment in mark_segments:
+            if _segment_crossing(segment, mark_segment) is not None or _collinear_overlap(segment, mark_segment, tol=0.0) is not None:
+                raise RuntimeError(f"thread-mouth dimension line intersects {label}")
     require_leader_clear(ink, {"caption": caption, "isometric": iso_outline})
     for line in ink.leader:
         require_inside("mouth dimension line/witness", (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), lane)
