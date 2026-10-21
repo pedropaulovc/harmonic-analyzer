@@ -2918,7 +2918,7 @@ def test_grouping_rejects_unproved_drawing_model_correspondence(monkeypatch, fai
             return original(entity)
 
         fixture.model.Extension.GetCorresponding2 = unavailable
-    with pytest.raises(RuntimeError) as refused:
+    with pytest.raises(_WitnessComError if failure == "mapping-error" else RuntimeError) as refused:
         drawing._group_flat_locations(fixture.adapter, view, annotations)
     assert all(a.Visible == 1 for a in annotations)
     assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in annotations)
@@ -3053,7 +3053,7 @@ def test_correspondence_failure_observer_retains_exact_handles_and_original_refu
     assert observed[0][2][0]["mapping_attempted"] is True
     assert observed[0][2][0]["mapped_present"] is False
     assert sum(entity is point for entity in fixture.mapping_calls) == 1
-    assert isinstance(refused.value.__cause__, RuntimeError)
+    assert refused.value.__cause__ is None  # Preserve the actual guard, not a replacement wrapper.
     assert all(a.Visible == 1 for a in annotations)
     if observer_raises:
         assert any("optional diagnostic reader failed" in fields.get("diagnostic_error", "") for _message, fields in fixture.events)
@@ -3069,10 +3069,23 @@ def test_successful_grouping_does_not_run_failure_census(monkeypatch) -> None:
     drawing._group_flat_locations(fixture.adapter, view, annotations)
 
 
-@pytest.mark.parametrize("fault", ("none", "path-reader", "point-interface"))
+@pytest.mark.parametrize("fault", (
+    "none", "path-reader", "point-interface", "app-bind", "reader-unprintable",
+    "logger-once", "logger-all", "getfaces-null", "getfaces-error",
+    "empty-tuple", "empty-list", "geometry-error", "geometry-null",
+    "selector-error", "two-face-errors",
+))
 def test_failure_census_collects_independent_controls_without_repeating_raw_point(monkeypatch, fault) -> None:
     import json
     import sys
+    import _telemetry
+
+    class UnprintableDiagnosticError(Exception):
+        def __repr__(self):
+            raise ValueError("diagnostic repr failed")
+
+        def __str__(self):
+            raise ValueError("diagnostic str failed")
 
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     generated = sys.modules["solidworks_mcp.adapters._generated.sldworks_2026"]
@@ -3107,11 +3120,17 @@ def test_failure_census_collects_independent_controls_without_repeating_raw_poin
     ):
         equip(value, interface)
     drawing_document = equip(SimpleNamespace(), "IModelDoc2")
+    save_reads = []
+
+    def save_flag(path):
+        save_reads.append(path)
+        return False
+
     for document, kind, path in ((fixture.model, 1, "Clamp.Part"), (drawing_document, 3, "Clamp.Drawing")):
         document.GetType = lambda kind=kind: kind
         document.GetTitle = lambda path=path: path
         document.GetPathName = lambda path=path: path
-        document.GetSaveFlag = lambda: False
+        document.GetSaveFlag = lambda path=path: save_flag(path)
     fixture.adapter.swApp.ActiveDoc = drawing_document
     adapter = SimpleNamespace(currentModel=drawing_document, swApp=fixture.adapter.swApp)
     annotation.OwnerType, annotation.Owner = 0, view
@@ -3124,17 +3143,43 @@ def test_failure_census_collects_independent_controls_without_repeating_raw_poin
     block = equip(SimpleNamespace(), "IFeature")
     view_block = equip(SimpleNamespace(GetFaces=lambda: (view_face,)), "IFeature")
     fixture.model.FeatureByName = lambda name: block if name == "Block" else feature
-    fixture.model.Extension.GetCorrespondingEntity2 = lambda entity: source_face if entity is view_face else None
+    canonical_calls = []
+
+    def canonical_face(entity):
+        canonical_calls.append(entity)
+        return source_face if entity is view_face else None
+
+    fixture.model.Extension.GetCorrespondingEntity2 = canonical_face
     monkeypatch.setattr(drawing, "resolve_faces", lambda _model, _selectors: {"flat": source_face})
-    monkeypatch.setattr(drawing, "face_geometry", lambda _face: object())
-    monkeypatch.setattr(drawing, "PlanarFace", lambda *_args: SimpleNamespace(matches=lambda _geometry: True))
+    bad_face, other_bad_face = object(), object()
+
+    def geometry(face):
+        if face is bad_face and fault in ("geometry-error", "two-face-errors"):
+            raise UnprintableDiagnosticError()
+        if face is bad_face and fault == "geometry-null":
+            return None
+        return face
+
+    def selected(geometry):
+        if (geometry is bad_face and fault == "selector-error") or (geometry is other_bad_face and fault == "two-face-errors"):
+            raise UnprintableDiagnosticError()
+        return True
+
+    monkeypatch.setattr(drawing, "face_geometry", geometry)
+    monkeypatch.setattr(drawing, "PlanarFace", lambda *_args: SimpleNamespace(matches=selected))
     forward = {
         id(source_point): point, id(source_flat): flat, id(fixture.sketch): fixture.drawing_sketch,
         id(feature): view_feature, id(block): view_block,
     }
     view.GetCorresponding = lambda entity: forward.get(id(entity))
     bound_point = equip(SimpleNamespace(GetID=point.GetID, GetSketch=point.GetSketch), "ISketchPoint")
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: bound_point if value is point and interface == "ISketchPoint" else value)
+
+    def bind(value, interface):
+        if interface == "ISldWorks" and fault == "app-bind":
+            raise UnprintableDiagnosticError()
+        return bound_point if value is point and interface == "ISketchPoint" else value
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     fixture.correspondence[id(point)] = None
     fixture.correspondence[id(bound_point)] = source_point
     fixture.correspondence[id(fixture.drawing_sketch)] = fixture.sketch
@@ -3143,12 +3188,37 @@ def test_failure_census_collects_independent_controls_without_repeating_raw_poin
     drawing_document.Extension = equip(SimpleNamespace(
         GetPersistReference3=lambda entity: b"\x03" if entity is point or entity is bound_point else b"\x04" if entity is flat else None,
     ), "IModelDocExtension")
-    if fault == "path-reader":
+    if fault in ("path-reader", "reader-unprintable"):
         def unavailable_path():
+            if fault == "reader-unprintable":
+                raise UnprintableDiagnosticError()
             raise RuntimeError("path reader unavailable")
         fixture.model.GetPathName = unavailable_path
     elif fault == "point-interface":
         point._oleobj_.capabilities[_WitnessDispatch.point_iid] = _WitnessComError(-2147418111)
+    elif fault in ("logger-once", "logger-all"):
+        sink = _telemetry.info
+
+        def failing_logger(message, **fields):
+            if fault == "logger-all" or fields.get("census_reader") == "source.GetPathName":
+                raise UnprintableDiagnosticError()
+            sink(message, **fields)
+
+        monkeypatch.setattr(_telemetry, "info", failing_logger)
+    elif fault == "getfaces-null":
+        view_block.GetFaces = lambda: None
+    elif fault == "getfaces-error":
+        def unavailable_faces():
+            raise UnprintableDiagnosticError()
+        view_block.GetFaces = unavailable_faces
+    elif fault == "empty-tuple":
+        view_block.GetFaces = lambda: ()
+    elif fault == "empty-list":
+        view_block.GetFaces = lambda: []
+    elif fault in ("geometry-error", "geometry-null", "selector-error"):
+        view_block.GetFaces = lambda: (view_face, bad_face)
+    elif fault == "two-face-errors":
+        view_block.GetFaces = lambda: (view_face, bad_face, other_bad_face)
     result = drawing._audit_flat_correspondence(
         adapter, view, source_display, display, source_entities, (10, 11), attached, (10, 11),
         [{"role": "point", "mapping_attempted": True, "mapped_present": False}],
@@ -3156,21 +3226,130 @@ def test_failure_census_collects_independent_controls_without_repeating_raw_poin
     )
     assert result is None  # Diagnostics never return an accepted attachment.
     assert all(entity is not point for entity in fixture.mapping_calls)
+    assert save_reads.count("Clamp.Part") == 2
+    assert save_reads.count("Clamp.Drawing") == (2 if fault == "app-bind" else 4)
+    if fault == "logger-all":
+        assert canonical_calls == [view_face]  # Later independent native control still ran.
+        return
     records = {row["reader"]: row for _message, fields in fixture.events if "census_row" in fields for row in [json.loads(fields["census_row"])]}
     assert records["reverse.point.raw-already-attempted"]["value"] == {"mapped_present": False, "repeated": False}
     assert records["reverse.flat.raw.GetCorresponding2"]["status"] == "read"
     assert records["forward.dimension-feature.GetCorresponding"]["status"] == "read"
-    assert records["control.canonical-same-source"]["value"] == 1
+    inventory = records["control.view-flat-inventory"]["value"]
+    if fault in ("getfaces-null", "getfaces-error"):
+        assert inventory == {"status": "unavailable", "face_count": None, "known_matching_faces": None, "unique_match_proven": False}
+        assert records["control.view-flat-count"]["status"] == "skipped"
+        assert "value" not in records["control.view-flat-count"]
+        assert records["control.view-block.GetFaces"]["status"] == ("null" if fault == "getfaces-null" else "unavailable")
+        assert not canonical_calls and "control.canonical-same-source" not in records
+    elif fault in ("empty-tuple", "empty-list"):
+        assert inventory == {"status": "complete", "face_count": 0, "known_matching_faces": 0, "unique_match_proven": False}
+        assert records["control.view-block.GetFaces"]["status"] == "read"
+        assert records["control.view-flat-count"]["status"] == "read"
+        assert records["control.view-flat-count"]["value"] == 0
+        assert not canonical_calls
+    elif fault in ("geometry-error", "geometry-null", "selector-error", "two-face-errors"):
+        assert inventory["status"] == "incomplete" and inventory["known_matching_faces"] == 1
+        assert inventory["unique_match_proven"] is False
+        assert records["control.view-flat-count"]["status"] == "skipped"
+        assert "value" not in records["control.view-flat-count"]
+        assert not canonical_calls and "control.canonical-same-source" not in records
+        if fault == "two-face-errors":
+            assert inventory["face_count"] == 3
+            assert records["control.face[1].geometry"]["status"] == "unavailable"
+            assert records["control.face[2].selector"]["status"] == "unavailable"
+        else:
+            reader = "control.face[1].selector" if fault == "selector-error" else "control.face[1].geometry"
+            assert records[reader]["status"] == ("null" if fault == "geometry-null" else "unavailable")
+    elif fault == "app-bind":
+        assert records["application.bind.ISldWorks"]["status"] == "unavailable"
+        assert records["application.ActiveDoc"]["status"] == "skipped"
+        assert records["source.GetPathName"]["status"] == "read"
+        assert records["source.FullName"]["status"] == "read"
+        assert records["control.GetCorrespondingEntity2"]["status"] == "read"
+        assert records["control.canonical-same-source"]["status"] == "skipped"
+    else:
+        assert inventory["status"] == "complete" and inventory["unique_match_proven"] is True
+        assert records["control.canonical-same-source"]["value"] == 1
     assert records["source.GetSaveFlag.after"]["value"] is False
     assert records["drawing.GetSaveFlag.after"]["value"] is False
     assert records["point.drawing-in-source.GetPersistReference3"]["status"] == "null"
     assert records["point.drawing-native.persistent-reference"]["value"] == {"length": 1, "hex": "03"}
-    if fault == "path-reader":
+    if fault in ("path-reader", "reader-unprintable"):
         assert records["source.GetPathName"]["status"] == "unavailable"
         assert records["source.FullName"]["status"] == "read"
+        if fault == "reader-unprintable":
+            assert records["source.GetPathName"]["error"] == "<unprintable diagnostic value>"
+    elif fault == "logger-once":
+        assert "source.GetPathName" not in records
+        assert records["source.FullName"]["status"] == "read"
+        summary = next(fields for _message, fields in reversed(fixture.events) if "diagnostic_logging_failures" in fields)
+        failures = json.loads(summary["diagnostic_logging_failures"])
+        assert len(failures) == 1 and failures[0]["reader"] == "source.GetPathName"
+        assert failures[0]["status"] == "read" and failures[0]["logging_error"] == "<unprintable diagnostic value>"
     elif fault == "point-interface":
         assert records["drawing.point.QI.ISketchPoint"]["value"]["supported"] is None
         assert "reverse.point.bound.GetCorresponding2" not in records
     else:
         assert records["reverse.point.bound.GetCorresponding2"]["status"] == "read"
-        assert records["forward.point.owner-same-drawing"]["value"] == 1
+        if fault == "app-bind":
+            assert records["forward.point.owner-same-drawing"]["status"] == "skipped"
+        else:
+            assert records["forward.point.owner-same-drawing"]["value"] == 1
+
+
+@pytest.mark.parametrize("fault", (
+    "observer", "observer-repr", "primary-logger", "fallback-logger",
+    "both-loggers", "original-repr",
+))
+def test_attachment_failure_preserves_original_object_and_native_traceback(monkeypatch, fault) -> None:
+    import _telemetry
+
+    class UnprintableDiagnosticError(Exception):
+        def __repr__(self):
+            raise ValueError("secondary repr failed")
+
+        def __str__(self):
+            raise ValueError("secondary str failed")
+
+    class UnprintableOriginal(RuntimeError):
+        def __repr__(self):
+            raise ValueError("original repr failed")
+
+    original = UnprintableOriginal("native attachment refusal") if fault == "original-repr" else RuntimeError("native attachment refusal")
+    native_tracebacks, observations, logs = [], [], []
+
+    def native_reader():
+        try:
+            raise original
+        except RuntimeError:
+            native_tracebacks.append(original.__traceback__)
+            raise
+
+    def observer(attached, types, mappings):
+        observations.append((attached, types, mappings))
+        if fault in ("observer-repr", "both-loggers"):
+            raise UnprintableDiagnosticError()
+        if fault in ("observer", "fallback-logger"):
+            raise ValueError("optional observer failed")
+
+    def logger(message, **fields):
+        primary = "attachment_readback_error" in fields
+        if fault == "both-loggers" or (primary and fault == "primary-logger") or (not primary and fault == "fallback-logger"):
+            raise UnprintableDiagnosticError()
+        logs.append((message, fields))
+
+    annotation = SimpleNamespace(GetAttachedEntities3=native_reader)
+    display = SimpleNamespace(GetAnnotation=lambda: annotation)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_telemetry, "info", logger)
+    with pytest.raises(RuntimeError, match="native attachment refusal") as refused:
+        part._point_flat_attachment(SimpleNamespace(), display, object(), stage="original-refusal", failure_observer=observer)
+    assert refused.value is original
+    assert observations == [((), (), [])]
+    current = refused.value.__traceback__
+    while current is not None and current is not native_tracebacks[0]:
+        current = current.tb_next
+    assert current is native_tracebacks[0]  # Retain the actual native-raise frame.
+    if fault == "observer-repr":
+        assert logs[-1][1]["diagnostic_error"] == "<unprintable failure-observer exception>"

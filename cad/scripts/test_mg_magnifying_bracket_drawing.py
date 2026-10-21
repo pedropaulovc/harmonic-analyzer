@@ -788,7 +788,7 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
     assert state.definition == "DRILL " + native_definition + "\n" + spec.MOUNTING_HOLE_PROCESS
 
 
-@pytest.mark.parametrize("thread_failure", (None, "native", "diagnostic", "capture"))
+@pytest.mark.parametrize("thread_failure", (None, "native", "diagnostic", "diagnostic_unprintable", "capture", "capture_unprintable"))
 def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_moving_its_tip(monkeypatch, tmp_path, thread_failure) -> None:
     """Replay observed collisions; relocated native ink still needs seat proof."""
     adapter, side, callout, state, required = _tap_name_adapter(monkeypatch)
@@ -831,6 +831,13 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     events = []
     original = RuntimeError("native thread does not show both longitudinal flanks")
+    class UnprintableDiagnostic(ValueError):
+        def __str__(self):
+            raise ValueError("secondary str failed")
+
+        def __repr__(self):
+            raise ValueError("secondary repr failed")
+
 
     def capture_failure(active_adapter, label, message, **kwargs):
         assert thread_failure is not None
@@ -838,6 +845,10 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
         assert kwargs["exception"] is original and kwargs["sheet_png"] is True
         if thread_failure == "diagnostic":
             assert "secondary diagnostic failure" in kwargs["thread_evidence"]["errors"]["diagnostic"]
+        elif thread_failure == "diagnostic_unprintable":
+            assert kwargs["thread_evidence"]["errors"]["diagnostic"] == (
+                "UnprintableDiagnostic: <unprintable diagnostic exception>"
+            )
         else:
             assert kwargs["thread_evidence"] == {"observed": "native"}
         assert kwargs["section_label"] == "A-A"
@@ -845,14 +856,19 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
         events.append("capture-native-and-png")
         if thread_failure == "capture":
             raise ValueError("secondary export failure")
+        if thread_failure == "capture_unprintable":
+            raise UnprintableDiagnostic()
         raise original
 
     # Never let this pure fixture invoke host-facing forensic collaborators.
     monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture_failure)
     def diagnostic(*_args):
         events.append("diagnostic")
+        captured["original_traceback"] = original.__traceback__
         if thread_failure == "diagnostic":
             raise ValueError("secondary diagnostic failure")
+        if thread_failure == "diagnostic_unprintable":
+            raise UnprintableDiagnostic()
         return {"observed": "native"}
 
     monkeypatch.setattr(drawing, "_mouth_thread_diagnostic", diagnostic)
@@ -864,11 +880,25 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
         monkeypatch.setattr(drawing, "_show_mouth_thread", fail_thread)
         if thread_failure == "capture":
             def fail_warning(*_args):
+                captured["warning_attempted"] = True
                 raise ValueError("secondary logging failure")
             monkeypatch.setattr(drawing._telemetry, "warn", fail_warning)
         with pytest.raises(RuntimeError) as raised:
             asyncio.run(drawing.build(adapter))
         assert raised.value is original
+        assert str(raised.value) == "native thread does not show both longitudinal flanks"
+        traceback = raised.value.__traceback__
+        frames = []
+        retained_original = False
+        while traceback is not None:
+            retained_original |= traceback is captured["original_traceback"]
+            frames.append(traceback.tb_frame.f_code.co_name)
+            traceback = traceback.tb_next
+        assert retained_original and "fail_thread" in frames
+        assert "capture_failure" not in frames and "diagnostic" not in frames
+        assert "fail_warning" not in frames
+        if thread_failure == "capture":
+            assert captured["warning_attempted"]
         assert events == ["guard", "diagnostic", "capture-native-and-png"]
         assert "finalize" not in captured and "wall" not in captured
         return
@@ -1121,10 +1151,18 @@ def test_section_thread_requires_real_native_longitudinal_ink(monkeypatch, repre
     ("annotation.polyline[0]",),
     ("view.mode", "primary.line_count", "annotation.line[0]"),
 ))
-def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypatch, faults):
+@pytest.mark.parametrize("secondary_failure", (None, "exception_format", "logger"))
+def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypatch, faults, secondary_failure):
     class Opaque(SimpleNamespace):
         def __repr__(self):
             raise AssertionError("logging must record presence, not dispatch repr")
+
+    class UnprintableDiagnostic(RuntimeError):
+        def __repr__(self):
+            raise ValueError("secondary repr failed")
+
+        def __str__(self):
+            raise ValueError("secondary str failed")
 
     calls = []
     messages = []
@@ -1135,6 +1173,8 @@ def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypat
     def probe(key, value):
         calls.append(key)
         if key in faults:
+            if secondary_failure == "exception_format":
+                raise UnprintableDiagnostic()
             raise RuntimeError(f"injected {key}")
         return value
 
@@ -1162,7 +1202,12 @@ def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypat
         GetDisplayMode2=lambda: probe("view.mode", 2),
         GetCThreadQuality=lambda: probe("view.quality", True),
     )
-    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    def log(message):
+        messages.append(message)
+        if secondary_failure == "logger":
+            raise ValueError("secondary logger failed")
+
+    monkeypatch.setattr(drawing._telemetry, "info", log)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
     monkeypatch.setattr(drawing, "_mouth_profile_box", lambda *_a: (0.300, 0.170, 0.3375, 0.203))
@@ -1172,7 +1217,10 @@ def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypat
     if required_errors:
         with pytest.raises(RuntimeError, match="native ink read failed") as failure:
             drawing._show_mouth_thread(object(), section)
-        assert all(key in str(failure.value) for key in required_errors)
+        if secondary_failure == "exception_format":
+            assert "UnprintableDiagnostic: <unprintable diagnostic exception>" in str(failure.value)
+        else:
+            assert all(key in str(failure.value) for key in required_errors)
     else:
         # Diagnostic counterpart errors do not change primary acceptance.
         drawing._show_mouth_thread(object(), section)
@@ -1189,7 +1237,10 @@ def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypat
                     assert f"{scope}.{family}[{index}]" not in calls
                 else:
                     assert f"{scope}.{family}[{index}]" in calls
-    assert all(any(f"injected {key}" in message for message in messages) for key in faults)
+    if secondary_failure == "exception_format":
+        assert sum("<unprintable diagnostic exception>" in message for message in messages) == len(faults)
+    else:
+        assert all(any(f"injected {key}" in message for message in messages) for key in faults)
     if "view.quality" not in faults:
         assert any("GetCThreadQuality=True" in message for message in messages)
 
@@ -1357,13 +1408,17 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
 
 @pytest.mark.parametrize("feature_name", ("LeverTap", "BracketMountingTaps"))
-@pytest.mark.parametrize("fault", (None, "preferences", "line_reader", "zoom", "update", "all_empty", "polylines"))
+@pytest.mark.parametrize("fault", (None, "preferences", "line_reader", "unprintable_reader", "zoom", "update", "all_empty", "polylines"))
 def test_thread_diagnostic_records_native_generation_without_authorizing_ink(monkeypatch, feature_name, fault):
     import json
 
     class Opaque(SimpleNamespace):
         def __repr__(self):
             raise AssertionError("native dispatch must never be serialized or repr-logged")
+
+    class UnprintableDiagnostic(RuntimeError):
+        def __str__(self):
+            raise ValueError("secondary diagnostic str failed")
 
     events = []
     state = SimpleNamespace(updated=False)
@@ -1395,6 +1450,8 @@ def test_thread_diagnostic_records_native_generation_without_authorizing_ink(mon
 
     def line_count():
         events.append(("line_count", state.updated))
+        if fault == "unprintable_reader" and not state.updated:
+            raise UnprintableDiagnostic()
         if fault == "line_reader" and not state.updated:
             raise RuntimeError("pre-generation line reader refused")
         return 2 if state.updated and fault != "all_empty" else 0
@@ -1478,7 +1535,12 @@ def test_thread_diagnostic_records_native_generation_without_authorizing_ink(mon
         assert "model_polylines.edge[1].source_id" not in reads
         assert reads["model_polylines.records"] == record + record
     assert "NOT cosmetic-thread ownership" in result["model_polylines_role"]
-    if fault in ("preferences", "line_reader", "zoom", "update", "polylines"):
+    if fault == "unprintable_reader":
+        for family in ("ICThread", "IAnnotation"):
+            key = f"before_generation.thread[0].{family}.lines.count"
+            assert key not in reads
+            assert errors[key] == "UnprintableDiagnostic: <unprintable diagnostic exception>"
+    if fault in ("preferences", "line_reader", "unprintable_reader", "zoom", "update", "polylines"):
         assert errors
     else:
         assert not errors

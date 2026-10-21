@@ -522,7 +522,11 @@ def _mouth_thread_diagnostic(adapter: Any, section: Any, *, feature_name: str = 
             evidence["reads"][name] = {"present": value is not None} if opaque else value
             return value
         except Exception as error:
-            evidence["errors"][name] = f"{type(error).__name__}: {error}"
+            try:
+                detail = f"{type(error).__name__}: {error}"
+            except Exception:
+                detail = f"{type(error).__name__}: <unprintable diagnostic exception>"
+            evidence["errors"][name] = detail
             return None
 
     view = _early_bound(section, "IView")
@@ -667,13 +671,18 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
         try:
             value = read()
         except Exception as error:
-            detail = f"{scope}: {member}: {error!r}"
-            _telemetry.info(f"thread-mouth {scope}: member={member}, error={error!r}")
+            try:
+                detail = f"{scope}: {member}: {error!r}"
+            except Exception:
+                detail = f"{scope}: {member}: {type(error).__name__}: <unprintable diagnostic exception>"
             if required:
                 errors.append(detail)
+            with contextlib.suppress(Exception):
+                _telemetry.info(f"thread-mouth {detail}")
             return unavailable
-        shown = f"present={value is not None}" if member in ("ICThread.GetAnnotation", "ICThread.GetDisplayData", "IAnnotation.GetDisplayData") else repr(value)
-        _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={shown}")
+        with contextlib.suppress(Exception):
+            shown = f"present={value is not None}" if member in ("ICThread.GetAnnotation", "ICThread.GetDisplayData", "IAnnotation.GetDisplayData") else repr(value)
+            _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={shown}")
         return value
 
     def collect_display(data: Any, scope: str, *, required: bool) -> dict[str, list[Any]]:
@@ -688,7 +697,8 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
                 continue  # Only this count's dependent index reads are unavailable.
             if count < 0:
                 detail = f"{scope}: {count_member}: invalid negative count {count}"
-                _telemetry.info(f"thread-mouth {detail}")
+                with contextlib.suppress(Exception):
+                    _telemetry.info(f"thread-mouth {detail}")
                 if required:
                     errors.append(detail)
                 continue
@@ -713,7 +723,8 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
     data = collect("native ink", "ICThread.GetDisplayData", lambda: _early_bound(thread.GetDisplayData(), "IDisplayData"), required=True)
     primary = {"line": [], "polyline": [], "arc": []}
     if data is not unavailable:
-        _telemetry.info(f"thread-mouth native ink: dataPresent={data is not None}")
+        with contextlib.suppress(Exception):
+            _telemetry.info(f"thread-mouth native ink: dataPresent={data is not None}")
         if data is not None:
             primary = collect_display(data, "native ink", required=True)
     # This same-thread counterpart is independent diagnostic evidence only;
@@ -721,7 +732,8 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
     if annotation is not unavailable and annotation is not None:
         other = collect("annotation diagnostic", "IAnnotation.GetDisplayData", lambda: _early_bound(annotation.GetDisplayData(), "IDisplayData"), required=False)
         if other is not unavailable:
-            _telemetry.info(f"thread-mouth annotation diagnostic: dataPresent={other is not None}")
+            with contextlib.suppress(Exception):
+                _telemetry.info(f"thread-mouth annotation diagnostic: dataPresent={other is not None}")
             if other is not None:
                 collect_display(other, "annotation diagnostic", required=False)
     if errors:
@@ -768,7 +780,8 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
                 merged.append((xmin, xmax))
         runs.extend((y, xmin, xmax) for xmin, xmax in merged)
     longitudinal = [run for run in runs if run[2] - run[1] > (profile[2] - profile[0]) / 2.0]
-    _telemetry.info(f"thread-mouth native ink: profile={profile}, longitudinal_runs={longitudinal}")
+    with contextlib.suppress(Exception):
+        _telemetry.info(f"thread-mouth native ink: profile={profile}, longitudinal_runs={longitudinal}")
     centre_y = (profile[1] + profile[3]) / 2.0
     if not any(y < centre_y - 1e-7 for y, _, _ in longitudinal) or not any(y > centre_y + 1e-7 for y, _, _ in longitudinal):
         raise RuntimeError("native thread does not show both longitudinal flanks")
@@ -919,21 +932,34 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         _show_mouth_thread(adapter, mouth)
     except Exception as error:
+        original_traceback = error.__traceback__
         try:
-            thread_evidence = _mouth_thread_diagnostic(adapter, mouth)
-        except Exception as diagnostic_error:
-            thread_evidence = {"errors": {"diagnostic": f"{type(diagnostic_error).__name__}: {diagnostic_error}"}}
-        try:
-            _seat_forensics.capture_com_failure(
-                adapter, f"{PART_STEM}-native-thread", str(error),
-                api="bracket native section thread guard", exception=error,
-                sheet_png=True, section_label="A-A", thread_evidence=thread_evidence,
-            )
-        except Exception as capture_error:
-            if capture_error is not error:
-                with contextlib.suppress(Exception):
-                    _telemetry.warn(f"native thread secondary capture failure: {capture_error!r}")
-        raise
+            try:
+                thread_evidence = _mouth_thread_diagnostic(adapter, mouth)
+            except Exception as diagnostic_error:
+                try:
+                    detail = f"{type(diagnostic_error).__name__}: {diagnostic_error}"
+                except Exception:
+                    detail = f"{type(diagnostic_error).__name__}: <unprintable diagnostic exception>"
+                thread_evidence = {"errors": {"diagnostic": detail}}
+            try:
+                message = str(error)
+            except Exception:
+                message = f"{type(error).__name__}: <unprintable original exception>"
+            try:
+                _seat_forensics.capture_com_failure(
+                    adapter, f"{PART_STEM}-native-thread", message,
+                    api="bracket native section thread guard", exception=error,
+                    sheet_png=True, section_label="A-A", thread_evidence=thread_evidence,
+                )
+            except Exception as capture_error:
+                if capture_error is not error:
+                    with contextlib.suppress(Exception):
+                        _telemetry.warn(f"native thread secondary capture failure: {capture_error!r}")
+        finally:
+            # Forensics normally raises this same object, mutating its traceback.
+            # Optional observers, formatters and loggers must never own the refusal.
+            raise error.with_traceback(original_traceback)
     _remove_out_of_cut_mounting_marks(adapter, mouth)
     landing = model_point_in_view(adapter, side, (NECK_HALF_X / 1000.0, 0.0, -4.5e-3), label="minimum thread-mouth wall")
     add_leader_note(adapter, WALL_CALLOUT, text_xy=WALL_TEXT_XY, attach_xy=landing, view=side, label="honest manufactured minimum wall")
