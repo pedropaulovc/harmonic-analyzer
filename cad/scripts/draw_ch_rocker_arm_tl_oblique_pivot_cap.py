@@ -89,7 +89,10 @@ BOTTOM_KEEP = {
     "PocketDia": (0.060, 0.233),
     "PocketCenterX": (0.1275, 0.115), "PocketCenterY": (0.070, 0.15125),
 }
-SECTION_KEEP = {"CapHeight": (0.365, 0.180), "PocketDepth": (0.330, 0.240)}
+# f0c native readback: crossing the X319.3 mm attachment flips this full
+# 124 mm shoulder rightward. Keep X260 left of it, above the underside's
+# Y213.088 mm padded outline and left of the finish symbol's X269.5 mm.
+SECTION_KEEP = {"CapHeight": (0.365, 0.180), "PocketDepth": (0.260, 0.236)}
 BOLT_SECTION_KEEP = {"EntryReliefDepth": (0.365, 0.140)}
 # Signed bolt coordinates still witness the actual pocket axis. Allocate lanes
 # for the entire three-row block, not just its numeric anchor: the native left
@@ -97,12 +100,12 @@ BOLT_SECTION_KEEP = {"EntryReliefDepth": (0.365, 0.140)}
 BOLT_KEEP = {
     "BoltHoleDia": (0.300, 0.080),
     "Bolt1X": (0.300, 0.100), "Bolt3X": (0.120, 0.095),
-    "Bolt2X": (0.300, 0.245), "Bolt4X": (0.120, 0.215),
+    "Bolt2X": (0.300, 0.245), "Bolt4X": (0.145, 0.215),
     "Bolt1Y": (0.285, 0.135), "Bolt2Y": (0.285, 0.215),
     "Bolt3Y": (0.100, 0.135), "Bolt4Y": (0.100, 0.240),
 }
 REGISTER_KEEP = {
-    "RegisterDia": (0.260, 0.115),
+    "RegisterDia": (0.262, 0.115),
     "Register1X": (0.370, 0.095), "Register2X": (0.310, 0.240),
     "Register1Y": (0.350, 0.135), "Register2Y": (0.240, 0.228),
 }

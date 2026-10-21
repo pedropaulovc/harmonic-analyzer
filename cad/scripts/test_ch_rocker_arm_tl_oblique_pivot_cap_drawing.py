@@ -1031,6 +1031,12 @@ def test_cap_full_bolt_callouts_fit_paper_and_have_separate_rows() -> None:
         (285.4, 127.6, 345.7, 143.9), (285.0, 135.0), drawing.BOLT_KEEP["Bolt1Y"],
     )
     assert right_y[1] - right_x[3] > 5.0
+    # f0c's actual sheet 3 exposed a different collision: the X100 Y-line
+    # crosses Bolt4X's last row [98.0,212.8]..[142.1,216.7] mm.
+    upper_x_row = _cap_paper_box(
+        (98.0, 212.8, 142.1, 216.7), (120.0, 215.0), drawing.BOLT_KEEP["Bolt4X"],
+    )
+    assert upper_x_row[0] - drawing.BOLT_KEEP["Bolt4Y"][0] * 1000.0 > 5.0
 
 
 def test_cap_section_and_register_complete_blocks_clear_context_and_heading() -> None:
@@ -1040,11 +1046,15 @@ def test_cap_section_and_register_complete_blocks_clear_context_and_heading() ->
     )
     assert 255.05 - chamber[3] > 5.0
     assert chamber[1] - (drawing.BOTTOM_CENTER[1] * 1000.0 + spec.LENGTH / 2.0) > 5.0
-    depth = _cap_paper_box(
-        (110.98, 212.91, 235.0, 245.7), (235.0, 230.0), drawing.SECTION_KEEP["PocketDepth"],
-    )
-    assert depth[0] > drawing.BOTTOM_CENTER[0] * 1000.0 + spec.WIDTH / 2.0 + 5.0
-    assert depth[3] < 266.7 - 5.0
+    # Do not translate PocketDepth's old text box: f0c proved the shoulder
+    # flips from left to right when its anchor crosses the feature attachment.
+    # This is a lane/route contract, not post-position native extent evidence.
+    depth_x, depth_y = (value * 1000.0 for value in drawing.SECTION_KEEP["PocketDepth"])
+    assert depth_x < 319.3 - 20.0  # actual native thickness attachment
+    assert depth_x > 124.0215 + 12.7 + 5.0  # space for the full left shoulder
+    assert depth_x < 269.5009 - 5.0  # actual finish-symbol leftmost stroke
+    assert depth_y - 17.09 > 213.088 + 5.0  # padded underside top, not only border
+    assert depth_y + 15.7 < 266.7 - 5.0
     register = _cap_paper_box(
         (153.0, 207.6, 213.1, 223.74), (215.0, 215.0), drawing.REGISTER_KEEP["Register2Y"],
     )
