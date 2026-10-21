@@ -1529,6 +1529,35 @@ Source path/configuration, annotation ownership/type/count, final value,
 dangling/override, inventory and layout guards remain in force. Source-only
 regressions do not by themselves qualify this COM behavior on a native seat.
 
+The thumb-screw sheet keeps axial dimensions on physical finished-face rims
+and diameters on their model-owned source-circle references. Place complete
+native lines with `OffsetText` disabled first, then compare each axial
+label's measured native width with its witness/arrow span. Enable text-only
+offset only where that ink cannot fit with clearance; with the current
+metrics, thread length stays centered at 4:1 but needs a shelf at 2:1.
+Snapshot all three axial dimensions, not just the shelved ones. Reacquire
+witness stations, arrow tips and current line/arrow reach after toggling text
+mode, after placement and at final readback; smart-arrow flips do not permit
+the physical stations to move.
+
+Diameter text uses measured native geometry too. Center the collar label
+between its classified horizontal witnesses, with at least 2 mm of settled
+clearance to each. Put the two-row thread-diameter label below the lower
+collar witness, then recompute the outer collar line's X from the thread
+label's actual right edge. Text shelves and these outside moves target
+2.2 mm of clearance, including a 0.2-mm settling allowance. The collar X
+proof reads the classified native dimension line, not the annotation anchor.
+The current pre-fit budget is intended to allow a natural 4:1 view, not
+promise 5:1; actual native fitting still selects the scale.
+
+The thumb guards reuse `_Reader`/`_dump_annotation`, including native
+leaders, and run the complete `audit_dump` gating predicates with live view
+geometry rather than a reduced list of overlap finders. Source, native
+position and actual-ink checks remain mandatory, including text/line,
+arrow/text and dimension-extension-at-text refusals. Source-only checks do
+not establish a native visual pass or guaranteed scale; the scoped native
+sheet and final shared audit still need qualification.
+
 For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
 `cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,
 `cad/out/pdf/sm-vn-knife-mount-dowel.pdf` and
