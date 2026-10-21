@@ -1752,6 +1752,9 @@ reopens and runs the original `ForceRebuild3` plus `EditRebuild3` path. Both use
 the original verification consumer: six gates, 14 visits, 15 drive writes,
 16 boundary observations, 28 carriage reads and all scheduled interference calls.
 Preparation and remating retain their original SDK rebuilds.
+Every pre-trajectory and post-cleanup resident inventory must be empty, including
+unrelated documents. A survivor makes the pair inconclusive; it does not authorize
+another close or retry.
 
 Admission requires the supported rigid-body, configuration, body-health,
 feature and equation contracts. Unknown native evidence, missing observations,
@@ -1763,8 +1766,9 @@ Reports are `cad/out/reports/jig-dirty-edit.json` and
 `jig-dirty-edit-budget.json`, alongside the existing soundness stamp. A failed
 pair also retains evidence under `reports/failures/`. The cooperative planning
 budget is 60 minutes from the existing process/seat start, including setup,
-hashing and observations, with ten minutes reserved for cleanup. Existing
-budget ledgers are refused; they do not grant a fresh allowance on resubmission.
+hashing and observations, with ten minutes reserved for cleanup. An existing
+budget ledger is refused before native work or report ownership: prior report,
+failure and budget files remain untouched, with no fresh allowance.
 This does not preempt an in-flight COM call or replace the farm timeout.
 `complete-parent-decision-required` records a complete diagnostic pair, not
 approval to change production rebuilding.
@@ -1773,9 +1777,12 @@ The actual-function inert smoke passed both trajectories, report round-trip,
 cleanup and real diagnostic telemetry (two trajectories, 32 boundaries), with
 no refused host action during execution or explicit cleanup. It uses temporary
 ordinary JSONL streams and inert host-capability ports; it does not prove native
-COM, Windows append semantics, network export or performance. The 124 focused
-regressions pass. Native qualification and a later observer-free acceptance
-run remain required before any production cutover or speedup claim.
+COM, Windows append semantics, network export or performance. The 130 focused
+regressions pass, including resident-document isolation and prior-evidence
+preservation. The first native qualification was cancelled after review findings;
+before cancellation acknowledgment, admission rejected `NotesAreaFtrFolder`.
+That feature remains unsupported. Native qualification and a later observer-free
+acceptance run remain required before any production cutover or speedup claim.
 
 ### Backend: Azure Blob over HTTPS (443)
 

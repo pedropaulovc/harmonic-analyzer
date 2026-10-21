@@ -1595,8 +1595,8 @@ def _cleanup(adapter, relevant, budget):
                     _early_bound(adapter.swApp, "ISldWorks").CloseDoc(row["title"])
             result["after"] = _residents(adapter, budget, cleanup=True)
             _require(
-                not any(row["path"] in relevant for row in result["after"]),
-                "relevant visible/hidden document remains resident after discard",
+                not result["after"],
+                "visible/hidden document remains resident after discard",
             )
             result["confirmed"] = not result["errors"]
         except BaseException as exc:
@@ -2400,6 +2400,11 @@ def _compare(b, a, budget):
 async def run(adapter, name, outer_report):
     import verify
 
+    _require(name == verify.SWEEP_OWNER, "dirty-Edit experiment is jig-local only")
+    # Claim this submission before any path can publish or replace its evidence.
+    # Refusing an existing ledger must not enter reporting or native cleanup.
+    submission_budget = Budget(BUDGET_PATH)
+
     evidence = {
         "schema": "jig-dirty-edit-v2",
         "status": "inconclusive",
@@ -2412,6 +2417,8 @@ async def run(adapter, name, outer_report):
         "cleanup": None,
     }
     budget = None
+    # The late assignment below retains the existing native-cleanup ownership
+    # boundary if offline provenance/input discovery fails.
     paths = []
     relevant = set()
     primary = None
@@ -2420,7 +2427,6 @@ async def run(adapter, name, outer_report):
     current = None
     rejection = ""
     try:
-        _require(name == verify.SWEEP_OWNER, "dirty-Edit experiment is jig-local only")
         offline_started = time.perf_counter()
         evidence["provenance"] = _provenance()
         expected, paths = _input_paths(name)
@@ -2431,7 +2437,7 @@ async def run(adapter, name, outer_report):
         }
         initial = _hash_inputs(paths)
         evidence["input_snapshots"].append({"stage": "before-B", "files": initial})
-        budget = Budget(BUDGET_PATH)
+        budget = submission_budget
         budget.offline_s += time.perf_counter() - offline_started
         budget._persist()
 
@@ -2460,8 +2466,8 @@ async def run(adapter, name, outer_report):
             budget.check(f"start-{variant}")
             residents = _residents(adapter, budget)
             _require(
-                not any(row["path"] in relevant for row in residents),
-                "relevant visible/hidden input document is resident before independent open",
+                not residents,
+                "visible/hidden document is resident before independent open",
             )
             if variant == "A":
                 with budget.offline():

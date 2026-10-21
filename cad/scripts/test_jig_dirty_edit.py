@@ -1496,6 +1496,169 @@ def test_run_executes_both_real_consumers_exact_work_and_independent_cleanup(
 
 
 @pytest.mark.parametrize(
+    "stage", ["before-B", "before-A", "after-B-discard", "final-cleanup"]
+)
+def test_actual_run_rejects_unrelated_residents_without_reference_reopen_or_green_cleanup(
+    monkeypatch, tmp_path, stage
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    unrelated = NativePart(tmp_path / "unrelated.SLDPRT")
+    unrelated.GetNext = lambda: None
+    unrelated_row = {
+        "path": str(unrelated.path.resolve()),
+        "title": unrelated.GetTitle(),
+    }
+    if stage == "before-B":
+        adapter.resident_docs.append(unrelated)
+    original_hash = dirty._hash_inputs
+    original_close_all = adapter.swApp.CloseAllDocuments
+    original_close_doc = adapter.swApp.CloseDoc
+    original_static = verify._verify_static_one
+    original_walk = verify._walk_pass_sweep
+    injected = False
+    close_titles = []
+
+    def inject_after_cleanup(paths):
+        nonlocal injected
+        snapshot = original_hash(paths)
+        target = {"before-A": 1, "final-cleanup": 2}.get(stage)
+        if (
+            target is not None
+            and not injected
+            and len(adapter.roots) == target
+            and adapter.currentModel is None
+        ):
+            assert not adapter.resident_docs
+            adapter.resident_docs.append(unrelated)
+            injected = True
+        return snapshot
+
+    def close_all_with_unrelated_survivor(include_unsaved):
+        surviving = unrelated in adapter.resident_docs
+        result = original_close_all(include_unsaved)
+        if surviving or (stage == "after-B-discard" and len(adapter.roots) == 1):
+            adapter.resident_docs.append(unrelated)
+        return result
+
+    def record_owned_close(title):
+        close_titles.append(title)
+        return original_close_doc(title)
+
+    monkeypatch.setattr(dirty, "_hash_inputs", inject_after_cleanup)
+    monkeypatch.setattr(
+        adapter.swApp, "CloseAllDocuments", close_all_with_unrelated_survivor
+    )
+    monkeypatch.setattr(adapter.swApp, "CloseDoc", record_owned_close)
+    outer_report = verify.Report()
+    if stage == "final-cleanup":
+        evidence = asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, outer_report))
+    else:
+        with pytest.raises(dirty.Inconclusive, match="resident|cleanup"):
+            asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, outer_report))
+        evidence = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert evidence["status"] == "inconclusive"
+    assert outer_report.failed
+    assert json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8")) == evidence
+    assert json.loads(dirty.FAILURE_PATH.read_text(encoding="utf-8")) == evidence
+    variants = (
+        [] if stage == "before-B" else ["B", "A"] if stage == "final-cleanup" else ["B"]
+    )
+    assert [row["variant"] for row in evidence["trajectories"]] == variants
+    assert len(adapter.roots) == len(variants)
+    assert verify._verify_static_one is original_static
+    assert verify._walk_pass_sweep is original_walk
+    for root, row in zip(adapter.roots, evidence["trajectories"], strict=True):
+        assert [boundary["key"] for boundary in row["boundaries"]] == EXPECTED_KEYS
+        assert row["counts"] == {
+            "writes": 15,
+            "visits": 14,
+            "reads": 28,
+            "suppressions": 2,
+            "coincidences": 2,
+        }
+        assert len(root.writes) == 15
+        assert len(root.consumer_reads) == 28
+        assert len(root.suppressions) == len(root.coincidents) == 2
+        assert len(root.edits) == 19
+        assert len(root.forces) == (18 if row["variant"] == "A" else 2)
+        assert root.tools_calls == len(root.managers) == 11
+        assert all(
+            manager.compute_calls == manager.done_calls == 1
+            for manager in root.managers
+        )
+        assert row["gates"] == {
+            "passed": [f"{verify.SWEEP_OWNER}:{suffix}" for suffix in GATE_SUFFIXES],
+            "failed": [],
+        }
+    assert evidence["cleanup"]["confirmed"] is False
+    assert evidence["cleanup"]["after"] == [unrelated_row]
+    assert any(
+        error["phase"] == "cleanup.verify"
+        and "document remains resident" in error["message"]
+        for error in evidence["cleanup"]["errors"]
+    )
+    assert adapter.currentModel is None
+    assert adapter.resident_docs == [unrelated]
+    assert unrelated.GetTitle() not in close_titles
+    if stage == "before-A":
+        assert evidence["trajectories"][0]["cleanup"]["confirmed"] is True
+    if stage == "after-B-discard":
+        assert evidence["trajectories"][0]["cleanup"]["confirmed"] is False
+    if stage == "final-cleanup":
+        assert all(row["cleanup"]["confirmed"] for row in evidence["trajectories"])
+        assert evidence["comparison"] is not None
+
+
+@pytest.mark.parametrize("previous_reports", [False, True])
+def test_actual_run_refuses_existing_submission_without_touching_prior_evidence_or_native_state(
+    monkeypatch, tmp_path, previous_reports
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    prior_document = NativePart(tmp_path / "preexisting.SLDPRT")
+    prior_document.GetNext = lambda: None
+    adapter.currentModel = prior_document
+    resident_docs = adapter.resident_docs
+    resident_docs.append(prior_document)
+    previous = {dirty.BUDGET_PATH: b'{"submission": 1, "prior": true}\r\n'}
+    if previous_reports:
+        previous.update(
+            {
+                dirty.REPORT_PATH: b"prior report bytes\r\n\xff",
+                dirty.FAILURE_PATH: b"prior failure bytes\x00\n",
+            }
+        )
+    for path, payload in previous.items():
+        path.write_bytes(payload)
+    discovery = []
+    original_provenance = dirty._provenance
+
+    def record_provenance():
+        discovery.append("provenance")
+        return original_provenance()
+
+    monkeypatch.setattr(dirty, "_provenance", record_provenance)
+    outer_report = verify.Report()
+    outer_report.passed.append("previous-pass")
+    outer_report.failed.append(("previous-failure", "previous-reason"))
+    with pytest.raises(dirty.Inconclusive, match="already exists|resubmission"):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, outer_report))
+    for path, payload in previous.items():
+        assert path.read_bytes() == payload
+    if not previous_reports:
+        assert not dirty.REPORT_PATH.exists()
+        assert not dirty.FAILURE_PATH.exists()
+    assert discovery == []
+    assert adapter.events == []
+    assert adapter.roots == []
+    assert adapter.currentModel is prior_document
+    assert adapter.resident_docs is resident_docs
+    assert resident_docs == [prior_document]
+    assert outer_report.passed == ["previous-pass"]
+    assert outer_report.failed == [("previous-failure", "previous-reason")]
+    assert "_attempt" not in adapter.__dict__
+
+
+@pytest.mark.parametrize(
     "fault", ["false-edit", "swallowed-edit", "swallowed-compute", "missing-volume"]
 )
 def test_native_false_or_swallowed_failure_cannot_be_green(
