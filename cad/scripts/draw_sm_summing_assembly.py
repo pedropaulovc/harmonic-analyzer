@@ -56,9 +56,9 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_group_perf_probe import native_input_identity
-from _drawing_sm_quality_probe import (
-    SmQualityCandidateInvalid,
-    run_sm_quality_probe,
+from _drawing_sm_refresh_probe import (
+    SmRefreshCandidateInvalid,
+    run_sm_refresh_probe,
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
@@ -816,13 +816,13 @@ def _assert_exploded_caption(
     readback["bom_vertical_limits_m"] = (bottom, top)
     readback["caption_extent_m"] = extent
     if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
-        raise SmQualityCandidateInvalid(
+        raise SmRefreshCandidateInvalid(
             f"summing exploded caption has invalid extent {extent!r}"
         )
     box = (extent[0], extent[1], extent[3], extent[4])
     readback["caption_box_m"] = box
     if box[2] <= box[0] or box[3] <= box[1]:
-        raise SmQualityCandidateInvalid(
+        raise SmRefreshCandidateInvalid(
             f"summing exploded caption has empty extent {extent!r}"
         )
     gap = bottom - box[3]
@@ -838,9 +838,9 @@ def _assert_exploded_caption(
         _assert_box_on_sheet(box, label="summing exploded caption")
     except RuntimeError as error:
         # This pure box assertion has no native collaborator to suppress.
-        raise SmQualityCandidateInvalid(str(error)) from error
+        raise SmRefreshCandidateInvalid(str(error)) from error
     if gap < EXPLODED_CAPTION_MIN_GAP:
-        raise SmQualityCandidateInvalid(
+        raise SmRefreshCandidateInvalid(
             f"summing exploded caption has {gap * 1000.0:.3f} mm below the BOM; "
             f"requires {EXPLODED_CAPTION_MIN_GAP * 1000.0:.1f} mm"
         )
@@ -893,14 +893,14 @@ def _assert_exploded_balloon_bounds(
                 or message.startswith("invalid rendered sheet-circle geometry: ")
             ):
                 raise
-            raise SmQualityCandidateInvalid(str(error)) from error
+            raise SmRefreshCandidateInvalid(str(error)) from error
         x, y, radius = circle
         bounds = (x - radius, y - radius, x + radius, y + radius)
         circles.append({"stem": landing.stem, "item": item, "circle_m": circle, "bounds_m": bounds})
         try:
             _assert_box_on_sheet(bounds, label=label)
         except RuntimeError as error:
-            raise SmQualityCandidateInvalid(str(error)) from error
+            raise SmRefreshCandidateInvalid(str(error)) from error
         for name, keepout in (("BOM", bom_box), ("caption", caption_box)):
             if (
                 bounds[0] <= keepout[2]
@@ -908,7 +908,7 @@ def _assert_exploded_balloon_bounds(
                 and bounds[1] <= keepout[3]
                 and bounds[3] >= keepout[1]
             ):
-                raise SmQualityCandidateInvalid(
+                raise SmRefreshCandidateInvalid(
                     f"{label}: rendered circle bounds={bounds!r} intersects "
                     f"{name}={keepout!r} (sheet metres) after the final rebuild"
                 )
@@ -1021,8 +1021,8 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.sm_summing_assembly")
 async def build(adapter: Any) -> dict[str, str]:
-    """Diagnostic ONLY: draft EDGE placement then precision restoration; no export."""
-    await run_sm_quality_probe(
+    """Diagnostic ONLY: six-arm pre-call EDGE refresh contrast; no export."""
+    await run_sm_refresh_probe(
         adapter,
         template=DRAWING_TEMPLATES[SPEC.layout].path,
         prepare_arm=_prepare_exploded_perf_arm,
