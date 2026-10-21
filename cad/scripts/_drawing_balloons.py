@@ -371,6 +371,89 @@ def _spread_balloons(
             raise RuntimeError("failed to re-ring a BOM balloon")
 
 
+@_telemetry.traced("drawing.auto_balloon_edge_weight", label_param="label")
+def _auto_balloon_edges_with_normal_weight(
+    draw: Any, ddoc: Any, options: Any, *, label: str
+) -> Any:
+    """Borrow the document's Normal visible-edge slot for the native call only.
+
+    Issue #1667's same-seat w5/PID 8256 THICK/NORMAL/NORMAL/THICK experiment
+    returned 6/11/11/6 native balloons with the mapping set BEFORE view creation.
+    That proves the preference's effect, not this narrower call-local lifetime;
+    the latter still needs native production-drawing/PDF proof. Preserve the
+    template and its physical slot widths, and restore before the existing
+    rebuild, ownership/layout checks and save. There is no retry or extra rebuild.
+    """
+    started = time.perf_counter()
+    native_ms = 0.0
+    native_called = False
+    try:
+        extension = _early_bound(draw.Extension, "IModelDocExtension")
+        preference = _sw_type_info.constant("swLineFontVisibleEdgesThickness")
+        option = _sw_type_info.constant("swDetailingNoOptionSpecified")
+        normal = _sw_type_info.constant("swLW_NORMAL")
+        original = int(extension.GetUserPreferenceInteger(preference, option))
+        # These are measured document widths in metres, not a new width policy.
+        normal_width = float(
+            extension.GetUserPreferenceDouble(
+                _sw_type_info.constant("swPageSetupPrinterNormalLineWeight"), option
+            )
+        )
+        thick_width = float(
+            extension.GetUserPreferenceDouble(
+                _sw_type_info.constant("swPageSetupPrinterThickLineWeight"), option
+            )
+        )
+        _telemetry.annotate(
+            preference="swLineFontVisibleEdgesThickness",
+            original_slot=original,
+            normal_slot=normal,
+            thick_slot=_sw_type_info.constant("swLW_THICK"),
+            normal_width_m=normal_width,
+            thick_width_m=thick_width,
+        )
+        # Enter the finally BEFORE the setter: a failing COM call can still
+        # have changed the document, even when it raises or returns False.
+        try:
+            result = extension.SetUserPreferenceInteger(preference, option, normal)
+            _telemetry.annotate(normal_set_return=result)
+            readback = int(extension.GetUserPreferenceInteger(preference, option))
+            _telemetry.annotate(normal_readback_slot=readback)
+            if result is not True:
+                raise RuntimeError(f"{label}: failed to set Normal visible-edge slot")
+            if readback != normal:
+                raise RuntimeError(
+                    f"{label}: Normal visible-edge slot readback differs"
+                )
+            with _telemetry.span(
+                "drawing.auto_balloon_native", label=label, attachment="EDGE"
+            ):
+                native_started = time.perf_counter()
+                native_called = True
+                try:
+                    return ddoc.AutoBalloon5(options)
+                finally:
+                    native_ms = (time.perf_counter() - native_started) * 1000.0
+                    _telemetry.annotate(native_call_ms=native_ms)
+        finally:
+            result = extension.SetUserPreferenceInteger(preference, option, original)
+            _telemetry.annotate(restore_set_return=result)
+            readback = int(extension.GetUserPreferenceInteger(preference, option))
+            _telemetry.annotate(restore_readback_slot=readback)
+            if result is not True:
+                raise RuntimeError(f"{label}: failed to restore visible-edge slot")
+            if readback != original:
+                raise RuntimeError(
+                    f"{label}: restored visible-edge slot readback differs"
+                )
+    finally:
+        _telemetry.annotate(
+            native_called=native_called,
+            native_call_ms=native_ms,
+            preference_guard_ms=(time.perf_counter() - started) * 1000.0 - native_ms,
+        )
+
+
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
 def _create_auto_balloons(
     adapter: Any,
@@ -404,7 +487,10 @@ def _create_auto_balloons(
     options.ItemNumberStart = 1
     options.ItemNumberIncrement = 1
     options.ItemOrder = 1
-    notes = ddoc.AutoBalloon5(options)
+    if attachment == "edge":
+        notes = _auto_balloon_edges_with_normal_weight(draw, ddoc, options, label=label)
+    else:
+        notes = ddoc.AutoBalloon5(options)
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="_create_auto_balloons")
     if not notes or isinstance(notes, str):

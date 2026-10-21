@@ -268,6 +268,31 @@ Keep the full Numbers and the view's actual scale. Read `INote::GetExtent`
 after insertion to prove at least 4 mm of final air, as well as sheet and
 title-block containment; a readable source string does not prove a readable PDF.
 
+**Native EDGE autoballoons borrow a line-font slot, not a new drawing style.**
+`_drawing_balloons.add_auto_balloons`, currently consumed by the MG wheel view,
+saves the document's `swLineFontVisibleEdgesThickness` mapping, selects
+`swLW_NORMAL` only around `IDrawingDoc::AutoBalloon5`, and restores the exact
+saved mapping in `finally` before the existing rebuild and owner/layout checks.
+Both setters must return true and their integer readbacks must match; a failed
+restore aborts generation rather than allowing save/export. FACE autoballoons
+and manually anchored balloons do not use this guard. The template binary and
+the physical Normal/Thick widths are not changed.
+
+The API contract is document-scoped
+`IModelDocExtension::Set/GetUserPreferenceInteger` with
+`swDetailingNoOptionSpecified`; `GetUserPreferenceDouble` reads the
+`swPageSetupPrinterNormalLineWeight` and `swPageSetupPrinterThickLineWeight`
+widths in metres. The `drawing.auto_balloon_edge_weight` span records the
+original, requested and readback slots, setter results, actual widths, native
+call time and guard overhead (`native_call_ms`, `preference_guard_ms`).
+`drawing.auto_balloon_native` isolates the native call, including failures.
+[Issue #1667](https://github.com/pedropaulovc/harmonic-analyzer/issues/1667)'s
+same-seat w5/PID 8256 THICK/NORMAL/NORMAL/THICK experiment returned 6/11/11/6
+native balloons, but applied the mapping **before creating views**. It does
+not prove the narrower call-local guard: that still requires a farm-produced
+MG drawing/PDF with complete coverage, correct native EDGE owners and the
+original final drawing appearance. No retry or additional rebuild is implied.
+
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when
 `GetTextInBoxStyleAtIndex` is `swTextInBoxStyleNone`). `_layout_geometry`
