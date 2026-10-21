@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Mapping, Sequence
 from math import dist, isfinite
 from typing import Any
 
+from solidworks_mcp.adapters import sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_views
 
 import _config
+import _seat_forensics
 import _telemetry
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M, sheet_region
@@ -39,6 +42,7 @@ from _layout_audit import (
     audit_dump,
     calibrate_sheet_advance,
     display_box,
+    line_segment,
     severity,
 )
 import sh_vn_thumb_screw_spec as supplier
@@ -194,7 +198,9 @@ def _supplier_displays(adapter: Any) -> dict[str, Any]:
     views = list(iter_views(adapter))
     fronts = [view for view in views if view.GetOrientationName() == "*Front"]
     if len(fronts) != 1:
-        raise RuntimeError("thumb supplier sheet must have exactly one final Front view")
+        raise RuntimeError(
+            "thumb supplier sheet must have exactly one final Front view"
+        )
     found = {}
     for raw_view in views:
         current_view = _early_bound(raw_view, "IView")
@@ -204,7 +210,9 @@ def _supplier_displays(adapter: Any) -> dict[str, Any]:
             native = _early_bound(display.GetDimension2(0), "IDimension")
             name = str(native.FullName).split("@", 1)[0]
             if name in found or current_view.GetOrientationName() != "*Front":
-                raise RuntimeError("thumb supplier references duplicated or changed owner")
+                raise RuntimeError(
+                    "thumb supplier references duplicated or changed owner"
+                )
             found[name] = display
             display = display.GetNext5()
     return found
@@ -221,12 +229,15 @@ def _assert_supplier_positions(
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         actual = tuple(float(value) for value in annotation.GetPosition())
         if (
-            bool(display.OffsetText) != bool(short_geometry.get(name, {}).get("shelved"))
+            bool(display.OffsetText)
+            != bool(short_geometry.get(name, {}).get("shelved"))
             or len(actual) != 3
             or not all(map(isfinite, actual))
             or dist(actual[:2], positions[name]) > _POSITION_TOLERANCE_M
         ):
-            raise RuntimeError(f"{name}: settled thumb supplier dimension left its lane")
+            raise RuntimeError(
+                f"{name}: settled thumb supplier dimension left its lane"
+            )
 
 
 def _supplier_annotation_record(adapter: Any, display: Any) -> dict[str, Any]:
@@ -238,7 +249,9 @@ def _supplier_annotation_record(adapter: Any, display: Any) -> dict[str, Any]:
         raise RuntimeError(f"thumb supplier annotation read failed: {refused}")
     data = record.get("display") or {}
     if not data.get("texts"):
-        raise RuntimeError("thumb supplier dimension has unreadable native text/line ink")
+        raise RuntimeError(
+            "thumb supplier dimension has unreadable native text/line ink"
+        )
     if any(
         not isfinite(float(row.get("w") or 0.0)) or float(row.get("w") or 0.0) <= 0.0
         for row in data["texts"]
@@ -259,7 +272,9 @@ def _short_native_geometry(record: Mapping[str, Any]) -> dict[str, Any]:
         len(row) < 8 or not all(isfinite(float(value)) for value in row)
         for row in arrows
     ):
-        raise RuntimeError("short thumb supplier dimension has unreadable native arrows")
+        raise RuntimeError(
+            "short thumb supplier dimension has unreadable native arrows"
+        )
     tips = tuple(sorted((float(row[0]), float(row[1])) for row in arrows))
     geometry = annotation_geometry(
         record, owner="*Front", advance=calibrate_sheet_advance((record,))
@@ -269,7 +284,8 @@ def _short_native_geometry(record: Mapping[str, Any]) -> dict[str, Any]:
     witnesses = []
     for x, _y in tips:
         runs = [
-            segment for segment in geometry.segments
+            segment
+            for segment in geometry.segments
             if segment.role == "ext-line"
             and abs(segment.x1 - segment.x0) < 1e-7
             and abs(segment.x0 - x) <= _POSITION_TOLERANCE_M
@@ -279,7 +295,9 @@ def _short_native_geometry(record: Mapping[str, Any]) -> dict[str, Any]:
         ys = [y for segment in runs for y in (segment.y0, segment.y1)]
         witnesses.append((x, min(ys), max(ys)))
     reach = [
-        x for segment in geometry.segments if segment.role in ("dim-line", "arrow")
+        x
+        for segment in geometry.segments
+        if segment.role in ("dim-line", "arrow")
         for x in (segment.x0, segment.x1)
     ]
     if not reach:
@@ -287,32 +305,253 @@ def _short_native_geometry(record: Mapping[str, Any]) -> dict[str, Any]:
     return {"tips": tips, "witnesses": tuple(witnesses), "left": min(reach)}
 
 
+def _short_native_snapshot(
+    adapter: Any, display: Any, record: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Diagnostic-only readbacks; none of these policy reads approve geometry."""
+    reader = _Reader(adapter)
+    typed = reader.need(
+        lambda: _early_bound(display, "IDisplayDimension"), name="IDisplayDimension"
+    )
+    properties = {}
+    for name, expected_type in (
+        ("OffsetText", bool),
+        ("SmartWitness", bool),
+        ("ArrowSide", int),
+        ("LeaderVisibility", int),
+        ("MaxWitnessLineLength", float),
+    ):
+        value = reader.need(
+            lambda name=name: getattr(typed, name), name=f"IDisplayDimension.{name}"
+        )
+        properties[name] = (
+            value
+            if type(value) is expected_type
+            else {"unmeasured": True, "unexpected_result": repr(value)}
+        )
+    gaps = {}
+    for index in (0, 1):
+        # The generated wrapper returns (success, UseDoc, Gap), not byref VARIANTs.
+        result = reader.need(
+            lambda index=index: typed.GetWitnessLineGap(index, False, 0.0),
+            name=f"IDisplayDimension.GetWitnessLineGap[{index}]",
+        )
+        if (
+            isinstance(result, (tuple, list))
+            and len(result) == 3
+            and type(result[0]) is bool
+            and type(result[1]) is bool
+            and type(result[2]) is float
+            and isfinite(result[2])
+        ):
+            gaps[index] = {
+                "success": result[0],
+                "unmeasured": not result[0],
+                "uses_document": result[1] if result[0] else None,
+                "gap_m": result[2] if result[0] else None,
+                "native_result": result,
+            }
+        else:
+            gaps[index] = {"unmeasured": True, "unexpected_result": repr(result)}
+
+    def document_gap() -> float:
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if model is None:
+            raise RuntimeError("no active drawing model for witness-gap diagnostic")
+        extension = _early_bound(model.Extension, "IModelDocExtension")
+        if extension is None:
+            raise RuntimeError("no drawing extension for witness-gap diagnostic")
+        return extension.GetUserPreferenceDouble(
+            sw_type_info.constant("swDetailingWitnessLineGap"),
+            sw_type_info.constant("swDetailingNoOptionSpecified"),
+        )
+
+    preference = reader.need(
+        document_gap, name="IModelDocExtension.GetUserPreferenceDouble(witness-gap)"
+    )
+    snapshot = {
+        "native": record,
+        "properties": properties,
+        "witness_gaps": gaps,
+        "document_witness_gap_m": (
+            preference
+            if type(preference) is float and isfinite(preference)
+            else {"unmeasured": True, "unexpected_result": repr(preference)}
+        ),
+        "read_errors": reader.take_errors(),
+    }
+
+    def segment_data(segment: Any) -> dict[str, Any]:
+        return {
+            "role": segment.role,
+            "start": (segment.x0, segment.y0),
+            "end": (segment.x1, segment.y1),
+        }
+
+    try:
+        geometry = annotation_geometry(
+            record, owner="*Front", advance=calibrate_sheet_advance((record,))
+        )
+        if geometry is None:
+            raise RuntimeError("no classified native annotation geometry")
+        snapshot["classified_segments"] = [
+            segment_data(segment) for segment in geometry.segments
+        ]
+        snapshot["arrow_tails"] = [
+            segment_data(segment) for segment in geometry.arrow_tails
+        ]
+        raw_lines = [
+            (index, segment)
+            for index, row in enumerate(record["display"].get("lines") or ())
+            if (segment := line_segment(row)) is not None
+        ]
+        per_tip_runs = []
+        for index, arrow in enumerate(record["display"].get("arrows") or ()):
+            if len(arrow) < 2:
+                continue
+            x, y = float(arrow[0]), float(arrow[1])
+            if not all(isfinite(value) for value in (x, y)):
+                continue
+            per_tip_runs.append(
+                {
+                    "arrow_index": index,
+                    "tip": (x, y),
+                    "classified_witness_runs": [
+                        segment_data(segment)
+                        for segment in geometry.segments
+                        if segment.role == "ext-line"
+                        and abs(segment.x1 - segment.x0) < 1e-7
+                        and abs(segment.x0 - x) <= _POSITION_TOLERANCE_M
+                    ],
+                    # Keep the role-free raw rows too: a leader/shoulder that was
+                    # misclassified must remain distinguishable from a real witness.
+                    "raw_vertical_runs": [
+                        {"line_index": row, **segment_data(segment)}
+                        for row, segment in raw_lines
+                        if abs(segment.x1 - segment.x0) < 1e-7
+                        and abs(segment.x0 - x) <= _POSITION_TOLERANCE_M
+                    ],
+                }
+            )
+        snapshot["per_tip_runs"] = per_tip_runs
+    except Exception as error:
+        snapshot["classification_error"] = {
+            "type": type(error).__name__,
+            "message": str(error),
+        }
+    return snapshot
+
+
+def _log_short_native_transition(phase: str, dimensions: Mapping[str, Any]) -> None:
+    payload = {
+        "schema": 1,
+        "phase": phase,
+        "tolerance_m": _POSITION_TOLERANCE_M,
+        "dimensions": dimensions,
+    }
+    try:
+        encoded = json.dumps(payload, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        # A malformed native value must not erase the evidence or replace the
+        # original layout refusal with a JSON-serialization exception.
+        encoded = json.dumps(
+            {
+                "schema": 1,
+                "phase": phase,
+                "serialization_error": str(error),
+                "native_state_repr": repr(payload),
+            },
+            sort_keys=True,
+            allow_nan=False,
+        )
+    _telemetry.info("thumb_supplier_native_geometry_transition " + encoded)
+
+
 def _read_settled_short_geometry(
-    adapter: Any, found: Mapping[str, Any], expected: Mapping[str, Mapping[str, Any]]
+    adapter: Any,
+    found: Mapping[str, Any],
+    expected: Mapping[str, Mapping[str, Any]],
+    *,
+    phase: str,
 ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
     if set(expected) != set(_AXIAL_NAMES):
         raise RuntimeError("thumb supplier axial-line proof inventory changed")
     fresh = {}
+    transitions = {}
+    failures = {}
     for name in _AXIAL_NAMES:
-        record = _supplier_annotation_record(adapter, found[name])
-        actual = _short_native_geometry(record)
-        for key in ("tips", "witnesses"):
-            old, new = expected[name][key], actual[key]
-            if len(old) != len(new) or any(
-                dist(before, after) > _POSITION_TOLERANCE_M
-                for before, after in zip(old, new, strict=True)
-            ):
-                raise RuntimeError(f"{name}: native supplier witness/arrow station moved")
-        # Smart arrows may legitimately flip when text leaves the span.
-        # Their current shape and tails, not stale arrays, govern clearance.
-        fresh[name] = (record, actual)
+        before = expected[name]["native_before"]
+        after = {}
+        comparison = {}
+        try:
+            record = _supplier_annotation_record(adapter, found[name])
+            after = _short_native_snapshot(adapter, found[name], record)
+            actual = _short_native_geometry(record)
+            after["computed"] = actual
+            for key in ("tips", "witnesses"):
+                old, new = expected[name][key], actual[key]
+                pairs = [
+                    {
+                        "index": index,
+                        "before": prior,
+                        "after": current,
+                        "delta_m": tuple(
+                            b - a for a, b in zip(prior, current, strict=True)
+                        ),
+                        "distance_m": dist(prior, current),
+                    }
+                    for index, (prior, current) in enumerate(zip(old, new))
+                ]
+                comparison[key] = {
+                    "count_before": len(old),
+                    "count_after": len(new),
+                    "pairs": pairs,
+                    "max_distance_m": max(
+                        (pair["distance_m"] for pair in pairs), default=0.0
+                    ),
+                    "changed": len(old) != len(new)
+                    or any(
+                        pair["distance_m"] > _POSITION_TOLERANCE_M for pair in pairs
+                    ),
+                }
+            # Smart arrows may flip; their freshly classified ink, not stale
+            # arrays, still governs clearance. The station guards are unchanged.
+            fresh[name] = (record, actual)
+        except Exception as error:
+            failures[name] = error
+            after["guard_error"] = {"type": type(error).__name__, "message": str(error)}
+        transitions[name] = {
+            "before": before,
+            "after": after,
+            "comparison": comparison,
+            "shelved": expected[name]["shelved"],
+        }
+    # Collect every axial dimension before the first refusal, including the
+    # complete unclassified display arrays and registered native leaders.
+    _log_short_native_transition(phase, transitions)
+    for name in _AXIAL_NAMES:
+        if name in failures:
+            raise failures[name]
+        for key, change in transitions[name]["comparison"].items():
+            if change["changed"]:
+                raise RuntimeError(
+                    f"{name}: native supplier witness/arrow station moved; "
+                    f"phase={phase}; key={key}; max_distance_m={change['max_distance_m']:.9g}; "
+                    f"counts={change['count_before']}->{change['count_after']}"
+                )
     return fresh
 
 
 def _assert_shelved_short_text(
-    adapter: Any, found: Mapping[str, Any], expected: Mapping[str, Mapping[str, Any]]
+    adapter: Any,
+    found: Mapping[str, Any],
+    expected: Mapping[str, Mapping[str, Any]],
+    *,
+    phase: str,
 ) -> None:
-    for name, (record, actual) in _read_settled_short_geometry(adapter, found, expected).items():
+    for name, (record, actual) in _read_settled_short_geometry(
+        adapter, found, expected, phase=phase
+    ).items():
         text = display_box({"texts": record["display"]["texts"]})
         if text is None:
             raise RuntimeError(f"{name}: supplier axial text has no native ink")
@@ -322,7 +561,9 @@ def _assert_shelved_short_text(
             left, right = (tip[0] for tip in actual["tips"])
             clear = text.xmin >= left + CLEAR_GAP_M and text.xmax <= right - CLEAR_GAP_M
         if not clear:
-            raise RuntimeError(f"{name}: supplier axial text crowds its native line geometry")
+            raise RuntimeError(
+                f"{name}: supplier axial text crowds its native line geometry"
+            )
 
 
 def _shelf_short_text(
@@ -333,6 +574,17 @@ def _shelf_short_text(
 ) -> dict[str, tuple[float, float]]:
     """Keep physical line stations fixed; shelf text beyond fresh native tails."""
     result = dict(positions)
+    _log_short_native_transition(
+        "before_offset_text_mode",
+        {
+            name: {
+                "before": expected[name]["native_before"],
+                "requested_text_position_m": (*positions[name], 0.0),
+                "offset_text_requested": expected[name]["shelved"],
+            }
+            for name in _AXIAL_NAMES
+        },
+    )
     for name in _AXIAL_NAMES:
         if not expected[name]["shelved"]:
             continue
@@ -340,10 +592,14 @@ def _shelf_short_text(
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         display.OffsetText = True
         if not annotation.SetPosition2(*positions[name], 0.0):
-            raise RuntimeError(f"{name}: failed to enable short thumb supplier text offset")
+            raise RuntimeError(
+                f"{name}: failed to enable short thumb supplier text offset"
+            )
     rebuild_drawing(adapter, label="thumb supplier short-span text mode")
     fresh = _supplier_displays(adapter)
-    for name, (record, actual) in _read_settled_short_geometry(adapter, fresh, expected).items():
+    for name, (record, actual) in _read_settled_short_geometry(
+        adapter, fresh, expected, phase="after_offset_text_mode"
+    ).items():
         if not expected[name]["shelved"]:
             continue
         annotation = _early_bound(fresh[name].GetAnnotation(), "IAnnotation")
@@ -357,7 +613,9 @@ def _shelf_short_text(
             raise RuntimeError(f"{name}: failed to shelf short thumb supplier text")
         result[name] = target
     rebuild_drawing(adapter, label="thumb supplier short-span text shelves")
-    _assert_shelved_short_text(adapter, _supplier_displays(adapter), expected)
+    _assert_shelved_short_text(
+        adapter, _supplier_displays(adapter), expected, phase="after_text_shelves"
+    )
     return result
 
 
@@ -367,18 +625,22 @@ def _assert_supplier_paths(adapter: Any, found: Mapping[str, Any]) -> None:
     No PDF is available here; its printed ink/edge checks still belong to the
     final shared audit. Native leaders, text, arrows and view outlines are real.
     """
-    records = [_supplier_annotation_record(adapter, display) for display in found.values()]
+    records = [
+        _supplier_annotation_record(adapter, display) for display in found.values()
+    ]
     views = []
     for raw in iter_views(adapter):
         view = _early_bound(raw, "IView")
         orientation = str(view.GetOrientationName())
-        views.append({
-            "name": str(view.GetName2()),
-            "orientation": orientation,
-            "pictorial": is_pictorial_orientation(orientation),
-            "outline": tuple(float(value) for value in view.GetOutline()),
-            "annotations": records if orientation == "*Front" else [],
-        })
+        views.append(
+            {
+                "name": str(view.GetName2()),
+                "orientation": orientation,
+                "pictorial": is_pictorial_orientation(orientation),
+                "outline": tuple(float(value) for value in view.GetOutline()),
+                "annotations": records if orientation == "*Front" else [],
+            }
+        )
     template = DRAWING_TEMPLATES[SPEC.layout]
     region = sheet_region(adapter)
     dump = {
@@ -386,7 +648,8 @@ def _assert_supplier_paths(adapter: Any, found: Mapping[str, Any]) -> None:
         "width": template.width_m,
         "height": template.height_m,
         "zone": {
-            "left": region.xmin, "bottom": region.ymin,
+            "left": region.xmin,
+            "bottom": region.ymin,
             "right": template.width_m - region.xmax,
             "top": template.height_m - region.ymax,
         },
@@ -394,7 +657,8 @@ def _assert_supplier_paths(adapter: Any, found: Mapping[str, Any]) -> None:
         "read_errors": {},
     }
     findings = [
-        finding for finding in audit_dump(dump)
+        finding
+        for finding in audit_dump(dump)
         if severity(finding) is FindingSeverity.GATING
     ]
     if findings:
@@ -413,13 +677,16 @@ def _collar_native_stations(record: Mapping[str, Any]) -> tuple[float, float, fl
     if geometry is None or len(arrows) != 2:
         raise RuntimeError("thumb collar diameter has no native line/witness geometry")
     vertical = [
-        segment for segment in geometry.segments
+        segment
+        for segment in geometry.segments
         if segment.role == "dim-line" and abs(segment.x1 - segment.x0) < 1e-7
     ]
     tips = [float(row[1]) for row in arrows if len(row) >= 8]
     witnesses = [
-        segment.y0 for segment in geometry.segments
-        if segment.role == "ext-line" and abs(segment.y1 - segment.y0) < 1e-7
+        segment.y0
+        for segment in geometry.segments
+        if segment.role == "ext-line"
+        and abs(segment.y1 - segment.y0) < 1e-7
         and any(abs(segment.y0 - y) <= _POSITION_TOLERANCE_M for y in tips)
     ]
     if not vertical or len(tips) != 2 or not witnesses:
@@ -430,17 +697,30 @@ def _collar_native_stations(record: Mapping[str, Any]) -> tuple[float, float, fl
         not all(map(isfinite, (x, lower, upper)))
         or upper <= lower
         or any(abs(segment.x0 - x) > _POSITION_TOLERANCE_M for segment in vertical)
-        or any(not any(abs(y - station) <= _POSITION_TOLERANCE_M for station in witnesses) for y in tips)
+        or any(
+            not any(abs(y - station) <= _POSITION_TOLERANCE_M for station in witnesses)
+            for y in tips
+        )
     ):
         raise RuntimeError("thumb collar diameter has inconsistent native stations")
     return x, lower, upper
 
 
-def _diameter_vertical_gaps(adapter: Any, found: Mapping[str, Any]) -> tuple[float, float, float]:
-    collar_record = _supplier_annotation_record(adapter, found["SupplierCollarDiameter"])
+def _diameter_vertical_gaps(
+    adapter: Any, found: Mapping[str, Any]
+) -> tuple[float, float, float]:
+    collar_record = _supplier_annotation_record(
+        adapter, found["SupplierCollarDiameter"]
+    )
     _x, lower, upper = _collar_native_stations(collar_record)
     collar = display_box({"texts": collar_record["display"]["texts"]})
-    thread = display_box({"texts": _supplier_display_data(adapter, found["SupplierThreadDiameter"])["texts"]})
+    thread = display_box(
+        {
+            "texts": _supplier_display_data(adapter, found["SupplierThreadDiameter"])[
+                "texts"
+            ]
+        }
+    )
     if collar is None or thread is None:
         raise RuntimeError("thumb supplier diameter has no measured native text")
     return collar.ymin - lower, upper - collar.ymax, lower - thread.ymax
@@ -449,7 +729,9 @@ def _diameter_vertical_gaps(adapter: Any, found: Mapping[str, Any]) -> tuple[flo
 def _assert_diameter_vertical_clearance(adapter: Any, found: Mapping[str, Any]) -> None:
     gaps = _diameter_vertical_gaps(adapter, found)
     if not all(isfinite(gap) and gap >= CLEAR_GAP_M for gap in gaps):
-        raise RuntimeError("thumb supplier diameter text crowds a native collar witness")
+        raise RuntimeError(
+            "thumb supplier diameter text crowds a native collar witness"
+        )
 
 
 def _place_diameter_vertical_stations(
@@ -461,17 +743,30 @@ def _place_diameter_vertical_stations(
     # change from moving inside/outside its span. Never refit or move a view.
     for _phase in range(2):
         found = _supplier_displays(adapter)
-        collar_record = _supplier_annotation_record(adapter, found["SupplierCollarDiameter"])
+        collar_record = _supplier_annotation_record(
+            adapter, found["SupplierCollarDiameter"]
+        )
         _x, lower, upper = _collar_native_stations(collar_record)
         collar = display_box({"texts": collar_record["display"]["texts"]})
-        thread = display_box({"texts": _supplier_display_data(adapter, found["SupplierThreadDiameter"])["texts"]})
+        thread = display_box(
+            {
+                "texts": _supplier_display_data(
+                    adapter, found["SupplierThreadDiameter"]
+                )["texts"]
+            }
+        )
         if collar is None or thread is None:
             raise RuntimeError("thumb supplier diameter has no measured native text")
         if collar.height + 2 * (CLEAR_GAP_M + PLACE_SETTLE_M) > upper - lower:
-            raise RuntimeError("thumb collar native text cannot fit between its witnesses")
+            raise RuntimeError(
+                "thumb collar native text cannot fit between its witnesses"
+            )
         shifts = {
             "SupplierCollarDiameter": (lower + upper) / 2 - collar.center()[1],
-            "SupplierThreadDiameter": lower - CLEAR_GAP_M - PLACE_SETTLE_M - thread.ymax,
+            "SupplierThreadDiameter": lower
+            - CLEAR_GAP_M
+            - PLACE_SETTLE_M
+            - thread.ymax,
         }
         moved = False
         for name, dy in shifts.items():
@@ -483,7 +778,9 @@ def _place_diameter_vertical_stations(
             target = (x, y + dy)
             display.OffsetText = False
             if not annotation.SetPosition2(*target, 0.0):
-                raise RuntimeError(f"{name}: failed to place measured diameter text station")
+                raise RuntimeError(
+                    f"{name}: failed to place measured diameter text station"
+                )
             result[name] = target
             moved = True
         if not moved:
@@ -525,7 +822,9 @@ def _space_diameter_lines(
         target = (x + CLEAR_GAP_M + PLACE_SETTLE_M - gap, y)
         display.OffsetText = False
         if not annotation.SetPosition2(*target, 0.0):
-            raise RuntimeError("failed to space thumb supplier collar line beyond thread text")
+            raise RuntimeError(
+                "failed to space thumb supplier collar line beyond thread text"
+            )
         result[name] = target
         rebuild_drawing(adapter, label="thumb supplier measured diameter text spacing")
     _assert_diameter_text_gap(adapter, _supplier_displays(adapter))
@@ -562,6 +861,9 @@ def _place_supplier_dimensions(
             raise RuntimeError(f"{name}: supplier axial text has no native ink")
         span = geometry["tips"][1][0] - geometry["tips"][0][0]
         geometry["shelved"] = text.width + 2 * (CLEAR_GAP_M + PLACE_SETTLE_M) > span
+        before = _short_native_snapshot(adapter, found[name], record)
+        before["computed"] = dict(geometry)
+        geometry["native_before"] = before
         short_geometry[name] = geometry
     result = _shelf_short_text(adapter, found, result, short_geometry)
     _assert_supplier_positions(_supplier_displays(adapter), result, short_geometry)
@@ -577,7 +879,9 @@ def _assert_supplier_dimensions(
     """Prove all six native references after the finalizer's last rebuild."""
     found = _supplier_displays(adapter)
     _assert_supplier_positions(found, positions, short_geometry)
-    _assert_shelved_short_text(adapter, found, short_geometry)
+    _assert_shelved_short_text(
+        adapter, found, short_geometry, phase="after_final_rebuild"
+    )
     _assert_diameter_text_gap(adapter, found)
     _assert_diameter_vertical_clearance(adapter, found)
     _assert_supplier_paths(adapter, found)
@@ -741,14 +1045,43 @@ def supplier_dimensions(
     return positions, short_geometry
 
 
+def _capture_supplier_failure(adapter: Any, phase: str, error: Exception) -> None:
+    """Preserve the live partial sheet without replacing its original failure."""
+    try:
+        _seat_forensics.capture_com_failure(
+            adapter,
+            f"thumb-supplier-{phase}",
+            str(error),
+            api="thumb supplier native dimension authoring/settled checks",
+            exception=error,
+            sheet_png=True,
+            supplier_phase=phase,
+            supplier_dimension_count=6,
+            view_keys=("*Front",),
+        )
+    except Exception as capture_error:
+        if capture_error is not error:
+            error.add_note(f"thumb supplier forensic capture failed: {capture_error!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     checks = []
 
     def annotate(current_adapter: Any, views: dict[str, Any]) -> None:
-        positions, short_geometry = supplier_dimensions(current_adapter, views)
-        checks.append(
-            lambda: _assert_supplier_dimensions(current_adapter, positions, short_geometry)
-        )
+        try:
+            positions, short_geometry = supplier_dimensions(current_adapter, views)
+        except Exception as error:
+            _capture_supplier_failure(current_adapter, "annotation", error)
+            raise
+
+        def settled() -> None:
+            try:
+                _assert_supplier_dimensions(current_adapter, positions, short_geometry)
+            except Exception as error:
+                _capture_supplier_failure(current_adapter, "settled", error)
+                raise
+
+        checks.append(settled)
 
     return await build_purchased_fastener_drawing(
         adapter,
