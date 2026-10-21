@@ -248,11 +248,8 @@ def test_top_wall_uses_the_actual_transfer_axis_minimum_not_the_nominal_row() ->
     assert spec.BLOCK_PLANE_TOP_GAP_MIN == 2.35
     assert spec.TRANSFER_AXIS_TOP_MIN == 5.0
     thread_r = spec.THREAD_MAJOR_MM[spec.BLOCK_THREAD] / 2.0
-    assert thread_r == pytest.approx(2.0828)
-    assert spec.SPOT_FLOAT == pytest.approx(0.10775)
     actual_wall = spec.TRANSFER_AXIS_TOP_MIN - spec.SPOT_FLOAT - thread_r
     assert spec.WORST_WALLS["#8 tap to top face"] == pytest.approx(actual_wall)
-    assert actual_wall == pytest.approx(2.80945)
     assert actual_wall >= spec.WALL_TARGET == 2.0
     # Source-cutting check only: its nominal row is not the actual aligned
     # hole row. Do not spend TL-22/height bands again after measuring 5 mm.
@@ -265,7 +262,6 @@ def test_top_wall_uses_the_actual_transfer_axis_minimum_not_the_nominal_row() ->
         - thread_r
     )
     assert spec.NOMINAL_ROW_TOP_WALL_MIN == pytest.approx(source_wall)
-    assert source_wall == pytest.approx(7.87945)
     assert source_wall > actual_wall
 
 

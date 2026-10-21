@@ -134,9 +134,9 @@ of this repair.
 
 Follow F1/F2 on TL-00's cartridge sheet for the single fit-up procedure. **Before transfer
 punching**, check that the actual TL-22 side-hole axes are at least **5.0 mm
-below the actual TL-29 top**. After the 0.10775 mm punch float and 2.0828 mm
-#8 major radius, this leaves at least 2.80945 mm top wall, above the 2 mm
-target. **After free-feed alignment and final tightening, throughout travel**,
+below the actual TL-29 top**. Deduct the source-catalog #8 major radius
+and transfer-punch float for the shortest top wall; this bound exceeds the
+2 mm target. **After free-feed alignment and final tightening, throughout travel**,
 the entire actual TL-29 top footprint, including every high corner, must
 remain at least **2.35 mm below the actual TL-22 cap mounting plane**.
 Inspect from that plane before final cap installation; do not force the nut
