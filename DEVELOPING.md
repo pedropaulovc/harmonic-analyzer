@@ -83,8 +83,14 @@ model/effort requests remain provider errors, without automatic substitution.
 
 The wrapper freezes the six effective strings in the internal
 `HARMONIC_MACHINIST_REVIEW_SETTINGS` carrier for graph loading and all submitter
-workers, then restores the caller's environment. It is not a public environment
-override; standalone review CLI ignores it. The single `machinist_review_config.py`
+workers, then restores the caller's environment. Registered task action arguments
+carry that complete snapshot as canonical JSON text, not a `ReviewSettings`
+object: the farm's graph exporter accepts primitive action data. The runtime
+callback validates and reconstructs typed settings before touching stamps,
+reports or cache state; it never reselects the ambient profile. Missing, extra,
+non-string or malformed carrier fields remain errors. The carrier is not a public
+environment override; standalone review CLI ignores it. The single
+`machinist_review_config.py`
 module supplies both standalone defaults and the registered selector. Its real
 source digest is combined with canonical effective settings for review-only
 cache identity; no settings sidecar is created. Equivalent explicit/omitted

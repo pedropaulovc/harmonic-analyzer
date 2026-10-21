@@ -3398,7 +3398,7 @@ def _evaluate_machinist_review(
 
 @_cache.keyed_action
 def _cached_machinist_review_action(
-    stem: str, mode: MachinistReviewMode, settings: _review_settings.ReviewSettings
+    stem: str, mode: MachinistReviewMode, settings_json: str
 ) -> None:
     """Review on the submitter, caching verdicts BEFORE enforcing their policy.
 
@@ -3407,11 +3407,11 @@ def _cached_machinist_review_action(
     Ensemble errors never publish or leave a freshness stamp; failed individual
     runs remain evidence and do not change the aggregate's partial-run policy.
     """
-    if not isinstance(settings, _review_settings.ReviewSettings):
-        raise ValueError("registered machinist review requires resolved ReviewSettings")
-    # Validate direct callers before removing stamps or probing. Never reselect
-    # ambient defaults: this snapshot also owns the task's freshness.
-    _review_settings.from_carrier(settings.canonical())
+    if not isinstance(settings_json, str):
+        raise ValueError("registered machinist review requires a complete settings carrier")
+    # Rehydrate the graph's primitive snapshot before removing stamps or probing.
+    # Never reselect ambient defaults: it also owns the task's freshness.
+    settings = _review_settings.from_carrier(settings_json)
     label = f"check:machinist_review:{stem}"
     directory = _machinist_review_dir(stem)
     stamp = _machinist_review_stamp(stem)
@@ -3498,7 +3498,7 @@ def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
 
 def _machinist_review_tasks():
     # Validate on every graph enumeration, including all-OFF/preimported graphs.
-    settings = _machinist_review_settings()
+    settings_json = _machinist_review_settings().canonical()
     for stem, mode in _reviewed_drawings():
         deps = _machinist_review_file_deps(stem)
         directory = _machinist_review_dir(stem)
@@ -3511,7 +3511,7 @@ def _machinist_review_tasks():
             "uptodate": [
                 config_changed({
                     "mode": mode.value, "inputs": [_rel_tag(dep) for dep in deps],
-                    "profile": json.loads(settings.canonical()),
+                    "profile": json.loads(settings_json),
                 }),
                 not _cache.forced_refresh(f"check:machinist_review:{stem}"),
             ],
@@ -3524,7 +3524,7 @@ def _machinist_review_tasks():
                     for run in range(1, _review_settings.BUILD_RUNS + 1)
                 ),
             ],
-            "actions": [(_cached_machinist_review_action, [stem, mode, settings])],
+            "actions": [(_cached_machinist_review_action, [stem, mode, settings_json])],
             "clean": True,
             "verbosity": 2,
         }
