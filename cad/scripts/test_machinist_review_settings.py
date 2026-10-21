@@ -159,45 +159,64 @@ def test_registered_selector_applies_to_both_omitted_roles(monkeypatch, selector
     if selector is not None:
         monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
     expected = settings.resolve_settings(
-        reviewer=selector or "claude", judge_reviewer=selector or "claude",
+        reviewer=selector or "claude",
+        judge_reviewer=selector or "claude",
     )
     assert settings.registered_settings() == expected
     assert settings.from_carrier(None) == expected
 
 
-@pytest.mark.parametrize(("overrides", "expected_roles"), [
-    ({"reviewer": "claude"}, ("claude", "codex")),
-    ({"judge_reviewer": "claude"}, ("codex", "claude")),
-    ({"reviewer": "claude", "judge_reviewer": "claude"}, ("claude", "claude")),
-])
+@pytest.mark.parametrize(
+    ("overrides", "expected_roles"),
+    [
+        ({"reviewer": "claude"}, ("claude", "codex")),
+        ({"judge_reviewer": "claude"}, ("codex", "claude")),
+        ({"reviewer": "claude", "judge_reviewer": "claude"}, ("claude", "claude")),
+    ],
+)
 def test_explicit_registered_role_overrides_are_independent(
-    monkeypatch, overrides, expected_roles,
+    monkeypatch,
+    overrides,
+    expected_roles,
 ):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "codex")
     selected = settings.registered_settings(**overrides)
     assert selected == settings.resolve_settings(
-        reviewer=expected_roles[0], judge_reviewer=expected_roles[1],
+        reviewer=expected_roles[0],
+        judge_reviewer=expected_roles[1],
     )
 
 
-@pytest.mark.parametrize(("field", "value"), [
-    ("model", "explicit-review-model"), ("effort", "high"),
-    ("judge_model", "explicit-judge-model"), ("judge_effort", "high"),
-])
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("model", "explicit-review-model"),
+        ("effort", "high"),
+        ("judge_model", "explicit-judge-model"),
+        ("judge_effort", "high"),
+    ],
+)
 def test_explicit_registered_model_and_effort_override_only_their_field(
-    monkeypatch, field, value,
+    monkeypatch,
+    field,
+    value,
 ):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "codex")
     expected = settings.resolve_settings(reviewer="codex", judge_reviewer="codex")
     assert settings.registered_settings(**{field: value}) == replace(
-        expected, **{field: value},
+        expected,
+        **{field: value},
     )
 
 
 @pytest.mark.parametrize("selector", ["", "Claude", "codex ", "unknown"])
-@pytest.mark.parametrize("overrides", [{}, {"reviewer": "claude"}, {"judge_reviewer": "codex"}])
+@pytest.mark.parametrize(
+    "overrides", [{}, {"reviewer": "claude"}, {"judge_reviewer": "codex"}]
+)
 def test_invalid_selector_rejects_any_omitted_registered_role(
-    monkeypatch, selector, overrides,
+    monkeypatch,
+    selector,
+    overrides,
 ):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
     with pytest.raises(ValueError, match="HARMONIC_MACHINIST_REVIEWER must be"):
@@ -207,18 +226,28 @@ def test_invalid_selector_rejects_any_omitted_registered_role(
 def test_both_explicit_registered_roles_ignore_invalid_ambient_selector(monkeypatch):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid")
     assert settings.registered_settings(
-        reviewer="codex", judge_reviewer="claude",
-        model="review-model", judge_effort="high",
+        reviewer="codex",
+        judge_reviewer="claude",
+        model="review-model",
+        judge_effort="high",
     ) == settings.resolve_settings(
-        reviewer="codex", judge_reviewer="claude",
-        model="review-model", judge_effort="high",
+        reviewer="codex",
+        judge_reviewer="claude",
+        model="review-model",
+        judge_effort="high",
     )
 
 
-def test_complete_carrier_preserves_exact_selection_despite_registered_environment(monkeypatch):
+def test_complete_carrier_preserves_exact_selection_despite_registered_environment(
+    monkeypatch,
+):
     selected = settings.resolve_settings(
-        reviewer="codex", model="custom-review-model", effort="high",
-        judge_reviewer="claude", judge_model="custom-judge-model", judge_effort="low",
+        reviewer="codex",
+        model="custom-review-model",
+        effort="high",
+        judge_reviewer="claude",
+        judge_model="custom-judge-model",
+        judge_effort="low",
     )
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid")
     assert settings.from_carrier(selected.canonical()) == selected
