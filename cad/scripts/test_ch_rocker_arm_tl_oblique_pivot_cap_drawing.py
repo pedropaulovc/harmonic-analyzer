@@ -1004,6 +1004,73 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     assert drawing.REGISTER_END_KEEP["RegisterEndChamfer"][0] > profile_x + profile_half_width + 0.006
 
 
+def _cap_paper_box(box_mm, old_anchor_mm, new_anchor):
+    """Translate measured pre-fix ink; this is not a native post-fix replay."""
+    dx = new_anchor[0] * 1000.0 - old_anchor_mm[0]
+    dy = new_anchor[1] * 1000.0 - old_anchor_mm[1]
+    return (box_mm[0] + dx, box_mm[1] + dy, box_mm[2] + dx, box_mm[3] + dy)
+
+
+def test_cap_full_bolt_callouts_fit_paper_and_have_separate_rows() -> None:
+    # Actual 20261021T085834832Z PDF/audit, sheet 3, mm from bottom-left.
+    # The old anchors were on paper while both complete left Y blocks were not.
+    left_lower = _cap_paper_box(
+        (-0.9, 127.6, 60.3, 143.9), (60.0, 135.0), drawing.BOLT_KEEP["Bolt3Y"],
+    )
+    left_upper = _cap_paper_box(
+        (-0.9, 237.6, 60.3, 253.9), (60.0, 245.0), drawing.BOLT_KEEP["Bolt4Y"],
+    )
+    for box in (left_lower, left_upper):
+        assert box[0] > 12.7 + 5.0
+        assert box[2] < 419.1 - 5.0
+        assert box[3] < 255.05 - 5.0  # PDF heading's lower ink edge
+    right_x = _cap_paper_box(
+        (293.6, 112.6, 307.0, 128.74), (300.0, 120.0), drawing.BOLT_KEEP["Bolt1X"],
+    )
+    right_y = _cap_paper_box(
+        (285.4, 127.6, 345.7, 143.9), (285.0, 135.0), drawing.BOLT_KEEP["Bolt1Y"],
+    )
+    assert right_y[1] - right_x[3] > 5.0
+
+
+def test_cap_section_and_register_complete_blocks_clear_context_and_heading() -> None:
+    # Native findings measured the entire multiline callout, not just the value.
+    chamber = _cap_paper_box(
+        (22.27, 231.72, 97.73, 258.0), (60.0, 245.0), drawing.BOTTOM_KEEP["PocketDia"],
+    )
+    assert 255.05 - chamber[3] > 5.0
+    assert chamber[1] - (drawing.BOTTOM_CENTER[1] * 1000.0 + spec.LENGTH / 2.0) > 5.0
+    depth = _cap_paper_box(
+        (110.98, 212.91, 235.0, 245.7), (235.0, 230.0), drawing.SECTION_KEEP["PocketDepth"],
+    )
+    assert depth[0] > drawing.BOTTOM_CENTER[0] * 1000.0 + spec.WIDTH / 2.0 + 5.0
+    assert depth[3] < 266.7 - 5.0
+    register = _cap_paper_box(
+        (153.0, 207.6, 213.1, 223.74), (215.0, 215.0), drawing.REGISTER_KEEP["Register2Y"],
+    )
+    assert register[1] > drawing.REGISTER_RIGHT_CENTER[1] * 1000.0 + spec.LENGTH / 2.0 + 5.0
+    chamfer = _cap_paper_box(
+        (134.6, 240.1, 225.4, 249.5), (180.0, 245.0), drawing.REGISTER_END_KEEP["RegisterEndChamfer"],
+    )
+    assert chamfer[0] > 151.0 + 5.0  # register-sheet heading's right edge
+    assert chamfer[1] > 240.2 + 5.0  # actual free-end projection edge
+    assert chamfer[3] < 266.7 - 5.0
+
+
+@pytest.mark.parametrize(("keep", "name", "old", "row", "witness_x", "side"), [
+    ("RIGHT_KEEP", "WireDepth", (340.0, 145.0), (325.0, 140.4, 354.9, 143.9), 335.25, "right"),
+    ("RIGHT_KEEP", "CounterboreDepth", (310.0, 245.0), (264.9, 237.3, 354.9, 241.2), 328.75, "left"),
+    ("REGISTER_PROJECTION_KEEP", "RegisterProjection", (175.0, 110.0), (138.1, 107.8, 211.7, 111.7), 210.25, "left"),
+    ("REGISTER_KEEP", "RegisterDia", (295.0, 115.0), (248.2, 108.3, 341.7, 112.2), 320.0, "left"),
+])
+def test_cap_full_callout_rows_clear_native_vertical_witnesses(keep, name, old, row, witness_x, side) -> None:
+    moved = _cap_paper_box(row, old, getattr(drawing, keep)[name])
+    if side == "right":
+        assert moved[0] - witness_x > 3.0
+    else:
+        assert witness_x - moved[2] > 3.0
+
+
 def test_native_recipe_adapter_calls_bind_to_the_real_interface() -> None:
     tree = ast.parse(RECIPE.read_text(encoding="utf-8"), filename=str(RECIPE))
     calls = _adapter_calls(tree)

@@ -8,6 +8,11 @@ The register sheet's aligned XZ (*Top) projection retains the register
 free-end chamfer's native dimension; it cannot transfer into the YZ view.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
 coordinates remain ordinary native dimensions from the actual pocket axis.
+
+Paper-layout repair measured from the 20261021T085834832Z native PDF/audit:
+keep full callout blocks inside the border and off their own witnesses, the
+section-sheet heading/context, and the register side-view edge. Coordinates
+below are requested placements, not a claim of native after-fix acceptance.
 """
 
 from __future__ import annotations
@@ -54,8 +59,8 @@ VIEW_SCALE = (1, 1)
 SHEET_NAMES = ("ACCESS", "SECTIONS", "BOLT-LOCATIONS", "REGISTERS")
 TOP_CENTER = (0.180, 0.190)
 RIGHT_CENTER = (0.335, TOP_CENTER[1])
-BOTTOM_CENTER = (0.115, 0.190)
-SECTION_CENTER = (0.300, 0.195)
+BOTTOM_CENTER = (0.115, 0.170)
+SECTION_CENTER = (0.300, 0.180)
 BOLT_SECTION_CENTER = (0.300, 0.100)
 BOLT_CENTER = (0.210, 0.170)
 REGISTER_FRONT_CENTER = (0.115, 0.175)
@@ -64,9 +69,9 @@ REGISTER_RIGHT_CENTER = (0.205, REGISTER_FRONT_CENTER[1])
 # The native circular-rim chamfer imports in XZ, not the YZ side view.
 # Its undimensioned *Front parent context keeps this a true third-angle set.
 REGISTER_END_CENTER = (REGISTER_FRONT_CENTER[0], 0.235)
-ISO_CENTER = (0.080, 0.055)
+ISO_CENTER = (0.080, 0.059)
 ISO_SCALE = (1, 1)
-ISO_NOTE_XY = (0.025, 0.102)
+ISO_NOTE_XY = (0.025, 0.110)
 SHEET_HEADING_XY = (0.025, 0.260)
 # The long head, aperture and relief callouts fan out left of their rims.
 # Ordinary centre coordinates and the mouth-width lane occupy the right/bottom.
@@ -77,32 +82,32 @@ TOP_KEEP = {
     "WireWidth": (0.245, 0.120),
     "EntryReliefDia": (0.075, 0.130),
 }
-RIGHT_KEEP = {"CounterboreDepth": (0.310, 0.245), "WireDepth": (0.340, 0.145)}
+RIGHT_KEEP = {"CounterboreDepth": (0.280, 0.245), "WireDepth": (0.370, 0.145)}
 # A dedicated underside owns the corner-to-pocket coordinates and fitted
 # sections; neither bolt nor register callout shoulders share these lanes.
 BOTTOM_KEEP = {
-    "PocketDia": (0.060, 0.245),
-    "PocketCenterX": (0.1275, 0.135), "PocketCenterY": (0.070, 0.17125),
+    "PocketDia": (0.060, 0.233),
+    "PocketCenterX": (0.1275, 0.115), "PocketCenterY": (0.070, 0.15125),
 }
-SECTION_KEEP = {"CapHeight": (0.365, 0.195), "PocketDepth": (0.235, 0.230)}
+SECTION_KEEP = {"CapHeight": (0.365, 0.180), "PocketDepth": (0.330, 0.240)}
 BOLT_SECTION_KEEP = {"EntryReliefDepth": (0.365, 0.140)}
-# Signed bolt coordinates still witness the actual pocket axis. Hang the
-# two-row X callouts outside their short spans, with separate upper/lower
-# shelves; Y callouts end before those shelves rather than crossing them.
+# Signed bolt coordinates still witness the actual pocket axis. Allocate lanes
+# for the entire three-row block, not just its numeric anchor: the native left
+# Y blocks extended 61 mm leftward and the lower right X/Y rows touched.
 BOLT_KEEP = {
     "BoltHoleDia": (0.300, 0.080),
-    "Bolt1X": (0.300, 0.120), "Bolt3X": (0.120, 0.095),
-    "Bolt2X": (0.300, 0.250), "Bolt4X": (0.120, 0.225),
+    "Bolt1X": (0.300, 0.100), "Bolt3X": (0.120, 0.095),
+    "Bolt2X": (0.300, 0.245), "Bolt4X": (0.120, 0.215),
     "Bolt1Y": (0.285, 0.135), "Bolt2Y": (0.285, 0.215),
-    "Bolt3Y": (0.060, 0.135), "Bolt4Y": (0.060, 0.245),
+    "Bolt3Y": (0.100, 0.135), "Bolt4Y": (0.100, 0.240),
 }
 REGISTER_KEEP = {
-    "RegisterDia": (0.295, 0.115),
-    "Register1X": (0.370, 0.095), "Register2X": (0.260, 0.230),
-    "Register1Y": (0.350, 0.135), "Register2Y": (0.215, 0.215),
+    "RegisterDia": (0.260, 0.115),
+    "Register1X": (0.370, 0.095), "Register2X": (0.310, 0.240),
+    "Register1Y": (0.350, 0.135), "Register2Y": (0.240, 0.228),
 }
-REGISTER_PROJECTION_KEEP = {"RegisterProjection": (0.175, 0.110)}
-REGISTER_END_KEEP = {"RegisterEndChamfer": (0.180, 0.245)}
+REGISTER_PROJECTION_KEEP = {"RegisterProjection": (0.160, 0.110)}
+REGISTER_END_KEEP = {"RegisterEndChamfer": (0.220, 0.252)}
 SECTION_LINE_MODEL = ((-part_spec.WIDTH / 2.0 - 4.0, 0.0, 0.0), (part_spec.WIDTH / 2.0 + 4.0, 0.0, 0.0))
 BOLT_SECTION_LINE_MODEL = tuple(
     (x, min(y for _, y in part_spec.BOLT_POINTS), 0.0)
