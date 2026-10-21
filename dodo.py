@@ -1921,6 +1921,13 @@ def _drawing_file_deps(stem: str) -> list[str]:
             runtime = [path for path in runtime if _resolved(Path(path)) != registry]
             runtime.append(_drawing_registry_dep(stem, registry))
     runtime.append(_submodule_dep())
+    if stem == "mg_magnifier_assembly":
+        # Diagnostic branch only: spec.assets already declares the current DRWDOT.
+        # The same-seat ABBA arm's historical bytes must also enter the cache key.
+        historical_template = (
+            REPO_ROOT / "cad" / "templates" / "issue1667-historical-landscape.DRWDOT"
+        )
+        runtime.append(str(_resolved(historical_template)))
     if spec.source_kind == "assembly":
         # Assembly-sourced drawings need the same exact-identity signal as
         # part-sourced drawings. The recipe-stable .SLDASM digest preserves

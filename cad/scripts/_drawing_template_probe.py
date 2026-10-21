@@ -1,4 +1,4 @@
-"""Temporary issue-1667 template A/B probe; NEVER merge into production.
+"""Temporary issue-1667 same-seat template ABBA probe; NEVER merge into production.
 
 Observers only read COM properties/returned notes. The only image is a desktop
 pixel grab after native creation and the unchanged production ownership proof.
@@ -7,8 +7,8 @@ No drawing save/export is permitted: both complete and incomplete runs STOP.
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
+import sys
 import time
 from typing import Any, Callable, NoReturn, Sequence
 
@@ -18,6 +18,17 @@ from _com import _early_bound
 import _drawing_balloons as balloons
 import _seat_forensics
 import _telemetry
+
+
+class TemplateProbeStop(RuntimeError):
+    """Only the expected diagnostic outcome; native/recipe errors stay fatal."""
+
+    def __init__(self, report: dict[str, Any]) -> None:
+        self.report = report
+        super().__init__(
+            "INTENTIONAL TEMPLATE PROBE STOP before save/export; "
+            f"proof={report['proof']}; report={report['report_path']}"
+        )
 
 
 def _read(probe: Callable[[], Any]) -> Any:
@@ -97,19 +108,17 @@ def observe_notes(adapter: Any, notes: Any) -> dict[str, Any]:
 
 def stop_after_template_probe(
     adapter: Any, view: Any, *, items: Sequence[tuple[str, str]], label: str,
-    template: Path,
+    template: Path, out_dir: Path, report: dict[str, Any],
 ) -> NoReturn:
-    """Run the exact production helper once, retain evidence, then intentionally fail."""
-    out_dir = _seat_forensics._capture_dir("1667-template-balloon-probe")
-    report: dict[str, Any] = {
-        "diagnostic_only": True, "intentional_stop_before_save_export": True,
-        "label": label, "expected_items": list(items),
-        "template_path": str(template.resolve()),
-        "post_rebuild_count_source": "same AutoBalloon5 return array, not a view traversal",
-    }
-    failure = None
+    """Retain the exact production proof, then STOP on complete/incomplete coverage."""
+    report.update(
+        diagnostic_only=True, intentional_stop_before_save_export=True,
+        label=label, expected_items=list(items), proof="unexpected_error",
+        template_path=str(template.resolve()),
+        report_path=str(out_dir / "capture.json"),
+        post_rebuild_count_source="same AutoBalloon5 return array, not a view traversal",
+    )
     try:
-        report["template_sha256"] = hashlib.sha256(template.read_bytes()).hexdigest()
         started = time.perf_counter()
         try:
             landings = balloons.add_auto_balloons(
@@ -127,18 +136,20 @@ def stop_after_template_probe(
                 reporting_inside_helper_ms=observers,
                 helper_excluding_measured_observers_ms=elapsed - observers,
             )
-    except Exception as exc:  # noqa: BLE001 - coverage failure must still write evidence
-        failure = exc
-        report.update(proof="failed", error=f"{type(exc).__name__}: {exc}")
+    except TemplateProbeStop:
+        # Only the helper's explicit missing-items boundary may continue ABBA.
+        pass
     finally:
+        failure = sys.exception()
+        if failure is not None:
+            report.update(
+                proof="unexpected_error", error=f"{type(failure).__name__}: {failure}"
+            )
         started = time.perf_counter()
         report["artifacts"] = _seat_forensics._write_artefacts(
             (("desktop_png", lambda: _seat_forensics._grab_screen(out_dir / "desktop.png")),)
         )
         report["post_proof_capture_ms"] = (time.perf_counter() - started) * 1000.0
         written = _seat_forensics._write_failure_report(out_dir, report)
-        _telemetry.info(f"Intentional template probe STOP before save/export: {written['report']}")
-    raise RuntimeError(
-        f"INTENTIONAL TEMPLATE PROBE STOP before save/export; proof={report['proof']}; "
-        f"report={out_dir / 'capture.json'}"
-    ) from failure
+        _telemetry.info(f"Template probe retained before save/export: {written['report']}")
+    raise TemplateProbeStop(report)

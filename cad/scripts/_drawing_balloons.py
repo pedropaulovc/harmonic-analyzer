@@ -529,6 +529,16 @@ def add_auto_balloons(
         )
     missing = sorted(expected.keys() - seen)
     if missing:
+        if _diagnostic is not None:
+            from _drawing_template_probe import TemplateProbeStop
+
+            _diagnostic.update(
+                proof="incomplete",
+                proven_count=len(landings),
+                missing_items=missing,
+                error=f"{label}: missing native BOM items {missing}",
+            )
+            raise TemplateProbeStop(_diagnostic)
         raise RuntimeError(f"{label}: missing native BOM items {missing}")
     _telemetry.success(f"{label}: validated {len(landings)} native BOM balloons")
     return landings
