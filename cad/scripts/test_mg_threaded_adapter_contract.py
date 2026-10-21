@@ -259,13 +259,19 @@ def test_native_return_type_census_distinguishes_void_mutators() -> None:
     assert _native_return_type(mutated) != _native_return_type(setter)
 
 
-@pytest.mark.parametrize("recipe", ("draw_mg_magnifying_bracket.py", "draw_mg_magnifying_lever.py"))
+@pytest.mark.parametrize("recipe", (
+    "draw_mg_magnifying_bracket.py",
+    "draw_mg_magnifying_lever.py",
+    "draw_mg_magnifying_clamp.py",
+    "draw_mg_magnifier_assembly.py",
+))
 def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) -> None:
     assert not _undeclared_bound_calls(_tree(SCRIPTS / recipe))
     wrong = ast.parse('def inline_binding(): _early_bound(None, "ISilhouetteEdge").NotADeclaredFaceAccessor()')
     assert _undeclared_bound_calls(wrong) == ["ISilhouetteEdge.NotADeclaredFaceAccessor"]
     for interface, property_name in (
         ("IView", "ReferencedDocument"),
+        ("IModelDoc2", "Extension"),
         ("IView", "ModelToViewTransform"),
         ("IDimension", "FullName"),
         ("IDimension", "SystemValue"),
@@ -306,6 +312,24 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("INote", "GetExtent", 0, 12),
     ("INote", "GetAnnotation", 0, 9),
     ("IAnnotation", "GetPosition", 0, 12),
+    ("IDisplayDimension", "GetDisplayData", 0, 9),
+    ("IPartDoc", "FeatureByName", 1, 9),
+    ("IView", "GetCorresponding", 1, 9),
+    ("IFeature", "GetFaces", 0, 12),
+    ("IModelDocExtension", "GetCorrespondingEntity2", 1, 9),
+    ("INote", "GetText", 0, 8),
+    ("IAnnotation", "GetAttachedEntities3", 0, 12),
+    ("IAnnotation", "GetAttachedEntityCount3", 0, 3),
+    ("IAnnotation", "GetAttachedEntityTypes", 0, 12),
+    ("IAnnotation", "GetLeaderCount", 0, 3),
+    ("IAnnotation", "IsDangling", 0, 11),
+    ("IDisplayData", "GetTextCount", 0, 3),
+    ("IDisplayData", "GetTextAtIndex", 1, 8),
+    ("IDisplayData", "GetTextPositionAtIndex", 1, 12),
+    ("IDisplayData", "GetTextHeightAtIndex", 1, 5),
+    ("IDisplayData", "GetTextRefPositionAtIndex", 1, 3),
+    ("IDisplayData", "GetTextAngleAtIndex", 1, 5),
+    ("IDisplayData", "GetTextLineSpacingAtIndex", 1, 5),
 ))
 def test_witness_and_bracket_native_method_contracts(interface, member, arity, retval) -> None:
     methods, maps = _native_declaration(interface)

@@ -28,6 +28,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
@@ -64,6 +65,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_face_read import face_geometry
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -415,14 +417,165 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
 
 
 def _add_stock_note(adapter: Any, view: Any) -> None:
-    """Flag an actual supplied flat, not the free-floating hex silhouette."""
-    model = _early_bound(view, "IView").ReferencedDocument
-    face = resolve_faces(model, {"supplied_hex_flat": PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)})["supplied_hex_flat"]
-    note = add_attached_note(adapter, view, text=property_link("Manufacturing Notes"), entity_type="FACE", entity=face, attached_to=face, note_xy=STOCK_NOTE_XY, label="supplied hex stock flat")
-    native = _early_bound(note, "INote")
-    resolved = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-    if resolved != STOCK_NOTE:
-        raise RuntimeError(f"supplied hex stock flat: model property did not resolve: {resolved!r}")
+    """Use the supplied flat's drawing-context face, with exact source proof."""
+    native = _early_bound(view, "IView")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    audit = {
+        "stage": "stock.source_face", "source_context": "referenced part",
+        "selection_context": "target drawing view", "diagnostic_errors": [],
+    }
+    missing = object()
+    source_face = face = extension = None
+    notes_before = missing
+
+    def diagnostic(row: dict[str, Any], field: str, member: str, reader: Any, *, record: bool = True) -> Any:
+        try:
+            value = reader()
+        except Exception as exc:
+            audit["diagnostic_errors"].append({
+                "field": field, "member": member, "type": type(exc).__name__, "message": str(exc),
+            })
+            return missing
+        if record:
+            row[field] = value
+        return value
+
+    def emit() -> None:
+        evidence = json.dumps(audit, sort_keys=True, default=repr)
+        _telemetry.info(
+            f"clamp stock face audit: {evidence}",
+            operation_stage=audit["stage"], auditJSON=evidence,
+        )
+
+    try:
+        model = native.ReferencedDocument
+        if model is None:
+            raise RuntimeError("supplied hex stock flat: view has no referenced part")
+        selector = PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)
+        source_face = resolve_faces(model, {"supplied_hex_flat": selector})["supplied_hex_flat"]
+        audit["stage"] = "stock.source_self"
+        audit["source_self"] = app.IsSame(source_face, source_face)
+        if audit["source_self"] != 1:
+            raise RuntimeError("supplied hex stock flat: source face identity is unavailable")
+        # Select4 requires an entity from the active document. Follow the
+        # output-fixture's feature -> view face -> source correspondence, not
+        # a part-body face selected into a drawing or a geometry/FaceID alias.
+        audit["stage"] = "stock.view_feature"
+        feature = _early_bound(model, "IPartDoc").FeatureByName("Block")
+        if feature is None:
+            raise RuntimeError("supplied hex stock flat: source has no Block feature")
+        view_feature = _early_bound(native.GetCorresponding(feature), "IFeature")
+        if view_feature is None:
+            raise RuntimeError("supplied hex stock flat: Block has no drawing-view correspondence")
+        audit["stage"] = "stock.view_flat"
+        feature_faces = tuple(view_feature.GetFaces() or ())
+        matches = []
+        for candidate in feature_faces:
+            geometry = face_geometry(candidate)
+            if geometry is not None and selector.matches(geometry):
+                matches.append(candidate)
+        audit["view_feature_faces"] = len(feature_faces)
+        audit["view_flat_candidates"] = len(matches)
+        if len(matches) != 1:
+            raise RuntimeError(f"supplied hex stock flat: expected one drawing-view flat, found {len(matches)}")
+        face = matches[0]
+        audit["stage"] = "stock.view_self"
+        audit["view_self"] = app.IsSame(face, face)
+        if audit["view_self"] != 1:
+            raise RuntimeError("supplied hex stock flat: drawing face identity is unavailable")
+        audit["stage"] = "stock.source_correspondence"
+        extension = _early_bound(_early_bound(model, "IModelDoc2").Extension, "IModelDocExtension")
+        canonical = extension.GetCorrespondingEntity2(face)
+        audit["canonical_present"] = canonical is not None
+        if canonical is None:
+            raise RuntimeError("supplied hex stock flat: drawing face has no source correspondence")
+        audit["stage"] = "stock.canonical_self"
+        audit["canonical_self"] = app.IsSame(canonical, canonical)
+        audit["stage"] = "stock.source_same"
+        audit["source_same"] = app.IsSame(canonical, source_face)
+        if audit["canonical_self"] != 1 or audit["source_same"] != 1:
+            raise RuntimeError("supplied hex stock flat: drawing face does not prove exact source identity")
+        diagnostic(audit, "raw_source_vs_view", "ISldWorks.IsSame", lambda: app.IsSame(source_face, face))
+        notes_before = diagnostic(audit, "notes_before", "IView.GetNotes", lambda: tuple(native.GetNotes() or ()), record=False)
+        if notes_before is not missing:
+            audit["view_note_count_before"] = len(notes_before)
+        audit["stage"] = "stock.attach"
+        emit()
+        note = add_attached_note(adapter, view, text=property_link("Manufacturing Notes"), entity_type="FACE", entity=face, attached_to=face, note_xy=STOCK_NOTE_XY, label="supplied hex stock flat")
+        audit["stage"] = "stock.resolved_property"
+        resolved = str(_early_bound(note, "INote").GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if resolved != STOCK_NOTE:
+            raise RuntimeError(f"supplied hex stock flat: model property did not resolve: {resolved!r}")
+        audit["stage"] = "stock.complete"
+        emit()
+    except Exception as original:
+        audit["failure"] = {"type": type(original).__name__, "message": str(original)}
+        # A strict helper failure can precede its INote return. Inspect the
+        # documented view-note inventory, without guessing which note is new
+        # or replacing the original failure with an optional diagnostic error.
+        try:
+            notes = diagnostic(audit, "view_notes", "IView.GetNotes", lambda: tuple(native.GetNotes() or ()), record=False)
+            if notes is not missing:
+                audit["view_notes"] = []
+                for index, raw_note in enumerate(notes):
+                    row: dict[str, Any] = {"index": index}
+                    audit["view_notes"].append(row)
+                    note = _early_bound(raw_note, "INote")
+                    row["note_present"] = note is not None
+                    if note is None:
+                        continue
+                    diagnostic(row, "text", "INote.GetText", lambda: note.GetText())
+                    diagnostic(row, "self", f"ISldWorks.IsSame(note[{index}],note[{index}])", lambda: app.IsSame(note, note))
+                    if notes_before is not missing:
+                        row["same_to_before"] = []
+                        for previous_index, previous in enumerate(notes_before):
+                            if previous is None:
+                                row["same_to_before"].append({"index": previous_index, "unavailable": True, "reason": "prior note handle is None"})
+                                continue
+                            code = diagnostic(row, f"before[{previous_index}]", "ISldWorks.IsSame", lambda: app.IsSame(note, previous), record=False)
+                            row["same_to_before"].append({"index": previous_index, "unavailable": True} if code is missing else {"index": previous_index, "code": code})
+                    annotation = diagnostic(row, "annotation", "INote.GetAnnotation", lambda: _early_bound(note.GetAnnotation(), "IAnnotation"), record=False)
+                    if annotation is missing or annotation is None:
+                        row["annotation_present"] = False if annotation is None else None
+                        continue
+                    row["annotation_present"] = True
+                    diagnostic(row, "count", "IAnnotation.GetAttachedEntityCount3", lambda: annotation.GetAttachedEntityCount3())
+                    types = diagnostic(row, "types", "IAnnotation.GetAttachedEntityTypes", lambda: tuple(annotation.GetAttachedEntityTypes() or ()))
+                    diagnostic(row, "dangling", "IAnnotation.IsDangling", lambda: annotation.IsDangling())
+                    diagnostic(row, "leaders", "IAnnotation.GetLeaderCount", lambda: annotation.GetLeaderCount())
+                    diagnostic(row, "owner_type", "IAnnotation.OwnerType", lambda: annotation.OwnerType)
+                    owner = diagnostic(row, "owner", "IAnnotation.Owner", lambda: annotation.Owner, record=False)
+                    row["owner_present"] = None if owner is missing else owner is not None
+                    if owner is not missing and owner is not None:
+                        diagnostic(row, "owner_self", f"ISldWorks.IsSame(note_owner[{index}],note_owner[{index}])", lambda: app.IsSame(owner, owner))
+                        if row.get("owner_type") == 0:
+                            diagnostic(row, "owner_to_view", f"ISldWorks.IsSame(note_owner[{index}],target_view)", lambda: app.IsSame(owner, native))
+                    attached = diagnostic(row, "entities", "IAnnotation.GetAttachedEntities3", lambda: tuple(annotation.GetAttachedEntities3() or ()), record=False)
+                    if attached is missing:
+                        continue
+                    row["entities_reported"], row["attachments"] = len(attached), []
+                    for entity_index, entity in enumerate(attached):
+                        item = {"index": entity_index, "present": entity is not None}
+                        row["attachments"].append(item)
+                        if entity is None:
+                            continue
+                        diagnostic(item, "self", f"ISldWorks.IsSame(attached[{entity_index}],attached[{entity_index}])", lambda: app.IsSame(entity, entity))
+                        if face is not None:
+                            diagnostic(item, "view_same", f"ISldWorks.IsSame(attached[{entity_index}],view_face)", lambda: app.IsSame(entity, face))
+                        if extension is not None and types is not missing and entity_index < len(types) and types[entity_index] == 2:
+                            canonical = diagnostic(item, "source", "IModelDocExtension.GetCorrespondingEntity2", lambda: extension.GetCorrespondingEntity2(entity), record=False)
+                            item["source_present"] = None if canonical is missing else canonical is not None
+                            if canonical is not missing and canonical is not None and source_face is not None:
+                                diagnostic(item, "source_same", f"ISldWorks.IsSame(attached_source[{entity_index}],source_face)", lambda: app.IsSame(canonical, source_face))
+        except Exception as diagnostic_error:
+            audit["diagnostic_errors"].append({
+                "field": "failure_inventory", "type": type(diagnostic_error).__name__, "message": str(diagnostic_error),
+            })
+        try:
+            emit()
+        except Exception:
+            pass  # Optional logging must never replace the actual native failure.
+        raise
 
 
 async def build(adapter: Any) -> dict[str, str]:
