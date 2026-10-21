@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 import _buildgraph
 from _assembly_contract import assembly_contract
@@ -733,30 +734,287 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
         assert reach < detail.crop_radius_mm - 3.0, stem
 
 
-def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
-    """Proof run 20261017T222049387Z, sheet 2: walked to the ear's apex, the
-    bracket's leader 3 ran down the lifted hold-down (item 7) that stands
-    over it.  It lands on the foot's free-end edge instead: on the part, at
-    half the foot's height, and in the isometric well left of the
-    hold-down's head (the north bracket carries its hold-down, so their
-    offsets cancel apart from the lift, which moves v only)."""
-    import ch_pivot_bracket_sides as sides
-    import ch_pivot_bracket_spec as bracket
-    import ch_vn_bracket_hold_down_screw_spec as hold_down
+class _BalloonView:
+    def __init__(self, name: str, notes=()) -> None:
+        self.Name = name
+        self.notes = list(notes)
+        self.linked = True
+        self.bom_name = "Channel BOM"
+        self.link_result = True
+        self.link_calls = []
 
-    x, y, z = drawing.BRACKET_BALLOON_POINT_MM
-    assert x == -bracket.FOOT_W / 2.0
-    assert z == sides.FOOT_Z1
-    assert 0.0 < y < bracket.FOOT_H
-    # The north bracket's part frame runs with the machine's (its foot
-    # toward machine +z), so the part point projects like a machine one.
-    assert sides.OUTBOARD_SIGN["N"] == 1.0
-    moved = drawing.exploded_offset(drawing.explode.BRACKET_HOLD_DOWN, "north")
-    carried = drawing.exploded_offset(drawing.explode.BRACKET, "north")
-    assert (moved[0], moved[2]) == (carried[0], carried[2])
-    head_left = _iso((0.0, 0.0, sides.HOLE_Z))[0] - hold_down.HEAD_DIA / 2.0
-    # 6.0 model mm, 0.86 on the sheet at 1:7: a leader's width and more.
-    assert head_left - _iso((x, y, z))[0] > 5.0
+    def GetNotes(self):
+        return tuple(self.notes)
+
+    def SetKeepLinkedToBOM(self, linked, name):
+        self.link_calls.append((linked, name))
+        return self.link_result
+
+    def GetKeepLinkedToBOM(self):
+        return self.linked
+
+    def GetKeepLinkedToBOMName(self):
+        return self.bom_name
+
+
+class _NativeBalloon:
+    def __init__(self, stem: str, item: str, instance: str) -> None:
+        self.item = item
+        self.style = 1
+        self.is_bom = True
+        self.attached = True
+        self.dangling = False
+        self.component = SimpleNamespace(
+            Name2=instance, GetPathName=lambda: f"C:/parts/{stem}.SLDPRT"
+        )
+        self.entities = (SimpleNamespace(GetComponent=lambda: self.component),)
+        self.entity_types = (1,)
+
+    def IsBomBalloon(self):
+        return self.is_bom
+
+    def IsAttached(self):
+        return self.attached
+
+    def GetBomBalloonText(self, upper):
+        assert upper is True
+        return self.item
+
+    def GetBomBalloonTextStyle(self, upper):
+        assert upper is True
+        return self.style
+
+    def GetAnnotation(self):
+        return self
+
+    def IsDangling(self):
+        return self.dangling
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetAttachedEntityTypes(self):
+        return self.entity_types
+
+
+def _balloon_partition(items):
+    bracket = set(drawing.NORTH_BRACKET_DETAIL.stems)
+    keeper = set(drawing.NORTH_KEEPER_DETAIL.stems)
+    return (
+        tuple(pair for pair in items if pair[0] not in bracket | keeper),
+        tuple(pair for pair in items if pair[0] in bracket),
+        tuple(pair for pair in items if pair[0] in keeper),
+    )
+
+
+@pytest.fixture
+def native_balloon_coverage(monkeypatch):
+    from _drawing_balloons import BalloonLanding
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *args: None)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    items = tuple(
+        (stem, str(101 + index * 3))
+        for index, stem in enumerate(drawing.BOM_COMPONENTS)
+    )
+    north = {stem: f"bank-1/{stem}-20" for stem in drawing.BOM_COMPONENTS}
+    views = []
+    landings = []
+    for name, assigned in zip(("main", "B", "C"), _balloon_partition(items)):
+        notes = []
+        for stem, item in assigned:
+            note = _NativeBalloon(stem, item, north[stem])
+            notes.append(note)
+            landings.append(
+                BalloonLanding(stem, north[stem], note, (0.1, 0.2), name)
+            )
+        views.append((_BalloonView(name, notes), assigned))
+    table = SimpleNamespace(BomFeature=SimpleNamespace(Name="Channel BOM"))
+    audit_calls = []
+    monkeypatch.setattr(
+        drawing, "assert_balloon_landings",
+        lambda adapter, actual: audit_calls.append((adapter, actual)),
+    )
+    return SimpleNamespace(
+        adapter=object(), view_items=tuple(views), table=table, north=north,
+        landings=landings, audit_calls=audit_calls,
+    )
+
+
+def _check_native_coverage(case):
+    drawing._assert_bom_balloon_coverage(
+        case.adapter, case.view_items, case.table, case.north, case.landings
+    )
+
+
+def test_native_balloon_inventory_covers_exactly_the_assigned_19_items(
+    native_balloon_coverage,
+) -> None:
+    case = native_balloon_coverage
+    assert [len(items) for _view, items in case.view_items] == [12, 4, 3]
+    # Ordinary detail labels are not inventory and must not count as balloons.
+    case.view_items[1][0].notes.append(SimpleNamespace(IsBomBalloon=lambda: False))
+    _check_native_coverage(case)
+    assert case.audit_calls == [(case.adapter, case.landings)]
+
+
+@pytest.mark.parametrize("view_index", (0, 1, 2))
+@pytest.mark.parametrize(
+    "damage",
+    (
+        "missing", "duplicate", "wrong_native_item", "wrong_style", "wrong_north",
+        "wrong_family", "dangling", "unattached", "no_edge", "two_edges",
+        "not_edge", "wrong_view", "unlinked", "wrong_bom",
+        "missing_landing", "duplicate_landing", "unproven_landing",
+    ),
+)
+def test_final_native_inventory_refuses_incomplete_or_false_coverage(
+    native_balloon_coverage, damage, view_index,
+) -> None:
+    from dataclasses import replace
+
+    case = native_balloon_coverage
+    main = case.view_items[view_index][0]
+    note = main.notes[0]
+    if damage == "missing":
+        main.notes.pop(0)
+    elif damage == "duplicate":
+        main.notes.append(note)
+    elif damage == "wrong_native_item":
+        note.item = "9999"
+    elif damage == "wrong_style":
+        note.style = 2
+    elif damage == "wrong_north":
+        note.component.Name2 = note.component.Name2.replace("-20", "-1")
+    elif damage == "wrong_family":
+        note.component.GetPathName = lambda: "C:/parts/unrelated.SLDPRT"
+    elif damage == "dangling":
+        note.dangling = True
+    elif damage == "unattached":
+        note.attached = False
+    elif damage == "no_edge":
+        note.entities = ()
+        note.entity_types = ()
+    elif damage == "two_edges":
+        note.entities *= 2
+        note.entity_types *= 2
+    elif damage == "not_edge":
+        note.entity_types = (2,)
+    elif damage == "wrong_view":
+        case.view_items[(view_index + 1) % 3][0].notes.append(main.notes.pop(0))
+    elif damage == "unlinked":
+        main.linked = False
+    elif damage == "wrong_bom":
+        main.bom_name = "Other BOM"
+    elif damage == "missing_landing":
+        case.landings.pop()
+    elif damage == "duplicate_landing":
+        case.landings[-1] = case.landings[0]
+    elif damage == "unproven_landing":
+        case.landings[0] = replace(case.landings[0], sheet_xy=None)
+    with pytest.raises(RuntimeError):
+        _check_native_coverage(case)
+
+
+def test_final_native_inventory_retains_public_landing_audit(
+    native_balloon_coverage, monkeypatch,
+) -> None:
+    def reject(*args):
+        raise RuntimeError("landing moved after rebuild")
+
+    monkeypatch.setattr(drawing, "assert_balloon_landings", reject)
+    with pytest.raises(RuntimeError, match="landing moved"):
+        _check_native_coverage(native_balloon_coverage)
+
+
+@pytest.mark.parametrize("failure", (None, "setter", "unlinked", "wrong_bom"))
+def test_view_bom_association_requires_both_native_readbacks(
+    monkeypatch, failure,
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    table = SimpleNamespace(BomFeature=SimpleNamespace(Name="Channel BOM"))
+    view = _BalloonView("detail")
+    if failure == "setter":
+        view.link_result = False
+    elif failure == "unlinked":
+        view.linked = False
+    elif failure == "wrong_bom":
+        view.bom_name = "Other BOM"
+    if failure is None:
+        drawing._link_view_to_bom(view, table, label="detail")
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._link_view_to_bom(view, table, label="detail")
+    assert view.link_calls == [(True, "Channel BOM")]
+
+
+def test_exploded_sheet_places_native_balloons_once_per_assigned_view(
+    monkeypatch, native_balloon_coverage,
+) -> None:
+    case = native_balloon_coverage
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    main, bracket, keeper = (view for view, _items in case.view_items)
+    items = tuple(pair for _view, assigned in case.view_items for pair in assigned)
+    monkeypatch.setattr(drawing, "place_view", lambda *args, **kwargs: main)
+    monkeypatch.setattr(
+        drawing, "_exploded_detail",
+        lambda _adapter, detail: (
+            bracket if detail is drawing.NORTH_BRACKET_DETAIL else keeper
+        ),
+    )
+    for name in (
+        "set_high_quality_shaded_with_edges", "set_view_exploded_state",
+        "_center_view_outline", "_assert_view_on_sheet", "_mark_exploded_details",
+        "_add_north_end_trail", "_assert_exploded_caption",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *args, **kwargs: "test")
+    monkeypatch.setattr(drawing, "insert_bom_table", lambda *args, **kwargs: case.table)
+    monkeypatch.setattr(drawing, "_validate_bom", lambda *args: items)
+    monkeypatch.setattr(drawing, "_bom_vertical_limits", lambda *args: (0.1, 0.2))
+    monkeypatch.setattr(drawing, "_add_note_block", lambda *args, **kwargs: object())
+    placements = []
+
+    def place(_adapter, view, *, items, anchors, **kwargs):
+        placements.append((view, tuple(items), anchors))
+        assert view.link_calls == [(True, case.table.BomFeature.Name)]
+        return [
+            landing for landing in case.landings
+            if landing.stem in {stem for stem, _item in items}
+        ]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", place)
+    final_calls = []
+    monkeypatch.setattr(
+        drawing, "_assert_bom_balloon_coverage",
+        lambda *args: final_calls.append(args),
+    )
+    settled = drawing._place_exploded_sheet(adapter, case.north)
+    assert len(placements) == 3
+    assigned = {view.Name: pairs for view, pairs, _anchors in placements}
+    assert assigned == {view.Name: pairs for view, pairs in case.view_items}
+    assert sorted(len(pairs) for pairs in assigned.values()) == [3, 4, 12]
+    assert {stem for pairs in assigned.values() for stem, _item in pairs} == set(
+        drawing.BOM_COMPONENTS
+    )
+    for _view, pairs, anchors in placements:
+        assert set(anchors) == {stem for stem, _item in pairs}
+        for stem, anchor in anchors.items():
+            assert anchor.instance == case.north[stem]
+            assert anchor.point_mm is None
+    final_calls.clear()
+    settled()
+    assert len(final_calls) == 1
+    actual_adapter, view_items, table, north, landings = final_calls[0]
+    assert actual_adapter is adapter
+    assert dict((view.Name, tuple(pairs)) for view, pairs in view_items) == assigned
+    assert table is case.table
+    assert north is case.north
+    assert {id(landing) for landing in landings} == {
+        id(landing) for landing in case.landings
+    }
+    assert len(landings) == 19
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:

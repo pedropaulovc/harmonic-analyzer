@@ -5,7 +5,8 @@ r"""Create the MHA-CH-00 channel assembly fitter package (four sheets).
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
    (ch_channel_explode_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
-   balloon per BOM row.
+   native balloon per BOM row on its north-most instance. Details B/C carry
+   the seven small-hardware rows; the main exploded view carries the rest.
 3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
    length, a cropped 4:1 detail of the south end with the spring set, and
    steps 1-8. The south bracket is set off a wave disc spring that preloads
@@ -47,9 +48,10 @@ from _check import check
 from _com import _early_bound
 import _config
 from _drawing_balloons import (
-    # BalloonAnchor,
-    # add_component_bom_balloons,
-    # assert_balloon_landings,
+    BalloonAnchor,
+    BalloonLanding,
+    add_component_bom_balloons,
+    assert_balloon_landings,
     isolate_drawing_view_components,
 )
 from _drawing_common import (
@@ -101,12 +103,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
 )
-from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
-from ch_pivot_bracket_spec import (
-    FOOT_H as BRACKET_FOOT_H,
-    FOOT_W as BRACKET_FOOT_W,
-    SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
-)
+from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
@@ -199,22 +196,7 @@ EXPLODED_ISO_CENTER = (0.100, 0.140)
 # balloon radius, so a balloon circle can never reach the border.
 BALLOON_MARGIN = 0.026
 BALLOON_MAX_RADIUS = 0.0056
-# Balloon 3 (the rocker pivot bracket) walked to its ear's apex. Lifted 60
-# straight up its foot hole, which lies in front of the ear, the hold-down
-# (item 7) now stands right over that apex in the isometric, so leader 3 ran
-# down the hold-down's head and shank to its landing (proof run
-# 20261017T222049387Z, sheet 2). Its landing is the foot's free end instead:
-# the edge drawn sheet-left of it, at half the foot's height, about 9.5 model
-# mm left of the hold-down's axis. It falls after the hold-down's landing in
-# the ring's attachment order, so leader 3 swaps ring slots with leader 7 and
-# runs left of the hold-down. Part frame (ch_pivot_bracket_spec): the foot
-# spans x -FOOT_W/2..FOOT_W/2 and z ..FOOT_Z1, the north bracket unturned.
-BRACKET_BALLOON_POINT_MM = (
-    -BRACKET_FOOT_W / 2.0,
-    BRACKET_FOOT_H / 2.0,
-    BRACKET_FOOT_Z1,
-)
-BOM_ANCHOR = (0.205, 0.262)
+BOM_ANCHOR = (0.190, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.030,
@@ -622,12 +604,16 @@ def _exploded(
 # washer, 29 to 40 mm from those centres in the isometric (estimated from the
 # spec dimensions, with margin).
 EXPLODED_DETAIL_SCALE = (1, 2)
-EXPLODED_DETAIL_X = 0.392  # the column between the BOM and the right border
+# The BOM ends at x348 mm. Reserve the right-hand column for the detail
+# circles AND their native balloons, rather than ringing into the table or
+# the sheet border. The enlarged views retain their scales and crop radii.
+EXPLODED_DETAIL_X = 0.383
+DETAIL_BALLOON_MARGIN = 0.004
 NORTH_BRACKET_DETAIL = BankView(
     "DETAIL B",
     EXPLODED_DETAIL_SCALE,
     _exploded((_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1]), explode.BRACKET, "north"),
-    (EXPLODED_DETAIL_X, 0.240),
+    (EXPLODED_DETAIL_X, 0.232),
     frozenset(
         {
             explode.BRACKET,
@@ -645,6 +631,7 @@ NORTH_BRACKET_DETAIL = BankView(
     # stack beside the circle, where the machinist review (PR #1605) could not
     # tell which boundary it named; the lower left of the circle is clear.
     letter_corner=(-1, -1),
+    label_xy=(EXPLODED_DETAIL_X - 0.016, 0.196),
 )
 NORTH_KEEPER_DETAIL = BankView(
     "DETAIL C",
@@ -654,7 +641,7 @@ NORTH_KEEPER_DETAIL = BankView(
         explode.KEEPER,
         "north",
     ),
-    (EXPLODED_DETAIL_X, 0.170),
+    (EXPLODED_DETAIL_X, 0.145),
     frozenset({explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}),
     crop_radius_mm=36.0,
     parts="NORTH KEEPER",
@@ -665,8 +652,13 @@ NORTH_KEEPER_DETAIL = BankView(
     # the letter (r8 layout audit, leader-through-text); r7's leaders pass
     # 10 mm clear of the lower right.
     letter_corner=(1, -1),
+    label_xy=(EXPLODED_DETAIL_X - 0.016, 0.113),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+DETAIL_BALLOON_STEMS = frozenset().union(
+    *(detail.stems for detail in EXPLODED_DETAILS)
+)
+MAIN_BALLOON_STEMS = frozenset(BOM_COMPONENTS) - DETAIL_BALLOON_STEMS
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
 # rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
@@ -1353,13 +1345,105 @@ def _place_assembled_sheet(adapter: Any) -> None:
     )
 
 
+def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
+    """Use the one native BOM's item identities on every ballooned view."""
+    bom = _early_bound(table, "IBomTableAnnotation")
+    name = str(_early_bound(bom.BomFeature, "IBomFeature").Name or "")
+    if not name:
+        raise RuntimeError("channel BOM feature has no name")
+    view = _early_bound(view, "IView")
+    if not view.SetKeepLinkedToBOM(True, name):
+        raise RuntimeError(f"{label}: failed to link view to BOM {name!r}")
+    if (
+        not bool(view.GetKeepLinkedToBOM())
+        or str(view.GetKeepLinkedToBOMName() or "") != name
+    ):
+        raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
+
+
+def _assert_bom_balloon_coverage(
+    adapter: Any,
+    view_items: tuple[tuple[Any, tuple[tuple[str, str], ...]], ...],
+    table: Any,
+    north_instances: dict[str, str],
+    landings: list[BalloonLanding],
+) -> None:
+    """Refuse missing, substituted, loose or unproved native balloons at save."""
+    expected_stems = Counter(BOM_COMPONENTS)
+    if Counter(stem for _view, items in view_items for stem, _item in items) != (
+        expected_stems
+    ):
+        raise RuntimeError("channel balloon views do not partition all BOM rows")
+    if Counter(landing.stem for landing in landings) != expected_stems:
+        raise RuntimeError("channel balloon landings do not cover every BOM row once")
+    for landing in landings:
+        if landing.sheet_xy is None:
+            raise RuntimeError(
+                f"channel {landing.stem}: balloon has no proven visible landing"
+            )
+    assert_balloon_landings(adapter, landings)
+    bom = _early_bound(table, "IBomTableAnnotation")
+    name = str(_early_bound(bom.BomFeature, "IBomFeature").Name or "")
+    if not name:
+        raise RuntimeError("channel BOM feature has no name")
+    for raw_view, items in view_items:
+        view = _early_bound(raw_view, "IView")
+        label = view_name(adapter, view)
+        if (
+            not bool(view.GetKeepLinkedToBOM())
+            or str(view.GetKeepLinkedToBOMName() or "") != name
+        ):
+            raise RuntimeError(f"{label}: balloon view lost its native BOM link")
+        by_item = {item: stem for stem, item in items}
+        actual: Counter[str] = Counter()
+        for raw_note in tuple(view.GetNotes() or ()):
+            note = _early_bound(raw_note, "INote")
+            if not note.IsBomBalloon():
+                continue
+            item = str(note.GetBomBalloonText(True) or "").strip()
+            if item not in by_item or int(note.GetBomBalloonTextStyle(True)) != 1:
+                raise RuntimeError(f"{label}: unexpected native BOM balloon {item!r}")
+            stem = by_item[item]
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            entities = tuple(annotation.GetAttachedEntities3() or ())
+            kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+            if (
+                not note.IsAttached()
+                or annotation.IsDangling()
+                or len(entities) != 1
+                or kinds != (1,)  # swSelectType_e.swSelEDGES
+                or entities[0] is None
+            ):
+                raise RuntimeError(f"{label}: {stem} balloon is not attached to one edge")
+            component = _early_bound(entities[0], "IEntity").GetComponent()
+            if component is None:
+                raise RuntimeError(f"{label}: {stem} balloon has no component owner")
+            component = _early_bound(component, "IComponent2")
+            instance = str(component.Name2 or "")
+            if (
+                _component_stem(component) != stem
+                or instance.casefold() != north_instances[stem].casefold()
+            ):
+                raise RuntimeError(
+                    f"{label}: item {item} attaches to {instance!r}, "
+                    f"not north-most {north_instances[stem]!r}"
+                )
+            actual[item] += 1
+            _telemetry.info(
+                f"channel native BOM balloon {item}: {stem}, {instance}, "
+                f"view {label}, attached edge, not dangling"
+            )
+        if actual != Counter(by_item.keys()):
+            raise RuntimeError(
+                f"{label}: actual native BOM balloons {dict(actual)!r} "
+                f"do not match {tuple(by_item)!r}"
+            )
+
+
 def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
 ) -> Callable[[], None]:
-    """Place the exploded isometric and BOM; return its settled caption check.
-
-    Balloons are intentionally omitted pending deterministic placement (#1667).
-    """
+    """Place one BOM and its 19 pinned native balloons; return the save check."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1388,29 +1472,23 @@ def _place_exploded_sheet(
         configuration_grouping="same-part",
         label="channel",
     )
-    _validate_bom(adapter, table)
-    # TODO(#1667): Restore after deterministic farm balloon placement;
-    # balloons intentionally omitted meanwhile.
-    # items = _validate_bom(adapter, table)
-    # landings = add_component_bom_balloons(
-    #     adapter,
-    #     exploded,
-    #     items=items,
-    #     anchors={
-    #         stem: BalloonAnchor(
-    #             point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
-    #             instance=north_instances[stem],
-    #         )
-    #         for stem in BOM_COMPONENTS
-    #     },
-    #     label="channel exploded-view BOM coverage",
-    #     margin=BALLOON_MARGIN,
-    # )
-    # if len(landings) != len(BOM_COMPONENTS):
-    #     raise RuntimeError(
-    #         f"channel exploded view carries {len(landings)} balloons, "
-    #         f"expected one per BOM row ({len(BOM_COMPONENTS)})"
-    #     )
+    items = _validate_bom(adapter, table)
+    _link_view_to_bom(exploded, table, label="channel exploded")
+    main_items = tuple((stem, item) for stem, item in items if stem in MAIN_BALLOON_STEMS)
+    view_items = [(exploded, main_items)]
+    # #1667's fixed-point screen pick is viewport-sensitive; this candidate
+    # instead discovers a currently hit-tested edge on the exact pinned
+    # instance. It does not change the shared picker or claim that bug fixed.
+    landings = add_component_bom_balloons(
+        adapter,
+        exploded,
+        items=main_items,
+        anchors={
+            stem: BalloonAnchor(instance=north_instances[stem]) for stem, _ in main_items
+        },
+        label="channel exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
     bom_bottom, _ = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -1425,14 +1503,32 @@ def _place_exploded_sheet(
     _add_north_end_trail(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
     for detail in EXPLODED_DETAILS:
-        _exploded_detail(adapter, detail)
+        view = _exploded_detail(adapter, detail)
+        _link_view_to_bom(view, table, label=detail.title)
+        detail_items = tuple((stem, item) for stem, item in items if stem in detail.stems)
+        view_items.append((view, detail_items))
+        landings.extend(
+            add_component_bom_balloons(
+                adapter,
+                view,
+                items=detail_items,
+                anchors={
+                    stem: BalloonAnchor(instance=north_instances[stem])
+                    for stem, _ in detail_items
+                },
+                label=f"channel {detail.title} BOM coverage",
+                margin=DETAIL_BALLOON_MARGIN,
+            )
+        )
     _activate_sheet(adapter, SHEET_NAMES[1])
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("channel exploded caption rebuild failed")
     _assert_exploded_caption(adapter, table, caption)
 
     def settled() -> None:
-        # assert_balloon_landings(adapter, landings)
+        _assert_bom_balloon_coverage(
+            adapter, tuple(view_items), table, north_instances, landings
+        )
         _assert_exploded_caption(adapter, table, caption)
 
     return settled
@@ -1628,14 +1724,20 @@ def _mark_detail(
         raise RuntimeError(f"failed to letter the {label}")
 
 
-def _exploded_detail(adapter: Any, detail: BankView) -> None:
+def _exploded_detail(adapter: Any, detail: BankView) -> Any:
     """One enlarged, exploded hardware cluster: placed, isolated, cropped to
     its circle and labelled under it."""
     view = _placed_bank_view(adapter, detail)
     _crop(adapter, view, detail)
+    _assert_view_on_sheet(
+        view,
+        margin=DETAIL_BALLOON_MARGIN + BALLOON_MAX_RADIUS,
+        label=detail.title,
+    )
     _activate_view(adapter, view, label=detail.title)
-    if add_note(adapter, detail.label_text, *detail.crop_label_xy) is None:
+    if add_note(adapter, detail.label_text, *(detail.label_xy or detail.crop_label_xy)) is None:
         raise RuntimeError(f"failed to label {detail.title}")
+    return view
 
 
 def _mark_exploded_details(adapter: Any, exploded: Any) -> None:
