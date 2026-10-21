@@ -1855,12 +1855,12 @@ CAPTURE_STEPS = (
     *HOLD_DOWN_STEPS,
 )
 CAPTURE_CHECKS = (
-    "TOOLING ACCEPTANCE UNVERIFIED: FREE CARRIAGE 2 TRAVEL IS NOT POSITIVELY "
-    "BOUNDED. NORMAL PASS SWEEPS DO NOT COVER ARBITRARY CAPTURED SLIDE.",
+    "TOOLING: QUALIFY ACTUAL STOPPED TRAVEL AND BOTH PASSES IN EACH USED "
+    "FEED MODE PER SHEET 11; MISSING ACTUAL EVIDENCE IS UNVERIFIED.",
     "KEEP THE STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER XY CHANGES. "
     "ISOLATE THE SPINDLE. TOOL EXTENTS COVER THE ENTIRE USED Z RANGE, DEEPEST "
-    "CUT THROUGH RETRACTION. SHEET 11 FIXED-SUPPORT NUMBERS ARE SOURCE "
-    "DIAGNOSTICS, NOT INSTALLED ACCEPTANCE. RECHECK AFTER TOOL/DEPTH/SETUP CHANGES.",
+    "CUT INCLUDING BREAKTHROUGH THROUGH RETRACTION. SHEET 11 GIVES THE "
+    "ACTUAL-INPUT RIGID CLEARANCE RULE. RECHECK AFTER TOOL/DEPTH/SETUP CHANGES.",
     f"REFERENCE TABLE HEIGHTS: WORK {PART_TOP_Z:.1f}; PIN ENDS {PIN_TOP_Z:.1f} "
     f"({retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} ABOVE WORK), NOMINAL. "
     "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
@@ -3970,31 +3970,26 @@ def _fitter_bore_plane_transfer() -> float:
             * retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
 
 
-def _fitter_carrier_motion() -> tuple[float, float]:
-    """FIXED-SUPPORT source translation/rotation diagnostic, in any world frame.
+@dataclass(frozen=True)
+class LocalCaptureMotion:
+    support_mm: float
+    bore_angle_rad: float
+    bore_bias_rad: float
+    span_min_mm: float
 
-    This does NOT enclose the present free second carriage's along-rail motion.
-    Installed positive acceptance is on design hold until travel is bounded.
-    Both normal and final support points lie in the local captured enclosure;
-    twice its norm bounds their separation. For the actual fixed support-line
-    unit vector u, separation L is body-fixed, so ||du||=||d(L*u)||/L
-    <=2*S/Lmin exactly. For body-fixed UNIT bore vector v, ||dv||<=2*sin(gamma/2).
-    k=u.v is invariant: with h=sqrt(1-k*k), d((v-k*u)/h)=(dv-k*du)/h.
-    Thus orthogonalized-vector change <=dv/cos(alpha)+tan(alpha)*du;
-    the fixed manufactured bore bias cannot be replaced by a varying k.
-    The third basis-vector change is <= the first two changes' sum. For two
-    proper rotation matrices, operator norm = Frobenius norm/sqrt(2), giving
-    F <= sqrt(du^2+dn^2+du*dn). Thus any material point at radius rho from the
-    support midpoint moves <= S+rho*F. This includes yaw, one-end lift and
-    twist; common installation pitch/roll and unequal support heights cancel.
+
+def _fitter_local_capture() -> LocalCaptureMotion:
+    """Printed local capture sphere, independent of guide travel/orientation.
+
+    Both seated-normal and captured support intersections lie within S0/2
+    of the fixed block's accepted seat-height datum. The actual straight land
+    lies inside Tmax: extrapolate its cylindrical fit to the underside mouth,
+    never credit the chamfer as a guide. Source constants are rounded outward
+    as printed; no actual rail angle, travel, clearance or stop fit is assumed.
     """
     bounds = retention.capture_bounds()
     alpha = math.atan(retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
     grip = retention.CARRIER_ENGAGEMENT_MIN
-    # The inspected straight land lies somewhere inside the actual thickness.
-    # Its nearer end is no farther than Tmax-grip from the underside mouth.
-    # Extrapolate its cylindrical fit to that mouth; do not pretend the
-    # chamfered mouth itself supplies the clearance/2 guide.
     extension = max(0.0, carrier.THICKNESS + carrier.THICKNESS_BAND - grip)
     mouth_offset = (extension * retention.CARRIER_DIAMETRAL_CLEARANCE_MAX
                     / (grip * math.cos(alpha)))
@@ -4012,12 +4007,203 @@ def _fitter_carrier_motion() -> tuple[float, float]:
     span = min(b[0] - a[0] for a, b in
                (trammel.pin_pair(name) for name in trammel.PASS_RADIUS))
     span -= 2.0 * (math.sqrt(2.0) * carrier.POSITION_BAND + _fitter_bore_plane_transfer())
-    if span <= 2.0 * support:
-        raise ValueError("captured support displacement loses the source span bound")
-    du = 2.0 * support / span
-    dv = 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0)
-    dn = dv / math.cos(alpha) + math.tan(alpha) * du
-    return support, math.sqrt(du * du + dn * dn + du * dn)
+    span = math.floor(span * 1000.0) / 1000.0
+    if span <= 0.0:
+        raise ValueError("captured carrier has no positive manufactured support span")
+    return LocalCaptureMotion(
+        _fitter_print_limit(support),
+        math.ceil(bounds.carrier_motion_tilt * 1e6) / 1e6,
+        math.ceil(alpha * 1e6) / 1e6,
+        span,
+    )
+
+
+@dataclass(frozen=True)
+class InstalledGuideTravelMeasurement:
+    """Actual outward segment containing every stopped block-datum projection.
+
+    The datum is the fixed block's bearing axis at accepted carrier-seat
+    height, transferred from its machined faces, NOT the floating pin centre.
+    g includes transfer/measurement error and every rigid guide take-up state;
+    beta bounds the frame from one reference throughout travel/reversal.
+    TOTAL tau includes hidden analytical key/reseat float and uncertainty,
+    not only contact repeats observed with screws tight. Evidence identifies
+    continuous inspection of two nonparallel faces, not endpoint samples.
+    """
+    support: int
+    near_axis_point_xyz_mm: Point3
+    far_axis_point_xyz_mm: Point3
+    max_datum_line_error_mm: float
+    max_frame_angle_rad: float
+    near_contact_span_mm: float
+    far_contact_span_mm: float
+    contact_span_basis: str
+    continuous_takeup_evidence: str
+
+
+@dataclass(frozen=True)
+class InstalledStopSweepMeasurement:
+    """Actual seated continuous first-contact path, both directions, one mode.
+
+    Stations are projections along GUIDE 1, never screw commands. The record
+    identifies the whole coupled path, no reset/disassembly or prior collision.
+    NW/SE intervals include uncertainty in the common guide-1 station datum.
+    Other/secondary contact supplies no mechanical-stop endpoint premise.
+    """
+    pass_name: str
+    feed_mode: Literal["roughing", "finishing"]
+    nw_contact: Literal["guide1_near", "guide1_far", "guide2_near", "guide2_far",
+                        "other_or_secondary", "uninspected"]
+    se_contact: Literal["guide1_near", "guide1_far", "guide2_near", "guide2_far",
+                        "other_or_secondary", "uninspected"]
+    nw_station_mm: tuple[float, float]
+    se_station_mm: tuple[float, float]
+    normal_path_evidence: str
+
+
+@dataclass(frozen=True)
+class InstalledStoppedTravelMeasurement:
+    """Identified unchanged installation, with a reachable XYZ inspection method.
+
+    Method may use suitable instruments/transfers; DRO-only reach is NOT
+    assumed. Four independent guide endpoints are algebraic corners, not four
+    carrier poses that the fitter must assemble. No source stop/rail defaults.
+    """
+    source: str
+    measurement_method: str
+    guides: tuple[InstalledGuideTravelMeasurement, ...]
+    sweeps: tuple[InstalledStopSweepMeasurement, ...]
+
+
+@dataclass(frozen=True)
+class StoppedTravelMotion:
+    mu: float
+    separation_error_mm: float
+    contact_span_mm: float
+    station_motion_mm: float
+    midpoint_motion_mm: float
+    carrier_rotation_factor: float
+    guide_errors_mm: tuple[float, float]
+    guide_angles_rad: tuple[float, float]
+    local: LocalCaptureMotion
+
+
+def _actual_number(value: float, label: str, *, nonnegative: bool = False) -> float:
+    if (isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(value) or (nonnegative and value < 0.0)):
+        raise ValueError(f"{label} requires a finite {'nonnegative ' if nonnegative else ''}number")
+    return float(value)
+
+
+def _stopped_tooling_motion(
+    travel: InstalledStoppedTravelMeasurement | None,
+    feed_modes: tuple[str, ...],
+) -> StoppedTravelMotion | None:
+    """Derive the paired-travel theorem solely from actual Q/g/beta/TOTAL tau.
+
+    Every corner ball lies in both positive cones for -e1 and e2. Convexity
+    extends the derivative floor mu over the WHOLE independent stop rectangle.
+    Endpoint pairing gives |ds1|+|ds2| <= (E+2*sigma)/mu even at a free-guide
+    first contact, with backlash and opposite-sign station changes included.
+    No command/driver is held fixed. Body-fixed L and k=u.b give the exact
+    two-vector rotation bound F<=hypot(a,c), including guide-frame variation.
+    """
+    if (not isinstance(travel, InstalledStoppedTravelMeasurement)
+            or any(not isinstance(text, str) or not text.strip()
+                   for text in (travel.source, travel.measurement_method))
+            or not isinstance(feed_modes, tuple) or not feed_modes
+            or any(mode not in ("roughing", "finishing") for mode in feed_modes)
+            or len(set(feed_modes)) != len(feed_modes)
+            or not isinstance(travel.guides, tuple) or len(travel.guides) != 2
+            or any(not isinstance(guide, InstalledGuideTravelMeasurement)
+                   or isinstance(guide.support, bool) or not isinstance(guide.support, int)
+                   for guide in travel.guides)
+            or {guide.support for guide in travel.guides} != {0, 1}):
+        return None
+    guides = sorted(travel.guides, key=lambda guide: guide.support)
+    segments, lengths, directions, errors, angles, spreads = [], [], [], [], [], []
+    for guide in guides:
+        if any(not isinstance(text, str) or not text.strip()
+               for text in (guide.contact_span_basis, guide.continuous_takeup_evidence)):
+            return None
+        points = (guide.near_axis_point_xyz_mm, guide.far_axis_point_xyz_mm)
+        if any(not isinstance(point, tuple) or len(point) != 3 for point in points):
+            raise ValueError("actual guide endpoints require three XYZ coordinates")
+        for point in points:
+            for coordinate in point:
+                _actual_number(coordinate, "actual guide coordinate")
+        length = math.dist(*points)
+        if not math.isfinite(length) or length <= 0.0:
+            raise ValueError("actual guide reference segment must have positive finite length")
+        segments.append(points)
+        lengths.append(length)
+        directions.append(tuple((points[1][k] - points[0][k]) / length for k in range(3)))
+        errors.append(_actual_number(guide.max_datum_line_error_mm, "guide g", nonnegative=True))
+        angles.append(_actual_number(guide.max_frame_angle_rad, "guide beta", nonnegative=True))
+        spreads.extend((
+            _actual_number(guide.near_contact_span_mm, "near TOTAL tau", nonnegative=True),
+            _actual_number(guide.far_contact_span_mm, "far TOTAL tau", nonnegative=True),
+        ))
+    expected = {(name, mode) for name in trammel.PASS_RADIUS for mode in feed_modes}
+    if (not isinstance(travel.sweeps, tuple)
+            or any(not isinstance(sweep, InstalledStopSweepMeasurement)
+                   or not isinstance(sweep.pass_name, str)
+                   or not isinstance(sweep.feed_mode, str) for sweep in travel.sweeps)
+            or len(travel.sweeps) != len(expected)
+            or {(sweep.pass_name, sweep.feed_mode) for sweep in travel.sweeps} != expected):
+        return None
+    for sweep in travel.sweeps:
+        if (sweep.nw_contact not in ("guide1_near", "guide2_far")
+                or sweep.se_contact not in ("guide1_far", "guide2_near")
+                or not isinstance(sweep.normal_path_evidence, str)
+                or not sweep.normal_path_evidence.strip()):
+            return None
+        intervals = (sweep.nw_station_mm, sweep.se_station_mm)
+        if any(not isinstance(interval, tuple) or len(interval) != 2 for interval in intervals):
+            raise ValueError("actual guide-1 endpoint stations require lower/upper intervals")
+        for low, high in intervals:
+            _actual_number(low, "guide-1 station")
+            _actual_number(high, "guide-1 station")
+            if low > high:
+                raise ValueError("actual guide-1 station interval is reversed")
+        (nw_low, nw_high), (se_low, se_high) = intervals
+        if (nw_low < 0.0 or se_high > lengths[0] or nw_high >= se_low
+                or (sweep.nw_contact == "guide1_near" and nw_high > spreads[0])
+                or (sweep.se_contact == "guide1_far" and se_low < lengths[0] - spreads[1])):
+            return None
+    local = _fitter_local_capture()
+    radius = local.support_mm + sum(errors)
+    mu = 1.0
+    axes = (tuple(-value for value in directions[0]), directions[1])
+    for q2 in segments[1]:
+        for q1 in segments[0]:
+            vector = tuple(q2[k] - q1[k] for k in range(3))
+            norm = math.hypot(*vector)
+            if not math.isfinite(norm) or not math.isfinite(radius):
+                raise ValueError("actual guide cone dimensions overflow")
+            if radius >= norm:
+                return None
+            for axis in axes:
+                cosine = sum(axis[k] * (vector[k] / norm) for k in range(3))
+                theta = math.acos(max(-1.0, min(1.0, cosine))) + math.asin(radius / norm)
+                if theta >= math.pi / 2.0:
+                    return None
+                mu = min(mu, math.nextafter(math.cos(theta), -math.inf))
+    error = 2.0 * radius
+    sigma = max(spreads)
+    station = (error + 2.0 * sigma) / mu
+    midpoint = (error + station) / 2.0
+    a = min(2.0, (error + station) / local.span_min_mm)
+    gamma = min(math.pi, local.bore_angle_rad + 2.0 * max(angles))
+    c = (2.0 * math.sin(gamma / 2.0) / math.cos(local.bore_bias_rad)
+         + math.tan(local.bore_bias_rad) * a)
+    factor = min(2.0, math.hypot(a, c))
+    if not all(math.isfinite(value) for value in (station, midpoint, factor)):
+        raise ValueError("actual stopped-motion bounds overflow")
+    return StoppedTravelMotion(
+        mu, error, sigma, station, midpoint, factor,
+        tuple(errors), tuple(angles), local,
+    )
 
 
 def _fitter_carrier_radius(stems: tuple[str, ...]) -> float:
@@ -4078,25 +4264,24 @@ def _fitter_local_motion(stem: str) -> float:
     return result
 
 
-def fitter_tooling_motion_limits() -> tuple[FitterMotionLimit, ...]:
-    """Source-derived displacement norms, not source world-coordinate limits."""
-    support, factor = _fitter_carrier_motion()
+def fitter_tooling_motion_limits(motion: StoppedTravelMotion) -> tuple[FitterMotionLimit, ...]:
+    """Made carrier-rigid groups, using the actual stopped-travel derivation."""
+    midpoint, factor = motion.midpoint_motion_mm, motion.carrier_rotation_factor
     return (
-        FitterMotionLimit("CARRIER/RISER/LOCATORS", support + factor * _fitter_carrier_radius(
-            (CARRIER, RISER, HUB_PIN, CL_DOWEL, RISER_SCREW))),
-        FitterMotionLimit("LEVER STOCK", support + factor * _fitter_carrier_radius((FEED_LEVER,))),
-        FitterMotionLimit("FILLED CARTRIDGE ENVELOPE", max(
-            _fitter_local_motion(stem) for stem in (PIVOT_PIN, PIVOT_CAP, PIVOT_RETAINER))),
+        FitterMotionLimit("CARRIER/RISER/LOCATORS", midpoint + factor * _fitter_print_limit(
+            _fitter_carrier_radius((CARRIER, RISER, HUB_PIN, CL_DOWEL, RISER_SCREW)))),
+        FitterMotionLimit("LEVER STOCK", midpoint + factor * _fitter_print_limit(
+            _fitter_carrier_radius((FEED_LEVER,)))),
     )
 
 
 @dataclass(frozen=True)
 class NormalToolingGap:
-    """Global extrema of WHOLE group over BOTH normal sweeps.
+    """Global extrema of WHOLE group over BOTH full normal paths in this mode.
 
     r is distance to the actual registered spindle axis; z increases toward
-    spindle. Step extents include full revolution and the ENTIRE used spindle-Z
-    range from deepest cut through retraction, not just one tool position.
+    spindle. Step extents include full revolution and its census's ENTIRE used
+    spindle-Z range, deepest actual breakthrough through retraction.
     radial_gap=min(rGroup)-max(rStep); axial_gap=max(min(zStep)-max(zGroup),
     min(zGroup)-max(zStep)). Neither is conditioned on the other footprint.
     Gauge the convex envelope itself (bridge holes/steps), not just its parts.
@@ -4106,6 +4291,7 @@ class NormalToolingGap:
     """
     group: str
     tool_step: str
+    feed_mode: Literal["roughing", "finishing"]
     radial_gap_mm: float | None
     axial_gap_mm: float | None
     uncertainty_mm: float
@@ -4190,10 +4376,19 @@ def _wire_capture_qualified(
     return set(actual.row_evidence) == expected and len(actual.row_evidence) == len(expected)
 
 
+@dataclass(frozen=True)
+class InstalledToolStepMeasurement:
+    """Actual noncutting step and its full used tip-Z interval in one feed mode."""
+    name: str
+    feed_mode: Literal["roughing", "finishing"]
+    tip_z_range_mm: tuple[float, float]
+    source: str
+
+
 
 @dataclass(frozen=True)
 class InstalledNormalToolingMeasurement:
-    """Actual BOTH-pass extrema over the entire used spindle-Z range; no defaults.
+    """Actual BOTH-pass, mode-specific full-Z gaps; no nominal installed defaults.
 
     Head R/H are in CARRIER coordinates about the normal through its TOP tap:
     R includes washer float, head eccentricity, tilt projection and allowed
@@ -4204,11 +4399,24 @@ class InstalledNormalToolingMeasurement:
     Wire L/T bound every free head-to-head arc/free-end path INCLUDING
     permitted feeding, about the fixed filled head-pair outside envelope.
     Secondary gaps are from the PIN-SEAT POINT, not one clocked part.
+    Guide radii enclose ALL normal filled guide-carried rigid/cartridge
+    envelopes, fixed wire-head pairs and pin-seat points about the virtual
+    block datum, BOTH passes/modes. Basis may combine conforming printed
+    made-part bands with measured purchased extents; no re-CMM of made parts
+    is required. Source own-motion H inflates each radius before rotation,
+    so no fitter measurement of an upset envelope is assumed. Drive float
+    bounds ALL fixed-axis/rough detached bracket-nut axial excursions; normal
+    drive envelopes include full rotations. Rough removed screws/pairs are
+    kept OFF the fixture, not classified as stationary installed material.
     """
     source: str
-    tool_steps: tuple[str, ...]
+    tool_steps: tuple[InstalledToolStepMeasurement, ...]
     tool_step_census: Literal["complete", "incomplete", "uninspected"]
-    full_normal_sweeps: tuple[str, ...]
+    travel: InstalledStoppedTravelMeasurement | None
+    guide_envelope_radius_mm: tuple[float, float]
+    guide_envelope_basis: tuple[str, str]
+    drive_axial_float_mm: float
+    drive_float_evidence: str
     clamp_rh_mm: tuple[float, float]
     lever_rh_mm: tuple[float, float]
     work_rh_mm: tuple[float, float]
@@ -4224,185 +4432,338 @@ def _fitter_print_limit(value: float) -> float:
     """Use the drawing's outward-rounded constants in its executable rule."""
     return math.ceil(value * 1000.0) / 1000.0
 
+def _tooling_motion_groups(feed_mode: str) -> dict[str, tuple[tuple[str, int], ...]]:
+    """Exhaustive physical ownership, not the finishing-only native mate state.
+
+    The roughing nut/bracket train stays on the fixed-axis screw while block
+    screws and their pairs are removed off-fixture. Each BOM instance appears
+    once, including those removed instances. New families require an explicit
+    owner; unknown material never silently becomes a zero-motion fixed row.
+    """
+    if feed_mode not in ("roughing", "finishing"):
+        raise ValueError("tooling ownership requires roughing or finishing mode")
+    carrier_groups = {
+        CARRIER: "CARRIER/RISER/LOCATORS", RISER: "CARRIER/RISER/LOCATORS",
+        HUB_PIN: "CARRIER/RISER/LOCATORS", CL_DOWEL: "CARRIER/RISER/LOCATORS",
+        RISER_SCREW: "CARRIER/RISER/LOCATORS", FEED_LEVER: "LEVER STOCK",
+        CLAMP_SCREW: "CLAMP HEAD", LEVER_SCREW: "LEVER HEADS/LOCK PAIRS",
+        LEVER_LOCK_WASHER: "LEVER HEADS/LOCK PAIRS",
+    }
+    fixed = {
+        BASE_BAR, RAIL, END_BRACKET, HOLD_DOWN_STUD, T_NUT, FLANGE_NUT,
+        RAIL_SCREW, BRACKET_SCREW, PILLOW_BLOCK_SCREW,
+    }
+    drive = {LEADSCREW, HANDWHEEL, PILLOW_BLOCK}
+    cartridge = {PIVOT_PIN, PIVOT_CAP, PIVOT_RETAINER, BEARING}
+    groups: dict[str, list[tuple[str, int]]] = {}
+    for stem in BOM_ORDER:
+        for index in range(QUANTITIES[stem]):
+            root, support = _motion_root(stem, index)
+            if feed_mode == "roughing" and stem in (BLOCK_SCREW, BLOCK_LOCK_WASHER):
+                label = "REMOVED FROM FIXTURE"
+            elif (stem in drive or (feed_mode == "roughing"
+                                   and stem in (NUT_BRACKET, LEADSCREW_NUT, NUT_SCREW))):
+                label = "FIXED-AXIS DRIVE ITEMS"
+            elif root == CARRIER and stem in carrier_groups:
+                label = carrier_groups[stem]
+            elif root == CARRIAGE:
+                if stem in cartridge:
+                    label = "FILLED CARTRIDGE ENVELOPE"
+                elif stem in (PIVOT_CLEVIS_PIN, PIVOT_COTTER):
+                    label = f"SECONDARY SEAT POINT {support + 1}"
+                elif stem == PIVOT_LOCK_WIRE:
+                    label = "WIRE HEAD-PAIR ENVELOPES"
+                elif stem in (CARRIAGE, PIVOT_BLOCK, PIVOT_CAP_SCREW, CARRIAGE_SCREW,
+                              NUT_BRACKET, LEADSCREW_NUT, NUT_SCREW,
+                              BLOCK_SCREW, BLOCK_LOCK_WASHER):
+                    label = "GUIDE-CARRIED FIXTURE ITEMS"
+                else:
+                    raise ValueError(f"unclassified guide-carried tooling family {stem}")
+            elif stem in fixed:
+                label = "FIXED FIXTURE ITEMS"
+            else:
+                raise ValueError(f"unclassified tooling family {stem}")
+            groups.setdefault(label, []).append((stem, index))
+    return {label: tuple(items) for label, items in groups.items()}
+
+
 
 def _normal_tooling_allowances(
     actual: InstalledNormalToolingMeasurement,
     primary: dict[tuple[str, int], PrimaryCaptureMeasurement],
+    motion: StoppedTravelMotion,
 ) -> dict[str, float]:
-    support, factor = map(_fitter_print_limit, _fitter_carrier_motion())
-    limits = {row.label: _fitter_print_limit(row.norm_allowance_mm)
-              for row in fitter_tooling_motion_limits()}
+    midpoint, factor = motion.midpoint_motion_mm, motion.carrier_rotation_factor
+    limits = {row.label: row.norm_allowance_mm for row in fitter_tooling_motion_limits(motion)}
     for label, stem, pair in (
         ("CLAMP HEAD", CLAMP_SCREW, actual.clamp_rh_mm),
         ("LEVER HEADS/LOCK PAIRS", LEVER_SCREW, actual.lever_rh_mm),
     ):
         radius, height = pair
         reach = _fitter_print_limit(_fitter_head_inplane_reach(stem))
-        limits[label] = support + factor * math.hypot(reach + radius, height)
+        limits[label] = midpoint + factor * math.hypot(reach + radius, height)
     work_r, work_h = actual.work_rh_mm
-    limits["WORK/BLANK STACK"] = support + factor * math.hypot(
+    limits["WORK/BLANK STACK"] = midpoint + factor * math.hypot(
         work_r + _fitter_print_limit(_fitter_bore_plane_transfer()), work_h,
     )
-    for index in range(len(RAILS)):
+
+    def guide_motion(index: int, local_motion: float) -> float:
+        # Radius must cover the WHOLE own-float enclosure, not just its normal
+        # sample. A normal envelope plus H encloses it without extra metrology.
+        radius = actual.guide_envelope_radius_mm[index] + local_motion
+        return (motion.station_motion_mm + 2.0 * motion.guide_errors_mm[index]
+                + 2.0 * radius * math.sin(min(motion.guide_angles_rad[index], math.pi / 2.0)))
+
+    own = _fitter_print_limit(max(
+        _fitter_local_motion(stem) for stem in (PIVOT_PIN, PIVOT_CAP, PIVOT_RETAINER)
+    ))
+    limits["FILLED CARTRIDGE ENVELOPE"] = max(guide_motion(i, own) + own for i in range(2))
+    for index in range(2):
         sphere = max(math.hypot(*(max(abs(lo), abs(hi)) for lo, hi in
                                  record.secondary_envelope_in_pin_seat_frame_mm))
                      for (_pass, support_index), record in primary.items() if support_index == index)
-        limits[f"SECONDARY SEAT POINT {index + 1}"] = support + sphere
+        support = motion.local.support_mm
+        limits[f"SECONDARY SEAT POINT {index + 1}"] = guide_motion(index, support) + support + sphere
     arc, tail = actual.wire_contour_mm
-    limits["WIRE HEAD-PAIR ENVELOPES"] = max(arc / 2.0, tail) + actual.wire_diameter_mm / 2.0
-    limits["OTHER FIXTURE ITEMS"] = 0.0
-    return limits
+    guide = max(guide_motion(i, 0.0) for i in range(2))
+    limits["WIRE HEAD-PAIR ENVELOPES"] = guide + max(arc / 2.0, tail) + actual.wire_diameter_mm / 2.0
+    limits["GUIDE-CARRIED FIXTURE ITEMS"] = guide
+    limits["FIXED-AXIS DRIVE ITEMS"] = actual.drive_axial_float_mm
+    limits["FIXED FIXTURE ITEMS"] = 0.0
+    if any(not math.isfinite(value) for value in limits.values()):
+        raise ValueError("actual tooling motion allowance overflows")
+    return {label: _fitter_print_limit(value) for label, value in limits.items()}
 
 
 def installed_tooling_clearance(
     actual: InstalledNormalToolingMeasurement | None = None, *,
     primary_measurements: tuple[PrimaryCaptureMeasurement, ...] | None = None,
 ) -> tooling.ToolingClearanceReport:
-    """Refuse installed positive certification while free-carriage travel is unbounded."""
+    """Conditional intact rigid-tool geometry only; never strength/overall safety."""
     unknown = tooling.ToolingClearanceReport("UNVERIFIED", None, None, None)
     if actual is None or primary_measurements is None:
         return unknown
     if not isinstance(actual, InstalledNormalToolingMeasurement):
         raise ValueError("installed tooling acceptance requires actual normal-gap measurements")
-    if not isinstance(actual.source, str) or not actual.source.strip():
+    if (not isinstance(actual.source, str) or not actual.source.strip()
+            or not isinstance(actual.tool_steps, tuple) or not actual.tool_steps):
         return unknown
-    coverage_complete = (
-        actual.tool_step_census == "complete"
-        and isinstance(actual.full_normal_sweeps, tuple)
-        and set(actual.full_normal_sweeps) == set(trammel.PASS_RADIUS)
-        and len(actual.full_normal_sweeps) == len(trammel.PASS_RADIUS)
-        and actual.wire_contour_state == "qualified"
-    )
-    if (not isinstance(actual.tool_steps, tuple) or not actual.tool_steps
-            or any(not isinstance(step, str) or not step.strip() for step in actual.tool_steps)
-            or len(set(actual.tool_steps)) != len(actual.tool_steps)):
+    step_keys = []
+    for step in actual.tool_steps:
+        if (not isinstance(step, InstalledToolStepMeasurement)
+                or any(not isinstance(text, str) or not text.strip() for text in (step.name, step.source))
+                or step.feed_mode not in ("roughing", "finishing")):
+            return unknown
+        if not isinstance(step.tip_z_range_mm, tuple) or len(step.tip_z_range_mm) != 2:
+            raise ValueError("actual tool census requires deepest-breakthrough/retract Z interval")
+        low, high = step.tip_z_range_mm
+        _actual_number(low, "actual deepest tool Z including breakthrough")
+        _actual_number(high, "actual retract tool Z")
+        if low > high:
+            raise ValueError("actual tool-Z interval is reversed")
+        step_keys.append((step.name, step.feed_mode))
+    if len(set(step_keys)) != len(step_keys):
         return unknown
+    modes = tuple(dict.fromkeys(mode for _step, mode in step_keys))
     for pair in (actual.clamp_rh_mm, actual.lever_rh_mm, actual.work_rh_mm, actual.wire_contour_mm):
-        if (not isinstance(pair, tuple) or len(pair) != 2
-                or any(isinstance(value, bool) or not isinstance(value, (int, float))
-                       or not math.isfinite(value) or value < 0.0 for value in pair)):
-            raise ValueError("actual head/stock R/H and feeding-safe wire L/T must be finite nonnegative pairs")
-    if (isinstance(actual.wire_diameter_mm, bool)
-            or not isinstance(actual.wire_diameter_mm, (int, float))
-            or not math.isfinite(actual.wire_diameter_mm) or actual.wire_diameter_mm <= 0.0):
-        raise ValueError("actual maximum individual-strand diameter must be finite and positive")
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise ValueError("actual head/stock R/H and feeding-safe wire L/T require pairs")
+        for value in pair:
+            _actual_number(value, "actual head/stock/wire extent", nonnegative=True)
+    if _actual_number(actual.wire_diameter_mm, "actual strand diameter", nonnegative=True) <= 0.0:
+        raise ValueError("actual maximum individual-strand diameter must be positive")
+    if (not isinstance(actual.guide_envelope_radius_mm, tuple)
+            or len(actual.guide_envelope_radius_mm) != 2):
+        raise ValueError("actual normal guide envelopes require both support radii")
+    for radius in actual.guide_envelope_radius_mm:
+        if _actual_number(radius, "actual normal guide-envelope radius", nonnegative=True) <= 0.0:
+            raise ValueError("actual normal guide-envelope radius must be positive")
+    _actual_number(actual.drive_axial_float_mm, "actual drive axial float", nonnegative=True)
+    if (not isinstance(actual.guide_envelope_basis, tuple)
+            or len(actual.guide_envelope_basis) != 2
+            or any(not isinstance(text, str) or not text.strip()
+                   for text in (*actual.guide_envelope_basis, actual.drive_float_evidence))):
+        return unknown
+    motion = _stopped_tooling_motion(actual.travel, modes)
+    if motion is None:
+        return unknown
     primary = qualify_primary_capture_measurements(primary_measurements)
-    coverage_complete = coverage_complete and _bearing_enclosure_qualified(actual.bearing_enclosure, primary)
-    coverage_complete = coverage_complete and _wire_capture_qualified(actual.wire_capture, primary)
-    limits = _normal_tooling_allowances(actual, primary)
-    expected = {(group, step) for group in limits for step in actual.tool_steps}
+    coverage_complete = (
+        actual.tool_step_census == "complete" and actual.wire_contour_state == "qualified"
+        and _bearing_enclosure_qualified(actual.bearing_enclosure, primary)
+        and _wire_capture_qualified(actual.wire_capture, primary)
+    )
+    limits = _normal_tooling_allowances(actual, primary, motion)
+    ownership = {mode: _tooling_motion_groups(mode) for mode in modes}
+    expected = {
+        (group, step, mode) for step, mode in step_keys
+        for group in (*ownership[mode], "WORK/BLANK STACK")
+        if group != "REMOVED FROM FIXTURE"
+    }
+    if any(group not in limits for group, _step, _mode in expected):
+        raise ValueError("tooling motion ownership has no corresponding allowance")
     if (not isinstance(actual.gaps, tuple)
-            or any(not isinstance(gap, NormalToolingGap) for gap in actual.gaps)):
+            or any(not isinstance(gap, NormalToolingGap)
+                   or any(not isinstance(text, str) for text in
+                          (gap.group, gap.tool_step, gap.feed_mode)) for gap in actual.gaps)):
         return unknown
     coverage_complete = (
-        coverage_complete and {(gap.group, gap.tool_step) for gap in actual.gaps} == expected
+        coverage_complete
+        and {(gap.group, gap.tool_step, gap.feed_mode) for gap in actual.gaps} == expected
         and len(actual.gaps) == len(expected)
     )
     minimum, limiting = math.inf, None
     for gap in actual.gaps:
-        if (gap.group, gap.tool_step) not in expected:
+        if (gap.group, gap.tool_step, gap.feed_mode) not in expected:
             coverage_complete = False
             continue
         values = [value for value in (gap.radial_gap_mm, gap.axial_gap_mm) if value is not None]
+        uncertainty = _actual_number(gap.uncertainty_mm, "gap uncertainty", nonnegative=True)
         if not values:
             coverage_complete = False
             continue
-        if (any(isinstance(value, bool) or not isinstance(value, (int, float))
-                or not math.isfinite(value) for value in values)
-                or isinstance(gap.uncertainty_mm, bool)
-                or not isinstance(gap.uncertainty_mm, (int, float))
-                or not math.isfinite(gap.uncertainty_mm) or gap.uncertainty_mm < 0.0):
-            raise ValueError("normal gaps and their nonnegative uncertainty must be finite")
-        clearance = max(values) - gap.uncertainty_mm - limits[gap.group]
+        for value in values:
+            _actual_number(value, "normal gap")
+        clearance = max(values) - uncertainty - limits[gap.group]
         if clearance < minimum:
-            minimum, limiting = clearance, (gap.group, actual.tool_steps.index(gap.tool_step))
+            minimum, limiting = clearance, (gap.group, step_keys.index((gap.tool_step, gap.feed_mode)))
     if minimum > 0.0 and not coverage_complete:
         return unknown
-    if minimum > 0.0:
-        # Explicit temporary design hold: the correctly derived fixed-support
-        # norm omits carriage 2's free rail motion. No input record can turn
-        # that missing source premise into an installed positive certificate.
-        return tooling.ToolingClearanceReport(
-            "UNVERIFIED", None, None,
-            f"{actual.source}: free second-carriage travel is not yet bounded",
-        )
-    return tooling.ToolingClearanceReport("POTENTIAL_CONFLICT", minimum, limiting, actual.source)
+    status = "VERIFIED_GEOMETRY_ONLY" if minimum > 0.0 else "POTENTIAL_CONFLICT"
+    return tooling.ToolingClearanceReport(status, minimum, limiting, actual.source)
 
 
 def fitter_tooling_table_lines() -> tuple[str, ...]:
-    """Fixed-support diagnostic only while actual captured travel is unbounded."""
+    """Shop-executable actual-input rule; never fabricate installed N values."""
     def upper(value: float) -> str:
         return f"{_fitter_print_limit(value):.3f}"
 
-    support, factor = _fitter_carrier_motion()
+    local = _fitter_local_capture()
+    own = _fitter_print_limit(max(
+        _fitter_local_motion(stem) for stem in (PIVOT_PIN, PIVOT_CAP, PIVOT_RETAINER)
+    ))
     lines = [
-        "TOOLING ACCEPTANCE UNVERIFIED: FREE CARRIAGE 2 TRAVEL IS NOT POSITIVELY "
-        "LIMITED. DO NOT ACCEPT FROM NORMAL-PASS SWEEP GAPS.",
-        "FIXED-SUPPORT SOURCE DIAGNOSTIC ONLY: GAP > N + UNCERTAINTY, mm",
-        "SPINDLE ISOLATED: MEASURE MINIMUM GAPS TO EACH NON-CUTTING STEP "
-        "OVER THE ENTIRE USED SPINDLE-Z RANGE, DEEPEST CUT THROUGH RETRACTION. "
-        "FILL EACH CARTRIDGE/HEAD-PAIR/COMPONENT ASSEMBLY'S "
-        "CONVEX ENVELOPE, BRIDGING HOLES/STEPS, NOT ONLY CURRENT OVERLAP. "
-        "GLOBAL BOTH-SWEEP EXTREMA; FULL-TURN STEP EXTENTS: "
-        "RADIAL GAP=MIN GROUP R-MAX STEP R; AXIAL GAP=MAX(MIN STEP Z-"
-        "MAX GROUP Z,MIN GROUP Z-MAX STEP Z), R FROM ACTUAL SPINDLE AXIS.",
-        "FOLLOWING N VALUES ASSUME FIXED SUPPORTS; THEY DO NOT ENCLOSE FREE "
-        "SECOND-CARRIAGE SLIDE. PRIMARY C2A-C5D QUALIFICATION STILL APPLIES.",
+        "TOOLING: RETAINED MECHANICAL STOPS ON BOTH GUIDES AND THE ACTUAL "
+        "MEASUREMENTS BELOW ARE REQUIRED. NO SOURCE RAIL ANGLE, STOP WINDOW "
+        "OR NOMINAL CUTTING ARC IS INSTALLED EVIDENCE. PRIMARY C2A-C5D, "
+        "ACTUAL BEARING CONTAINMENT AND FORMED-WIRE QUALIFICATIONS REMAIN REQUIRED.",
+        "SPINDLE ISOLATED. FOR EACH USED ROUGHING/FINISHING MODE, GAUGE BOTH "
+        "COMPLETE SEATED FIRST-CONTACT-TO-FIRST-CONTACT NORMAL PATHS, BOTH "
+        "DIRECTIONS. NO BRANCH RESET, DISASSEMBLY OR EARLIER COLLISION. AN "
+        "OTHER/SECONDARY CONTACT IS UNVERIFIED, NOT A STOP ENDPOINT.",
+        "RECORD EVERY NON-CUTTING STEP BY NAME/MODE, FULL REVOLUTION AND "
+        "ACTUAL USED TIP-Z INTERVAL: DEEPEST CUT INCLUDING BREAKTHROUGH THROUGH "
+        "RETRACTION. GAUGE GLOBAL WHOLE-ENVELOPE EXTREMA OVER THAT ENTIRE "
+        "Z RANGE AND BOTH FULL NORMAL PATHS IN THAT MODE, NOT JUST WORK TOP.",
+        "FILL EACH CARTRIDGE/HEAD-PAIR/COMPONENT ASSEMBLY'S CONVEX OUTSIDE "
+        "ENVELOPE, BRIDGING HOLES/STEPS; NO BRIDGE BETWEEN DISTINCT SUPPORTS. "
+        "RADIAL GAP=MIN GROUP R-MAX STEP R; AXIAL GAP=MAX(MIN STEP Z-MAX "
+        "GROUP Z,MIN GROUP Z-MAX STEP Z). R/Z USE THE ACTUAL REGISTERED SPINDLE AXIS.",
+        "AT EVERY GROUP X TOOL-STEP/MODE PAIR, ONE AVAILABLE RADIAL OR AXIAL "
+        "GAP MUST EXCEED N+UNCERTAINTY. UNMEASURED OTHER AXIS MAY REMAIN UNKNOWN. "
+        "UNCERTAINTY BOUNDS MAX ERROR/RUNOUT OF REPORTED AXES. EQUALITY OR "
+        "SHORTFALL IS A POTENTIAL CONFLICT; MISSING NECESSARY COVERAGE IS UNVERIFIED.",
+        "WITH CARRIER OFF, USE EACH BLOCK'S EXISTING END/SIDE/TOP DATUM FACES "
+        "AND ACTUAL BORE-CENTRE/ACCEPTED STACK OFFSETS TO TRANSFER THE FIXED "
+        "BLOCK BEARING-AXIS POINT AT CARRIER-SEAT HEIGHT. NOT THE FLOATING PIN "
+        "CENTRE. REGISTER BOTH GUIDES IN ONE 3D FRAME; KEEP TRANSFER ERROR.",
+        "IDENTIFY SETUP, RECORD AND A MEASUREMENT METHOD REACHING ALL DATUMS "
+        "(QUALIFIED TRANSFERS MAY BE USED); DRO-ONLY RANGE/FOUR XY TARGETS ARE "
+        "NOT ASSUMED SUFFICIENT. INSPECT CONTINUOUS FULL TRAVEL, REVERSALS AND "
+        "ALL RIGID SIDE/LIFT/RACK TAKE-UP, USING TWO NONPARALLEL BLOCK FACES.",
+        "EACH GUIDE i: RECORD OUTWARD Qnear/Qfar XYZ ENDPOINTS WHOSE SEGMENT "
+        "CONTAINS EVERY DATUM PROJECTION AT ALL RETAINED STOP/RESEAT/TAKE-UP "
+        "EXTREMES; ei=(Qfar-Qnear)/LENGTH. gi BOUNDS ALL PERPENDICULAR DATUM "
+        "DEPARTURE INCLUDING TRANSFER/INSPECTION UNCERTAINTY. betai (RADIANS) "
+        "BOUNDS THE BLOCK FRAME FROM ONE FIXED FRAME THROUGHOUT THAT INSPECTION.",
+        "RECORD TOTAL NEAR/FAR CONTACT SPREADS tau: NEAR PROJECTIONS IN "
+        "[0,tauNEAR], FAR IN [LENGTH-tauFAR,LENGTH]. INCLUDE HIDDEN ANALYTICAL "
+        "KEY FLOAT, ALL RETAINED RESEATING/CONTACT/RIGID PLAY AND UNCERTAINTY; "
+        "KEEP THE BASIS. TIGHTENED CONTACT REPEATS ALONE DO NOT BOUND HIDDEN FLOAT.",
+        "EACH PASS X USED MODE: NW FIRST CONTACT=GUIDE1 NEAR OR GUIDE2 FAR; "
+        "SE=GUIDE1 FAR OR GUIDE2 NEAR. RECORD GUIDE-1 STATION INTERVALS AT BOTH; "
+        "NW UPPER < SE LOWER, WITHIN ITS SEGMENT AND CONSISTENT WITH ITS tau "
+        "IF GUIDE1 CONTACTS. THESE ARE ACTUAL STATIONS, NOT SCREW COMMANDS. "
+        "KEEP IDENTIFIED FULL CONTINUOUS SEATED BIDIRECTIONAL PATH EVIDENCE.",
+        f"SOURCE LOCAL BOUNDS: S0={local.support_mm:.3f} mm; "
+        f"gamma0={local.bore_angle_rad:.6f} rad; alpha={local.bore_bias_rad:.6f} rad; "
+        f"LMIN={local.span_min_mm:.3f} mm. S0/2 ENCLOSES EACH NORMAL/CAPTURED "
+        "SUPPORT ABOUT ITS BLOCK DATUM. THESE ARE NOT INSTALLED GUIDE LIMITS.",
+        "CALCULATE R=S0+g1+g2, E=2R. FOR ALL FOUR INDEPENDENT ENDPOINT "
+        "DIFFERENCES V=Q2-Q1 AND EACH r=-e1,e2: theta=ACOS(r.DOT.V/|V|)"
+        "+ASIN(R/|V|). REQUIRE R<|V| AND EVERY theta<PI/2. mu=MIN COS(theta) "
+        "OVER ALL EIGHT. CORNERS ARE ALGEBRA, NOT REQUIRED ASSEMBLED POSES. "
+        "NO POSITIVE CONE BOUND MEANS UNVERIFIED; DO NOT USE A NOMINAL ANGLE.",
+        "sigma=MAX ALL FOUR TOTAL tau; D=(E+2sigma)/mu; M=(E+D)/2; "
+        "a=MIN(2,(E+D)/LMIN); gamma=MIN(PI,gamma0+2MAX(beta1,beta2)); "
+        "c=2SIN(gamma/2)/COS(alpha)+TAN(alpha)*a; F=MIN(2,SQRT(a^2+c^2)). "
+        "D BOUNDS THE SUM OF BOTH STATION CHANGES INCLUDING BACKLASH AND "
+        "FREE-GUIDE ENDPOINT EXTENSIONS. ROUND mu/LMIN DOWN, UPPER BOUNDS/N UP.",
+        "FOR EACH GUIDE RECORD A NORMAL ENVELOPE RADIUS ri ABOUT ITS BLOCK "
+        "DATUM: ALL GUIDE-CARRIED RIGID/CARTRIDGE MATERIAL, FIXED HEAD PAIRS "
+        "AND PIN-SEAT POINT, BOTH PASSES/MODES. USE CONFORMING MADE DIMENSIONS "
+        "PLUS ACTUAL PURCHASED EXTENTS (CALIPER COORDINATE EXTENTS MAY GIVE "
+        "A DIAGONAL BOUND); KEEP BASIS, NO NEW SIZE CAP OR RE-CMM REQUIREMENT.",
+        "B_i(h)=D+2gi+2(ri+h)SIN(MIN(betai,PI/2)). ADDING SOURCE OWN-MOTION h "
+        "TO NORMAL RADIUS ENCLOSES THE ENTIRE LOCAL FLOAT BEFORE ROTATION. "
+        "THE FITTER NEED NOT MEASURE AN UPSET ENVELOPE. BMAX(h)=MAX OVER BOTH GUIDES.",
     ]
-    lines.extend(f"{row.label}: N={upper(row.norm_allowance_mm)}"
-                 for row in fitter_tooling_motion_limits())
-    lines.append(
-        "CARTRIDGE: FILLED CONVEX OUTSIDE BLOCK/PIN/CAP/RETAINER ENVELOPE; "
-        "BRIDGE HOLES/STEPS. BEARINGS REQUIRE IDENTIFIED ACTUAL ALL-MATERIAL "
-        "FULL-ENDPLAY/FULL-CAPTURE CONTAINMENT PROOF IN THAT ENVELOPE, "
-        "BOTH SUPPORTS/PASSES. C1 DIMENSIONS ALONE ARE NOT THAT PROOF; "
-        "ABSENT EVIDENCE IS UNVERIFIED, NOT INSTALLED ACCEPTANCE."
-    )
-    lines.append(
+    for label, stems in (
+        ("CARRIER/RISER/LOCATORS", (CARRIER, RISER, HUB_PIN, CL_DOWEL, RISER_SCREW)),
+        ("LEVER STOCK", (FEED_LEVER,)),
+    ):
+        lines.append(f"{label}: N=M+{upper(_fitter_carrier_radius(stems))}*F")
+    lines.extend((
+        f"FILLED CARTRIDGE ENVELOPE: h={upper(own)}; N=BMAX(h)+h. FILL "
+        "OUTSIDE BLOCK/PIN/CAP/RETAINER HULL. IDENTIFIED ACTUAL ALL-BEARING-"
+        "MATERIAL/FULL-ENDPLAY/FULL-CAPTURE CONTAINMENT IN THIS SAME HULL IS "
+        "MANDATORY, BOTH SUPPORTS/PASSES; C1 CALIPERS ALONE ARE NOT THAT PROOF.",
         f"AT STEP 12, CALIPER {_item(CLAMP_SCREW)} AND {_item(LEVER_SCREW)}/"
         f"{_item(LEVER_LOCK_WASHER)} IN CARRIER COORDINATES: R=MAX IN-PLANE "
-        "REACH ABOUT NORMAL THROUGH TAP AT CARRIER TOP (INCLUDE WASHER FLOAT, HEAD "
-        "OFFSET/TILT AND ALLOWED CLOCKING); H=MAX NORMAL DISTANCE ABOVE/"
-        "BELOW CARRIER UNDERSIDE. BOUND H FROM STACK LENGTHS BEFORE FITTING."
-    )
+        "REACH ABOUT NORMAL THROUGH TAP AT CARRIER TOP, INCLUDING WASHER "
+        "FLOAT, OFFSET/TILT/CLOCKING; H=MAX ABS NORMAL REACH FROM CARRIER "
+        "UNDERSIDE. BOUND H FROM WHOLE STACK LENGTHS BEFORE FITTING.",
+    ))
     for stem, label in ((CLAMP_SCREW, "CLAMP HEAD"), (LEVER_SCREW, "LEVER HEADS/LOCK PAIRS")):
-        lines.append(f"{label}: N={upper(support)}+{upper(factor)}*"
-                     f"SQRT(({upper(_fitter_head_inplane_reach(stem))}+R)^2+H^2)")
+        lines.append(f"{label}: N=M+F*SQRT(({upper(_fitter_head_inplane_reach(stem))}+R)^2+H^2)")
     lines.extend((
         "WORK/BLANK STACK: R=MAX OF REACHES ABOUT BOTH ACTIVE BORE-PAIR "
-        "TOP-FACE MIDPOINTS, BOTH PASSES (LOCATE WITH STRAIGHTEDGE WHILE "
-        "BORES ACCESSIBLE BEFORE STEP 9). H=MAX NORMAL DISTANCE FROM CARRIER UNDERSIDE, ALL "
-        "WORK/BLANKS INCLUDED; USE ACTUAL STACK LENGTHS. KEEP THE WORK "
-        "RIGIDLY CLAMPED TO THE CARRIER; CLAMP SLIP IS NOT CERTIFIED.",
-        f"WORK/BLANK STACK: N={upper(support)}+{upper(factor)}*"
-        f"SQRT((R+{upper(_fitter_bore_plane_transfer())})^2+H^2). "
-        "CHECK EVERY NON-CUTTING STEP; FLUTE CONTACT DOES NOT WAIVE THIS ROW.",
-        "SECONDARY, EACH SUPPORT: GAUGE THE NORMAL GAP FROM THE PIN-SEAT "
-        "POINT, NOT ONE CLOCKED CLEVIS/COTTER. BEFORE STEP 9, A GAP TO "
-        "THE WHOLE FILLED EXPOSED JOURNAL/SEAT ENVELOPE IS A CONSERVATIVE "
-        "PROXY IF THE CENTRE IS HIDDEN. AT C5C USE THE COMPLETE COUPLED "
-        "CLOCK/ENDPLAY ENVELOPE: X/Y=MAX ABS LOCAL X/Y; "
-        "H=MAX ABS LOW/HIGH FROM PIN SEAT.",
-        f"SECONDARY SEAT POINT: N={upper(support)}+SQRT(X^2+Y^2+H^2)",
-        "C3C WIRES: GAUGE NORMAL GAP FROM EACH FILLED FIXED HEAD-PAIR "
-        "OUTSIDE ENVELOPE, NOT FROM THE AS-FORMED WIRE. L/T FOLLOW EACH "
-        "INDIVIDUAL STRAND CENTRELINE: L BOUNDS EACH FREE ARC SECURED "
-        "AT TWO HEADS; T EACH FREE-END PATH FROM ITS SECURED HEAD. INCLUDE "
-        "EVERY LOOP/TAIL AND ALL PERMITTED FEEDING/SLIDING. CUT BRANCH "
-        "LENGTHS BEFORE TWISTING AND TRIMMED TAILS MAY BE USED ONLY IF "
-        "THEY BOUND THAT FEEDING; OTHERWISE USE WHOLE CUT LENGTH FOR "
-        "EACH UNCERTAIN L/T. KEEP THE C3C NORMAL ROUTE/CLEARANCE CHECK.",
-        "ACTUAL C3C CLOCK/FORM REQUIRES IDENTIFIED FULL-CAPTURE SWEPT-VOID "
-        "QUALIFICATION FOR EVERY WIRE ROW AGAINST ITS REAL CAP CUT UNION. "
-        "NORMAL ROOF RECESS, CONTOUR LENGTH OR REPRESENTATIVE 0/180 SOURCE "
-        "MODEL ALONE IS NOT THAT PROOF; ABSENT EVIDENCE IS UNVERIFIED.",
-        "D=MAX ACTUAL SINGLE-WIRE DIA BEFORE FORMING. "
-        "WIRE HEAD-PAIR ENVELOPES: N=MAX(L/2,T)+D/2. UNKNOWN CONTOUR/ANCHOR "
-        "COVERAGE FAILS; INTACT SECURED WIRE, NO ELASTIC STRETCH OR "
-        "CONNECTION FAILURE. CAP FLOAT DOES NOT CARRY FIXED HEADS.",
-        "OTHER FIXTURE ITEMS: N=0; EACH MUST CLEAR EVERY STEP. ALL READINGS INCLUDE "
-        "MAX UNCERTAINTY/RUNOUT OF THE REPORTED AXES; EQUALITY, MISSING DATA "
-        "OR INCOMPLETE COVERAGE CANNOT PASS. FIXED-SUPPORT SOURCE N ONLY.",
+        "TOP-FACE MIDPOINTS, BOTH PASSES (STRAIGHTEDGE WHILE BORES ACCESSIBLE "
+        "BEFORE STEP 9). H=MAX ABS NORMAL REACH FROM CARRIER UNDERSIDE, ALL "
+        "STOCK/BLANKS INCLUDED. KEEP STOCK RIGIDLY CLAMPED; NO CLAMP-SLIP CERTIFICATE.",
+        f"WORK/BLANK STACK: N=M+F*SQRT((R+{upper(_fitter_bore_plane_transfer())})^2+H^2). "
+        "CHECK EACH NON-CUTTING STEP; INTENDED FLUTE CONTACT DOES NOT WAIVE THIS ROW.",
+        "SECONDARY SEAT POINT i: GAUGE FROM THE PIN-SEAT POINT, NOT ONE "
+        "CLOCKED CLEVIS/COTTER. BEFORE STEP 9 THE WHOLE FILLED EXPOSED JOURNAL/"
+        "SEAT IS A CONSERVATIVE PROXY IF CENTRE HIDDEN. USE ACTUAL C5C COUPLED "
+        "CLOCK/ENDPLAY CORNER SPHERE C=SQRT(X^2+Y^2+H^2), MAX ABS EACH AXIS "
+        "FROM PIN SEAT. N=B_i(S0)+S0+C.",
+        "C3C WIRES: NORMAL GAP IS FROM EACH FILLED FIXED HEAD-PAIR ENVELOPE, "
+        "NOT AS-FORMED WIRE. L BOUNDS EVERY TWO-HEAD FREE ARC CENTRELINE, T "
+        "EVERY FREE-END PATH, INCLUDING ALL PERMITTED FEEDING/SLIDING/LOOPS/"
+        "TAILS. PRE-FORM BRANCH/TRIMMED TAIL LENGTHS SUFFICE ONLY IF THEY "
+        "BOUND ALL FEEDING; OTHERWISE USE WHOLE CUT LENGTH FOR UNCERTAIN L/T.",
+        "DW=MAX ACTUAL INDIVIDUAL-STRAND DIAMETER; WIRE HEAD-PAIR ENVELOPES: "
+        "N=BMAX(0)+MAX(L/2,T)+DW/2. KEEP C3C NORMAL ROUTE/RECESS AND IDENTIFIED "
+        "ACTUAL FORMED-CLOCK FULL-CAPTURE SWEPT-VOID QUALIFICATION FOR EVERY "
+        "ROW. ROOF RECESS/CONTOUR/SOURCE 0/180 MODEL ALONE IS INSUFFICIENT. "
+        "INTACT SECURED WIRE ONLY, NO ELASTIC STRETCH/CONNECTION FAILURE.",
+        "GUIDE-CARRIED FIXTURE ITEMS: N=BMAX(0), ALL BLOCK/CARRIAGE/FIXED-HEAD "
+        "MATERIAL AND DESCENDANTS NOT IN OTHER ROWS. FINISHING NUT-BRACKET/"
+        "NUT/NUT-SCREWS/BLOCK FASTENERS BELONG TO GUIDE1. ROUGHING DETACHES "
+        "BRACKET/NUT/NUT-SCREWS TO FIXED-AXIS DRIVE; REMOVED BLOCK SCREWS/"
+        "LOCK PAIRS STAY OFF FIXTURE. OWN EVERY BOM INSTANCE ONCE IN EACH MODE.",
+        "FIXED-AXIS DRIVE ITEMS: LEADSCREW/HANDWHEEL/KP08 AND ROUGH DETACHED "
+        "BRACKET/NUT TRAIN. NORMAL FILLED ENVELOPES INCLUDE ALL PERMITTED "
+        "ROTATIONS/RADIAL/ROCK PLAY; N=MEASURED TOTAL AXIAL FLOAT INCLUDING "
+        "KP08/NUT BACKLASH, WITH EVIDENCE. NO CATALOGUE ENDPLAY OR ZERO DEFAULT.",
+        "FIXED FIXTURE ITEMS ONLY: N=0 FOR TRUE STATIC BARS/RAILS/BRACKETS/"
+        "TABLE ANCHORS. EVERY OTHER MATERIAL ITEM MUST "
+        "HAVE ITS ACTUAL MOTION OWNER. ROUND ALL FINAL N UP TO .001 mm.",
+        "ACCEPT ONLY COMPLETE ACTUAL RECORDS AND STRICT POSITIVE GAP RESIDUALS "
+        "FOR EVERY GROUP/STEP/MODE. GEOMETRY ONLY: NO STRENGTH, IMPACT, "
+        "DEFLECTION, CLAMP-SLIP OR OVERALL MACHINE-SAFETY CLAIM. CHANGED "
+        "RAILS/STOPS/RESEATING/TOOL/DEPTH/SETUP INVALIDATE THEIR RECORDS.",
     ))
     return tuple(lines)
 

@@ -3583,13 +3583,69 @@ def test_accepted_upper_bearing_profile_needs_separate_actual_receiving_authorit
         spec.qualify_primary_capture_measurements((bad, *records[1:]))
 
 
+def _synthetic_stopped_travel(feed_modes=("roughing", "finishing")):
+    """Independent fictitious XYZ observations, never installation evidence."""
+    return spec.InstalledStoppedTravelMeasurement(
+        source="SYNTHETIC STOPPED-TRAVEL TEST ONLY: no physical inspection",
+        measurement_method="SYNTHETIC XYZ datum transfer and two-face frame observations",
+        guides=tuple(
+            spec.InstalledGuideTravelMeasurement(
+                support=support,
+                near_axis_point_xyz_mm=near,
+                far_axis_point_xyz_mm=far,
+                max_datum_line_error_mm=error,
+                max_frame_angle_rad=angle,
+                near_contact_span_mm=near_span,
+                far_contact_span_mm=far_span,
+                contact_span_basis="SYNTHETIC total contact/reseat/key float plus uncertainty",
+                continuous_takeup_evidence="SYNTHETIC whole-travel XYZ/two-normal rigid take-up",
+            )
+            for support, near, far, error, angle, near_span, far_span in (
+                (0, (-100.0, 0.0, 0.0), (-300.0, 0.0, 0.0), 0.05, 0.001, 0.6, 0.8),
+                (1, (100.0, 20.0, 5.0), (500.0, 20.0, 5.0), 0.08, 0.002, 1.0, 1.2),
+            )
+        ),
+        sweeps=tuple(
+            spec.InstalledStopSweepMeasurement(
+                pass_name=pass_name,
+                feed_mode=mode,
+                nw_contact="guide1_near",
+                se_contact="guide1_far",
+                nw_station_mm=(0.0, 0.5),
+                se_station_mm=(199.5, 200.0),
+                normal_path_evidence="SYNTHETIC seated continuous path both directions, no reset/contact",
+            )
+            for pass_name, mode in product(("inner", "outer"), feed_modes)
+        ),
+    )
+
+
+def _synthetic_tooling_motion(actual):
+    return spec._stopped_tooling_motion(
+        actual.travel, tuple(dict.fromkeys(step.feed_mode for step in actual.tool_steps)),
+    )
+
+
 def _synthetic_normal_tooling_measurement():
     records = _synthetic_primary_measurements()
     actual = spec.InstalledNormalToolingMeasurement(
         source="SYNTHETIC NORMAL-GAP TEST ONLY: not an actual installed acceptance",
-        tool_steps=("smooth shank", "holder", "spindle"),
+        tool_steps=tuple(
+            spec.InstalledToolStepMeasurement(
+                name=name, feed_mode=mode, tip_z_range_mm=(97.2, 145.0),
+                source="SYNTHETIC full-revolution/deepest-breakthrough-through-retract census",
+            )
+            for name, mode in product(("smooth shank", "holder", "spindle"), ("roughing", "finishing"))
+        ),
         tool_step_census="complete",
-        full_normal_sweeps=("inner", "outer"),
+        travel=_synthetic_stopped_travel(),
+        guide_envelope_radius_mm=(110.0, 135.0),
+        guide_envelope_basis=(
+            "SYNTHETIC support 1 whole normal rigid/cartridge/head-pair/seat envelope",
+            "SYNTHETIC support 2 whole normal rigid/cartridge/head-pair/seat envelope",
+        ),
+        drive_axial_float_mm=0.7,
+        drive_float_evidence="SYNTHETIC complete actual drive and detached nut/bracket backlash excursion",
         clamp_rh_mm=(4.9, 28.0),
         lever_rh_mm=(7.0, 36.0),
         work_rh_mm=(185.0, 20.5),
@@ -3621,32 +3677,34 @@ def _synthetic_normal_tooling_measurement():
         gaps=(),
     )
     limits = spec._normal_tooling_allowances(
-        actual, spec.qualify_primary_capture_measurements(records),
+        actual, spec.qualify_primary_capture_measurements(records), _synthetic_tooling_motion(actual),
     )
     actual = replace(actual, gaps=tuple(
-        spec.NormalToolingGap(group, step, None, allowance + 1.25, 0.25)
+        spec.NormalToolingGap(group, step.name, step.feed_mode, None, allowance + 1.25, 0.25)
         for group, allowance in limits.items() for step in actual.tool_steps
     ))
     return actual, records, limits
 
 
-def test_positive_gap_witnesses_cannot_close_missing_free_carriage_travel_authority() -> None:
+def test_complete_synthetic_stopped_matrix_has_a_real_conditional_positive_path() -> None:
     actual, records, _limits = _synthetic_normal_tooling_measurement()
     report = spec.installed_tooling_clearance(actual, primary_measurements=records)
-    assert report.status == "UNVERIFIED"
-    assert report.min_clearance is None
+    assert report.status == "VERIFIED_GEOMETRY_ONLY"
+    assert report.min_clearance == pytest.approx(1.0)
     assert report.authority
     radial = replace(actual, gaps=tuple(
         replace(gap, radial_gap_mm=gap.axial_gap_mm, axial_gap_mm=None)
         for gap in actual.gaps
     ))
-    assert spec.installed_tooling_clearance(radial, primary_measurements=records).status == "UNVERIFIED"
+    assert spec.installed_tooling_clearance(
+        radial, primary_measurements=records,
+    ).status == "VERIFIED_GEOMETRY_ONLY"
     orthogonally_separated = replace(actual, gaps=tuple(
         replace(gap, radial_gap_mm=-100.0) for gap in actual.gaps
     ))
     assert spec.installed_tooling_clearance(
         orthogonally_separated, primary_measurements=records,
-    ).status == "UNVERIFIED"
+    ).status == "VERIFIED_GEOMETRY_ONLY"
 
 
 @pytest.mark.parametrize("delta", (0.0, -0.01))
@@ -3668,7 +3726,7 @@ def test_normal_gap_equality_or_shortfall_is_not_positive_clearance(delta) -> No
     {"wire_contour_state": "uninspected"},
     {"wire_contour_state": "rejected"},
     {"wire_contour_state": True},
-    {"full_normal_sweeps": ("inner",)},
+    {"travel": None},
     {"source": ""},
     {"gaps": ()},
     {"bearing_enclosure": None},
@@ -3785,7 +3843,8 @@ def test_normal_gap_uses_complete_secondary_envelope_not_one_clocked_pose() -> N
     assert spec.installed_tooling_clearance(actual, primary_measurements=grown).status == "POTENTIAL_CONFLICT"
 
 
-@pytest.mark.parametrize("field", ("clamp_rh_mm", "lever_rh_mm", "work_rh_mm", "wire_contour_mm"))
+@pytest.mark.parametrize("field", ("clamp_rh_mm", "lever_rh_mm", "work_rh_mm", "wire_contour_mm",
+                                   "guide_envelope_radius_mm"))
 def test_normal_gap_actual_hardware_extents_are_not_nominal_caps(field) -> None:
     actual, records, _limits = _synthetic_normal_tooling_measurement()
     assert spec.installed_tooling_clearance(
@@ -3796,11 +3855,19 @@ def test_normal_gap_actual_hardware_extents_are_not_nominal_caps(field) -> None:
 @pytest.mark.parametrize("arc,tail,expected", ((100.0, 20.0, 50.0), (100.0, 60.0, 60.0)))
 def test_wire_contour_halves_only_two_anchor_arcs_not_tails(arc, tail, expected) -> None:
     actual, records, _limits = _synthetic_normal_tooling_measurement()
+    motion = _synthetic_tooling_motion(actual)
     limits = spec._normal_tooling_allowances(
         replace(actual, wire_contour_mm=(arc, tail)),
-        spec.qualify_primary_capture_measurements(records),
+        spec.qualify_primary_capture_measurements(records), motion,
     )
-    assert limits["WIRE HEAD-PAIR ENVELOPES"] == pytest.approx(expected + actual.wire_diameter_mm / 2.0)
+    base = max(
+        motion.station_motion_mm + 2.0 * error + 2.0 * radius * math.sin(min(angle, math.pi / 2.0))
+        for error, angle, radius in zip(
+            motion.guide_errors_mm, motion.guide_angles_rad, actual.guide_envelope_radius_mm, strict=True,
+        )
+    )
+    raw = base + expected + actual.wire_diameter_mm / 2.0
+    assert limits["WIRE HEAD-PAIR ENVELOPES"] == pytest.approx(math.ceil(raw * 1000.0) / 1000.0)
 
 
 def test_wire_surface_section_is_not_a_zero_radius_centreline() -> None:
@@ -3821,15 +3888,17 @@ def test_actual_wire_section_requires_a_positive_finite_measurement(diameter) ->
 
 def test_installed_gap_rule_uses_outward_rounded_printed_constants(monkeypatch) -> None:
     actual, records, _limits = _synthetic_normal_tooling_measurement()
-    monkeypatch.setattr(spec, "_fitter_carrier_motion", lambda: (1.00001, 0.010001))
+    motion = replace(_synthetic_tooling_motion(actual), midpoint_motion_mm=1.00001,
+                     carrier_rotation_factor=0.010001)
     monkeypatch.setattr(spec, "_fitter_head_inplane_reach", lambda _stem: 2.00001)
     monkeypatch.setattr(spec, "fitter_tooling_motion_limits",
-                        lambda: (spec.FitterMotionLimit("CARRIER/RISER/LOCATORS", 2.00001),))
+                        lambda _motion: (spec.FitterMotionLimit("CARRIER/RISER/LOCATORS", 2.00001),))
     limits = spec._normal_tooling_allowances(
-        actual, spec.qualify_primary_capture_measurements(records),
+        actual, spec.qualify_primary_capture_measurements(records), motion,
     )
     assert limits["CARRIER/RISER/LOCATORS"] == 2.001
-    assert limits["CLAMP HEAD"] == pytest.approx(1.001 + 0.011 * math.hypot(2.001 + 4.9, 28.0))
+    raw = 1.00001 + 0.010001 * math.hypot(2.001 + 4.9, 28.0)
+    assert limits["CLAMP HEAD"] == pytest.approx(math.ceil(raw * 1000.0) / 1000.0)
 
 
 @pytest.mark.parametrize("uncertainty", (-0.1, math.inf, math.nan, True))
@@ -3843,30 +3912,671 @@ def test_normal_gap_invalid_uncertainty_cannot_verify(uncertainty) -> None:
 
 
 def test_normal_gap_allowance_grows_with_transverse_carrier_reach(monkeypatch) -> None:
-    before = spec.fitter_tooling_motion_limits()[0].norm_allowance_mm
+    motion = spec._stopped_tooling_motion(_synthetic_stopped_travel(), ("roughing", "finishing"))
+    before = spec.fitter_tooling_motion_limits(motion)[0].norm_allowance_mm
     monkeypatch.setattr(carrier, "OUTLINE_Y", (-1000.0, 1000.0))
-    after = spec.fitter_tooling_motion_limits()[0].norm_allowance_mm
+    after = spec.fitter_tooling_motion_limits(motion)[0].norm_allowance_mm
     assert after > before + 10.0
 
 
-def test_carrier_rotation_bound_includes_bore_bias_conditioning() -> None:
-    support, factor = spec._fitter_carrier_motion()
+def test_local_capture_preserves_manufactured_bore_bias_and_span() -> None:
+    local = spec._fitter_local_capture()
     bounds = retention.capture_bounds()
     span = min(b[0] - a[0] for a, b in
                (spec.trammel.pin_pair(name) for name in spec.trammel.PASS_RADIUS))
     alpha = math.atan(retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
     plane_transfer = (carrier.THICKNESS + carrier.THICKNESS_BAND) * math.tan(alpha)
     span -= 2.0 * (math.sqrt(2.0) * carrier.POSITION_BAND + plane_transfer)
-    du = 2.0 * support / span
-    dn = 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0) / math.cos(alpha) + math.tan(alpha) * du
-    assert factor == pytest.approx(math.sqrt(du * du + dn * dn + du * dn))
-    assert factor > 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0)
+    assert 0.0 <= local.bore_bias_rad - alpha < 1e-6
+    assert 0.0 <= local.bore_angle_rad - bounds.carrier_motion_tilt < 1e-6
+    assert 0.0 <= span - local.span_min_mm < 0.001
+    assert local.support_mm > 0.0
 
 
 def test_support_bound_extrapolates_the_engaged_land_to_the_underside_mouth(monkeypatch) -> None:
-    before, _factor = spec._fitter_carrier_motion()
+    before = spec._fitter_local_capture().support_mm
     monkeypatch.setattr(carrier, "THICKNESS_BAND", carrier.THICKNESS_BAND + 0.5)
-    after, _factor = spec._fitter_carrier_motion()
+    after = spec._fitter_local_capture().support_mm
     assert after > before
 
 
+
+
+def test_stopped_motion_uses_all_independent_xyz_corners_and_both_cones() -> None:
+    travel = _synthetic_stopped_travel()
+    motion = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    local = spec._fitter_local_capture()
+    radii = tuple(local.support_mm / 2.0 + guide.max_datum_line_error_mm for guide in travel.guides)
+    axes = []
+    for sign, guide in zip((-1.0, 1.0), travel.guides, strict=True):
+        length = math.dist(guide.near_axis_point_xyz_mm, guide.far_axis_point_xyz_mm)
+        axes.append(tuple(sign * (b - a) / length for a, b in zip(
+            guide.near_axis_point_xyz_mm, guide.far_axis_point_xyz_mm, strict=True,
+        )))
+    candidates = []
+    corners = []
+    for q1, q2 in product(
+        (travel.guides[0].near_axis_point_xyz_mm, travel.guides[0].far_axis_point_xyz_mm),
+        (travel.guides[1].near_axis_point_xyz_mm, travel.guides[1].far_axis_point_xyz_mm),
+    ):
+        vector = tuple(b - a for a, b in zip(q1, q2, strict=True))
+        norm = math.hypot(*vector)
+        corners.append(norm)
+        for axis in axes:
+            theta = math.acos(sum(a * v for a, v in zip(axis, vector, strict=True)) / norm)
+            theta += math.asin(sum(radii) / norm)
+            candidates.append(math.cos(theta))
+    # The four independent corners have different lengths; they are not four
+    # assembled poses with one manufactured bore-pair span.
+    assert max(corners) - min(corners) > 300.0
+    assert len(candidates) == 8
+    assert motion is not None
+    assert motion.mu == pytest.approx(min(candidates))
+    expected_e = 2.0 * sum(radii)
+    expected_sigma = max(value for guide in travel.guides for value in
+                         (guide.near_contact_span_mm, guide.far_contact_span_mm))
+    assert motion.separation_error_mm == pytest.approx(expected_e)
+    assert motion.contact_span_mm == expected_sigma
+    assert motion.station_motion_mm == pytest.approx((expected_e + 2.0 * expected_sigma) / motion.mu)
+    assert motion.midpoint_motion_mm == pytest.approx((expected_e + motion.station_motion_mm) / 2.0)
+    assert motion.guide_errors_mm == (0.05, 0.08)
+    assert motion.guide_angles_rad == (0.001, 0.002)
+    assert spec._stopped_tooling_motion(
+        replace(travel, guides=tuple(reversed(travel.guides))), ("roughing", "finishing"),
+    ) == motion
+
+
+def test_xyz_height_and_pitch_change_the_bound_without_changing_four_xy_readings() -> None:
+    travel = _synthetic_stopped_travel()
+    before = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    first, second = travel.guides
+    for near_z, far_z in ((205.0, 205.0), (5.0, 305.0)):
+        changed = replace(second, near_axis_point_xyz_mm=(*second.near_axis_point_xyz_mm[:2], near_z),
+                          far_axis_point_xyz_mm=(*second.far_axis_point_xyz_mm[:2], far_z))
+        after = spec._stopped_tooling_motion(
+            replace(travel, guides=(first, changed)), ("roughing", "finishing"),
+        )
+        assert after is not None
+        assert after.mu < before.mu
+        assert after.station_motion_mm > before.station_motion_mm
+
+
+def test_common_proper_registration_preserves_the_measured_motion_bound() -> None:
+    travel = _synthetic_stopped_travel()
+
+    def registered(point):
+        x, y, z = point
+        return (17.0 + z, -31.0 + x, 8.0 + y)
+
+    moved = replace(travel, guides=tuple(
+        replace(guide, near_axis_point_xyz_mm=registered(guide.near_axis_point_xyz_mm),
+                far_axis_point_xyz_mm=registered(guide.far_axis_point_xyz_mm))
+        for guide in travel.guides
+    ))
+    before = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    after = spec._stopped_tooling_motion(moved, ("roughing", "finishing"))
+    for field in ("mu", "separation_error_mm", "station_motion_mm", "midpoint_motion_mm",
+                  "carrier_rotation_factor"):
+        assert getattr(after, field) == pytest.approx(getattr(before, field))
+
+
+@pytest.mark.parametrize("nw,se,nw_interval,se_interval", (
+    ("guide1_near", "guide1_far", (0.0, 0.6), (199.2, 200.0)),
+    ("guide2_far", "guide2_near", (10.0, 11.0), (190.0, 191.0)),
+    ("guide1_near", "guide2_near", (0.0, 0.5), (190.0, 191.0)),
+    ("guide2_far", "guide1_far", (10.0, 11.0), (199.5, 200.0)),
+))
+def test_each_valid_first_contact_pair_can_prove_full_synthetic_coverage(nw, se, nw_interval, se_interval) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    travel = replace(actual.travel, sweeps=tuple(
+        replace(sweep, nw_contact=nw, se_contact=se,
+                nw_station_mm=nw_interval, se_station_mm=se_interval)
+        for sweep in actual.travel.sweeps
+    ))
+    assert spec.installed_tooling_clearance(
+        replace(actual, travel=travel), primary_measurements=records,
+    ).status == "VERIFIED_GEOMETRY_ONLY"
+
+
+@pytest.mark.parametrize("field,contact", (
+    ("nw_contact", "guide1_far"), ("nw_contact", "guide2_near"),
+    ("se_contact", "guide1_near"), ("se_contact", "guide2_far"),
+    ("nw_contact", "other_or_secondary"), ("se_contact", "other_or_secondary"),
+    ("nw_contact", "uninspected"), ("se_contact", "uninspected"),
+))
+def test_wrong_or_secondary_first_contact_cannot_certify(field, contact) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, *rest = actual.travel.sweeps
+    travel = replace(actual.travel, sweeps=(replace(first, **{field: contact}), *rest))
+    assert spec._stopped_tooling_motion(travel, ("roughing", "finishing")) is None
+    assert spec.installed_tooling_clearance(
+        replace(actual, travel=travel), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("change", (
+    {"nw_station_mm": (-0.01, 0.5)},
+    {"se_station_mm": (199.5, 200.01)},
+    {"nw_station_mm": (0.0, 0.60001)},
+    {"se_station_mm": (199.19999, 200.0)},
+    {"nw_station_mm": (100.0, 101.0), "se_station_mm": (101.0, 102.0)},
+    {"nw_station_mm": (100.0, 102.0), "se_station_mm": (101.0, 103.0)},
+))
+def test_station_intervals_must_prove_order_segment_and_total_contact_spreads(change) -> None:
+    travel = _synthetic_stopped_travel()
+    first, *rest = travel.sweeps
+    assert spec._stopped_tooling_motion(
+        replace(travel, sweeps=(replace(first, **change), *rest)), ("roughing", "finishing"),
+    ) is None
+
+
+@pytest.mark.parametrize("index", range(4))
+def test_every_pass_and_feed_mode_requires_its_own_continuous_sweep(index) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    sweeps = actual.travel.sweeps
+    for incomplete in (sweeps[:index] + sweeps[index + 1:],
+                       (*sweeps[:index], sweeps[(index + 1) % 4], *sweeps[index + 1:]),
+                       (*sweeps[:index], replace(sweeps[index], normal_path_evidence=""), *sweeps[index + 1:])):
+        assert spec.installed_tooling_clearance(
+            replace(actual, travel=replace(actual.travel, sweeps=incomplete)), primary_measurements=records,
+        ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("location,field", (
+    ("travel", "source"), ("travel", "measurement_method"),
+    ("guide0", "contact_span_basis"), ("guide1", "contact_span_basis"),
+    ("guide0", "continuous_takeup_evidence"), ("guide1", "continuous_takeup_evidence"),
+))
+def test_endpoint_samples_without_inspection_and_total_tau_basis_remain_unknown(location, field) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    travel = actual.travel
+    if location == "travel":
+        travel = replace(travel, **{field: " "})
+    else:
+        support = int(location[-1])
+        guides = tuple(replace(guide, max_datum_line_error_mm=0.0, max_frame_angle_rad=0.0,
+                               **{field: ""}) if guide.support == support else guide
+                       for guide in travel.guides)
+        travel = replace(travel, guides=guides)
+    assert spec.installed_tooling_clearance(
+        replace(actual, travel=travel), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+def test_both_actual_guides_are_indispensable_not_inferred_from_source_axes() -> None:
+    travel = _synthetic_stopped_travel()
+    first, second = travel.guides
+    for guides in ((), (first,), (second,), (first, first), (first, second, second)):
+        assert spec._stopped_tooling_motion(
+            replace(travel, guides=guides), ("roughing", "finishing"),
+        ) is None
+
+
+@pytest.mark.parametrize("field", (
+    "max_datum_line_error_mm", "max_frame_angle_rad", "near_contact_span_mm", "far_contact_span_mm",
+))
+@pytest.mark.parametrize("value", (-0.01, math.inf, math.nan, True, None))
+def test_guide_error_angle_and_total_tau_require_finite_nonnegative_numbers(field, value) -> None:
+    travel = _synthetic_stopped_travel()
+    first, second = travel.guides
+    with pytest.raises(ValueError):
+        spec._stopped_tooling_motion(
+            replace(travel, guides=(replace(first, **{field: value}), second)), ("roughing", "finishing"),
+        )
+
+
+@pytest.mark.parametrize("point", ((-100.0, 0.0), (-100.0, 0.0, math.nan),
+                                   (-100.0, math.inf, 0.0), (-100.0, None, 0.0),
+                                   (-100.0, False, 0.0), (-300.0, 0.0, 0.0)))
+def test_malformed_or_zero_length_xyz_segment_has_no_nominal_fallback(point) -> None:
+    travel = _synthetic_stopped_travel()
+    first, second = travel.guides
+    with pytest.raises(ValueError):
+        spec._stopped_tooling_motion(
+            replace(travel, guides=(replace(first, near_axis_point_xyz_mm=point), second)),
+            ("roughing", "finishing"),
+        )
+
+
+@pytest.mark.parametrize("interval", ((0.5, 0.0), (0.0,), (0.0, math.inf),
+                                      (math.nan, 0.5), (False, 0.5), (None, 0.5)))
+def test_malformed_station_interval_raises_instead_of_supplying_a_command_default(interval) -> None:
+    travel = _synthetic_stopped_travel()
+    first, *rest = travel.sweeps
+    with pytest.raises(ValueError):
+        spec._stopped_tooling_motion(
+            replace(travel, sweeps=(replace(first, nw_station_mm=interval), *rest)),
+            ("roughing", "finishing"),
+        )
+
+
+@pytest.mark.parametrize("second_near,second_far", (
+    ((-96.0, 0.0, 0.0), (104.0, 0.0, 0.0)),
+    ((-96.0, 3.0, 0.0), (104.0, 3.0, 0.0)),
+    ((100.0, 20.0, 5.0), (100.0, -180.0, 5.0)),
+    ((100.0, 0.0, 0.0), (100.0, 200.0, 0.0)),
+))
+def test_corner_ball_or_nonpositive_actual_cone_cannot_reuse_source_mu(
+    monkeypatch, second_near, second_far,
+) -> None:
+    travel = _synthetic_stopped_travel()
+    monkeypatch.setattr(spec, "_fitter_local_capture",
+                        lambda: spec.LocalCaptureMotion(4.0, 0.02, 0.003, 300.0))
+    first, second = (replace(guide, max_datum_line_error_mm=0.0) for guide in travel.guides)
+    second = replace(second, near_axis_point_xyz_mm=second_near, far_axis_point_xyz_mm=second_far)
+    assert spec._stopped_tooling_motion(
+        replace(travel, guides=(first, second)), ("roughing", "finishing"),
+    ) is None
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert spec.installed_tooling_clearance(
+        replace(actual, travel=replace(travel, guides=(first, second))), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("support,field", tuple(product(
+    (0, 1), ("near_contact_span_mm", "far_contact_span_mm"),
+)))
+def test_total_tau_not_visible_repeatability_controls_paired_travel(support, field) -> None:
+    travel = _synthetic_stopped_travel()
+    before = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    changed = tuple(replace(guide, **{field: 4.2}) if guide.support == support else guide
+                    for guide in travel.guides)
+    after = spec._stopped_tooling_motion(
+        replace(travel, guides=changed),
+        ("roughing", "finishing"),
+    )
+    assert after.mu == before.mu
+    assert after.contact_span_mm == 4.2
+    assert after.station_motion_mm - before.station_motion_mm == pytest.approx(6.0 / before.mu)
+
+
+@pytest.mark.parametrize("support", (0, 1))
+def test_each_guide_error_enters_support_separation_and_cones(support) -> None:
+    travel = _synthetic_stopped_travel()
+    before = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    changed = replace(travel, guides=tuple(
+        replace(guide, max_datum_line_error_mm=guide.max_datum_line_error_mm + 0.5)
+        if guide.support == support else guide for guide in travel.guides
+    ))
+    after = spec._stopped_tooling_motion(changed, ("roughing", "finishing"))
+    assert after.separation_error_mm - before.separation_error_mm == pytest.approx(1.0)
+    assert after.mu < before.mu
+    assert after.station_motion_mm > before.station_motion_mm
+    assert after.midpoint_motion_mm > before.midpoint_motion_mm
+
+
+@pytest.mark.parametrize("support", (0, 1))
+def test_frame_take_up_propagates_to_carrier_and_both_guides_not_only_endpoints(support) -> None:
+    actual, records, before_limits = _synthetic_normal_tooling_measurement()
+    before = _synthetic_tooling_motion(actual)
+    travel = replace(actual.travel, guides=tuple(
+        replace(guide, max_frame_angle_rad=0.03) if guide.support == support else guide
+        for guide in actual.travel.guides
+    ))
+    changed = replace(actual, travel=travel)
+    after = _synthetic_tooling_motion(changed)
+    after_limits = spec._normal_tooling_allowances(
+        changed, spec.qualify_primary_capture_measurements(records), after,
+    )
+    assert after.mu == before.mu
+    assert after.station_motion_mm == before.station_motion_mm
+    assert after.carrier_rotation_factor > before.carrier_rotation_factor
+    for group in ("CARRIER/RISER/LOCATORS", "WORK/BLANK STACK", "CLAMP HEAD",
+                  "FILLED CARTRIDGE ENVELOPE", "WIRE HEAD-PAIR ENVELOPES",
+                  f"SECONDARY SEAT POINT {support + 1}", "GUIDE-CARRIED FIXTURE ITEMS"):
+        assert after_limits[group] > before_limits[group]
+    assert after_limits["FIXED FIXTURE ITEMS"] == before_limits["FIXED FIXTURE ITEMS"] == 0.0
+    assert after_limits["FIXED-AXIS DRIVE ITEMS"] == before_limits["FIXED-AXIS DRIVE ITEMS"]
+
+
+def test_actual_stations_cover_free_guide_and_backlash_without_holding_a_command(monkeypatch) -> None:
+    travel = _synthetic_stopped_travel()
+    travel = replace(travel, guides=tuple(
+        replace(guide, max_datum_line_error_mm=0.0, max_frame_angle_rad=0.0,
+                near_contact_span_mm=1.0, far_contact_span_mm=1.0)
+        for guide in travel.guides
+    ))
+    monkeypatch.setattr(spec, "_fitter_local_capture",
+                        lambda: spec.LocalCaptureMotion(2.0, 0.02, 0.003, 300.0))
+    motion = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    # Parallel literal station changes have |delta V|=4, admissible under E.
+    # The first has no driver change; the second changes actual driver station
+    # despite the same hypothetical screw command. Neither is bounded by S0.
+    for delta_s1, delta_s2 in ((0.0, 4.0), (2.0, 2.0)):
+        assert abs(delta_s1) + abs(delta_s2) > motion.local.support_mm
+        assert abs(delta_s1) + abs(delta_s2) <= motion.station_motion_mm
+    assert motion.separation_error_mm == 4.0
+
+
+def test_free_guide_limited_endpoint_needs_pairing_and_the_two_sigma_term(monkeypatch) -> None:
+    travel = _synthetic_stopped_travel()
+    travel = replace(travel, guides=tuple(
+        replace(guide, near_axis_point_xyz_mm=(-100.0, 0.0, 0.0) if guide.support == 0 else (100.0, 0.0, 0.0),
+                far_axis_point_xyz_mm=(-300.0, 0.0, 0.0) if guide.support == 0 else (300.0, 0.0, 0.0),
+                max_datum_line_error_mm=0.0, max_frame_angle_rad=0.0,
+                near_contact_span_mm=1.0, far_contact_span_mm=1.0)
+        for guide in travel.guides
+    ), sweeps=tuple(
+        replace(sweep, nw_contact="guide2_far", nw_station_mm=(20.0, 20.0),
+                se_contact="guide1_far", se_station_mm=(199.0, 199.0))
+        for sweep in travel.sweeps
+    ))
+    monkeypatch.setattr(spec, "_fitter_local_capture",
+                        lambda: spec.LocalCaptureMotion(2.0, 0.02, 0.003, 300.0))
+    motion = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    normal = (20.0, 199.0)
+    upset = (15.0, 200.0)
+    assert upset[0] < min(sweep.nw_station_mm[0] for sweep in travel.sweeps)
+    deltas = tuple(u - n for u, n in zip(upset, normal, strict=True))
+    assert deltas == (-5.0, 1.0)
+    assert min(map(abs, deltas)) == motion.contact_span_mm
+    # Both exact lengths equal 417 with normal/upset relative offsets -2/+2.
+    assert 200.0 + sum(normal) - 2.0 == 200.0 + sum(upset) + 2.0 == 417.0
+    assert abs(sum(deltas)) == motion.separation_error_mm
+    total = sum(map(abs, deltas))
+    assert total > motion.separation_error_mm / motion.mu
+    assert total <= motion.station_motion_mm
+
+
+def test_carrier_rotation_uses_exact_hypot_with_fixed_bore_bias(monkeypatch) -> None:
+    local = spec.LocalCaptureMotion(2.0, 0.021, 0.07, 300.0)
+    monkeypatch.setattr(spec, "_fitter_local_capture", lambda: local)
+    travel = _synthetic_stopped_travel()
+    motion = spec._stopped_tooling_motion(travel, ("roughing", "finishing"))
+    a = min(2.0, (motion.separation_error_mm + motion.station_motion_mm) / local.span_min_mm)
+    gamma = min(math.pi, local.bore_angle_rad + 2.0 * max(motion.guide_angles_rad))
+    c = 2.0 * math.sin(gamma / 2.0) / math.cos(local.bore_bias_rad) + math.tan(local.bore_bias_rad) * a
+    assert motion.carrier_rotation_factor == pytest.approx(min(2.0, math.hypot(a, c)))
+    assert motion.carrier_rotation_factor < math.sqrt(a * a + c * c + a * c)
+    assert c > 2.0 * math.sin(gamma / 2.0)
+    large_frame_excursion = replace(travel, guides=tuple(
+        replace(guide, max_frame_angle_rad=2.0 * math.pi) for guide in travel.guides
+    ))
+    assert spec._stopped_tooling_motion(
+        large_frame_excursion, ("roughing", "finishing"),
+    ).carrier_rotation_factor == 2.0
+    monkeypatch.setattr(spec, "_fitter_local_capture", lambda: replace(local, span_min_mm=0.01))
+    assert spec._stopped_tooling_motion(travel, ("roughing", "finishing")).carrier_rotation_factor == 2.0
+
+
+@pytest.mark.parametrize("axis", ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
+                                  (math.sqrt(0.5), math.sqrt(0.5), 0.0), (0.0, 0.0, 1.0)))
+def test_two_vector_rotation_bound_and_body_fixed_k_are_exact_invariants(axis) -> None:
+    angle, alpha = 0.37, 0.08
+    u, n = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)
+    bore = (math.sin(alpha), math.cos(alpha), 0.0)
+
+    def rotate(point):
+        cross = (axis[1] * point[2] - axis[2] * point[1],
+                 axis[2] * point[0] - axis[0] * point[2],
+                 axis[0] * point[1] - axis[1] * point[0])
+        dot = sum(a * p for a, p in zip(axis, point, strict=True))
+        return tuple(p * math.cos(angle) + c * math.sin(angle) + a * dot * (1.0 - math.cos(angle))
+                     for p, c, a in zip(point, cross, axis, strict=True))
+
+    du, dn = math.dist(u, rotate(u)), math.dist(n, rotate(n))
+    operator_norm = 2.0 * math.sin(angle / 2.0)
+    assert du * du + dn * dn == pytest.approx(operator_norm ** 2 * (1.0 + axis[2] ** 2))
+    assert operator_norm <= math.hypot(du, dn) + 1e-15
+    if axis[2] == 0.0:
+        assert math.hypot(du, dn) == pytest.approx(operator_norm)
+    else:
+        assert math.hypot(du, dn) > operator_norm
+    assert sum(a * b for a, b in zip(rotate(u), rotate(bore), strict=True)) == pytest.approx(math.sin(alpha))
+
+
+def test_synthetic_gap_census_covers_every_group_step_and_feed_mode() -> None:
+    actual, records, limits = _synthetic_normal_tooling_measurement()
+    expected_groups = {
+        "CARRIER/RISER/LOCATORS", "LEVER STOCK", "FILLED CARTRIDGE ENVELOPE",
+        "CLAMP HEAD", "LEVER HEADS/LOCK PAIRS", "WORK/BLANK STACK",
+        "SECONDARY SEAT POINT 1", "SECONDARY SEAT POINT 2", "WIRE HEAD-PAIR ENVELOPES",
+        "GUIDE-CARRIED FIXTURE ITEMS", "FIXED-AXIS DRIVE ITEMS", "FIXED FIXTURE ITEMS",
+    }
+    assert set(limits) == expected_groups
+    expected = {(group, name, mode) for group, name, mode in product(
+        expected_groups, ("smooth shank", "holder", "spindle"), ("roughing", "finishing"),
+    )}
+    assert {(gap.group, gap.tool_step, gap.feed_mode) for gap in actual.gaps} == expected
+    assert len(actual.gaps) == len(expected) == 72
+    for mode in ("roughing", "finishing"):
+        missing = tuple(gap for gap in actual.gaps
+                        if (gap.group, gap.tool_step, gap.feed_mode) !=
+                        ("FIXED-AXIS DRIVE ITEMS", "smooth shank", mode))
+        assert spec.installed_tooling_clearance(
+            replace(actual, gaps=missing), primary_measurements=records,
+        ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("mode", ("roughing", "finishing"))
+def test_only_used_feed_modes_need_both_passes_but_unused_records_do_not_substitute(mode) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    actual = replace(
+        actual, tool_steps=tuple(step for step in actual.tool_steps if step.feed_mode == mode),
+        gaps=tuple(gap for gap in actual.gaps if gap.feed_mode == mode),
+        travel=replace(actual.travel, sweeps=tuple(sweep for sweep in actual.travel.sweeps if sweep.feed_mode == mode)),
+    )
+    assert len(actual.travel.sweeps) == 2
+    assert spec.installed_tooling_clearance(actual, primary_measurements=records).status == "VERIFIED_GEOMETRY_ONLY"
+    other_mode = "finishing" if mode == "roughing" else "roughing"
+    assert spec.installed_tooling_clearance(
+        replace(actual, travel=_synthetic_stopped_travel((other_mode,))), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("change", (
+    {"source": ""}, {"name": " "}, {"feed_mode": "unknown"},
+))
+def test_every_tool_step_needs_identified_full_z_census_authority(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, *rest = actual.tool_steps
+    assert spec.installed_tooling_clearance(
+        replace(actual, tool_steps=(replace(first, **change), *rest)), primary_measurements=records,
+    ).status == "UNVERIFIED"
+    assert spec.installed_tooling_clearance(
+        replace(actual, tool_steps=(first, first, *rest)), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("z_range", ((145.0, 97.2), (97.2,), (97.2, math.inf),
+                                     (math.nan, 145.0), (False, 145.0), (97.2, None)))
+def test_actual_deepest_breakthrough_and_retract_interval_is_finite_and_ordered(z_range) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, *rest = actual.tool_steps
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, tool_steps=(replace(first, tip_z_range_mm=z_range), *rest)),
+            primary_measurements=records,
+        )
+
+
+@pytest.mark.parametrize("change", (
+    {"guide_envelope_basis": ("", "SYNTHETIC guide 2")},
+    {"guide_envelope_basis": ("SYNTHETIC guide 1", "")},
+    {"guide_envelope_basis": ()},
+    {"drive_float_evidence": " "},
+))
+def test_local_guide_radii_and_drive_backlash_need_inspection_sources(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert spec.installed_tooling_clearance(
+        replace(actual, **change), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("value", (0.0, -0.01, math.inf, math.nan, True, None))
+@pytest.mark.parametrize("support", (0, 1))
+def test_both_guide_envelope_radii_are_positive_finite_actual_extents(support, value) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    radii = tuple(value if index == support else radius
+                  for index, radius in enumerate(actual.guide_envelope_radius_mm))
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, guide_envelope_radius_mm=radii), primary_measurements=records,
+        )
+
+
+@pytest.mark.parametrize("value", (-0.01, math.inf, math.nan, True, None))
+def test_actual_drive_float_is_finite_nonnegative_not_nominal_bearing_endplay(value) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, drive_axial_float_mm=value), primary_measurements=records,
+        )
+
+
+def test_actual_drive_axial_float_changes_only_its_row_and_can_defeat_positive_gaps() -> None:
+    actual, records, before = _synthetic_normal_tooling_measurement()
+    changed = replace(actual, drive_axial_float_mm=actual.drive_axial_float_mm + 2.0)
+    after = spec._normal_tooling_allowances(
+        changed, spec.qualify_primary_capture_measurements(records), _synthetic_tooling_motion(changed),
+    )
+    assert after["FIXED-AXIS DRIVE ITEMS"] - before["FIXED-AXIS DRIVE ITEMS"] == pytest.approx(2.0)
+    assert {group: value for group, value in after.items() if group != "FIXED-AXIS DRIVE ITEMS"} == {
+        group: value for group, value in before.items() if group != "FIXED-AXIS DRIVE ITEMS"
+    }
+    report = spec.installed_tooling_clearance(changed, primary_measurements=records)
+    assert report.status == "POTENTIAL_CONFLICT"
+    assert report.limiting_pair[0] == "FIXED-AXIS DRIVE ITEMS"
+    assert spec.installed_tooling_clearance(
+        replace(actual, drive_axial_float_mm=0.0), primary_measurements=records,
+    ).status == "VERIFIED_GEOMETRY_ONLY"
+
+
+@pytest.mark.parametrize("mode", ("roughing", "finishing"))
+def test_tooling_motion_ownership_is_an_exhaustive_disjoint_physical_census(mode) -> None:
+    groups = spec._tooling_motion_groups(mode)
+    instances = [item for group in groups.values() for item in group]
+    expected = {(stem, index) for stem in spec.BOM_ORDER for index in range(spec.QUANTITIES[stem])}
+    assert expected
+    assert set(instances) == expected
+    assert len(instances) == len(expected)
+    for stem in (spec.LEADSCREW, spec.HANDWHEEL, spec.PILLOW_BLOCK):
+        assert {(stem, index) for index in range(spec.QUANTITIES[stem])} <= set(groups["FIXED-AXIS DRIVE ITEMS"])
+    bracket_owner = "GUIDE-CARRIED FIXTURE ITEMS" if mode == "finishing" else "FIXED-AXIS DRIVE ITEMS"
+    for stem in (spec.NUT_BRACKET, spec.LEADSCREW_NUT, spec.NUT_SCREW):
+        assert {(stem, index) for index in range(spec.QUANTITIES[stem])} <= set(groups[bracket_owner])
+    screw_owner = "GUIDE-CARRIED FIXTURE ITEMS" if mode == "finishing" else "REMOVED FROM FIXTURE"
+    for stem in (spec.BLOCK_SCREW, spec.BLOCK_LOCK_WASHER):
+        assert {(stem, index) for index in range(spec.QUANTITIES[stem])} <= set(groups[screw_owner])
+    assert (spec.RAIL, 0) in groups["FIXED FIXTURE ITEMS"]
+    assert (spec.CARRIER, 0) in groups["CARRIER/RISER/LOCATORS"]
+
+
+def test_free_guide_descendants_have_nonzero_guide_motion_not_fixed_item_allowances() -> None:
+    actual, _records, limits = _synthetic_normal_tooling_measurement()
+    groups = spec._tooling_motion_groups("finishing")
+    for stem, group in (
+        (spec.CARRIAGE, "GUIDE-CARRIED FIXTURE ITEMS"),
+        (spec.PIVOT_BLOCK, "GUIDE-CARRIED FIXTURE ITEMS"),
+        (spec.CARRIAGE_SCREW, "GUIDE-CARRIED FIXTURE ITEMS"),
+        (spec.PIVOT_CAP_SCREW, "GUIDE-CARRIED FIXTURE ITEMS"),
+        (spec.PIVOT_LOCK_WIRE, "WIRE HEAD-PAIR ENVELOPES"),
+        (spec.PIVOT_CLEVIS_PIN, "SECONDARY SEAT POINT 2"),
+        (spec.PIVOT_COTTER, "SECONDARY SEAT POINT 2"),
+        (spec.PIVOT_PIN, "FILLED CARTRIDGE ENVELOPE"),
+        (spec.PIVOT_CAP, "FILLED CARTRIDGE ENVELOPE"),
+        (spec.PIVOT_RETAINER, "FILLED CARTRIDGE ENVELOPE"),
+        (spec.BEARING, "FILLED CARTRIDGE ENVELOPE"),
+    ):
+        free_instances = {(stem, index) for index in range(spec.QUANTITIES[stem])
+                          if spec._motion_root(stem, index) == (spec.CARRIAGE, 1)}
+        assert free_instances
+        assert free_instances <= set(groups[group])
+        assert limits[group] >= _synthetic_tooling_motion(actual).station_motion_mm > 0.0
+    assert limits["FIXED FIXTURE ITEMS"] == 0.0
+
+
+def test_unknown_bom_family_is_not_silently_made_table_static(monkeypatch) -> None:
+    unknown = "SYNTHETIC-UNCLASSIFIED-TOOLING-FAMILY"
+    monkeypatch.setattr(spec, "BOM_ORDER", (*spec.BOM_ORDER, unknown))
+    monkeypatch.setattr(spec, "QUANTITIES", {**spec.QUANTITIES, unknown: 1})
+    for mode in ("roughing", "finishing"):
+        with pytest.raises(ValueError):
+            spec._tooling_motion_groups(mode)
+
+
+@pytest.mark.parametrize("dominant_support", (0, 1))
+def test_guide_rotation_uses_whole_local_float_radius_for_cartridges_and_seats(monkeypatch, dominant_support) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    actual = replace(actual, guide_envelope_radius_mm=tuple(
+        100.0 if support == dominant_support else 1.0 for support in range(2)
+    ))
+    motion = replace(
+        _synthetic_tooling_motion(actual), station_motion_mm=5.0,
+        guide_errors_mm=(0.1, 0.2), guide_angles_rad=(0.2, 0.2),
+        local=replace(_synthetic_tooling_motion(actual).local, support_mm=2.5),
+    )
+    own_by_stem = {spec.PIVOT_PIN: 2.0, spec.PIVOT_CAP: 3.0, spec.PIVOT_RETAINER: 4.00001}
+    monkeypatch.setattr(spec, "_fitter_local_motion", own_by_stem.__getitem__)
+    primary = spec.qualify_primary_capture_measurements(records)
+    limits = spec._normal_tooling_allowances(actual, primary, motion)
+
+    def outward(value):
+        return math.ceil(value * 1000.0) / 1000.0
+
+    def base(support, own):
+        return (5.0 + 2.0 * motion.guide_errors_mm[support]
+                + 2.0 * (actual.guide_envelope_radius_mm[support] + own) * math.sin(0.2))
+
+    own = 4.001
+    assert limits["FILLED CARTRIDGE ENVELOPE"] == outward(max(base(i, own) + own for i in range(2)))
+    assert limits["FILLED CARTRIDGE ENVELOPE"] > outward(max(base(i, 0.0) + own for i in range(2)))
+    assert limits["GUIDE-CARRIED FIXTURE ITEMS"] == outward(max(base(i, 0.0) for i in range(2)))
+    arc, tail = actual.wire_contour_mm
+    assert limits["WIRE HEAD-PAIR ENVELOPES"] == outward(
+        max(base(i, 0.0) for i in range(2)) + max(arc / 2.0, tail) + actual.wire_diameter_mm / 2.0,
+    )
+    for support in range(2):
+        sphere = max(math.hypot(*(max(abs(low), abs(high)) for low, high in
+                                 record.secondary_envelope_in_pin_seat_frame_mm))
+                     for (_pass, index), record in primary.items() if index == support)
+        assert limits[f"SECONDARY SEAT POINT {support + 1}"] == outward(base(support, 2.5) + 2.5 + sphere)
+    # The wire is carried by the fixed heads, not by the floating cap.
+    monkeypatch.setattr(spec, "_fitter_local_motion", lambda _stem: 40.0)
+    grown = spec._normal_tooling_allowances(actual, primary, motion)
+    assert grown["FILLED CARTRIDGE ENVELOPE"] > limits["FILLED CARTRIDGE ENVELOPE"]
+    assert grown["WIRE HEAD-PAIR ENVELOPES"] == limits["WIRE HEAD-PAIR ENVELOPES"]
+
+
+def test_large_frame_angle_cannot_reduce_a_guide_rotation_allowance() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    primary = spec.qualify_primary_capture_measurements(records)
+    motion = _synthetic_tooling_motion(actual)
+    at_quarter_turn = spec._normal_tooling_allowances(
+        actual, primary, replace(motion, guide_angles_rad=(math.pi / 2.0, math.pi / 2.0)),
+    )
+    beyond = spec._normal_tooling_allowances(
+        actual, primary, replace(motion, guide_angles_rad=(math.pi, 2.0 * math.pi)),
+    )
+    for group in ("FILLED CARTRIDGE ENVELOPE", "SECONDARY SEAT POINT 1", "SECONDARY SEAT POINT 2",
+                  "WIRE HEAD-PAIR ENVELOPES", "GUIDE-CARRIED FIXTURE ITEMS"):
+        assert beyond[group] == at_quarter_turn[group]
+
+
+@pytest.mark.parametrize("field", ("radial_gap_mm", "axial_gap_mm"))
+@pytest.mark.parametrize("value", (math.inf, math.nan, True, "1.0"))
+def test_nonfinite_or_nonnumeric_known_gap_is_malformed_not_unknown(field, value) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, *rest = actual.gaps
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, gaps=(replace(first, **{field: value}), *rest)), primary_measurements=records,
+        )
+
+
+def test_made_carrier_and_lever_rows_use_actual_midpoint_rotation_and_outward_arms(monkeypatch) -> None:
+    motion = spec._stopped_tooling_motion(_synthetic_stopped_travel(), ("roughing", "finishing"))
+    motion = replace(motion, midpoint_motion_mm=7.25, carrier_rotation_factor=0.125)
+
+    def radius(stems):
+        if stems == (spec.FEED_LEVER,):
+            return 20.00001
+        assert set(stems) == {spec.CARRIER, spec.RISER, spec.HUB_PIN, spec.CL_DOWEL, spec.RISER_SCREW}
+        return 40.00001
+
+    monkeypatch.setattr(spec, "_fitter_carrier_radius", radius)
+    limits = {row.label: row.norm_allowance_mm for row in spec.fitter_tooling_motion_limits(motion)}
+    assert limits == {
+        "CARRIER/RISER/LOCATORS": pytest.approx(7.25 + 0.125 * 40.001),
+        "LEVER STOCK": pytest.approx(7.25 + 0.125 * 20.001),
+    }
