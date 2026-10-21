@@ -7,9 +7,9 @@ symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; none is
 restated here.
 
 The near-face setting remains a controlled native model dimension. Its
-attached callout names the stick-mark/thumbscrew-axis alignment it establishes,
-without a REF qualifier on that controlled setting. STOP_MARK still owns the
-nominal alignment; the callout does not add a second acceptance criterion.
+attached callout names the measured block face; step 5 explains the
+stick-mark/thumbscrew-axis indexing purpose. STOP_MARK still owns the nominal
+alignment, with no REF qualifier on the controlled setting.
 """
 
 from __future__ import annotations
@@ -91,9 +91,9 @@ CLAMPED_SETUP_NOTE = (
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# Name the source-owned index relationship without a REF qualifier that could
-# be read as waiving the controlled near-face setting's acceptance band.
-STOP_POSITION_CALLOUT = f"{spec.STICK.upper()} SETUP MARK\nON THUMBSCREW AXIS"
+# Name the measured face here; step 5 explains the source-owned index purpose
+# without implying that the dimension's witness lands on the thumbscrew axis.
+STOP_POSITION_CALLOUT = "NEAR BLOCK FACE"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)
