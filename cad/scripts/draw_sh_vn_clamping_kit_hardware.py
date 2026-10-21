@@ -1,7 +1,9 @@
 """Draw the three installed forms from one Precision Matthews clamping kit.
 
 Each explicitly configured member retains its four-view reference content.
-The twelve installed members are not twelve procurement units.
+REWORK and MEASURE-AND-FIT additionally own the existing HoldDownStud-only
+manufacturing controls and source-linked actual-fit instructions. The twelve
+installed members are not twelve procurement units.
 """
 
 from __future__ import annotations
@@ -13,10 +15,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_variant_drawing import build_purchased_variant_drawing
+from _purchased_variant_drawing import (
+    build_purchased_variant_drawing,
+    configure_reference_views,
+)
 from _part_configuration_exports import _sha256
 from _com import _early_bound, _read_member
 from _drawing_attachment import (
@@ -24,13 +30,23 @@ from _drawing_attachment import (
     _assert_leader_lands,
     _is_same_attachment,
 )
-from _drawing_common import set_high_quality_shaded_with_edges
-from _drawing_dimensions import set_reference_dimension
+from _drawing_common import read_required_properties, set_high_quality_shaded_with_edges
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_planar import PlanarFace
+from _printed_limits import limits
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges, visible_view_entities
-from _drawing_projection import model_points_in_view
-from _drawing_leader_notes import add_attached_note
-from _drawing_notes import property_link
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_leader_notes import add_attached_note, add_property_linked_callout
+from _drawing_notes import add_property_linked_note, property_link
 from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
 import sh_vn_clamping_kit_t_nut_spec as tnut
@@ -42,6 +58,10 @@ from _layout_geometry import Box, Segment, segment_box_distance
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_clamping_kit_hardware"]
 PART_STEM = SPEC.artifact_stem
+SOURCE = SPEC.source
+# These declarations describe only the saved/default HoldDownStud STEP. Other
+# kit members retain their separately configured reference/export ownership.
+FEATURE_SPEC_MODULE = "sh_vn_clamping_kit_hold_down_stud_spec"
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "52-PIECE CLAMPING KIT, 14 MM T-SLOT, 1/2-13 HARDWARE"
 VARIANTS = (
@@ -50,6 +70,209 @@ VARIANTS = (
     ("FlangeNut", "[3] FLANGE NUT"),
 )
 PURCHASE_UNIT = "52-PIECE KIT"
+SHEET_SCALE = (2.0, 1.0)
+SHEET_NAMES = ("REWORK", "MEASURE-AND-FIT")
+FRONT_CENTER = (0.120, 0.150)
+END_CENTER = (FRONT_CENTER[0], 0.245)
+ISO_CENTER = (0.330, 0.170)
+FRONT_KEEP = {"FinishedLength": (0.060, FRONT_CENTER[1])}
+END_KEEP = {"CutEndChamfer": (0.195, END_CENTER[1])}
+STOCK_NOTE_XY = (0.025, 0.077)
+MANUFACTURING_NOTES_XY = (0.025, 0.056)
+LOWER_END_NOTE_XY = (0.155, 0.095)
+INSTRUCTION_PLACEMENTS = {
+    "Stud Measurement Instructions": (0.025, 0.252),
+    "Stud Fit Limits": (0.225, 0.252),
+    "Stud Rework Acceptance": (0.025, 0.170),
+}
+INSTRUCTION_TEXT_HEIGHT = 0.0035
+INSTRUCTION_ISO_CENTER = (0.340, 0.125)
+STUD_REWORK_PROPERTIES = {
+    "Stock Length": f"{stud.STOCK_LENGTH} IN STOCK",
+    "Stock Note": stud.STOCK_NOTE,
+    "Lower End Note": stud.LOWER_END_NOTE,
+    "Manufacturing Notes": stud.DRAWING_NOTES,
+    **stud.REWORK_INSTRUCTION_PROPERTIES,
+}
+REQUIRED_PROPERTIES = (
+    "Number", "Material Specification", "Finish", "Quantity", "Stock Name",
+    "Supplier", "Supplier SKUs",
+    *(f"{stud.CONFIGURATION} Rework {name}" for name in STUD_REWORK_PROPERTIES),
+)
+
+
+class _CutEndCone(ConeFace):
+    """Disambiguate the coaxial factory and cut-end cones on the unchanged Y axis."""
+
+    def matches(self, geometry) -> bool:
+        return (
+            super().matches(geometry)
+            and len(geometry.box) == 6
+            and abs(geometry.box[4] * 1000.0 - stud.LENGTH) <= self.tolerance_mm
+        )
+
+
+part_metadata(
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+    fields={
+        "volume_mm3": (stud.VOLUME_MM3, ("VOLUME_MM3",)),
+        "material.finish": (stud.FINISH, ("FINISH",)),
+        "notes.process": (stud.PROCESS, ("PROCESS",)),
+    },
+)
+requirement(
+    "finished_upper_end", kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), stud.LENGTH),),
+    requirements=("length", "note"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "length": (limits(stud.LENGTH, stud.LENGTH_PLACES), ("LENGTH", "LENGTH_BAND")),
+        "length_nominal": (stud.LENGTH, ("LENGTH",)),
+        "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"length": stud.LENGTH_PLACES},
+)
+requirement(
+    "cut_end_chamfer", kind="chamfer", faces=(_CutEndCone(45.0),),
+    requirements=("length", "note"),
+    fields={
+        "at": ([0.0, stud.LENGTH, 0.0], ("LENGTH", "__frame__")),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "length": ([0.0, stud.CUT_END_CHAMFER_MAX], ("CUT_END_CHAMFER_MAX",)),
+        "length_nominal": (stud.CUT_END_CHAMFER_MAX, ("CUT_END_CHAMFER_MAX",)),
+        "note": (stud.DIMENSION_CALLOUTS["CutEndChamfer"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"length": stud.CUT_END_CHAMFER_PLACES},
+)
+
+
+def assert_machining_controls(adapter: Any, annotations: list[Any]) -> None:
+    """Read actual native drivers, precision, MAX limits and chamfer angle."""
+    remaining = {
+        "FinishedLength": stud.LENGTH / 1000.0,
+        "CutEndChamfer": stud.CUT_END_CHAMFER_MAX / 1000.0,
+    }
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            raise RuntimeError(f"unexpected or duplicate stud control {name!r}")
+        nominal = remaining.pop(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(dimension.DrivenState) != 2 or not math.isclose(
+            float(dimension.SystemValue), nominal, abs_tol=1e-9
+        ):
+            raise RuntimeError(f"{name}: native machining driver changed")
+        if "(" in str(display.GetText(1) or "") or ")" in str(display.GetText(2) or ""):
+            raise RuntimeError(f"{name}: machining control is displayed reference-only")
+        if int(tolerance.Type) != stud.DIMENSION_TOLERANCE_TYPES[name]:
+            raise RuntimeError(f"{name}: native tolerance type changed")
+        if name == "CutEndChamfer":
+            if not math.isclose(float(tolerance.GetMinValue()), -nominal, abs_tol=1e-12) or not math.isclose(
+                float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12
+            ):
+                raise RuntimeError("cut-end chamfer: native zero-to-MAX band changed")
+            angle = _early_bound(display.GetDimension2(1), "IDimension")
+            if angle is None or not math.isclose(
+                float(angle.SystemValue), math.pi / 4.0, abs_tol=1e-9
+            ):
+                raise RuntimeError("cut-end chamfer: native angle changed")
+    if remaining:
+        raise RuntimeError(f"missing native stud controls: {sorted(remaining)}")
+    assert_imported_precision(adapter, annotations, stud.DRAWING_PRECISION_BY_NAME)
+
+
+def _assert_stud_rework_properties(model: Any) -> None:
+    properties = read_required_properties(
+        model, REQUIRED_PROPERTIES, required=REQUIRED_PROPERTIES
+    )
+    for name, expected in STUD_REWORK_PROPERTIES.items():
+        if properties[f"{stud.CONFIGURATION} Rework {name}"] != expected:
+            raise RuntimeError(f"stud rework: stale source-linked {name!r}")
+    for name, expected in {
+        **STUD_REWORK_PROPERTIES,
+        "Number": properties["Number"],
+        "Quantity": str(stud.QUANTITY),
+        "Material Specification": properties["Material Specification"],
+        "Process": stud.PROCESS,
+        "Finish": stud.FINISH,
+        "Tolerance Class": stud.TOLERANCE_CLASS,
+    }.items():
+        actual = str(model.GetCustomInfoValue(stud.CONFIGURATION, name) or "")
+        if actual.replace("\r\n", "\n") != expected.replace("\r\n", "\n"):
+            raise RuntimeError(f"stud rework: native member {name!r} changed")
+
+
+def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
+    """Author the exact existing stud rework package within the shared drawing."""
+    document = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not document.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate stud REWORK sheet")
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=SHEET_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
+    rework_views = [front, end, iso]
+    configure_reference_views(adapter, stud.CONFIGURATION, rework_views)
+    _assert_stud_rework_properties(_early_bound(front.ReferencedDocument, "IModelDoc2"))
+    for view in rework_views:
+        set_hidden_lines_removed(adapter, view)
+    annotations = []
+    for view, keep, label in (
+        (front, FRONT_KEEP, "finished length from unchanged lower end"),
+        (end, END_KEEP, "upper cut-end chamfer"),
+    ):
+        annotations.extend(curate_view_dimensions(
+            adapter, view, keep=keep, view_label=label,
+            dimensions_by_feature=stud.DRAWING_DIMENSIONS,
+        ))
+    assert_machining_controls(adapter, annotations)
+    set_dimension_callouts(adapter, annotations, stud.DIMENSION_CALLOUTS)
+    lower_end = model_point_in_view(
+        adapter, front, (0.0, 0.0, 0.0), label="unmodified lower factory end"
+    )
+    add_property_linked_callout(
+        adapter, front, property_name=f"{stud.CONFIGURATION} Rework Lower End Note",
+        edge_xy=lower_end, note_xy=LOWER_END_NOTE_XY,
+    )
+    add_property_linked_note(
+        adapter, f"{stud.CONFIGURATION} Rework Stock Note", *STOCK_NOTE_XY
+    )
+    add_property_linked_note(
+        adapter, f"{stud.CONFIGURATION} Rework Manufacturing Notes", *MANUFACTURING_NOTES_XY
+    )
+    if not document.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate stud MEASURE-AND-FIT sheet")
+    instruction_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *INSTRUCTION_ISO_CENTER, scale=SHEET_SCALE
+    )
+    configure_reference_views(adapter, stud.CONFIGURATION, [instruction_iso])
+    set_hidden_lines_removed(adapter, instruction_iso)
+    for property_name, position in INSTRUCTION_PLACEMENTS.items():
+        add_property_linked_note(
+            adapter, f"{stud.CONFIGURATION} Rework {property_name}", *position,
+            char_height=INSTRUCTION_TEXT_HEIGHT,
+        )
+
+    def settled() -> None:
+        for sheet_name, views in (
+            (SHEET_NAMES[0], rework_views), (SHEET_NAMES[1], [instruction_iso]),
+        ):
+            if not document.ActivateSheet(sheet_name):
+                raise RuntimeError(f"failed to read stud sheet {sheet_name!r}")
+            for view in views:
+                if (
+                    str(view.ReferencedConfiguration) != stud.CONFIGURATION
+                    or Path(view.GetReferencedModelName()).resolve() != SOURCE.resolve()
+                    or tuple(view.ScaleRatio) != SHEET_SCALE
+                ):
+                    raise RuntimeError("stud rework view source/configuration/scale changed")
+        if not document.ActivateSheet(SHEET_NAMES[0]):
+            raise RuntimeError("failed to read stud REWORK controls")
+        _assert_stud_rework_properties(_early_bound(front.ReferencedDocument, "IModelDoc2"))
+        assert_machining_controls(adapter, annotations)
+
+    return (settled,)
 
 
 def _measured_display_box(rendered: dict[str, Any]) -> Any:
@@ -110,8 +333,13 @@ def _stud_length_reference(
             and math.isclose(params[0], 0.0, abs_tol=1e-9)
             and math.isclose(params[2], 0.0, abs_tol=1e-9)
             and math.isclose(abs(params[4]), 1.0, abs_tol=1e-9)
-            and math.isclose(
-                params[6] * 1000, stud.RADIUS - stud.END_CHAMFER, abs_tol=1e-5
+            and any(
+                math.isclose(params[1] * 1000, station, abs_tol=1e-5)
+                and math.isclose(params[6] * 1000, radius, abs_tol=1e-5)
+                for station, radius in (
+                    (0.0, stud.RADIUS - stud.LOWER_FACTORY_CHAMFER),
+                    (stud.LENGTH, stud.RADIUS - stud.CUT_END_CHAMFER_MAX),
+                )
             )
         ):
             rims.append((params[1], edge))
@@ -282,7 +510,7 @@ def _installation_flag(
         view.UpdateViewDisplayGeometry()
         scan = scan_view_edges(view, label=label)
         if configuration == "HoldDownStud":
-            radius = stud.RADIUS - stud.END_CHAMFER
+            radius = stud.RADIUS - stud.LOWER_FACTORY_CHAMFER
             point_mm = (0.0, 0.0, radius)
         else:
             part = _early_bound(view.ReferencedDocument, "IPartDoc")
@@ -1742,6 +1970,8 @@ async def build(adapter: Any) -> dict[str, str]:
         item=ITEM,
         purchase_unit=PURCHASE_UNIT,
         annotate_member=annotate_member,
+        additional_sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
+        append_sheets=append_stud_rework_sheets,
     )
 
 

@@ -1,4 +1,4 @@
-r"""Create the nine-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
+r"""Create the ten-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
@@ -21,13 +21,16 @@ pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
 ring fits the sheet, each family ballooned once on one ring, on no other sheet.
 Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
 in two columns, and the checks. Sheet 8 carries cartridge manufacture/pressing,
-joint acceptance and wiring. Both instruction sheets retain a small, visible
-collapsed reference isometric at 1:20 below the right-column text: their native
-model views supply the live ``$PRPSHEET`` title-block links, just as the other
-seven sheets' views do. Sheet 9 carries operation and machine acceptance,
-with the finished isometric below the right-column checks at 1:15. Every view
-is one the builder named in the machine frame (``spec.VIEW_AXES``), its mapping
-proven on the sheet before anything is placed by it. Every text,
+joint acceptance and wiring (C1-C3C). Sheet 9 carries the pre-bearing underside
+inspection (C2A) and qualifies the actual top capture fit (C4-C5D), with a signed
+functional inspection schematic, not a manufacturing view or dimension. These
+three instruction sheets retain a small, visible collapsed reference isometric
+at 1:20 below the right-column text: their native model views supply the live
+``$PRPSHEET`` title-block links, just as the other seven sheets' views do.
+Sheet 10 carries operation/service (C6-C7) and machine acceptance, with the
+finished isometric below the right-column checks at 1:15. Every view is one the
+builder named in the machine frame (``spec.VIEW_AXES``), its mapping proven on
+the sheet before anything is placed by it. Every text,
 pose and reference value comes from
 ``ch_rocker_arm_tl_oblique_jig_assembly_spec`` (and through it the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``) or the part registry; this recipe
@@ -115,6 +118,7 @@ ASSEMBLED_SHEET = "ASSEMBLED AT INNER PASS"
 BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
 CARTRIDGE_SHEET = "CARTRIDGEASSEMBLY"
+TOP_CAPTURE_SHEET = "TOPCAPTUREFIT"
 CAPTURE_SHEET = "CAPTUREANDOPERATION"
 
 
@@ -216,6 +220,7 @@ SHEET_NAMES = (
     *(cluster.sheet for cluster in CLUSTERS),
     STEPS_SHEET,
     CARTRIDGE_SHEET,
+    TOP_CAPTURE_SHEET,
     CAPTURE_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
@@ -259,6 +264,7 @@ def package_sheet_scales(
         BOM_SHEET: REFERENCE_SCALE,
         STEPS_SHEET: NOTES_REFERENCE_SCALE,
         CARTRIDGE_SHEET: NOTES_REFERENCE_SCALE,
+        TOP_CAPTURE_SHEET: NOTES_REFERENCE_SCALE,
         CAPTURE_SHEET: ISOMETRIC_SCALE,
     }
     return {
@@ -399,8 +405,9 @@ TITLE_BLOCK_KEEP_OUT = (
 # Sheet 7: the assembly sequence in two columns of one width, the heading and
 # as many whole steps as fit the left column, which runs down beside the
 # title block; the rest atop the right column, the checks under them.
-# Sheet 8 reuses that layout for cartridge assembly; sheet 9 separates operation
-# and acceptance, leaving real bottom-right room for the finished isometric.
+# Sheets 8 and 9 reuse that layout for cartridge assembly and actual top
+# capture fit. Sheet 10 separates operation and acceptance, leaving real
+# bottom-right room for the finished isometric.
 # 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
@@ -650,8 +657,11 @@ CHECKS_XY = STEPS_LAYOUT.checks_xy
 CARTRIDGE_LAYOUT = steps_sheet_layout(
     spec.CARTRIDGE_STEPS, (), heading="CARTRIDGE ASSEMBLY: C1-C3C"
 )
+TOP_CAPTURE_LAYOUT = steps_sheet_layout(
+    spec.TOP_CAPTURE_STEPS, (), heading="TOP CAPTURE FIT: C2A, C4-C5D"
+)
 CAPTURE_LAYOUT = steps_sheet_layout(
-    spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="OPERATION AND ACCEPTANCE: C4-C7"
+    spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="OPERATION AND ACCEPTANCE: C6-C7"
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -678,8 +688,81 @@ NOTES_REFERENCE_REGIONS = {
     for sheet, layout in (
         (STEPS_SHEET, STEPS_LAYOUT),
         (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT),
+        (TOP_CAPTURE_SHEET, TOP_CAPTURE_LAYOUT),
     )
 }
+# C2A's functional section shares the unused right-column room with the live
+# source-property view. Its exaggerated recess is explicitly not to scale:
+# the source instruction and its minimum clearance govern, never sketch size.
+TOP_CAPTURE_PAPER_REGION = NOTES_REFERENCE_REGIONS[TOP_CAPTURE_SHEET]
+PIN_TIP_INSPECTION_REGION = (
+    TOP_CAPTURE_PAPER_REGION[0],
+    TOP_CAPTURE_PAPER_REGION[1],
+    TOP_CAPTURE_PAPER_REGION[0] + 0.126,
+    TOP_CAPTURE_PAPER_REGION[3],
+)
+NOTES_REFERENCE_REGIONS[TOP_CAPTURE_SHEET] = (
+    PIN_TIP_INSPECTION_REGION[2] + REGION_GAP,
+    TOP_CAPTURE_PAPER_REGION[1],
+    TOP_CAPTURE_PAPER_REGION[2],
+    TOP_CAPTURE_PAPER_REGION[3],
+)
+PIN_TIP_SECTION_DATUM_Y = PIN_TIP_INSPECTION_REGION[3] - 0.060
+PIN_TIP_SECTION_TIP_Y = PIN_TIP_SECTION_DATUM_Y + 0.010
+
+
+def pin_tip_inspection_lines() -> tuple[
+    tuple[tuple[float, float], tuple[float, float]], ...
+]:
+    """Paper-only functional section: +Z points into the block, above Z=0."""
+    x, _bottom, _right, top = PIN_TIP_INSPECTION_REGION
+    datum, tip = PIN_TIP_SECTION_DATUM_Y, PIN_TIP_SECTION_TIP_Y
+    upper = top - 0.027
+    profiles = (
+        # Block material either side of the open pin bore; mount faces at Z=0.
+        ((x + 0.024, datum), (x + 0.024, upper),
+         (x + 0.042, upper), (x + 0.042, datum)),
+        ((x + 0.064, datum), (x + 0.064, upper),
+         (x + 0.082, upper), (x + 0.082, datum)),
+        # The lowest pin tip stays on the +Z side, not in the carriage.
+        ((x + 0.049, upper), (x + 0.049, tip),
+         (x + 0.057, tip), (x + 0.057, upper)),
+        # Ground bridge below the mount faces; its upper face is the datum line.
+        ((x + 0.024, datum), (x + 0.024, datum - 0.003),
+         (x + 0.082, datum - 0.003), (x + 0.082, datum)),
+        # Feeler in the open recess; its paper thickness is not a model size.
+        ((x + 0.048, datum + 0.002), (x + 0.060, datum + 0.002),
+         (x + 0.060, datum + 0.004), (x + 0.048, datum + 0.004),
+         (x + 0.048, datum + 0.002)),
+    )
+    return (
+        *((a, b) for profile in profiles for a, b in zip(profile, profile[1:])),
+        ((x + 0.020, datum), (x + 0.090, datum)),
+        ((x + 0.006, datum), (x + 0.006, upper)),
+        ((x + 0.003, upper - 0.004), (x + 0.006, upper)),
+        ((x + 0.009, upper - 0.004), (x + 0.006, upper)),
+        # A drawn inspection bracket, not an imported/manufacturing dimension.
+        ((x + 0.061, datum), (x + 0.061, tip)),
+        ((x + 0.0595, datum), (x + 0.0625, datum)),
+        ((x + 0.0595, tip), (x + 0.0625, tip)),
+    )
+
+
+def pin_tip_inspection_labels() -> tuple[tuple[str, tuple[float, float]], ...]:
+    """Identify the schematic's signed features; C2A owns the full procedure."""
+    x, _bottom, _right, top = PIN_TIP_INSPECTION_REGION
+    return (
+        ("C2A FUNCTIONAL SECTION", (x, top)),
+        ("SCHEMATIC - NOT TO SCALE", (x, top - 0.006)),
+        ("+Z INTO BLOCK", (x, top - 0.014)),
+        ("PIN", (x + 0.047, top - 0.020)),
+        ("Z=0 MOUNTING PLANE", (x, top - 0.070)),
+        (f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN RECESS",
+         (x + 0.069, top - 0.070)),
+        ("GROUND BRIDGE + FEELER", (x, top - 0.078)),
+        ("NO PROUD CARRIAGE FEATURE", (x, top - 0.086)),
+        ("BEARINGS ABSENT; SEE C2A", (x, top - 0.092)),
+    )
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -1750,7 +1833,7 @@ def _place_reference_view(
 
 
 def _place_notes_reference_views(adapter: Any) -> None:
-    """Keep both instruction sheets' title blocks linked to the live assembly."""
+    """Keep every instruction sheet's title block linked to the live assembly."""
     caption = f"REFERENCE {_scale_text(NOTES_REFERENCE_SCALE)}"
     for sheet_name, region in NOTES_REFERENCE_REGIONS.items():
         label = f"jig {sheet_name.lower()} reference"
@@ -1768,6 +1851,28 @@ def _place_notes_reference_views(adapter: Any) -> None:
             caption,
             ((x0 + x1 - len(caption) * NOTE_CHAR_M) / 2.0, y0 - VIEW_LABEL_GAP),
             label=f"{label} caption",
+        )
+
+
+def _place_pin_tip_inspection(adapter: Any) -> None:
+    """Draw C2A's sheet sketch, using the verified T006 form-plot pattern."""
+    _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    _early_bound(draw, "IDrawingDoc").EditSheet()
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        for start, end in pin_tip_inspection_lines():
+            if manager.CreateLine(*start, 0.0, *end, 0.0) is None:
+                raise RuntimeError("failed to sketch the C2A functional inspection")
+    finally:
+        manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    for text, xy in pin_tip_inspection_labels():
+        _add_note_block(
+            adapter, TOP_CAPTURE_SHEET, text, xy, label="C2A functional inspection",
         )
 
 
@@ -2045,6 +2150,7 @@ def _place_steps_notes(adapter: Any) -> None:
 def _place_capture_notes(adapter: Any) -> None:
     for sheet, layout, label in (
         (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT, "cartridge assembly"),
+        (TOP_CAPTURE_SHEET, TOP_CAPTURE_LAYOUT, "actual top capture fit"),
         (CAPTURE_SHEET, CAPTURE_LAYOUT, "operation and installed-machine acceptance"),
     ):
         _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
@@ -2204,6 +2310,7 @@ def _place_package(
         )
     _place_steps_notes(adapter)
     _place_capture_notes(adapter)
+    _place_pin_tip_inspection(adapter)
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )

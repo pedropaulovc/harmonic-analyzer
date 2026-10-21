@@ -131,6 +131,12 @@ TOP_WASHER_OD = 24.0
 TOP_WASHER_BORE = 10.2
 TOP_WASHER_SUPPLY_MIN_THICKNESS = 7.0
 TOP_RUNNING_GAP = (0.10, 0.25)
+# Installed qualification, not new manufactured-part tolerances. The travel
+# is measured relative to the pin/clevis at primary take-up; secondary keeper
+# features must remain clear rather than becoming an unintended uplift stop.
+TOP_PRIMARY_RELATIVE_TRAVEL_MAX = TOP_RUNNING_GAP[1]
+TOP_SECONDARY_CLEARANCE_MIN = 0.50
+PIN_TIP_CARRIAGE_CLEARANCE_MIN = 0.50
 TOP_WASHER_NOMINAL_THICKNESS = (
     PIN_CROSS_HOLE_FROM_SEAT + PIN_CROSS_HOLE_DIA / 2.0
     - PIN_CLEVIS_NOMINAL_DIAMETER - CARRIER_THICKNESS - sum(TOP_RUNNING_GAP) / 2.0

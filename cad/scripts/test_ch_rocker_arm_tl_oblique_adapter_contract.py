@@ -31,6 +31,7 @@ RECIPES = (
     "build_ch_rocker_arm_tl_vn_oblique_pivot_lock_wire.py",
     "build_ch_rocker_arm_tl_oblique_nut_bracket.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
+    "build_sh_vn_clamping_kit_hardware.py",
 )
 HARDWARE_RECIPES = RECIPES[5:9]
 STOCK_GEOMETRY = SCRIPTS / "_pivot_retention_stock_geometry.py"
@@ -282,6 +283,7 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 def test_census_includes_real_new_methods_without_demanding_extrusion_in_wrappers() -> None:
     assert len(RECIPES) == len(set(RECIPES))
+    assert len(RECIPES) == 12
     for recipe in RECIPES[2:4]:
         calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
         assert {"create_sketch", "create_cut_extrude"} <= calls
@@ -297,19 +299,42 @@ def test_census_includes_real_new_methods_without_demanding_extrusion_in_wrapper
         units = _census_units(recipe)
         assert STOCK_WRAPPER in units
         assert len(units) >= 3  # actual root, imported diagnostic author, stock wrapper
+    stud = "build_sh_vn_clamping_kit_hardware.py"
+    assert stud in RECIPES
+    assert _census_units(stud) == (SCRIPTS / stud,)
+    stud_calls = {
+        call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / stud))
+    }
+    assert {"create_part", "create_sketch", "create_revolve", "add_chamfer"} <= stud_calls
 
 
-def test_real_direct_method_rename_is_rejected_without_importing_recipe() -> None:
-    path = SCRIPTS / "build_ch_rocker_arm_tl_oblique_pivot_cap.py"
+@pytest.mark.parametrize(
+    "recipe, method",
+    (
+        ("build_ch_rocker_arm_tl_oblique_pivot_cap.py", "create_extrusion"),
+        ("build_sh_vn_clamping_kit_hardware.py", "create_revolve"),
+    ),
+)
+def test_real_direct_method_rename_is_rejected_without_importing_recipe(
+    recipe: str, method: str,
+) -> None:
+    path = SCRIPTS / recipe
     tree = copy.deepcopy(sdk._tree(path))
-    actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "create_extrusion")
-    actual.func.attr = "create_extrude"
-    with pytest.raises(AssertionError, match="undeclared adapter calls.*create_extrude"):
+    actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == method)
+    actual.func.attr = "retention_undeclared_method"
+    with pytest.raises(AssertionError, match="undeclared adapter calls.*retention_undeclared_method"):
         _bind_calls(path, tree)
 
 
-def test_actual_call_with_wrong_keyword_is_rejected_by_sdk_signature() -> None:
-    path = SCRIPTS / "build_ch_rocker_arm_tl_oblique_pivot_cap.py"
+@pytest.mark.parametrize(
+    "recipe",
+    (
+        "build_ch_rocker_arm_tl_oblique_pivot_cap.py",
+        "build_sh_vn_clamping_kit_hardware.py",
+    ),
+)
+def test_actual_call_with_wrong_keyword_is_rejected_by_sdk_signature(recipe: str) -> None:
+    path = SCRIPTS / recipe
     tree = copy.deepcopy(sdk._tree(path))
     actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "create_sketch")
     method = sdk._adapter_methods()[actual.func.attr][1]
@@ -325,5 +350,17 @@ def test_projected_tuple_arity_mutation_is_not_skipped() -> None:
     actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "add_line" and any(isinstance(arg, ast.Starred) for arg in call.args))
     starred = next(arg for arg in actual.args if isinstance(arg, ast.Starred))
     starred.value = ast.Tuple(elts=[ast.Constant(value=0.0)] * 3, ctx=ast.Load())
+    with pytest.raises(AssertionError, match="cannot bind"):
+        _bind_calls(path, tree)
+
+
+def test_actual_stud_call_with_excess_positional_arity_is_rejected() -> None:
+    path = SCRIPTS / "build_sh_vn_clamping_kit_hardware.py"
+    tree = copy.deepcopy(sdk._tree(path))
+    actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "create_sketch")
+    method = sdk._adapter_methods()[actual.func.attr][1]
+    assert method.args.vararg is None, "mutation needs a concrete SDK signature"
+    positional = len(method.args.posonlyargs) + len(method.args.args)
+    actual.args = [ast.Constant(value=0.0) for _ in range(positional + 1)]
     with pytest.raises(AssertionError, match="cannot bind"):
         _bind_calls(path, tree)

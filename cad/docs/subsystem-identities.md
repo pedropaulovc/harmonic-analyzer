@@ -111,15 +111,18 @@ overall/end-offset/diameter values before the cut and after the driven rebuild.
 Its numerical equation-neutrality check is not a manufacturing tolerance.
 
 For a pass change, isolate the machine and support the carrier before removing
-**both** top retainers; only then lift the carrier. Refit both retainers and
-install two fresh cotters before either pass can run. Replace disturbed safety
-wire with freshly formed pieces. Destructive **upward** pivot-pin extraction
+**both** top retainers; only then lift the carrier. Refit both retainers,
+install two fresh cotters and repeat the actual top-capture qualification
+before either pass can run. Replace disturbed safety wire with freshly formed
+pieces. Destructive **upward** pivot-pin extraction
 requires replacement of the service pin and both bearings in that cartridge,
 not reuse after a through-ball extraction load.
 
 The capture stack raises the carrier/work setup by **12.5 mm**, including the
 1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
-end is nominally **4 mm above the finished work**. The cap is 50 × 75 ×
+end remains nominally **4 mm above the finished work**; the actual-fit
+qualification does not change pin or retainer geometry or raise the setup.
+The cap is 50 × 75 ×
 11.50 mm, with the ordinary ±0.51 mm thickness band, not a new precision
 control, machined from 5/8 in stock. Its bolt coordinates are X = ±14.5 mm,
 Y = ±25.5 mm; the two register centres are (−4.5, −24) and (4.5, 24) mm.
@@ -139,6 +142,34 @@ nut/leadscrew axis Z = 40.4 mm, side-hole positions, 3/4 × 2 in stock and
 leadline remain unchanged. No cap relief or capture-hardware change is part
 of this repair.
 
+TL-VN-58 keeps its existing identity and Precision Matthews
+52PCCK-9/16-14mm procurement: **four 1/2-13 × 3 in STOCK studs**, not a
+57.2 mm vendor SKU. Rework only each unused upper free end to **57.2 mm
+finished length, ordinary .X ±0.8 mm**, and restore the cut-end chamfer
+(1.0 mm maximum). Its native model and manufacturing sheet describe the
+finished reworked part, not a purchased-identification-only envelope.
+The lower factory end, loaded lower thread interval and insertion remain
+unchanged, as do all anchors, stations, slots, footprints, clamp spans,
+T-nut/flange-nut positions, both full pass sweeps and the +12.5 mm work height.
+
+Accept the actual installed stud/nut stack only with **G ≥3 mm** to the moving
+block/wing throughout **both complete hand sweeps**, and at least **one
+complete 1/2-13 pitch (25.4/13 mm)** beyond every fully seated flange nut,
+while retaining that nut's **entire actual complete internal thread span**.
+Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
+hold-down washer or force the assembly; reject an incompatible setup.
+Measure the actual complete-thread setback separately: the cut-end chamfer
+limit alone does not bound incomplete threads or establish nut engagement.
+
+These are actual fit-up requirements, not invented PM kit tolerance bands.
+The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal
+carriage height and 13 mm estimated nut height remain unverified kit inputs.
+TECO 41605's approximately 17.5 mm nut is comparison data, not a PM maximum.
+Explicit measured ranges and their uncertainty are needed to accept the
+installed setup; nominal dimensions alone cannot mark it VERIFIED. Neither
+the free-end trim nor these geometric checks certify preload, mechanical
+strength, bump-force capacity or deflection.
+
 Follow F1/F2 on TL-00's cartridge sheet for the single fit-up procedure. **Before transfer
 punching**, check that the actual TL-22 side-hole axes are at least **5.0 mm
 below the actual TL-29 top**. Deduct the source-catalog #8 major radius
@@ -153,10 +184,39 @@ KP08 or end-bracket STOCK height bands. Existing formed-wire/cotter
 envelope inspections remain required; the top cut alone does not certify
 all hardware clearances.
 
-The fitter package separates cartridge manufacture, pressing, joint acceptance
-and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) from operation, pass changes and machine
-acceptance (C4–C7, **CAPTUREANDOPERATION**). The operation sheet retains the finished
-isometric at 1:15 without competing with the cartridge assembly instructions.
+The ten-sheet fitter package keeps cartridge manufacture, pressing, joint
+acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) on sheet 8. The new
+**TOPCAPTUREFIT** sheet 9 is the single complete instruction authority for
+C2A and C4/C5 actual qualification; operation, pass changes and machine
+acceptance (C6/C7, **CAPTUREANDOPERATION**) move to sheet 10. The operation
+sheet retains the finished isometric at 1:15 without competing with the
+cartridge or top-fit instructions.
+
+C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
+With the actual pin/block/cap benched without bearings and the cap temporarily
+seated by the C3 method, without wire, C2A requires **minimum pin-tip recess
+≥0.50 mm above the carriage mounting plane Z0 (+Z into the block)** throughout
+the entire free hard-capture motion, including tilt. The actual carriage
+beneath the pin must have no feature proud above that plane. An accessible
+ground bridge/0.50 mm feeler inspection before bearing installation records
+measurement uncertainty; neither bearing restraint, an assumed endplay band
+nor altered fits substitutes for this actual qualification.
+
+C4 qualifies both the actual **0.10–0.25 mm normal carrier/retainer running
+gap** and **maximum primary relative take-up travel ≤0.25 mm**. C5 requires
+actual carrier clearance **≥0.50 mm to every cotter eye, prong, head and end
+at primary retainer/clevis take-up**, through all reachable endplay, clocking
+and rocking states at both supports in both pass pairs. Positive full-shank
+bridging and carrier undersupport beneath both retainer lands must remain.
+Secondary hardware must not contact first: reject such a set, refit or replace
+the correct parts and repeat the qualification. Arbitrary cotter reforming
+is not a clearance remedy, and a cotter is not an uplift stop.
+
+Nominal geometry is conditionally viable, not a guarantee for every tolerance
+corner or a vendor-maximum claim. Actual eye/prong envelopes and their
+tooling authority remain unknown until established by measurement, including
+measurement uncertainty. Follow sheet 9 for the complete qualification
+procedure; this outline is not a second instruction authority.
 
 The cap chamber's existing associative pocket-size callout limits only its
 floor/wall inside corner to **R0.20 MAX**; the shared template's R1.0 general
@@ -637,7 +697,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | ZYLtech HW-SC-T8x2-NUT Tr8x2 brass flange nut (ships with HW-SC-T8x2-600), screwed to the TL-29 nut bracket; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 | AMPEC KP08 pillow blocks (Bearings Direct) x2, one on each TL-28 end bracket, carrying the TL-VN-54 leadscrew; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 | MISUMI HOK40-HC8 Ø40 knurled handwheel, revolving grip, Ø8 H8 through bore, 2 x M5 taps (one set screw supplied), on the TL-VN-54 leadscrew; bought fixture hardware modelled vendor-checked for the jig assembly |
-| added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in studs x4, holding the TL-20 base bars down to the mill table; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in STOCK studs x4, reworked at the unused upper free ends to 57.2 ±0.8 mm finished length; unchanged lower ends, loaded intervals, insertion and TL-20 table anchors; actual G ≥3 mm through both full hand sweeps and ≥one complete pitch beyond each seated nut with its full actual complete internal span engaged are required |
 | added | `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 | Precision Matthews 52PCCK-9/16-14mm kit 14 mm T-nuts x4, tapped 1/2-13, one under each TL-VN-58 stud; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 flange nuts x4, one on each TL-VN-58 stud on the TL-20 base bar's top face; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | McMaster 91251A197 #8-32 X 3/4 SHCS x14: holds an HGR15R rail to its TL-20 base bar, tapped THRU; bought fixture hardware modelled for the jig assembly |

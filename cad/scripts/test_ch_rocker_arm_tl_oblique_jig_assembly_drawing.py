@@ -4,7 +4,7 @@ The sheet text comes from the jig spec, the BOM prints every family made and
 bought with its registry number, numbered as the steps cite it, every BOM row
 carries a balloon, and each sheet's budgeted regions stay inside the border,
 out of the title block and clear of one another. Actual view creation and the
-shared finalizer must leave all nine physical sheets linked to the live source.
+shared finalizer must leave all ten physical sheets linked to the live source.
 """
 
 from __future__ import annotations
@@ -249,7 +249,9 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert {drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET, drawing.CAPTURE_SHEET} <= set(drawing.SHEET_NAMES)
+    assert drawing.SHEET_NAMES[7:] == (
+        drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
+    )
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -257,6 +259,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.CAPTURE_SHEET] == drawing.ISOMETRIC_SCALE
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.TOP_CAPTURE_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -350,12 +353,14 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
         assert drawing._STEP_LABEL.fullmatch(label)
     assert instruction_words(drawing.STEPS_LAYOUT) == words(" ".join(spec.ASSEMBLY_STEPS))
     assert words(drawing.ASSEMBLY_CHECKS) == words(" ".join(spec.ASSEMBLY_CHECKS))
-    cartridge, capture = drawing.CARTRIDGE_LAYOUT, drawing.CAPTURE_LAYOUT
+    cartridge = drawing.CARTRIDGE_LAYOUT
+    top_capture = drawing.TOP_CAPTURE_LAYOUT
+    capture = drawing.CAPTURE_LAYOUT
     assert instruction_words(cartridge) == words(" ".join(spec.CARTRIDGE_STEPS))
+    assert instruction_words(top_capture) == words(" ".join(spec.TOP_CAPTURE_STEPS))
     assert instruction_words(capture) == words(" ".join(spec.CAPTURE_STEPS))
+    assert not cartridge.checks and not top_capture.checks
     assert words(capture.checks) == words(" ".join(spec.CAPTURE_CHECKS))
-    labels = [step.partition(". ")[0] for step in (*spec.CARTRIDGE_STEPS, *spec.CAPTURE_STEPS)]
-    assert len(labels) == len(set(labels))
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
@@ -364,6 +369,8 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
         (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
         (cartridge.steps, drawing.STEPS_LINE_WIDTH),
         (cartridge.continued, drawing.STEPS_LINE_WIDTH),
+        (top_capture.steps, drawing.STEPS_LINE_WIDTH),
+        (top_capture.continued, drawing.STEPS_LINE_WIDTH),
         (capture.steps, drawing.STEPS_LINE_WIDTH),
         (capture.continued, drawing.STEPS_LINE_WIDTH),
         (capture.checks, drawing.STEPS_LINE_WIDTH),
@@ -688,6 +695,7 @@ def _lines(text: str) -> int:
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
     _assert_steps_sheet_fits(drawing.CARTRIDGE_LAYOUT)
+    _assert_steps_sheet_fits(drawing.TOP_CAPTURE_LAYOUT)
 
 
 @pytest.mark.parametrize(
@@ -695,6 +703,7 @@ def test_steps_sheet_regions_fit_apart() -> None:
     (
         (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
         (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
+        (drawing.TOP_CAPTURE_SHEET, drawing.TOP_CAPTURE_LAYOUT),
     ),
 )
 def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layout) -> None:
@@ -709,12 +718,55 @@ def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layou
          view[1] - drawing.VIEW_LABEL_GAP),
     )
     assert drawing.NOTES_REFERENCE_SCALE == (1.0, 20.0)
+    assert _inside_sheet(region)
     assert _inside(view, region)
     assert _inside_sheet(view) and _inside_sheet(caption)
     assert not _overlap(view, caption)
     for note in _steps_sheet_boxes(layout):
         assert not _overlap(view, note)
         assert not _overlap(caption, note)
+
+
+def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
+    region = drawing.PIN_TIP_INSPECTION_REGION
+    reference = drawing.NOTES_REFERENCE_REGIONS[drawing.TOP_CAPTURE_SHEET]
+    assert _inside_sheet(region) and _inside_sheet(reference)
+    assert not _overlap(region, reference)
+    lines = drawing.pin_tip_inspection_lines()
+    datum_y, tip_y = drawing.PIN_TIP_SECTION_DATUM_Y, drawing.PIN_TIP_SECTION_TIP_Y
+    # +Z into the block is above the mounting plane, never into the carriage.
+    assert tip_y > datum_y
+    datum = max(
+        (line for line in lines if line[0][1] == line[1][1] == datum_y),
+        key=lambda line: line[1][0] - line[0][0],
+    )
+    pin_tip = max(
+        (line for line in lines if line[0][1] == line[1][1] == tip_y),
+        key=lambda line: line[1][0] - line[0][0],
+    )
+    assert datum[0][0] < pin_tip[0][0] < pin_tip[1][0] < datum[1][0]
+    positive_z = min(
+        (line for line in lines if line[0][0] == line[1][0]),
+        key=lambda line: line[0][0],
+    )
+    assert positive_z[0][1] == datum_y and positive_z[1][1] > tip_y
+    labels = dict(drawing.pin_tip_inspection_labels())
+    assert {"SCHEMATIC - NOT TO SCALE", "+Z INTO BLOCK", "Z=0 MOUNTING PLANE"} <= labels.keys()
+    assert f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN RECESS" in labels
+    note_boxes = [_note_box(text, xy) for text, xy in labels.items()]
+    instruction_boxes = _steps_sheet_boxes(drawing.TOP_CAPTURE_LAYOUT)
+    for index, box in enumerate(note_boxes):
+        assert _inside(box, region) and _inside_sheet(box)
+        assert not _overlap(box, reference)
+        assert all(not _overlap(box, other) for other in note_boxes[index + 1:])
+        assert all(not _overlap(box, other) for other in instruction_boxes)
+    for start, end in lines:
+        box = (
+            min(start[0], end[0]), min(start[1], end[1]),
+            max(start[0], end[0]), max(start[1], end[1]),
+        )
+        assert _inside(box, region) and _inside_sheet(box)
+        assert all(not _overlap(box, note) for note in note_boxes + instruction_boxes)
 
 
 def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
@@ -794,7 +846,7 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
     assert configurations == [(False, drawing.ASSEMBLY_VIEW_CONFIGURATION)]
 
 
-def test_cartridge_and_operation_notes_are_placed_once_on_their_own_sheets(monkeypatch) -> None:
+def test_capture_instructions_are_placed_once_on_their_own_sheets(monkeypatch) -> None:
     placed = []
     monkeypatch.setattr(
         drawing, "_add_note_block",
@@ -805,6 +857,7 @@ def test_cartridge_and_operation_notes_are_placed_once_on_their_own_sheets(monke
     expected = []
     for sheet, layout in (
         (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
+        (drawing.TOP_CAPTURE_SHEET, drawing.TOP_CAPTURE_LAYOUT),
         (drawing.CAPTURE_SHEET, drawing.CAPTURE_LAYOUT),
     ):
         for text, xy in (
@@ -906,7 +959,8 @@ def test_steps_cite_every_screw_by_item_number() -> None:
     steps = "\n".join(
         text
         for layout in (
-            drawing.STEPS_LAYOUT, drawing.CARTRIDGE_LAYOUT, drawing.CAPTURE_LAYOUT
+            drawing.STEPS_LAYOUT, drawing.CARTRIDGE_LAYOUT,
+            drawing.TOP_CAPTURE_LAYOUT, drawing.CAPTURE_LAYOUT,
         )
         for text in (layout.steps, layout.continued)
     )
@@ -1723,6 +1777,7 @@ def native_property_package(monkeypatch):
         "CARRIER EXPLODED",
         "ASSEMBLY STEPS",
         "CARTRIDGEASSEMBLY",
+        "TOPCAPTUREFIT",
         "CAPTUREANDOPERATION",
     )
     properties = {
@@ -1738,7 +1793,10 @@ def native_property_package(monkeypatch):
         properties=properties,
         GetCustomInfoValue=lambda _configuration, name: properties[name],
     )
-    doc = SimpleNamespace(active=physical_names[0], sheets={}, notes=[], oversized=None)
+    doc = SimpleNamespace(
+        active=physical_names[0], sheets={}, notes=[], oversized=None,
+        sketch_lines=[], paper_edits=[],
+    )
     for name in physical_names:
         sheet = SimpleNamespace(
             name=name, views=[], CustomPropertyView="",
@@ -1823,6 +1881,15 @@ def native_property_package(monkeypatch):
     doc.CreateDrawViewFromModelView3 = create_view
     doc.ClearSelection2 = lambda _all: None
     doc.EditRebuild3 = lambda: True
+    doc.EditSheet = lambda: doc.paper_edits.append(doc.active)
+
+    def create_line(x0, y0, z0, x1, y1, z1):
+        assert doc.paper_edits[-1] == doc.active
+        assert doc.SketchManager.AddToDB is True
+        doc.sketch_lines.append((doc.active, (x0, y0, z0), (x1, y1, z1)))
+        return object()
+
+    doc.SketchManager = SimpleNamespace(AddToDB=False, CreateLine=create_line)
 
     def member(obj, name):
         value = getattr(obj, name)
@@ -1893,11 +1960,12 @@ def native_property_package(monkeypatch):
     )
 
 
-def test_all_nine_physical_sheets_link_to_their_actual_live_model_view(
+def test_every_physical_sheet_links_to_its_actual_live_model_view(
     native_property_package,
 ) -> None:
     package = native_property_package
     scales, _settled = drawing._place_package(package.adapter)
+    assert tuple(scales) == tuple(package.doc.sheets) == drawing.SHEET_NAMES
     with pytest.raises(package.save_boundary):
         asyncio.run(drawing.finalize_drawing(
             package.adapter,
@@ -1945,7 +2013,82 @@ def test_all_nine_physical_sheets_link_to_their_actual_live_model_view(
                 if name == sheet and text.startswith("REFERENCE ")] == ["REFERENCE 1:20"]
 
 
-@pytest.mark.parametrize("sheet", (drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET))
+@pytest.mark.parametrize(
+    "sheet",
+    (
+        drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET,
+        drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
+    ),
+)
+def test_placed_instruction_notes_and_visible_source_view_stay_on_clear_paper(
+    native_property_package, sheet,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    view, = package.doc.sheets[sheet].views
+    outline = view.GetOutline()
+    notes = [
+        _note_box(text, xy)
+        for name, text, xy in package.doc.notes
+        if name == sheet
+    ]
+    assert notes
+    assert _inside_sheet(outline)
+    for index, box in enumerate(notes):
+        assert _inside_sheet(box)
+        assert not _overlap(box, outline)
+        assert all(not _overlap(box, other) for other in notes[index + 1:])
+    assert tuple(view.ScaleRatio) == (
+        drawing.ISOMETRIC_SCALE if sheet == drawing.CAPTURE_SHEET
+        else drawing.NOTES_REFERENCE_SCALE
+    )
+    assert view.IsExploded() is False
+
+
+def test_c2a_section_is_real_sheet_ink_beside_the_live_source_view(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
+    assert package.doc.SketchManager.AddToDB is False
+    assert package.doc.sketch_lines == [
+        (drawing.TOP_CAPTURE_SHEET, (*start, 0.0), (*end, 0.0))
+        for start, end in drawing.pin_tip_inspection_lines()
+    ]
+    view, = package.doc.sheets[drawing.TOP_CAPTURE_SHEET].views
+    assert view.model_path == str(drawing.SOURCE)
+    for sheet, start, end in package.doc.sketch_lines:
+        box = (
+            min(start[0], end[0]), min(start[1], end[1]),
+            max(start[0], end[0]), max(start[1], end[1]),
+        )
+        assert _inside(box, drawing.PIN_TIP_INSPECTION_REGION)
+        assert not _overlap(box, view.GetOutline())
+        for owner, text, xy in package.doc.notes:
+            if owner == sheet:
+                assert not _overlap(box, _note_box(text, xy))
+
+
+@pytest.mark.parametrize("previous_add_to_db", (False, True))
+def test_c2a_native_sketch_refusal_restores_database_mode(
+    native_property_package, previous_add_to_db,
+) -> None:
+    package = native_property_package
+    manager = package.doc.SketchManager
+    manager.AddToDB = previous_add_to_db
+    manager.CreateLine = lambda *_coordinates: None
+    with pytest.raises(RuntimeError, match="C2A functional inspection"):
+        drawing._place_pin_tip_inspection(package.adapter)
+    assert manager.AddToDB is previous_add_to_db
+    assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
+    assert not package.doc.notes
+
+
+@pytest.mark.parametrize(
+    "sheet",
+    (drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET),
+)
 def test_instruction_reference_refuses_a_native_outline_outside_its_room(
     native_property_package, sheet,
 ) -> None:

@@ -36,9 +36,10 @@ feed lever screws (the operator's push and pull on the lever, TL-VN-71).
 Each pair's stack adds to its row's grip. The four nut screws are button
 heads (BHCS) bearing directly on the Tr8 nut's brass flange, no washer (owner
 ruling 2026-10-20). Every other head seats in a counterbore or countersink,
-or on a flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit.
-A longer stud reaches the swinging carrier (the jig spec's
-``STUD_LENGTH_MAX``).
+or on a flat face. Hold-down studs start as the kit's 1/2-13 x 3 in stock,
+then only their unused upper ends are cut to the finished length below.
+The actual installed stack must retain the full nut thread and clear the
+moving wing; the former carrier-only length limit is not sufficient.
 
 Each joint's screw is its own bought part and BOM row (TL-VN-61 to TL-VN-69, the
 wedge-lock pairs TL-VN-70 and TL-VN-71); the assembly steps name each by its
@@ -61,6 +62,7 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
+from _printed_tolerance import printed_band_mm
 
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
@@ -281,10 +283,17 @@ LEVER_LOCK_WASHER = Washer(
 )
 WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER)
 
-# Hold-down studs, from the clamping kit (fixtures.clamping-kit-pm-52pcck-14mm).
+# Hold-down studs, reworked from the clamping-kit stock
+# (fixtures.clamping-kit-pm-52pcck-14mm). Keep the loaded lower ends unchanged.
 HOLD_DOWN_STUD_THREAD = "1/2-13"
-HOLD_DOWN_STUD_LENGTH = "3"
-HOLD_DOWN_STUD_LENGTH_MM = inch_mm(HOLD_DOWN_STUD_LENGTH)  # 76.2
+HOLD_DOWN_STUD_STOCK_LENGTH = "3"
+HOLD_DOWN_STUD_STOCK_LENGTH_MM = inch_mm(HOLD_DOWN_STUD_STOCK_LENGTH)
+HOLD_DOWN_STUD_LENGTH_MM = 57.2
+HOLD_DOWN_STUD_LENGTH_PLACES = 1
+HOLD_DOWN_STUD_LENGTH_BAND = printed_band_mm(HOLD_DOWN_STUD_LENGTH_PLACES)
+HOLD_DOWN_STUD_CLEARANCE_MIN = 3.0
+HOLD_DOWN_STUD_COMPLETE_PROJECTION_PITCHES = 1.0
+HOLD_DOWN_STUD_PITCH_MM = INCH / int(HOLD_DOWN_STUD_THREAD.rsplit("-", 1)[1])
 HOLD_DOWN_STUD_COUNT = RAILS * len(trammel.HOLD_DOWN_STUDS)  # near + far a bar
 
 # --- Import-time checks ------------------------------------------------------------

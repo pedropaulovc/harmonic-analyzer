@@ -48,8 +48,37 @@ def _drawing_module(stem: str) -> ModuleType:
     return importlib.import_module(f"draw_{stem}")
 
 
+def _spec_module_name(stem: str, scripts: Path) -> str:
+    """Read a literal member-spec owner; ordinary drawings keep <stem>_spec.
+
+    A configured shared producer need not invent a monolithic spec or re-export
+    the saved/default member's facts. This lookup never imports a drawing.
+    """
+    drawing = _source_module_path(f"draw_{stem}", scripts)
+    owners = [
+        node.value for node in source_tree(drawing).body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "FEATURE_SPEC_MODULE" for target in node.targets)
+    ]
+    if not owners:
+        return f"{stem}_spec"
+    if len(owners) != 1 or not isinstance(owners[0], ast.Constant) or not isinstance(owners[0].value, str):
+        raise ValueError(f"draw_{stem}: FEATURE_SPEC_MODULE must be one literal module name")
+    name = owners[0].value
+    _source_module_path(name, scripts)
+    return name
+
+
 def _spec_module(stem: str) -> ModuleType:
-    return importlib.import_module(f"{stem}_spec")
+    name = _spec_module_name(stem, Path(__file__).resolve().parent)
+    module = importlib.import_module(name)
+    if name != f"{stem}_spec":
+        # A feature bundle uses the producer's bare/default STEP, not another
+        # member that merely lives in the same native file.
+        default = _config.parts(stem.replace("_", "-")).get("default_configuration")
+        if not default or getattr(module, "CONFIGURATION", None) != default:
+            raise ValueError(f"{stem}: feature spec must own the saved default configuration")
+    return module
 
 
 def _notes_module(stem: str) -> ModuleType:
@@ -195,7 +224,7 @@ def source_paths(stem: str) -> tuple[Path, ...]:
     stem = _stem(stem)
     scripts = Path(__file__).resolve().parent
     drawing = _source_module_path(f"draw_{stem}", scripts)
-    spec = _source_module_path(f"{stem}_spec", scripts)
+    spec = _source_module_path(_spec_module_name(stem, scripts), scripts)
     notes = scripts / f"{stem}_notes.py"
     roots = {Path(__file__).resolve(), drawing, spec}
     if notes.is_file():
@@ -352,8 +381,8 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "step": bundle_paths(stem)[1].name, "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
-        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material", "finish"), *fact_citations.get("material.thickness", [])]},
-        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*registry_cite("process"), *_title_cite("edge_break.display_r", "edge_break.display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
+        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": facts.get("material.finish", row.get("finish", UNKNOWN)), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material"), *fact_citations.get("material.finish", registry_cite("finish")), *fact_citations.get("material.thickness", [])]},
+        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.display_r", "edge_break.display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 

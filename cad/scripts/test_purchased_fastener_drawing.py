@@ -678,6 +678,109 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
     assert state.finalized
 
 
+@pytest.mark.parametrize("drift", [None, "reference-view", "reference-activation"])
+def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalization(
+    monkeypatch, tmp_path, drift
+):
+    variants = (("HoldDownStud", "STUD"), ("TNut", "T-NUT"), ("FlangeNut", "FLANGE NUT"))
+    state = _variant_sheet(
+        monkeypatch, tmp_path, variants, dict.fromkeys((name for name, _ in variants), 4), 12
+    )
+    events = []
+    active = ["HARDWARE"]
+    new_drawing = configured.new_project_drawing
+
+    def create(adapter, *, layout):
+        draw, sheet = new_drawing(adapter, layout=layout)
+        sheet.GetName = lambda: "HARDWARE"
+
+        def activate(name):
+            if drift == "reference-activation" and name == "HARDWARE" and state.views:
+                return False
+            active[0] = name
+            events.append(("activate", name))
+            return True
+
+        draw.ActivateSheet = activate
+        return draw, sheet
+
+    def blank(_adapter, names, *, label):
+        assert not state.views, "extra sheets must copy the blank template, not reference views"
+        events.append(("blank", tuple(names)))
+
+    def annotate(_adapter, configuration, cells, views):
+        def settled():
+            assert active[0] == "HARDWARE"
+            events.append(("member", configuration))
+        return (settled,)
+
+    def append(adapter):
+        assert len(state.views) == 12
+        assert adapter.currentModel.ActivateSheet("REWORK")
+        events.append(("append",))
+
+        def settled():
+            assert adapter.currentModel.ActivateSheet("MEASURE-AND-FIT")
+            events.append(("rework-settled",))
+        return (settled,)
+
+    finalizations = []
+
+    async def finalize(_adapter, outputs, *, settled_checks, **kwargs):
+        finalizations.append(kwargs)
+        if drift == "reference-view":
+            state.views.pop()
+        for settled in settled_checks:
+            settled()
+        state.finalized = True
+        return {"pdf": str(outputs.pdf)}
+
+    monkeypatch.setattr(configured, "new_project_drawing", create)
+    monkeypatch.setattr(configured, "create_blank_drawing_sheets", blank)
+    monkeypatch.setattr(
+        configured, "iter_views",
+        lambda _adapter: iter(state.views if active[0] == "HARDWARE" else ()),
+    )
+    monkeypatch.setattr(configured, "finalize_drawing", finalize)
+    scales = {"REWORK": (2.0, 1.0), "MEASURE-AND-FIT": (2.0, 1.0)}
+
+    def build():
+        return asyncio.run(configured.build_purchased_variant_drawing(
+            state.adapter, state.spec, variants=variants, item="PM KIT",
+            purchase_unit="52-PIECE KIT", annotate_member=annotate,
+            additional_sheet_scales=scales, append_sheets=append,
+        ))
+
+    if drift:
+        with pytest.raises(RuntimeError):
+            build()
+        assert not state.finalized
+    else:
+        build()
+        assert state.finalized
+        assert len(finalizations) == 1
+        assert finalizations[0]["expected_sheet_names"] == ("HARDWARE", *scales)
+        assert finalizations[0]["sheet_scales"] == {"HARDWARE": (1, 1), **scales}
+        assert events[0] == ("blank", ("HARDWARE", *scales))
+        assert events[-4:] == [
+            ("member", "TNut"), ("member", "FlangeNut"),
+            ("activate", "MEASURE-AND-FIT"), ("rework-settled",),
+        ]
+
+
+@pytest.mark.parametrize("scales, author", [
+    ({"REWORK": (2.0, 1.0)}, None),
+    (None, lambda _adapter: ()),
+    ({}, lambda _adapter: ()),
+])
+def test_configured_sheet_refuses_incomplete_append_contract_before_native_calls(scales, author):
+    with pytest.raises(ValueError):
+        asyncio.run(configured.build_purchased_variant_drawing(
+            object(), object(), variants=(), item="KIT", purchase_unit="KIT",
+            additional_sheet_scales=scales, append_sheets=author,
+        ))
+
+
 @pytest.mark.parametrize(
     ("count", "offset", "size", "moves", "fits"),
     (
@@ -3137,9 +3240,10 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
         def IsCircle(self):
             return True
 
-    radius = (kit.stud.RADIUS - kit.stud.END_CHAMFER) / 1000
-    rims = [Rim(kit.stud.LENGTH / 1000, radius), Rim(0.0, radius)]
-    land = Rim(kit.stud.END_CHAMFER / 1000, kit.stud.RADIUS / 1000)
+    lower_radius = (kit.stud.RADIUS - kit.stud.LOWER_FACTORY_CHAMFER) / 1000
+    cut_radius = (kit.stud.RADIUS - kit.stud.CUT_END_CHAMFER_MAX) / 1000
+    rims = [Rim(kit.stud.LENGTH / 1000, cut_radius), Rim(0.0, lower_radius)]
+    land = Rim(kit.stud.LOWER_FACTORY_CHAMFER / 1000, kit.stud.RADIUS / 1000)
     state = SimpleNamespace(display=None)
     projection_events = []
 
@@ -3786,7 +3890,7 @@ def kit_installation_native(monkeypatch):
             ]
         else:
             radius = (
-                (spec.RADIUS - spec.END_CHAMFER) / 1000
+                (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
                 if configuration == "HoldDownStud"
                 else spec.FLANGE_DIA / 2000
             )
@@ -3809,7 +3913,7 @@ def kit_installation_native(monkeypatch):
                 else spec.HEIGHT / 1000
             )
             chamfer_y = (
-                spec.END_CHAMFER / 1000 if configuration == "HoldDownStud" else 0.0005
+                spec.LOWER_FACTORY_CHAMFER / 1000 if configuration == "HoldDownStud" else 0.0005
             )
             chamfer_radius = (
                 spec.RADIUS / 1000

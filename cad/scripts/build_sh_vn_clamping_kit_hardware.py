@@ -1,9 +1,9 @@
 r"""Configured Precision Matthews clamping-kit hardware (MHA-SH-VN-57).
 
 One purchased SKU owns the exact ``HoldDownStud``, ``TNut`` and ``FlangeNut``
-native members. Their datasheet-built envelopes, sketch frames, analytic
-checks and Hole Wizard sequences preserve the original three kit producers;
-no vendor CAD was obtained and no supplier dimensions are revised here.
+native members. TNut and FlangeNut retain their datasheet-built envelopes and
+Hole Wizard sequences. HoldDownStud preserves the existing upper-end-only
+shortening, genuine native length driver and independent end chamfers.
 
 All members retain their +Y thread axis at the origin as one shared
 ``ScrewAxis`` (Front Plane x Right Plane). Member-owned geometry is suppressed
@@ -20,6 +20,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 import _config
@@ -29,8 +30,11 @@ import sh_vn_clamping_kit_t_nut_spec as t_nut
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _drawing_marks import apply_drawing_properties
+from _dimensions import name_dimensions
+from _drawing_marks import apply_drawing_properties, mark_dimensions_for_drawing
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
@@ -49,7 +53,14 @@ from _purchased_part_variants import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _sketch import add_line_chain, ensure_fully_defined, set_sketch_direct_db
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _sketch_circle import define_circle
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
@@ -78,7 +89,9 @@ MEMBER_SPECS = {
 # Parent sketches precede their dependent solid features. ScrewAxis is shared,
 # not owned by any one member, and is never part of the suppression matrix.
 MEMBER_FEATURES = {
-    HOLD_DOWN_STUD_CONFIGURATION: ("StudProfile", "Stud"),
+    HOLD_DOWN_STUD_CONFIGURATION: (
+        "StudProfile", "Stud", "LowerFactoryChamfer", "CutEndChamfer",
+    ),
     T_NUT_CONFIGURATION: ("SectionProfile", "Body", "TNutThreadBore"),
     FLANGE_NUT_CONFIGURATION: (
         "FlangeProfile",
@@ -102,15 +115,44 @@ MEMBER_PROPERTIES = {
     }
     for configuration, spec in MEMBER_SPECS.items()
 }
+# The purchased family stays untouched at document scope; these machining
+# instructions and finished-end treatment belong only to the stud member.
+STUD_REWORK_PROPERTIES = {
+    "Stock Length": f"{hold_down_stud.STOCK_LENGTH} IN STOCK",
+    "Stock Note": hold_down_stud.STOCK_NOTE,
+    "Lower End Note": hold_down_stud.LOWER_END_NOTE,
+    "Manufacturing Notes": hold_down_stud.DRAWING_NOTES,
+    **hold_down_stud.REWORK_INSTRUCTION_PROPERTIES,
+}
+MEMBER_PROPERTIES[HOLD_DOWN_STUD_CONFIGURATION].update({
+    **STUD_REWORK_PROPERTIES,
+    "Process": hold_down_stud.PROCESS,
+    "Finish": hold_down_stud.FINISH,
+    "Tolerance Class": hold_down_stud.TOLERANCE_CLASS,
+})
 MEMBER_NOTE_PROPERTIES = {
     f"{configuration} Manufacturing Notes": spec.DRAWING_NOTES
     for configuration, spec in MEMBER_SPECS.items()
 }
+MEMBER_NOTE_PROPERTIES[f"{HOLD_DOWN_STUD_CONFIGURATION} Manufacturing Notes"] = (
+    "REWORKED STUD; SEE REWORK AND MEASURE-AND-FIT."
+)
+MEMBER_NOTE_PROPERTIES.update({
+    f"{HOLD_DOWN_STUD_CONFIGURATION} Rework {name}": value
+    for name, value in STUD_REWORK_PROPERTIES.items()
+})
+SAVED_DRAWING_PROPERTIES = (
+    "Number", "Material Specification", "Finish", "Quantity",
+    *STOCK_PROPERTIES, *MEMBER_NOTE_PROPERTIES,
+)
 
 
 def hold_down_stud_profile_points() -> list[tuple[float, float]]:
-    """Stud PROFILE as Front-plane points: x = radius, y = axial station."""
-    return [(r, y) for y, r in hold_down_stud.PROFILE]
+    """Length-driven blank; separate native chamfers produce the finished PROFILE."""
+    return [
+        (0.0, 0.0), (hold_down_stud.RADIUS, 0.0),
+        (hold_down_stud.RADIUS, hold_down_stud.LENGTH), (0.0, hold_down_stud.LENGTH),
+    ]
 
 
 def t_nut_profile_points() -> list[tuple[float, float]]:
@@ -123,10 +165,31 @@ def flange_nut_hex_points() -> list[tuple[float, float]]:
     return [(x, -z) for x, z in flange_nut.HEX_OUTLINE]
 
 
+def _author_cut_end_maximum(adapter) -> None:
+    """Apply native MAX to the actual cut-end feature, never reference ink."""
+    _display, dimension = _named_dimension(adapter, "CutEndChamfer", "CutEndChamfer")
+    maximum = hold_down_stud.CUT_END_CHAMFER_MAX / 1000.0
+    if int(dimension.DrivenState) != 2 or not math.isclose(
+        float(dimension.SystemValue), maximum, abs_tol=1e-9
+    ):
+        raise RuntimeError("cut-end chamfer is not the real driving maximum")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 6  # swTolMAX
+    if not tolerance.SetValues(-maximum, 0.0):
+        raise RuntimeError("cut-end chamfer MAX band was rejected")
+    if (
+        int(tolerance.Type) != 6
+        or not math.isclose(float(tolerance.GetMinValue()), -maximum, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError("cut-end chamfer MAX band did not persist")
+
+
 async def _author_hold_down_stud(adapter) -> None:
-    """Author the original revolved stud in the active member configuration."""
+    """Author the existing finished stud rework only in its own configuration."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
+    dims = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -136,14 +199,45 @@ async def _author_hold_down_stud(adapter) -> None:
     points = hold_down_stud_profile_points()
     profile = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    # The chain starts on the origin at the T-nut end and closes along the axis
-    # from the nut end, so the centerline merges into its two axis corners.
-    await define_polygon_chain(adapter, profile, points, label="stud")
+    # Genuine drivers on the rectangular blank; closure defines opposite sides.
+    for line, direction in zip(
+        profile, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(f"stud {direction}", await adapter.add_sketch_constraint(line, None, direction))
+    await dimension_between(
+        adapter, f"{profile[1]}.start", f"{profile[1]}.end",
+        "vertical_distance", hold_down_stud.LENGTH, "stud FinishedLength",
+    )
+    dims.record("FinishedLength")
+    await dimension_between(
+        adapter, f"{profile[0]}.start", f"{profile[0]}.end",
+        "horizontal_distance", hold_down_stud.RADIUS, "stud MajorRadius",
+    )
+    dims.record("MajorRadius")
+    await anchor_point_to_origin(adapter, f"{profile[0]}.start", 0.0, 0.0, "stud anchor")
     await ensure_fully_defined(adapter, "stud profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
+    dims.apply(adapter, "StudProfile")
     check("revolve stud", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Stud")
+    # Preserve the estimated lower factory rim and the branch's new cut-end
+    # chamfer as separate features; neither touches the loaded lower interval.
+    check("lower factory envelope", await adapter.add_chamfer(
+        hold_down_stud.LOWER_FACTORY_CHAMFER,
+        [[hold_down_stud.RADIUS, 0.0, 0.0]], tangent_propagation=False,
+    ))
+    name_last_feature(adapter, "LowerFactoryChamfer")
+    check("upper cut-end chamfer", await adapter.add_chamfer(
+        hold_down_stud.CUT_END_CHAMFER_MAX,
+        [[hold_down_stud.RADIUS, hold_down_stud.LENGTH, 0.0]], tangent_propagation=False,
+    ))
+    name_last_feature(adapter, "CutEndChamfer")
+    name_dimensions(adapter, "CutEndChamfer", ["CutEndChamfer"])
+    _author_cut_end_maximum(adapter)
+    apply_drawing_precision(adapter, hold_down_stud.DRAWING_PRECISION)
+    for feature, dimensions in hold_down_stud.DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, dimensions)
     await volume_check(
         adapter, "stud", hold_down_stud.VOLUME_MM3, 0.005 * hold_down_stud.VOLUME_MM3
     )
@@ -335,19 +429,7 @@ async def build(adapter) -> dict[str, str]:
     artefacts = await save_member_part(
         adapter, PART_NAME, CONFIGURATIONS, material=MATERIAL, readback=_readback
     )
-    require_saved_drawing_properties(
-        adapter,
-        (
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Stock Name",
-            "Supplier",
-            "Supplier SKUs",
-            *MEMBER_NOTE_PROPERTIES,
-        ),
-    )
+    require_saved_drawing_properties(adapter, SAVED_DRAWING_PROPERTIES)
     return artefacts
 
 

@@ -161,23 +161,26 @@ def test_source_paths_never_import_draw_spec_or_citation_modules(monkeypatch) ->
         assert any(path.name == f"draw_{stem}.py" for path in paths), stem
 
 
-def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("member_owner", [False, True])
+def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(tmp_path: Path, monkeypatch, member_owner) -> None:
     import _buildgraph
 
     scripts = tmp_path / "cad" / "scripts"
     scripts.mkdir(parents=True)
+    spec_name = "shared_member_spec" if member_owner else "synthetic_spec"
     files = {
         "export_features.py": "",
         "draw_synthetic.py": (
             "from _feature_requirements import requirement, part_metadata\n"
-            "raise RuntimeError('source discovery must not execute this')\n"
+            + ("FEATURE_SPEC_MODULE = 'shared_member_spec'\n" if member_owner else "")
+            + "raise RuntimeError('source discovery must not execute this')\n"
             "_AUTHORITY = ('unimported_authority', 'PRINTED_NOTE')\n"
             "def _fields():\n"
             "    return {'note': ('printed', (_AUTHORITY,))}\n"
             "requirement('synthetic', fields=_fields())\n"
             "part_metadata(precision_sources=(('unimported_precision', 'PLACES'),))\n"
         ),
-        "synthetic_spec.py": "raise RuntimeError('must not import the spec')\n",
+        f"{spec_name}.py": "import authority_dependency\nraise RuntimeError('must not import the spec')\n",
         "synthetic_notes.py": "raise RuntimeError('must not import the notes')\n",
         "unimported_authority.py": "import authority_dependency\nPRINTED_NOTE = 'printed'\n",
         "unimported_precision.py": "PLACES = 2\n",
@@ -194,13 +197,70 @@ def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(t
         try:
             paths = set(exporter.source_paths("synthetic"))
             assert {scripts / name for name in files} <= paths
-            for name in ("draw_synthetic", "synthetic_spec", "synthetic_notes", "unimported_authority", "unimported_precision", "authority_dependency"):
+            for name in ("draw_synthetic", spec_name, "synthetic_notes", "unimported_authority", "unimported_precision", "authority_dependency"):
                 assert name not in sys.modules
             (scripts / "unimported_precision.py").unlink()
             with pytest.raises(ValueError, match="missing citation source module: unimported_precision"):
                 exporter.source_paths("synthetic")
         finally:
             _buildgraph.clear_import_caches()
+
+
+@pytest.mark.parametrize("declaration", [
+    "FEATURE_SPEC_MODULE = name",
+    "FEATURE_SPEC_MODULE = 42",
+    "FEATURE_SPEC_MODULE = 'member_spec'\nFEATURE_SPEC_MODULE = 'member_spec'",
+    "FEATURE_SPEC_MODULE = 'missing_spec'",
+    "FEATURE_SPEC_MODULE = '../member_spec'",
+])
+def test_feature_spec_owner_refuses_dynamic_duplicate_missing_or_invalid_modules(tmp_path, declaration):
+    (tmp_path / "draw_synthetic.py").write_text(declaration, encoding="utf-8")
+    (tmp_path / "member_spec.py").write_text("", encoding="utf-8")
+    with pytest.raises(ValueError):
+        exporter._spec_module_name("synthetic", tmp_path)
+
+
+def test_shared_stud_features_use_actual_default_member_spec_and_rework_provenance() -> None:
+    import sh_vn_clamping_kit_hold_down_stud_spec as stud
+
+    stem = "sh_vn_clamping_kit_hardware"
+    assert stem in exporter.SUPPORTED_PARTS
+    assert exporter._spec_module(stem) is stud
+    assert _config.parts(stem.replace("_", "-"))["default_configuration"] == stud.CONFIGURATION == "HoldDownStud"
+    paths = exporter.source_paths(stem)
+    assert Path(stud.__file__).resolve() in paths
+    assert any(path.name == "ch_rocker_arm_tl_oblique_fasteners_spec.py" for path in paths)
+    assert not any(path.name == f"{stem}_spec.py" for path in paths)
+    assert exporter.step_configurations(stem) == ()
+    manifest = exporter.requirement_manifest(stem)
+    assert manifest["drawing"]["number"] == "MHA-SH-VN-57"
+    assert manifest["volume_mm3"] == stud.VOLUME_MM3
+    assert manifest["material"]["finish"] == stud.FINISH
+    assert manifest["notes"]["process"] == stud.PROCESS
+    assert manifest["notes"]["manufacturing"] == stud.DRAWING_NOTES.splitlines()
+    assert set(manifest["features"]) == {"finished_upper_end", "cut_end_chamfer"}
+    assert manifest["features"]["finished_upper_end"]["length"] == [56.4, 58.0]
+    assert manifest["features"]["cut_end_chamfer"]["length"] == [0.0, 1.0]
+    assert set(exporter._cite(stud, "FINISH")) <= set(manifest["material"]["cite"])
+    assert set(exporter._cite(stud, "PROCESS")) <= set(manifest["notes"]["cite"])
+    registry = "harmonic-analyzer/cad/config/parts/sh-vn-clamping-kit-hardware.yaml:sh-vn-clamping-kit-hardware"
+    assert f"{registry}.finish" not in manifest["material"]["cite"]
+    assert f"{registry}.process" not in manifest["notes"]["cite"]
+    # Common purchase metadata and untouched configurations never become rework.
+    assert _config.parts(stem.replace("_", "-"))["process"] == "purchased"
+
+
+@pytest.mark.parametrize("default", [None, "TNut", "FlangeNut"])
+def test_shared_stud_feature_owner_refuses_a_different_saved_default(monkeypatch, default):
+    original = _config.parts
+
+    def parts(stem):
+        row = original(stem)
+        return {**row, "default_configuration": default} if stem == "sh-vn-clamping-kit-hardware" else row
+
+    monkeypatch.setattr(_config, "parts", parts)
+    with pytest.raises(ValueError, match="saved default configuration"):
+        exporter.requirement_manifest("sh_vn_clamping_kit_hardware")
 
 
 def test_source_tree_cache_reads_current_contents_even_at_the_same_path(tmp_path: Path) -> None:
@@ -248,7 +308,7 @@ def test_draw_declarations_cite_current_calls_and_declared_sources(stem: str) ->
         f"harmonic-analyzer/{relative}:{call.lineno}-{call.end_lineno}"
         for call in calls
     }
-    spec = importlib.import_module(f"{stem}_spec")
+    spec = exporter._spec_module(stem)
     for name, declared in declarations.items():
         feature = features[name]
         assert declared.path == path
