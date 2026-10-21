@@ -319,11 +319,17 @@ MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
 would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
 callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
-The owner-approved **Ø2.40 MAX × 6.00 MAX** bound occupies four qualifier rows:
-**FINISHED CAVITY EXCEPT TAP-DRILL BORE/POINT:** /
-**Ø2.40 MAX X 6.00 MAX DEEP FROM ACTUAL ENTRY** /
-**ABOUT ACTUAL FINISHED-HOLE AXIS;** / **TO MAINTAIN 2.0 MIN WALL**.
-Only the separately dimensioned tap-drill bore and point are excluded.
+The owner-approved **Ø2.40 MAX × 6.00 MAX** bound occupies four feature-limit rows:
+**CAVITY ENVELOPE Ø2.40 MAX X 6.00 MAX DEEP** /
+**(EXCEPT TAP-DRILL BORE/POINT)** /
+**ACTUAL FINISHED-HOLE AXIS / ENTRY** /
+**RIB-STEP & COEFFICIENT-PLATE WALLS 2.0 MIN**.
+The axis/entry row locates the cylinder about each actual finished-hole axis,
+from its actual entry. Only the separately dimensioned tap-drill bore and
+point are excluded from that envelope, not from the independent wall minimum.
+This is a flat-ended bounding cylinder, not an ordinary full-diameter
+blind-hole depth: no other smaller-diameter tip or lead cavity may continue
+beyond its **6.00 MAX** end.
 Every other part of the finished hole cavity must lie inside the cylinder:
 full and partial threads, lead/chamfer/tip recesses, reliefs, and any extra
 void left by runout or deflection. This is geometrically equivalent to bounding
@@ -390,7 +396,10 @@ envelope radius**, not a basic external screw radius. Together these bounds
 guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
 step wall** remains controlling at the approved geometry.
 
-The callout connects the finished-cavity bound to maintaining **2.0 MIN WALL**.
+The callout names the protected **rib-step and coefficient-plate walls**, with
+an independent **2.0 MIN** requirement. The coefficient-plate walls are the
+longitudinal receiver profile's upper/lower boundaries, including the continuous
+underside; naming only the rib step would omit that wall family.
 The **1.29 mm** radial separation to the extended top-face plane
 is not the finite sharp-step distance above, nor is it a claim that every
 surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
