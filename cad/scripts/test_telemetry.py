@@ -2040,7 +2040,10 @@ def test_cone_topology_timings_preserve_results_and_partial_failure(
 
 @pytest.mark.parametrize(
     "outcome",
-    ["scaled", "unscaled", "false_create", "bind_error", "scale_error", "invalid_scale"],
+    [
+        "scaled", "unscaled", "false_create", "bind_error",
+        "scale_error", "invalid_scale", "two_views",
+    ],
 )
 def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, outcome):
     from solidworks_mcp.adapters.solidworks import drawing
@@ -2113,7 +2116,7 @@ def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, 
     expected = expected_create.copy()
     if outcome != "false_create":
         expected.append(("bind", raw_view, "IView"))
-    if outcome in {"scaled", "scale_error"}:
+    if outcome in {"scaled", "scale_error", "two_views"}:
         expected.extend([("double_array", [1.0, 2.0]), ("scale", (1.0, 2.0))])
 
     def invoke():
@@ -2141,33 +2144,37 @@ def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, 
     with _telemetry.span("drawing.build"):
         invoke()
     finished = {s.name: s for s in spans.get_finished_spans()}
-    parent = finished["drawing.place_view"]
+    suffix = " [part.SLDPRT *Front x=0.1 y=0.2]"
+    parent = finished[f"drawing.place_view{suffix}"]
+    assert parent.attributes["phase_kind"] == "placement"
     assert parent.parent.span_id == finished["drawing.build"].context.span_id
     assert parent.attributes["source_file"] == "part.SLDPRT"
     assert parent.attributes["orientation"] == "*Front"
-    assert parent.attributes["scale_requested"] is (scale is not None)
+    assert parent.attributes["scale_request"] == (
+        "specified" if scale is not None else "omitted"
+    )
     phases = ["create"]
     if outcome != "false_create":
         phases.append("bind")
     if outcome not in {"unscaled", "false_create", "bind_error"}:
         phases.append("scale")
     assert {name for name in finished if name.startswith("drawing.place_view.")} == {
-        f"drawing.place_view.{phase}" for phase in phases
+        f"drawing.place_view.{phase}{suffix}" for phase in phases
     }
     for phase in phases:
-        child = finished[f"drawing.place_view.{phase}"]
+        child = finished[f"drawing.place_view.{phase}{suffix}"]
         assert child.parent.span_id == parent.context.span_id
     failed_phase = {"false_create": "create", "bind_error": "bind"}.get(outcome)
     assert parent.status.status_code.name == ("ERROR" if failed_phase else "OK")
     if failed_phase:
-        failed = finished[f"drawing.place_view.{failed_phase}"]
+        failed = finished[f"drawing.place_view.{failed_phase}{suffix}"]
         assert failed.status.status_code.name == "ERROR"
         assert failed.attributes["error.type"] == (
             "RuntimeError" if outcome == "false_create" else "OSError"
         )
         assert failed.attributes["error.message"] == parent.attributes["error.message"]
     if "scale" in phases:
-        attempted = finished["drawing.place_view.scale"]
+        attempted = finished[f"drawing.place_view.scale{suffix}"]
         assert attempted.status.status_code.name == "OK"
         assert attempted.attributes["phase_kind"] == "native_scale_attempt"
     count = len(spans.get_finished_spans())
@@ -2177,6 +2184,22 @@ def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, 
     _telemetry._instrument_loaded_adapter()
     invoke()
     assert len(spans.get_finished_spans()) > count
+    if outcome == "two_views":
+        assert imported_alias(
+            adapter, "C:/models/part.SLDPRT", "*Front", 0.3, 0.4, scale=scale
+        ) is bound_view
+        assert calls == [
+            ("ddoc",),
+            ("create", ("C:/models/part.SLDPRT", "*Front", 0.3, 0.4, 0.0)),
+            ("bind", raw_view, "IView"),
+            ("double_array", [1.0, 2.0]),
+            ("scale", (1.0, 2.0)),
+        ]
+        names = {s.name for s in spans.get_finished_spans()}
+        second = " [part.SLDPRT *Front x=0.3 y=0.4]"
+        for phase in ("", ".create", ".bind", ".scale"):
+            assert f"drawing.place_view{phase}{suffix}" in names
+            assert f"drawing.place_view{phase}{second}" in names
 
 
 def test_build_session_instruments_only_an_already_loaded_adapter(capture, monkeypatch):
