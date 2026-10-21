@@ -174,10 +174,11 @@ DETAIL_CENTER = (0.115, 0.150)
 DETAIL_SCALE = (10.0, 1.0)
 DETAIL_RADIUS_MM = 6.0
 DETAIL_LABEL_XY = (0.115, 0.071)
-# The parent D identifier and native leader shoulder stand above VIEW F's
-# profile, right of ReceiverX0's callout (r10 underline ends near X355 mm).
-# SetLabelPosition moves only the label, not the source circle or datum A.
-DETAIL_LETTER_OFFSET = (0.050, 0.030)
+# R11's left-facing D shoulder crossed ReceiverX0 at (365,180) mm.
+# Target (400,170), right of its text and below its Y173 mm underline,
+# keeping the shoulder-to-circle route below that dimension.
+# SetLabelPosition leaves the source circle and datum A unchanged.
+DETAIL_LETTER_OFFSET = (0.085, 0.020)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 

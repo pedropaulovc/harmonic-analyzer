@@ -523,6 +523,11 @@ Sheet 1's PlateWidth text remains **(266,81.3) mm**; projection-derived
 local gaps must start both witnesses **1 mm below the actual +Z body end**.
 The independent recorded-native PlateThickness replay adds +35/+50 mm;
 its geometry, identity and gap mutation proofs remain unchanged.
+R11's parent-view D identifier cleared the profile at (365,180) mm, but
+its left-facing native shoulder routed through the screw-pattern dimension.
+The revised target is **(400,170) mm**: right of that text and below its
+underline, leaving the source circle and datum A unchanged. Native ink
+clearance still requires the next saved-sheet inspection.
 
 These are **analytical source budgets and requested native placements**,
 not an after-fix acceptance claim. Native rebuild/readbacks, audit and
