@@ -17,11 +17,24 @@ import draw_mg_magnifying_clamp as drawing
 import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
 import _gtol_face_resolve
+import _drawing_dimension_import as dimension_import
+import _drawing_dimensions as drawing_dimensions
 import _drawing_leader_notes as leader_notes
 import _drawing_notes as drawing_notes
 from _drawing_layout_check import DrawableRegion
-from _layout_audit import find_leader_through_text
-from _layout_geometry import AnnotationGeometry, Box, Segment, SheetGeometry, find_border_breaches
+from _layout_audit import arrowhead_segments, find_leader_through_text
+from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
+    AnnotationGeometry,
+    Box,
+    Segment,
+    SheetGeometry,
+    find_border_breaches,
+    find_text_on_line,
+    find_text_on_text,
+    segment_box_distance,
+    segment_box_overlap_length,
+)
 from _gtol_face import FaceGeometry, SURFACE_PLANE
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 
@@ -183,6 +196,242 @@ def test_linked_notes_own_finished_acceptance_without_claiming_stock_form() -> N
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
     assert "LINEAR +/-" not in notes
+
+
+def _front_drawing_layout(monkeypatch):
+    """Use the real named curation, SetPosition and below-text application."""
+    view = SimpleNamespace(GetName2=lambda: "front")
+    values = {
+        "Height": 0.0295, "LeverBoreYDim": 0.01995, "LeverBoreDiaDim": 0.0065,
+        "LeverBoreFromZFlat": 0.00635, "ThumbTapToBoreRim": 0.00325,
+        "RodTapToBoreRim": 0.00325,
+    }
+
+    class Annotation:
+        def __init__(self, name, value):
+            self.owner, self.entities, self.position = view, (object(), object()), None
+            relative = name.endswith("ToBoreRim")
+            self.dimension = SimpleNamespace(
+                Name=name, SystemValue=value,
+                Tolerance=SimpleNamespace(
+                    Type=2 if relative else 0,
+                    minimum=-0.00102 if relative else 0.0,
+                    maximum=0.00102 if relative else 0.0,
+                ),
+            )
+            self.text = {4: spec.HEIGHT_CALLOUT if name == "Height" else ""}
+            self.display = SimpleNamespace(
+                GetDimension=lambda: self.dimension,
+                GetDimension2=lambda _index: self.dimension,
+                SetText=lambda part, text: self.text.__setitem__(part, text),
+                GetText=lambda part: self.text.get(part, ""),
+                ShowParenthesis=False,
+            )
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+        def SetPosition(self, x, y, z):
+            self.position = (x, y, z)
+            return True
+
+        def GetPosition(self):
+            return self.position
+
+        def Select2(self, *_args):
+            raise AssertionError("the layout must not delete a native dimension")
+
+    annotations = {name: Annotation(name, value) for name, value in values.items()}
+    before = {
+        name: (item.dimension, item.dimension.SystemValue, item.dimension.Tolerance,
+               item.dimension.Tolerance.Type, item.dimension.Tolerance.minimum,
+               item.dimension.Tolerance.maximum, item.display.ShowParenthesis,
+               item.owner, item.entities)
+        for name, item in annotations.items()
+    }
+
+    def read_member(value, member):
+        result = getattr(value, member)
+        return result() if callable(result) else result
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: True),
+        _attempt=lambda reader, default=None: reader(), _get_attr_or_call=read_member,
+    )
+
+    def imported(_adapter, target, features):
+        assert _adapter is adapter and target is view
+        return [
+            (name, annotations[name])
+            for feature in features for name in sorted(spec.DRAWING_DIMENSIONS[feature])
+        ]
+
+    monkeypatch.setattr(dimension_import, "insert_feature_dimensions", imported)
+    monkeypatch.setattr(
+        drawing_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, _interface, *_members: value,
+    )
+    curated = []
+    for keep in (drawing.RIGHT_KEEP, drawing.RIGHT_LOCATION_KEEP):
+        curated.extend(drawing.curate_view_dimensions(
+            adapter, view, keep=keep, view_label="front",
+            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+        ))
+    drawing.set_dimension_callouts(adapter, curated, drawing.DIMENSION_CALLOUTS)
+    return SimpleNamespace(annotations=annotations, curated=curated, before=before)
+
+
+def test_front_layout_moves_native_dimensions_and_wraps_only_height_below_text(monkeypatch) -> None:
+    state = _front_drawing_layout(monkeypatch)
+    assert len(state.curated) == len(state.annotations)
+    for name, item in state.annotations.items():
+        wanted = (drawing.RIGHT_KEEP | drawing.RIGHT_LOCATION_KEEP)[name]
+        assert item.GetPosition() == (*wanted, 0.0)
+        assert state.before[name] == (
+            item.dimension, item.dimension.SystemValue, item.dimension.Tolerance,
+            item.dimension.Tolerance.Type, item.dimension.Tolerance.minimum,
+            item.dimension.Tolerance.maximum, item.display.ShowParenthesis,
+            item.owner, item.entities,
+        )
+        assert set(item.text) == {4}
+    height = state.annotations["Height"].display.GetText(4)
+    assert height.splitlines() == [spec.HEIGHT_CALLOUT.splitlines()[0], "FULL THREAD", "ENGAGEMENT"]
+    assert height.split() == spec.HEIGHT_CALLOUT.split()
+    assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == spec.LEVER_BORE_CALLOUT
+    for name in ("ThumbTapToBoreRim", "RodTapToBoreRim"):
+        assert state.annotations[name].display.GetText(4).split() == [
+            "TAP", "ENTRY", "AXIS", "TO", "BORE", "RIM"
+        ]
+
+
+def test_wrapped_native_height_block_retains_air_to_border_witness_and_arrow(monkeypatch) -> None:
+    state = _front_drawing_layout(monkeypatch)
+    height = state.annotations["Height"]
+    # R18 PDF advances, 3.5653 mm glyph height and 5.5562 mm row pitch.
+    # Reflow is a prediction for the unchanged native font, not new-seat proof.
+    widths = {
+        "29.50": 0.0116375, "MHA-MG-VN-50": 0.0358361,
+        "FULL THREAD ENGAGEMENT": 0.0619257,
+        "FULL THREAD": 0.0283568, "ENGAGEMENT": 0.0322770,
+    }
+    pitch, glyph_height = 0.0055562, 0.0035653
+
+    def ink(anchor, below):
+        rows = ["29.50", *below.splitlines()]
+        first_y = anchor[1] + 0.0037121 + (len(rows) - 3) * pitch / 2.0
+        return tuple(
+            Box(anchor[0] - widths[row] / 2.0, first_y - index * pitch,
+                anchor[0] + widths[row] / 2.0, first_y - index * pitch + glyph_height)
+            for index, row in enumerate(rows)
+        )
+
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    region = DrawableRegion.from_margins(
+        template.width_m, template.height_m,
+        left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
+    )
+    before = SheetGeometry(
+        name="Sheet1", width=template.width_m, height=template.height_m, region=region,
+        annotations=(AnnotationGeometry(
+            label="Height", kind="dim", owner="front",
+            text_boxes=ink((0.032, 0.155), spec.HEIGHT_CALLOUT), exact=True,
+        ),),
+    )
+    assert any(item.kind == "outside-border" for item in find_border_breaches(before))
+    after_boxes = ink(height.GetPosition(), height.display.GetText(4))
+    after = replace(before, annotations=(replace(before.annotations[0], text_boxes=after_boxes),))
+    assert find_border_breaches(after) == []
+    # R18's 19.95 top witness and Height's upper-arrow tail remain fixed.
+    assert min(box.ymin for box in after_boxes) - 0.1428 >= ARROW_TEXT_CLEARANCE_M
+    assert (0.17145 - 0.003556) - max(box.ymax for box in after_boxes) >= ARROW_TEXT_CLEARANCE_M
+
+
+@pytest.mark.parametrize("name, old_y, arrow_y", (
+    ("ThumbTapToBoreRim", 0.185, 0.17745),
+    ("RodTapToBoreRim", 0.072, 0.07695),
+))
+def test_native_rim_blocks_leave_section_arrows_bore_callout_and_own_witness(monkeypatch, name, old_y, arrow_y) -> None:
+    state = _front_drawing_layout(monkeypatch)
+    # Seven exact R18 PDF glyph boxes, including both stacked tolerance rows.
+    thumb_boxes = (
+        Box(0.0810509, 0.1870180, 0.0897335, 0.1905833),
+        Box(0.0914934, 0.1921015, 0.0937997, 0.1944302),
+        Box(0.0920206, 0.1881638, 0.0932724, 0.1884625),
+        Box(0.0947240, 0.1914902, 0.1029445, 0.1950555),
+        Box(0.0947240, 0.1869645, 0.1029445, 0.1905298),
+        Box(0.0750753, 0.1814083, 0.1087006, 0.1849736),
+        Box(0.0776372, 0.1758520, 0.1061808, 0.1794173),
+    )
+
+    def shifted(boxes, dx, dy):
+        return tuple(Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy) for box in boxes)
+
+    old_boxes = shifted(thumb_boxes, 0.0, old_y - 0.185)
+    marker = AnnotationGeometry(
+        label="section-line A", kind="section", owner="front",
+        segments=(Segment(0.085, arrow_y, 0.073, arrow_y, "arrow"),),
+    )
+    rim = AnnotationGeometry(label=name, kind="dim", owner="front", text_boxes=old_boxes, exact=True)
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    before = SheetGeometry(
+        name="Sheet1", width=template.width_m, height=template.height_m,
+        region=DrawableRegion.whole_sheet(template.width_m, template.height_m),
+        annotations=(rim, marker),
+    )
+    assert any(item.a == name and item.b == marker.label for item in find_text_on_line(before))
+    x, y, _z = state.annotations[name].GetPosition()
+    moved = replace(rim, text_boxes=shifted(old_boxes, x - 0.092, y - old_y))
+    assert find_text_on_line(replace(before, annotations=(moved, marker))) == []
+    witness_start = 0.1438 if name == "ThumbTapToBoreRim" else 0.1418
+    witness = Segment(0.09475, witness_start, 0.09475, old_y - 0.0110819, "ext-line")
+    if name == "RodTapToBoreRim":
+        assert any(segment_box_overlap_length(witness, box) > 0.003 for box in old_boxes)
+    assert all(segment_box_overlap_length(witness, box) == 0.0 for box in moved.text_boxes)
+
+    # The native bore block must move too: its original drill row occupies
+    # the new upper-rim text lane. Replay actual rows, not a nominal font box.
+    bore_rows = (
+        Box(0.1431325, 0.1818180, 0.1517218, 0.1853833),
+        Box(0.1561428, 0.1862902, 0.1613944, 0.1898555),
+        Box(0.1268490, 0.1762082, 0.1732583, 0.1797736),
+        Box(0.1126544, 0.1702786, 0.1872289, 0.1742173),
+    )
+    bore = AnnotationGeometry(label="LeverBoreDiaDim", kind="dim", owner="front", text_boxes=bore_rows, exact=True)
+    if name == "ThumbTapToBoreRim":
+        assert find_text_on_text(replace(before, annotations=(moved, bore)))
+    bx, by, _z = state.annotations["LeverBoreDiaDim"].GetPosition()
+    bore = replace(bore, text_boxes=shifted(bore_rows, bx - 0.150, by - 0.1798))
+    assert find_text_on_text(replace(before, annotations=(moved, bore))) == []
+    line_y = y - 0.0100819  # Native R18 rim dimension-line offset below anchor.
+    if name == "ThumbTapToBoreRim":
+        assert 0.17145 + 0.002 < line_y < 0.1955029 - 0.002
+    else:
+        assert 0.0669971 + 0.002 < line_y < 0.07695 - 0.002
+
+
+def test_upper_width_lane_clears_actual_a_arrow_ink_not_a_padding_air_floor(monkeypatch) -> None:
+    state = _front_drawing_layout(monkeypatch)
+    a_ink = Box(0.0652137, 0.1761622, 0.0710726, 0.1823344)
+    original_width_ink = Box(0.0712621, 0.1721558, 0.0797953, 0.1757211)
+    _x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
+    dy = y - 0.174
+    moved = Box(
+        original_width_ink.xmin, original_width_ink.ymin + dy,
+        original_width_ink.xmax, original_width_ink.ymax + dy,
+    )
+
+    def arrow_gap(anchor_y):
+        # R18's real left width arrow; native line is 2.7781 mm below anchor.
+        arrow = (0.06595, anchor_y - 0.0027781, 0.0003,
+                 -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0)
+        return min(segment_box_distance(segment, a_ink) for segment in arrowhead_segments(arrow))
+
+    assert arrow_gap(0.1865) < ARROW_TEXT_CLEARANCE_M
+    assert arrow_gap(y) >= ARROW_TEXT_CLEARANCE_M
+    # GetOutline contains 5.5879 mm of lower padding here. The 1.5 mm
+    # overlap tolerance is not a 1.5 mm air floor against that padded box.
+    assert moved.ymax < 0.189915
+    assert 0.1955029 - moved.ymax > 0.005
 
 
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:

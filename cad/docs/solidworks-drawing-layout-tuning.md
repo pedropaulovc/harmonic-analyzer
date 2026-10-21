@@ -1217,6 +1217,12 @@ and strict attachment, including distinct source/view handles, then failed
 the final audit because that leader crossed the isometric scale caption.
 Route the actual attached leader clear of the caption; identity closure is
 not sheet-layout acceptance, and neither guard should be weakened.
+R18 cleared that crossing and passed the native audit, but the full height
+qualifier still clipped the left border and both tap-to-rim qualifier blocks
+overlapped the section-cut markers. Wrap and place the entire native text
+block, not just the numeric value, clear of the border, section markers and
+neighbouring dimensions. Preserve every qualifier word, value, band and
+attachment; final PNG inspection remains required even after audit success.
 
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
