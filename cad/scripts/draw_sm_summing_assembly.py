@@ -1021,7 +1021,7 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.sm_summing_assembly")
 async def build(adapter: Any) -> dict[str, str]:
-    """Diagnostic ONLY: EDGE draft/high/high/draft, no later sheets/publication."""
+    """Diagnostic ONLY: draft EDGE placement then precision restoration; no export."""
     await run_sm_quality_probe(
         adapter,
         template=DRAWING_TEMPLATES[SPEC.layout].path,

@@ -1,10 +1,10 @@
-"""Issue-1667 SM EDGE-only draft/high/high/draft diagnostic; NEVER MERGE.
+"""Issue-1667 SM draft-placement/precision-restoration diagnostic; NEVER MERGE.
 
 Four fresh production-prepared drawings, one held PID and one native call each.
-Every arm uses the same HLV->HLR excursion, explicit shaded-quality request and
-Normal mapping. Pre-call quality reads are not proof of in-call geometry; later
-observers retain their post-call boundary. No sheet is saved or exported, and
-even a qualified contrast ends in diagnostic STOP.
+All place EDGE balloons in draft; precision restoration is request-only/update/
+update/request-only. Readbacks do not prove settled or in-call geometry, and
+UpdateViewDisplayGeometry is not a repaint/export completion guarantee.
+No sheet is saved/exported; even a qualified contrast ends in diagnostic STOP.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ import _seat_forensics as forensics
 from _session import discard_open_documents
 
 
-SEQUENCE = ("draft", "high", "high", "draft")
+SEQUENCE = ("request_only", "geometry_update", "geometry_update", "request_only")
 LABEL = "summing exploded-view BOM coverage"
 SPRING = "sm-vn-counter-spring"
 # The actual SM preparer already resolves ten families. These bounds only limit
@@ -284,6 +284,13 @@ def _collect_stage(
                 ),
             )
         )
+        quality_started = time.perf_counter()
+        try:
+            snapshot["quality"] = _quality_state(view)
+        finally:
+            snapshot["quality_readback_ms"] = (
+                time.perf_counter() - quality_started
+            ) * 1000.0
         if len(returned) > MAX_VIEW_NOTES:
             raise RuntimeError("SM contrast: returned-note census exceeded fixed bound")
         snapshot["returned_notes"] = []
@@ -315,7 +322,9 @@ def _collect_stage(
         snapshot["error"] = f"{type(error).__name__}: {error}"
         raise
     finally:
-        snapshot["observer_ms"] = (time.perf_counter() - started) * 1000.0
+        snapshot["observer_ms"] = (
+            time.perf_counter() - started
+        ) * 1000.0 - snapshot.get("quality_readback_ms", 0.0)
 
 
 def _quality_state(view: Any) -> dict[str, Any]:
@@ -341,11 +350,17 @@ def _view_semantics(view: Any) -> dict[str, Any]:
 
 
 def _apply_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
-    """One common excursion and one assigned request; never repair or restore."""
-    started = time.perf_counter()
+    """One common excursion and one draft placement request; never repair."""
     row["quality_treatment_failures"] = []
+    quality_started = time.perf_counter()
     try:
         row["quality_before"] = _quality_state(view)
+    finally:
+        row["quality_original_readback_ms"] = (
+            time.perf_counter() - quality_started
+        ) * 1000.0
+    started = time.perf_counter()
+    try:
         row["view_semantics_before_quality"] = _view_semantics(view)
         try:
             set_hidden_lines_removed(adapter, view)
@@ -360,9 +375,7 @@ def _apply_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
                 raise
             row["quality_treatment_failures"].append(f"normalization: {error}")
         bound = _early_bound(view, "IView")
-        row["quality_set_return"] = bound.SetDisplayMode4(
-            False, 3, row["quality"] == "draft", True, True
-        )
+        row["quality_set_return"] = bound.SetDisplayMode4(False, 3, True, True, True)
         if row["quality_set_return"] is not True:
             row["quality_treatment_failures"].append(
                 f"final shaded-quality setter returned {row['quality_set_return']!r}"
@@ -376,6 +389,76 @@ def _apply_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
             )
     finally:
         row["quality_setup_ms"] = (time.perf_counter() - started) * 1000.0
+
+
+def _restore_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
+    """Fixed precision request, with one optional documented void update."""
+    bound = _early_bound(view, "IView")
+    restoration = row["quality_restoration"] = {
+        "treatment": row["restoration"],
+        "geometry_update_calls": 0,
+        "completion_limit": "display geometry access, NOT Windows repaint/export proof",
+    }
+    started = time.perf_counter()
+    try:
+        restoration["semantics_before"] = _view_semantics(view)
+        try:
+            set_hidden_lines_removed(adapter, view)
+        except RuntimeError as error:
+            if type(error) is not RuntimeError or not re.fullmatch(
+                r"failed to (?:transition drawing view through HLV|"
+                r"set hidden-lines-removed drawing view) \(mode reads -?\d+\)",
+                str(error),
+            ):
+                raise
+            row["quality_treatment_failures"].append(
+                f"precision normalization: {error}"
+            )
+        restoration["set_return"] = bound.SetDisplayMode4(False, 3, False, True, True)
+        if restoration["set_return"] is not True:
+            row["quality_treatment_failures"].append(
+                f"precision setter returned {restoration['set_return']!r}"
+            )
+    except BaseException as error:
+        restoration["request_error"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        row["restoration_request_ms"] = (time.perf_counter() - started) * 1000.0
+    row["restoration_geometry_update_ms"] = None
+    if row["restoration"] == "geometry_update":
+        started = time.perf_counter()
+        try:
+            restoration["geometry_update_calls"] = 1
+            # SDK void: neither bool conversion nor a completion assertion.
+            bound.UpdateViewDisplayGeometry()
+        except BaseException as error:
+            restoration["geometry_update_error"] = f"{type(error).__name__}: {error}"
+            raise
+        finally:
+            row["restoration_geometry_update_ms"] = (
+                time.perf_counter() - started
+            ) * 1000.0
+    started = time.perf_counter()
+    try:
+        restoration["quality"] = _quality_state(view)
+    finally:
+        row["restoration_quality_readback_ms"] = (
+            time.perf_counter() - started
+        ) * 1000.0
+    started = time.perf_counter()
+    try:
+        restoration["semantics_after"] = _view_semantics(view)
+        restoration["outline_m"] = tuple(bound.GetOutline() or ())
+        if not (
+            restoration["semantics_before"]
+            == restoration["semantics_after"]
+            == row["view_semantics_before_quality"]
+        ):
+            raise RuntimeError(
+                "SM quality contrast: view semantics changed during restoration"
+            )
+    finally:
+        row["restoration_observer_ms"] = (time.perf_counter() - started) * 1000.0
 
 
 def _call_once(
@@ -538,6 +621,16 @@ def _call_once(
                         "post-call unmodified native-option observations differ"
                     )
         row["option_observer_ms"] = (time.perf_counter() - observed_started) * 1000.0
+        _restore_quality(adapter, view, row)
+        _collect_stage(
+            adapter,
+            view,
+            returned,
+            stage="post_quality_restoration_pre_normal_restore_pre_rebuild",
+            out_dir=out_dir,
+            cached_hwnd=cached_hwnd,
+            row=row,
+        )
     finally:
         primary = _active_exception()
         started = time.perf_counter()
@@ -568,10 +661,12 @@ def _call_once(
         row=row,
     )
     started = time.perf_counter()
-    draw.ClearSelection2(True)
-    if draw.EditRebuild3() is not True:
-        raise RuntimeError("SM contrast: existing post-call drawing rebuild failed")
-    row["existing_rebuild_ms"] = (time.perf_counter() - started) * 1000.0
+    try:
+        draw.ClearSelection2(True)
+        if draw.EditRebuild3() is not True:
+            raise RuntimeError("SM contrast: existing post-call drawing rebuild failed")
+    finally:
+        row["existing_rebuild_ms"] = (time.perf_counter() - started) * 1000.0
     inventory_notes = _collect_stage(
         adapter,
         view,
@@ -644,28 +739,29 @@ async def run_sm_quality_probe(
     ],
 ) -> NoReturn:
     """Fixed SM-only coverage contrast; known invalid arms continue, errors abort."""
-    out_dir = forensics._capture_dir("1667-sm-edge-quality-fixed-contrast")
+    out_dir = forensics._capture_dir("1667-sm-draft-restore-fixed-contrast")
     report: dict[str, Any] = {
         "diagnostic_only": True,
         "never_merge": True,
         "status": "aborted",
         "sequence": SEQUENCE,
         "report_path": str(out_dir / "capture.json"),
-        "proof_scope": "post-helper diagnostic owner/circle/field/BOM/caption only; NOT full-sheet/PDF/machinist proof",
+        "proof_scope": "draft-to-precision attachment survival only; NOT shipped native/PDF/machinist proof",
         "observer_limit": (
-            "pre-call quality getters do not prove in-call geometry; all later "
-            "scene/identity evidence is post-call. The common HLV->HLR excursion "
-            "and identical pre-call getter sequence were absent from run1790."
+            "quality readbacks do not prove settled or in-call geometry; "
+            "UpdateViewDisplayGeometry accesses displayed geometry before Windows "
+            "repaint, not an export/repaint completion guarantee."
         ),
         "no_save_export_or_publication": True,
         "arms": [
             {
                 "order": order,
                 "attachment": "edge",
-                "quality": quality,
+                "quality": "draft",
+                "restoration": restoration,
                 "status": "not_reached",
             }
-            for order, quality in enumerate(SEQUENCE, start=1)
+            for order, restoration in enumerate(SEQUENCE, start=1)
         ],
     }
     baseline = None
@@ -684,6 +780,10 @@ async def run_sm_quality_probe(
         for row in report["arms"]:
             phase = "setup"
             post_helper_started: float | None = None
+            row["post_helper_proof_ms_scope"] = (
+                "inclusive elapsed envelope; overlaps separately reported bounds, "
+                "stage observer and quality readback costs; NOT an additive phase"
+            )
             try:
                 row["documents_before"] = _empty_documents(adapter)
                 if int(adapter.swApp.GetProcessID()) != seat_pid:
@@ -706,7 +806,7 @@ async def run_sm_quality_probe(
                     len(items) != 10
                     or len(dict(items)) != 10
                     or len({item for _stem, item in items}) != 10
-                    or SPRING not in dict(items)
+                    or dict(items).get(SPRING) != "8"
                 ):
                     raise RuntimeError(
                         "SM contrast: expected exactly ten unique SM BOM families/items"
@@ -815,29 +915,72 @@ async def run_sm_quality_probe(
                     row["bounds_observer_ms"] = (
                         time.perf_counter() - proof_started
                     ) * 1000.0
-                final_rows = [_note_snapshot(note) for note in returned]
-                _indices, final_failures = _validate_snapshots(
-                    final_rows,
-                    items=items,
-                    allowed=allowed,
-                    attachment=row["attachment"],
+                _collect_stage(
+                    adapter,
+                    view,
+                    returned,
+                    stage="post_caption_bounds",
+                    out_dir=out_dir / f"{row['order']:02d}-{row['attachment']}",
+                    cached_hwnd=row["cached_pre_call_hwnd"],
+                    row=row,
                 )
-                row["post_caption_rebuild_returned_notes"] = final_rows
-                failures.extend(
-                    f"post-caption rebuild: {error}" for error in final_failures
-                )
-                _final_notes, final_inventory = _view_inventory(view)
-                row["post_caption_rebuild_view_bom_inventory"] = final_inventory
-                _indices, final_inventory_failures = _validate_snapshots(
-                    final_inventory,
-                    items=items,
-                    allowed=allowed,
-                    attachment=row["attachment"],
-                )
-                failures.extend(
-                    f"post-caption actual view inventory: {error}"
-                    for error in final_inventory_failures
-                )
+                final = row["observations"][-1]
+                row["post_caption_rebuild_returned_notes"] = final["returned_notes"]
+                row["post_caption_rebuild_view_bom_inventory"] = final[
+                    "view_bom_inventory"
+                ]
+                row["final_quality"] = final["quality"]
+                for snapshot in row["observations"]:
+                    stage_failures = []
+                    for key in ("returned_notes", "view_bom_inventory"):
+                        _indices, stage_errors = _validate_snapshots(
+                            snapshot[key],
+                            items=items,
+                            allowed=allowed,
+                            attachment=row["attachment"],
+                        )
+                        stage_failures.extend(
+                            f"{key}: {error}" for error in stage_errors
+                        )
+                    if (
+                        snapshot["view_only_annotation_identities"]
+                        or snapshot["returned_only_annotation_identities"]
+                    ):
+                        stage_failures.append(
+                            "native return and actual view annotation identities differ"
+                        )
+                    snapshot["candidate_failures"] = stage_failures
+                    failures.extend(
+                        f"{snapshot['stage']}: {error}" for error in stage_failures
+                    )
+                quality_observations = [
+                    (
+                        "precision restoration",
+                        row["quality_restoration"]["quality"],
+                        False,
+                    ),
+                    *(
+                        (
+                            snapshot["stage"],
+                            snapshot["quality"],
+                            snapshot["stage"] == "post_call_pre_restore_pre_rebuild",
+                        )
+                        for snapshot in row["observations"]
+                    ),
+                ]
+                for boundary, quality, draft in quality_observations:
+                    if not (
+                        quality["facetted_hlr"] is draft
+                        and type(quality["display_mode"]) is int
+                        and quality["display_mode"] in (3, 7)
+                        and quality["use_parent"] is False
+                        and quality["shaded_edges"] is True
+                        and quality["precision_threads"] is True
+                    ):
+                        row["quality_treatment_failures"].append(
+                            f"{boundary}: requested {'draft' if draft else 'precision'} "
+                            f"quality readback mismatch: {quality!r}"
+                        )
                 row["post_helper_proof_ms"] = (
                     time.perf_counter() - post_helper_started
                 ) * 1000.0
@@ -940,20 +1083,34 @@ async def run_sm_quality_probe(
                     "order": row["order"],
                     "attachment": row["attachment"],
                     "quality": row["quality"],
+                    "restoration": row["restoration"],
                     "status": row["status"],
                     "native_call_ms": row.get("native_call_ms"),
                     "quality_setup_ms": row.get("quality_setup_ms"),
+                    "quality_original_readback_ms": row.get(
+                        "quality_original_readback_ms"
+                    ),
+                    "restoration_observer_ms": row.get("restoration_observer_ms"),
                     "quality_pre_call_readback_ms": row.get(
                         "quality_pre_call_readback_ms"
                     ),
-                    "post_call_observer_ms": (
-                        sum(
-                            stage["observer_ms"]
-                            for stage in row.get("observations", ())
-                        )
-                        + row.get("option_observer_ms", 0.0)
-                        + row.get("post_helper_proof_ms", 0.0)
+                    "restoration_request_ms": row.get("restoration_request_ms"),
+                    "restoration_geometry_update_ms": row.get(
+                        "restoration_geometry_update_ms"
                     ),
+                    "restoration_quality_readback_ms": row.get(
+                        "restoration_quality_readback_ms"
+                    ),
+                    "stage_costs": [
+                        {
+                            "stage": stage["stage"],
+                            "observer_ms": stage["observer_ms"],
+                            "quality_readback_ms": stage.get("quality_readback_ms"),
+                        }
+                        for stage in row.get("observations", ())
+                    ],
+                    "option_observer_ms": row.get("option_observer_ms"),
+                    "bounds_observer_ms": row.get("bounds_observer_ms"),
                     "normal_mapping_enter_ms": row.get("normal_mapping_guard", {}).get(
                         "enter_ms"
                     ),
@@ -964,22 +1121,6 @@ async def run_sm_quality_probe(
                 }
                 for row in report["arms"]
             ],
-            "draft_native_call_mean_ms": sum(
-                row["native_call_ms"]
-                for row in report["arms"]
-                if row["quality"] == "draft"
-            )
-            / 2.0
-            if qualified
-            else None,
-            "high_native_call_mean_ms": sum(
-                row["native_call_ms"]
-                for row in report["arms"]
-                if row["quality"] == "high"
-            )
-            / 2.0
-            if qualified
-            else None,
         }
         report["elapsed_ms"] = (time.perf_counter() - started) * 1000.0
         primary = _active_exception()
