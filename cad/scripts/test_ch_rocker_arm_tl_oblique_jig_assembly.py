@@ -3038,7 +3038,7 @@ def test_primary_measurement_api_has_no_verified_or_measured_defaults() -> None:
     ("prebearing_capture_coverage", ()),
     ("prebearing_capture_coverage", spec.PREBEARING_CAPTURE_REQUIRED_COVERAGE[:-1]),
     ("prebearing_capture_evidence", ""),
-)):
+))
 def test_primary_measurement_api_rejects_invalid_actual_fit_bounds(field, value) -> None:
     records = _synthetic_primary_measurements()
     bad = replace(records[0], **{field: value})
