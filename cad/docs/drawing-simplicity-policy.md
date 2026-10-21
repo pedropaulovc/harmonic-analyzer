@@ -58,6 +58,11 @@ cannot ask for what the authors were told to leave out.
   carrier. Source bands remain model-owned. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
+  Source ownership requires native `IDimension` identity both with the source
+  parameter and with a dimension enumerated from the intended model feature;
+  matching names or values alone cannot prove membership. `IFeature` wrapper
+  equality is diagnostic only: drawing-context owners can compare unequal
+  even when the original model dimension is identical.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;

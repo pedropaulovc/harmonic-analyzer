@@ -11,7 +11,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_views, view_name
 
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _dimensions import _feature_display_dimensions
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_points_in_view
@@ -58,6 +58,26 @@ def _binding(adapter: Any, raw_view: Any) -> tuple[str, str, str]:
     return name, str(Path(source).resolve()), configuration
 
 
+def _source_feature_dimensions(
+    adapter: Any, source_feature: Any, native: Any
+) -> list[dict[str, Any]]:
+    """Prove membership by model dimensions, not drawing-context feature wrappers."""
+    inventory = []
+    for raw_display in _feature_display_dimensions(source_feature):
+        display = _bind(raw_display, "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError("source feature display has no native dimension")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        inventory.append(
+            {
+                "full_name": str(dimension.FullName),
+                "dimension_is_same": int(adapter.swApp.IsSame(native, dimension)),
+            }
+        )
+    return inventory
+
+
 def _source_owner_context(
     adapter: Any,
     view: Any,
@@ -68,6 +88,8 @@ def _source_owner_context(
     feature_owner: Any,
     dimension_same: int | None,
     feature_same: int | None,
+    feature_dimensions: list[dict[str, Any]],
+    feature_dimensions_error: dict[str, str] | None,
 ) -> dict[str, Any]:
     """Scalar evidence only; a failed diagnostic must not hide the refusal."""
 
@@ -88,14 +110,6 @@ def _source_owner_context(
     def dimension_name(raw: Any) -> str | None:
         return None if raw is None else str(_early_bound(raw, "IDimension").FullName)
 
-    def feature_dimensions() -> list[str | None]:
-        if source_feature is None:
-            return []
-        return [
-            dimension_name(_early_bound(display, "IDisplayDimension").GetDimension2(0))
-            for display in _feature_display_dimensions(source_feature)
-        ]
-
     return {
         "drawing_path": probe(
             lambda: str(_early_bound(adapter.currentModel, "IModelDoc2").GetPathName())
@@ -114,7 +128,11 @@ def _source_owner_context(
         "native_feature_owner_type": probe(lambda: feature_type(feature_owner)),
         "source_feature_name": probe(lambda: feature_name(source_feature)),
         "source_feature_type": probe(lambda: feature_type(source_feature)),
-        "source_feature_dimension_names": probe(feature_dimensions),
+        "source_feature_dimension_names": [
+            row["full_name"] for row in feature_dimensions
+        ],
+        "source_feature_dimensions": feature_dimensions,
+        "source_feature_dimensions_error": feature_dimensions_error,
         "dimension_is_same": dimension_same,
         "feature_is_same": feature_same,
     }
@@ -150,12 +168,30 @@ def _assert_source(
         if feature_owner is None or source_feature is None
         else int(adapter.swApp.IsSame(feature_owner, source_feature))
     )
+    feature_dimensions = []
+    feature_dimensions_error = None
+    if source_feature is not None:
+        try:
+            feature_dimensions = _source_feature_dimensions(
+                adapter, source_feature, native
+            )
+        except Exception as exc:
+            feature_dimensions_error = {
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+            }
+    feature_members = [
+        row
+        for row in feature_dimensions
+        if row["full_name"].split("@")[:2] == [name, feature]
+        and row["dimension_is_same"] == 1
+    ]
     if (
         source_dimension is None
         or source_feature is None
-        or feature_owner is None
         or dimension_same != 1
-        or feature_same != 1
+        or feature_dimensions_error is not None
+        or not feature_members
     ):
         context = _source_owner_context(
             adapter,
@@ -167,12 +203,26 @@ def _assert_source(
             feature_owner,
             dimension_same,
             feature_same,
+            feature_dimensions,
+            feature_dimensions_error,
         )
         _telemetry.info(
             f"supplier_source_owner_failure {name}@{feature}: "
             + json.dumps(context, sort_keys=True, allow_nan=False)
         )
         raise RuntimeError(f"{name}: supplier reference changed native model/feature owner")
+    _telemetry.info(
+        f"supplier_source_owner_proof {name}@{feature}: "
+        + json.dumps(
+            {
+                "dimension_is_same": dimension_same,
+                "feature_is_same": feature_same,
+                "source_feature_dimension": feature_members[0],
+            },
+            sort_keys=True,
+            allow_nan=False,
+        )
+    )
     source_sketch = _early_bound(source_feature, "IFeature").GetSpecificFeature2()
     entities = tuple(annotation.GetAttachedEntities3() or ())
     types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))

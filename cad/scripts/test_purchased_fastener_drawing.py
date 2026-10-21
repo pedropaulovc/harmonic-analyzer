@@ -5479,7 +5479,7 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
 
 
 @pytest.mark.parametrize(
-    "drift", ("missing", "duplicate", "unknown", "view-owner", "feature-owner", "model-dimension", "attachment-owner", "configuration", "orientation"),
+    "drift", ("missing", "duplicate", "unknown", "view-owner", "feature-membership", "model-dimension", "attachment-owner", "configuration", "orientation"),
 )
 def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_drift(monkeypatch, drift):
     import _supplier_screw_dimensions as screws
@@ -5490,7 +5490,22 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(screws, "iter_views", lambda adapter: adapter.views)
     source_sketch = object()
-    source_feature = SimpleNamespace(GetSpecificFeature2=lambda: source_sketch)
+    raw_source_display = object()
+    source_display = SimpleNamespace(GetDimension2=lambda _index: case.native)
+    source_feature = SimpleNamespace(
+        Name="SupplierReference",
+        GetTypeName2=lambda: "ProfileFeature",
+        GetSpecificFeature2=lambda: source_sketch,
+        GetFirstDisplayDimension=lambda: raw_source_display,
+        GetNextDisplayDimension=lambda _display: None,
+    )
+
+    def bind_source_display(raw, interface):
+        assert raw is raw_source_display
+        assert interface == "IDisplayDimension"
+        return source_display
+
+    monkeypatch.setattr(screws, "_bind", bind_source_display)
     case.annotation.entities = (
         SimpleNamespace(GetSketch=lambda: source_sketch),
         SimpleNamespace(GetSketch=lambda: source_sketch),
@@ -5499,7 +5514,11 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         Parameter=lambda _name: case.native,
         FeatureByName=lambda _name: source_feature,
     )
-    case.native.GetFeatureOwner = lambda: source_feature
+    # Native can return a distinct IFeature wrapper for this exact model dimension.
+    owner_wrapper = SimpleNamespace(
+        Name="SupplierReference", GetTypeName2=lambda: "ProfileFeature",
+    )
+    case.native.GetFeatureOwner = lambda: owner_wrapper
     case.view.name = "Drawing View1"
     case.view.binding = (case.view.name, "stock.SLDPRT", "Default")
     case.view.ReferencedDocument = model
@@ -5527,8 +5546,10 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         case.native.FullName = "Unrequested@SupplierReference@stock.SLDPRT"
     elif drift == "view-owner":
         case.annotation.Owner = object()
-    elif drift == "feature-owner":
-        case.native.GetFeatureOwner = lambda: object()
+    elif drift == "feature-membership":
+        # Identical names and values are insufficient without native identity.
+        different_dimension = SimpleNamespace(**vars(case.native))
+        source_display.GetDimension2 = lambda _index: different_dimension
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
     elif drift == "attachment-owner":
