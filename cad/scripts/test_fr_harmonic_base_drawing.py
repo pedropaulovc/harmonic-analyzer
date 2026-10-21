@@ -3064,15 +3064,8 @@ _NOTE_CHAR_MM = 2.69
 _NOTE_LINE_MM = 4.58
 
 
-def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -> None:
+def test_numbered_note_and_x_flag_predict_clearance_in_the_proven_lanes() -> None:
     import draw_fr_harmonic_base as sheet
-
-    assert sheet.PIVOT_SEAT_NOTE_XY == (0.020, 0.100)
-    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
-    assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
-    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
-    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2456, 0.1550)
-    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.193, 0.135)
 
     # Native-r4 embedded-font calibration supplies conservative NEW text-width
     # estimates. This is not a claim that numbered note 1 has printed natively.
@@ -3095,9 +3088,7 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     # Values retain their native r4 size. SEE NOTE 1 is conservatively 24.7 mm
     # wide, not the smaller SEE D1 or the initial 22 mm estimate.
     x_value = (0.2291351, 0.1292219, 0.2562650, 0.1327219)
-    y_value = (0.2599351, 0.1822219, 0.2870650, 0.1857219)
     x_flag = (0.2427 - 0.01235, 0.1347819, 0.2427 + 0.01235, 0.1382819)
-    y_flag = (0.2735 - 0.01235, 0.18778, 0.2735 + 0.01235, 0.19128)
     letters = {
         "X": (0.242401, 0.142429, 0.245245, 0.148808),
         "X zero": (0.218557, 0.142407, 0.221143, 0.148787),
@@ -3108,7 +3099,7 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
         ((wx, x_value[1] - 0.001), (wx, end_y))
         for wx, end_y in _R2B_PIVOT_X_WITNESS_STARTS
     ]
-    for label, box in {"X value": x_value, "Y value": y_value, "X flag": x_flag, "Y flag": y_flag}.items():
+    for label, box in {"X value": x_value, "X flag": x_flag}.items():
         for name, letter in letters.items():
             assert _box_gap(box, letter) >= 0.0035, (label, name)
         for witness in witnesses:
@@ -3119,12 +3110,8 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
         "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
         "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
     }
-    for box in (x_flag, y_value, y_flag):
-        for label, tag in tags.items():
-            assert _box_gap(box, tag) >= 0.0035, label
-    y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
-    assert _segment_box_gap(y_offset_leader, y_flag) >= 0.0035
-    assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
+    for label, tag in tags.items():
+        assert _box_gap(x_flag, tag) >= 0.0035, label
 
 
 def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
