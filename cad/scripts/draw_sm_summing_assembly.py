@@ -969,6 +969,40 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
 
+async def _build_minimal_native_repro(adapter: Any) -> None:
+    """NEVER MERGE: transport the bounded native repro in the held farm seat."""
+    import os
+
+    from _seat_forensics import _capture_dir as forensics_capture_dir
+    # NEVER MERGE: standalone diagnostic, not a production drawing dependency.
+    from diagnostics.repro_sm_autoballoon_native import FIRST_CASES, SECOND_CASES, run
+
+    executable = adapter.swApp.GetExecutablePath()
+    if not executable:
+        raise RuntimeError("SolidWorks executable path is unavailable")
+    location = Path(str(executable))
+    install_root = location if location.is_dir() else location.parent
+    relative = Path("lang") / "english" / "bom-standard.sldbomtbt"
+    candidates = (install_root / relative, install_root / "SOLIDWORKS" / relative)
+    bom_template = next((path for path in candidates if path.is_file()), None)
+    if bom_template is None:
+        raise FileNotFoundError(
+            "native BOM-table template is missing; checked "
+            + ", ".join(str(path) for path in candidates)
+        )
+    second_leaf_report = os.environ.get("HARMONIC_SM_REPRO_SECOND_LEAF_REPORT")
+    cases = SECOND_CASES if second_leaf_report else FIRST_CASES
+    run(
+        adapter.swApp,
+        assembly=SOURCE,
+        drawing_template=_TEMPLATE.path,
+        bom_template=bom_template,
+        out_dir=forensics_capture_dir("sm-minimal-native-repro"),
+        cases=cases,
+        seed_report=Path(second_leaf_report) if second_leaf_report else None,
+    )
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("part", choices=[ARTIFACT_STEM])
@@ -978,4 +1012,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_build(_build_minimal_native_repro))  # NEVER MERGE: diagnostic only.
