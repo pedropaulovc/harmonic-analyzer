@@ -39,9 +39,10 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import struct
 import sys
 import textwrap
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 from solidworks_mcp.adapters.com_variant import double_array, null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -53,6 +54,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 import _config
+import _seat_forensics
 import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
@@ -1167,7 +1169,10 @@ def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
             raise RuntimeError("GetPolylines7 returned a truncated primitive")
         kind, size = data[offset:offset + 2]
         if kind not in (0, 1) or size != (0 if kind == 0 else 12):
-            raise RuntimeError(f"GetPolylines7 invalid geometry header {(kind, size)!r}")
+            raise RuntimeError(
+                f"GetPolylines7 invalid geometry header {(kind, size)!r}"
+                f" at primitive {index}, offset {offset}"
+            )
         size = int(size)
         count_index = offset + 8 + size
         if count_index >= len(data):
@@ -1193,6 +1198,91 @@ def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
     return tuple(rendered)
 
 
+def _projection_polyline_snapshot(value: Any) -> dict[str, Any]:
+    """Retain the original G7 return tree without interpreting or truncating arrays.
+
+    Every double keeps its exact IEEE-754 bytes, including packed values, signed
+    zero and NaN payloads. COM objects cannot be serialized as live interfaces:
+    retain each slot's wrapper/dispatch identity; the native document copy owns
+    the entities. Do not dereference them or dump generated-wrapper docstrings.
+    """
+    kind = type(value)
+    record: dict[str, Any] = {"type": f"{kind.__module__}.{kind.__qualname__}"}
+    if value is None or kind in (bool, int, str):
+        record["value"] = value
+    elif kind is float:
+        record["repr"] = repr(value)
+        record["ieee754_le"] = struct.pack("<d", value).hex()
+    elif isinstance(value, (tuple, list)):
+        record["length"] = len(value)
+        record["items"] = [_projection_polyline_snapshot(item) for item in value]
+    else:
+        record["python_id"] = id(value)
+        try:
+            attributes = vars(value)
+        except Exception as exc:
+            attributes = {}
+            record["attributes_error"] = f"{type(exc).__name__}: {exc}"
+        dispatch = attributes.get("_oleobj_")
+        try:
+            record["dispatch_repr" if dispatch is not None else "opaque_repr"] = repr(
+                dispatch if dispatch is not None else value
+            )
+        except Exception as exc:
+            record["repr_error"] = f"{type(exc).__name__}: {exc}"
+    return record
+
+
+def _capture_projection_polyline_failure(
+    adapter: Any, view: Any, *, stage: str, result: Any, observed: bool,
+    exception: Exception, evidence: dict[str, Any],
+) -> NoReturn:
+    """Preserve a refused G7 decode, its native frame and partial drawing."""
+    probe: dict[str, Any] = {
+        "stage": stage,
+        "call": "early-bound IView.GetPolylines7(1); optional OUT argument omitted",
+        "return_observed": observed,
+        "rendered_status": "UNAVAILABLE",
+        "component_readback": evidence,
+        "view_state": {},
+        "reader_errors": {},
+    }
+    try:
+        # This is the unchanged object returned by the one original call, not a
+        # second getter, a cast, a sliced buffer or an alternative interpretation.
+        probe["original_return"] = _projection_polyline_snapshot(result)
+    except Exception as exc:
+        probe["reader_errors"]["original_return"] = f"{type(exc).__name__}: {exc}"
+    try:
+        view = _early_bound(view, "IView")
+        for name, reader in (
+            ("view", lambda: view_name(adapter, view)),
+            ("revision", lambda: _early_bound(adapter.swApp, "ISldWorks").RevisionNumber()),
+            ("orientation", lambda: view.GetOrientationName()),
+            ("configuration", lambda: view.ReferencedConfiguration),
+            ("display_mode", lambda: view.GetDisplayMode2()),
+            ("facetted_hlr", lambda: view.GetFacettedHlrDisplay()),
+            ("scale", lambda: view.ScaleRatio),
+            ("position", lambda: view.Position),
+            ("outline", lambda: view.GetOutline()),
+            ("cropped", lambda: view.IsCropped()),
+            ("model_to_view", lambda: _early_bound(
+                view.ModelToViewTransform, "IMathTransform"
+            ).ArrayData),
+        ):
+            try:
+                probe["view_state"][name] = _projection_polyline_snapshot(reader())
+            except Exception as exc:
+                probe["reader_errors"][name] = f"{type(exc).__name__}: {exc}"
+    except Exception as exc:
+        probe["probe_error"] = f"{type(exc).__name__}: {exc}"
+    _seat_forensics.capture_com_failure(
+        adapter, "mg-magnifier-thread-projection-polylines", str(exception),
+        api="IView.GetPolylines7", exception=exception, sheet_png=True,
+        native_polyline_probe=probe,
+    )
+
+
 @_telemetry.traced("drawing.mg_projection_model_ink", label_param="stage")
 def _projection_model_ink(
     adapter: Any, view: Any, *, stage: str,
@@ -1210,6 +1300,7 @@ def _projection_model_ink(
     view = _early_bound(view, "IView")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     values, errors, evidence = {}, [], {"stage": stage}
+    reader_exceptions: dict[str, Exception] = {}
     # Independent readers leave a discriminating trace even if one is refused.
     # Zoom is the documented GetPolylines7 generation prerequisite, not a retry.
     for name, reader in (
@@ -1223,6 +1314,7 @@ def _projection_model_ink(
             values[name] = reader()
         except Exception as exc:
             errors.append(f"{name}: {type(exc).__name__}: {exc}")
+            reader_exceptions[name] = exc
     full = {}
     evidence["drawing_components"] = []
     for raw in values.get("drawing_components") or ():
@@ -1246,7 +1338,18 @@ def _projection_model_ink(
             for edge in _projection_rendered_edges(values.get("polylines"))
         )
     except Exception as exc:
-        errors.append(f"model polylines: {type(exc).__name__}: {exc}")
+        original = reader_exceptions.get("polylines", exc)
+        evidence["errors"] = [*errors, f"model polylines: {type(original).__name__}: {original}"]
+        evidence["rendered_model_edges"] = None
+        components = values.get("visible_components")
+        evidence["visible_components_observed"] = "visible_components" in values
+        evidence["visible_component_count"] = (
+            len(components) if isinstance(components, (tuple, list)) else None
+        )
+        _capture_projection_polyline_failure(
+            adapter, view, stage=stage, result=values.get("polylines"),
+            observed="polylines" in values, exception=original, evidence=evidence,
+        )
     evidence["rendered_model_edges"] = len(rendered)
     evidence["visible_components"] = []
     targets = {

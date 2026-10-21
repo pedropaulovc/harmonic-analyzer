@@ -778,6 +778,16 @@ def lever_tip_native(monkeypatch, projection_native):
     import _drawing_dimensions as dimensions
 
     native = projection_native
+    native.failure_captures = []
+
+    def capture_failure(adapter, label, message, **kwargs):
+        # Never let offline tests save production documents or capture the host.
+        assert adapter is native.adapter
+        native.failure_captures.append((label, message, kwargs))
+        native.events.append(("capture-failure",))
+        raise kwargs["exception"]
+
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture_failure)
     native.annotations = []
     native.imports = []
     native.shown = []
@@ -799,6 +809,12 @@ def lever_tip_native(monkeypatch, projection_native):
         UpdateViewDisplayGeometry=lambda: None,
         GetOutline=lambda: native.outline,
         GetDetailCircleInfo2=lambda: native.fence,
+        GetOrientationName=lambda: "*Back",
+        ReferencedConfiguration="Default",
+        GetDisplayMode2=lambda: 2,
+        GetFacettedHlrDisplay=lambda: False,
+        Position=(0.100, 0.053),
+        ModelToViewTransform=SimpleNamespace(ArrayData=tuple(float(i) for i in range(16))),
     )
     native.base = SimpleNamespace(name="base", GetAnnotations=lambda: [])
     native.sheet_view = SimpleNamespace(name="sheet", GetAnnotations=lambda: [])
@@ -816,6 +832,7 @@ def lever_tip_native(monkeypatch, projection_native):
     native.adapter.swApp = SimpleNamespace(
         IsSame=lambda a, b: int(a is b),
         GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+        RevisionNumber=lambda: "34.4",
     )
     native.adapter.currentModel.ViewZoomtofit2 = lambda: native.events.append(("zoom",))
     monkeypatch.setattr(drawing, "double_array", tuple)
@@ -1234,6 +1251,180 @@ def test_model_polyline_reader_refuses_unproven_ink(lever_tip_native, failure):
         result = (native.rendered_edges, data)
     with pytest.raises(RuntimeError, match="GetPolylines7"):
         drawing._projection_rendered_edges(result)
+
+
+def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failure(lever_tip_native):
+    import struct
+
+    native = lever_tip_native
+    # Only (0.0,17.0) was retained from R25, not the complete buffer. This
+    # constructed remainder tests preservation; it is NOT an alternate format.
+    nan_bits = bytes.fromhex("010000000000f87f")
+    payload = (
+        0.0, 17.0, *(float(i) / 7 for i in range(128)), -0.0,
+        struct.unpack("<d", nan_bits)[0],
+    )
+    original_return = (tuple(native.edges), payload)
+    calls = []
+
+    def polylines(cross):
+        calls.append(cross)
+        return original_return
+
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match=r"invalid geometry header \(0.0, 17.0\).*offset 0") as caught:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert calls == [1]
+    assert len(native.failure_captures) == 1
+    _label, message, capture = native.failure_captures[0]
+    assert capture["exception"] is caught.value
+    assert message == str(caught.value)
+    assert capture["sheet_png"] is True
+    assert capture["api"] == "IView.GetPolylines7"
+    probe = capture["native_polyline_probe"]
+    assert probe["return_observed"] is True
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    tree = probe["original_return"]
+    assert tree["type"] == "builtins.tuple" and tree["length"] == 2
+    edge_slots, buffer = tree["items"]
+    assert edge_slots["length"] == 2
+    assert [slot["python_id"] for slot in edge_slots["items"]] == [id(edge) for edge in native.edges]
+    assert buffer["length"] == len(payload)
+    assert [item["type"] for item in buffer["items"]] == ["builtins.float"] * len(payload)
+    assert [bytes.fromhex(item["ieee754_le"]) for item in buffer["items"]] == [
+        struct.pack("<d", value) for value in payload
+    ]
+    state = probe["view_state"]
+    assert state["revision"]["value"] == "34.4"
+    assert state["orientation"]["value"] == "*Back"
+    assert state["display_mode"]["value"] == 2
+    assert state["facetted_hlr"]["value"] is False
+    assert state["cropped"]["value"] is False
+    assert state["model_to_view"]["length"] == 16
+    assert probe["reader_errors"] == {}
+    assert native.imports == [] and native.annotations == [] and not native.cropped
+    assert not any(event[0] in ("move", "caption-move", "crop") for event in native.events)
+
+
+def test_polyline_capture_retains_original_getter_exception_and_independent_view_reads(
+    lever_tip_native,
+):
+    native = lever_tip_native
+    original = OSError("native G7 OUT reader refused")
+    calls = []
+
+    def polylines(cross):
+        calls.append(("polylines", cross))
+        raise original
+
+    def display_mode():
+        calls.append(("display-mode",))
+        raise RuntimeError("display-mode diagnostic refused")
+
+    def quality():
+        calls.append(("facetted-hlr",))
+        return False
+
+    def outline():
+        calls.append(("outline",))
+        raise RuntimeError("outline diagnostic refused")
+
+    class Transform:
+        @property
+        def ArrayData(self):
+            calls.append(("transform",))
+            return tuple(float(i) for i in range(16))
+
+    native.view.GetPolylines7 = polylines
+    native.view.GetDisplayMode2 = display_mode
+    native.view.GetFacettedHlrDisplay = quality
+    native.view.GetOutline = outline
+    native.view.ModelToViewTransform = Transform()
+    with pytest.raises(OSError) as caught:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert caught.value is original
+    capture = native.failure_captures[0][2]
+    assert capture["exception"] is original and capture["sheet_png"] is True
+    probe = capture["native_polyline_probe"]
+    assert probe["return_observed"] is False
+    assert probe["original_return"] == {"type": "builtins.NoneType", "value": None}
+    assert set(probe["reader_errors"]) == {"display_mode", "outline"}
+    assert probe["view_state"]["facetted_hlr"]["value"] is False
+    assert probe["view_state"]["model_to_view"]["length"] == 16
+    assert calls == [
+        ("polylines", 1), ("display-mode",), ("facetted-hlr",), ("outline",), ("transform",),
+    ]
+    assert native.imports == [] and not native.cropped
+
+
+def test_polyline_snapshot_keeps_opaque_dispatch_identity_without_wrapper_repr():
+    class NativeWrapper:
+        def __init__(self):
+            self._oleobj_ = object()
+
+        def __repr__(self):
+            raise AssertionError("must not dump the generated native wrapper")
+
+    wrapper = NativeWrapper()
+    tree = drawing._projection_polyline_snapshot(([wrapper, None, True, 17], (0.0, -0.0)))
+    slots = tree["items"][0]
+    assert slots["type"] == "builtins.list" and slots["length"] == 4
+    assert slots["items"][0]["dispatch_repr"] == repr(wrapper._oleobj_)
+    assert slots["items"][0]["python_id"] == id(wrapper)
+    assert "repr_error" not in slots["items"][0]
+    assert slots["items"][1:] == [
+        {"type": "builtins.NoneType", "value": None},
+        {"type": "builtins.bool", "value": True},
+        {"type": "builtins.int", "value": 17},
+    ]
+    assert tree["items"][1]["items"][0]["ieee754_le"] != tree["items"][1]["items"][1]["ieee754_le"]
+
+
+def test_unreadable_opaque_polyline_slot_does_not_discard_numeric_payload():
+    class Unreadable:
+        @property
+        def __dict__(self):
+            raise RuntimeError("opaque attributes refused")
+
+        def __repr__(self):
+            raise RuntimeError("opaque repr refused")
+
+    tree = drawing._projection_polyline_snapshot(((Unreadable(),), (0.0, 17.0)))
+    slot = tree["items"][0]["items"][0]
+    assert "opaque attributes refused" in slot["attributes_error"]
+    assert "opaque repr refused" in slot["repr_error"]
+    assert tree["items"][1]["length"] == 2
+    assert [item["repr"] for item in tree["items"][1]["items"]] == ["0.0", "17.0"]
+
+
+def test_payload_snapshot_failure_cannot_mask_original_or_skip_view_readers(
+    lever_tip_native, monkeypatch,
+):
+    native = lever_tip_native
+    original = RuntimeError("original decoder failure")
+    raw = object()
+    snapshot = drawing._projection_polyline_snapshot
+
+    def refuse_raw(value):
+        if value is raw:
+            raise RuntimeError("raw snapshot refused")
+        return snapshot(value)
+
+    monkeypatch.setattr(drawing, "_projection_polyline_snapshot", refuse_raw)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._capture_projection_polyline_failure(
+            native.adapter, native.view, stage="diagnostic isolation",
+            result=raw, observed=True, exception=original, evidence={},
+        )
+    assert caught.value is original
+    capture = native.failure_captures[0][2]
+    assert capture["exception"] is original and capture["sheet_png"] is True
+    probe = capture["native_polyline_probe"]
+    assert "raw snapshot refused" in probe["reader_errors"]["original_return"]
+    assert probe["view_state"]["revision"]["value"] == "34.4"
+    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["view_state"]["model_to_view"]["length"] == 16
 
 
 @pytest.mark.parametrize("failure", [

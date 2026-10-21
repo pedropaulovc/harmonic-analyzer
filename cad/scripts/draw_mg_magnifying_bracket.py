@@ -12,6 +12,7 @@ No press-fit, collar, finish-land or GD&T-frame convention remains.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import math
 import re
 import sys
@@ -45,6 +46,7 @@ from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overla
 from _paths import CAD_ROOT
 from _session import run_build
 from _section_axis import position_section_caption
+import _seat_forensics
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
@@ -510,6 +512,143 @@ def _remove_out_of_cut_mounting_marks(adapter: Any, section: Any) -> None:
         raise RuntimeError("out-of-cut mounting centre mark survived deletion")
 
 
+def _mouth_thread_diagnostic(adapter: Any, section: Any, *, feature_name: str = "LeverTap") -> dict[str, Any]:
+    """Observe a failed section or staged native control; never authorize ink."""
+    evidence: dict[str, Any] = {"feature": feature_name, "reads": {}, "errors": {}}
+
+    def observe(name: str, reader: Any, *, opaque: bool = False) -> Any:
+        try:
+            value = reader()
+            evidence["reads"][name] = {"present": value is not None} if opaque else value
+            return value
+        except Exception as error:
+            evidence["errors"][name] = f"{type(error).__name__}: {error}"
+            return None
+
+    view = _early_bound(section, "IView")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    layer_manager = observe("layer_manager", lambda: _early_bound(model.GetLayerManager(), "ILayerMgr"), opaque=True)
+    base = observe("base_view", lambda: _early_bound(view.GetBaseView(), "IView"), opaque=True)
+    source = observe("source", lambda: _early_bound(base.ReferencedDocument, "IModelDoc2"), opaque=True) if base is not None else None
+    source_extension = None
+    if source is not None:
+        observe("source.path", lambda: source.GetPathName())
+        source_extension = observe("source.extension", lambda: _early_bound(source.Extension, "IModelDocExtension"), opaque=True)
+        feature = observe("source.feature", lambda: _early_bound(_early_bound(source, "IPartDoc").FeatureByName(feature_name), "IFeature"), opaque=True)
+        if feature is not None:
+            definition = observe("source.definition", lambda: _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2"), opaque=True)
+            if definition is not None:
+                observe("source.CosmeticThreadType", lambda: definition.CosmeticThreadType)
+                observe("source.ThreadEndCondition", lambda: definition.ThreadEndCondition)
+                observe("source.ThreadClass", lambda: definition.ThreadClass)
+                observe("source.Type", lambda: definition.Type)
+                observe("source.FastenerSize", lambda: definition.FastenerSize)
+                observe("source.EndCondition", lambda: definition.EndCondition)
+                observe("source.HoleDepth", lambda: definition.HoleDepth)
+                observe("source.ThreadDepth", lambda: definition.ThreadDepth)
+                observe("source.TapDrillDepth", lambda: definition.TapDrillDepth)
+                observe("source.ThruTapDrillDepth", lambda: definition.ThruTapDrillDepth)
+                observe("source.ThreadDiameter", lambda: definition.ThreadDiameter)
+                observe("source.TapDrillDiameter", lambda: definition.TapDrillDiameter)
+                observe("source.ThruTapDrillDiameter", lambda: definition.ThruTapDrillDiameter)
+    # Official DP_Detailing mapping; numeric enum values read from swconst PE
+    # metadata, not guessed. Read only: no document/global display toggles.
+    for label, document in (("drawing", model), ("source", source)):
+        if document is None:
+            continue
+        extension = source_extension if label == "source" else observe("drawing.extension", lambda: _early_bound(document.Extension, "IModelDocExtension"), opaque=True)
+        if extension is not None:
+            for name, value in (("swDisplayAnnotations", 31), ("swDisplayCosmeticThreads", 41), ("swDetailingCThreadDisplayHighQuality", 257)):
+                observe(f"{label}.{name}", lambda: extension.GetUserPreferenceToggle(value, 0))
+    for label, current in (("section", view), ("base", base)):
+        if current is None:
+            continue
+        for name, reader in (
+            ("mode", lambda: current.GetDisplayMode2()),
+            ("thread_quality", lambda: current.GetCThreadQuality()),
+            ("use_parent_mode", lambda: current.GetUseParentDisplayMode()),
+            ("faceted", lambda: current.GetFacettedHlrDisplay()),
+            ("angle", lambda: current.Angle), ("scale", lambda: current.ScaleDecimal),
+            ("outline", lambda: tuple(current.GetOutline())),
+        ):
+            observe(f"{label}.{name}", reader)
+    cut = observe("section.cut", lambda: _early_bound(view.GetSection(), "IDrSection"), opaque=True)
+    if cut is not None:
+        observe("section.cut_only", lambda: cut.GetDisplayOnlySurfaceCut())
+
+    def source_identity(name: str, entity: Any) -> None:
+        if source_extension is None or entity is None:
+            return
+        canonical = observe(f"{name}.canonical", lambda: source_extension.GetCorrespondingEntity2(entity), opaque=True)
+        if canonical is not None:
+            observe(f"{name}.source_id", lambda: tuple(source_extension.GetPersistReference3(canonical)))
+
+    def thread_readers(stage: str) -> None:
+        observe(f"{stage}.mode", lambda: view.GetDisplayMode2())
+        observe(f"{stage}.thread_quality", lambda: view.GetCThreadQuality())
+        threads = observe(f"{stage}.threads", lambda: tuple(view.GetCThreads() or ()), opaque=True)
+        if threads is None:
+            return
+        evidence["reads"][f"{stage}.thread_count"] = len(threads)
+        for index, raw_thread in enumerate(threads):
+            prefix = f"{stage}.thread[{index}]"
+            thread = observe(prefix, lambda: _early_bound(raw_thread, "ICThread"), opaque=True)
+            if thread is None:
+                continue
+            annotation = observe(f"{prefix}.annotation", lambda: _early_bound(thread.GetAnnotation(), "IAnnotation"), opaque=True)
+            if annotation is not None:
+                observe(f"{prefix}.visible", lambda: annotation.Visible)
+                observe(f"{prefix}.dangling", lambda: annotation.IsDangling())
+                layer_name = observe(f"{prefix}.layer", lambda: annotation.Layer)
+                if layer_name and layer_manager is not None:
+                    layer = observe(f"{prefix}.layer_object", lambda: _early_bound(layer_manager.GetLayer(layer_name), "ILayer"), opaque=True)
+                    if layer is not None:
+                        observe(f"{prefix}.layer_visible", lambda: layer.Visible)
+                        observe(f"{prefix}.layer_printable", lambda: layer.Printable)
+                observe(f"{prefix}.attachment_types", lambda: tuple(annotation.GetAttachedEntityTypes() or ()))
+                attached = observe(f"{prefix}.attachments", lambda: tuple(annotation.GetAttachedEntities3() or ()), opaque=True)
+                if attached is not None:
+                    evidence["reads"][f"{prefix}.attachment_count"] = len(attached)
+                    for attachment_index, entity in enumerate(attached):
+                        source_identity(f"{prefix}.attachment[{attachment_index}]", entity)
+            for family, owner in (("ICThread", thread), ("IAnnotation", annotation)):
+                if owner is None:
+                    continue
+                data = observe(f"{prefix}.{family}.display", lambda: _early_bound(owner.GetDisplayData(), "IDisplayData"), opaque=True)
+                if data is None:
+                    continue
+                for kind, count_reader, row_reader in (
+                    ("lines", lambda: data.GetLineCount(), lambda i: data.GetLineAtIndex2(i)),
+                    ("polylines", lambda: data.GetPolyLineCount(), lambda i: data.GetPolylineAtIndex2(i)),
+                    ("arcs", lambda: data.GetArcCount(), lambda i: data.GetArcAtIndex2(i)),
+                ):
+                    key = f"{prefix}.{family}.{kind}"
+                    count = observe(f"{key}.count", lambda: int(count_reader()))
+                    if count is not None:
+                        for row_index in range(max(0, count)):
+                            observe(f"{key}[{row_index}]", lambda: tuple(row_reader(row_index)))
+
+    thread_readers("before_generation")
+    # One documented GetPolylines7 generation boundary, not a setting sweep or
+    # retry. Immediate geometry access after HLR/HLV needs UpdateViewDisplayGeometry.
+    observe("generation.zoom_to_fit", lambda: model.ViewZoomtofit2())
+    observe("generation.update", lambda: view.UpdateViewDisplayGeometry())
+    thread_readers("after_generation")
+    polylines = observe("model_polylines", lambda: view.GetPolylines7(1), opaque=True)
+    evidence["model_polylines_role"] = "Solid-model/silhouette evidence only; null edge is NOT cosmetic-thread ownership."
+    if isinstance(polylines, (tuple, list)) and len(polylines) == 2:
+        edges, data = polylines
+        observe("model_polylines.records", lambda: tuple(data or ()))
+        if edges is not None:
+            evidence["reads"]["model_polylines.edge_count"] = len(edges)
+            for index, edge in enumerate(edges):
+                evidence["reads"][f"model_polylines.edge[{index}].present"] = edge is not None
+                source_identity(f"model_polylines.edge[{index}]", edge)
+    elif polylines is not None:
+        evidence["errors"]["model_polylines"] = "GetPolylines7 did not return its edge/OUT-polyline pair"
+    return evidence
+
+
 def _show_mouth_thread(adapter: Any, section: Any) -> None:
     """Import the model's native thread; refuse an empty/plain-bore representation."""
     if import_cosmetic_threads(adapter, section) != (1, 1):
@@ -533,7 +672,8 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
             if required:
                 errors.append(detail)
             return unavailable
-        _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={value!r}")
+        shown = f"present={value is not None}" if member in ("ICThread.GetAnnotation", "ICThread.GetDisplayData", "IAnnotation.GetDisplayData") else repr(value)
+        _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={shown}")
         return value
 
     def collect_display(data: Any, scope: str, *, required: bool) -> dict[str, list[Any]]:
@@ -568,7 +708,7 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
         visible = collect("native ink", "IAnnotation.Visible", lambda: int(annotation.Visible), required=True)
         dangling = collect("native ink", "IAnnotation.IsDangling", lambda: annotation.IsDangling(), required=True)
 
-    # Import already activates this view, and HLR regenerates precision threads.
+    # Import activates this view; HLR requests (but must not imply) precision.
     # Neither display-data API documents another activation prerequisite.
     data = collect("native ink", "ICThread.GetDisplayData", lambda: _early_bound(thread.GetDisplayData(), "IDisplayData"), required=True)
     primary = {"line": [], "polyline": [], "arc": []}
@@ -776,7 +916,24 @@ async def build(adapter: Any) -> dict[str, str]:
     _curate_tap_callout(adapter, side, tap)
     _set_hole_process(tap, mate=TAP_PROCESS, tapped=True)
     neck_location = _neck_to_foot_side(adapter, side, edges)
-    _show_mouth_thread(adapter, mouth)
+    try:
+        _show_mouth_thread(adapter, mouth)
+    except Exception as error:
+        try:
+            thread_evidence = _mouth_thread_diagnostic(adapter, mouth)
+        except Exception as diagnostic_error:
+            thread_evidence = {"errors": {"diagnostic": f"{type(diagnostic_error).__name__}: {diagnostic_error}"}}
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, f"{PART_STEM}-native-thread", str(error),
+                api="bracket native section thread guard", exception=error,
+                sheet_png=True, section_label="A-A", thread_evidence=thread_evidence,
+            )
+        except Exception as capture_error:
+            if capture_error is not error:
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(f"native thread secondary capture failure: {capture_error!r}")
+        raise
     _remove_out_of_cut_mounting_marks(adapter, mouth)
     landing = model_point_in_view(adapter, side, (NECK_HALF_X / 1000.0, 0.0, -4.5e-3), label="minimum thread-mouth wall")
     add_leader_note(adapter, WALL_CALLOUT, text_xy=WALL_TEXT_XY, attach_xy=landing, view=side, label="honest manufactured minimum wall")
