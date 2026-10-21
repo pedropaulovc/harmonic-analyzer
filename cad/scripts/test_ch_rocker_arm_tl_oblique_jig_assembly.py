@@ -2654,17 +2654,17 @@ def test_an_attained_wire_endpoint_into_an_actual_stud_is_not_hidden_by_the_cens
     assert proof.nominal == proof.upset == "UNRESOLVED"
 
 
-@pytest.mark.parametrize("stem", (spec.PIVOT_CAP_SCREW, spec.PIVOT_LOCK_WIRE))
+@pytest.mark.parametrize("stem", (spec.PIVOT_LOCK_WIRE,))
 @pytest.mark.parametrize("support", (0, 1))
 def test_cap_descendant_upset_padding_uses_its_actual_source_points_and_cap_frame(stem, support) -> None:
-    index = support * (4 if stem == spec.PIVOT_CAP_SCREW else 2)
+    index = support * 2
     points = [
         spec.frame_point(spec.PLACEMENTS[stem][index], p)
         for p in spec._box_corners(spec._component_local_boxes()[stem])
     ]
     cap = spec.PLACEMENTS[spec.PIVOT_CAP][support][0]
     # Include an extended attained envelope point; a footprint-only radius
-    # must not silently become authority for a longer source wire/screw.
+    # must not silently become authority for a longer source wire.
     points.append((cap[0] + 100.0, cap[1] - 80.0, cap[2] - 30.0))
     bounds = retention.capture_bounds()
     xy, down, up = spec._upset_fixture_padding(stem, index, points, "outer", bounds)
@@ -3332,3 +3332,225 @@ def test_moving_the_actual_feed_bracket_cannot_keep_an_old_matched_plane_proof(m
         proof = census[_fixture_pair(pass_name, (spec.PIVOT_BLOCK, 0), (spec.NUT_BRACKET, 0))]
         assert proof.nominal == proof.upset == "UNRESOLVED"
         assert proof.nominal_gap <= 0.0
+
+
+def test_cap_prisms_keep_only_the_two_real_registers_below_the_seating_plane() -> None:
+    boxes = spec._component_local_boxes()
+    nominal = spec._capture_fixture_source_prisms(spec.PIVOT_CAP, 0, boxes, manufactured=False)
+    manufactured = spec._capture_fixture_source_prisms(spec.PIVOT_CAP, 0, boxes, manufactured=True)
+    assert len(nominal) == len(manufactured) == 3
+    assert nominal[0][2] == (0.0, pivot_cap.HEIGHT)
+    assert manufactured[0][2][0] == 0.0  # an actual seating-face datum, not +/- height
+    assert manufactured[0][2][1] > nominal[0][2][1]
+
+    def contains(pieces, point):
+        return any(all(lo <= value <= hi for value, (lo, hi) in zip(point, piece, strict=True))
+                   for piece in pieces)
+
+    assert not contains(manufactured, (0.0, 0.0, -pivot_cap.REGISTER_PROJECTION / 2.0))
+    for index, (x, y) in enumerate(pivot_cap.REGISTER_POINTS, 1):
+        assert contains(nominal, (x, y, -pivot_cap.REGISTER_PROJECTION / 2.0))
+        assert manufactured[index][0][0] < nominal[index][0][0]
+        assert manufactured[index][0][1] > nominal[index][0][1]
+        assert manufactured[index][2][0] < nominal[index][2][0]
+        assert manufactured[index][2][1] == 0.0
+        assert manufactured[index][2][0] == pytest.approx(
+            -pivot_cap.REGISTER_PROJECTION - printed_band_mm(pivot_cap.REGISTER_PROJECTION_PLACES))
+
+
+@pytest.mark.parametrize("pass_name", tuple(trammel.PASS_RADIUS))
+def test_cap_screws_are_fixed_to_the_block_not_carried_by_cap_rock(pass_name) -> None:
+    boxes = spec._component_local_boxes()
+    bounds = retention.capture_bounds()
+    for index in range(spec.QUANTITIES[spec.PIVOT_CAP_SCREW]):
+        pieces = spec._capture_fixture_source_prisms(spec.PIVOT_CAP_SCREW, index, boxes, manufactured=True)
+        points = [spec.frame_point(spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][index], point)
+                  for piece in pieces for point in spec._box_corners(piece)]
+        assert spec._upset_fixture_padding(spec.PIVOT_CAP_SCREW, index, points, pass_name, bounds) == (0.0, 0.0, 0.0)
+        # Zero ADDITIONAL upset motion must not erase tap-location/axis errors,
+        # purchased head eccentricity, or the distinct low shank radius.
+        nominal = spec._capture_fixture_source_prisms(spec.PIVOT_CAP_SCREW, index, boxes, manufactured=False)
+        assert pieces[0][0][1] > nominal[0][0][1]
+        assert pieces[1][0][1] > nominal[1][0][1]
+        assert pieces[1][0][1] < pieces[0][0][1]
+        chain = spec._capture_fixture_height_chain(spec.PIVOT_CAP_SCREW, index)
+        assert chain["head seat", index] > 0.0
+
+
+def test_every_original_residual_pair_uses_its_grounded_proof_on_both_passes(
+    capture_fixture_census, qualified_capture_fixture_census,
+) -> None:
+    residuals = set()
+    for pass_name in trammel.PASS_RADIUS:
+        for support in range(2):
+            for screw in range(4 * support, 4 * support + 4):
+                key = _fixture_pair(pass_name, (spec.PIVOT_PIN, support), (spec.PIVOT_CAP_SCREW, screw))
+                residuals.add(key)
+                proof = capture_fixture_census[key]
+                assert proof.upset == "CONTINUOUS_SEPARATOR"
+                assert proof.upset_gap > 0.0
+                assert any("full-clock circular pin-section/screw" in basis for basis in proof.basis)
+            key = _fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))
+            residuals.add(key)
+            proof = capture_fixture_census[key]
+            assert proof.upset == "SOURCE_CAPTURE_JOINT"
+            assert any("bore-mouth/flange shield" in basis for basis in proof.basis)
+            assert proof.upset_gap <= 0.0  # not a static recessed-bearing box certificate
+            for offset in range(2):
+                key = _fixture_pair(pass_name, (spec.CARRIAGE_SCREW, 4 * support + offset),
+                                    (spec.PIVOT_CAP_SCREW, 4 * support + 2 + offset))
+                residuals.add(key)
+                proof = capture_fixture_census[key]
+                assert proof.upset == "CONTINUOUS_SEPARATOR" and proof.upset_gap > 0.0
+    assert len(residuals) == 28
+    assert len(qualified_capture_fixture_census) == 4680
+    assert all(qualified_capture_fixture_census[key].source_resolved for key in residuals)
+    # This explicitly labelled synthetic record set exercises source closure,
+    # not a native run or installed acceptance. No pair is dropped.
+    assert all(proof.source_resolved for proof in qualified_capture_fixture_census.values())
+
+
+def test_pin_screw_radial_separator_has_both_sides_of_its_capture_translation_boundary() -> None:
+    boxes = spec._component_local_boxes()
+    bounds = retention.capture_bounds()
+    for support in range(2):
+        for screw in range(4 * support, 4 * support + 4):
+            gap = spec._capture_fixture_pin_screw_radial_gap(support, screw, bounds, boxes)
+            assert gap is not None and gap > 0.0
+            for epsilon in (-1e-8, 1e-8):
+                moved = replace(bounds, cap_lateral_shift=bounds.cap_lateral_shift + gap + epsilon)
+                result = spec._capture_fixture_pin_screw_radial_gap(support, screw, moved, boxes)
+                assert result == pytest.approx(-epsilon, abs=1e-12)
+                assert (result > 0.0) == (epsilon < 0.0)
+            assert spec._capture_fixture_pin_screw_radial_gap(1 - support, screw, bounds, boxes) is None
+
+
+def test_pin_screw_circle_bound_contains_section_ends_clock_and_reversible_tilt() -> None:
+    boxes = spec._component_local_boxes()
+    bounds = retention.capture_bounds()
+    pin_pieces = spec._capture_fixture_source_prisms(spec.PIVOT_PIN, 0, boxes, manufactured=True)
+    screw_pieces = spec._capture_fixture_source_prisms(spec.PIVOT_CAP_SCREW, 0, boxes, manufactured=True)
+    flange_mid = (pivot_pin.FLANGE_BOTTOM_STATION + pivot_pin.FLANGE_TOP_STATION) / 2.0
+    q = bounds.cap_lateral_shift + bounds.flange_lateral_shift
+    # Triangular radial support proves ALL phases. These interstitial actual
+    # cylinder surface points additionally catch use of flange radius at a tip,
+    # omitted axial ends, or an unsigned one-way tilt.
+    for pin_piece, phase, tilt in product(
+        pin_pieces, (2.0 * math.pi * (k + 0.37) / 17.0 for k in range(17)),
+        (-bounds.pin_tilt, 0.0, bounds.pin_tilt),
+    ):
+        radius = pin_piece[0][1]
+        for z in pin_piece[2]:
+            x, y, h = radius * math.cos(phase), radius * math.sin(phase), z - flange_mid
+            x, h = x * math.cos(tilt) + h * math.sin(tilt), -x * math.sin(tilt) + h * math.cos(tilt)
+            pin_extent = math.hypot(x, y) + q
+            for screw_radius, screw_piece in zip(
+                (retention_hardware.SCREW_HEAD_DIA_MAX / 2.0, retention_hardware.SCREW_MAJOR_DIA_MAX / 2.0),
+                screw_pieces, strict=True,
+            ):
+                screw_extent = screw_radius + math.hypot(screw_piece[0][1] - screw_radius,
+                                                        screw_piece[1][1] - screw_radius)
+                for screw in range(4):
+                    p, s = spec.PLACEMENTS[spec.PIVOT_PIN][0][0], spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][screw][0]
+                    actual_gap = math.hypot(s[0] - p[0], s[1] - p[1]) - pin_extent - screw_extent
+                    bound = spec._capture_fixture_pin_screw_radial_gap(0, screw, bounds, boxes)
+                    assert actual_gap >= bound - 1e-12
+                    assert actual_gap > 0.0
+
+
+def test_relocated_screw_into_real_flange_material_cannot_keep_the_radial_theorem(monkeypatch) -> None:
+    pin_pose = spec.PLACEMENTS[spec.PIVOT_PIN][0]
+    local = (pivot_pin.FLANGE_DIA / 4.0, 0.0,
+             (pivot_pin.FLANGE_BOTTOM_STATION + pivot_pin.FLANGE_TOP_STATION) / 2.0)
+    witness = spec.frame_point(pin_pose, local)
+    placements = dict(spec.PLACEMENTS)
+    screws = list(placements[spec.PIVOT_CAP_SCREW])
+    _old_origin, rows = screws[0]
+    screws[0] = ((witness[0], witness[1], witness[2] + retention_hardware.SCREW_LENGTH / 2.0), rows)
+    placements[spec.PIVOT_CAP_SCREW] = tuple(screws)
+    monkeypatch.setattr(spec, "PLACEMENTS", placements)
+    assert math.hypot(*local[:2]) < pivot_pin.FLANGE_DIA / 2.0
+    assert pivot_pin.FLANGE_BOTTOM_STATION < local[2] < pivot_pin.FLANGE_TOP_STATION
+    screw_point = _in_frame(rows, screws[0][0], witness)
+    assert math.hypot(*screw_point[:2]) < retention_hardware.SCREW_MAJOR_DIA_MIN / 2.0
+    assert -retention_hardware.SCREW_LENGTH < screw_point[2] < 0.0
+    assert spec._capture_fixture_pin_screw_radial_gap(0, 0, retention.capture_bounds(), spec._component_local_boxes()) is None
+    proof = spec.capture_fixture_clearance_census(
+        native_baseline="SYNTHETIC MUTATION ONLY: not an actual native attestation", samples=3,
+    )[_fixture_pair("inner", (spec.PIVOT_PIN, 0), (spec.PIVOT_CAP_SCREW, 0))]
+    assert proof.upset == "UNRESOLVED" and proof.upset_gap <= 0.0
+
+
+def test_bearing_shield_is_not_a_fixed_bearing_height_or_axial_play_assumption() -> None:
+    bounds = retention.capture_bounds()
+    shield = spec.capture_fixture_bearing_shield_bounds(bounds)
+    assert set(shield) == {"flange radial cover", "flat pocket radial cover", "solid flange barrier",
+                           "outer-race mid-plane below bore mouth", "register radial separator"}
+    assert min(shield.values()) > 0.0
+    assert shield["flange radial cover"] == pytest.approx(
+        bounds.flange_contact_margin + retention.STOP_CONTACT_DIAMETER / 2.0 - bearing.OD / 2.0)
+    assert shield["flat pocket radial cover"] == pytest.approx(
+        bounds.cap_pocket_margin + retention.STOP_CONTACT_DIAMETER / 2.0 - bearing.OD / 2.0)
+    # The actual source OD mid-plane stays in its bore even if the bearing
+    # extracts until the conservative cap-roof ceiling. No chamfer MAX or
+    # fixed nominal recess is assumed.
+    assert shield["outer-race mid-plane below bore mouth"] == pytest.approx(
+        (bearing.WIDTH - 0.12) / 2.0
+        - retention.PIN_FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+        - retention.CAP_CHAMBER_EXCESS[1] - bounds.cap_roof_rise)
+    assert shield["solid flange barrier"] > 0.0
+    primary = {}
+    for support in range(2):
+        assert spec._capture_fixture_joint((spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1),
+                                           bounds, "inner", primary) is not None
+        assert spec._capture_fixture_joint((spec.PIVOT_CAP, support), (spec.BEARING, 2 * (1 - support) + 1),
+                                           bounds, "inner", primary) is None
+
+
+@pytest.mark.parametrize("field, margin", (
+    ("flange_contact_margin", "flange radial cover"),
+    ("cap_pocket_margin", "flat pocket radial cover"),
+))
+def test_bearing_shield_refuses_both_radial_cover_failure_boundaries(field, margin) -> None:
+    bounds = retention.capture_bounds()
+    boundary = bearing.OD / 2.0 - retention.STOP_CONTACT_DIAMETER / 2.0
+    for epsilon in (-1e-8, 1e-8):
+        changed = replace(bounds, **{field: boundary + epsilon})
+        assert spec.capture_fixture_bearing_shield_bounds(changed)[margin] == pytest.approx(epsilon, abs=1e-12)
+        joint = spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), changed, "inner", {})
+        assert (joint is not None) == (epsilon > 0.0)
+
+
+@pytest.mark.parametrize("margin", ("solid flange barrier", "outer-race mid-plane below bore mouth"))
+@pytest.mark.parametrize("epsilon", (-1e-8, 1e-8))
+def test_bearing_shield_has_both_barrier_and_bore_guidance_boundary_sides(margin, epsilon, monkeypatch) -> None:
+    bounds = retention.capture_bounds()
+    if margin == "solid flange barrier":
+        boundary = (printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+                    + 2.0 * retention.PIN_STOP_FACE_VARIATION_MAX / math.cos(bounds.pin_tilt))
+        monkeypatch.setattr(retention, "PIN_FLANGE_THICK", boundary + epsilon)
+    else:
+        boundary = (0.12 + 2.0 * (retention.PIN_FLANGE_THICK + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+                    + retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise))
+        monkeypatch.setattr(bearing, "WIDTH", boundary + epsilon)
+    value = spec.capture_fixture_bearing_shield_bounds(bounds)[margin]
+    # More flange thickness helps the barrier, and more race width keeps the
+    # mid-plane deeper in the bore. The other four obligations remain intact.
+    assert (value > 0.0) == (epsilon > 0.0)
+    assert (spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is not None) == (epsilon > 0.0)
+
+
+def test_bearing_shield_does_not_bypass_register_material_in_the_bearing_footprint(monkeypatch) -> None:
+    bounds = retention.capture_bounds()
+    monkeypatch.setattr(pivot_cap, "REGISTER_POINTS", ((-1.0, 0.0), (1.0, 0.0)))
+    assert spec.capture_fixture_bearing_shield_bounds(bounds)["register radial separator"] < 0.0
+    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is None
+
+
+def test_upper_bearing_contact_barrier_still_needs_exact_native_baseline() -> None:
+    census = spec.capture_fixture_clearance_census(samples=3)
+    for pass_name in trammel.PASS_RADIUS:
+        for support in range(2):
+            proof = census[_fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))]
+            assert proof.upset == "UNRESOLVED" and proof.upset_gap <= 0.0
+            assert any("static recess/AABB separation alone is not credited" in basis for basis in proof.basis)

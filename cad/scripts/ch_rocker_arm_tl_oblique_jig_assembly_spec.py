@@ -2325,6 +2325,13 @@ def _upset_fixture_padding(
     bounds: retention.CaptureBounds,
 ) -> tuple[float, float, float]:
     """Additional (XY, down, up) for the intact rigid captured mechanism."""
+    if stem == PIVOT_CAP_SCREW:
+        # C3 seats these screws in the BLOCK's receiver threads. The cap can
+        # move around their fixed shanks/heads, not carry them with its register
+        # float, yaw or rock. Direct tap-location/angular and purchased head
+        # errors remain in the manufactured prisms and head-seat height chain.
+        # This intact-rigid premise credits no thread pullout/bending strength.
+        return 0.0, 0.0, 0.0
     pin_face_angle = bounds.pin_tilt
     seat_height = (
         retention.PIN_LOWER_GAP[1] + retention.PIN_FLANGE_THICK
@@ -2378,10 +2385,9 @@ def _upset_fixture_padding(
             + radius * math.sin(pin_face_angle) + height * (1.0 - math.cos(pin_face_angle))
         )
         return xy, vertical, vertical
-    if stem in (PIVOT_CAP, PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
-        # All three use the actual cap frame, including off-centre screw and
-        # physical wire-row placements. A cap-footprint radius alone does not
-        # enclose an extended wire endpoint or a screw's below-cap tip.
+    if stem in (PIVOT_CAP, PIVOT_LOCK_WIRE):
+        # Both use the actual cap frame, including physical wire-row placements.
+        # A cap-footprint radius alone does not enclose an extended wire endpoint.
         cap_origin = PLACEMENTS[PIVOT_CAP][root_index][0]
         radius = max(math.hypot(p[0] - cap_origin[0], p[1] - cap_origin[1]) for p in points)
         height = max(abs(p[2] - cap_origin[2]) for p in points)
@@ -2840,6 +2846,28 @@ def _capture_fixture_joint(
         return "capture_bounds: integral flange/solid block stop annulus; existing exact bearing-seat fits remain mandatory"
     if families == {PIVOT_CAP, PIVOT_PIN}:
         return "capture_bounds: flange/pocket and roof stop circle; positive pin/aperture and normal corner clearances"
+    if families == {PIVOT_CAP, BEARING}:
+        cap_index = i if a == PIVOT_CAP else j
+        bearing_index = i if a == BEARING else j
+        if bearing_index % len(BEARING_SEAT_Z) != len(BEARING_SEAT_Z) - 1:
+            return None
+        if (PLACEMENTS[PIVOT_CAP][cap_index] != PIVOT_CAP_PLACEMENTS[cap_index]
+                or PLACEMENTS[PIVOT_BLOCK][cap_index] != PIVOT_BLOCK_PLACEMENTS[cap_index]
+                or PLACEMENTS[PIVOT_PIN][cap_index] != (PIVOT_PIN_ORIGINS[cap_index], PIN_ROWS)
+                or PLACEMENTS[BEARING][bearing_index] != BEARING_PLACEMENTS[bearing_index]):
+            return None
+        shield = capture_fixture_bearing_shield_bounds(bounds)
+        if min(shield.values()) > 0.0:
+            return (
+                "bore-mouth/flange shield for this upper 6200: installed outer-race/bore contact guides free axial "
+                "extraction until its intact annular end face meets the full-coverage solid flange; actual purchased "
+                "outer-ring cylindrical OD land must include its axial mid-plane. Inner race meets the narrow boss; "
+                "balls/seals remain in the intact purchased bearing. Positive flange "
+                "thickness separates that stop from the flat cap roof; both registers remain radially outside. "
+                "No bearing friction, pullout force, fixed outer-ring height or invented internal axial-play limit. "
+                + "; ".join(f"{name}={value:.9g} mm" for name, value in shield.items())
+            )
+        return None
     if families == {PIVOT_BLOCK, PIVOT_CAP_SCREW}:
         return "unchanged exact cap-screw/block thread-major fit only; C3B actual complete-thread interval and seating remain mandatory"
     if families == {PIVOT_CAP, PIVOT_CAP_SCREW}:
@@ -2906,6 +2934,27 @@ def _capture_fixture_source_prisms(
             grown(wing, (bore_x, wing_y, 0.0),
                   (printed_band_mm(pivot_block.WING_AXIS_REACH_PLACES), wing_y, height)),
         )
+    if stem == PIVOT_CAP:
+        # Only the TWO registers project below the seating face. A filled
+        # negative-Z footprint invents cap material above the upper bearing.
+        body = ((-pivot_cap.WIDTH / 2.0, pivot_cap.WIDTH / 2.0),
+                (-pivot_cap.LENGTH / 2.0, pivot_cap.LENGTH / 2.0),
+                (0.0, pivot_cap.HEIGHT))
+        edge = (printed_band_mm(pivot_cap.OUTLINE_PLACES)
+                + printed_band_mm(pivot_cap.CENTER_LOCATION_PLACES)) if manufactured else 0.0
+        body = grown(body, (edge, edge, 0.0),
+                     (edge, edge, printed_band_mm(pivot_cap.HEIGHT_PLACES) if manufactured else 0.0))
+        radius = (pivot_cap.REGISTER_DIA + (pivot_cap.REGISTER_BAND[0] if manufactured else 0.0)) / 2.0
+        location = printed_band_mm(pivot_cap.REGISTER_LOCATION_PLACES) if manufactured else 0.0
+        projection = pivot_cap.REGISTER_PROJECTION + (
+            printed_band_mm(pivot_cap.REGISTER_PROJECTION_PLACES) if manufactured else 0.0)
+        # The cylindrical projection's tilted axis is covered through its full
+        # depth; the free-end chamfer only removes material.
+        radial = radius + location + (
+            projection * math.tan(math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)) if manufactured else 0.0)
+        registers = tuple(((x - radial, x + radial), (y - radial, y + radial), (-projection, 0.0))
+                          for x, y in pivot_cap.REGISTER_POINTS)
+        return body, *registers
     if stem == PIVOT_PIN:
         bearing_r = (pivot_pin.FIT_DIA + pivot_pin.BEARING_BAND[0]) / 2.0
         boss_r = (pivot_pin.COLLAR_DIA + (printed_band_mm(pivot_pin.COLLAR_PLACES) if manufactured else 0.0)) / 2.0
@@ -3001,8 +3050,6 @@ def _capture_fixture_source_prisms(
                    printed_band_mm(base_bar.STATION_PLACES) + printed_band_mm(base_bar.RAIL_ROW_PLACES),
                    printed_band_mm(base_bar.THICK_PLACES)),
         CARRIAGE: (b2 + printed_band_mm(pivot_block.HOLE_STATION_PLACES) + pivot_block.SCREW_FLOAT,) * 2 + (0.0,),
-        PIVOT_CAP: (printed_band_mm(pivot_cap.OUTLINE_PLACES) + printed_band_mm(pivot_cap.CENTER_LOCATION_PLACES),) * 2
-                   + (printed_band_mm(pivot_cap.HEIGHT_PLACES),),
         PIVOT_RETAINER: (printed_band_mm(1) / 2.0, printed_band_mm(1) / 2.0, 0.0),
         PIVOT_LOCK_WIRE: (printed_band_mm(retention.CAP_BOLT_LOCATION_PLACES)
                           + retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
@@ -3040,10 +3087,6 @@ def _capture_fixture_source_prisms(
         # Approved rework's sole new exterior authority, not stock 3-in length
         # tolerance and not an invented purchased-kit band.
         return (grown(box, (0.0, 0.0, 0.0), (0.0, hold_down_stud.LENGTH_BAND, 0.0)),)
-    if stem == PIVOT_CAP:
-        x, y, height = bands[stem]
-        return (grown(box, (x, y, printed_band_mm(pivot_cap.REGISTER_PROJECTION_PLACES)),
-                      (x, y, height)),)
     if stem == RISER:
         x, y, height = bands[stem]
         return (grown(box, (x, y, 0.0), (x, y, height)),)
@@ -3211,6 +3254,97 @@ def _capture_fixture_carrier_plane_gap(
             - top + bounds.cap_top_rise - rise + (cap_radius - radius) * math.tan(bounds.carrier_tilt))
 
 
+def _capture_fixture_pin_screw_radial_gap(
+    pin: int, screw: int, bounds: retention.CaptureBounds, boxes: dict[str, Box3],
+) -> float | None:
+    """Full-clock circular separator about the SAME fixed block axis (mm).
+
+    The flange centre can translate by cap float + flange/pocket float. Each
+    finite pin section then adds only its OWN axial tilt lever about that
+    flange centre, not the far pin tip's lever at every flange point. Screws
+    remain in the block threads; their direct manufactured source envelopes
+    retain tap-angle/location and purchased eccentricity. Common rail placement
+    and alignment cancel; no bearing friction or internal axial play is used.
+    """
+    if _motion_root(PIVOT_PIN, pin) != _motion_root(PIVOT_CAP_SCREW, screw):
+        return None
+    # This theorem uses the authored bearing-axis/tap datums, not arbitrary
+    # relocated or rotated components. Such a mutation keeps the ordinary
+    # finite-prism census and must obtain its own separator.
+    if (PLACEMENTS[PIVOT_PIN][pin] != (PIVOT_PIN_ORIGINS[pin], PIN_ROWS)
+            or PLACEMENTS[PIVOT_BLOCK][pin] != PIVOT_BLOCK_PLACEMENTS[pin]
+            or PLACEMENTS[PIVOT_CAP][pin] != PIVOT_CAP_PLACEMENTS[pin]
+            or PLACEMENTS[PIVOT_CAP_SCREW][screw] != PIVOT_CAP_SCREW_PLACEMENTS[screw]):
+        return None
+    pin_pieces = _capture_fixture_source_prisms(PIVOT_PIN, pin, boxes, manufactured=True)
+    flange_mid = (pivot_pin.FLANGE_BOTTOM_STATION + pivot_pin.FLANGE_TOP_STATION) / 2.0
+    pin_radius = bounds.cap_lateral_shift + bounds.flange_lateral_shift + max(
+        piece[0][1] + max(abs(z - flange_mid) for z in piece[2]) * math.sin(bounds.pin_tilt)
+        for piece in pin_pieces
+    )
+    screw_pieces = _capture_fixture_source_prisms(PIVOT_CAP_SCREW, screw, boxes, manufactured=True)
+    # Each source piece is a circular section plus a square direct-location
+    # uncertainty. Enclose that Minkowski sum by r + hypot(dx,dy), NOT the
+    # impossible circumscribed square of the purchased round head.
+    screw_radii = (retention_hardware.SCREW_HEAD_DIA_MAX / 2.0,
+                   retention_hardware.SCREW_MAJOR_DIA_MAX / 2.0)
+    screw_radius = max(
+        radius + math.hypot(piece[0][1] - radius, piece[1][1] - radius)
+        for radius, piece in zip(screw_radii, screw_pieces, strict=True)
+    )
+    pin_origin = PLACEMENTS[PIVOT_PIN][pin][0]
+    screw_origin = PLACEMENTS[PIVOT_CAP_SCREW][screw][0]
+    return math.hypot(*(screw_origin[a] - pin_origin[a] for a in (0, 1))) - pin_radius - screw_radius
+
+
+def capture_fixture_bearing_shield_bounds(
+    bounds: retention.CaptureBounds | None = None,
+) -> dict[str, float]:
+    """Upper-bearing/cap contact barrier about actual block-top Z=0 (mm).
+
+    A bearing need NOT stay at its nominal recess during uplift. The existing
+    two full-stop-circle proofs already put the complete bore mouth below a
+    projected solid flange and a flat cap roof. Its actual outer-ring end-face
+    annulus (5972K41 outer_ring_section), not a fictitious solid bearing disk,
+    encounters that flange before exiting its cylindrical seat. The inner
+    ring meets the real narrow pin boss; retained balls/seals are not promoted
+    to a rigid union. Actual receiving/profile acceptance MUST establish that
+    the uninterrupted cylindrical outer-ring OD land includes its axial
+    mid-plane, as the native source does. No supplier chamfer maximum is
+    invented. Intact purchased-bearing/installed-fit acceptance remains
+    mandatory; this is neither bearing-disintegration nor strength proof.
+    """
+    bounds = retention.capture_bounds() if bounds is None else bounds
+    stop_r, bearing_r = retention.STOP_CONTACT_DIAMETER / 2.0, bearing.OD / 2.0
+    # Catalogue receiving width is 9 -0.12/0; authority is the published
+    # 6200 envelope in bearing_spec, not an invented internal endplay band.
+    bearing_width_min = bearing.WIDTH - 0.12
+    flange_min = retention.PIN_FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+    flange_max = retention.PIN_FLANGE_THICK + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+    roof_high = flange_max + retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
+    pieces = _capture_fixture_source_prisms(PIVOT_CAP, 0, _component_local_boxes(), manufactured=True)[1:]
+    register_gap = min(
+        math.hypot(*(0.0 if lo <= 0.0 <= hi else min(abs(lo), abs(hi)) for lo, hi in piece[:2]))
+        - bearing_r - bounds.cap_lateral_shift
+        - max(abs(z) for z in piece[2]) * math.sin(bounds.cap_tilt)
+        - max(math.hypot(x, y) for x in piece[0] for y in piece[1]) * (1.0 - math.cos(bounds.cap_tilt))
+        for piece in pieces
+    )
+    # Clocking/yaw preserves radial norm, so no independent yaw travel is
+    # subtracted from the register's radial separator.
+    return {
+        "flange radial cover": bounds.flange_contact_margin + stop_r - bearing_r,
+        "flat pocket radial cover": bounds.cap_pocket_margin + stop_r - bearing_r,
+        "solid flange barrier": flange_min * math.cos(bounds.pin_tilt)
+                                - 2.0 * retention.PIN_STOP_FACE_VARIATION_MAX,
+        # Roof height overbounds the stopped ring's top. Its full-OD mid-plane
+        # witness remains below the bore mouth: this is witness depth, NOT a
+        # claimed minimum axial extent of the purchased cylindrical land.
+        "outer-race mid-plane below bore mouth": bearing_width_min / 2.0 - roof_high,
+        "register radial separator": register_gap,
+    }
+
+
 def _capture_fixture_upper_axial_shifts() -> tuple[float, float]:
     """Finite EXTERNAL overbound, not a primary washer-bridge proof.
 
@@ -3272,6 +3406,9 @@ def capture_fixture_clearance_census(
     transforms only. It does not establish clearance of independently padded
     upset envelopes. Named capture joints use capture_bounds instead; all
     remaining failed separators are explicitly UNRESOLVED.
+    Cap screws are fixed to the block's engaged threads, not carried by cap
+    motion. An extracting upper bearing instead needs the bore-mouth/flange
+    shield and exact native baseline; its static recess is never upset proof.
 
     This is conditional source geometry, not as-built acceptance. C2-C5 actual
     gaps, seated heads/registers, full threads, accepted TL-29 fit-up, actual
@@ -3539,6 +3676,22 @@ def capture_fixture_clearance_census(
                         if plane_gap > 0.0:
                             basis.append("capture_bounds coupled lower-carrier plane, actual head/wire cap-frame extent and rock/yaw lever; shared support datums cancel")
                 families = {first[0], second[0]}
+                if families == {PIVOT_CAP, BEARING} and roots[first] == roots[second]:
+                    bearing_item = first if first[0] == BEARING else second
+                    if bearing_item[1] % len(BEARING_SEAT_Z) == len(BEARING_SEAT_Z) - 1:
+                        # A nominally recessed bearing box is NOT its uplift
+                        # envelope. Require the explicit bore-mouth shield
+                        # joint below, qualified by the exact native baseline.
+                        upset_gap = min(upset_gap, 0.0)
+                        basis.append("upper bearing may extract axially: static recess/AABB separation alone is not credited during upset")
+                if families == {PIVOT_PIN, PIVOT_CAP_SCREW}:
+                    pin_item = first if first[0] == PIVOT_PIN else second
+                    screw_item = first if first[0] == PIVOT_CAP_SCREW else second
+                    radial_gap = _capture_fixture_pin_screw_radial_gap(pin_item[1], screw_item[1], bounds, boxes)
+                    if radial_gap is not None:
+                        upset_gap = max(upset_gap, radial_gap)
+                        if radial_gap > 0.0:
+                            basis.append("same-block full-clock circular pin-section/screw separator: direct manufactured tap/head envelopes, flange-centre capture translation and each finite section's own tilt lever; fixed screw threads, common rail alignment cancels")
                 if first[0] == PIVOT_PIN and second[0] == CARRIAGE and roots[first] == roots[second]:
                     record = primary.get((pass_name, roots[first][1]))
                     if record is not None:
