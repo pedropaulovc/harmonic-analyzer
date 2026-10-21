@@ -448,7 +448,7 @@ on the modeled reach assumption, not a maximum imposed by **4.95 MIN**.
 An unbounded MIN drill remains unacceptable.
 `magnifying_bracket_joint_layout` owns those design/native-pilot stacks,
 the independent printed pilot-only step-wall budget and the separate
-conditional modeled-thread guard above. Receiver-row location remains
+required thread-cutting-envelope guard above. Receiver-row location remains
 top-referenced **2.54 ±0.05 mm**, placing both axes on unchanged local Y=0;
 increasing the plate downward must not move the axes. No receiver, screw,
 flange or mount pose is changed to buy material.
@@ -457,7 +457,9 @@ The intended drawing reduction is **9 → 6 views**, pending native
 regeneration/inspection: remove C-C and H-H entirely, combine knife detail
 D and ridge detail E into **D at 10:1** with all existing knife dimensions,
 knife ridge **R0.1 MAX** and datum A; the rib-side/profile **R1 MAX** appears
-in VIEW G. Retain the ordinary views and both isometrics.
+in VIEW G. The six retained views are the sheet-1 top/plan view, VIEW G,
+sheet-1 isometric, sheet-2 VIEW F, Detail D, and sheet-2 isometric. The
+five non-detail views include both isometrics; there are no section views.
 `PlateThickness@PlateProfile` stays model-owned at **7.00 mm** under
 the ordinary two-place band; a section solely to distinguish plate and
 pad thickness is no longer required. This is source intent, not evidence
@@ -513,7 +515,7 @@ These are **analytical source budgets and requested native placements**,
 not an after-fix acceptance claim. Native rebuild/readbacks, audit and
 enlarged-sheet inspection must still prove the whole text, leaders,
 witnesses, source circle and isometric clearance on both sheets, with all
-dimensions, five ordinary views, one Detail D and zero sections retained.
+dimensions and the six views listed above retained, with zero sections.
 The r7 `19X7.06` BASIC-box left-border strike lies in whitespace
 (prefix ends **284.309 mm**, border **284.6645 mm**, value begins
 **285.731 mm**); the enlarged PDF is visibly unstruck, so it is unchanged.
