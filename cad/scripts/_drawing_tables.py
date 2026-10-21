@@ -710,7 +710,7 @@ def _bind_bom_number_property(
     *,
     configuration: str,
     label: str,
-    _visibility_probe: Callable[[Any, int, Callable[[], None]], None] | None = None,
+    _visibility_probe: Callable[[Any, int], None] | None = None,
 ) -> None:
     """Display associative Numbers without replacing the native grouping column."""
     rows = int(table.RowCount)
@@ -780,11 +780,7 @@ def _bind_bom_number_property(
     if _visibility_probe is None:
         _set_bom_column_hidden(table, native_column, True, label=label)
     else:
-        _visibility_probe(
-            table,
-            native_column,
-            lambda: _set_bom_column_hidden(table, native_column, True, label=label),
-        )
+        _visibility_probe(table, native_column)
         raise RuntimeError(f"{label} BOM visibility diagnostic unexpectedly returned")
     retained = inserted[:-1] + ((201, True),)
     if _bom_physical_columns(table, label=label) != retained:
@@ -1016,7 +1012,7 @@ def insert_bom_table(
     configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
     configuration: str | None = None,
     label: str,
-    _visibility_probe: Callable[[Any, int, Callable[[], None]], None] | None = None,
+    _visibility_probe: Callable[[Any, int], None] | None = None,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
 

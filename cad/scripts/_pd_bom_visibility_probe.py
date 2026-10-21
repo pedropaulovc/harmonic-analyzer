@@ -1,7 +1,7 @@
-"""Temporary Native2554 PD-only read/visibility/restore experiment; never saves.
+"""Temporary Native2564 PD-only pristine raw-p visibility control; never saves.
 
-The caller supplies the actual existing hide, not a reconstructed +1 oracle.
-Raw property indices and True/False table indices remain separate evidence.
+The previous p+1 write materialized a latent Qty column and was not reversible.
+This control never writes p+1: raw property and True/False indices stay separate.
 Remove this module and its explicit PD hook after the intentional failed leaf.
 """
 
@@ -316,7 +316,6 @@ def _prove_candidate(stage: dict[str, Any], baseline: dict[str, Any], p: int) ->
 def probe_visibility_domain(
     table: Any,
     native_column: int,
-    existing_hide: Callable[[], None],
     *,
     reference: Any,
     configuration: str,
@@ -324,17 +323,16 @@ def probe_visibility_domain(
     counts: Counter[str],
     part_numbers: dict[str, str],
 ) -> NoReturn:
-    """Run original p+1 once, restore exactly, run raw p once, restore, STOP."""
+    """On a pristine table, hide raw p once, restore exactly, then STOP."""
     _require(configuration == "Default", "diagnostic is only approved for Default")
     _require(type(native_column) is int and native_column >= 0, "invalid native201 index")
     p = native_column
-    original_raw, candidate_raw = p + 1, p
+    candidate_raw = p
     bom = _bind(table, "IBomTableAnnotation")
     reference = _bind(reference, "IView")
     documents: dict[str, Any] = {}
     baseline: dict[str, Any] | None = None
-    pending: list[int] = []
-    baseline_flags: dict[int, bool] = {}
+    pending_restore = False
     primary: BaseException | None = None
     cleanup_errors: list[str] = []
     cleanup_setters: list[tuple[int, bool]] = []
@@ -373,15 +371,15 @@ def probe_visibility_domain(
             }
         _telemetry.info("drawing.pd_visibility_domain " + json.dumps({
             "phase": phase, "native201_typed_index": p,
-            "original_raw": original_raw, "candidate_raw": candidate_raw,
+            "candidate_raw": candidate_raw, "not_attempted_raw": p + 1,
             "setter": None if setter is None else {"member": "SetColumnHidden", "args": setter},
             "cleanup_setters": cleanup_setters, "cleanup_errors": cleanup_errors,
-            "pending_raw_restores": pending[:], "evidence": evidence,
+            "pending_raw_restores": [candidate_raw] if pending_restore else [], "evidence": evidence,
         }, separators=(",", ":"), allow_nan=False))
         return stage
 
     try:
-        baseline = capture("BEFORE-EXISTING", None)
+        baseline = capture("PRISTINE-BEFORE-CANDIDATE", None)
         _prove_native(baseline, counts, part_numbers, quantities=True)
         _complete(baseline["render"])
         _render_texts(baseline)
@@ -404,37 +402,13 @@ def probe_visibility_domain(
         false_prefix = _projection(columns, False)
         _require(true_prefix == false_prefix, "baseline is not actually all visible")
         _require([i for i, c in enumerate(true_prefix) if c["type"][0] == 201] == [p] and p == len(true_prefix) - 1, "actual pre-hide unique201 index changed")
-        for index in (original_raw, candidate_raw):
-            _require(index < len(columns["raw_ColumnHidden"]) and columns["raw_ColumnHidden"][index] is False, f"raw baseline {index} is not exactly BOOL False")
-            baseline_flags[index] = columns["raw_ColumnHidden"][index]
-        _require(original_raw != candidate_raw, "control indices must differ")
+        _require(
+            candidate_raw < len(columns["raw_ColumnHidden"])
+            and columns["raw_ColumnHidden"][candidate_raw] is False,
+            f"raw baseline {candidate_raw} is not exactly BOOL False",
+        )
 
-        pending.append(original_raw)  # BEFORE void setter: it can mutate then throw.
-        try:
-            existing_hide()
-        except BaseException as error:
-            try:
-                capture("AFTER-EXISTING-SETTER-ERROR", (original_raw, True))
-            except Exception as evidence_error:
-                error.add_note(f"immediate evidence failed: {evidence_error}")
-            raise
-        existing = capture("AFTER-EXISTING", (original_raw, True))
-        # Incorrect column/Qty visibility is the control outcome, not an oracle.
-        _prove_native(existing, counts, part_numbers, quantities=False)
-        # A configuration-owned Qty visibility change is also control evidence;
-        # source active configurations and native associations still must match.
-        _prove_unchanged(existing, baseline, exact=False, bom_configuration=False)
-
-        # Consume the one undo BEFORE its void setter. A partial mutation or
-        # failed proof must not cause a second, possibly materializing write.
-        pending.remove(original_raw)
-        cleanup_setters.append((original_raw, baseline_flags[original_raw]))
-        table.SetColumnHidden(original_raw, baseline_flags[original_raw])
-        restored = capture("RESTORED-ORIGINAL", (original_raw, baseline_flags[original_raw]))
-        _prove_native(restored, counts, part_numbers, quantities=True)
-        _prove_unchanged(restored, baseline, exact=True)
-
-        pending.append(candidate_raw)  # BEFORE the only candidate void setter.
+        pending_restore = True  # BEFORE the only candidate void setter.
         try:
             table.SetColumnHidden(candidate_raw, True)
         except BaseException as error:
@@ -452,18 +426,15 @@ def probe_visibility_domain(
         primary = error
         raise
     finally:
-        # Reverse mutation order, deduplicated. Each setter/evidence/proof runs
-        # independently so a failed restore cannot suppress source inspection.
-        attempted: set[int] = set()
-        for index in reversed(pending):
-            if index in attempted:
-                continue
-            attempted.add(index)
-            cleanup_setters.append((index, baseline_flags[index]))
+        # Consume the one restore BEFORE its void setter. Neither a partial
+        # mutation nor a failed proof may trigger a second materializing write.
+        if pending_restore:
+            pending_restore = False
+            cleanup_setters.append((candidate_raw, False))
             try:
-                table.SetColumnHidden(index, baseline_flags[index])
+                table.SetColumnHidden(candidate_raw, False)
             except BaseException as error:
-                cleanup_errors.append(f"restore raw {index}: {type(error).__name__}: {str(error)[:768]}")
+                cleanup_errors.append(f"restore raw {candidate_raw}: {type(error).__name__}: {str(error)[:768]}")
         try:
             final = capture("FINAL-RESTORED", None)
         except BaseException as error:
