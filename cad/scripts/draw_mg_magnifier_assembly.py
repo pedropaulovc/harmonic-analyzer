@@ -58,6 +58,7 @@ import mg_vn_wheel_axle_front_washer_spec as front_washer
 import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
+from _drawing_auto_balloon_diagnostic import collect_and_stop as collect_auto_balloons_and_stop
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
@@ -1735,6 +1736,15 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _activate_sheet(adapter, sheet_name)
         scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        # DIAGNOSTIC ONLY: first (wheel/washer) view intentionally stops unsaved.
+        collect_auto_balloons_and_stop(
+            adapter,
+            view,
+            items=balloon_items(items, stems),
+            anchors=BALLOON_ANCHORS,
+            label=f"magnifier {label} BOM coverage",
+            margin=BALLOON_MARGIN,
+        )
         landings += add_component_bom_balloons(
             adapter,
             view,

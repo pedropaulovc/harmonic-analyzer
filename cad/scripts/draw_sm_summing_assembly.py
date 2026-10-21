@@ -40,6 +40,7 @@ import sm_summing_explode_spec as explode
 import sm_summing_lever_spec as lever_spec
 from _check import check
 from _com import _early_bound
+from _drawing_auto_balloon_diagnostic import collect_and_stop as collect_auto_balloons_and_stop
 from _drawing_balloons import (
     BalloonAnchor,
     add_component_bom_balloons,
@@ -871,6 +872,15 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="summing",
     )
     items = _validate_bom(adapter, table)
+    # DIAGNOSTIC ONLY: existing native auto-placement, then intentional unsaved STOP.
+    collect_auto_balloons_and_stop(
+        adapter,
+        exploded,
+        items=items,
+        anchors=BALLOON_ANCHORS,
+        label="summing exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
     landings = add_component_bom_balloons(
         adapter,
         exploded,
