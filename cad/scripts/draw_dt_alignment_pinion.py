@@ -266,7 +266,9 @@ def _set_isometric_edge_weight(adapter: Any, view: Any) -> None:
     Native proof showed a root-component font change also thins both orthographic
     views. Select model edges through IView instead, and use the drawing's
     selected-edge API. No edge is hidden and no document default is changed.
-    The actual exported PDF must prove the width and view scope.
+    Run after the final display-mode regeneration: the earlier HLR-view
+    formatting trial exported unchanged Thick ink. The actual exported PDF
+    must still prove the width and view scope.
     """
     bound = _early_bound(view, "IView")
     edges = visible_view_entities(bound, 1, label="alignment pictorial edge weight")
@@ -420,7 +422,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
-    _set_isometric_edge_weight(adapter, iso)
 
     return await finalize_drawing(
         adapter,
@@ -428,6 +429,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: _set_isometric_edge_weight(adapter, iso),),
     )
 
 
