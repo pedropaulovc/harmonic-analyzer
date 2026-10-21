@@ -1,17 +1,16 @@
-"""Issue-1667 SM draft-placement/precision-restoration diagnostic; NEVER MERGE.
+"""Issue-1667 SM pre-call refresh diagnostic; NEVER MERGE.
 
-Four fresh production-prepared drawings, one held PID and one native call each.
-All place EDGE balloons in draft; precision restoration is request-only/update/
-update/request-only. Readbacks do not prove settled or in-call geometry, and
-UpdateViewDisplayGeometry is not a repaint/export completion guarantee.
-No sheet is saved/exported; even a qualified contrast ends in diagnostic STOP.
+Six fresh production-prepared drawings on one held seat, one native call each.
+Control/view-geometry-update/graphics-redraw/redraw/update/control interventions
+occur after borrowing Normal and before identical final quality observations.
+Quality is an observed covariate, not a requested treatment or completion proof.
+No sheet is saved/exported; even complete coverage ends in diagnostic STOP.
 """
 
 from __future__ import annotations
 
 import math
 from pathlib import Path
-import re
 from sys import exception as _active_exception
 import time
 from typing import Any, Awaitable, Callable, NoReturn, Sequence
@@ -27,12 +26,18 @@ from _drawing_group_perf_probe import (
     _preference,
     assert_matched_setup,
 )
-from _drawing_view_display import set_hidden_lines_removed
 import _seat_forensics as forensics
 from _session import discard_open_documents
 
 
-SEQUENCE = ("request_only", "geometry_update", "geometry_update", "request_only")
+SEQUENCE = (
+    "control",
+    "view_geometry_update",
+    "graphics_redraw",
+    "graphics_redraw",
+    "view_geometry_update",
+    "control",
+)
 LABEL = "summing exploded-view BOM coverage"
 SPRING = "sm-vn-counter-spring"
 # The actual SM preparer already resolves ten families. These bounds only limit
@@ -43,17 +48,17 @@ MAX_SPRING_INSTANCES = 8
 MAX_SPRING_EDGES = 64
 
 
-class SmQualityCandidateInvalid(RuntimeError):
+class SmRefreshCandidateInvalid(RuntimeError):
     """An observed coverage/attachment/layout failure, not a native exception."""
 
 
-class SmQualityProbeStop(RuntimeError):
+class SmRefreshProbeStop(RuntimeError):
     """Reports were retained; this deliberate failure cannot publish a drawing."""
 
     def __init__(self, report: dict[str, Any]) -> None:
         self.report = report
         super().__init__(
-            "INTENTIONAL SM QUALITY DIAGNOSTIC STOP before save/export/cache "
+            "INTENTIONAL SM REFRESH DIAGNOSTIC STOP before save/export/cache "
             f"publication; status={report['status']}; report={report['report_path']}"
         )
 
@@ -349,116 +354,37 @@ def _view_semantics(view: Any) -> dict[str, Any]:
     }
 
 
-def _apply_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
-    """One common excursion and one draft placement request; never repair."""
-    row["quality_treatment_failures"] = []
-    quality_started = time.perf_counter()
-    try:
-        row["quality_before"] = _quality_state(view)
-    finally:
-        row["quality_original_readback_ms"] = (
-            time.perf_counter() - quality_started
-        ) * 1000.0
+def _refresh_before_call(adapter: Any, view: Any, row: dict[str, Any]) -> None:
+    """One assigned void refresh, with identical semantic observations in controls."""
     started = time.perf_counter()
     try:
-        row["view_semantics_before_quality"] = _view_semantics(view)
-        try:
-            set_hidden_lines_removed(adapter, view)
-        except RuntimeError as error:
-            # Only these two existing helper readback failures are a failed
-            # treatment, not an unknown COM exception or permission to retry.
-            if type(error) is not RuntimeError or not re.fullmatch(
-                r"failed to (?:transition drawing view through HLV|"
-                r"set hidden-lines-removed drawing view) \(mode reads -?\d+\)",
-                str(error),
-            ):
-                raise
-            row["quality_treatment_failures"].append(f"normalization: {error}")
-        bound = _early_bound(view, "IView")
-        row["quality_set_return"] = bound.SetDisplayMode4(False, 3, True, True, True)
-        if row["quality_set_return"] is not True:
-            row["quality_treatment_failures"].append(
-                f"final shaded-quality setter returned {row['quality_set_return']!r}"
-            )
-        row["view_semantics_after_quality"] = _view_semantics(view)
-        row["post_quality_outline_m"] = tuple(bound.GetOutline() or ())
-        # Quality can legitimately change outline geometry; do NOT gate on it.
-        if row["view_semantics_after_quality"] != row["view_semantics_before_quality"]:
-            raise RuntimeError(
-                "SM quality contrast: view semantics changed during treatment"
-            )
+        row["refresh_semantics_before"] = _view_semantics(view)
     finally:
-        row["quality_setup_ms"] = (time.perf_counter() - started) * 1000.0
-
-
-def _restore_quality(adapter: Any, view: Any, row: dict[str, Any]) -> None:
-    """Fixed precision request, with one optional documented void update."""
-    bound = _early_bound(view, "IView")
-    restoration = row["quality_restoration"] = {
-        "treatment": row["restoration"],
-        "geometry_update_calls": 0,
-        "completion_limit": "display geometry access, NOT Windows repaint/export proof",
-    }
+        row["refresh_semantics_before_ms"] = (time.perf_counter() - started) * 1000.0
+    row["refresh_calls"] = 0
     started = time.perf_counter()
     try:
-        restoration["semantics_before"] = _view_semantics(view)
-        try:
-            set_hidden_lines_removed(adapter, view)
-        except RuntimeError as error:
-            if type(error) is not RuntimeError or not re.fullmatch(
-                r"failed to (?:transition drawing view through HLV|"
-                r"set hidden-lines-removed drawing view) \(mode reads -?\d+\)",
-                str(error),
-            ):
-                raise
-            row["quality_treatment_failures"].append(
-                f"precision normalization: {error}"
-            )
-        restoration["set_return"] = bound.SetDisplayMode4(False, 3, False, True, True)
-        if restoration["set_return"] is not True:
-            row["quality_treatment_failures"].append(
-                f"precision setter returned {restoration['set_return']!r}"
-            )
+        if row["refresh"] == "view_geometry_update":
+            row["refresh_calls"] = 1
+            _early_bound(view, "IView").UpdateViewDisplayGeometry()
+        elif row["refresh"] == "graphics_redraw":
+            row["refresh_calls"] = 1
+            # SDK void; obsolete but the existing zero-argument repo convention.
+            _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
+        elif row["refresh"] != "control":
+            raise RuntimeError("SM refresh: unknown predeclared intervention")
     except BaseException as error:
-        restoration["request_error"] = f"{type(error).__name__}: {error}"
+        row["refresh_error"] = f"{type(error).__name__}: {error}"
         raise
     finally:
-        row["restoration_request_ms"] = (time.perf_counter() - started) * 1000.0
-    row["restoration_geometry_update_ms"] = None
-    if row["restoration"] == "geometry_update":
-        started = time.perf_counter()
-        try:
-            restoration["geometry_update_calls"] = 1
-            # SDK void: neither bool conversion nor a completion assertion.
-            bound.UpdateViewDisplayGeometry()
-        except BaseException as error:
-            restoration["geometry_update_error"] = f"{type(error).__name__}: {error}"
-            raise
-        finally:
-            row["restoration_geometry_update_ms"] = (
-                time.perf_counter() - started
-            ) * 1000.0
+        row["refresh_ms"] = (time.perf_counter() - started) * 1000.0
     started = time.perf_counter()
     try:
-        restoration["quality"] = _quality_state(view)
+        row["refresh_semantics_after"] = _view_semantics(view)
+        if row["refresh_semantics_after"] != row["refresh_semantics_before"]:
+            raise RuntimeError("SM refresh: view semantics changed during intervention")
     finally:
-        row["restoration_quality_readback_ms"] = (
-            time.perf_counter() - started
-        ) * 1000.0
-    started = time.perf_counter()
-    try:
-        restoration["semantics_after"] = _view_semantics(view)
-        restoration["outline_m"] = tuple(bound.GetOutline() or ())
-        if not (
-            restoration["semantics_before"]
-            == restoration["semantics_after"]
-            == row["view_semantics_before_quality"]
-        ):
-            raise RuntimeError(
-                "SM quality contrast: view semantics changed during restoration"
-            )
-    finally:
-        row["restoration_observer_ms"] = (time.perf_counter() - started) * 1000.0
+        row["refresh_semantics_after_ms"] = (time.perf_counter() - started) * 1000.0
 
 
 def _call_once(
@@ -520,11 +446,14 @@ def _call_once(
             raise RuntimeError(
                 "SM contrast: Normal visible-edge mapping was not applied"
             )
+        _refresh_before_call(adapter, view, row)
         quality_started = time.perf_counter()
-        row["pre_call_quality"] = _quality_state(view)
-        row["quality_pre_call_readback_ms"] = (
-            time.perf_counter() - quality_started
-        ) * 1000.0
+        try:
+            row["pre_call_quality"] = _quality_state(view)
+        finally:
+            row["quality_pre_call_readback_ms"] = (
+                time.perf_counter() - quality_started
+            ) * 1000.0
         # No COM between the last faceted getter and this one native invocation.
         started = time.perf_counter()
         try:
@@ -555,7 +484,7 @@ def _call_once(
         row["option_candidate_failures"] = []
         row["option_comparison_failures"] = []
         row["option_observation_stage"] = (
-            "post-call/post-passive/pre-restoration/pre-rebuild; NOT in-call proof"
+            "post-call/post-passive/pre-Normal-restoration/pre-rebuild; NOT in-call proof"
         )
         for name in (
             *authored,
@@ -621,16 +550,6 @@ def _call_once(
                         "post-call unmodified native-option observations differ"
                     )
         row["option_observer_ms"] = (time.perf_counter() - observed_started) * 1000.0
-        _restore_quality(adapter, view, row)
-        _collect_stage(
-            adapter,
-            view,
-            returned,
-            stage="post_quality_restoration_pre_normal_restore_pre_rebuild",
-            out_dir=out_dir,
-            cached_hwnd=cached_hwnd,
-            row=row,
-        )
     finally:
         primary = _active_exception()
         started = time.perf_counter()
@@ -723,7 +642,7 @@ def _validate_snapshots(
     return valid_indices, failures
 
 
-async def run_sm_quality_probe(
+async def run_sm_refresh_probe(
     adapter: Any,
     *,
     template: Path,
@@ -739,29 +658,29 @@ async def run_sm_quality_probe(
     ],
 ) -> NoReturn:
     """Fixed SM-only coverage contrast; known invalid arms continue, errors abort."""
-    out_dir = forensics._capture_dir("1667-sm-draft-restore-fixed-contrast")
+    out_dir = forensics._capture_dir("1667-sm-precall-refresh-fixed-contrast")
     report: dict[str, Any] = {
         "diagnostic_only": True,
         "never_merge": True,
         "status": "aborted",
         "sequence": SEQUENCE,
         "report_path": str(out_dir / "capture.json"),
-        "proof_scope": "draft-to-precision attachment survival only; NOT shipped native/PDF/machinist proof",
+        "proof_scope": "pre-call refresh/coverage contrast only; NOT shipped native/PDF/machinist proof",
         "observer_limit": (
-            "quality readbacks do not prove settled or in-call geometry; "
-            "UpdateViewDisplayGeometry accesses displayed geometry before Windows "
-            "repaint, not an export/repaint completion guarantee."
+            "quality is an observed covariate, not a requested treatment; getters "
+            "do not prove settled or in-call geometry. Refreshes are void, not "
+            "export completion guarantees. Passing controls make even six full "
+            "inventories inconclusive for refresh causality."
         ),
         "no_save_export_or_publication": True,
         "arms": [
             {
                 "order": order,
                 "attachment": "edge",
-                "quality": "draft",
-                "restoration": restoration,
+                "refresh": refresh,
                 "status": "not_reached",
             }
-            for order, restoration in enumerate(SEQUENCE, start=1)
+            for order, refresh in enumerate(SEQUENCE, start=1)
         ],
     }
     baseline = None
@@ -835,8 +754,6 @@ async def run_sm_quality_probe(
                     != baseline["allowed_full_shown_owners"]
                 ):
                     raise RuntimeError("SM contrast: shown component owners differ")
-                phase = "quality_application"
-                _apply_quality(adapter, view, row)
                 phase = "native_and_observers"
                 returned, inventory_notes = _call_once(
                     adapter,
@@ -864,18 +781,6 @@ async def run_sm_quality_probe(
                     allowed=allowed,
                     attachment=row["attachment"],
                 )
-                quality = row["pre_call_quality"]
-                if not (
-                    quality["facetted_hlr"] is (row["quality"] == "draft")
-                    and type(quality["display_mode"]) is int
-                    and quality["display_mode"] in (3, 7)
-                    and quality["use_parent"] is False
-                    and quality["shaded_edges"] is True
-                    and quality["precision_threads"] is True
-                ):
-                    row["quality_treatment_failures"].append(
-                        f"pre-call quality readback differs from requested {row['quality']}: {quality!r}"
-                    )
                 failures.extend(row["option_candidate_failures"])
                 expected = dict((item, stem) for stem, item in items)
                 indices, inventory_failures = _validate_snapshots(
@@ -909,7 +814,7 @@ async def run_sm_quality_probe(
                 proof_started = time.perf_counter()
                 try:
                     finish_bounds(adapter, landings)
-                except SmQualityCandidateInvalid as error:
+                except SmRefreshCandidateInvalid as error:
                     failures.append(f"layout: {error}")
                 finally:
                     row["bounds_observer_ms"] = (
@@ -953,34 +858,6 @@ async def run_sm_quality_probe(
                     failures.extend(
                         f"{snapshot['stage']}: {error}" for error in stage_failures
                     )
-                quality_observations = [
-                    (
-                        "precision restoration",
-                        row["quality_restoration"]["quality"],
-                        False,
-                    ),
-                    *(
-                        (
-                            snapshot["stage"],
-                            snapshot["quality"],
-                            snapshot["stage"] == "post_call_pre_restore_pre_rebuild",
-                        )
-                        for snapshot in row["observations"]
-                    ),
-                ]
-                for boundary, quality, draft in quality_observations:
-                    if not (
-                        quality["facetted_hlr"] is draft
-                        and type(quality["display_mode"]) is int
-                        and quality["display_mode"] in (3, 7)
-                        and quality["use_parent"] is False
-                        and quality["shaded_edges"] is True
-                        and quality["precision_threads"] is True
-                    ):
-                        row["quality_treatment_failures"].append(
-                            f"{boundary}: requested {'draft' if draft else 'precision'} "
-                            f"quality readback mismatch: {quality!r}"
-                        )
                 row["post_helper_proof_ms"] = (
                     time.perf_counter() - post_helper_started
                 ) * 1000.0
@@ -988,15 +865,11 @@ async def run_sm_quality_probe(
                 row["options_comparison_eligible"] = not row[
                     "option_comparison_failures"
                 ]
-                row["treatment_comparison_eligible"] = not row[
-                    "quality_treatment_failures"
-                ]
                 row["status"] = (
                     "invalid_candidate"
                     if failures
                     else "qualified"
                     if row["options_comparison_eligible"]
-                    and row["treatment_comparison_eligible"]
                     else "comparison_ineligible"
                 )
                 phase = "post_arm_identity"
@@ -1082,24 +955,16 @@ async def run_sm_quality_probe(
                 {
                     "order": row["order"],
                     "attachment": row["attachment"],
-                    "quality": row["quality"],
-                    "restoration": row["restoration"],
+                    "refresh": row["refresh"],
                     "status": row["status"],
                     "native_call_ms": row.get("native_call_ms"),
-                    "quality_setup_ms": row.get("quality_setup_ms"),
-                    "quality_original_readback_ms": row.get(
-                        "quality_original_readback_ms"
+                    "refresh_ms": row.get("refresh_ms"),
+                    "refresh_semantics_before_ms": row.get(
+                        "refresh_semantics_before_ms"
                     ),
-                    "restoration_observer_ms": row.get("restoration_observer_ms"),
+                    "refresh_semantics_after_ms": row.get("refresh_semantics_after_ms"),
                     "quality_pre_call_readback_ms": row.get(
                         "quality_pre_call_readback_ms"
-                    ),
-                    "restoration_request_ms": row.get("restoration_request_ms"),
-                    "restoration_geometry_update_ms": row.get(
-                        "restoration_geometry_update_ms"
-                    ),
-                    "restoration_quality_readback_ms": row.get(
-                        "restoration_quality_readback_ms"
                     ),
                     "stage_costs": [
                         {
@@ -1130,4 +995,4 @@ async def run_sm_quality_probe(
             if primary is None:
                 raise
             primary.add_note(f"SM contrast final-report write failed: {error}")
-    raise SmQualityProbeStop(report)
+    raise SmRefreshProbeStop(report)
