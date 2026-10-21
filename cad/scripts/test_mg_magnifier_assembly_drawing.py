@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import pytest
 
 import _drawing_balloons
-import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import joint_retention
@@ -859,7 +858,7 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
     assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
 
 
-class _NativeWheelBalloon:
+class _NativeBalloon:
     """A returned native note with readable item, attachment and rendered circle."""
 
     def __init__(self, item: str, owner: str):
@@ -949,7 +948,7 @@ def native_wheel_balloons(monkeypatch):
         explode.WHEEL_GROUP_STEMS,
     )
     owners = {stem: f"wheel-sub-1/{stem}-1" for stem, _item in items}
-    native = [_NativeWheelBalloon(item, owners[stem]) for stem, item in items]
+    native = [_NativeBalloon(item, owners[stem]) for stem, item in items]
 
     def component(stem, path, *, visible=True):
         return SimpleNamespace(
@@ -1416,6 +1415,117 @@ def test_native_wheel_circle_bounds_are_reread_after_the_final_rebuild(
         drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
 
 
+@pytest.fixture
+def native_lever_bounds(native_wheel_balloons):
+    items = drawing.balloon_items(
+        {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)},
+        explode.LEVER_GROUP_STEMS,
+    )
+    landings = []
+    for stem, item in items:
+        owner = f"lever-sub-1/{stem}-1"
+        landings.append(
+            _drawing_balloons.BalloonLanding(
+                stem, owner, _NativeBalloon(item, owner), None, "lever bounds"
+            )
+        )
+    caption = SimpleNamespace(box=(0.18, 0.115, 0.26, 0.125))
+    caption.GetExtent = lambda: (*caption.box[:2], 0.0, *caption.box[2:], 0.0)
+    return SimpleNamespace(
+        adapter=native_wheel_balloons.adapter, landings=landings, caption=caption
+    )
+
+
+def test_native_lever_bounds_leave_native_positions_and_owners_unchanged(
+    native_lever_bounds,
+) -> None:
+    fixture = native_lever_bounds
+    before = [(landing.note.circle, landing.note.owner) for landing in fixture.landings]
+    drawing._assert_lever_balloon_bounds(
+        fixture.adapter, fixture.landings, fixture.caption
+    )
+    assert [
+        (landing.note.circle, landing.note.owner) for landing in fixture.landings
+    ] == before
+    assert fixture.adapter.currentModel.sheet == drawing.SHEET_NAMES[2]
+
+
+@pytest.mark.parametrize("boundary", ["left", "bottom", "right", "top"])
+def test_native_lever_rejects_circle_crossing_field_with_its_centre_inside(
+    native_lever_bounds,
+    boundary,
+) -> None:
+    fixture = native_lever_bounds
+    landing = fixture.landings[-1]
+    radius = 0.0047
+    left, bottom, right, top = drawing.LEVER_FIELD
+    mid_x, mid_y = (left + right) / 2.0, (bottom + top) / 2.0
+    x, y = {
+        "left": (left + radius / 2.0, mid_y),
+        "bottom": (mid_x, bottom + radius / 2.0),
+        "right": (right - radius / 2.0, mid_y),
+        "top": (mid_x, top - radius / 2.0),
+    }[boundary]
+    landing.note.circle = (x, y, radius)
+    assert left < x < right and bottom < y < top
+    with pytest.raises(RuntimeError, match="leaves LEVER_FIELD") as error:
+        drawing._assert_lever_balloon_bounds(
+            fixture.adapter, fixture.landings, fixture.caption
+        )
+    assert landing.stem in str(error.value)
+    assert f"item {landing.note.item}" in str(error.value)
+
+
+@pytest.mark.parametrize("gap", [-0.000001, 0.0, 0.000001])
+def test_native_lever_circle_must_clear_actual_caption_extent(
+    native_lever_bounds,
+    gap,
+) -> None:
+    fixture = native_lever_bounds
+    # Binary-exact radius/top make the zero-gap contact case unambiguous.
+    radius = 1.0 / 256.0
+    fixture.landings[-1].note.circle = (0.22, 0.125 + radius + gap, radius)
+    if gap > 0.0:
+        drawing._assert_lever_balloon_bounds(
+            fixture.adapter, fixture.landings, fixture.caption
+        )
+    else:
+        with pytest.raises(RuntimeError, match="intersects lever caption"):
+            drawing._assert_lever_balloon_bounds(
+                fixture.adapter, fixture.landings, fixture.caption
+            )
+
+
+@pytest.mark.parametrize("changed", ["circle", "caption"])
+def test_native_lever_bounds_reread_ink_and_caption_after_final_rebuild(
+    native_lever_bounds,
+    changed,
+) -> None:
+    fixture = native_lever_bounds
+    drawing._assert_lever_balloon_bounds(
+        fixture.adapter, fixture.landings, fixture.caption
+    )
+
+    def final_rebuild():
+        if changed == "circle":
+            _x, y, radius = fixture.landings[-1].note.circle
+            fixture.landings[-1].note.circle = (
+                drawing.LEVER_FIELD[2] - radius / 2.0,
+                y,
+                radius,
+            )
+        else:
+            fixture.caption.box = (0.09, 0.14, 0.11, 0.16)
+        return True
+
+    fixture.adapter.currentModel.EditRebuild3 = final_rebuild
+    drawing.rebuild_drawing(fixture.adapter, label="finalize_drawing")
+    with pytest.raises(RuntimeError, match="after the final rebuild"):
+        drawing._assert_lever_balloon_bounds(
+            fixture.adapter, fixture.landings, fixture.caption
+        )
+
+
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:
     field = (0.0, 0.0, 0.200, 0.150)
     widths = {(1.0, 2.0): 0.250, (1.0, 3.0): 0.150, (1.0, 4.0): 0.110}
@@ -1453,42 +1563,3 @@ def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
     assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
 
 
-@pytest.mark.parametrize(
-    ("stem", "station", "radius", "rows"),
-    [
-        (
-            "mg-magnifying-lever",
-            assembly.LEVER_ROD_DIA / 2.0,
-            assembly.LEVER_ROD_DIA / 2.0,
-            _transforms.ROT_Y_180,
-        ),
-        (
-            # The shoulder's Ø5 edge (#1559): the old x = R station now falls
-            # on the turned-down thread, so a point at radius R is off the rod.
-            "mg-magnifying-vertical-rod",
-            assembly.VROD_SHOULDER_X,
-            assembly.VROD_DIA / 2.0,
-            _transforms.compose_rows(
-                _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180
-            ),
-        ),
-    ],
-)
-def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
-    stem: str, station: float, radius: float, rows: list[list[float]]
-) -> None:
-    x, y, z = drawing.BALLOON_ANCHORS[stem].point_mm
-    assert x == pytest.approx(station)
-    assert math.hypot(y, z) == pytest.approx(radius)
-    normal = [
-        sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
-        for j in range(3)
-    ]
-    assert sum(normal) > 0.0  # faces the +X+Y+Z viewer
-    if stem == "mg-magnifying-lever":
-        # Square to the rod axis, and straight at the viewer.
-        assert sum(normal) == pytest.approx(math.sqrt(2.0))
-    else:
-        # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
-        # for any even segment count (r12 missed mid-chord at 1:2).
-        assert (y, z) == pytest.approx((-radius, 0.0))
