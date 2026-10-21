@@ -122,6 +122,21 @@ minor. Whoever runs the gate matches each one to the part's declared entry
 matching declaration gates the package like a blocker. An emitter of an
 approved declaration carries a comment naming it.
 
+The owner's **2026-10-21** decision temporarily accepts only the missing BOM
+balloons in the FR/CH/SM/MG groups already disabled by
+[#1795](https://github.com/pedropaulovc/harmonic-analyzer/pull/1795), tracked by
+[#1667](https://github.com/pedropaulovc/harmonic-analyzer/issues/1667).
+Their assembly contracts declare `MB-1667-FR`, `MB-1667-CH`, `MB-1667-SM` and
+`MB-1667-MG` as `accept`. CH alone also accepts the directly inherent
+contradiction with its retained north-most-instance balloon note. MG's enabled
+finished-wire balloon (item 19) is not exempt. Wrong owners/numbers, defective
+or dangling present balloons, unrelated new omissions and all other findings
+remain subject to review. Restore the actual balloons only after the linked
+root-cause fix has native validation and owner review; remove these exceptions
+and their `TODO(#1667)` comments in the same production restoration.
+These declarations guide the reviewer; matching is an LLM judgment, not a
+deterministic post-processing filter or an automatic SHIP verdict.
+
 The owner's **2026-10-20** ruling for **MHA-FR-01 `fr-harmonic-base` RV-02**
 accepts one nonnumeric departure from rule 2: redundant default **2B** in that
 package's generated native hole-table **SIZE cells only**. The package-local

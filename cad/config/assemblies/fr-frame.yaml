@@ -32,3 +32,8 @@ machinist_exceptions:
     where: "the MATCH-FIT AND ASSEMBLY SEQUENCE step 9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP. SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-FR-VN-50 HEADS."
     finding: "fit-up at assembly (rule 19)"
     reason: "the nameplate's four #4-40 base seats are spotted through the clamped plate and drilled and tapped at assembly (the base sheet prints them as transferred from MHA-FR-04), so the plate's holes locate at the title block's .X grade: the 0.203 diametral float of the screw in its 3.048 hole (3.048 - 2.845) is far short of the 3.705 the loose bands would demand (plate station .X +/-0.8 plus a base tap at .XX +/-0.51 on each axis, 2 x sqrt(2) x 1.31 = 3.705), so the step absorbs the whole stack and neither part takes a tighter band (owner ruling 2026-10-15, #1468 option A) (owner-accepted)"
+  - id: "MB-1667-FR"
+    kind: "accept"
+    where: "sheet 2 frame exploded view: BOM items 1-10, only the balloon group disabled by #1795"
+    finding: "missing BOM-to-part item balloons from that disabled group (rule 22); absence of those same balloons elsewhere in the package is the same known omission"
+    reason: "Owner decision 2026-10-21 accepts the existing #1795 bypass temporarily while #1667 is root-caused. This does not accept wrong owners, wrong item numbers, dangling or otherwise defective present balloons, new unrelated omissions, or other assembly findings. Restore only after the linked #1667 fix is validated; remove MB-1667-FR and its TODO(#1667) with that restoration."

@@ -1738,8 +1738,8 @@ def _place_package(adapter: Any) -> None:
         label="frame",
     )
     _validate_frame_bom(adapter, table)
-    # TODO(#1667): Restore after deterministic farm balloon placement;
-    # balloons intentionally omitted meanwhile.
+    # TODO(#1667): Restore this disabled group only after the linked fix is
+    # validated; remove MB-1667-FR and this TODO with restoration.
     # balloon_items = _validate_frame_bom(adapter, table)
     # landings = add_component_bom_balloons(
     #     adapter,
