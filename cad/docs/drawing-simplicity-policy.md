@@ -145,7 +145,16 @@ Before starting independent reviews, the findings judge inspects the repository
 PDF diff tool's **overlaid** before/after pictures: shared ink is gray, removed
 ink red, and added ink blue. It may skip a package only when the differences are
 rendering noise, or an assembly drawing changes only one part's geometry without
-affecting mating shown on the drawings. Uncertainty requires a full review.
+affecting mating shown on the drawings. SolidWorks balloon placement is unstable:
+movement of a balloon or leader is noise when both its number and referenced
+part/region remain unchanged. That noise may coexist with a skippable single-part
+geometry change. A different number or target requires review, as does uncertainty
+about either. This allowance does not extend to dimension changes or other
+annotation edits. Proximity of a changed feature to a joint alone does not prove
+a mating effect; the judge compares the depicted connections and relative
+placement. A hypothetical hidden effect of a small local feature is not a
+depicted mating change. Uncertainty grounded in the visible assembly evidence
+still requires a full review.
 An unchanged overlay is inspected too; an image-generation or precheck failure
 is not permission to skip. The report retains the before/after identities,
 overlay evidence and decision. A skip returns `SHIP` with an explicit warning

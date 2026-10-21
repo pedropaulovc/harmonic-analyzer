@@ -269,20 +269,54 @@ def test_precheck_failure_is_error_not_skip_or_full_review(
     assert [call["phase"] for call in harness.calls] == ["precheck"]
 
 
-@pytest.mark.parametrize("with_baseline", [False, True])
+@pytest.mark.parametrize("baseline", ["absent", "present", "missing", "unreadable"])
 @pytest.mark.parametrize("reviewer", mr.REVIEWERS)
 def test_force_bypasses_precheck_and_runs_after_only_unconditionally(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, with_baseline: bool, reviewer: str,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, baseline: str, reviewer: str,
 ) -> None:
     package = _package(tmp_path)
-    if not with_baseline:
+    if baseline == "absent":
         package = mr.ReviewPackage(package.name, package.kind, package.sources)
+    elif baseline == "missing":
+        package = mr.ReviewPackage(
+            package.name, package.kind, package.sources,
+            before_sources=(tmp_path / "missing-before.pdf",),
+        )
+    before_accesses: list[Path] = []
+    copyfile = mr.shutil.copyfile
+    sha256 = mr._sha256
+
+    def guarded_copyfile(source: Path, target: Path) -> Any:
+        if source in package.before_sources:
+            before_accesses.append(source)
+            if baseline == "unreadable":
+                raise PermissionError("baseline is unreadable")
+        return copyfile(source, target)
+
+    def guarded_sha256(source: Path) -> str:
+        if source in package.before_sources:
+            before_accesses.append(source)
+            if baseline == "unreadable":
+                raise PermissionError("baseline is unreadable")
+        return sha256(source)
+
+    monkeypatch.setattr(mr.shutil, "copyfile", guarded_copyfile)
+    monkeypatch.setattr(mr, "_sha256", guarded_sha256)
     harness = _Reviewer(_decision("skip", "rendering_noise"))
     monkeypatch.setattr(mr, "_run_reviewer", harness)
     aggregate = _aggregate(package, tmp_path, reviewer, force=True)
-    assert aggregate["verdict"] == "SHIP" and len(aggregate["runs"]) == 3
+    assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
+    assert len(aggregate["runs"]) == 3
     assert aggregate["precheck"]["forced"]
+    assert aggregate["precheck"]["error"] is None
+    assert aggregate["precheck"]["diff"] is None
+    assert aggregate["before_sources"] == [str(path) for path in package.before_sources]
+    assert aggregate["before_source_sha256"] == []
+    assert aggregate["source_sha256"] == [sha256(path) for path in package.sources]
+    assert before_accesses == []
     assert [call["phase"] for call in harness.calls] == ["review"] * 3
+    assert all(call["sheet_count"] == 1 for call in harness.calls)
+    assert all(call["hashes"] == aggregate["source_sha256"] for call in harness.calls)
 
 
 def test_both_inputs_are_frozen_before_diff_and_never_reread_from_live_paths(

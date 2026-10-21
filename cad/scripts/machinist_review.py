@@ -2304,7 +2304,7 @@ def aggregate_package(
         try:
             for label, originals, frozen in (
                 ("after", package.sources, sources),
-                ("before", package.before_sources, before_sources),
+                ("before", () if force else package.before_sources, before_sources),
             ):
                 directory = source_dir / label
                 directory.mkdir(parents=True, exist_ok=True)
