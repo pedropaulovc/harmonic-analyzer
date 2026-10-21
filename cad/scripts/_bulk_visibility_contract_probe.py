@@ -278,6 +278,16 @@ def api_int(value: Any, label: str, verdict: Verdict = Verdict.PRESERVATION) -> 
     return value
 
 
+def _use_sheet_scale(value: Any, verdict: Verdict = Verdict.PRESERVATION) -> int:
+    """Normalize this property's observed Boolean or documented integer flag."""
+    require(
+        type(value) in (bool, int) and value in (0, 1),
+        verdict,
+        f"UseSheetScale: expected Boolean or integer 0/1, got {value!r}",
+    )
+    return int(value)
+
+
 def api_string(value: Any, label: str, *, empty: bool = False) -> str:
     require(
         type(value) is str and (empty or bool(value)),
@@ -2204,7 +2214,8 @@ class NativeProbe:
             view.UseSheetScale = 0
             view.ScaleRatio = self.doubles((5.0, 1.0))
             require(
-                view.UseSheetScale == 0 and tuple(view.ScaleRatio) == (5.0, 1.0),
+                _use_sheet_scale(view.UseSheetScale, Verdict.CONSTRUCTION) == 0
+                and tuple(view.ScaleRatio) == (5.0, 1.0),
                 Verdict.CONSTRUCTION,
                 "explicit view scale not consumed",
             )
@@ -2297,7 +2308,7 @@ class NativeProbe:
                 ),
                 "orientation": view.GetOrientationName(),
                 "scale": array(view.ScaleRatio, "view scale"),
-                "use_sheet_scale": api_int(view.UseSheetScale, "UseSheetScale"),
+                "use_sheet_scale": _use_sheet_scale(view.UseSheetScale),
                 "position": array(view.Position, "view position"),
                 "transform": transform,
             }

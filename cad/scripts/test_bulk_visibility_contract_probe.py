@@ -938,11 +938,10 @@ def sheet_inventory(tmp_path, monkeypatch):
         views[view_id], components[view_id] = view, nodes
         groups[view_id] = [SheetPseudoView(view_id), view]
 
-    drawing = SimpleNamespace(
-        groups=[groups[probe.ViewId.B], groups[probe.ViewId.A]],
-        current=probe.ViewId.A,
-        ActiveDrawingView=None,
-    )
+    drawing = OfflineDrawing()
+    drawing.groups = [groups[probe.ViewId.B], groups[probe.ViewId.A]]
+    drawing.current = probe.ViewId.A
+    drawing.ActiveDrawingView = None
     drawing.GetViews = lambda: tuple(tuple(group) for group in drawing.groups)
 
     def named_sheet(name):
@@ -1221,6 +1220,172 @@ def test_activate_view_refuses_late_group_failure_before_view_activation(
         ("ActivateSheet", probe.ViewId.A),
     ]
     assert fixture.drawing.ActiveDrawingView is None
+
+
+@pytest.fixture
+def sheet_scale_construction(sheet_inventory, monkeypatch):
+    """Run actual create_drawing/readback/views with inert native object ports."""
+    fixture = sheet_inventory
+    subject, drawing = fixture.subject, fixture.drawing
+    fixture.controls.scale_result = False
+    fixture.scale_writes = []
+    fixture.created_views = []
+    fixture.markers = []
+    template = subject.root / "cad/templates/harmonic-analyzer-landscape.DRWDOT"
+    template.parent.mkdir(parents=True)
+    template.write_bytes(b"offline drawing template")
+
+    class ScaleReadbackView(OfflineModel):
+        @property
+        def UseSheetScale(self):
+            return fixture.controls.scale_result
+
+        @UseSheetScale.setter
+        def UseSheetScale(self, value):
+            fixture.scale_writes.append(value)
+
+    for view in fixture.views.values():
+        view.__class__ = ScaleReadbackView
+        view.DisableAutoUpdate = False
+    for sheet in fixture.sheets.values():
+        sheet.SetName = lambda name: setattr(drawing, "title", f"Draw - {name}")
+        sheet.GetProperties = lambda: (12, 13, 5, 1, False, 0.4318, 0.2794)
+    all_views = drawing.GetViews
+    drawing.GetViews = lambda: (
+        all_views() if len(fixture.created_views) == 2 else ((object(),),)
+    )
+    drawing.NewSheet4 = lambda *arguments: True
+
+    def create_view(path, orientation, x, y, z):
+        view = fixture.views[drawing.current]
+        fixture.created_views.append(view)
+        return view
+
+    def insert_note(text):
+        fixture.markers.append(text)
+        position = []
+
+        def set_position(x, y, z):
+            position[:] = (x, y, z)
+            return True
+
+        annotation = SimpleNamespace(
+            SetPosition=set_position, GetPosition=lambda: tuple(position)
+        )
+        return SimpleNamespace(GetAnnotation=lambda: annotation, GetText=lambda: text)
+
+    drawing.CreateDrawViewFromModelView3 = create_view
+    drawing.ClearSelection2 = lambda _all: None
+    drawing.InsertNote = insert_note
+    drawing.AutomaticViewUpdate = True
+    drawing.IActiveView = SimpleNamespace(EnableGraphicsUpdate=True)
+    drawing.FeatureManager = SimpleNamespace(
+        EnableFeatureTree=True, EnableFeatureTreeWindow=True
+    )
+    subject.app.new_results.append(drawing)
+    monkeypatch.setattr(
+        subject,
+        "model",
+        lambda label: drawing if label is probe.Document.DRAWING else fixture.source,
+    )
+    monkeypatch.setattr(subject, "doubles", lambda values: tuple(values))
+    monkeypatch.setattr(subject, "rebuild", lambda: None)
+    return fixture
+
+
+@pytest.mark.parametrize("value_a", [False, 0])
+@pytest.mark.parametrize("value_b", [False, 0])
+def test_sheet_scale_representation_passes_full_inventory_and_caller(
+    sheet_inventory, value_a, value_b
+):
+    fixture = sheet_inventory
+    fixture.views[probe.ViewId.A].UseSheetScale = value_a
+    fixture.views[probe.ViewId.B].UseSheetScale = value_b
+    fixture.subject.views()
+    assert all(
+        type(state["use_sheet_scale"]) is int and state["use_sheet_scale"] == 0
+        for state in fixture.subject.view_baselines.values()
+    )
+    canonical = json.dumps(fixture.subject.view_baselines, sort_keys=True)
+    for view in fixture.views.values():
+        view.UseSheetScale = 0 if type(view.UseSheetScale) is bool else False
+    fixture.subject.views()
+    assert json.dumps(fixture.subject.view_baselines, sort_keys=True) == canonical
+    fixture.subject.activate_view(probe.ViewId.A)
+    assert fixture.drawing.ActiveDrawingView is fixture.views[probe.ViewId.A]
+
+
+@pytest.mark.parametrize("value", [True, 1])
+@pytest.mark.parametrize("view_id", tuple(probe.ViewId))
+@pytest.mark.parametrize("reverse", [False, True])
+def test_sheet_scale_enabled_still_fails_independent_view_contract(
+    sheet_inventory, value, view_id, reverse
+):
+    fixture = sheet_inventory
+    if reverse:
+        fixture.drawing.groups.reverse()
+    fixture.views[view_id].UseSheetScale = value
+    with pytest.raises(probe.ProbeFailure, match="view projection/scale/configuration"):
+        fixture.subject.views()
+
+
+class SheetScaleInt(int):
+    pass
+
+
+@pytest.mark.parametrize("value", [0.0, "0", None, -1, 2, SheetScaleInt(0)])
+@pytest.mark.parametrize("view_id", tuple(probe.ViewId))
+def test_sheet_scale_malformed_inventory_value_fails_closed(
+    sheet_inventory, value, view_id
+):
+    fixture = sheet_inventory
+    fixture.views[view_id].UseSheetScale = value
+    with pytest.raises(probe.ProbeFailure, match="UseSheetScale: expected") as caught:
+        fixture.subject.views()
+    assert caught.value.verdict is probe.Verdict.PRESERVATION
+
+
+@pytest.mark.parametrize("value", [False, 0])
+def test_sheet_scale_constructor_readback_reaches_complete_fixture(
+    sheet_scale_construction, value
+):
+    fixture = sheet_scale_construction
+    fixture.controls.scale_result = value
+    fixture.subject.create_drawing()
+    assert fixture.scale_writes == [0, 0]
+    assert all(type(value) is int for value in fixture.scale_writes)
+    assert len(fixture.created_views) == 2
+    assert set(fixture.subject.view_baselines) == set(probe.ViewId)
+    assert all(
+        type(state["use_sheet_scale"]) is int and state["use_sheet_scale"] == 0
+        for state in fixture.subject.view_baselines.values()
+    )
+    assert "fixture" in fixture.subject.receipt.data
+
+
+@pytest.mark.parametrize("value", [True, 1])
+def test_sheet_scale_constructor_rejects_enabled_scale(sheet_scale_construction, value):
+    fixture = sheet_scale_construction
+    fixture.controls.scale_result = value
+    with pytest.raises(probe.ProbeFailure, match="explicit view scale not consumed"):
+        fixture.subject.create_drawing()
+    assert len(fixture.created_views) == 1
+    assert fixture.markers == []
+    assert "fixture" not in fixture.subject.receipt.data
+
+
+@pytest.mark.parametrize("value", [0.0, "0", None, -1, 2, SheetScaleInt(0)])
+def test_sheet_scale_constructor_rejects_malformed_readback(
+    sheet_scale_construction, value
+):
+    fixture = sheet_scale_construction
+    fixture.controls.scale_result = value
+    with pytest.raises(probe.ProbeFailure, match="UseSheetScale: expected") as caught:
+        fixture.subject.create_drawing()
+    assert caught.value.verdict is probe.Verdict.CONSTRUCTION
+    assert len(fixture.created_views) == 1
+    assert fixture.markers == []
+    assert "fixture" not in fixture.subject.receipt.data
 
 
 class TemplateString(str):

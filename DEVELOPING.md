@@ -1646,9 +1646,21 @@ the owned drawing's indexed `Sheet(name)` getter and requires matching
 `ISheet.GetName()`. This follows the existing production layout collector; a
 pseudoview is not a model view. Real-view `Sheet` ownership, exact group counts
 and all downstream identity/layout/component guards remain required. No active
-sheet substitution, fallback or additional activation is used. The inert
-before/after smoke and 315 focused tests pass; the repaired native route, all
-29 controls and complete 32-output acceptance remain unproved.
+sheet substitution, fallback or additional activation is used. On worker 5,
+`ca448d9` passed the encountered group's named-sheet and real-view ownership
+checks, then C00 rejected the successfully returned Python `False` from
+`IView.UseSheetScale`. Whole-inventory validation had not completed.
+
+Although `UseSheetScale` is declared as integer 0/1, this native return requires
+property-local normalization of exact Boolean or exact integer 0/1 to integer
+0/1. Both constructor and inventory readbacks use it; the integer-zero setter,
+independent-scale guard and strict integer validation for other APIs remain
+unchanged. Floats, strings, nulls, out-of-domain integers and subclasses fail
+closed. The actual-function inert before/after smoke and 349 focused tests pass.
+The native correction, all 29 controls and complete 32-output acceptance remain
+unproved. The failed run passed C28 with empty owned-document inventory, no
+secondary errors and all original source/token hashes unchanged; normal drawing
+generation was not reached.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible
