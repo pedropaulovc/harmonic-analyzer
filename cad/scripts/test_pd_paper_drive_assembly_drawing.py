@@ -2332,6 +2332,11 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             )
             for component in components_by_key[key]
         }
+        # Both assembly configurations address real members of the same files.
+        # Switching BOM membership must not mutate the source occurrences.
+        for member_name, configuration_info in tuple(native_configurations.items()):
+            native_configurations[member_name.removesuffix(" Simplified")] = configuration_info
+            properties[(member_name.removesuffix(" Simplified"), "Number")] = number
         native = SimpleNamespace(
             properties=properties,
             configurations=native_configurations,
@@ -2344,7 +2349,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             component.GetModelDoc2 = lambda native=native: native
             component.GetSuppression2 = lambda: 2
             exclusions = {
-                (3, (drawing.SIMPLIFIED_VIEW_CONFIGURATION,)): False
+                (3, (configuration,)): False
+                for configuration in ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
             }
             component.exclusions = exclusions
             component.GetExcludeFromBOM2 = (
@@ -2385,18 +2391,41 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table = MagicMock()
     table.Type = 2
     available = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
-    visibility = (False, True)
-    table.BomFeature = SimpleNamespace(
-        PartConfigurationGrouping=3, DisplayAsOneItem=False, TableType=2,
-        GetConfigurationCount=lambda only_visible: 1 if only_visible else 2,
-        GetConfigurations=lambda only_visible, _visibility: (
-            (available[-1:], visibility[-1:])
-            if only_visible else (available, visibility)
-        ),
-    )
+    members_by_configuration = {
+        drawing.SIMPLIFIED_VIEW_CONFIGURATION: tuple(native_rows),
+        "Default": tuple([
+            SimpleNamespace(**(vars(component) | {
+                "ReferencedConfiguration": component.ReferencedConfiguration.removesuffix(" Simplified"),
+            }))
+            for component in group
+        ] for group in native_rows),
+    }
     state = SimpleNamespace(
         columns=columns, native_rows=native_rows, row_keys=list(keys), cells=cells,
         advertised_extra=advertised_extra, hidden_rows=set(), requested_heights={},
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        members_by_configuration=members_by_configuration,
+    )
+
+    def set_configurations(only_visible, flags, names):
+        if only_visible is not True or tuple(flags) != (True,) or len(names) != 1:
+            return False
+        selected = names[0]
+        if selected not in members_by_configuration:
+            return False
+        if selected != state.configuration:
+            native_rows[:] = members_by_configuration[selected]
+            state.configuration = selected
+        return True
+
+    table.BomFeature = SimpleNamespace(
+        PartConfigurationGrouping=3, DisplayAsOneItem=False, TableType=2,
+        SetConfigurations=set_configurations,
+        GetConfigurationCount=lambda only_visible: 1 if only_visible else 2,
+        GetConfigurations=lambda only_visible, _visibility: (
+            ((state.configuration,), (True,)) if only_visible else
+            (available, tuple(name == state.configuration for name in available))
+        ),
     )
     table._pd_state = state
     type(table).RowCount = PropertyMock(side_effect=lambda: len(cells))
@@ -2592,7 +2621,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.SetRowHeight.side_effect = set_row_height
     table.GetComponents2.side_effect = lambda row, configuration: (
         native_rows[row - 1]
-        if configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION else ()
+        if configuration == state.configuration else ()
     )
     if not native_columns:
         # Most consumer tests begin with the valid, already-bound final table.
@@ -2834,7 +2863,6 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
     monkeypatch.setattr(_drawing_tables, "bom_table_template", lambda _: "native.sldbomtbt")
     monkeypatch.setattr(_drawing_tables, "bool_array", tuple)
     monkeypatch.setattr(_drawing_tables, "bstr_array", tuple)
-    table.BomFeature.SetConfigurations = lambda *_: True
     adapter._get_attr_or_call = lambda obj, name: getattr(obj, name)
     adapter._attempt = lambda action: action()
     adapter.currentModel.ClearSelection2 = lambda _: None
@@ -3497,12 +3525,44 @@ def test_bom_insertion_refuses_hidden_physical_rows_before_number_binding(monkey
     assert scene.table.RowHidden(hidden_row) is True
 
 
+def _pd_native_balloon_note(table, component):
+    """Native eligibility depends on occurrence AND actual member, not Number."""
+    def item(_upper):
+        wanted = (component.GetPathName(), component.Name2, component.ReferencedConfiguration)
+        for row in range(1, table.TotalRowCount):
+            for eligible in table.GetComponents2(row, table._pd_state.configuration):
+                if (eligible.GetPathName(), eligible.Name2, eligible.ReferencedConfiguration) == wanted:
+                    column = next(
+                        index for index in range(table.TotalColumnCount)
+                        if table.GetColumnType3(index, True)[0] == 202
+                    )
+                    return table.DisplayedText2(row, column, True)
+        return "*"
+
+    return SimpleNamespace(GetBomBalloonText=item)
+
+
+def test_default_balloon_is_ineligible_for_simplified_only_bom(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()  # No override retains the simplified rendered view.
+    stem = "pd-vn-transgear-pivot-screw"
+    row = scene.keys.index(stem)
+    component = scene.state.members_by_configuration["Default"][row][0]
+    landing = drawing.BalloonLanding(
+        stem, component.Name2, _pd_native_balloon_note(table, component), None, "PD consumer",
+    )
+    assert table.GetComponents2(row + 1, drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+    assert landing.note.GetBomBalloonText(True) == "*"
+    with pytest.raises(RuntimeError, match=r"resolved item \*, expected"):
+        drawing._assert_bom_balloon_items([landing], {stem: str(row + 1)})
+
+
 def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number_binding(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    configuration = drawing.BOM_CONFIGURATION
     before_members = {
         key: tuple(id(component) for component in group)
-        for key, group in zip(scene.keys, scene.state.native_rows, strict=True)
+        for key, group in zip(scene.keys, scene.state.members_by_configuration[configuration], strict=True)
     }
     before_identities = {
         key: tuple(
@@ -3512,7 +3572,7 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
             )
             for component in group
         )
-        for key, group in zip(scene.keys, scene.state.native_rows, strict=True)
+        for key, group in zip(scene.keys, scene.state.members_by_configuration[configuration], strict=True)
     }
     # Isolate graphical view/split/balloon work, not the real insertion helper,
     # Number binding, rebuilds, native identity checks or quantity consumers.
@@ -3522,22 +3582,40 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
         "_isolate_instances", "_shift_view", "_uncross_ring", "_spread_balloons",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
-    monkeypatch.setattr(drawing, "place_view", lambda *_, **__: scene.view)
+    # Model the observed post-operation views, without attributing the native
+    # configuration change to any particular link/isolation/scale operation.
+    native_views = iter((
+        scene.view, SimpleNamespace(ReferencedConfiguration="Default"),
+        SimpleNamespace(ReferencedConfiguration="Default"),
+    ))
+    monkeypatch.setattr(drawing, "place_view", lambda *_, **__: next(native_views))
     monkeypatch.setattr(drawing, "_view_outline", lambda _: drawing.BOM_REFERENCE_LIMITS)
     monkeypatch.setattr(drawing, "transgear_view_shift", lambda _: (0.0, 0.0))
     monkeypatch.setattr(drawing, "inner_view_shift", lambda *_: (0.0, 0.0))
     monkeypatch.setattr(drawing, "inner_view_scale", lambda *_: drawing.INNER_SCALE_LADDER[0])
     monkeypatch.setattr(drawing, "_split_bom", lambda *_, **__: ())
-    monkeypatch.setattr(drawing, "add_component_bom_balloons", lambda *_, **__: [])
-    monkeypatch.setattr(
-        drawing, "_balloon_collar_on_its_rear_rim",
-        lambda *_, **__: SimpleNamespace(note=object()),
-    )
+    def balloons(_adapter, view, *, items, **_options):
+        landings = []
+        for stem, _item in items:
+            row = scene.keys.index(stem)
+            component = scene.state.members_by_configuration["Default"][row][0]
+            note = _pd_native_balloon_note(scene.table, component)
+            landings.append(drawing.BalloonLanding(stem, component.Name2, note, None, "PD consumer"))
+        drawing._assert_bom_balloon_items(landings, dict(items))
+        return landings
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
+    monkeypatch.setattr(drawing, "_balloon_collar_on_its_rear_rim", lambda adapter, view, *, item, label: (
+        balloons(adapter, view, items=((drawing.COLLAR_STEM, item),))[0]
+    ))
 
     _landings, table, items, _pieces, snapshot = drawing._place_bom_sheet(
         scene.adapter, drawing._source_family_counts(scene.model)
     )
     assert table is scene.table
+    assert scene.view.ReferencedConfiguration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    assert table.GetComponents2(1, drawing.SIMPLIFIED_VIEW_CONFIGURATION) == ()
+    drawing._assert_bom_balloon_items(_landings, items)
     assert set(items) == set(drawing.BOM_PART_NUMBERS)
     assert table.RowCount == table.TotalRowCount == 44
     assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
@@ -3559,9 +3637,9 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
         ) == before_identities[key]
         assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
     for key, quantity, configurations in (
-        ("pd-transgear-removable", 3, {"T12 Simplified", "T18 Simplified", "T24 Simplified"}),
-        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink Simplified"}),
-        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink Simplified"}),
+        ("pd-transgear-removable", 3, {"T12", "T18", "T24"}),
+        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink"}),
+        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink"}),
     ):
         row = scene.keys.index(key) + 1
         assert table.Text2(row, 3, True) == table.DisplayedText2(row, 3, True) == str(quantity)
@@ -4252,14 +4330,111 @@ def _pd_display_grid(table, rows, anchor):
     )
 
 
-def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
+@pytest.mark.parametrize("actual", ["Default", "Default Simplified", "", None])
+def test_pd_balloon_configuration_guard_reads_actual_state_without_forcing_it(monkeypatch, actual):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+
+    class View:
+        @property
+        def ReferencedConfiguration(self):
+            return actual
+
+    if actual == drawing.BOM_CONFIGURATION:
+        drawing._assert_bom_balloon_configuration(View(), label="post-operation view")
+    else:
+        with pytest.raises(RuntimeError, match="post-operation view: balloon view configuration"):
+            drawing._assert_bom_balloon_configuration(View(), label="post-operation view")
+
+
+@pytest.mark.parametrize("changed_item", [None, "*", "1"], ids=("stable", "star", "wrong-item"))
+def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
+    monkeypatch, changed_item,
+):
+    pieces, _reads, _split_after, _total_rows, snapshot = _pd_split_bom_fixture(
+        monkeypatch, configuration=drawing.BOM_CONFIGURATION,
+    )
+    for name in ("_early_bound", "_bind"):
+        monkeypatch.setattr(_drawing_balloons, name, lambda obj, *_: obj)
+    items = {key: str(index) for index, key in enumerate(pieces[0]._pd_state.row_keys, 1)}
+    stem = "pd-transgear-removable"
+    if changed_item not in (None, "*"):
+        assert changed_item in items.values()
+        assert changed_item != items[stem]
+    row = pieces[0]._pd_state.row_keys.index(stem)
+    components = pieces[0]._pd_state.native_rows[row]
+    values = [items[stem]] * len(components)
+    landings = []
+    for index, component in enumerate(components):
+        edge = SimpleNamespace(GetComponent=lambda component=component: component)
+        annotation = SimpleNamespace(
+            GetAttachedEntities3=lambda edge=edge: (edge,),
+            GetAttachedEntityTypes=lambda: (1,),
+        )
+        note = SimpleNamespace(
+            GetBomBalloonText=lambda _upper, index=index: values[index],
+            GetAnnotation=lambda annotation=annotation: annotation,
+        )
+        landings.append(drawing.BalloonLanding(stem, component.Name2, note, None, "settled PD"))
+    assert len(landings) == 3  # Same family, three distinct native occurrences.
+    drawing._assert_bom_balloon_items(landings, items)
+
+    def rebuild():
+        if changed_item is not None:
+            values[-1] = changed_item  # A stem-deduplicated census would miss this.
+        return True
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=rebuild),
+        open_model=AsyncMock(),
+        _attempt=lambda action, **_options: action(),
+    )
+    monkeypatch.setattr(drawing, "SOURCE", SimpleNamespace(is_file=lambda: True))
+    monkeypatch.setattr(drawing, "check", lambda *_: None)
+    monkeypatch.setattr(drawing, "require_step_notes", lambda: object())
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_, **__: {"Number": steps.DRAWING_NUMBER})
+    monkeypatch.setattr(drawing, "_source_family_counts", lambda _: {})
+    for name in (
+        "_validate_persisted_explode", "_create_sheets", "_place_assembled_sheet",
+        "_place_pivot_view", "_place_fitup_sheets", "assert_full_detail_view",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_, **__: None)
+    monkeypatch.setattr(drawing, "_place_bom_sheet", lambda *_: (
+        landings, pieces[0], items, pieces, snapshot,
+    ))
+    monkeypatch.setattr(drawing, "_balloon_assembled_sheet", lambda *_: [])
+    monkeypatch.setattr(drawing, "_place_exploded_sheet", lambda *_: [])
+
+    async def finalize(actual_adapter, _outputs, *, settled_checks, **_options):
+        assert actual_adapter.currentModel.EditRebuild3() is True
+        drawing.assert_balloon_landings(adapter, landings)  # Geometry remains valid.
+        for check in settled_checks:
+            check()
+        return {"settled": "passed"}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    if changed_item is None:
+        assert asyncio.run(drawing.build(adapter)) == {"settled": "passed"}
+        with pytest.raises(RuntimeError, match="no native components"):
+            drawing._assert_bom_pieces(
+                pieces, header_count=1, total_rows=44,
+                configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION, expected_snapshot=snapshot,
+            )
+    else:
+        with pytest.raises(RuntimeError, match=r"settled pd-transgear-removable .*resolved item .*expected"):
+            asyncio.run(drawing.build(adapter))
+
+
+def _pd_split_bom_fixture(
+    monkeypatch, *, coverage="complete", configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+):
     total_rows = len(drawing.BOM_PART_NUMBERS) + 1
     split_after = drawing.bom_split_row(
         (drawing.BOM_ROW_HEIGHT,) * total_rows, 1
     )
     _model, _components, baseline, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    assert baseline.BomFeature.SetConfigurations(True, (True,), (configuration,))
     expected_snapshot = _drawing_tables.validate_bom_number_property(
-        baseline, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        baseline, configuration=configuration,
         label="paper-drive", expected_rows=total_rows,
     )
     second_start = split_after + {"complete": 1, "duplicate": 0, "missing": 2}[coverage]
@@ -4269,6 +4444,7 @@ def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
         ((0, split_after), (second_start, total_rows - 1))
     ):
         _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+        assert table.BomFeature.SetConfigurations(True, (True,), (configuration,))
         data_rows = frozenset(range(max(start, 1), end + 1))
         readable_rows = data_rows | {0}
         reads = set()

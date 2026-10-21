@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import product
-import json
 import math
 from pathlib import PureWindowsPath
 import re
@@ -16,7 +15,6 @@ import sys
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import bstr_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
@@ -1359,244 +1357,6 @@ def assert_balloon_landings(adapter: Any, landings: Sequence[BalloonLanding]) ->
         )
 
 
-def _bom_diagnostic_read(getter: Callable[[], Any], *, raw: bool = False) -> Any:
-    """EC2C observation only: isolate each getter; never serialize COM handles."""
-    try:
-        value = getter()
-        if raw or value is None or isinstance(value, (bool, int, float)):
-            return value
-        if isinstance(value, dict) and "error" in value:
-            return value
-        text = value if isinstance(value, str) else repr(value)
-        if isinstance(value, str) and len(text) <= 512:
-            return text
-        return {"raw_repr": text[:512], "truncated": len(text) > 512}
-    except Exception as error:
-        return {"error": f"{type(error).__name__}: {error}"[:512]}
-
-
-def _bom_diagnostic_view(view: Any) -> dict[str, Any]:
-    if view is None:
-        return {"null": True}
-    if isinstance(view, dict):
-        return view
-    view = _bom_diagnostic_read(lambda: _early_bound(view, "IView"), raw=True)
-    return {
-        "name": _bom_diagnostic_read(lambda: view.GetName2()),
-        "model": _bom_diagnostic_read(lambda: view.GetReferencedModelName()),
-        "configuration": _bom_diagnostic_read(lambda: view.ReferencedConfiguration),
-        "linked": _bom_diagnostic_read(lambda: view.GetKeepLinkedToBOM()),
-        "link_name": _bom_diagnostic_read(lambda: view.GetKeepLinkedToBOMName()),
-    }
-
-
-def _bom_diagnostic_component(component: Any, configurations: list[Any]) -> dict[str, Any]:
-    if component is None:
-        return {"null": True}
-    if isinstance(component, dict):
-        return component
-    configurations = [_bom_diagnostic_read(lambda: name) for name in configurations[:2]]
-    c = _bom_diagnostic_read(lambda: _early_bound(component, "IComponent2"), raw=True)
-    member = _bom_diagnostic_read(lambda: c.ReferencedConfiguration)
-    model = _bom_diagnostic_read(lambda: _early_bound(c.GetModelDoc2(), "IModelDoc2"), raw=True)
-    config = _bom_diagnostic_read(
-        lambda: _early_bound(model.GetConfigurationByName(member), "IConfiguration"), raw=True
-    )
-    result = {
-        "path": _bom_diagnostic_read(lambda: c.GetPathName()),
-        "name": _bom_diagnostic_read(lambda: c.Name2),
-        "configuration": member,
-        "reference": _bom_diagnostic_read(lambda: c.ComponentReference),
-        "bom_source": _bom_diagnostic_read(lambda: config.BOMPartNoSource),
-        "alternate_name": _bom_diagnostic_read(lambda: config.AlternateName),
-        "use_alternate_name": _bom_diagnostic_read(lambda: config.UseAlternateNameInBOM),
-        "exclusion_configurations": configurations,
-        "exclusion_raw": (
-            _bom_diagnostic_read(lambda: c.GetExcludeFromBOM2(3, bstr_array(configurations)))
-            if all(isinstance(name, str) for name in configurations)
-            else {"error": "assembly view/BOM configuration unavailable"}
-        ),
-    }
-    for key, configuration in (("member_number_raw", member), ("document_number_raw", "")):
-        result[key] = _bom_diagnostic_read(
-            lambda: _early_bound(
-                _early_bound(model.Extension, "IModelDocExtension").CustomPropertyManager(configuration),
-                "ICustomPropertyManager",
-            ).Get6("Number", True)  # Cached only: never activate an unvisited member.
-        )
-    return result
-
-
-def _bom_diagnostic_edge(edge: Any, configurations: list[Any]) -> dict[str, Any]:
-    if edge is None:
-        return {"null": True}
-    if isinstance(edge, dict):
-        return {"unavailable": edge}
-    component = _bom_diagnostic_read(
-        lambda: _early_bound(_bind(edge, "IEntity"), "IEntity").GetComponent(), raw=True
-    )
-    if isinstance(component, dict):
-        return {"component": component}
-    return {"component": _bom_diagnostic_component(component, configurations)}
-
-
-def _bom_diagnostic_before(view: Any, manager: Any, context: dict[str, Any]) -> dict[str, Any]:
-    current = _bom_diagnostic_view(view)
-    configurations = [current.get("configuration"), context["configuration"]]
-    count = _bom_diagnostic_read(lambda: manager.GetSelectedObjectCount2(-1))
-    return {
-        "view": current, "selection_count": count, "selection_index": 1,
-        "selection_truncated": count > 1 if isinstance(count, int) else None,
-        "selection_type": _bom_diagnostic_read(lambda: manager.GetSelectedObjectType3(1, -1)),
-        "selection_view": _bom_diagnostic_view(_bom_diagnostic_read(
-            lambda: manager.GetSelectedObjectsDrawingView2(1, -1), raw=True
-        )),
-        "selected": _bom_diagnostic_edge(_bom_diagnostic_read(
-            lambda: manager.GetSelectedObject6(1, -1), raw=True
-        ), configurations),
-    }
-
-
-def _bom_diagnostic_attachment(
-    adapter: Any, note: Any, choice: _AnchorChoice, configurations: list[Any],
-) -> dict[str, Any]:
-    annotation = _bom_diagnostic_read(
-        lambda: _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation"), raw=True
-    )
-    entities = _bom_diagnostic_read(lambda: annotation.GetAttachedEntities3(), raw=True)
-    kinds = _bom_diagnostic_read(lambda: annotation.GetAttachedEntityTypes(), raw=True)
-    result = {
-        "dangling": _bom_diagnostic_read(lambda: annotation.IsDangling()),
-        "kinds_raw": _bom_diagnostic_read(
-            lambda: kinds[:4] if isinstance(kinds, (tuple, list)) else kinds
-        ),
-        "kinds_truncated": len(kinds) > 4 if isinstance(kinds, (tuple, list)) else None,
-    }
-    if not isinstance(entities, (tuple, list)):
-        result["entities_unavailable"] = _bom_diagnostic_read(lambda: entities)
-        return result
-    result.update(count=len(entities), truncated=len(entities) > 4)
-    result["entities"] = [
-        {"owner": _bom_diagnostic_edge(edge, configurations),
-         "is_same_raw": _bom_diagnostic_read(lambda: adapter.swApp.IsSame(edge, choice.edge))}
-        for edge in entities[:4]
-    ]
-    return result
-
-
-def _bom_diagnostic_table(context: dict[str, Any], view_configuration: Any, item: str) -> dict[str, Any]:
-    table = _bom_diagnostic_read(lambda: _early_bound(context["table"], "ITableAnnotation"), raw=True)
-    bom = _bom_diagnostic_read(lambda: _early_bound(context["table"], "IBomTableAnnotation"), raw=True)
-    feature = _bom_diagnostic_read(lambda: _early_bound(bom.BomFeature, "IBomFeature"), raw=True)
-    result = {name: _bom_diagnostic_read(lambda: getattr(feature, name)) for name in (
-        "Name", "PartConfigurationGrouping", "DisplayAsOneItem", "Configuration",
-    )}
-    result["configurations_raw"] = _bom_diagnostic_read(lambda: feature.GetConfigurations(False, None))
-    for name in ("TotalRowCount", "RowCount", "TotalColumnCount"):
-        result[name] = _bom_diagnostic_read(lambda: getattr(table, name))
-    columns = []
-    count = result["TotalColumnCount"]
-    for column in range(min(max(count, 0), 16) if isinstance(count, int) else 0):
-        kind = _bom_diagnostic_read(lambda: table.GetColumnType3(column, True), raw=True)
-        columns.append({
-            "index": column, "type_raw": _bom_diagnostic_read(lambda: kind),
-            "kind": kind[0] if isinstance(kind, (tuple, list)) and kind else None,
-            "property": _bom_diagnostic_read(lambda: bom.GetColumnCustomProperty(column)),
-        })
-    result.update(columns=columns, columns_truncated=count > 16 if isinstance(count, int) else None)
-    item_columns = [c["index"] for c in columns if c["kind"] == 202]
-    split = _bom_diagnostic_read(lambda: table.GetSplitInformation(0, 0, 0, 0), raw=True)
-    result["split_raw"] = _bom_diagnostic_read(lambda: split)
-    # The context is already split. TotalRowCount does NOT grant access to
-    # another piece's global rows; unavailable reads are not evidence of absence.
-    if not (isinstance(split, (tuple, list)) and len(split) == 5
-            and split[0] == 1 and all(isinstance(v, int) for v in split)
-            and 0 <= split[3] <= split[4] and len(item_columns) == 1):
-        result["rows_unavailable"] = "no proven split-owned range or unique native 202 column"
-        return result
-    rows = range(max(1, split[3]), split[4] + 1)
-    result["rows_truncated"] = len(rows) > 63  # Header plus at most 63 owned data rows.
-    result["header_item"] = _bom_diagnostic_read(lambda: table.DisplayedText2(0, item_columns[0], True))
-    scanned = []
-    matches = []
-    for row in rows[:63]:
-        physical_item = _bom_diagnostic_read(lambda: table.DisplayedText2(row, item_columns[0], True))
-        scanned.append({"row": row, "item": physical_item})
-        if isinstance(physical_item, str) and physical_item.strip() == item:
-            matches.append(row)
-    result.update(scanned=scanned, matches_truncated=len(matches) > 4, matches=[])
-    configurations = [_bom_diagnostic_read(lambda: context["configuration"])]
-    if view_configuration != configurations[0]:
-        configurations.append(view_configuration)
-    for row in matches[:4]:
-        record: dict[str, Any] = {"row": row, "cells": [], "configurations": []}
-        for column in columns:
-            if column["kind"] in (202, 203) or column["property"] == "Number":
-                record["cells"].append({
-                    "column": column["index"], "kind": column["kind"], "property": column["property"],
-                    "text": _bom_diagnostic_read(lambda: table.DisplayedText2(row, column["index"], True)),
-                })
-        for configuration in configurations[:2]:
-            counts = _bom_diagnostic_read(lambda: bom.GetComponentsCount2(row, configuration))
-            members = _bom_diagnostic_read(lambda: bom.GetComponents2(row, configuration), raw=True)
-            entry = {"configuration": configuration, "count_item_number_raw": counts}
-            if isinstance(members, (tuple, list)):
-                entry.update(count=len(members), truncated=len(members) > 8, members=[
-                    _bom_diagnostic_component(c, [view_configuration, context["configuration"]])
-                    for c in members[:8]
-                ])
-            else:
-                entry["members_unavailable"] = _bom_diagnostic_read(lambda: members)
-            record["configurations"].append(entry)
-        result["matches"].append(record)
-    result["search_scope"] = "owned split rows only; getter errors mean unavailable, not absent"
-    return result
-
-
-def _emit_bom_association_failure(
-    adapter: Any, view: Any, note: Any, choice: _AnchorChoice, stem: str,
-    expected_item: str, item: str, before: Any, context: dict[str, Any],
-) -> None:
-    """One failure-only EC2C record; even logger failures cannot replace the guard."""
-    try:
-        current = _bom_diagnostic_view(view)
-        configurations = [current.get("configuration"), context["configuration"]]
-        record = {
-            "record": "drawing.bom_balloon_association", "contract": "EC2C",
-            "caps": {"text": 512, "selection": 1, "attachments": 4, "columns": 16,
-                     "rows": 64, "matches": 4, "members": 8, "configurations": 2},
-            "stem": stem[:512], "expected_item": expected_item[:512], "actual_item": item[:512],
-            "anchor_instance": choice.instance[:512], "method": choice.method,
-            "before": before, "current_view": current,
-            "attachment": _bom_diagnostic_read(
-                lambda: _bom_diagnostic_attachment(adapter, note, choice, configurations), raw=True
-            ),
-            "table": _bom_diagnostic_read(
-                lambda: _bom_diagnostic_table(context, current.get("configuration"), expected_item), raw=True
-            ),
-            "previous_success": "unavailable: no preceding successful insertion",
-            "same_component_control": "unavailable: no earlier same-component balloon retained",
-        }
-        previous = context.get("previous_success")
-        if previous is not None:
-            pre, actual, old_note, old_choice, old_view, old_stem = previous
-            old_current = _bom_diagnostic_view(old_view)
-            record["previous_success"] = {
-                "stem": old_stem[:512], "anchor_instance": old_choice.instance[:512],
-                "before": pre, "successful_item": actual[:512], "current_view": old_current,
-                "current_item": _bom_diagnostic_read(lambda: _early_bound(old_note, "INote").GetBomBalloonText(True)),
-                "same_view_raw": _bom_diagnostic_read(lambda: adapter.swApp.IsSame(old_view, view)),
-                "control_scope": "preceding successful insertion, not a same-component control",
-                "attachment": _bom_diagnostic_read(lambda: _bom_diagnostic_attachment(
-                    adapter, old_note, old_choice,
-                    [old_current.get("configuration"), context["configuration"]],
-                ), raw=True),
-            }
-        _telemetry.info("drawing.bom_balloon_association " + json.dumps(record, separators=(",", ":")))
-    except Exception:
-        pass  # Observation/serialization/logging must preserve the original item failure.
-
-
 def _create_component_bom_balloon(
     adapter: Any,
     view: Any,
@@ -1605,7 +1365,6 @@ def _create_component_bom_balloon(
     choice: _AnchorChoice,
     expected_item: str,
     label: str,
-    _bom_diagnostics: dict[str, Any] | None = None,
 ) -> BalloonLanding:
     """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed.
 
@@ -1658,35 +1417,15 @@ def _create_component_bom_balloon(
     options.ItemNumberStart = 1
     options.ItemNumberIncrement = 1
     options.ItemOrder = 1
-    before = None
-    if _bom_diagnostics is not None:
-        try:
-            before = _bom_diagnostic_before(view, manager, _bom_diagnostics)
-        except Exception:
-            before = {"error": "pre-insert diagnostic unavailable"}
     note = extension.InsertBOMBalloon2(options)
     draw.ClearSelection2(True)
     if note is None:
         raise RuntimeError(f"{label}: failed to insert {stem} balloon")
     item = _balloon_item_number(adapter, note, label=label)
     if item != expected_item:
-        if _bom_diagnostics is not None:
-            _emit_bom_association_failure(
-                adapter, view, note, choice, stem, expected_item, item, before, _bom_diagnostics
-            )
-        failure = RuntimeError(
+        raise RuntimeError(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
-        if _bom_diagnostics is not None and _bom_diagnostics.get("probe") is not None:
-            try:
-                _bom_diagnostics["probe"](
-                    failed_view=view, note=note, choice=choice, stem=stem,
-                    expected_item=expected_item, item=item, before=before,
-                )
-            except Exception as probe_error:
-                failure.add_note("Temporary PD BOM ABA probe failed; see chained probe/cleanup errors.")
-                raise failure from probe_error
-        raise failure
     landing = BalloonLanding(
         stem=stem,
         instance=choice.instance,
@@ -1695,11 +1434,6 @@ def _create_component_bom_balloon(
         label=label,
     )
     _prove_landing(adapter, landing)
-    if _bom_diagnostics is not None:
-        try:
-            _bom_diagnostics["previous_success"] = (before, item, note, choice, view, stem)
-        except Exception:
-            pass  # Retention cannot change a successful insertion's return.
     return landing
 
 
@@ -1713,7 +1447,6 @@ def add_component_bom_balloons(
     label: str,
     margin: float = 0.014,
     explode_offsets: Mapping[str, tuple[float, float, float]] | None = None,
-    _bom_diagnostics: dict[str, Any] | None = None,
 ) -> list[BalloonLanding]:
     """Insert and ring one checked balloon per requested component family.
 
@@ -1730,9 +1463,6 @@ def add_component_bom_balloons(
     validated by the drawing. This is not a missing-step fallback: when supplied
     (including an empty mapping), no source explode is queried or shown.
     ``None`` retains the native view explode-step reader.
-    ``_bom_diagnostics`` retains the preceding proved insertion for PD failure
-    observation; its temporary private ``probe`` callback may run a controlled
-    BOM-only ABA experiment before the original strict item failure is raised.
     """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")
@@ -1790,7 +1520,6 @@ def add_component_bom_balloons(
             choice=choice,
             expected_item=item,
             label=label,
-            _bom_diagnostics=_bom_diagnostics,
         )
         for (stem, item), choice in zip(items, picks)
     ]

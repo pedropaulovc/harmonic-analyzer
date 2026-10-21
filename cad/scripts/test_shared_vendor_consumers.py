@@ -657,6 +657,83 @@ class _NumberTable:
         return self.components
 
 
+@pytest.mark.parametrize("override,quantity,item", [(None, 1, "*"), ("Default", 3, "1")])
+def test_bom_configuration_selects_native_members_independently_of_rendered_view(
+    unwrapped_com, monkeypatch, override, quantity, item,
+):
+    members = {
+        configuration: tuple(_component(
+            f"native-wire-{ordinal}", configuration=member,
+            properties={(member, "Number"): NUMBER},
+        ) for ordinal in range(1, count + 1))
+        for configuration, member, count in (
+            ("Default", "LeverWire", 3), ("Default Simplified", "LeverWire Simplified", 1),
+        )
+    }
+    table = _NumberTable(())
+    table.configuration = None
+
+    def select(only_visible, flags, names):
+        if only_visible is not True or tuple(flags) != (True,) or len(names) != 1:
+            return False
+        table.configuration = names[0]
+        table.components = members[table.configuration]
+        table.cells[1][2] = str(len(table.components))
+        return True
+
+    table.BomFeature = SimpleNamespace(
+        SetConfigurations=select, PartConfigurationGrouping=1, DisplayAsOneItem=False,
+    )
+    table.GetComponents2 = lambda row, configuration: (
+        table.components if configuration in ("", table.configuration) else ()
+    )
+    view = SimpleNamespace(
+        ReferencedConfiguration="Default Simplified", InsertBomTable6=lambda *_: table,
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(ClearSelection2=lambda _: None, ForceRebuild3=lambda _: True),
+        _get_attr_or_call=lambda obj, name: getattr(obj, name),
+        _attempt=lambda action: action(),
+    )
+    monkeypatch.setattr(tables, "_activate_and_select_view", lambda *_, **__: None)
+    monkeypatch.setattr(tables, "bom_table_template", lambda _: "native.sldbomtbt")
+    monkeypatch.setattr(tables, "bool_array", tuple)
+    monkeypatch.setattr(tables, "bstr_array", tuple)
+    monkeypatch.setattr(tables, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(tables._sw_type_info, "early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(tables._sw_type_info, "is_early_bound", lambda *_: True)
+    tables.insert_bom_table(
+        adapter, view, anchor_xy=(0.1, 0.2), expected_components=(WIRE,),
+        component_identities={WIRE: (WIRE, "LeverWire")}, part_number_property="Number",
+        configuration_grouping="same-name", configuration=override, label="wire",
+    )
+    snapshot = tables.validate_bom_number_property(
+        table, configuration=override or view.ReferencedConfiguration,
+        label="wire", occurrence_quantities=True,
+    )
+    assert snapshot == ((1, ((WIRE, "LeverWire", quantity),), NUMBER, str(quantity)),)
+    assert view.ReferencedConfiguration == "Default Simplified"
+    # A Default view's real member is not eligible just because its Number
+    # matches a simplified member. The selected BOM configuration controls it.
+    selected = members["Default"][0]
+    note = SimpleNamespace(GetBomBalloonText=lambda _upper: (
+        "1" if any(
+            (c.Name2, c.ReferencedConfiguration) == (selected.Name2, selected.ReferencedConfiguration)
+            for c in table.GetComponents2(1, table.configuration)
+        ) else "*"
+    ))
+    assert note.GetBomBalloonText(True) == item
+
+
+@pytest.mark.parametrize("configuration", ["", "   "])
+def test_explicit_empty_bom_configuration_is_not_view_derived(configuration):
+    with pytest.raises(ValueError, match="explicit BOM configuration must be nonempty"):
+        tables.insert_bom_table(
+            None, None, anchor_xy=(0.1, 0.2), expected_components=(),
+            configuration=configuration, label="wire",
+        )
+
+
 @pytest.fixture
 def number_binding(unwrapped_com, monkeypatch):
     rebuilds = []

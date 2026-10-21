@@ -987,6 +987,7 @@ def insert_bom_table(
     component_identities: dict[str, tuple[str, str | None]] | None = None,
     part_number_property: Literal["Number"] | None = None,
     configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
+    configuration: str | None = None,
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -1004,6 +1005,9 @@ def insert_bom_table(
     retaining distinct member keys while combining the transgear variants.
     ``part_number_property="Number"`` makes the PART NUMBER column associative
     to the model custom property without changing the internal BOM grouping key.
+    ``configuration`` selects native BOM membership independently of the rendered
+    view; ``None`` retains the view-derived configuration. An explicit name must
+    be nonempty. Bind it before Number, quantity and layout authoring.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
@@ -1020,11 +1024,14 @@ def insert_bom_table(
         raise ValueError("only the released Number custom property is supported")
     if part_number_property is not None and component_identities is None:
         raise ValueError("an associative Number column requires native row identities")
+    if configuration is not None and not configuration.strip():
+        raise ValueError("an explicit BOM configuration must be nonempty")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
-    configuration = str(
-        adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
-    )
+    if configuration is None:
+        configuration = str(
+            adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
+        )
     bom = view.InsertBomTable6(
         False,  # UseAnchorPoint=False -> place at the explicit X/Y below
         anchor_xy[0],
@@ -1045,7 +1052,7 @@ def insert_bom_table(
     # A COM-inserted top-level BOM starts with NO configuration bound (a
     # header-only table without even its per-configuration QTY column) --
     # IBomFeature::SetConfigurations is the documented binding path for
-    # top-level tables, so bind the view's own configuration.
+    # top-level tables, so bind the selected configuration before formatting.
     bom = _sw_type_info.early_bound_or_flag(bom, "IBomTableAnnotation", "BomFeature")
     feature = adapter._get_attr_or_call(bom, "BomFeature")
     if feature is None:
@@ -1057,9 +1064,9 @@ def insert_bom_table(
         "PartConfigurationGrouping",
         "DisplayAsOneItem",
     )
-    if not feature.SetConfigurations(
+    if feature.SetConfigurations(
         True, bool_array([True]), bstr_array([configuration])
-    ):
+    ) is not True:
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
         )
