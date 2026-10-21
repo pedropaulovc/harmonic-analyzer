@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import math
 from fractions import Fraction
 from pathlib import Path
@@ -15,6 +16,7 @@ import draw_mg_magnifying_clamp as drawing
 import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
 import _gtol_face_resolve
+import _drawing_leader_notes as leader_notes
 from _gtol_face import FaceGeometry, SURFACE_PLANE
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -355,49 +357,279 @@ def test_native_tap_class_omission_rejects_refused_or_stale_callouts(options) ->
         drawing._omit_tap_thread_class(_TapCallout(**options), label="native tap")
 
 
-@pytest.mark.parametrize("stale_property", (False, True))
-@pytest.mark.parametrize("has_supplied_flat", (True, False))
-def test_stock_note_resolves_and_attaches_only_the_actual_supplied_flat(monkeypatch, has_supplied_flat, stale_property) -> None:
-    def face(normal, origin):
-        native = SimpleNamespace()
-        native.geometry = FaceGeometry(native, SURFACE_PLANE, (*normal, *origin), normal, (0.0,) * 6)
-        return native
+class _StockFace:
+    def __init__(self, context, key, normal, origin):
+        self.context, self.native_key = context, (context, key)
+        self.face_id = 7  # Deliberately collides across faces/documents; never an identity.
+        self.geometry = FaceGeometry(self, SURFACE_PLANE, (*normal, *origin), normal, (0.0,) * 6)
+        self.document = None
+        self.selection_count = 0
 
-    cap = face((0.0, 1.0, 0.0), (0.0, spec.BLOCK_HEIGHT / 1000.0, 0.0))
-    opposite = face((0.0, 0.0, -1.0), (0.0, 0.0, -spec.HEX_AF / 2000.0))
-    supplied = face((0.0, 0.0, 1.0), (0.0, 0.0, spec.HEX_AF / 2000.0))
-    faces = [cap, opposite, *([supplied] if has_supplied_flat else [])]
-    for native, following in zip(faces, [*faces[1:], None], strict=True):
-        native.GetNextFace = lambda following=following: following
-    model = SimpleNamespace(GetBodies2=lambda _kind, _visible: (SimpleNamespace(GetFirstFace=lambda: faces[0]),), properties={"Manufacturing Notes": "OLD STOCK" if stale_property else spec.STOCK_NOTE})
-    view = SimpleNamespace(ReferencedDocument=model)
-    calls = []
+    def Select4(self, append, data):
+        assert self.context == "view", "Select4 must not select an underlying-part face into the active drawing"
+        assert append is False and data.View is self.document.view
+        self.selection_count += 1
+        if self.document.fault == "selection_rejected":
+            return False
+        self.document.selected = self.document.wrong if self.document.fault == "wrong_pick" else self.document.selected_alias
+        return True
+
+
+class _StockNoteAnnotation:
+    def __init__(self, document):
+        self.document = document
+        self.entity = document.wrong if document.fault in ("wrong_attachment", "inventory_unavailable") else document.selected
+        self.leaders, self.position = 0, None
+        self.OwnerType = 0
+        self.Owner = document.view
+
+    def GetAttachedEntities3(self):
+        return (self.entity,)
+
+    def GetAttachedEntityCount3(self):
+        return 1
+
+    def GetAttachedEntityTypes(self):
+        return (2,)
+
+    def GetLeaderCount(self):
+        return self.leaders
+
+    def IsDangling(self):
+        return self.document.fault == "dangling"
+
+    def SetLeader3(self, *_args):
+        self.leaders = 1
+        return 0
+
+    def SetPosition2(self, x, y, z):
+        self.position = (x, y, z)
+        return True
+
+
+class _StockNoteDocument:
+    def __init__(self, fault):
+        self.fault, self.selected, self.active, self.notes = fault, None, None, []
+        self.SelectionManager = SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(View=None),
+            GetSelectedObjectCount2=lambda _mark: int(self.selected is not None),
+            GetSelectedObject6=lambda _index, _mark: self.selected,
+        )
+        self.Extension = SimpleNamespace(SelectByID2=self._reject_coordinate_pick)
+
+    def _reject_coordinate_pick(self, *_args):
+        raise AssertionError("stock note must select the exact view flat, not a guessed coordinate")
+
+    def ActivateView(self, name):
+        assert name == "stock iso"
+        self.active = self.view
+        return True
+
+    def ClearSelection2(self, _all):
+        self.selected = None
+
+    def InsertNote(self, text):
+        assert text == drawing.property_link("Manufacturing Notes")
+        assert self.active is self.view and self.selected is not None
+        annotation = _StockNoteAnnotation(self)
+        note = SimpleNamespace(
+            GetAnnotation=lambda: annotation,
+            GetText=lambda: self.model.properties["Manufacturing Notes"],
+        )
+        self.notes.append(note)
+        return note
+
+
+def _stock_context_fixture(monkeypatch, *, fault=None, stale_property=False, has_supplied_flat=True, cross_context_code=0):
+    origin = (0.0, 0.0, spec.HEX_AF / 2000.0)
+    normal = (0.0, 0.0, 1.0)
+    supplied = _StockFace("source", "stock", normal, origin)
+    cap = _StockFace("source", "cap", (0.0, 1.0, 0.0), (0.0, spec.BLOCK_HEIGHT / 1000.0, 0.0))
+    opposite = _StockFace("source", "opposite", (0.0, 0.0, -1.0), (0.0, 0.0, -origin[2]))
+    source_faces = [cap, opposite, *([supplied] if has_supplied_flat else [])]
+    for face, following in zip(source_faces, [*source_faces[1:], None], strict=True):
+        face.GetNextFace = lambda following=following: following
+    view_face = _StockFace("view", "stock", normal, origin)
+    selected_alias = _StockFace("view", "stock", normal, origin)
+    wrong = _StockFace("view", "wrong", normal, origin)
+    wrong_source = _StockFace("other part", "stock", normal, origin)
+    canonical_alias = _StockFace("source", "stock", normal, origin)
+    feature, view_feature = SimpleNamespace(), SimpleNamespace()
+    candidates = [view_face]
+    if fault == "no_view_flat":
+        candidates = []
+    elif fault == "duplicate_view_flat":
+        candidates.append(wrong)
+    view_feature.GetFaces = lambda: tuple(candidates)
+    bindings, records, correspondences = [], [], []
+
+    def feature_by_name(name):
+        assert name == "Block"
+        return None if fault == "no_block" else feature
+
+    def corresponding_feature(source):
+        assert source is feature  # Never retry the fixture's known-null direct face API.
+        return None if fault == "no_view_feature" else view_feature
+
+    def corresponding_source(entity):
+        correspondences.append(entity)
+        assert entity.context == "view"
+        if fault == "no_source_correspondence":
+            return None
+        return wrong_source if fault == "wrong_source" or entity.native_key[1] == "wrong" else canonical_alias
+
+    model = SimpleNamespace(
+        GetBodies2=lambda _kind, _visible: (SimpleNamespace(GetFirstFace=lambda: source_faces[0]),),
+        FeatureByName=feature_by_name,
+        Extension=SimpleNamespace(GetCorrespondingEntity2=corresponding_source),
+        properties={"Manufacturing Notes": "OLD STOCK" if stale_property else spec.STOCK_NOTE},
+    )
+    document = _StockNoteDocument(fault)
+
+    def notes():
+        if fault == "inventory_unavailable":
+            raise RuntimeError("native view note inventory unavailable")
+        return tuple(document.notes)
+
+    view = SimpleNamespace(
+        ReferencedDocument=model, GetCorresponding=corresponding_feature,
+        GetName2=lambda: "stock iso", GetNotes=notes,
+    )
+    document.view, document.model, document.wrong, document.selected_alias = view, model, wrong, selected_alias
+    for face in (view_face, selected_alias, wrong):
+        face.document = document
+
+    def same(first, second):
+        if first is second:
+            if fault == "source_self_unknown" and first is supplied:
+                return 2
+            if fault == "view_self_unknown" and first is view_face:
+                return 2
+            if fault == "canonical_self_unknown" and first is canonical_alias:
+                return 2
+            return 1
+        if first is canonical_alias and second is supplied and fault == "source_same_unknown":
+            return 2
+        if getattr(first, "context", None) == "source" and getattr(second, "context", None) == "view":
+            return cross_context_code
+        return int(getattr(first, "native_key", object()) == getattr(second, "native_key", object()))
+
+    def bind(value, interface):
+        bindings.append((value, interface))
+        if value is model and interface == "IModelDoc2":
+            return SimpleNamespace(Extension=model.Extension)  # No FeatureByName on this interface.
+        return value
+
+    def read_member(value, member):
+        value = getattr(value, member)
+        return value() if callable(value) else value
+
+    adapter = SimpleNamespace(
+        currentModel=document, swApp=SimpleNamespace(IsSame=same),
+        _attempt=lambda fn, default=None: fn(), _get_attr_or_call=read_member,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(_gtol_face_resolve, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(_gtol_face_resolve, "_bind", lambda value, _interface: value)
     monkeypatch.setattr(_gtol_face_resolve, "_com_invoke", lambda value, _interface, member: getattr(value, member)())
     monkeypatch.setattr(_gtol_face_resolve, "face_geometry", lambda value, *, identities: value.geometry)
+    monkeypatch.setattr(drawing, "face_geometry", lambda value: value.geometry)
+    monkeypatch.setattr(leader_notes, "rebuild_drawing", lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
+    return SimpleNamespace(
+        adapter=adapter, view=view, model=model, source=supplied, face=view_face,
+        alias=selected_alias, wrong_source=wrong_source, document=document,
+        bindings=bindings, records=records, correspondences=correspondences,
+    )
 
-    def insert_note(_adapter, picked_view, **kwargs):
-        calls.append((picked_view, kwargs))
-        property_name = kwargs["text"].split('"')[1]
-        return SimpleNamespace(GetText=lambda: model.properties[property_name])
 
-    monkeypatch.setattr(drawing, "add_attached_note", insert_note)
-    if not has_supplied_flat:
-        with pytest.raises(RuntimeError, match="matched 0 faces"):
-            drawing._add_stock_note(None, view)
-        assert calls == []
-    elif stale_property:
-        with pytest.raises(RuntimeError, match="model property did not resolve"):
-            drawing._add_stock_note(None, view)
-    else:
-        drawing._add_stock_note(None, view)
-        assert len(calls) == 1 and calls[0][0] is view
-        arguments = calls[0][1]
-        assert arguments["entity_type"] == "FACE"
-        assert arguments["entity"] is arguments["attached_to"] is supplied
-        assert arguments["text"] == drawing.property_link("Manufacturing Notes")
-        assert "entity_xy" not in arguments  # no free pointer pretending to attach
+@pytest.mark.parametrize("cross_context_code", (0, 2))
+def test_stock_note_uses_the_exact_view_face_and_native_source_correspondence(monkeypatch, cross_context_code) -> None:
+    state = _stock_context_fixture(monkeypatch, cross_context_code=cross_context_code)
+    drawing._add_stock_note(state.adapter, state.view)
+    assert state.face.selection_count == 1 and state.source.selection_count == 0
+    assert len(state.document.notes) == 1 and state.document.selected is None
+    annotation = state.document.notes[0].GetAnnotation()
+    assert annotation.GetAttachedEntities3() == (state.alias,) and state.alias is not state.face
+    assert state.adapter.swApp.IsSame(state.alias, state.face) == 1
+    assert state.adapter.swApp.IsSame(state.source, state.face) == cross_context_code
+    assert annotation.GetAttachedEntityTypes() == (2,) and annotation.GetLeaderCount() == 1
+    assert not annotation.IsDangling() and annotation.position == (*drawing.STOCK_NOTE_XY, 0.0)
+    assert state.document.notes[0].GetText() == spec.STOCK_NOTE
+    assert (state.model, "IPartDoc") in state.bindings
+    audit = json.loads(state.records[-1][1]["auditJSON"])
+    assert audit["source_self"] == audit["view_self"] == audit["canonical_self"] == audit["source_same"] == 1
+    assert audit["raw_source_vs_view"] == cross_context_code and audit["stage"] == "stock.complete"
+
+
+@pytest.mark.parametrize("fault, message", (
+    ("no_block", "source has no Block"),
+    ("no_view_feature", "Block has no drawing-view correspondence"),
+    ("no_view_flat", "expected one drawing-view flat, found 0"),
+    ("duplicate_view_flat", "expected one drawing-view flat, found 2"),
+    ("no_source_correspondence", "drawing face has no source correspondence"),
+    ("wrong_source", "does not prove exact source identity"),
+    ("source_same_unknown", "does not prove exact source identity"),
+    ("source_self_unknown", "source face identity is unavailable"),
+    ("view_self_unknown", "drawing face identity is unavailable"),
+    ("canonical_self_unknown", "does not prove exact source identity"),
+))
+def test_stock_note_rejects_unproved_native_face_correspondence_before_insertion(monkeypatch, fault, message) -> None:
+    state = _stock_context_fixture(monkeypatch, fault=fault)
+    if fault == "wrong_source":
+        assert state.source.geometry.parameters == state.wrong_source.geometry.parameters
+        assert state.source.face_id == state.wrong_source.face_id  # Geometry/ID collision must still fail.
+    with pytest.raises(RuntimeError, match=message):
+        drawing._add_stock_note(state.adapter, state.view)
+    assert state.document.notes == [] and state.face.selection_count == 0
+
+
+def test_stock_note_still_requires_the_independently_resolved_supplied_flat(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch, has_supplied_flat=False)
+    with pytest.raises(RuntimeError, match="matched 0 faces"):
+        drawing._add_stock_note(state.adapter, state.view)
+    assert state.document.notes == [] and state.face.selection_count == 0
+
+
+@pytest.mark.parametrize("fault", ("wrong_pick", "wrong_attachment", "dangling"))
+def test_stock_note_keeps_the_actual_shared_face_attachment_guard(monkeypatch, fault) -> None:
+    state = _stock_context_fixture(monkeypatch, fault=fault)
+    with pytest.raises(RuntimeError, match="lost its face attachment"):
+        drawing._add_stock_note(state.adapter, state.view)
+    audit = json.loads(state.records[-1][1]["auditJSON"])
+    row = audit["view_notes"][0]
+    assert row["count"] == row["entities_reported"] == row["leaders"] == 1 and row["types"] == [2]
+    assert row["dangling"] is (fault == "dangling")
+    assert row["owner_present"] is True and row["owner_self"] == row["owner_to_view"] == 1
+    assert row["attachments"][0]["self"] == 1
+    assert row["attachments"][0]["view_same"] == row["attachments"][0]["source_same"] == int(fault == "dangling")
+    assert audit["view_note_count_before"] == 0 and row["same_to_before"] == []
+    assert audit["source_same"] == 1  # A valid mapping never excuses a later wrong attachment.
+
+
+def test_stock_note_optional_failure_inventory_never_masks_the_strict_attachment_error(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch, fault="inventory_unavailable")
+    with pytest.raises(RuntimeError, match="lost its face attachment"):
+        drawing._add_stock_note(state.adapter, state.view)
+    audit = json.loads(state.records[-1][1]["auditJSON"])
+    assert "lost its face attachment" in audit["failure"]["message"]
+    assert any(error["member"] == "IView.GetNotes" for error in audit["diagnostic_errors"])
+    assert "view_notes" not in audit
+
+
+def test_stock_note_requires_successful_selection_of_the_verified_view_face(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch, fault="selection_rejected")
+    with pytest.raises(RuntimeError, match="failed to select supplied hex stock flat face by entity"):
+        drawing._add_stock_note(state.adapter, state.view)
+    assert state.face.selection_count == 1 and state.source.selection_count == 0
+    assert state.document.notes == []
+
+
+def test_stock_note_preserves_native_property_resolution_as_a_required_guard(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch, stale_property=True)
+    with pytest.raises(RuntimeError, match="model property did not resolve"):
+        drawing._add_stock_note(state.adapter, state.view)
+    assert state.document.notes[0].GetText() == "OLD STOCK"
 
 
 @pytest.mark.parametrize("interface", ("IEntity", "ISketchPoint", "ISketchSegment"))

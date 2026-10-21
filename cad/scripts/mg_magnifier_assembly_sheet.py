@@ -56,7 +56,9 @@ DIMENSION_CALLOUTS = {
 LEVER_CALLOUTS = {
     CLAMP_STATION_DIMENSION: "CLAMP STATION: SETS MAGNIFICATION",
     FIXTURE_DROP_DIMENSION: "FIXTURE DROP:\nSETS TRACE HEIGHT",
-    THREAD_PROJECTION_DIMENSION: "FLAT LEVER TIP PROUD OF FAR BRACKET FACE",
+    # Below-text supports line breaks; keep the qualifier on the native
+    # dimension while fitting the narrow lane left of the assembled bracket.
+    THREAD_PROJECTION_DIMENSION: "FLAT LEVER TIP\nPROUD OF FAR\nBRACKET FACE",
 }
 
 # --- Fitter package -----------------------------------------------------------
