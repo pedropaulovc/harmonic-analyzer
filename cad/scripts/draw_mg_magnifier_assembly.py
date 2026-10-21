@@ -65,15 +65,12 @@ from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
     add_auto_balloons,
-    add_component_bom_balloons,
-    assert_balloon_landings,
     isolate_drawing_view_components,
 )
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     _SW_SHADED_EDGES,
     DrawingOutputs,
-    finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -81,6 +78,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_group_perf_probe import native_input_identity, run_matched_group_probe
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -100,6 +98,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
+from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
@@ -873,6 +872,18 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
 
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
+
+# Diagnostic manual arm: exact lever-family portion of BALLOON_ANCHORS from
+# fb1fe894e595c397d0945af042f7071f16200299, recipe blob
+# 3d2e7f53c81caa70d6082bb2370af8e7cb91ee73. The wire is beyond our STOP.
+OLD_LEVER_ANCHORS = {stem: BalloonAnchor() for stem in explode.LEVER_GROUP_STEMS} | {
+    "mg-magnifying-lever": BalloonAnchor(
+        point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
+    ),
+    "mg-magnifying-vertical-rod": BalloonAnchor(
+        point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
+    ),
+}
 
 
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
@@ -1648,6 +1659,26 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
+    """Diagnostic ONLY: lever7 ABBA, STOP before later sheet work/publication."""
+    await run_matched_group_probe(
+        adapter,
+        template=DRAWING_TEMPLATES[SPEC.layout].path,
+        case="mg-lever-7",
+        manual_recipe_blob="3d2e7f53c81caa70d6082bb2370af8e7cb91ee73",
+        anchors=OLD_LEVER_ANCHORS,
+        label=f"magnifier {LEVER_LABEL} BOM coverage",
+        margin=BALLOON_MARGIN,
+        prepare_arm=_prepare_lever_perf_arm,
+    )
+
+
+async def _prepare_lever_perf_arm(
+    adapter: Any, report: dict[str, Any]
+) -> tuple[
+    Any,
+    tuple[tuple[str, str], ...],
+    Callable[[Any, list[BalloonLanding]], None],
+]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
@@ -1663,8 +1694,9 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
+    report["native_inputs"] = native_input_identity(source_model, SOURCE)
     _create_sheets(adapter)
-    settled_checks = _place_assembled_sheet(adapter)
+    _place_assembled_sheet(adapter)
     # Every view's configuration and exploded state is final before the BOM
     # binds: a configuration switch after it re-dirties the source.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
@@ -1720,105 +1752,51 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
 
     _activate_sheet(adapter, SHEET_NAMES[1])
-    scales = {
-        WHEEL_LABEL: _fit_ring(
-            adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
-        )
-    }
-    wheel_landings = add_auto_balloons(
+    wheel_scale = _fit_ring(
+        adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
+    )
+    # This is unchanged production setup before the lever boundary, not a
+    # measured wheel arm or a rerun of the completed wheel benchmark.
+    add_auto_balloons(
         adapter,
         wheel,
         items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
     )
-    landings = list(wheel_landings)
     _activate_sheet(adapter, SHEET_NAMES[2])
-    scales[LEVER_LABEL] = _fit_ring(
+    scale = _fit_ring(
         adapter, lever, LEVER_SCALE_LADDER, LEVER_FIELD, label=LEVER_LABEL
     )
-    lever_landings = add_auto_balloons(
-        adapter,
-        lever,
-        items=balloon_items(items, explode.LEVER_GROUP_STEMS),
-        label=f"magnifier {LEVER_LABEL} BOM coverage",
-    )
-    landings += lever_landings
-    _activate_sheet(adapter, SHEET_NAMES[3])
-    scales[FINISHED_LABEL] = _fit_ring(
-        adapter, finished, FINISHED_SCALE_LADDER, FINISHED_FIELD, label=FINISHED_LABEL
-    )
-    landings += add_component_bom_balloons(
-        adapter,
-        finished,
-        items=balloon_items(items, frozenset({explode.WIRE_STEM})),
-        anchors=BALLOON_ANCHORS,
-        label=f"magnifier {FINISHED_LABEL} BOM coverage",
-        margin=BALLOON_MARGIN,
-    )
-    if len(landings) != len(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"magnifier package carries {len(landings)} balloons, expected one per "
-            f"BOM row ({len(BOM_COMPONENTS)})"
-        )
-    (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
-    _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
+    lever_items = balloon_items(items, explode.LEVER_GROUP_STEMS)
+    report["setup"] = {
+        "bom_items": items,
+        "bom_cells": _bom_cells(_early_bound(table, "ITableAnnotation")),
+        "wheel_fitted_scale": wheel_scale,
+        "wheel_fitted_outline_m": _view_outline(wheel, label=WHEEL_LABEL),
+        "fitted_scale": scale,
+        "fitted_outline_m": _view_outline(lever, label=LEVER_LABEL),
+        "configuration": str(_early_bound(lever, "IView").ReferencedConfiguration),
+        "exploded_view": EXPLODED_VIEW_NAMES[SIMPLIFIED_VIEW_CONFIGURATION],
+        "isolated_stems": sorted(explode.LEVER_GROUP_STEMS),
+    }
 
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[1],
-        exploded_caption(WHEEL_GROUP, scales[WHEEL_LABEL]),
-        WHEEL_CAPTION_XY,
-        label="wheel caption",
-    )
-    lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
-    lever_caption_note = _add_note_block(
-        adapter,
-        SHEET_NAMES[2],
-        lever_caption,
-        lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), lever_caption),
-        label="lever caption",
-    )
-    finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[3],
-        finished_caption,
-        caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
-        label="finished caption",
-    )
-    _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-    )
-    _activate_sheet(adapter, SHEET_NAMES[1])
-    _hide_bom_reference(adapter, reference, table, items)
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title=PDF_TITLE,
-        scale=SHEET_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        # Each sheet's title-block scale is its main view's: the ladder's
-        # rung the exploded and finished views settled on.
-        sheet_scales={
-            SHEET_NAMES[0]: SHEET_SCALE,
-            SHEET_NAMES[1]: scales[WHEEL_LABEL],
-            SHEET_NAMES[2]: scales[LEVER_LABEL],
-            SHEET_NAMES[3]: scales[FINISHED_LABEL],
-        },
-        settled_checks=(
-            *settled_checks,
-            lambda: assert_balloon_landings(adapter, landings),
-            lambda: _assert_wheel_balloon_bounds(adapter, wheel_landings),
-            lambda: _assert_lever_balloon_bounds(
-                adapter, lever_landings, lever_caption_note
-            ),
-        ),
-    )
+    def finish_and_assert_bounds(
+        current_adapter: Any, landings: list[BalloonLanding]
+    ) -> None:
+        # Same caption text/coordinates as 01ec; only bring this common proof
+        # forward across the STOP, without fitting/ballooning the finished wire.
+        text = exploded_caption(LEVER_GROUP, scale)
+        caption = _add_note_block(
+            current_adapter,
+            SHEET_NAMES[2],
+            text,
+            lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), text),
+            label="lever caption",
+        )
+        rebuild_drawing(current_adapter, label="lever performance caption proof")
+        _assert_lever_balloon_bounds(current_adapter, landings, caption)
+
+    return lever, lever_items, finish_and_assert_bounds
 
 
 def _parse_args() -> argparse.Namespace:
