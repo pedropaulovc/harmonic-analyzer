@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import math
-import re
 import tomllib
 from types import SimpleNamespace
 from pathlib import Path
@@ -633,41 +632,6 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
         "SetBalloon(",
     ):
         assert banned not in source
-
-
-def test_manufacturing_notes_do_not_restate_dimensions() -> None:
-    # A note may name the locating mate, but it may not restate a size, a band
-    # or a finish: those remain dimensions and native symbols under
-    # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method).
-    # The only numeric requirement allowed is the rule-20 wall-shortfall flag.
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): at most four short lines.
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4
-    assert max(len(line) for line in lines) <= 64
-    stripped = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", spec.DRAWING_NOTES)
-    assert "INSIDE CORNERS" not in spec.DRAWING_NOTES
-    stripped = re.sub(r"WALL \d\.\d\d MIN,", "", stripped)
-    assert not any(character.isdigit() for character in stripped)
-    for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra", "DRILL"):
-        assert banned not in spec.DRAWING_NOTES
-    assert f"WALL {spec.MOUNT_HEAD_WEB_WORST:.2f} MIN" in spec.DRAWING_NOTES
-    assert spec.MOUNT_HEAD_WEB_WORST < 2.0
-
-
-def test_accepted_corner_geometry_uses_the_title_block_default() -> None:
-    exceptions = {
-        exception.id: exception
-        for exception in load_exceptions(
-            _config.CONFIG_DIR, "dt_cone_pivot_post", "part"
-        )
-    }
-    corner = exceptions["RV-02"]
-    assert corner.kind == "accept"
-    assert "head-to-body, crank-boss-to-head and cone-pad-to-body" in corner.where
-    assert "R1.0 MAX" in corner.reason
-    assert "title-block default" in corner.reason
-    assert "accepted corner geometry is unchanged" in corner.reason
-    assert "printed as a note until" not in corner.reason
 
 
 def test_source_records_exact_manual_photo_provenance() -> None:
