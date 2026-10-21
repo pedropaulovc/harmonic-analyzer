@@ -1714,14 +1714,10 @@ saved/reopened fixture drawing's title changed. Probe cleanup hit the same
 ownership guard. The exact rejected title was not recorded, so its spelling and
 cause are not established. This was not a deadline failure.
 
-The admitted fixture drawing now treats `GetTitle()` as a mutable UI hint in
-both unsaved and saved generations. Fresh native identity, admitted path/type,
-complete inventory correspondence and title uniqueness must all pass before any
-hint is committed or used for activation/close. Parts and assemblies retain their
-strict title policy, as does frozen post-close survivor reconciliation. Saved
-activation now incurs the existing inventory-validation reads; their time remains
-charged to the shared budget. Failure notes retain already-read expected/fresh
-metadata without additional diagnostic COM calls.
+Saved fixture activation now performs the same complete native inventory check
+as unsaved activation; its cost remains charged to the shared budget. The
+ownership and title-refresh contract below governs both. Failure notes retain
+already-read expected/fresh metadata without additional diagnostic COM calls.
 
 The actual-function inert smoke and 665 focused tests pass, including changed
 saved hints through activation, E5 export and cleanup, with identity/path/type
@@ -1798,15 +1794,17 @@ do not silently drop an unresolved acquisition. Refused or failed reconciliation
 retains held/unresolved ledger evidence and blocks normal-drawing handoff. Source
 cleanliness and read-only disk identities remain mandatory.
 
-An unsaved drawing's sheet-qualified display title may change without changing
-its native identity. Only an already-ADMITTED, originally pathless type-3 fixture
-drawing, independently matched to its retained live owner and still returning an
-exact empty path, may refresh its cached title. Both complete ownership and
+An already-ADMITTED type-3 fixture drawing may refresh its cached UI title only
+after independent matching to its retained native owner and unchanged admitted
+path/type. Unsaved ownership requires an exact empty fresh path; saved ownership
+requires the same normalized nonempty admitted path. Both complete ownership and
 discard inventories validate every identity, metadata row and case-insensitive
-title collision before committing any title changes. Parts, assemblies,
-saved/path-changed drawings and non-admitted owners retain title immutability;
-a replacement is never adopted. Unchanged positively owned pending acquisitions
-retain their existing first-discard route, not activation permission.
+title collision before committing any hint changes. Parts and assemblies retain
+title immutability. Path/type drift, non-admitted ownership or a replaced native
+object never gains refresh permission. Frozen post-close survivor reconciliation
+retains its exact metadata contract, without refreshing hints inside that close
+transaction. Unchanged positively owned pending acquisitions retain their
+existing first-discard route, not activation permission.
 
 Drawing activation uses the freshly validated title exactly once through the
 unchanged generated `ActivateDoc3(title, False, 2, 0)` route. Invalidated owners
