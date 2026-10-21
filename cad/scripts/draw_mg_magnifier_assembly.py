@@ -24,7 +24,8 @@ balloon per family, retaining SolidWorks' positions after BOM/owner validation.
 After the final rebuild, every wheel balloon's rendered circle must remain
 wholly in WHEEL_FIELD, clear of the BOM and caption/title-block fields.
 Sheet 3, LEVER GROUP: the same explode with only the lever group shown,
-manually ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
+native EDGE/Square balloons from the same BOM, and final rendered-circle
+bounds clear of the lever caption. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
 (mg_magnifier_assembly_steps) and the checks. The instruction column uses
 the left 190 mm; the finished view is centred in the remaining right field.
@@ -99,7 +100,6 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
-from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
@@ -394,46 +394,9 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# The lever and finished views keep their manual anchors: each walks its
-# family's lowest-named shown instance for a visible edge, except the two rods.
-#
-# MHA-MG-03 is a revolved capsule (a hemispherical dome at each end): no
-# flat face, no end circle. Its only model edges are the two dome-to-cylinder
-# tangent circles at x = R from each tip, which IView's visible-entity list
-# does not report (0 listed, tangent edges shown), and every body extreme
-# point sits on a dome silhouette, which no EDGE hit test picks (r1/r2, runs
-# 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
-# 20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b: the lever walked 12
-# extremes, no ink). MHA-MG-04's top is a #4-40 thread turned down to a
-# shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
-# circle, 45 below the clamp's bottom face once the explode drops the rod
-# (the bottom dome is tangent, like the lever's). Each is
-# pinned to the point of a circle that faces the *Isometric viewer (+X+Y+Z,
-# mg_magnifier_explode_spec): its part normal is the view direction
-# projected square to the rod axis.
-#   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
-#     (x = R, 50 clear of the clamp) at normal machine (0, 1, 1)/sqrt2;
-#   vertical rod (local x = -Y, y = -X, z = -Z): the shoulder's outer edge
-#     at x = SHOULDER_X, at normal machine (1, 0, 0), the point opposite the
-#     circle's seam. Each rod is revolved from a Front (z = 0) half-profile at
-#     y > 0, so its circles' seam vertex is (x, R, 0). The hit test's aperture
-#     is a few hundredths of a millimetre (_drawing_scan._HIT_ZOOM_HALF) and
-#     picks the drawn, tessellated circle: the rod's earlier front point
-#     (normal (1, 0, 1)/sqrt2, 135 deg from the seam) hit at 1:3 but drew no
-#     edge at 1:2 (r12, run 20261016T155038849Z-7389d03825f14ebd9df43bc29b661e3d),
-#     as a 30 deg tessellation's chord sag at 135 deg (0.085 mm on R2.5)
-#     would, sheet 0.028 at 1:3 and 0.043 at 1:2. The seam's opposite (180
-#     deg) is a tessellation vertex for any even segment count, so lies on the
-#     drawn edge.
-_LEVER_R = LEVER_ROD_DIA / 2.0
-_VROD_R = VROD_DIA / 2.0
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.LEVER_GROUP_STEMS} | {
-    "mg-magnifying-lever": BalloonAnchor(
-        point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
-    ),
-    "mg-magnifying-vertical-rod": BalloonAnchor(
-        point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
-    ),
+# Only the finished assembly's wire retains a manual anchor. The exploded
+# wheel and lever groups use native EDGE/Square balloons.
+BALLOON_ANCHORS = {
     explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
 }
 
@@ -908,6 +871,10 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
     return lambda: _assert_lever_callouts(displays, callouts)
 
 
+_LEVER_R = LEVER_ROD_DIA / 2.0
+_VROD_R = VROD_DIA / 2.0
+
+
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
     """Model points on the lever and vertical rod's cylinders, clear of the
     clamp, the fixture and the setting chain on their axes."""
@@ -1122,6 +1089,48 @@ def _assert_wheel_balloon_bounds(adapter: Any, landings: list[BalloonLanding]) -
                 f"{label}: rendered circle (x, y, radius)={circle!r}, "
                 f"bounds={bounds!r} leaves WHEEL_FIELD={WHEEL_FIELD!r} "
                 "(sheet metres) after the final rebuild"
+            )
+
+
+@_telemetry.traced("drawing.mg_lever_balloon_bounds")
+def _assert_lever_balloon_bounds(
+    adapter: Any, landings: list[BalloonLanding], caption: Any
+) -> None:
+    """Read final native lever circles against their field and actual caption."""
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    extent = tuple(float(value) for value in _early_bound(caption, "INote").GetExtent())
+    if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
+        raise RuntimeError(f"magnifier lever caption has invalid extent {extent!r}")
+    caption_box = (extent[0], extent[1], extent[3], extent[4])
+    if caption_box[2] <= caption_box[0] or caption_box[3] <= caption_box[1]:
+        raise RuntimeError(f"magnifier lever caption has empty extent {extent!r}")
+    for landing in landings:
+        note = _early_bound(landing.note, "INote")
+        item = str(note.GetBomBalloonText(True)).strip()
+        label = f"magnifier {LEVER_LABEL}: {landing.stem} item {item}"
+        circle = rendered_balloon_circle(note, label=label)
+        x, y, radius = circle
+        bounds = (x - radius, y - radius, x + radius, y + radius)
+        if not (
+            bounds[0] >= LEVER_FIELD[0]
+            and bounds[1] >= LEVER_FIELD[1]
+            and bounds[2] <= LEVER_FIELD[2]
+            and bounds[3] <= LEVER_FIELD[3]
+        ):
+            raise RuntimeError(
+                f"{label}: rendered circle (x, y, radius)={circle!r}, "
+                f"bounds={bounds!r} leaves LEVER_FIELD={LEVER_FIELD!r} "
+                "(sheet metres) after the final rebuild"
+            )
+        if (
+            bounds[0] <= caption_box[2]
+            and bounds[2] >= caption_box[0]
+            and bounds[1] <= caption_box[3]
+            and bounds[3] >= caption_box[1]
+        ):
+            raise RuntimeError(
+                f"{label}: rendered circle bounds={bounds!r} intersects lever "
+                f"caption={caption_box!r} (sheet metres) after the final rebuild"
             )
 
 
@@ -1615,12 +1624,11 @@ _TANGENT_EDGES_VISIBLE = 2  # swDisplayTangentEdges_e.swTangentEdgesVisible
 def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
     """Draw the view's tangent edges and read the mode back.
 
-    The lever and vertical rod balloons are pinned to their capsules' dome
-    tangent circles (:data:`BALLOON_ANCHORS`), which a hit test can only
-    select while the view draws tangent edges. The mode read 2 (visible)
-    before any change on r2 (run
+    Keep the lever group's existing presentation, including the capsule tangent
+    circles, when native balloons choose their visible edges. The mode read 2
+    (visible) before any change on r2 (run
     20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b); the read-back keeps
-    a template change from silently hiding the anchors' edges.
+    a template change from silently hiding those edges.
     """
     bound = _early_bound(view, "IView")
     before = int(bound.GetDisplayTangentEdges2())
@@ -1724,34 +1732,29 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
     )
     landings = list(wheel_landings)
-    for sheet_name, view, ladder, field, stems, label in (
-        (
-            SHEET_NAMES[2],
-            lever,
-            LEVER_SCALE_LADDER,
-            LEVER_FIELD,
-            explode.LEVER_GROUP_STEMS,
-            LEVER_LABEL,
-        ),
-        (
-            SHEET_NAMES[3],
-            finished,
-            FINISHED_SCALE_LADDER,
-            FINISHED_FIELD,
-            frozenset({explode.WIRE_STEM}),
-            FINISHED_LABEL,
-        ),
-    ):
-        _activate_sheet(adapter, sheet_name)
-        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
-        landings += add_component_bom_balloons(
-            adapter,
-            view,
-            items=balloon_items(items, stems),
-            anchors=BALLOON_ANCHORS,
-            label=f"magnifier {label} BOM coverage",
-            margin=BALLOON_MARGIN,
-        )
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    scales[LEVER_LABEL] = _fit_ring(
+        adapter, lever, LEVER_SCALE_LADDER, LEVER_FIELD, label=LEVER_LABEL
+    )
+    lever_landings = add_auto_balloons(
+        adapter,
+        lever,
+        items=balloon_items(items, explode.LEVER_GROUP_STEMS),
+        label=f"magnifier {LEVER_LABEL} BOM coverage",
+    )
+    landings += lever_landings
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    scales[FINISHED_LABEL] = _fit_ring(
+        adapter, finished, FINISHED_SCALE_LADDER, FINISHED_FIELD, label=FINISHED_LABEL
+    )
+    landings += add_component_bom_balloons(
+        adapter,
+        finished,
+        items=balloon_items(items, frozenset({explode.WIRE_STEM})),
+        anchors=BALLOON_ANCHORS,
+        label=f"magnifier {FINISHED_LABEL} BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
             f"magnifier package carries {len(landings)} balloons, expected one per "
@@ -1768,7 +1771,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="wheel caption",
     )
     lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
-    _add_note_block(
+    lever_caption_note = _add_note_block(
         adapter,
         SHEET_NAMES[2],
         lever_caption,
@@ -1811,6 +1814,9 @@ async def build(adapter: Any) -> dict[str, str]:
             *settled_checks,
             lambda: assert_balloon_landings(adapter, landings),
             lambda: _assert_wheel_balloon_bounds(adapter, wheel_landings),
+            lambda: _assert_lever_balloon_bounds(
+                adapter, lever_landings, lever_caption_note
+            ),
         ),
     )
 

@@ -85,6 +85,13 @@ Inspect every page and complete the blind machinist review before release.
 ## Magnifier package
 
 `draw_mg_magnifier_assembly.py` keeps its four sheets and all 19 BOM families.
+The wheel's 11 families and lever's seven families use the existing native
+EDGE/Square auto-balloon path. It retains native positions and validates exact
+BOM-item coverage and shown-family edge owners. The finished wire keeps its
+manual anchor and rising-leader placement. After the final rebuild, rendered
+wheel circles must stay wholly in `WHEEL_FIELD`; rendered lever circles must stay
+wholly in `LEVER_FIELD` and clear of the lever caption's actual native extent.
+
 The BOM's final five columns are item, full canonical Number, description,
 vendor SKU and quantity. Their widths are 12/48/82/32/12 mm respectively;
 the Number column has its own room for `MHA-MG-VN-50` through `MHA-MG-VN-56`.
@@ -111,3 +118,18 @@ Inspect the regenerated four-page package for all 19
 rows, full unbroken Numbers, readable descriptions/SKUs/quantities, unchanged
 reference-view handling and unobstructed balloons; the offline field-budget
 checks alone do not prove native text fit.
+
+## Summing-lever package
+
+`draw_sm_summing_assembly.py` uses the same native EDGE/Square path for all ten
+BOM families on its exploded sheet, without prescribing a duplicate instance.
+Its configuration, builder-owned explode, 1:4 scale, BOM and captions are
+unchanged. Final-rebuild checks retain native attachment and BOM-caption
+clearance validation, and read every rendered balloon circle against the usable
+sheet, the native BOM rectangle (position, column widths and grown row heights),
+and the caption's actual native extent. Coverage or bounds failures stop export;
+there is no alternate layout or manual-placement fallback.
+
+These local circle checks do not replace the downstream layout audit or
+inspection of the complete exported sheets for overlaps and leader readability.
+

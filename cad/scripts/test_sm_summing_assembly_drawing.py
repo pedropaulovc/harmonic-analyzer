@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,6 +17,7 @@ import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
+from _drawing_balloons import BalloonLanding
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from _cone_axis_constants import SUMMING_Z
@@ -74,7 +76,6 @@ def test_bom_rows_come_from_the_part_registry() -> None:
         assert drawing.BOM_SKUS[stem] == (" / ".join(map(str, skus)) or "-")
     assert drawing.BOM_SKUS[spec.KNIFE_MOUNT] == "-"
     assert drawing.BOM_SKUS[spec.BOSS_HOOK] == "9490T1"
-    assert set(drawing.BALLOON_ANCHORS) == set(notes.BOM_ORDER)
     assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2
 
 
@@ -196,6 +197,145 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
             (xy[0], xy[1] - 0.0047657, xy[0] + 0.1148531, xy[1]),
             label="captured exploded caption",
         )
+
+
+@pytest.fixture
+def native_exploded_bounds():
+    # Synthetic native readbacks: no geometry/layout acceptance is implied.
+    state = SimpleNamespace(
+        sheet=drawing.SHEET_NAMES[0],
+        left=0.226,
+        top=0.258,
+        heights=[0.009] * 11,
+        widths=[0.012, 0.030, 0.070, 0.028, 0.012],
+    )
+    model = SimpleNamespace()
+    model.ActivateSheet = lambda name: setattr(state, "sheet", name) or True
+    model.GetCurrentSheet = lambda: SimpleNamespace(GetName=lambda: state.sheet)
+    state.adapter = SimpleNamespace(currentModel=model)
+    state.table = SimpleNamespace(
+        RowCount=len(state.heights),
+        ColumnCount=len(state.widths),
+        GetAnnotation=lambda: SimpleNamespace(
+            GetPosition=lambda: (state.left, state.top, 0.0)
+        ),
+        GetRowHeight=lambda row: state.heights[row],
+        GetColumnWidth=lambda column: state.widths[column],
+    )
+    state.caption = SimpleNamespace(box=(0.226, 0.110, 0.34, 0.115))
+    state.caption.GetExtent = lambda: (
+        *state.caption.box[:2],
+        0.0,
+        *state.caption.box[2:],
+        0.0,
+    )
+    state.landings = []
+    for index, stem in enumerate(drawing.BOM_COMPONENTS, start=1):
+        note = SimpleNamespace(circle=(0.100, 0.150, 0.0047))
+        note.GetBomBalloonText = lambda _upper, item=str(index): item
+        note.GetAnnotation = lambda note=note: note
+        note.GetDisplayData = lambda note=note: note
+        note.GetArcCount = lambda: 1
+
+        def arc(_index, note=note):
+            x, y, radius = note.circle
+            point = (x + radius, y, 0.0)
+            return (0, 0, -1, -1, *point, *point, x, y, 0.0, 0.0, 0.0, 1.0, 1.0)
+
+        note.GetArcAtIndex2 = arc
+        state.landings.append(
+            BalloonLanding(stem, f"{stem}-1", note, None, "summing bounds")
+        )
+    return state
+
+
+def _check_native_exploded_bounds(fixture) -> None:
+    caption_box = drawing._assert_exploded_caption(
+        fixture.adapter, fixture.table, fixture.caption
+    )
+    drawing._assert_exploded_balloon_bounds(
+        fixture.adapter, fixture.table, fixture.landings, caption_box
+    )
+
+
+def test_native_summing_bounds_leave_the_rendered_positions_unchanged(
+    native_exploded_bounds,
+) -> None:
+    fixture = native_exploded_bounds
+    before = [landing.note.circle for landing in fixture.landings]
+    _check_native_exploded_bounds(fixture)
+    assert [landing.note.circle for landing in fixture.landings] == before
+    assert fixture.sheet == drawing.SHEET_NAMES[1]
+
+
+@pytest.mark.parametrize("boundary", ["left", "bottom", "right", "top", "title block"])
+def test_native_summing_rejects_rendered_circle_outside_usable_sheet(
+    native_exploded_bounds,
+    boundary,
+) -> None:
+    fixture = native_exploded_bounds
+    left, bottom, right, top = drawing.SHEET_INNER_BORDER
+    radius = 0.0047
+    mid_x, mid_y = (left + right) / 2.0, (bottom + top) / 2.0
+    x, y = {
+        "left": (left + radius / 2.0, mid_y),
+        "bottom": (mid_x, bottom + radius / 2.0),
+        "right": (right - radius / 2.0, mid_y),
+        "top": (mid_x, top - radius / 2.0),
+        "title block": (
+            (drawing.TITLE_BLOCK[0] + drawing.TITLE_BLOCK[2]) / 2.0,
+            drawing.TITLE_BLOCK[3] + radius / 2.0,
+        ),
+    }[boundary]
+    landing = fixture.landings[-1]
+    landing.note.circle = (x, y, radius)
+    with pytest.raises(RuntimeError, match=r"inner border|title block") as error:
+        _check_native_exploded_bounds(fixture)
+    assert landing.stem in str(error.value)
+    assert f"item {landing.note.GetBomBalloonText(True)}" in str(error.value)
+
+
+@pytest.mark.parametrize("keepout", ["BOM", "caption"])
+@pytest.mark.parametrize("gap", [-0.000001, 0.0, 0.000001])
+def test_native_summing_circle_must_clear_native_bom_and_caption(
+    native_exploded_bounds,
+    keepout,
+    gap,
+) -> None:
+    fixture = native_exploded_bounds
+    radius = 1.0 / 256.0
+    left = fixture.left if keepout == "BOM" else fixture.caption.box[0]
+    y = 0.2 if keepout == "BOM" else 0.1125
+    fixture.landings[-1].note.circle = (left - radius - gap, y, radius)
+    if gap > 0.0:
+        _check_native_exploded_bounds(fixture)
+    else:
+        with pytest.raises(RuntimeError, match=f"intersects {keepout}"):
+            _check_native_exploded_bounds(fixture)
+
+
+@pytest.mark.parametrize("changed", ["circle", "BOM rows", "BOM columns", "caption"])
+def test_native_summing_bounds_reread_settled_ink_table_and_caption(
+    native_exploded_bounds,
+    changed,
+) -> None:
+    fixture = native_exploded_bounds
+    if changed == "BOM rows":
+        fixture.landings[-1].note.circle = (0.37, 0.15, 1.0 / 256.0)
+    elif changed == "BOM columns":
+        fixture.landings[-1].note.circle = (0.39, 0.20, 1.0 / 256.0)
+    _check_native_exploded_bounds(fixture)
+    # The final rebuild can move ink or grow native table/caption extents.
+    if changed == "circle":
+        fixture.landings[-1].note.circle = (0.25, 0.20, 0.0047)
+    elif changed == "BOM rows":
+        fixture.heights[-1] += 0.01
+    elif changed == "BOM columns":
+        fixture.widths[-1] += 0.02
+    else:
+        fixture.caption.box = (0.09, 0.14, 0.11, 0.154)
+    with pytest.raises(RuntimeError, match=r"intersects BOM|intersects caption"):
+        _check_native_exploded_bounds(fixture)
 
 
 def test_retention_rows_cite_the_package_steps() -> None:

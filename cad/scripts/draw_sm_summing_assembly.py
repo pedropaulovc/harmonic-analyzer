@@ -4,9 +4,11 @@ Sheet 1 shows the assembled lever on its knife mounts (front and right) with
 the counter-spring screw height the level setting finds, a 1:1 knife-edge
 detail carrying the free-rock acceptance, and the notes. Sheet 2 is the
 builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
-balloon per BOM row. Sheet 3 is the finished isometric beside the numbered
-assembly steps and checks in a 190 mm left column, with the original text
-size and line pitch. Both settings are the assembly's own sketch dimensions
+native EDGE/Square balloon per BOM row. After the final rebuild, every
+rendered circle stays on the usable sheet, clear of the native BOM and caption
+extents. Sheet 3 is the finished isometric beside the numbered assembly steps
+and checks in a 190 mm left column, with the original text size and line pitch.
+Both settings are the assembly's own sketch dimensions
 (``build_sm_summing_assembly._author_settings``), imported here; the explode
 comes from ``sm_summing_explode_spec`` and every printed text comes from
 ``sm_summing_assembly_sheet``.
@@ -39,9 +41,10 @@ import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _check import check
 from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
-    BalloonAnchor,
-    add_component_bom_balloons,
+    BalloonLanding,
+    add_auto_balloons,
     assert_balloon_landings,
 )
 from _drawing_common import (
@@ -218,9 +221,6 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# One balloon per BOM row, each on its own family's visible edge: every family
-# is separated from its neighbours in the explode.
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
@@ -807,7 +807,9 @@ def exploded_caption_xy(bom_bottom: float) -> tuple[float, float]:
     return BOM_ANCHOR[0], bom_bottom - EXPLODED_CAPTION_OFFSET
 
 
-def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
+def _assert_exploded_caption(
+    adapter: Any, table: Any, note: Any
+) -> tuple[float, float, float, float]:
     _activate_sheet(adapter, SHEET_NAMES[1])
     bottom, top = _bom_vertical_limits(table)
     extent = tuple(float(value) for value in note.GetExtent())
@@ -830,12 +832,55 @@ def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
             f"summing exploded caption has {gap * 1000.0:.3f} mm below the BOM; "
             f"requires {EXPLODED_CAPTION_MIN_GAP * 1000.0:.1f} mm"
         )
+    return box
+
+
+@_telemetry.traced("drawing.sm_exploded_balloon_bounds")
+def _assert_exploded_balloon_bounds(
+    adapter: Any,
+    table: Any,
+    landings: list[BalloonLanding],
+    caption_box: tuple[float, float, float, float],
+) -> None:
+    """Read final native circles against the sheet, rebuilt BOM and caption."""
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    table = _early_bound(table, "ITableAnnotation")
+    bottom, top = _bom_vertical_limits(table)
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    left = float(annotation.GetPosition()[0])
+    widths = tuple(
+        float(table.GetColumnWidth(column)) for column in range(int(table.ColumnCount))
+    )
+    if not math.isfinite(left) or not widths or any(
+        not math.isfinite(width) or width <= 0.0 for width in widths
+    ):
+        raise RuntimeError("summing BOM has invalid native column widths or position")
+    bom_box = (left, bottom, left + sum(widths), top)
+    for landing in landings:
+        note = _early_bound(landing.note, "INote")
+        item = str(note.GetBomBalloonText(True)).strip()
+        label = f"summing exploded: {landing.stem} item {item}"
+        circle = rendered_balloon_circle(note, label=label)
+        x, y, radius = circle
+        bounds = (x - radius, y - radius, x + radius, y + radius)
+        _assert_box_on_sheet(bounds, label=label)
+        for name, keepout in (("BOM", bom_box), ("caption", caption_box)):
+            if (
+                bounds[0] <= keepout[2]
+                and bounds[2] >= keepout[0]
+                and bounds[1] <= keepout[3]
+                and bounds[3] >= keepout[1]
+            ):
+                raise RuntimeError(
+                    f"{label}: rendered circle bounds={bounds!r} intersects "
+                    f"{name}={keepout!r} (sheet metres) after the final rebuild"
+                )
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    BOM row; returns the check that proves every balloon again after the last
-    rebuild."""
+    """The exploded isometric, its BOM (with vendor SKU) and one native EDGE
+    balloon on each BOM family's own visible edge; returns the final-rebuild
+    attachment, caption and rendered-circle bounds check."""
     label = "summing exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -860,13 +905,11 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="summing",
     )
     items = _validate_bom(adapter, table)
-    landings = add_component_bom_balloons(
+    landings = add_auto_balloons(
         adapter,
         exploded,
         items=items,
-        anchors=BALLOON_ANCHORS,
         label="summing exploded-view BOM coverage",
-        margin=BALLOON_MARGIN,
     )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
@@ -887,7 +930,8 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
 
     def settled() -> None:
         assert_balloon_landings(adapter, landings)
-        _assert_exploded_caption(adapter, table, caption)
+        caption_box = _assert_exploded_caption(adapter, table, caption)
+        _assert_exploded_balloon_bounds(adapter, table, landings, caption_box)
 
     return settled
 
