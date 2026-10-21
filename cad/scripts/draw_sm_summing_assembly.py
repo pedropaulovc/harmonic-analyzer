@@ -14,8 +14,8 @@ comes from ``sm_summing_explode_spec`` and every printed text comes from
 Usage:
     uv run python cad\scripts\draw_sm_summing_assembly.py sm-summing-assembly
 
-NEVER MERGE this diagnostic branch: the CLI runs the SM-only display-update
-discriminator and intentionally fails before save/export/cache success.
+NEVER MERGE this diagnostic branch: the CLI runs the SM-only Wireframe
+workaround probe, captures terminal diagnostic output, and fails before cache success.
 ``build`` retains the ordinary merged-hotfix caption path without balloons.
 """
 
@@ -985,9 +985,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
 
-async def _build_display_update_probe(adapter: Any) -> dict[str, str]:
-    """NEVER MERGE: fresh display-update discriminator, no export."""
-    from _drawing_sm_display_update_probe import run_probe
+async def _build_wireframe_probe(adapter: Any) -> dict[str, str]:
+    """NEVER MERGE: one Wireframe contrast; terminal output is diagnostic only."""
+    from _drawing_sm_wireframe_probe import run_probe
 
     async def prepare() -> tuple[Any, Any, tuple[tuple[str, str], ...]]:
         await _open_source(adapter)
@@ -1002,8 +1002,10 @@ async def _build_display_update_probe(adapter: Any) -> dict[str, str]:
         bom_cells=_bom_cells,
         bom_column=_bom_column,
         anchors=BALLOON_ANCHORS,
+        layout=SPEC.layout,
+        sheet_layouts=SHEET_LAYOUTS,
     )
-    raise AssertionError("SM display-update diagnostic returned without its intentional stop")
+    raise AssertionError("SM Wireframe diagnostic returned without its intentional stop")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -1015,4 +1017,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(_build_display_update_probe))
+    sys.exit(run_build(_build_wireframe_probe))

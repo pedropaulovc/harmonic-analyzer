@@ -1,10 +1,10 @@
-"""NEVER MERGE: SM explicit view-display update discriminator, not a proven fix.
+"""NEVER MERGE: SM Wireframe -> native AutoBalloon -> authored-style probe.
 
-Four fresh production-prepared, unsaved drawings; one EDGE AutoBalloon5 each.
-Only treatment: one zero-argument, void IView.UpdateViewDisplayGeometry call.
-No relinking, resolving, configuration, quality, retry or fallback treatment.
-Read mediator states identically and re-select after treatment in every arm.
-All outcomes stop before export/cache success; no production SHIP/perf claim.
+One control/Wireframe/Wireframe/control experiment on fresh production drawings.
+One EDGE AutoBalloon5 per arm; raw and independent inventories precede restoration.
+Terminal diagnostic PDF/precision/render observations are separate from coverage.
+No refresh, resolving, relinking, quality variant, retry or production SHIP claim.
+All outcomes intentionally fail before cache success; hotfix1795 stays unchanged.
 """
 
 from __future__ import annotations
@@ -27,16 +27,24 @@ import _drawing_balloons as balloons
 import _seat_forensics as forensics
 import _telemetry
 from _com import _early_bound
+from _drawing_common import assert_precise_isometric_views, render_pdf_png
 from _drawing_selection import _activate_and_select_view
 from _session import discard_open_documents
 
-SEQUENCE = ("control", "view-update", "view-update", "control")
-LABEL = "SM display update probe"
+SEQUENCE = ("control", "wireframe", "wireframe", "control")
+LABEL = "SM Wireframe probe"
 VIEW_STATE_ORDER = (
     "IsModelOutOfDate",
     "IsLightweight",
     "IsModelLoaded",
     "GetFacettedHlrDisplay",
+)
+DISPLAY_ORDER = (
+    "GetDisplayMode2",
+    "GetUseParentDisplayMode",
+    "GetDisplayEdgesInShadedMode",
+    "GetFacettedHlrDisplay",
+    "GetCThreadQuality",
 )
 AUTHORED_OPTIONS = {
     "Layout": 1,
@@ -74,13 +82,13 @@ OPTION_TYPES = {name: type(value) for name, value in AUTHORED_OPTIONS.items()} |
 }
 
 
-class SmDisplayUpdateProbeStop(RuntimeError):
+class SmWireframeProbeStop(RuntimeError):
     """Intentional diagnostic failure, including when all native arms pass."""
 
     def __init__(self, report: dict[str, Any]) -> None:
         self.report = report
         super().__init__(
-            f"INTENTIONAL SM DISPLAY-UPDATE DIAGNOSTIC STOP before export/cache "
+            f"INTENTIONAL SM WIREFRAME DIAGNOSTIC STOP before cache "
             f"success; {report['interpretation']}; report={report['report_path']}"
         )
 
@@ -201,11 +209,14 @@ def _note(adapter: Any, raw: Any) -> dict[str, Any]:
         "attachment_types": [],
         "owners": [],
         "entity_count": 0,
+        "is_attached": note.IsAttached(),
+        "is_dangling": None,
     }
     annotation = note.GetAnnotation()
     if annotation is not None:
         annotation = _early_bound(annotation, "IAnnotation")
         row["annotation_name"] = annotation.GetName()
+        row["is_dangling"] = annotation.IsDangling()
         entities = tuple(annotation.GetAttachedEntities3() or ())
         kinds = tuple(annotation.GetAttachedEntityTypes() or ())
         supported = (
@@ -222,6 +233,8 @@ def _note(adapter: Any, raw: Any) -> dict[str, Any]:
                 for index, entity in enumerate(entities)
             ],
         )
+    if type(row["is_attached"]) is not bool or type(row["is_dangling"]) is not bool:
+        raise RuntimeError("unreadable note attachment/dangling status")
     return row
 
 
@@ -246,6 +259,8 @@ def _coverage(
         for note in notes
         if not note["is_bom"]
         or note["item"] not in allowed
+        or note["is_attached"] is not True
+        or note["is_dangling"] is not False
         or note["entity_count"] != 1
         or len(note["attachment_types"]) != 1
         or len(note["owners"]) != 1
@@ -310,7 +325,39 @@ def _view_state(view: Any) -> dict[str, Any]:
     return state
 
 
-@_telemetry.traced("drawing.sm_display_update.call_and_observe")
+def _display_state(view: Any) -> dict[str, Any]:
+    state = {}
+    for name in DISPLAY_ORDER:
+        try:
+            value = getattr(view, name)()
+            expected = int if name == "GetDisplayMode2" else bool
+            if type(value) is not expected:
+                raise ValueError(f"invalid {name}: {value!r}")
+            state[name] = value
+        except Exception as error:
+            state[name + "_error"] = _error(error)
+    return state
+
+
+def _authored_display(state: dict[str, Any]) -> bool:
+    # Mode3 and composite7 are equivalent only with shaded edges enabled.
+    return (
+        state.get("GetDisplayMode2") in (3, 7)
+        and state.get("GetUseParentDisplayMode") is False
+        and state.get("GetDisplayEdgesInShadedMode") is True
+        and state.get("GetCThreadQuality") is True
+        and not any(name.endswith("_error") for name in state)
+    )
+
+
+def _same_notes(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> bool:
+    # Already-recorded facts only; preserve multiplicity, ignore enumeration order.
+    return sorted(json.dumps(note, sort_keys=True) for note in left) == sorted(
+        json.dumps(note, sort_keys=True) for note in right
+    )
+
+
+@_telemetry.traced("drawing.sm_wireframe.call_and_observe")
 def _call_once(
     adapter: Any,
     view: Any,
@@ -333,6 +380,8 @@ def _call_once(
     normal = sw_type_info.constant("swLW_NORMAL")
     original = extension.GetUserPreferenceInteger(preference, option)
     row["normal_guard"] = {"original_slot": original, "normal_slot": normal}
+    row.update(treatment_ms=0.0, display_restore_calls=0, display_restore_ms=0.0)
+    restore_display = False
     try:
         started = time.perf_counter()
         result = extension.SetUserPreferenceInteger(preference, option, normal)
@@ -348,88 +397,146 @@ def _call_once(
             setattr(options, name, value)
         observer_started = time.perf_counter()
         row["pre_treatment_view_state"] = _view_state(view)
+        row["pre_treatment_display"] = _display_state(view)
         row["pre_treatment_observer_ms"] = (
             time.perf_counter() - observer_started
         ) * 1000
         row["observer_ms"] += row["pre_treatment_observer_ms"]
-        row["treatment_ms"] = 0.0
+        if not _authored_display(row["pre_treatment_display"]):
+            raise RuntimeError("initial view is not authored Shaded-with-Edges")
+        # This finally encloses native capture AND sealing the pre-restore inventory.
         try:
-            if row["arm"] == "view-update":
-                row["treatment_calls"] += 1
-                with _telemetry.span(
-                    "drawing.sm_display_update.view_geometry",
-                    arm=row["arm"],
-                    arm_index=row["index"],
-                ):
-                    # SDK VT_VOID: None means invocation returned, not failure.
-                    treatment_started = time.perf_counter()
-                    try:
-                        view.UpdateViewDisplayGeometry()
-                    finally:
-                        row["treatment_ms"] = (
-                            time.perf_counter() - treatment_started
-                        ) * 1000
-            elif row["arm"] != "control":
-                raise RuntimeError(f"unknown display-update arm: {row['arm']!r}")
-        except BaseException as error:
-            row["treatment_error"] = _error(error)
-            raise
-        observer_started = time.perf_counter()
-        row["post_treatment_view_state"] = _view_state(view)
-        row["post_treatment_observer_ms"] = (
-            time.perf_counter() - observer_started
-        ) * 1000
-        row["observer_ms"] += row["post_treatment_observer_ms"]
-        selection_started = time.perf_counter()
-        try:
-            _activate_and_select_view(adapter, view, label=LABEL)
-        except BaseException as error:
-            row["final_selection_error"] = _error(error)
-            raise
-        finally:
-            row["final_selection_ms"] = (
-                time.perf_counter() - selection_started
+            try:
+                if row["arm"] == "wireframe":
+                    restore_display = True  # The mutating call could partially fail.
+                    row["treatment_calls"] += 1
+                    with _telemetry.span("drawing.sm_wireframe.set_wireframe"):
+                        started = time.perf_counter()
+                        try:
+                            row["treatment_return"] = view.SetDisplayMode4(
+                                False, 0, False, True, True
+                            )
+                        finally:
+                            row["treatment_ms"] = (
+                                time.perf_counter() - started
+                            ) * 1000
+                elif row["arm"] != "control":
+                    raise RuntimeError(f"unknown Wireframe arm: {row['arm']!r}")
+            except BaseException as error:
+                row["treatment_error"] = _error(error)
+                raise
+            observer_started = time.perf_counter()
+            row["post_treatment_view_state"] = _view_state(view)
+            row["post_treatment_display"] = _display_state(view)
+            row["post_treatment_observer_ms"] = (
+                time.perf_counter() - observer_started
             ) * 1000
-        # No option getters or model/view mutation after this final selection.
-        raw = None
-        try:
-            with _telemetry.span(
-                "drawing.sm_display_update.autoballoon_native",
-                arm=row["arm"],
-                arm_index=row["index"],
+            row["observer_ms"] += row["post_treatment_observer_ms"]
+            state = row["post_treatment_display"]
+            if row["arm"] == "wireframe" and (
+                state.get("GetDisplayMode2") != 0
+                or state.get("GetUseParentDisplayMode") is not False
+                or any(name.endswith("_error") for name in state)
             ):
+                raise RuntimeError("Wireframe/local display treatment did not read back")
+            selection_started = time.perf_counter()
+            try:
+                _activate_and_select_view(adapter, view, label=LABEL)
+            except BaseException as error:
+                row["final_selection_error"] = _error(error)
+                raise
+            finally:
+                row["final_selection_ms"] = (
+                    time.perf_counter() - selection_started
+                ) * 1000
+            raw = None
+            try:
+                with _telemetry.span("drawing.sm_wireframe.autoballoon_native"):
+                    started = time.perf_counter()
+                    try:
+                        row["native_calls"] += 1
+                        raw = ddoc.AutoBalloon5(options)
+                    finally:
+                        row["native_ms"] = (time.perf_counter() - started) * 1000
+            finally:
+                # Python-only metadata immediately, before even passive pixels.
+                row["raw_return"] = {
+                    "python_type": type(raw).__name__,
+                    "count": len(raw) if type(raw) in (tuple, list) else None,
+                }
                 started = time.perf_counter()
                 try:
-                    row["native_calls"] += 1
-                    raw = ddoc.AutoBalloon5(options)
+                    row["passive_post_call_png"] = forensics._grab_screen(
+                        out_dir / f"{row['index']}-{row['arm']}-post-call.png",
+                        window=hwnd,
+                    )
+                except BaseException as error:
+                    row["passive_capture_error"] = _error(error)
+                    row["secondary_errors"].append("passive pixels: " + _error(error))
                 finally:
-                    row["native_ms"] = (time.perf_counter() - started) * 1000
-        finally:
-            # Python-only metadata immediately; preserve collection until all reads.
-            row["raw_return"] = {
-                "python_type": type(raw).__name__,
-                "count": len(raw) if type(raw) in (tuple, list) else None,
-            }
+                    row["observer_ms"] += (time.perf_counter() - started) * 1000
             started = time.perf_counter()
             try:
-                row["passive_post_call_png"] = forensics._grab_screen(
-                    out_dir / f"{row['index']}-{row['arm']}-post-call.png", window=hwnd
+                if raw is not None and type(raw) not in (tuple, list):
+                    raise RuntimeError("AutoBalloon5 returned non-array shape")
+                returned = tuple(raw) if raw is not None else ()
+                row["raw_notes"] = [_note(adapter, note) for note in returned]
+                row["inventory"] = _inventory(adapter, view)
+                row["pre_restore_sealed"] = True
+            finally:
+                _options(options, row, baseline)
+                row["observer_ms"] += (time.perf_counter() - started) * 1000
+        finally:
+            primary = active_exception()
+            try:
+                if restore_display:
+                    row["display_restore_calls"] += 1
+                    with _telemetry.span("drawing.sm_wireframe.restore_authored"):
+                        started = time.perf_counter()
+                        try:
+                            row["display_restore_return"] = view.SetDisplayMode4(
+                                False, 3, False, True, True
+                            )
+                        finally:
+                            row["display_restore_ms"] = (
+                                time.perf_counter() - started
+                            ) * 1000
+            except BaseException as error:
+                row["display_restore_error"] = _error(error)
+                row["secondary_errors"].append("display restore: " + _error(error))
+                if primary is not None:
+                    primary.add_note("additional display restoration: " + _error(error))
+            # Symmetric observation stage even in controls (zero display setters).
+            started = time.perf_counter()
+            try:
+                row["restored_display"] = _display_state(view)
+                try:
+                    row["passive_restored_png"] = forensics._grab_screen(
+                        out_dir / f"{row['index']}-{row['arm']}-restored.png",
+                        window=hwnd,
+                    )
+                except BaseException as error:
+                    row["restored_capture_error"] = _error(error)
+                    row["secondary_errors"].append(
+                        "restored pixels: " + _error(error)
+                    )
+                    if primary is not None:
+                        primary.add_note("additional restored pixels: " + _error(error))
+                row["restored_inventory"] = _inventory(adapter, view)
+                row["restored_inventory_unchanged"] = (
+                    row.get("pre_restore_sealed", False)
+                    and _same_notes(row["inventory"], row["restored_inventory"])
                 )
             except BaseException as error:
-                row["secondary_errors"].append("passive pixels: " + _error(error))
+                row["post_restore_observation_error"] = _error(error)
+                row["secondary_errors"].append("restored observation: " + _error(error))
+                if primary is not None:
+                    primary.add_note("additional restored observation: " + _error(error))
             finally:
-                row["observer_ms"] += (time.perf_counter() - started) * 1000
-        started = time.perf_counter()
-        try:
-            if raw is not None and type(raw) not in (tuple, list):
-                raise RuntimeError("AutoBalloon5 returned non-array shape")
-            returned = tuple(raw) if raw is not None else ()
-            row["raw_notes"] = [_note(adapter, note) for note in returned]
-            row["inventory"] = _inventory(adapter, view)
-        finally:
-            # Even an inventory failure cannot suppress the identical option reads.
-            _options(options, row, baseline)
-            row["observer_ms"] += (time.perf_counter() - started) * 1000
+                row["restoration_observer_ms"] = (
+                    time.perf_counter() - started
+                ) * 1000
+                row["observer_ms"] += row["restoration_observer_ms"]
     finally:
         primary = active_exception()
         started = time.perf_counter()
@@ -440,19 +547,17 @@ def _call_once(
             if result is not True or restored != original:
                 raise RuntimeError("Normal visible-edge slot restoration failed")
         except BaseException as error:
-            row["secondary_errors"].append("restore: " + _error(error))
+            row["secondary_errors"].append("Normal restore: " + _error(error))
             if primary is None:
                 raise
-            primary.add_note("additional SM restoration failure: " + _error(error))
+            primary.add_note("additional Normal restoration: " + _error(error))
         finally:
             row["restore_ms"] = (time.perf_counter() - started) * 1000
-    if row["secondary_errors"]:
-        raise RuntimeError(
-            "SM secondary observation/cleanup failed; see retained errors"
-        )
+    if "passive_capture_error" in row:
+        raise RuntimeError("SM native passive capture failed; see retained errors")
 
 
-@_telemetry.traced("drawing.sm_display_update.row_association")
+@_telemetry.traced("drawing.sm_wireframe.row_association")
 def _row_components(
     table: Any, state: dict[str, Any], bom_column: Callable[..., int]
 ) -> list[dict[str, Any]]:
@@ -525,6 +630,130 @@ def _row_components(
     return rows
 
 
+@_telemetry.traced("drawing.sm_wireframe.terminal_output")
+def _terminal_output(
+    adapter: Any,
+    view: Any,
+    row: dict[str, Any],
+    out_dir: Path,
+    *,
+    layout: Any,
+    sheet_layouts: dict[str, Any],
+) -> None:
+    """Terminal computation, never a pre-call intervention or coverage repair."""
+    quality: dict[str, Any] = {"errors": [], "precision_verified": False}
+    row["terminal_quality"] = quality
+    started = time.perf_counter()
+    try:
+        draw = _early_bound(adapter.currentModel, "IModelDoc2")
+        names = _early_bound(draw, "IDrawingDoc").GetSheetNames()
+        if (
+            type(names) not in (tuple, list)
+            or not names
+            or any(type(name) is not str or not name for name in names)
+            or len(set(names)) != len(names)
+        ):
+            raise RuntimeError(f"invalid diagnostic sheet names: {names!r}")
+        quality["sheet_names"] = list(names)
+        quality["expected_pages"] = len(names)
+        layouts = tuple(sheet_layouts[name] for name in names)
+        export_started = time.perf_counter()
+        try:
+            with _telemetry.span("drawing.sm_wireframe.diagnostic_pdf"):
+                quality["export"] = forensics._save_failure_document(
+                    adapter,
+                    out_dir,
+                    f"{row['index']}-{row['arm']}-restored",
+                    sheet_pdf=True,
+                )
+        finally:
+            quality["export_ms"] = (time.perf_counter() - export_started) * 1000
+        pdf = Path(quality["export"]["sheet_pdf"])
+        if not pdf.is_file() or pdf.stat().st_size <= 0:
+            raise RuntimeError("diagnostic PDF is absent/empty")
+        quality_started = time.perf_counter()
+        try:
+            # Prior project observations motivate this computed-output boundary;
+            # the official getter does not promise universal PDF-only readiness.
+            quality["checked_isometrics"] = assert_precise_isometric_views(
+                adapter, names
+            )
+            if (
+                type(quality["checked_isometrics"]) is not int
+                or quality["checked_isometrics"] < 1
+            ):
+                raise RuntimeError("no diagnostic isometric received a precision check")
+            quality["precision_verified"] = True
+        except Exception as error:
+            quality["errors"].append("precision assertion: " + _error(error))
+        finally:
+            quality["quality_ms"] = (time.perf_counter() - quality_started) * 1000
+        quality["display"] = _display_state(view)
+        quality["precision_verified"] = (
+            quality["precision_verified"]
+            and _authored_display(quality["display"])
+            and quality["display"].get("GetFacettedHlrDisplay") is False
+        )
+        quality["live_path"] = draw.GetPathName()
+        if quality["live_path"] != "":
+            quality["errors"].append("silent-copy export changed the live drawing path")
+        quality["inventory"] = _inventory(adapter, view)
+        quality["inventory_unchanged"] = _same_notes(
+            row.get("restored_inventory", []), quality["inventory"]
+        )
+        render_started = time.perf_counter()
+        try:
+            png = out_dir / f"{row['index']}-{row['arm']}-restored-pdf.png"
+            render_pdf_png(
+                pdf, png, layout=layout, expected_pages=len(names), page_layouts=layouts
+            )
+            quality["render_png"] = str(png)
+        finally:
+            quality["render_ms"] = (time.perf_counter() - render_started) * 1000
+    except Exception as error:
+        quality["errors"].append("terminal output: " + _error(error))
+    finally:
+        quality["total_ms"] = (time.perf_counter() - started) * 1000
+        row["secondary_errors"].extend(quality["errors"])
+        row["restoration_quality_verified"] = (
+            "display_restore_error" not in row
+            and "post_restore_observation_error" not in row
+            and "restored_capture_error" not in row
+            and _authored_display(row.get("restored_display", {}))
+            and row.get("restored_inventory_unchanged", False)
+            and quality["precision_verified"]
+            and quality.get("inventory_unchanged", False)
+            and not quality["errors"]
+            and bool(quality.get("render_png"))
+        )
+
+
+def _quality_interpret(rows: list[dict[str, Any]]) -> str:
+    if len(rows) != 4 or any("terminal_quality" not in row for row in rows):
+        return "unproven: incomplete terminal restoration observations"
+    controls = [row for row in rows if row["arm"] == "control"]
+    treated = [row for row in rows if row["arm"] == "wireframe"]
+    if all(row.get("restoration_quality_verified", False) for row in rows):
+        return (
+            "restored precision/text/owners/attachment verified in these arms; "
+            "visible landing and layout require human inspection"
+        )
+    if all(row.get("restoration_quality_verified", False) for row in controls) and any(
+        not row.get("restoration_quality_verified", False) for row in treated
+    ):
+        return "rejected: treated-only restoration quality failure"
+    if all(
+        row["terminal_quality"].get("export", {}).get("sheet_pdf")
+        and not row["terminal_quality"]["precision_verified"]
+        for row in rows
+    ):
+        return (
+            "diagnostic export limitation: precision unproven in all arms; "
+            "native coverage verdict unchanged"
+        )
+    return "unproven: restoration/export/render observations failed or split"
+
+
 def _interpret(rows: list[dict[str, Any]]) -> str:
     if len(rows) != 4 or any("error" in row for row in rows):
         return "inconclusive: setup/native/treatment/selection/cleanup failure"
@@ -561,34 +790,34 @@ def _interpret(rows: list[dict[str, Any]]) -> str:
     ):
         return "inconclusive: raw/inventory coverage disagreement"
     controls = [row for row in rows if row["arm"] == "control"]
-    updates = [row for row in rows if row["arm"] == "view-update"]
+    treated = [row for row in rows if row["arm"] == "wireframe"]
     kinds = ("raw_coverage", "inventory_coverage")
     position_two_correct = all(rows[1][kind]["correct_ten"] for kind in kinds)
     if all(rows[-1][kind]["correct_ten"] for kind in kinds):
         suffix = (
             ""
             if position_two_correct
-            else "; one update insufficient at position 2"
+            else "; Wireframe insufficient at position 2"
         )
         return "inconclusive: final control passes; position trend" + suffix
     if not position_two_correct:
-        return "one display update insufficient at position 2; no production claim"
+        return "Wireframe insufficient at position 2; no production claim"
     if all(
         all(
             "8" in row[kind]["missing"] and not row[kind]["incorrect"]
             for kind in kinds
         )
         for row in controls
-    ) and all(all(row[kind]["correct_ten"] for kind in kinds) for row in updates):
+    ) and all(all(row[kind]["correct_ten"] for kind in kinds) for row in treated):
         return (
-            "supports candidate display-update operation effect in these arms only; "
-            "mediator changes do not identify the mechanism; "
+            "supports candidate Wireframe coverage effect in these arms only; "
+            "not proof of restored quality, visible landing or layout; "
             "no production SHIP/performance claim"
         )
     return "inconclusive: split outcome or controls also pass; no production claim"
 
 
-@_telemetry.traced("drawing.sm_display_update.probe")
+@_telemetry.traced("drawing.sm_wireframe.probe")
 async def run_probe(
     adapter: Any,
     prepare: Callable[[], Awaitable[tuple[Any, Any, Any]]],
@@ -597,9 +826,11 @@ async def run_probe(
     bom_cells: Callable[..., Any],
     bom_column: Callable[..., int],
     anchors: dict[str, Any],
+    layout: Any,
+    sheet_layouts: dict[str, Any],
 ) -> NoReturn:
     """Called only in this diagnostic leaf's exclusively held run_build session."""
-    out_dir = forensics._capture_dir("sm-display-update-discriminator")
+    out_dir = forensics._capture_dir("sm-wireframe-discriminator")
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "diagnostic_only_never_merge": True,
@@ -623,6 +854,22 @@ async def run_probe(
             "identical pre/post-treatment Boolean observations are mediators, not readiness "
             "certificates; post-call resolution never establishes pre-call component state"
         ),
+        "interpretation_limit": (
+            "Wireframe may attach to shaded-hidden edges: correct owner, attached "
+            "and non-dangling do not prove a visible leader landing or good layout. "
+            "Faceting transience is a prior project observation, not an official "
+            "universal PDF-only readiness guarantee."
+        ),
+        "fallback_bounds": {
+            "fresh_attempts_per_artifact": 4,
+            "max_candidate_artifacts": 6,
+            "max_native_calls": 24,
+            "max_leaf_executions": 2,
+            "requires_parent_clearance": True,
+            "seed_zero_omissions": "stop: standalone seed did not reproduce",
+            "accept_reduction": "at least one actual spring omission in four attempts",
+            "stop_on_one_component_reproduction": True,
+        },
     }
     started = time.perf_counter()
     baseline_setup = None
@@ -707,6 +954,9 @@ async def run_probe(
                 observer_started = time.perf_counter()
                 row["raw_coverage"] = _coverage(row["raw_notes"], allowed)
                 row["inventory_coverage"] = _coverage(row["inventory"], allowed)
+                row["restored_coverage"] = _coverage(
+                    row.get("restored_inventory", []), allowed
+                )
                 row["post_call_state"] = _link_state(view, table, bom_cells)
                 row["post_call_pose"] = _pose(view)
                 row["post_call_source"] = _identity(source)
@@ -743,6 +993,18 @@ async def run_probe(
                     for association in row["row_components"]
                 )
                 row["observer_ms"] += (time.perf_counter() - observer_started) * 1000
+                _terminal_output(
+                    adapter, view, row, out_dir,
+                    layout=layout, sheet_layouts=sheet_layouts,
+                )
+                row["terminal_source"] = _identity(source)
+                row["terminal_source_changed"] = (
+                    row["terminal_source"] != row["post_call_source"]
+                )
+                if "inventory" in row["terminal_quality"]:
+                    row["terminal_coverage"] = _coverage(
+                        row["terminal_quality"]["inventory"], allowed
+                    )
             except BaseException as error:
                 row["error"] = _error(error)
                 raise
@@ -756,9 +1018,28 @@ async def run_probe(
             discard_open_documents(adapter)
         except BaseException as error:
             report["errors"].append("final discard: " + _error(error))
-        report["interpretation"] = _interpret(report["arms"])
+        report["coverage_interpretation"] = _interpret(report["arms"])
         if report["errors"]:
-            report["interpretation"] = "inconclusive: setup/native/cleanup failure"
+            report["coverage_interpretation"] = (
+                "inconclusive: setup/native/cleanup failure"
+            )
+        report["quality_interpretation"] = _quality_interpret(report["arms"])
+        report["interpretation"] = (
+            report["coverage_interpretation"] + "; " + report["quality_interpretation"]
+        )
+        report["fallback_required"] = (
+            not report["coverage_interpretation"].startswith("supports candidate")
+            or not all(
+                row.get("restoration_quality_verified", False)
+                for row in report["arms"]
+            )
+        )
+        report["visible_landing_verified"] = False
+        report["next_action"] = (
+            "separately cleared minimum-part native repro; no further variants"
+            if report["fallback_required"]
+            else "parent inspect passive images/PDF render; no fix claim before review"
+        )
         report["native_calls"] = sum(row["native_calls"] for row in report["arms"])
         report["full_probe_ms"] = (time.perf_counter() - started) * 1000
         report["finished_utc"] = datetime.now(UTC).isoformat()
@@ -768,5 +1049,5 @@ async def run_probe(
             )
         except BaseException as error:
             report["errors"].append("report write: " + _error(error))
-            raise SmDisplayUpdateProbeStop(report) from error
-    raise SmDisplayUpdateProbeStop(report)
+            raise SmWireframeProbeStop(report) from error
+    raise SmWireframeProbeStop(report)
