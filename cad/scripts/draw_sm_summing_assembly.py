@@ -22,7 +22,7 @@ import math
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -41,8 +41,9 @@ from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
     BalloonAnchor,
-    # add_component_bom_balloons,
-    # assert_balloon_landings,
+    BalloonLanding,
+    add_component_bom_balloons,
+    assert_balloon_landings,
 )
 from _drawing_common import (
     DrawingOutputs,
@@ -218,8 +219,9 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# One balloon per BOM row, each on its own family's visible edge: every family
-# is separated from its neighbours in the explode.
+# Walk each family's own visible ink instead of requiring the seat-sensitive
+# frozen coordinate picks from #1667. Native AutoBalloon5 can omit the spring;
+# insert each genuine BOM balloon explicitly and fail on an unproven landing.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 
 EXPLODED_VIEW_NAMES = {
@@ -832,11 +834,47 @@ def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
         )
 
 
-def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """Place the exploded isometric and BOM; return its settled caption check.
+def _assert_summing_balloons(
+    adapter: Any,
+    landings: Sequence[BalloonLanding],
+    items: Sequence[tuple[str, str]],
+) -> None:
+    """Keep complete native BOM identity and visible landings through export.
 
-    Balloons are intentionally omitted pending deterministic placement (#1667).
+    The shared manual path validates the exact EDGE owner and leader endpoint.
+    It also supports a listed-edge fallback with no proven endpoint; this
+    exploded package requires every family's own visible landing instead.
     """
+    expected = dict(items)
+    stems = [landing.stem for landing in landings]
+    if len(stems) != len(expected) or set(stems) != set(expected):
+        raise RuntimeError(
+            f"summing balloon families {stems!r} do not cover native BOM "
+            f"{list(expected)!r} exactly once"
+        )
+    for landing in landings:
+        if landing.sheet_xy is None:
+            raise RuntimeError(
+                f"summing {landing.stem} balloon has no proven visible landing"
+            )
+        note = _early_bound(landing.note, "INote")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        if not note.IsBomBalloon() or not note.IsAttached() or annotation.IsDangling():
+            raise RuntimeError(
+                f"summing {landing.stem} must remain an attached, non-dangling "
+                "native BOM balloon"
+            )
+        item = str(note.GetBomBalloonText(True) or "").strip()
+        if item != expected[landing.stem]:
+            raise RuntimeError(
+                f"summing {landing.stem} balloon resolved item {item!r}, "
+                f"expected native BOM item {expected[landing.stem]!r}"
+            )
+    assert_balloon_landings(adapter, landings)
+
+
+def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
+    """Place the exploded BOM and one explicitly attached balloon per native row."""
     label = "summing exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -860,23 +898,16 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         configuration_grouping="same-part",
         label="summing",
     )
-    _validate_bom(adapter, table)
-    # TODO(#1667): Restore after deterministic farm balloon placement;
-    # balloons intentionally omitted meanwhile.
-    # items = _validate_bom(adapter, table)
-    # landings = add_component_bom_balloons(
-    #     adapter,
-    #     exploded,
-    #     items=items,
-    #     anchors=BALLOON_ANCHORS,
-    #     label="summing exploded-view BOM coverage",
-    #     margin=BALLOON_MARGIN,
-    # )
-    # if len(landings) != len(BOM_COMPONENTS):
-    #     raise RuntimeError(
-    #         f"summing exploded view carries {len(landings)} balloons, "
-    #         f"expected one per BOM row ({len(BOM_COMPONENTS)})"
-    #     )
+    items = _validate_bom(adapter, table)
+    landings = add_component_bom_balloons(
+        adapter,
+        exploded,
+        items=items,
+        anchors=BALLOON_ANCHORS,
+        label="summing exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
+    _assert_summing_balloons(adapter, landings, items)
     bottom, _top = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -890,7 +921,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     _assert_exploded_caption(adapter, table, caption)
 
     def settled() -> None:
-        # assert_balloon_landings(adapter, landings)
+        _assert_summing_balloons(adapter, landings, items)
         _assert_exploded_caption(adapter, table, caption)
 
     return settled

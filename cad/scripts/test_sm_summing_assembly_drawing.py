@@ -241,3 +241,127 @@ def test_steps_and_checks_stay_above_the_inner_border() -> None:
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
             assert number in drawing.STEPS_AND_CHECKS
+
+
+class _BalloonNote:
+    def __init__(self, item: str) -> None:
+        self.item = item
+        self.native = True
+        self.attached = True
+        self.dangling = False
+
+    def IsBomBalloon(self) -> bool:
+        return self.native
+
+    def IsAttached(self) -> bool:
+        return self.attached
+
+    def GetAnnotation(self) -> _BalloonNote:
+        return self
+
+    def IsDangling(self) -> bool:
+        return self.dangling
+
+    def GetBomBalloonText(self, upper: bool) -> str:
+        assert upper
+        return self.item
+
+
+@pytest.fixture
+def balloon_case(monkeypatch):
+    # Deliberately reverse the numbers: the consumer must use the native BOM
+    # result, not duplicate the usual row order as another source of truth.
+    items = tuple(
+        (stem, str(len(drawing.BOM_COMPONENTS) - index))
+        for index, stem in enumerate(drawing.BOM_COMPONENTS)
+    )
+    landings = [
+        drawing.BalloonLanding(
+            stem=stem,
+            instance=f"{stem}-1",
+            note=_BalloonNote(item),
+            sheet_xy=(0.1, 0.1),
+            label="summing fixture",
+        )
+        for stem, item in items
+    ]
+    proofs = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing,
+        "assert_balloon_landings",
+        lambda adapter, actual: proofs.append((adapter, actual)),
+    )
+    return items, landings, proofs
+
+
+def test_summing_balloons_keep_native_row_numbers_and_exact_owner_proof(balloon_case):
+    items, landings, proofs = balloon_case
+    adapter = object()
+    drawing._assert_summing_balloons(adapter, landings, items)
+    assert proofs == [(adapter, landings)]
+
+
+@pytest.mark.parametrize("defect", ("missing", "duplicate", "unexpected"))
+def test_summing_balloons_require_each_native_bom_family_once(balloon_case, defect):
+    items, landings, proofs = balloon_case
+    if defect == "missing":
+        landings.pop()
+    elif defect == "duplicate":
+        landings[-1] = landings[0]
+    else:
+        old = landings[-1]
+        landings[-1] = drawing.BalloonLanding(
+            stem="unlisted-part",
+            instance=old.instance,
+            note=old.note,
+            sheet_xy=old.sheet_xy,
+            label=old.label,
+        )
+    with pytest.raises(RuntimeError, match="cover native BOM"):
+        drawing._assert_summing_balloons(object(), landings, items)
+    assert proofs == []
+
+
+@pytest.mark.parametrize(
+    "defect, message",
+    (
+        ("native", "native BOM balloon"),
+        ("attached", "native BOM balloon"),
+        ("dangling", "native BOM balloon"),
+        ("item", "expected native BOM item"),
+        ("landing", "no proven visible landing"),
+    ),
+)
+def test_summing_balloons_refuse_invalid_or_changed_attachment(
+    balloon_case, defect, message
+):
+    items, landings, proofs = balloon_case
+    old = landings[-1]
+    if defect == "landing":
+        landings[-1] = drawing.BalloonLanding(
+            stem=old.stem,
+            instance=old.instance,
+            note=old.note,
+            sheet_xy=None,
+            label=old.label,
+        )
+    else:
+        setattr(
+            old.note,
+            defect,
+            "?" if defect == "item" else defect == "dangling",
+        )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._assert_summing_balloons(object(), landings, items)
+    assert proofs == []
+
+
+def test_summing_balloons_recheck_after_a_later_rebuild(balloon_case):
+    items, landings, proofs = balloon_case
+    drawing._assert_summing_balloons(object(), landings, items)
+    assert len(proofs) == 1
+    landings[0].note.dangling = True
+    with pytest.raises(RuntimeError, match="non-dangling"):
+        drawing._assert_summing_balloons(object(), landings, items)
+    assert len(proofs) == 1
