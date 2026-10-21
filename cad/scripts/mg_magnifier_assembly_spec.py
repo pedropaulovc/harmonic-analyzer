@@ -14,10 +14,11 @@ chain on the Front plane carries them (LEVER_FEATURE), from the lever rod's
 west tip along its axis to the clamp centre, then down the vertical-rod line
 to the fixture axis. They print at the title block's general tolerance.
 
-The sheet's text (BOM rows, setting callouts, steps and checks) and the map of
-dimensions the drawing imports live in mg_magnifier_assembly_sheet, which
-only the drawing imports, so a wording edit there does not rebuild the
-assembly.
+The native setting callout text and its display-dimension compartments belong
+to these model dimensions too: SETTING_CALLOUTS is authored before assembly
+save and only read back by the drawing. BOM rows, steps, checks and the map of
+axle dimensions the drawing imports stay in mg_magnifier_assembly_sheet, so
+edits to that sheet-only wording do not rebuild the assembly.
 """
 
 from __future__ import annotations
@@ -30,6 +31,18 @@ import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 from mg_vn_lever_wire_geom import WHEEL_X
 from mg_wheel_bar_geom import WHEEL_BAR_Y
+
+# Native saved-view contract, captured before rebasing standard Front to -Z.
+# These preserve the fitter package's physical projections, not sheet wording.
+# The ISO prefix opts the named isometric into shared pictorial display checks.
+DRAWING_BACK_VIEW = "MG BACK"
+DRAWING_LEFT_VIEW = "MG LEFT"
+DRAWING_ISOMETRIC_VIEW = "ISO MG BACK-TOP-LEFT"
+DRAWING_STANDARD_VIEWS = {
+    DRAWING_BACK_VIEW: 1,  # swStandardViews_e.swFrontView: viewer at +Z
+    DRAWING_LEFT_VIEW: 4,  # swStandardViews_e.swRightView: viewer at +X
+    DRAWING_ISOMETRIC_VIEW: 7,  # swStandardViews_e.swIsometricView: +X+Y+Z
+}
 
 # The axle centreline in the machine frame: x, y of the bore; z runs from the
 # bar's front face forward (-z), station d at z = BAR_FRONT_Z - d.
@@ -85,4 +98,29 @@ LEVER_DRAWING_DIMENSIONS = {
 }
 LEVER_DRAWING_PRECISION = {
     LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 1, FIXTURE_DROP_DIMENSION: 1}
+}
+
+# Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
+# 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are
+# model annotations, not sheet prose: imported SetText writes through to the
+# source. Keep their text and native compartments under one model authority.
+# Above-callouts must stay on one line: SOLIDWORKS stores a line break there
+# but prints none of the callout (run 20261012T185729782Z). Below ones can wrap.
+SETTING_CALLOUTS = {
+    FEATURE: {
+        # The wheel-group stack spends this band to keep the locknut on full
+        # thread (LOCKNUT_THREAD_MARGIN 0.002); state the protected function.
+        PRESS_GAUGE_DIMENSION: (
+            3,
+            "PRESS GAUGE: KEEPS MHA-MG-VN-52 LOCKNUT ON FULL THREAD",
+        ),
+        ENDSHAKE_DIMENSION: (
+            4,
+            "WHEEL FREE, NO RATTLE;\nSET BY THE FIRST NUT,\nLOCKED BY THE SECOND",
+        ),
+    },
+    LEVER_FEATURE: {
+        CLAMP_STATION_DIMENSION: (3, "CLAMP STATION: SETS MAGNIFICATION"),
+        FIXTURE_DROP_DIMENSION: (4, "FIXTURE DROP:\nSETS TRACE HEIGHT"),
+    },
 }

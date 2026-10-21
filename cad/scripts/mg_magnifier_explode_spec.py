@@ -8,21 +8,23 @@ distances are presentation offsets, not dimensions. The bar, the pressed wheel
 axle, the lever and the clamp on it never move, and neither does the lever
 wire (the finished sheet balloons it).
 
-Machine frame: +X west, +Y up, -Z front (the pen side). The assembly keeps
-SolidWorks' own standard views, so the drawing's *Isometric looks from
-+X+Y+Z: from the machine's back, above and west. A part moved -Z draws up and
-right and passes BEHIND what it left; a part moved +Z draws down and left, in
-front. Each part pushed off the front of the axle therefore clears the
-wheel's outline by more than the wheel's projected radius (about 0.58 R along
-the axle's sheet direction, 0.82 mm of sheet travel per mm of Z), or the
-wheel hides it from its balloon.
+Machine frame: +X west, +Y up, -Z front (the pen side). Standard Front is
+rebased to the machine front, while the fitter package uses the preserved
+``ISO MG BACK-TOP-LEFT`` view from +X+Y+Z: the machine's back, above and west.
+A part moved -Z draws up and right and passes BEHIND what it left; a part
+moved +Z draws down and left, in front. Each part pushed off the front of the
+axle therefore clears the wheel's outline by more than the wheel's projected
+radius (about 0.58 R along the axle's sheet direction, 0.82 mm of sheet travel
+per mm of Z), or the wheel hides it from its balloon.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 from _simplified_names import simplified_name
 from mg_output_fixture_geom import FIXTURE_YAW_RAD
@@ -210,3 +212,128 @@ def plan_explode(
             names.update(matched)
         plan.append((step, tuple(sorted(names))))
     return plan
+
+
+def explode_offsets_property(configuration: str) -> str:
+    """File-level native-readback metadata, separate for each owned explode."""
+    return f"{exploded_view_name(configuration)} Offsets"
+
+
+def explode_contract_fingerprint(instances: Sequence[Instance]) -> str:
+    """Bind metadata to the current recipe and its resolved instance membership.
+
+    This detects stale recipe readbacks, including same-count changes. It does
+    not establish that an externally edited native explode still matches them.
+    """
+    contract = {
+        "instances": sorted(
+            (instance.name.replace("\\", "/").casefold(), instance.stem)
+            for instance in instances
+        ),
+        "steps": [
+            {
+                "label": step.label,
+                "members": step.members,
+                "axis": step.axis,
+                "distance_mm": step.distance_mm,
+                "instances": sorted(
+                    name.replace("\\", "/").casefold() for name in names
+                ),
+            }
+            for step, names in plan_explode(instances)
+        ],
+    }
+    encoded = json.dumps(
+        contract, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _checked_offset_rows(
+    rows: object, instances: Sequence[str]
+) -> dict[str, tuple[float, float, float]]:
+    expected = {name.replace("\\", "/").casefold() for name in instances}
+    if not expected or "" in expected or len(expected) != len(instances):
+        raise ValueError("component instance identities are empty or duplicated")
+    if not isinstance(rows, dict) or set(rows) != expected:
+        raise ValueError("offset instance identities do not match the source")
+    offsets = {}
+    for name, vector in rows.items():
+        if (
+            not isinstance(vector, (list, tuple))
+            or len(vector) != 3
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                for value in vector
+            )
+        ):
+            raise ValueError(f"{name!r} has no finite three-axis translation")
+        offsets[name] = (float(vector[0]), float(vector[1]), float(vector[2]))
+    return offsets
+
+
+def encode_explode_offsets(
+    configuration: str,
+    offsets: Mapping[str, Sequence[float]],
+    instances: Sequence[Instance],
+) -> str:
+    """Persist measured native world translations, never recipe estimates.
+
+    The author verifies every instance, including stationary ones, before its
+    normal source save. File-level text avoids a configuration activation when
+    the drawing consumes that immutable readback.
+    """
+    rows = {
+        name.replace("\\", "/").casefold(): vector for name, vector in offsets.items()
+    }
+    if len(rows) != len(offsets):
+        raise ValueError("builder-owned explode offsets have duplicate instance paths")
+    checked = _checked_offset_rows(rows, tuple(instance.name for instance in instances))
+    return json.dumps(
+        {
+            "configuration": configuration,
+            "view": exploded_view_name(configuration),
+            "steps": len(EXPLODE_STEPS),
+            "contract_sha256": explode_contract_fingerprint(instances),
+            "offsets_m": checked,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
+def decode_explode_offsets(
+    text: str, configuration: str, instances: Sequence[Instance]
+) -> dict[str, tuple[float, float, float]]:
+    """Require the source builder's complete, configuration-bound readback.
+
+    There is no drawing-time reconstruction or zero-step fallback: a stale or
+    incomplete source must be rebuilt by its owner.
+    """
+    view_name = exploded_view_name(configuration)
+    try:
+        payload = json.loads(text)
+        if (
+            not isinstance(payload, dict)
+            or set(payload)
+            != {"configuration", "view", "steps", "contract_sha256", "offsets_m"}
+            or payload["configuration"] != configuration
+            or payload["view"] != view_name
+            or type(payload["steps"]) is not int
+            or payload["steps"] != len(EXPLODE_STEPS)
+            or payload["contract_sha256"] != explode_contract_fingerprint(instances)
+        ):
+            raise ValueError(
+                "configuration, named view, native step count or explode contract differs"
+            )
+        return _checked_offset_rows(
+            payload["offsets_m"], tuple(instance.name for instance in instances)
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{view_name}: missing or invalid builder-owned explode offsets "
+            f"({exc}); rebuild assembly:mg_magnifier"
+        ) from exc
