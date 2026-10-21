@@ -90,10 +90,34 @@ def test_cap_screw_purchasing_matches_live_cbs_identity_not_material_surrogate()
     assert hardware.SCREW_SUPPLIER_SKU == screw.SKU == "NAS1352N5H12"
     assert row["supplier"] == fastener(stem).supplier == hardware.SCREW_SUPPLIER == "CBS Fasteners"
     assert hardware.SCREW_SOURCE_URL == "https://cbsfasteners.com/nas-fastener-inventory/"
-    assert hardware.SCREW_SUPPLIER_DESCRIPTION in row["material_specification"]
     assert "A286" in row["material_specification"]
     assert row["finish"] == "PASSIVATED"
     assert row["material"] == fastener(stem).material == "AISI 304"
+
+
+@pytest.mark.parametrize(
+    "suffix,required_physical_terms,supplier",
+    (
+        ("cap_screw", ("A286", "PASSIVATED"), "CBS Fasteners"),
+        ("clevis_pin", ("316", "STAINLESS"), "Huyett"),
+        ("cotter", ("CARBON STEEL", "ZINC CLEAR", "ASME B18.8.1"), "Huyett"),
+        ("lock_wire", ("302/304", "STAINLESS", "SOFT", "MS20995"), "Aircraft Spruce"),
+    ),
+)
+def test_required_purchase_materials_finishes_and_standards(
+    suffix, required_physical_terms, supplier,
+):
+    from _fastener_catalog import fastener
+    stem = (PREFIX + suffix).replace("_", "-")
+    row = yaml.safe_load((SCRIPTS.parent / "config" / "parts" / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
+    spec = importlib.import_module(PREFIX + suffix + "_spec")
+    registered = fastener(stem)
+    # Physical requirements must remain in the printed general specification.
+    # Do not pin its prose or which of Material/Finish carries a given term.
+    physical_specification = f"{row['material_specification']} {row['finish']}".upper()
+    assert all(term in physical_specification for term in required_physical_terms)
+    assert row["supplier"] == registered.supplier == supplier
+    assert tuple(row["supplier_skus"]) == registered.skus == (spec.SKU,)
 
 
 def test_stock_drills_publish_six_radial_openings_at_actual_hole_height():

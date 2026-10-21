@@ -138,7 +138,11 @@ while its labels remained in the intended area. `CreateLine` takes coordinates
 in the active drawing sketch, not paper metres. Obtain the sheet's own
 `IView` from `IDrawingDoc.GetFirstView`, then its `GetSketch()` and live
 `ModelToSketchTransform`; map the requested paper endpoints before creation.
-Do not hard-code a ×20 correction or change the sheet scale to conceal it.
+Do not hard-code a ×20 correction or change the reference's measured-fit scale
+to conceal it. Model-view insertion can also auto-drift the native sheet scale:
+pin and read back the fitted reference ratio **before** reading the sketch
+transform or creating the lines. This is the same ratio the finalizer re-pins,
+including when the reference needs 1:25 or 1:30 rather than 1:20.
 
 The recipe now requires every segment to belong to that sheet sketch and
 remain non-construction geometry. Both native endpoints inverse-map to their
@@ -146,12 +150,37 @@ individual intended paper points within 0.1 µm, with their full bounds inside
 the reserved schematic region. Independently match all 23 lines against the
 sheet view's native `GetLines4` display ink, using `GetXform` for its paper
 origin and scale; model `GetPolylines` data excludes these user-drawn segments.
-Repeat the proofs after the finalizer re-pins the sheet scales and rebuilds.
-A count of successful `CreateLine` returns or a broad region-containment
-check alone cannot prove a full-sized, correctly located schematic. Offline
-regressions exercise nonidentity scale, rotation and origin, plus misplaced,
-scaled and missing display ink; fresh native export and all-ten-sheet visual
-inspection remain required.
+Repeat the proofs after the finalizer re-pins the sheet scales and rebuilds,
+also requiring the authored native scale to remain unchanged. The subsequent
+`e9aa2521665e` native run proved all 23 lines at placement but correctly refused
+finalization when their paper coordinates shrank by exactly four. Its old log
+did not record the initial sheet ratio; creation at an auto-drifted 1:5 followed
+by finalization at 1:20 is consistent with that factor, not yet a measured
+ratio. Creation, placement and settled checks now log the actual sheet
+properties, sheet-view transform, sketch transform and first raw endpoint.
+A count of successful `CreateLine` returns or a broad region-containment check
+alone cannot prove a full-sized, correctly located schematic. Offline
+regressions exercise nonidentity scale, rotation and origin; scaled, displaced
+and missing display ink; an inserted-view sheet-scale drift; and finalization
+at each fitted scale. Fresh native export and all-ten-sheet visual inspection
+remain required.
+
+For the assembly's imported CL-tip reference, curate the native dimension at
+a near-tip **dimension-line anchor**, reset inherited `OffsetText`, then use
+`offset_dimension_text` for the separate clear text lane. Moving the whole
+dimension into that text lane first leaves unnecessarily long witnesses even
+if the value's position reads back correctly. Require the native display's
+arrow tips to remain at the projected model endpoints on the near-tip line
+both immediately and after finalization; retain the native model value,
+reference brackets, precision and no-tolerance contract.
+
+The second cartridge uses the same capture-part families on the other
+support, so its identification does not need duplicate BOM balloons. Explain
+that the capture parts are identical at both supports in the existing
+reserved exploded-view footer, alongside the BOM/assembly-sequence references.
+Do not introduce a free-floating caption beneath the ring: that area is not
+reserved text space. The existing footer width, on-sheet/title-block bounds,
+ring separation and native layout-audit checks remain in force.
 ### TL-22 pivot-block callout lanes
 
 The native drawing at `6dd691486` refused three enforced findings. On

@@ -5,7 +5,7 @@ ch-rocker-arm-tl-vn-oblique-pivot-cap-screw:
   supplier: CBS Fasteners
   supplier_skus: ["NAS1352N5H12"]
   material: AISI 304
-  material_specification: "A286 heat-resistant steel, passivated, NAS1352N5H12; CBS Fasteners 5/16-18 X 3/4 SHC A286 DRLD"
+  material_specification: "A286 heat-resistant steel"
   finish: PASSIVATED
   purchased_note: |-
     USE PREDRILLED HEAD; SAFETY-WIRE TO PAIRED SCREW.

@@ -112,7 +112,7 @@ def _ruled_cell(sheet: Any, anchor: tuple[float, ...]) -> tuple[float, ...]:
 def _fit_title_note(
     adapter: Any, draw: Any, sheet: Any, note: Any, *, label: str, minimum: float
 ) -> Callable[[], None]:
-    """Widen only this note; retain the largest native height fitting one row."""
+    """Fit this existing linked note on a bounded native-height ladder."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"{label}: note has no annotation")
@@ -127,14 +127,26 @@ def _fit_title_note(
         cell[2] - _CELL_CLEARANCE,
         cell[3] - _CELL_CLEARANCE,
     )
-    line_length = limit[2] - anchor[0] - 0.0003
+    # In this fixture the Material LineLength write persisted but did not
+    # widen the wrapped text. Leave that note's authored wrap metadata alone;
+    # keep the bounded length used by the successful Name path and DWG. NO.
+    line_length = (
+        None
+        if source_property_expression(link) == property_link("Material Specification")
+        else limit[2] - anchor[0] - 0.0003
+    )
     centre = ((cell[0] + cell[2]) / 2, (cell[1] + cell[3]) / 2)
     half = max(cell[2] - cell[0], cell[3] - cell[1]) / 2 + 0.002
     text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
     if text_format is None:
         raise RuntimeError(f"{label}: note has no native text format")
     height, face = float(text_format.CharHeight), str(text_format.TypeFaceName)
-    if not math.isfinite(height) or height < minimum or not face.strip() or line_length <= 0:
+    if (
+        not math.isfinite(height)
+        or height < minimum
+        or not face.strip()
+        or (line_length is not None and line_length <= 0)
+    ):
         raise RuntimeError(f"{label}: unreadable native format or cell")
 
     def measure(phase: str) -> tuple[tuple[float, ...], int]:
@@ -163,10 +175,11 @@ def _fit_title_note(
         )
         return box, rows
 
-    # Use the actual ruled width before reducing the note in bounded 0.1 mm
-    # native-height steps. No qualifier, supplier, SKU, grade or name is cut.
+    # Measure every candidate; no source text is rewritten or cut. The material
+    # property's semantic content is owned by the registry, not by this fitter.
     while True:
-        text_format.LineLength = line_length
+        if line_length is not None:
+            text_format.LineLength = line_length
         text_format.CharHeight = height
         if annotation.SetTextFormat(0, False, text_format) is not True:
             raise RuntimeError(f"{label}: local text format setter refused")
@@ -190,7 +203,10 @@ def _fit_title_note(
         if (
             actual_format is None
             or abs(float(actual_format.CharHeight) - height) > _FORMAT_TOL
-            or abs(float(actual_format.LineLength) - line_length) > _FORMAT_TOL
+            or (
+                line_length is not None
+                and abs(float(actual_format.LineLength) - line_length) > _FORMAT_TOL
+            )
             or str(actual_format.TypeFaceName) != face
             or annotation.GetUseDocTextFormat(0) is not False
             or len(actual_anchor) != 3

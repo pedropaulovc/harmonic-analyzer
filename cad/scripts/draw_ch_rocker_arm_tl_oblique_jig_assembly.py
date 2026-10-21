@@ -75,7 +75,11 @@ from _drawing_balloons import (
     isolate_drawing_view_components,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_reference_dimension,
+)
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_tables import (
@@ -342,6 +346,13 @@ CL_TIP_TEXT_MODEL_MM = (
     spec.CL_TIP_LINE[1][0] - 80.0,
     0.0,
     spec.CL_TIP_LINE[1][1] + 28.0,
+)
+# The dimension line stays near the dowel; only its value is carried into
+# the clear text lane. Curation places the whole dimension before offsetting.
+CL_TIP_LINE_MODEL_MM = (
+    spec.CL_TIP_LINE[1][0] - 12.0,
+    0.0,
+    sum(point[1] for point in spec.CL_TIP_LINE) / 2.0,
 )
 
 # Sheet 2: the full-height BOM left, its collapsed reference right. The table
@@ -808,7 +819,13 @@ def exploded_caption(cluster: Cluster, scale: tuple[float, float]) -> str:
         bom_sheet=BOM_SHEET_NUMBER,
         steps_sheet=STEPS_SHEET_NUMBER,
     )
-    return _wrapped((f"{cluster.title} {reference}",), width=EXPLODED_CAPTION_WIDTH)
+    lines = [f"{cluster.title} {reference}"]
+    if spec.PIVOT_CAP in cluster.stems:
+        # Both supports instantiate the same families, not handed parts.
+        # Explain the second cartridge in the existing reserved footer, without
+        # duplicating its BOM balloons or introducing text into the balloon ring.
+        lines.append("IDENTICAL CAPTURE PARTS AT BOTH SUPPORTS.")
+    return _wrapped(lines, width=EXPLODED_CAPTION_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -824,7 +841,7 @@ def _activate_sheet(adapter: Any, name: str) -> Any:
 
 def _add_note_block(
     adapter: Any, sheet_name: str, text: str, xy: tuple[float, float], *, label: str
-) -> Any:
+) -> None:
     """A sheet-owned note: activate the sheet so no view owns it."""
     _activate_sheet(adapter, sheet_name)
     note = add_note(adapter, text, *xy)
@@ -834,7 +851,6 @@ def _add_note_block(
     printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
     if printed != text:
         raise RuntimeError(f"jig {label} printed as {printed!r}")
-    return note
 
 
 def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
@@ -1339,17 +1355,27 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
     the settled drawing."""
     label = "jig elevation CL tip above riser"
     name = spec.CL_TIP_DIMENSION
+    line_xy = model_point_in_view(
+        adapter, elevation,
+        tuple(value / 1000.0 for value in CL_TIP_LINE_MODEL_MM),
+        label=f"{label} line",
+    )
     text_xy = model_point_in_view(
-        adapter,
-        elevation,
+        adapter, elevation,
         tuple(value / 1000.0 for value in CL_TIP_TEXT_MODEL_MM),
         label=f"{label} text",
     )
+    source_ends = model_points_in_view(
+        adapter, elevation,
+        [(x / 1000.0, 0.0, z / 1000.0) for x, z in spec.CL_TIP_LINE],
+        label=f"{label} native witness ends",
+    )
+    arrow_tips = tuple((line_xy[0], y, 0.0) for _x, y in source_ends)
     _show_base_view_sketches(adapter, elevation, (spec.CL_TIP_FEATURE,), label=label)
     annotations = curate_view_dimensions(
         adapter,
         elevation,
-        keep={name: text_xy},
+        keep={name: line_xy},
         view_label=label,
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
@@ -1361,9 +1387,47 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
         "IDisplayDimension",
     )
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    display.OffsetText = True
-    if not annotation.SetPosition2(*text_xy, 0.0):
-        raise RuntimeError(f"failed to offset {label} text")
+    # Reset an inherited offset before positioning the dimension line. With
+    # OffsetText on, SetPosition2 moves only the text and cannot repair a line
+    # curation previously left in the text lane.
+    display.OffsetText = False
+    if bool(display.OffsetText) or not annotation.SetPosition2(*line_xy, 0.0):
+        raise RuntimeError(f"failed to position {label} dimension line")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if (
+        len(position) != 3
+        or not all(math.isfinite(value) for value in position)
+        or math.dist(position, (*line_xy, 0.0)) > 0.00005
+    ):
+        raise RuntimeError(f"{label}: native dimension-line anchor at {position!r}")
+
+    def prove_dimension_line() -> None:
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        if data is None:
+            raise RuntimeError(f"{label}: missing native dimension-line display")
+        native_tips = []
+        for index in range(int(data.GetArrowHeadCount())):
+            raw = tuple(float(v) for v in (data.GetArrowHeadAtIndex2(index) or ()))
+            if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
+                raise RuntimeError(f"{label}: unreadable native dimension-line arrow")
+            native_tips.append(raw[:3])
+        # Use the same 0.05 mm paper tolerance as native annotation positions,
+        # not the schematic's tighter mathematical endpoint-transform proof.
+        for expected in arrow_tips:
+            match = next((
+                index for index, actual in enumerate(native_tips)
+                if math.dist(actual, expected) <= 0.00005
+            ), None)
+            if match is None:
+                raise RuntimeError(
+                    f"{label}: native dimension line lost arrow at {expected!r}; "
+                    f"native arrow tips {native_tips!r}"
+                )
+            native_tips.pop(match)
+
+    rebuild_drawing(adapter, label=f"{label} dimension-line anchor")
+    prove_dimension_line()
+    offset_dimension_text(adapter, annotations, {name: text_xy})
 
     def proven(when: str) -> None:
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
@@ -1392,6 +1456,7 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
                 f"{when} {label}: native offset text at {position!r}, "
                 f"expected {text_xy!r}"
             )
+        prove_dimension_line()
 
     proven("placed")
     return lambda: proven("settled")
@@ -1931,9 +1996,18 @@ def _inspection_transform_point(
     return coordinates
 
 
-def _inspection_sheet_sketch(adapter: Any) -> tuple[Any, Any, Any, Any]:
-    """The sheet view, its sketch, and its current native transform/utility."""
-    _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+def _inspection_sheet_sketch(
+    adapter: Any, *, when: str
+) -> tuple[Any, Any, Any, Any, tuple[float, float]]:
+    """The sheet view, its sketch, current transform/utility and native scale."""
+    sheet = _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    properties = tuple(float(value) for value in (sheet.GetProperties2() or ()))
+    if (
+        len(properties) < 4
+        or not all(math.isfinite(value) and value > 0.0 for value in properties[2:4])
+    ):
+        raise RuntimeError("C2A functional inspection: unreadable native sheet scale")
+    scale = (properties[2], properties[3])
     # GetFirstView is the sheet itself, not its first assembly view.
     view = _early_bound(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView(), "IView"
@@ -1950,12 +2024,25 @@ def _inspection_sheet_sketch(adapter: Any) -> tuple[Any, Any, Any, Any]:
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     if utility is None:
         raise RuntimeError("C2A functional inspection: missing native math utility")
-    return view, sketch, transform, utility
+    _telemetry.info(
+        f"C2A {when}: native_sheet_properties={properties!r}, "
+        f"sheet_scale={scale!r}, sheet_view_xform={tuple(view.GetXform() or ())!r}, "
+        f"model_to_sketch={matrix!r}"
+    )
+    return view, sketch, transform, utility, scale
 
 
-def _assert_pin_tip_inspection(adapter: Any, segments: Sequence[Any]) -> None:
+def _assert_pin_tip_inspection(
+    adapter: Any, segments: Sequence[Any], *,
+    expected_scale: tuple[float, float] | None = None, when: str = "placed",
+) -> None:
     """Prove the entire native schematic's paper location, size and visible ink."""
-    view, sketch, transform, utility = _inspection_sheet_sketch(adapter)
+    view, sketch, transform, utility, scale = _inspection_sheet_sketch(adapter, when=when)
+    if expected_scale is not None and scale != expected_scale:
+        raise RuntimeError(
+            f"C2A functional inspection: {when} sheet scale {scale!r} "
+            f"changed from authored {expected_scale!r}"
+        )
     inverse = _early_bound(transform.Inverse(), "IMathTransform")
     if inverse is None:
         raise RuntimeError("C2A functional inspection: non-invertible sketch transform")
@@ -1979,9 +2066,10 @@ def _assert_pin_tip_inspection(adapter: Any, segments: Sequence[Any]) -> None:
             if raw is None:
                 raise RuntimeError(f"C2A functional inspection: line {index} lost {which}")
             point = _early_bound(raw, "ISketchPoint")
-            actual = _inspection_transform_point(
-                utility, inverse, (float(point.X), float(point.Y), float(point.Z))
-            )
+            native = (float(point.X), float(point.Y), float(point.Z))
+            if index == 0 and which == "GetStartPoint2":
+                _telemetry.info(f"C2A {when}: native_line0_start={native!r}")
+            actual = _inspection_transform_point(utility, inverse, native)
             if math.dist(actual, (*endpoint, 0.0)) > PIN_TIP_LOCATION_TOL_M:
                 raise RuntimeError(
                     f"C2A functional inspection: line {index} {which} prints at "
@@ -2043,7 +2131,9 @@ def _place_pin_tip_inspection(adapter: Any) -> Callable[[], None]:
     draw = adapter.currentModel
     draw.ClearSelection2(True)
     _early_bound(draw, "IDrawingDoc").EditSheet()
-    _view, _sketch, transform, utility = _inspection_sheet_sketch(adapter)
+    _view, _sketch, transform, utility, scale = _inspection_sheet_sketch(
+        adapter, when="creation"
+    )
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous_add_to_db = bool(manager.AddToDB)
     segments = []
@@ -2068,8 +2158,10 @@ def _place_pin_tip_inspection(adapter: Any) -> Callable[[], None]:
             adapter, TOP_CAPTURE_SHEET, text, xy, label="C2A functional inspection",
         )
     rebuild_drawing(adapter, label="C2A functional inspection")
-    _assert_pin_tip_inspection(adapter, segments)
-    return lambda: _assert_pin_tip_inspection(adapter, segments)
+    _assert_pin_tip_inspection(adapter, segments, expected_scale=scale)
+    return lambda: _assert_pin_tip_inspection(
+        adapter, segments, expected_scale=scale, when="settled"
+    )
 
 
 def _place_finished_view(adapter: Any) -> None:
@@ -2509,20 +2601,6 @@ def _place_package(
             EXPLODED_CAPTION_XY,
             label=f"{cluster.sheet.lower()} caption",
         )
-        if spec.PIVOT_CAP in cluster.stems:
-            # Both supports instantiate the same pin/cap/retainer and purchased
-            # capture families (spec.PLACEMENTS); these are not handed parts.
-            # Label the second cartridge without duplicating any BOM balloon.
-            _x0, y0, x1, _y1 = _view_outline(view, label="second cartridge")
-            caption = "SECOND CARTRIDGE\nIDENTICAL CAPTURE PARTS"
-            _add_note_block(
-                adapter,
-                cluster.sheet,
-                caption,
-                (x1 - max(map(len, caption.splitlines())) * NOTE_CHAR_M,
-                 y0 - VIEW_LABEL_GAP),
-                label="second cartridge caption",
-            )
     if sorted(landing.stem for landing in landings) != sorted(BOM_COMPONENTS):
         raise RuntimeError(
             f"jig package carries {len(landings)} balloons, expected one per "
@@ -2530,6 +2608,22 @@ def _place_package(
         )
     _place_steps_notes(adapter)
     _place_capture_notes(adapter)
+    # The fitted reference can select 1:25 or 1:30. Author paper-only sketch
+    # geometry at that final native sheet scale, not the initial 1:20; the
+    # finalizer later re-pins this same ratio without rescaling the schematic.
+    sheet = _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    before = tuple(float(value) for value in (sheet.GetProperties2() or ()))
+    fitted = notes_scales[TOP_CAPTURE_SHEET]
+    if not sheet.SetScale(float(fitted[0]), float(fitted[1]), False, False):
+        raise RuntimeError("failed to set the C2A sheet's fitted reference scale")
+    properties = tuple(float(value) for value in (sheet.GetProperties2() or ()))
+    if len(properties) < 4 or tuple(properties[2:4]) != fitted:
+        raise RuntimeError("C2A sheet did not retain its fitted reference scale")
+    _telemetry.info(
+        f"C2A fitted sheet scale: before={before!r}, after={properties!r}, "
+        f"finalizer_target={fitted!r}"
+    )
+    rebuild_drawing(adapter, label="C2A fitted sheet scale")
     inspection_settled = _place_pin_tip_inspection(adapter)
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}

@@ -21,6 +21,7 @@ import _drawing_balloons
 import _component_references
 import _drawing_tables
 import _drawing_common
+import _drawing_dimensions
 import _drawing_view_configuration
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
@@ -326,12 +327,6 @@ def test_exploded_captions_fit_their_text_region() -> None:
         caption = drawing.exploded_caption(cluster, scale)
         assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
         assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
-        reference = spec.EXPLODED_CAPTION.format(
-            scale=drawing._scale_text(scale),
-            bom_sheet=drawing.SHEET_NAMES.index(drawing.BOM_SHEET) + 1,
-            steps_sheet=drawing.SHEET_NAMES.index(drawing.STEPS_SHEET) + 1,
-        )
-        assert caption.split() == f"{cluster.title} {reference}".split()
 
 
 def test_sheet_text_is_the_spec_text_wrapped() -> None:
@@ -1780,53 +1775,93 @@ def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
         assert not _overlap(text, other)
 
 
-@pytest.mark.parametrize("ignored_move", (False, True))
+@pytest.mark.parametrize("defect", (
+    None, "ignored-offset", "line-follows-text", "inherited-offset",
+))
 def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
-    monkeypatch, ignored_move,
+    monkeypatch, defect,
 ) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    target = (0.206, 0.146)
+    monkeypatch.setattr(
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, *_interface: value,
+    )
+    monkeypatch.setattr(
+        _drawing_dimensions, "dimension_name", lambda *_args: spec.CL_TIP_DIMENSION
+    )
+    for module in (drawing, _drawing_dimensions):
+        monkeypatch.setattr(module, "rebuild_drawing", lambda *a, **kw: None)
+    line_target, text_target = (0.217, 0.1382), (0.206, 0.146)
     position = [0.220, 0.139, 0.0]
+    line_position = position.copy()
     dimension = SimpleNamespace(
         SystemValue=spec.cl_dowel.TIP_HEIGHT / 1000.0,
         Tolerance=SimpleNamespace(Type=0),
     )
     display = SimpleNamespace(
-        OffsetText=False,
+        OffsetText=defect == "inherited-offset",
         GetDimension2=lambda _configuration: dimension,
         GetText=lambda part: "(" if part == 1 else ")",
         GetPrimaryPrecision2=lambda: spec.CL_TIP_PRECISION,
     )
 
     def move(x, y, z):
-        if display.OffsetText and not ignored_move:
+        if not (display.OffsetText and defect == "ignored-offset"):
             position[:] = (x, y, z)
-        return True  # the readback, not this return, catches an ignored move
+        if not display.OffsetText or defect == "line-follows-text":
+            line_position[:] = (x, y, z)
+        return True
 
     annotation = SimpleNamespace(
-        SetPosition2=move, GetPosition=lambda: tuple(position)
+        SetPosition2=move, GetPosition=lambda: tuple(position),
+        GetSpecificAnnotation=lambda: display,
     )
     display.GetAnnotation = lambda: annotation
+    display.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: 2,
+        GetArrowHeadAtIndex2=lambda index: (
+            line_position[0], line_position[1] + (-0.0002, 0.0002)[index], 0.0,
+            0.0, 1.0, 0.0, 0.001, 0.003, 0.0, 0.0, 0.0, 1.0,
+        ),
+    )
     imports = []
 
     def curate(_adapter, _view, **kwargs):
         imports.append(kwargs["keep"])
+        # Real curation moves the whole dimension while OffsetText is false.
+        # Returning an untouched annotation concealed the ordering regression.
+        move(*kwargs["keep"][spec.CL_TIP_DIMENSION], 0.0)
         return [annotation]
 
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda *a, **kw: target)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda *a, label, **kw: line_target if label.endswith(" line") else text_target,
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda *a, **kw: [(0.220, 0.138), (0.220, 0.1384)],
+    )
     monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *a, **kw: None)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "assert_imported_precision", lambda *a, **kw: None)
     monkeypatch.setattr(drawing, "set_reference_dimension", lambda *a, **kw: display)
-    if ignored_move:
-        with pytest.raises(RuntimeError, match="native offset text"):
-            drawing._cl_tip_setting(_ADAPTER, object())
+    adapter = SimpleNamespace(
+        currentModel=_ADAPTER.currentModel, _attempt=lambda callback: callback()
+    )
+    if defect in {"ignored-offset", "line-follows-text"}:
+        with pytest.raises(RuntimeError, match="native offset text|native dimension line"):
+            drawing._cl_tip_setting(adapter, object())
     else:
-        settled = drawing._cl_tip_setting(_ADAPTER, object())
-        assert imports == [{spec.CL_TIP_DIMENSION: target}]
-        assert position == [*target, 0.0]
+        settled = drawing._cl_tip_setting(adapter, object())
+        assert imports == [{spec.CL_TIP_DIMENSION: line_target}]
+        assert position == [*text_target, 0.0]
+        assert line_position == [*line_target, 0.0]
         assert dimension.SystemValue == spec.cl_dowel.TIP_HEIGHT / 1000.0
         settled()
+        line_position[0] += 0.003
+        with pytest.raises(RuntimeError, match="native dimension line"):
+            settled()
+        line_position[:] = (*line_target, 0.0)
         position[1] -= 0.003
         with pytest.raises(RuntimeError, match="native offset text"):
             settled()
@@ -1916,6 +1951,7 @@ def native_property_package(monkeypatch):
         active=physical_names[0], sheets={}, notes=[], oversized=None,
         sketch_lines=[], sketch_segments=[], paper_edits=[],
         display_scale=1.0, display_shift=(0.0, 0.0), hidden_line=None,
+        top_capture_fit_denominator=20.0,
     )
     for name in physical_names:
         sheet = SimpleNamespace(
@@ -1952,6 +1988,10 @@ def native_property_package(monkeypatch):
             ReferencedConfiguration=drawing.ASSEMBLY_VIEW_CONFIGURATION,
             exploded=False,
         )
+        if sheet.name == drawing.TOP_CAPTURE_SHEET:
+            # Native view insertion may auto-drift the requested sheet scale.
+            # The failing e9 run shrank its sheet sketch 4x at finalization.
+            sheet.properties[2:4] = [1.0, 5.0]
         view.GetName2 = lambda: f"DrawingView-{sheet.name}-{index}"
         view.GetOrientationName = lambda: orientation
         view.GetDisplayMode2 = lambda: _drawing_common._SW_SHADED_EDGES
@@ -1979,7 +2019,9 @@ def native_property_package(monkeypatch):
             else:
                 size = _iso_size(0.0)
             box = _view_box(view.Position, *size, view.ScaleRatio)
-            if doc.oversized == sheet.name:
+            if (doc.oversized == sheet.name
+                    or (sheet.name == drawing.TOP_CAPTURE_SHEET
+                        and view.ScaleRatio[1] < doc.top_capture_fit_denominator)):
                 # A native outline larger than the recipe's estimated room.
                 return (box[0], box[1], box[2], box[3] + 0.3)
             return box
@@ -2093,10 +2135,12 @@ def native_property_package(monkeypatch):
         lambda *_args: tuple(drawing.BOM_ITEM_NUMBERS.items()),
     )
     monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "JigBOM")
+
     monkeypatch.setattr(
         drawing, "_balloon_cluster",
-        lambda _adapter, _view, cluster, _items, _bom:
-        [SimpleNamespace(stem=stem) for stem in cluster.stems],
+        lambda _adapter, _view, cluster, _items, _bom: [
+            SimpleNamespace(stem=stem) for stem in cluster.stems
+        ],
     )
 
     def note(_adapter, text, x, y):
@@ -2294,6 +2338,29 @@ def test_c2a_native_sketch_refusal_restores_database_mode(
     assert manager.AddToDB is previous_add_to_db
     assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
     assert not package.doc.notes
+
+
+@pytest.mark.parametrize("denominator", (20.0, 25.0, 30.0))
+def test_c2a_is_authored_at_fitted_scale_before_real_finalizer_repins_it(
+    native_property_package, denominator,
+) -> None:
+    package = native_property_package
+    package.doc.top_capture_fit_denominator = denominator
+    scales, settled = drawing._place_package(package.adapter)
+    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
+    assert scales[drawing.TOP_CAPTURE_SHEET] == (1.0, denominator)
+    assert sheet.properties[2:4] == [1.0, denominator]
+    before = list(package.doc.sketch_lines)
+    with pytest.raises(package.save_boundary):
+        asyncio.run(drawing.finalize_drawing(
+            package.adapter, drawing.OUTPUTS, layout=drawing.SPEC.layout,
+            pdf_title="C2A scale lifecycle", scale=drawing.SHEET_SCALE,
+            expected_sheet_names=drawing.SHEET_NAMES,
+            sheet_layouts=drawing.SHEET_LAYOUTS, sheet_scales=scales,
+            settled_checks=(settled[2],),
+        ))
+    assert sheet.properties[2:4] == [1.0, denominator]
+    assert package.doc.sketch_lines == before
 
 
 @pytest.mark.parametrize(
