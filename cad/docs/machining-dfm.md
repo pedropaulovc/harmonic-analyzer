@@ -128,6 +128,10 @@ geometry is casting-shaped, not milling-shaped.
   table X/Y are reference. The generated native hole-table coordinates remain
   unchanged; the D1 row carries the same `SEE NOTE 1` flag in a custom NOTE
   column (#1744), because generated hole-table cells are not editable.
+  The native Y dimension keeps its short between-hole witnesses, with its value
+  and ABOVE flag offset into the exterior lower-left lane of sheet 2's top
+  view. This changes presentation only, not its model association or the
+  precedence of the seat-relative dimensions over reference table coordinates.
 
 ### Blind-thread DFM rule
 
