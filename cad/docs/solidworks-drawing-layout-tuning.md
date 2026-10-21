@@ -1512,6 +1512,17 @@ with no shoulder or added relief groove. Full engaged overlap excludes
 mouth chamfers, incomplete male thread at both ends, and root runout.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
+Keep the assembly's complete thread-projection qualifier attached to that native
+dimension when wrapping or repositioning it. R16 exported successfully while
+the sheet1 qualifier still extended outside the left border: native export
+success is not visual acceptance. Read every native display-text fragment,
+including the below-value qualifier, and require the full wording to survive.
+Fit the union of the existing callout ink and native-position/height/reference/
+angle-backed text boxes inside the current drawable sheet region, then check
+again after rebuild. The repository's text-width estimator is not an exact
+native glyph outline; inspect the final PNG as well. Preserve the native1.25,
+its tolerance and real dimension/source attachments.
+
 Create the independent thread-witness segments with `add_line_chain` so
 `SketchManager.AddToDB` suppresses inference during creation and restores its
 previous state afterward. A bare inferred line in r2 produced a 167.30 native
@@ -1672,6 +1683,19 @@ own an across-flats acceptance band. Attach the height precision's functional
 reason to the height dimension itself, and remove only the native hole-callout
 thread-class variable where the title block already owns 2B. Keep live
 thread/drill/depth variables and reject resolved text that still repeats 2B.
+
+Select the stock-note face in the active drawing's view context, not directly
+from the underlying part's body traversal. `IEntity.Select4` explicitly requires
+an entity obtained from the active document; setting `SelectData.View` does not
+remove that documented requirement. Reuse the output fixture's established
+feature-to-view route: `IView.GetCorresponding` on the source feature,
+`IFeature.GetFaces` in that context, then the source model extension's
+`GetCorrespondingEntity2` to prove the exact independently resolved supplied
+flat. Require positive native self controls, exact source correspondence and
+one matching face, then use that same view face for selection and attachment.
+Do not substitute FaceID or plane/box similarity for native source association.
+R16 imported all five ordinary location dimensions but its stock flag failed
+the strict FACE attachment check; the corrected context still needs native proof.
 
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,

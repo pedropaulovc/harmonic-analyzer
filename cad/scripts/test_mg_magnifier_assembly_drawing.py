@@ -492,6 +492,309 @@ def test_the_lever_settings_match_the_placed_lever_group() -> None:
     }
 
 
+@pytest.fixture
+def projection_native(monkeypatch):
+    """Synthetic native readbacks, not a claim about the repaired farm render.
+
+    The primary value is inside the sheet while the full qualifier crosses
+    its left border. Exercise the real extent/move/region helpers on one
+    imported annotation, retaining its source and attachment identities.
+    """
+    import _drawing_annotation_extent as extent
+
+    name = stack.THREAD_PROJECTION_DIMENSION
+    events = []
+    source = SimpleNamespace(
+        FullName=f"{name}@{stack.THREAD_FEATURE}@mg-magnifier",
+        SystemValue=stack.THREAD_PROJECTION / 1000.0,
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    endpoints = (object(), object())
+    owner = object()
+    rows = [
+        {"text": "1.25", "position": (-0.002, 0.0, 0.0), "reference": 0,
+         "height": 0.002, "angle": 0.0, "spacing": 1.0},
+        *[
+            {"text": line, "position": (0.0, -0.003 * (index + 1), 0.0),
+             "reference": 5, "height": 0.002, "angle": 0.0, "spacing": 1.0}
+            for index, line in enumerate(notes.LEVER_CALLOUTS[name].splitlines())
+        ],
+    ]
+
+    class Data:
+        def GetTextCount(self):
+            return len(rows)
+
+        def GetTextAtIndex(self, index):
+            return rows[index]["text"]
+
+        def GetTextPositionAtIndex(self, index):
+            return tuple(a + b for a, b in zip(annotation.position, rows[index]["position"]))
+
+        def GetTextHeightAtIndex(self, index):
+            return rows[index]["height"]
+
+        def GetTextRefPositionAtIndex(self, index):
+            return rows[index]["reference"]
+
+        def GetTextAngleAtIndex(self, index):
+            return rows[index]["angle"]
+
+        def GetTextLineSpacingAtIndex(self, index):
+            return rows[index]["spacing"]
+
+        def GetLineCount(self):
+            return 1
+
+        def GetLineAtIndex2(self, _index):
+            x, y, z = annotation.position
+            return (0, 0, 0, 0, x - 0.009, y - 0.012, z, x + 0.009, y - 0.012, z)
+
+    class Display(_Display):
+        def GetDisplayData(self):
+            return data
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return source
+
+    class Annotation:
+        position = (0.017, 0.190, 0.0)
+        move_result = True
+        ignore_move = False
+
+        def GetSpecificAnnotation(self):
+            return display
+
+        def GetType(self):
+            return extent._ANNOT_DIM
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition2(self, x, y, z):
+            events.append(("move", x, y, z))
+            if not self.ignore_move:
+                self.position = (x, y, z)
+            return self.move_result
+
+    annotation = Annotation()
+    annotation.source = source
+    annotation.endpoints = endpoints
+    annotation.owner = owner
+    display = Display({4: notes.LEVER_CALLOUTS[name]})
+    data = Data()
+    margins = {0: 0.0127, 1: 0.0127, 2: 0.0127, 3: 0.0127}
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 1, 4, 0, _TEMPLATE.width_m, _TEMPLATE.height_m, 0),
+        GetZoneMargin=lambda side: margins[side],
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet),
+        _attempt=lambda call: call(),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(extent, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(extent._sw_type_info, "early_bound_or_flag", lambda obj, *_a: obj)
+
+    def rebuild(_adapter, *, label):
+        events.append(("rebuild", label))
+
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(extent, "rebuild_drawing", rebuild)
+    return SimpleNamespace(
+        adapter=adapter, annotation=annotation, display=display, data=data,
+        rows=rows, margins=margins, source=source, endpoints=endpoints,
+        owner=owner, events=events,
+    )
+
+
+def test_thread_projection_wrap_preserves_every_word_and_below_compartment(
+    projection_native,
+) -> None:
+    native = projection_native
+    name = stack.THREAD_PROJECTION_DIMENSION
+    callouts = drawing._printable_lever_callouts()
+    assert " ".join(callouts[name].split()) == "FLAT LEVER TIP PROUD OF FAR BRACKET FACE"
+    assert len(callouts[name].splitlines()) == 3
+    assert drawing.LEVER_CALLOUT_LOCATION[name] == "below"
+    drawing._assert_lever_callouts([(name, native.display)], callouts)
+    wrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    native.rows[1]["text"] = " ".join(callouts[name].split())
+    del native.rows[2:]
+    unwrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert unwrapped[2] - unwrapped[0] > wrapped[2] - wrapped[0]
+
+
+@pytest.mark.parametrize("left_margin", [0.0127, 0.024])
+def test_thread_projection_fits_whole_qualifier_to_live_border_once(
+    projection_native, left_margin,
+) -> None:
+    native = projection_native
+    native.margins[3] = left_margin
+    before = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert native.data.GetTextPositionAtIndex(0)[0] > 0.0127
+    assert before[0] < left_margin
+    original_y = native.annotation.position[1]
+    drawing._fit_thread_projection(native.adapter, native.annotation)
+    after = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert after[0] == pytest.approx(left_margin + drawing.CLEAR_GAP_M)
+    assert after[1:] == pytest.approx(
+        (before[1], before[2] + after[0] - before[0], before[3])
+    )
+    assert native.annotation.position[1] == original_y
+    assert [event[0] for event in native.events] == ["rebuild", "move", "rebuild"]
+    assert native.annotation.source is native.source
+    assert native.annotation.endpoints is native.endpoints
+    assert native.annotation.owner is native.owner
+    assert native.display.GetDimension2(0) is native.source
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0  # existing general .XX band, not rewritten
+    # A dimension already comfortably inside its lane must not be moved.
+    x, y, z = native.annotation.position
+    native.annotation.position = (x + drawing.CLEAR_GAP_M, y, z)
+    native.events.clear()
+    drawing._fit_thread_projection(native.adapter, native.annotation)
+    assert [event[0] for event in native.events] == ["rebuild"]
+
+
+@pytest.mark.parametrize("failure", ["refused", "ignored"])
+def test_thread_projection_refuses_failed_native_move_without_retry(
+    projection_native, failure,
+) -> None:
+    native = projection_native
+    native.annotation.move_result = failure != "refused"
+    native.annotation.ignore_move = failure == "ignored"
+    with pytest.raises(RuntimeError, match="failed to move|crosses the zone frame"):
+        drawing._fit_thread_projection(native.adapter, native.annotation)
+    assert sum(event[0] == "move" for event in native.events) == 1
+
+
+@pytest.mark.parametrize("missing", ["all", "qualifier", "last-word"])
+def test_thread_projection_rejects_stored_but_unrendered_qualifier(
+    projection_native, missing,
+) -> None:
+    native = projection_native
+    if missing == "all":
+        native.rows.clear()
+    elif missing == "qualifier":
+        del native.rows[1:]
+    else:
+        native.rows[-1]["text"] = "BRACKET"
+    # Stored below-text alone is insufficient evidence of printed ink.
+    drawing._assert_lever_callouts(
+        [(stack.THREAD_PROJECTION_DIMENSION, native.display)],
+        drawing._printable_lever_callouts(),
+    )
+    with pytest.raises(RuntimeError, match="invalid native text count|missing rendered qualifier"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+@pytest.mark.parametrize(
+    ("field", "bad"),
+    [("position", (float("nan"), 0.0, 0.0)), ("position", (0.0, 0.0)),
+     ("height", 0.0), ("height", float("inf")), ("reference", 6),
+     ("angle", float("nan")), ("text", None)],
+)
+def test_thread_projection_refuses_malformed_native_qualifier_geometry(
+    projection_native, field, bad,
+) -> None:
+    native = projection_native
+    native.rows[1][field] = bad
+    with pytest.raises(RuntimeError, match="invalid native text"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+def test_thread_projection_checks_multiline_fragment_height(projection_native) -> None:
+    native = projection_native
+    native.rows[1]["text"] = notes.LEVER_CALLOUTS[stack.THREAD_PROJECTION_DIMENSION]
+    native.rows[1]["spacing"] = 2.0
+    del native.rows[2:]
+    # Put the block's anchor well below the native shoulder: its full bottom
+    # must participate, not merely its first line's insertion point.
+    native.rows[1]["position"] = (0.0, -0.020, 0.0)
+    box = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert box[1] == pytest.approx(0.190 - 0.020 - 0.002 * 5)
+    native.rows[1]["spacing"] = 0.0
+    with pytest.raises(RuntimeError, match="invalid native text geometry"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+def test_lever_import_retains_source_and_checks_qualifier_after_final_rebuild(
+    monkeypatch, projection_native,
+) -> None:
+    native = projection_native
+    name = stack.THREAD_PROJECTION_DIMENSION
+    others = {
+        key: SimpleNamespace(GetSpecificAnnotation=lambda d=_Display({}): d)
+        for key in drawing.LEVER_CALLOUT_LOCATION if key != name
+    }
+    annotations = {**others, name: native.annotation}
+    by_id = {id(annotation): key for key, annotation in annotations.items()}
+    imports = []
+    precision = []
+    activated = []
+    point_reads = iter([
+        ((0.04, 0.21), (0.06, 0.21), (0.06, 0.19)),
+        ((0.042, 0.21), (0.0423125, 0.21)),
+    ])
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: next(point_reads))
+    monkeypatch.setattr(drawing, "_add_setting_axes", lambda *_a: None)
+    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: by_id[id(annotation)])
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda _a, sheet: activated.append(sheet))
+
+    def curate(_adapter, view, **kwargs):
+        imports.append((view, kwargs))
+        native.annotation.position = (*kwargs["keep"][name], 0.0)
+        return list(annotations.values())
+
+    def callouts(_adapter, imported, values, *, location):
+        assert imported == list(annotations.values())
+        for key, value in values.items():
+            display = annotations[key].GetSpecificAnnotation()
+            display.parts[drawing.CALLOUT_TEXT_PART[location]] = value
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: precision.append(args))
+    view = object()
+    settled = drawing._lever_settings(native.adapter, view)
+    assert len(imports) == 1 and imports[0][0] is view
+    assert imports[0][1]["dimensions_by_feature"] == (
+        stack.LEVER_DRAWING_DIMENSIONS | stack.THREAD_DRAWING_DIMENSIONS
+    )
+    assert imports[0][1]["keep"][name] == pytest.approx((0.017, 0.190))
+    assert precision[0][2][name] == stack.THREAD_DRAWING_PRECISION[stack.THREAD_FEATURE][name]
+    assert native.annotation.source is native.source
+    assert native.annotation.endpoints is native.endpoints
+    assert native.annotation.owner is native.owner
+    settled()
+    assert activated[-1] == drawing.SHEET_NAMES[0]
+    # Simulate a later native rebuild moving only the qualifier outside the
+    # live sheet border; value/shoulder and stored GetText remain unchanged.
+    native.rows[1]["position"] = (-0.100, -0.003, 0.0)
+    moves = sum(event[0] == "move" for event in native.events)
+    with pytest.raises(RuntimeError, match="crosses the zone frame"):
+        settled()
+    assert sum(event[0] == "move" for event in native.events) == moves
+
+
+@pytest.mark.parametrize(
+    "box",
+    [(0.0127 - 1e-10, 0.100, 0.020, 0.110),
+     (0.020, 0.0127 - 1e-10, 0.030, 0.110),
+     (0.020, 0.100, _TEMPLATE.width_m - 0.0127 + 1e-10, 0.110),
+     (0.020, 0.100, 0.030, _TEMPLATE.height_m - 0.0127 + 1e-10)],
+)
+def test_projection_border_guard_has_no_outward_allowance(projection_native, box) -> None:
+    native = projection_native
+    with pytest.raises(RuntimeError, match="crosses the zone frame"):
+        drawing.require_inside(
+            stack.THREAD_PROJECTION_DIMENSION, box, drawing.sheet_region(native.adapter)
+        )
+
+
 def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
     monkeypatch,
 ) -> None:

@@ -61,6 +61,13 @@ import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
 from _component_references import component_identity, component_reference_names
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    callout_ink,
+    move_annotation,
+    require_inside,
+    sheet_region,
+)
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
@@ -101,6 +108,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _layout_geometry import estimate_text_box
 from _session import run_build
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
@@ -845,6 +853,85 @@ def lever_keep(
     }
 
 
+def _thread_projection_text_box(adapter: Any, annotation: Any) -> tuple[float, float, float, float]:
+    """Box the *whole* imported dimension, not just its primary value.
+
+    Use the native shoulder extent plus every displayed text fragment, as in
+    the cone-gear-shaft callout guard. DisplayData supplies positions/heights;
+    the shared layout estimator supplies widths (the SDK has no glyph-width
+    accessor for dimensions). Missing qualifier ink is an error, even when
+    GetText still stores the complete below-text.
+    """
+    label = stack.THREAD_PROJECTION_DIMENSION
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise RuntimeError(f"{label}: missing native text display data")
+    count = data.GetTextCount()
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"{label}: invalid native text count {count!r}")
+    boxes = []
+    texts = []
+    for index in range(count):
+        text = data.GetTextAtIndex(index)
+        if type(text) is not str:
+            raise RuntimeError(f"{label}: invalid native text fragment {index}")
+        if not text.strip():
+            continue
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        position = tuple(float(value) for value in data.GetTextPositionAtIndex(index))
+        height = float(data.GetTextHeightAtIndex(index))
+        reference = data.GetTextRefPositionAtIndex(index)
+        angle = float(data.GetTextAngleAtIndex(index))
+        spacing = float(data.GetTextLineSpacingAtIndex(index)) if "\n" in text else 1.0
+        if (
+            len(position) != 3
+            or not all(math.isfinite(value) for value in (*position, height, angle, spacing))
+            or height <= 0.0
+            or spacing <= 0.0
+            or type(reference) is not int
+            or not 0 <= reference <= 5  # swTextPosition_e
+        ):
+            raise RuntimeError(f"{label}: invalid native text geometry at {index}")
+        box = estimate_text_box(
+            text, anchor=(position[0], position[1]), height=height,
+            reference=reference, angle=angle, line_spacing=spacing,
+        )
+        if box is None:
+            raise RuntimeError(f"{label}: native text fragment {index} has no extent")
+        boxes.append((box.xmin, box.ymin, box.xmax, box.ymax))
+        texts.append(text)
+    qualifier = " ".join(notes.LEVER_CALLOUTS[label].split())
+    if qualifier not in " ".join(" ".join(texts).split()):
+        raise RuntimeError(f"{label}: missing rendered qualifier ink: {texts!r}")
+    boxes.append(callout_ink(adapter, annotation, label=label).text)
+    if any(
+        not all(math.isfinite(value) for value in box)
+        or box[0] >= box[2] or box[1] >= box[3]
+        for box in boxes
+    ):
+        raise RuntimeError(f"{label}: invalid full-text extent {boxes!r}")
+    return (
+        min(box[0] for box in boxes), min(box[1] for box in boxes),
+        max(box[2] for box in boxes), max(box[3] for box in boxes),
+    )
+
+
+def _fit_thread_projection(adapter: Any, annotation: Any) -> None:
+    """One measured rightward move of the same attached dimension, if needed."""
+    label = stack.THREAD_PROJECTION_DIMENSION
+    rebuild_drawing(adapter, label=f"measure {label} qualifier")
+    region = sheet_region(adapter)
+    box = _thread_projection_text_box(adapter, annotation)
+    dx = max(0.0, region.xmin + CLEAR_GAP_M - box[0])
+    if dx:
+        move_annotation(adapter, annotation, dx, 0.0, label=label)
+        box = _thread_projection_text_box(adapter, annotation)
+    # No border allowance, retry, smaller font or changed view scale.
+    require_inside(label, box, region)
+
+
 def _lever_settings(
     adapter: Any, view: Any, source_step: Callable[[str], None]
 ) -> Callable[[], None]:
@@ -903,7 +990,25 @@ def _lever_settings(
         )
     _assert_callouts(displays, callouts)
     source_step("lever settings import and readback")
-    return lambda: _assert_callouts(displays, callouts)
+    projection_annotation = next(
+        annotation for annotation in annotations
+        if dimension_name(adapter, annotation) == stack.THREAD_PROJECTION_DIMENSION
+    )
+    _fit_thread_projection(adapter, projection_annotation)
+
+    def settled() -> None:
+        # finalize_drawing runs this after its last rebuild. The last active
+        # sheet may be the BOM; query the actual sheet-1 template border.
+        _activate_sheet(adapter, SHEET_NAMES[0])
+        _assert_callouts(displays, callouts)
+        source_step("lever settings settled readback")
+        require_inside(
+            stack.THREAD_PROJECTION_DIMENSION,
+            _thread_projection_text_box(adapter, projection_annotation),
+            sheet_region(adapter),
+        )
+
+    return settled
 
 
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
