@@ -19,7 +19,7 @@ from _drawing_scan import _zoomed_on
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_part_drawing import build_purchased_part_drawing
-from _purchased_fastener_drawing import _box, _inside, _rebuild
+from _purchased_fastener_drawing import _box, _inside, _number_state, _rebuild
 from ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin_spec import CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin"]
@@ -94,9 +94,30 @@ def _fit_title_note(
     if not math.isfinite(height) or height < minimum or not face.strip() or line_length <= 0:
         raise RuntimeError(f"clevis {label}: unreadable native format or cell")
 
-    def measure() -> tuple[tuple[float, ...], int]:
-        if str(note.PropertyLinkedText) != link or str(note.GetText()) != text:
-            raise RuntimeError(f"clevis {label}: source link or complete value changed")
+    def record(phase: str) -> tuple[Any, Any, str]:
+        actual_link, actual_text = note.PropertyLinkedText, note.GetText()
+        # The first native refusal did not retain the differing strings. Record
+        # every COM write boundary so a changed link, resolved value or format
+        # can be attributed without weakening the complete-value contract.
+        state = (
+            f"clevis {label}: phase={phase!r}, expected_link={link!r}, "
+            f"actual_link={actual_link!r}, expected_text={text!r}, "
+            f"actual_text={actual_text!r}, requested_height_m={height!r}, "
+            f"requested_line_length_m={line_length!r}, "
+            f"native={_number_state(adapter, note, annotation)}"
+        )
+        _telemetry.info(state)
+        _telemetry.event(
+            "drawing.clevis_title_fit.state", label=label, phase=phase, state=state
+        )
+        return actual_link, actual_text, state
+
+    def measure(phase: str) -> tuple[tuple[float, ...], int]:
+        actual_link, actual_text, state = record(phase)
+        if actual_link != link or actual_text != text:
+            raise RuntimeError(
+                f"clevis {label}: source link or complete value changed; {state}"
+            )
         with _zoomed_on(adapter, centre, half):
             box = _box(note.GetExtent(), label=label, kind="note")
             display, refused = annotation_display(adapter, annotation)
@@ -109,13 +130,17 @@ def _fit_title_note(
     # The original material box wraps at about 60 mm although its ruled cell
     # is 92.45 mm wide. Use the real cell first, then reduce only this note in
     # bounded 0.1 mm native-height steps, measuring every candidate.
+    record("before-format-properties")
     while True:
         text_format.LineLength = line_length
+        record("after-line-length")
         text_format.CharHeight = height
+        record("after-char-height")
         if annotation.SetTextFormat(0, False, text_format) is not True:
             raise RuntimeError(f"clevis {label}: local text format setter refused")
+        record("after-set-text-format")
         _rebuild(draw, phase=f"clevis {label} title-cell fit")
-        box, rows = measure()
+        box, rows = measure("after-fit-rebuild")
         if rows == 1 and _inside(box, limit):
             break
         if height <= minimum + _FORMAT_TOL:
@@ -128,7 +153,7 @@ def _fit_title_note(
     def settled() -> None:
         actual_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
         actual_anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
-        box, rows = measure()
+        box, rows = measure("settled")
         if (
             actual_format is None
             or abs(float(actual_format.CharHeight) - height) > _FORMAT_TOL
