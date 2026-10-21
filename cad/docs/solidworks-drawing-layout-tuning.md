@@ -1778,19 +1778,27 @@ Wizard-point identity and the circle's owner/type/ID guard. Annotation
 attachment types use the same `swSelectType_e` enum; do not assume every actual
 sketch-point attachment is type11. Type25 alone does not prove the right point.
 
-Imported drawing sketch points and segments belong to the drawing-view context,
-not necessarily the referenced part's sketch inventory. First map each actual
-attachment through the **referenced part's**
-`IModelDocExtension.GetCorresponding2`; `GetCorrespondingEntity2` is the
-face/edge/vertex route, not a substitute for sketch objects. Establish native
-point/segment capability before binding in both contexts. Prove the requested
-view separately: map the model `ISketch` owner through `IView.GetCorresponding`
-and compare it with the actual drawing attachment's owner using same-interface,
-same-context native self and identity controls. Only then apply the unchanged
-model owner/type/ordered-ID checks. Drawing IDs need not equal model IDs.
-Null, ambiguous or wrong-view correspondence remains a refusal; coordinate or
-name similarity cannot repair it. Reuse a proven shared owner only within the
-current annotation, never across rebuilds.
+Imported drawing sketch points and segments belong to the requested drawing
+view, not the referenced part's sketch inventory. First prove the actual source
+point and flat against a fresh part-feature inventory and the source dimension.
+Map those typed source entities with `IView.GetCorresponding`; independently
+read the imported annotation's actual attachments. Require exclusive native
+point/segment capability, exact part/requested-view annotation ownership,
+matching native dimensions and their full names, and matching source features.
+
+Map the actual dimension's `IFeature` through the requested view, then obtain
+its supported `ISketch` using `IFeature.GetSpecificFeature2`. That sketch must
+match both actual and forward-mapped drawing attachment owners. Compare native
+ordered IDs and segment type only within this proven drawing sketch; model IDs
+need not equal drawing IDs. The dimension feature's sketch is not a substitute
+for the part-inventory source-point owner. Do not cast an arbitrary mapped
+object to `ISketch` or infer identity from coordinates or feature names.
+
+This forward route does not require inverse `GetCorresponding2` success on a
+drawing sketch point. `GetCorrespondingEntity2` remains the separate supported
+face/edge/vertex route. Null, ambiguous or wrong-view results, unknown native
+self/owner identity and malformed keys remain refusals. Reacquire all source
+and drawing proof after rebuilds; never cache correspondence across them.
 
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
@@ -1877,6 +1885,17 @@ unoccluded standard view and label its real direction. Sketch points and a
 dimension's witnesses alone are not a solid-visibility positive control.
 `IView.GetPolylines7` excludes user sketch segments; use its edge correspondence
 for this distinction, not a hand-mapped PDF-coordinate approximation.
+
+Decode `GetPolylines7` by native edge-slot order, including null silhouette
+slots. Its linked official VBA example consumes but ignores the size field for
+a type-0 polyline; only type-1 arcs consume the documented 12 geometry doubles.
+Require complete finite records and valid integral sizes/counts, with at least
+two points per polyline. After one record per returned edge slot, only finite
+exact-zero residual values may remain; their native cause is unknown. Neither
+an ignored size field nor residual zeros prove geometry. Do not special-case a
+record index, the observed size 17 or the observed residual length 34. A null
+return channel is unavailable, not an observed empty array; decoder success
+still does not replace actual model-edge identity or final render inspection.
 Suppress sketch inference while creating the crop boundary, restore the prior
 `AddToDB` state, and read the persisted native circle with
 `IView.GetDetailCircleInfo2`. Requested centre/radius are not measured bounds.

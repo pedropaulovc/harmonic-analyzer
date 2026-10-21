@@ -1167,7 +1167,14 @@ def _projection_error_text(exception: Exception) -> str:
 
 
 def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
-    """Decode GetPolylines7's (model edges, out-polylines), excluding sketch ink."""
+    """Decode GetPolylines7's edge-aligned records, excluding sketch ink.
+
+    The SDK's linked Get Polyline Data from Drawing View VBA example consumes
+    but ignores GeomDataSize for type 0; only type 1 carries geometry doubles.
+    R26/SW 34.4 returns nonzero ignored fields and residual zeros after the
+    edge-aligned records. The documented edge-slot correspondence determines
+    the record count. Neither ignored fields nor residual zeros establish ink.
+    """
     offset = index = 0
     location = "at primitive 0, offset 0"
     if not isinstance(result, (tuple, list)) or len(result) != 2:
@@ -1179,26 +1186,38 @@ def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
     except Exception as exc:
         raise RuntimeError(f"GetPolylines7 unreadable arrays {location}: {_projection_error_text(exc)}") from exc
     rendered = []
-    while offset < len(data):
+    while index < len(edges):
         location = f"at primitive {index}, offset {offset}"
         if offset + 9 > len(data):
             raise RuntimeError(f"GetPolylines7 returned a truncated primitive {location}")
         kind, size = data[offset:offset + 2]
-        if kind not in (0, 1) or size != (0 if kind == 0 else 12):
+        if kind not in (0, 1) or (kind == 1 and size != 12):
             raise RuntimeError(f"GetPolylines7 invalid geometry header {(kind, size)!r} {location}")
-        size = int(size)
+        try:
+            valid_size = math.isfinite(size) and size == int(size) and size >= 0
+        except Exception as exc:
+            raise RuntimeError(f"GetPolylines7 unreadable geometry size {location}: {_projection_error_text(exc)}") from exc
+        if not valid_size:
+            raise RuntimeError(f"GetPolylines7 invalid geometry size {size!r} {location}")
+        size = 0 if kind == 0 else 12
         count_index = offset + 8 + size
         if count_index >= len(data):
             raise RuntimeError(f"GetPolylines7 returned truncated geometry {location}")
         count = data[count_index]
         try:
-            valid_count = math.isfinite(count) and count == int(count) and count >= 0
+            # Type 0 has no analytic geometry: fewer than two points cannot
+            # describe its polyline. In particular, residual zeros are not an
+            # additional record for an unmatched edge slot.
+            valid_count = (
+                math.isfinite(count) and count == int(count)
+                and count >= (2 if kind == 0 else 0)
+            )
         except Exception as exc:
             raise RuntimeError(f"GetPolylines7 unreadable point count {location}: {_projection_error_text(exc)}") from exc
         if not valid_count:
             raise RuntimeError(f"GetPolylines7 invalid point count {count!r} {location}")
         end = count_index + 1 + 3 * int(count)
-        if end > len(data) or index >= len(edges):
+        if end > len(data):
             raise RuntimeError(f"GetPolylines7 edge/primitive cardinality mismatch {location}")
         try:
             record = tuple(float(value) for value in data[offset:end])
@@ -1213,10 +1232,13 @@ def _projection_rendered_edges(result: Any) -> tuple[Any, ...]:
         if ink and edges[index] is not None:
             rendered.append(edges[index])
         offset, index = end, index + 1
-    if index != len(edges):
-        raise RuntimeError(
-            f"GetPolylines7 edge/primitive cardinality mismatch at primitive {index}, offset {offset}"
-        )
+    location = f"at primitive {index}, offset {offset}"
+    try:
+        zero_residual = all(math.isfinite(value) and value == 0 for value in data[offset:])
+    except Exception as exc:
+        raise RuntimeError(f"GetPolylines7 unreadable residual data {location}: {_projection_error_text(exc)}") from exc
+    if not zero_residual:
+        raise RuntimeError(f"GetPolylines7 nonzero residual data / unmatched primitive {location}")
     return tuple(rendered)
 
 

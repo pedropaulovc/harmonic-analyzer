@@ -436,12 +436,16 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
 
 
-@pytest.mark.parametrize("classifier_name", ("_witness_relation_records", "_point_identity", "_point_flat_attachment"))
+@pytest.mark.parametrize(("classifier_script", "classifier_name"), (
+    ("build_mg_magnifying_clamp.py", "_witness_relation_records"),
+    ("build_mg_magnifying_clamp.py", "_point_identity"),
+    ("draw_mg_magnifying_clamp.py", "_require_flat_import"),
+))
 @pytest.mark.parametrize(("interface", "iid"), (
     ("ISketchPoint", "{83A33DBD-27C5-11CE-BFD4-00400513BB57}"),
     ("ISketchSegment", "{83A33DBF-27C5-11CE-BFD4-00400513BB57}"),
 ))
-def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid, classifier_name) -> None:
+def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid, classifier_script, classifier_name) -> None:
     # Parse only: importing the generated module here would load pywin32.
     # Neither point-key agreement nor native QI is proven by this offline census.
     wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
@@ -455,7 +459,7 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
                     identifiers[target.id] = ast.literal_eval(node.value.args[0])
     assert identifiers["CLSID"] == iid
     assert identifiers["coclass_clsid"] != iid
-    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == classifier_name)
+    classifier = next(node for node in _tree(SCRIPTS / classifier_script).body if isinstance(node, ast.FunctionDef) and node.name == classifier_name)
     imported_interfaces = {
         alias.name
         for node in ast.walk(classifier)
@@ -530,3 +534,51 @@ def test_thread_detail_geometry_properties_have_native_result_shapes(interface, 
     )
     entry = next(value for key, value in zip(getter_map.keys, getter_map.values, strict=True) if ast.literal_eval(key) == member)
     assert ast.literal_eval(entry)[2] == (retval, 0)
+
+
+def test_clamp_forward_attachment_native_calls_bind_to_pinned_sdk_without_imports() -> None:
+    tree = _tree(SCRIPTS / "draw_mg_magnifying_clamp.py")
+    proof = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_require_flat_import")
+    assert not _undeclared_bound_calls(tree)
+    # The local exclusive-interface binder has a role-dependent return type.
+    # Exercise every supported method shape against each actual owning SDK
+    # interface, including methods the simple named-binding walker cannot infer.
+    for interface, member, retval in (
+        ("IView", "GetCorresponding", 9),
+        ("IModelDoc2", "GetType", 3),
+        ("IDisplayDimension", "GetAnnotation", 9),
+        ("IDisplayDimension", "GetDimension2", 9),
+        ("IAnnotation", "GetAttachedEntities3", 12),
+        ("IAnnotation", "GetAttachedEntityTypes", 12),
+        ("IAnnotation", "IsDangling", 11),
+        ("IDimension", "GetFeatureOwner", 9),
+        ("IFeature", "GetTypeName2", 8),
+        ("IFeature", "GetSpecificFeature2", 9),
+        ("ISketchPoint", "GetID", 12),
+        ("ISketchPoint", "GetSketch", 9),
+        ("ISketchSegment", "GetID", 12),
+        ("ISketchSegment", "GetSketch", 9),
+        ("ISketchSegment", "GetType", 3),
+        ("ISldWorks", "IsSame", 3),
+    ):
+        methods, maps = _native_declaration(interface)
+        calls = [node for node in ast.walk(proof) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == member]
+        assert calls, f"{interface}.{member}: empty forward-proof census"
+        assert member in methods and all(member not in values for values in maps.values())
+        assert _native_return_type(methods[member]) == (retval, 0)
+        for call in calls:
+            assert _can_bind(call, methods[member]), f"{interface}.{member}"
+            wrong_arity = copy.deepcopy(call)
+            wrong_arity.args.append(ast.Constant(None))
+            assert not _can_bind(wrong_arity, methods[member]), f"{interface}.{member}: ineffective arity control"
+    for interface, member in (("IAnnotation", "Owner"), ("IAnnotation", "OwnerType"), ("IDimension", "FullName"), ("IFeature", "Name")):
+        assert member in _native_declaration(interface)[1]["_prop_map_get_"]
+    for interface in ("IAnnotation", "IDimension", "IFeature", "IModelDoc2", "ISketch", "ISketchPoint", "ISketchSegment", "IView"):
+        _native_declaration(interface)  # Every pinned IID provider must exist.
+    mutated = copy.deepcopy(tree)
+    changed = next(node for node in mutated.body if isinstance(node, ast.FunctionDef) and node.name == "_require_flat_import")
+    mapping = next(node for node in ast.walk(changed) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetCorresponding")
+    mapping.args.append(ast.Constant(None))
+    assert "IView.GetCorresponding arguments" in _undeclared_bound_calls(mutated)
+    # This is an ABI/shape census, not runtime evidence. R26 forward identity
+    # was observed only for LeverBoreFromZFlat; the other controls remain gated.
