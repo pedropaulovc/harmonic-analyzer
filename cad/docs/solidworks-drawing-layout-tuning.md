@@ -92,22 +92,30 @@ measures ASSEMBLY STEPS sequence `DetailItem376` at native extent
 [17.6178, 61.8495]–[224.9324, 84.6455] mm, insertion (18, 84.4) mm.
 The title-block keep-out is [216, 0]–[431.8, 66] mm. Move CHECK's insertion
 to (18, 92.6) mm (+8.2 mm up), not the audit's downward hint, and sequence
-insertion from (18, 258) to (18, 259.5) mm (+1.5 mm up).
-Rigid translation predicts CHECK extent [17.6178, 70.0495]–[224.9324,
-92.8455] mm: 4.0495 mm above the title block and 4.0528 mm below the
-sequence's translated extent [17.6178, 96.8983]–[227.9432, 259.9113] mm.
-Sequence top inner-border clearance is 6.7887 mm. Matched PDF ink gives
-baseline sequence bottom 96.0089 mm and CHECK top 84.3736 mm; the predicted
-printed gap is 4.9353 mm. Actual median printed heights are 3.8733/3.8734 mm,
-so the existing near-contact/separation thresholds are 1.93665/3.8733 mm,
-not the nominal-font 1.75/3.5 mm. The predicted printed gap clears both.
+insertion ultimately from (18, 258) to (18, 260.5) mm (+2.5 mm up).
+Original-seat translation predicts CHECK extent [17.6178, 70.0495]–[224.9324,
+92.8455] mm: 4.0495 mm above the title block and 5.0528 mm below the
+sequence's translated extent [17.6178, 97.8983]–[227.9432, 260.9113] mm.
+Sequence top inner-border clearance is 5.7887 mm; predicted printed gap is
+5.9353 mm. Actual median printed heights are 3.8733/3.8734 mm, so existing
+near-contact/separation thresholds are 1.93665/3.8733 mm, not nominal-font
+1.75/3.5 mm.
 The finished-view outline starts at x=276.6802 mm, leaving CHECK/sequence
 horizontal air of 51.7478/48.7370 mm; its caption and wire balloon are farther
 right. CHECK left/bottom inner-border clearances are 4.9178/57.3495 mm.
+The subsequent 86bc native drawing at sequence Y259.5/CHECK Y92.6 passed
+with zero gating findings, but measured sequence extent [17.6475, 96.8088]–
+[227.8142, 259.7953] and CHECK [17.6475, 70.1210]–[224.4782, 92.9963] mm.
+Its 3.8125 mm native gap missed our unchanged 4 mm padding acceptance,
+despite a 4.9354 mm printed gap clearing the 3.8733 mm advisory threshold.
+Evidence: `C:/farm-runs/com-perf-mg-clearance-inspection-20261021/actual-clearance-measurements.json`.
+Raising only sequence Y259.5 to Y260.5 predicts 4.8125 mm native gap,
+5.9354 mm printed gap and 5.9047 mm top-border clearance on that seat;
+title clearance stays 4.1210 mm. The existing fit test retains both measured
+seat cases and requires full 4 mm padding for each.
 Text, wrapping, font, scales, geometry and native guards stay unchanged.
-A fresh native audit and printed-sheet inspection remain necessary:
-these are measured-baseline predictions, not native after-fix proof or a
-clean-layout claim.
+Fresh exact-head native audit and printed-sheet acceptance remain necessary:
+these translations do not certify the Y260.5 output.
 
 ### Rocker R19 regression and local placement contract
 
