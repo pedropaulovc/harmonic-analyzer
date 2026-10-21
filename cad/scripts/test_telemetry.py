@@ -662,6 +662,126 @@ def test_every_resource_identifies_the_machine(capture):
         assert instance, f"{name} has no service.instance.id"
 
 
+@pytest.mark.parametrize("service", [None, _telemetry.BUILD_INFRA_SERVICE])
+def test_farm_resource_identity_reaches_exported_records(monkeypatch, request, service):
+    identity = {
+        "farm.workflow_id": "leaf:build:part:example:key:3600s",
+        "farm.run_id": "temporal-run",
+        "farm.attempt": "2",
+        "farm.execution": "execution",
+        "farm.worker": "worker@slot",
+    }
+    monkeypatch.setenv(
+        "OTEL_RESOURCE_ATTRIBUTES",
+        ",".join(f"{key}={value}" for key, value in identity.items())
+        + ",microsoft.applicationId=route-only,unrelated.resource=not-record-data",
+    )
+    _telemetry.configure(console=False, force=True)
+    spans, logs = request.getfixturevalue("capture")
+    with _telemetry.span("identity", service=service) as active:
+        _telemetry.info("inside")
+        active_context = active.get_span_context()
+    _telemetry.info("outside", service=service)
+
+    finished = spans.get_finished_spans()
+    assert len(finished) == 1
+    exported = finished[0]
+    assert {key: exported.attributes[key] for key in identity} == identity
+    records = {str(r.log_record.body): r for r in logs.get_finished_logs()}
+    assert set(records) == {"inside", "outside"}
+    for record in records.values():
+        assert {key: record.log_record.attributes[key] for key in identity} == identity
+        assert {key: record.resource.attributes[key] for key in identity} == identity
+        assert "microsoft.applicationId" not in record.log_record.attributes
+        assert "unrelated.resource" not in record.log_record.attributes
+    assert "microsoft.applicationId" not in exported.attributes
+    assert "unrelated.resource" not in exported.attributes
+    assert records["inside"].log_record.trace_id == active_context.trace_id
+    assert records["inside"].log_record.span_id == active_context.span_id
+    assert records["outside"].log_record.span_id == 0
+    expected_service = service or _telemetry._service_name
+    assert exported.resource.attributes["service.name"] == expected_service
+    assert all(
+        record.resource.attributes["service.name"] == expected_service
+        for record in records.values()
+    )
+
+
+def test_farm_identity_preserves_explicit_record_attributes(monkeypatch, request):
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.attempt=2,farm.worker=provider")
+    _telemetry.configure(console=False, force=True)
+    spans, logs = request.getfixturevalue("capture")
+    with _telemetry.span("explicit", **{"farm.attempt": 7, "farm.worker": "caller"}):
+        _telemetry.get_logger().info(
+            "explicit", extra={"farm.attempt": 9, "farm.worker": "log-caller"}
+        )
+    attrs = spans.get_finished_spans()[0].attributes
+    assert attrs["farm.attempt"] == 7
+    assert attrs["farm.worker"] == "caller"
+    attrs = logs.get_finished_logs()[0].log_record.attributes
+    assert attrs["farm.attempt"] == 9
+    assert attrs["farm.worker"] == "log-caller"
+
+
+def test_farm_identity_snapshots_each_provider_and_refreshes_on_configure(monkeypatch):
+    def capture_providers():
+        spans = InMemorySpanExporter()
+        logs = InMemoryLogRecordExporter()
+        span_processor = SimpleSpanProcessor(spans)
+        log_processor = SimpleLogRecordProcessor(logs)
+        _telemetry.trace.get_tracer_provider().add_span_processor(span_processor)
+        get_logger_provider().add_log_record_processor(log_processor)
+        _telemetry._span_processors.append(span_processor)
+        _telemetry._log_processors.append(log_processor)
+        return spans, logs
+
+    def emit(label):
+        with _telemetry.span(label):
+            _telemetry.info(label)
+            with _telemetry.span(label + "-aux", service=_telemetry.BUILD_INFRA_SERVICE):
+                _telemetry.info(label + "-aux")
+        _telemetry.info(label + "-plain")
+        _telemetry.info(label + "-routed", service=_telemetry.BUILD_INFRA_SERVICE)
+
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=old")
+    _telemetry.configure(console=False, force=True)
+    spans, logs = capture_providers()
+    emit("warm")  # Build both auxiliary caches before the environment changes.
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=new")
+    emit("cached")
+    assert len(spans.get_finished_spans()) == 4
+    assert len(logs.get_finished_logs()) == 8
+    for span in spans.get_finished_spans():
+        assert span.attributes["farm.execution"] == "old"
+    for record in logs.get_finished_logs():
+        assert record.log_record.attributes["farm.execution"] == "old"
+
+    _telemetry.configure(console=False, force=True)
+    spans, logs = capture_providers()
+    emit("fresh")
+    assert len(spans.get_finished_spans()) == 2
+    assert len(logs.get_finished_logs()) == 4
+    for span in spans.get_finished_spans():
+        assert span.attributes["farm.execution"] == "new"
+        assert span.resource.attributes["farm.execution"] == "new"
+    for record in logs.get_finished_logs():
+        assert record.log_record.attributes["farm.execution"] == "new"
+        assert record.resource.attributes["farm.execution"] == "new"
+
+    monkeypatch.delenv("OTEL_RESOURCE_ATTRIBUTES")
+    _telemetry.configure(console=False, force=True)
+    spans, logs = capture_providers()
+    emit("local")
+    assert len(spans.get_finished_spans()) == 2
+    assert len(logs.get_finished_logs()) == 4
+    for span in spans.get_finished_spans():
+        assert not (set(_telemetry._FARM_IDENTITY_KEYS) & set(span.attributes))
+    for record in logs.get_finished_logs():
+        assert not (
+            set(_telemetry._FARM_IDENTITY_KEYS) & set(record.log_record.attributes)
+        )
+
+
 def test_instance_id_prefers_explicit_env_then_worker_identity(monkeypatch):
     """Resolution order, most specific first: an operator's
     ``OTEL_SERVICE_INSTANCE_ID``, then the farm worker identity (two workers can
