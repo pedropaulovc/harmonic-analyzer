@@ -1837,12 +1837,12 @@ the surrounding `run_build` owns the entire farm seat and its mandatory outer
 session teardown remains enabled, including discard of remaining documents.
 The probe cannot observe that later cleanup; receipts state
 `held_model_scope=probe_exit` and `outer_session_teardown=not_observed_by_probe`.
-The observed outer teardown logged all documents closed, but that does not turn
-the failed C28 receipt into a successful owned-cleanup/source-preservation proof.
+An outer teardown that closes every document does not turn a failed C28 receipt
+into a successful owned-cleanup/source-preservation proof.
 Offline fakes model the documented collateral behavior; they are not native proof.
 
 All 29 controls remain required, including seven separately timed checked setup
-rebuilds; the eight-minute envelope is unvalidated and is not a hard COM bound.
+rebuilds. The cooperative time limits above cannot preempt a synchronous COM call.
 Any unsupported/failed control, unresolved cleanup or source-cleanliness failure
 blocks normal drawing. Preserve the finalized terminal report size/digest receipt
 even on failure, without masking the original error. Probe-control success, the
