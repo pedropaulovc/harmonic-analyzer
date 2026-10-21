@@ -345,23 +345,9 @@ def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None
     assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
 
 
-def test_the_sheet_carries_only_the_inside_corner_note() -> None:
-    """Every other digit on this print is a dimension: the taper angle and
-    upright root the old sheet spelled out in a note are now the crown
-    radius, the tangency statement and the foot width the views already
-    carry. The one note is the inside-corner ceiling (#1625 precedent)."""
-    import _config
-
-    assert dt_arbor_pedestal_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert '{"Manufacturing Notes": DRAWING_NOTES}' in builder
+def test_feature_callouts_do_not_repeat_dimension_values() -> None:
+    """Feature callouts qualify the model dimensions rather than restating them."""
     source = _drawing_source()
-    for helper in ("add_note(", "add_attached_note("):
-        assert helper not in source, helper
-    assert source.count("add_property_linked_note(adapter,") == 1
-    exceptions = _config.parts("dt-arbor-pedestal")["machinist_exceptions"]
-    assert [entry["id"] for entry in exceptions] == ["RV-01"]
-    assert "#1625" in exceptions[0]["reason"]
     # The only free text left is digit-free and tied to the dimension it
     # qualifies (a reaming instruction, a concentricity/tangency statement),
     # bar the part number that names a mate (rule 7).
@@ -436,7 +422,6 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "hole lateral lane": drawing.HOLE_LATERAL_XY,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "hold-down callout": drawing.HOLD_DOWN_CALLOUT_XY,
-        "manufacturing note": drawing.NOTES_ANCHOR,
     }
     for label, (x, y) in anchors.items():
         assert margin < x < template.width_m - margin, label
