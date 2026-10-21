@@ -1552,6 +1552,18 @@ def _verify_anchor_attachment(
             f"attaches to {len(entities)} entities of types {list(kinds)} owned by "
             f"{owners}"
         )
+    receipt = {
+        "stem": stem,
+        "drawing_label": label,
+        "expected_instance": instance,
+        "actual_instance": owners[0],
+        "entity_count": len(entities),
+        "entity_kinds": kinds,
+    }
+    _telemetry.event("drawing.balloon_attachment_verified", **receipt)
+    # Repeated placement/settled checks can exceed a span's event limit. Keep
+    # each successful readback in the structured DEBUG log as well.
+    _telemetry.debug("drawing.balloon_attachment_verified", **receipt)
 
 
 @dataclass(frozen=True)
