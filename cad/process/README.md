@@ -8,17 +8,20 @@ currently empty. The rocker plan is migrated to prechips 0.1.2 and the
 merged shop fixtures but held from enrollment until its traveler reaches exit 0
 (step 6 below). The legacy shaft and cone plans remain tracked as provenance,
 but are stale against the pinned prechips and are not run or shipped. Do not
-enroll one merely because its plan file exists.
+enroll one merely because its plan file exists. `_process_plans.MIGRATED_PLANS`
+records migrated plans, including the held rocker; `revision_stems()` is the
+deduplicated union of migrated and enrolled plans for revision tracking only.
 
 ## Bind stable labels, not STEP entity numbers
 
 Use the part's scoped `cad/out/features/<stem>/features.toml` and adjacent STEP
-as the drawing/geometry authority. Enrolled plans name their part consistently
-with that manifest and carry a literal `[drawing].revision` equal to
-`cad/config/release.yaml:next_revision`. Held or historical plans retain their
-authored revisions; advancing the release reservation does not revalidate them.
-Before enrollment, revalidate the plan against current geometry and its drawing
-revision. Migrated plans use bare stable labels matching
+as the drawing/geometry authority. Migrated and enrolled plans carry a literal
+`[drawing].revision` equal to `cad/config/release.yaml:next_revision`. Held migrated
+plans advance with that reservation, but revision freshness does not revalidate
+their geometry, enroll them, or imply machining qualification. Unmigrated
+historical plans retain their authored revisions. Before enrollment, revalidate
+the plan against current geometry and its drawing revision. Migrated plans use
+bare stable labels matching
 `HAF_[A-Z0-9_]+__P\d{2}` wherever prechips expects a face reference. Do not commit
 exact `#<entity>/ADVANCED_FACE[<ordinal>]/<label>` references: export can renumber
 entities without changing geometry.
@@ -30,7 +33,9 @@ expands inside a list; it cannot be used as a single-face scalar. Unknown labels
 wrong-part labels and ambiguous scalar bindings fail with a source line. A label
 mentioned inside longer prose is not replaced. Other tracked bytes are preserved.
 Binding also rejects a plan drawing revision that differs from the scoped
-manifest; release preflight requires both to match the configured next revision.
+manifest. Release preflight requires enrolled plans' authored and manifest
+revisions to match the configured next revision. It checks held migrated plans'
+authored freshness without requiring or qualifying an exported manifest.
 Do not add `[paths]` to a tracked plan: the wrapper supplies the three shared
 shop inputs as CLI flags. Binding never edits the tracked plan.
 
@@ -95,6 +100,8 @@ the authority for installed geometry and any shop-made adapter.
    labels, the current tracked drawing revision and no `[paths]`. A setup frame
    authored in a plan is a process proposal, not drawing authority or evidence
    of a physically verified setup.
+   Register a migrated plan in `_process_plans.MIGRATED_PLANS` even while held
+   from enrollment so revision tracking and source contracts include it.
 3. Register any needed fixture CAD spec and its `PRECHIPS_SOLIDS` contract;
    inventory `cad` tags must resolve to those specs. Cover the analytic volume
    and binding contract in tests instead of copying fixture geometry by hand.
@@ -147,10 +154,12 @@ byte snapshots of the bound plan and required report/HTML/PNGs to
 Scratch outputs, lock files and stray temporary files are not shipped.
 The staged `features/<stem>/` bundle and the bound plan's relative feature path
 continue to resolve together. Release notes list the travelers.
-After successful publication the publisher advances `release.yaml` and every
-enrolled plan's single `[drawing].revision` line together with the generated
-README images. The generated-only follow-up exemption covers only those revision
-lines and image files, not other plan/shop edits. Dry runs and failed publication
+After successful publication the publisher advances `release.yaml` and each
+migrated or enrolled plan's single `[drawing].revision` line, once per stem,
+together with the generated README images. This does not change traveler
+enrollment or machining qualification. The generated-only follow-up exemption
+covers only those revision lines and image files, not other plan/shop edits.
+Dry runs and failed publication
 leave tracked revisions and images byte-identical; post-publication partial
 installation reports explicit recovery paths.
 

@@ -4133,16 +4133,32 @@ def test_recipe_enrolls_strict_traveler_tests():
     assert "test_prechips_traveler.py" in command
 
 
-def test_recipe_gate_tracks_every_enrolled_plan(synthetic_prechips_task, monkeypatch):
+def test_recipe_gate_tracks_migrated_and_enrolled_plans(
+    synthetic_prechips_task, monkeypatch
+):
     dodo, plans, _, stem, source, _, _ = synthetic_prechips_task
     other = "synthetic_second_part"
+    held = "synthetic_held_part"
+    monkeypatch.setattr(plans, "MIGRATED_PLANS", (held, stem))
     monkeypatch.setattr(plans, "TRAVELER_STEMS", (stem, other))
     second = plans.plan_path(other)
     second.parent.mkdir(parents=True)
     second.write_text('features = "unused"\n', encoding="utf-8")
+    held_plan = plans.plan_path(held)
+    held_plan.parent.mkdir(parents=True)
+    held_plan.write_text('features = "held"\n', encoding="utf-8")
+    historical = plans.plan_path("synthetic_historical_part")
+    historical.parent.mkdir(parents=True)
+    historical.write_text('features = "historical"\n', encoding="utf-8")
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    assert {str(source.resolve()), str(second.resolve())} <= set(recipe["file_dep"])
-    for member in (source, second):
+    deps = recipe["file_dep"]
+    for member in (source, held_plan, second):
+        assert deps.count(str(member.resolve())) == 1
+    assert str(historical.resolve()) not in deps
+    before = dodo._digest_files(deps)
+    historical.write_text('features = "still historical"\n', encoding="utf-8")
+    assert dodo._digest_files(deps) == before
+    for member in (source, held_plan, second):
         before = dodo._digest_files(recipe["file_dep"])
         with member.open("a", encoding="utf-8") as stream:
             stream.write('[drawing]\nrevision = "v2"\n')
@@ -4277,6 +4293,7 @@ def test_prechips_empty_enrollment_has_no_tasks(monkeypatch, synthetic_prechips_
     import _process_plans
     dodo = _load_dodo()
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ())
+    monkeypatch.setattr(_process_plans, "MIGRATED_PLANS", ("synthetic_held_part",))
     assert list(dodo.task_prechips()) == []
     assert synthetic_prechips_kernel["discoveries"] == 0
     assert synthetic_prechips_kernel["queries"] == []

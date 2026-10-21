@@ -324,14 +324,20 @@ list them, and the final provenance manifest hashes their files. Any incomplete
 report, changed render/input, source binding drift or mismatched STEP digest
 fails before the ZIP is sealed. Empty enrollment stages and lists no travelers.
 
-Each enrolled plan's tracked `[drawing].revision` literal equals
-`cad/config/release.yaml:next_revision`. The publisher prepares source/temporary
-pairs for `release.yaml` and every enrolled plan before publication. It changes
-only the single revision line in each plan's `[drawing]` section, preserving
+Each migrated or enrolled plan's tracked `[drawing].revision` literal equals
+`cad/config/release.yaml:next_revision`. `_process_plans.revision_stems()` owns
+this deduplicated union, independently of traveler enrollment. Publisher
+preflight checks held migrated plans' authored freshness without requiring
+an exported manifest; enrolled plans retain strict authored/configured/manifest
+agreement, even if also migrated. Revision participation does not enroll a held
+plan or imply machining qualification. Historical unmigrated plans stay unchanged.
+The publisher prepares source/temporary pairs for `release.yaml` and every
+revision participant before publication. It changes only the single revision
+line in each plan's `[drawing]` section, preserving
 other bytes. After publication, replacements install in order; a failed
 replacement reports which sources were already installed and names manual
 recovery for the remaining revisions. All temporary files are discarded.
 `--no-publish` and failed publication leave the tracked images and revisions
 byte-identical. The generated-only follow-up exemption covers only generated
-README images, `next_revision`, and matching enrolled-plan revision lines;
+README images, `next_revision`, and matching migrated/enrolled-plan revision lines;
 other plan edits require the ordinary merge gates.

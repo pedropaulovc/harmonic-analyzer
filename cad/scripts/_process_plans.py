@@ -21,6 +21,9 @@ from filelock import FileLock
 from export_features import OUT as CAD_OUT
 from export_features import bundle_paths
 
+# Migrated plans track drawing revisions even while held from traveler enrollment.
+# Revision participation does not qualify a plan for machining or release staging.
+MIGRATED_PLANS: tuple[str, ...] = ("ch_rocker_arm",)
 TRAVELER_STEMS: tuple[str, ...] = ()
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_FILES = ("inventory.toml", "shop-policy.toml", "cutting-data.toml")
@@ -60,6 +63,11 @@ class PlaceholderRelease(TravelerIncomplete):
 
 def plan_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "plan.toml"
+
+
+def revision_stems() -> tuple[str, ...]:
+    """Migrated and enrolled revision participants, once each in stable order."""
+    return tuple(dict.fromkeys((*MIGRATED_PLANS, *TRAVELER_STEMS)))
 
 
 def shop_paths() -> tuple[Path, Path, Path]:
@@ -140,17 +148,20 @@ def _strings(text: str) -> Iterator[tuple[int, int, bool]]:
 
 def _check_revision(
     plan: dict[str, Any],
-    manifest: dict[str, Any],
+    manifest: dict[str, Any] | None,
     text: str,
     revision: str | None = None,
 ) -> None:
-    """Require the traveler's printed revision to identify its drawing."""
+    """Require authored freshness, plus exported agreement when a manifest applies."""
     authored = plan.get("drawing", {}).get("revision")
-    exported = manifest.get("drawing", {}).get("revision")
+    exported = (
+        manifest.get("drawing", {}).get("revision") if manifest is not None else None
+    )
     if (
         not isinstance(authored, str)
         or authored in {"", "unknown"}
-        or authored != exported
+        or manifest is not None
+        and authored != exported
         or revision is not None
         and authored != revision
     ):
@@ -168,12 +179,36 @@ def _check_revision(
             ):
                 line = number
                 break
-        expected = exported if revision is None else revision
+        detail = f"drawing.revision {authored!r}"
+        if manifest is not None:
+            detail += f" differs from manifest {exported!r}"
+        if revision is not None:
+            if manifest is None:
+                detail += f" differs from configured revision {revision!r}"
+            else:
+                detail += f" or configured revision {revision!r}"
         raise PlanBindError(
-            f"drawing.revision {authored!r} differs from manifest {exported!r}"
-            f" or configured revision {expected!r}",
+            detail,
             line,
         )
+
+
+def check_authored_plan_revision(stem: str, revision: str) -> None:
+    """Check held plan freshness without requiring or qualifying exported geometry."""
+    source = plan_path(stem)
+    try:
+        text = source.read_bytes().decode("utf-8")
+        _check_revision(tomllib.loads(text), None, text, revision)
+    except PlanBindError:
+        raise
+    except (
+        OSError,
+        UnicodeError,
+        tomllib.TOMLDecodeError,
+        TypeError,
+        AttributeError,
+    ) as exc:
+        raise PlanBindError(f"cannot validate revision in {source}: {exc}") from exc
 
 
 def check_plan_revision(

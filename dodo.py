@@ -3856,10 +3856,10 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
-            # The enrolled revision contract reads plans rather than importing them.
+            # Migrated/enrolled revision and label contracts read plans at runtime.
             *(
                 str(_process_plans.plan_path(stem).resolve())
-                for stem in _process_plans.TRAVELER_STEMS
+                for stem in _process_plans.revision_stems()
             ),
             # The shop-data contract reads the tracked shop inputs at runtime.
             *(str(path.resolve()) for path in _process_plans.shop_paths()),
