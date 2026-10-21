@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from math import isfinite
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
@@ -710,6 +710,7 @@ def _bind_bom_number_property(
     *,
     configuration: str,
     label: str,
+    _visibility_probe: Callable[[Any, int, Callable[[], None]], None] | None = None,
 ) -> None:
     """Display associative Numbers without replacing the native grouping column."""
     rows = int(table.RowCount)
@@ -776,7 +777,15 @@ def _bind_bom_number_property(
         raise RuntimeError(f"{label} BOM Number property binding did not persist")
     if _bom_physical_columns(table, label=label) != inserted:
         raise RuntimeError(f"{label} BOM column sequence changed during Number binding")
-    _set_bom_column_hidden(table, native_column, True, label=label)
+    if _visibility_probe is None:
+        _set_bom_column_hidden(table, native_column, True, label=label)
+    else:
+        _visibility_probe(
+            table,
+            native_column,
+            lambda: _set_bom_column_hidden(table, native_column, True, label=label),
+        )
+        raise RuntimeError(f"{label} BOM visibility diagnostic unexpectedly returned")
     retained = inserted[:-1] + ((201, True),)
     if _bom_physical_columns(table, label=label) != retained:
         raise RuntimeError(f"{label} BOM retained native column is not hidden")
@@ -1007,6 +1016,7 @@ def insert_bom_table(
     configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
     configuration: str | None = None,
     label: str,
+    _visibility_probe: Callable[[Any, int, Callable[[], None]], None] | None = None,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
 
@@ -1150,6 +1160,7 @@ def insert_bom_table(
             table,
             configuration=configuration,
             label=label,
+            _visibility_probe=_visibility_probe,
         )
     _telemetry.annotate(rows_after_number_binding=int(table.RowCount))
     actual_grouping = int(
