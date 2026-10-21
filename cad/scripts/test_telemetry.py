@@ -2042,7 +2042,7 @@ def test_cone_topology_timings_preserve_results_and_partial_failure(
     "outcome",
     [
         "scaled", "unscaled", "false_create", "bind_error",
-        "scale_error", "invalid_scale", "two_views",
+        "scale_error", "invalid_scale", "two_views", "false_factory",
     ],
 )
 def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, outcome):
@@ -2116,7 +2116,7 @@ def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, 
     expected = expected_create.copy()
     if outcome != "false_create":
         expected.append(("bind", raw_view, "IView"))
-    if outcome in {"scaled", "scale_error", "two_views"}:
+    if outcome in {"scaled", "scale_error", "two_views", "false_factory"}:
         expected.extend([("double_array", [1.0, 2.0]), ("scale", (1.0, 2.0))])
 
     def invoke():
@@ -2140,11 +2140,21 @@ def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, 
     invoke()
     assert spans.get_finished_spans() == ()
     _telemetry._instrument_loaded_adapter()
+    if outcome == "false_factory":
+        class FalseFactory:
+            def __bool__(self):
+                return False
+
+            def __call__(self, name, attributes):
+                return _telemetry._place_view_span(name, attributes)
+
+        drawing.set_place_view_context(FalseFactory())
     assert calls == [], "registration must not touch native ports"
     with _telemetry.span("drawing.build"):
         invoke()
     finished = {s.name: s for s in spans.get_finished_spans()}
     suffix = " [part.SLDPRT *Front x=0.1 y=0.2]"
+    assert f"drawing.place_view{suffix}" in finished
     parent = finished[f"drawing.place_view{suffix}"]
     assert parent.attributes["phase_kind"] == "placement"
     assert parent.parent.span_id == finished["drawing.build"].context.span_id
