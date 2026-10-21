@@ -619,6 +619,59 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
         raise RuntimeError(f"{stage}: {error}") from error
 
 
+def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any, *, stage: str) -> tuple[Any, Any]:
+    """Equal solved coordinates must not merge independently associated native points."""
+    import _telemetry
+
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    key, rows, comparisons, own_count, error = None, [], [], 0, None
+    points = []
+    try:
+        native = _early_bound(line, "ISketchSegment")
+        key = _segment_identity(adapter, native, stage=stage, role="endpoint-line")
+        owner = _early_bound(native.GetSketch(), "ISketch")
+        straight = _early_bound(native, "ISketchLine")
+        points = [("start", straight.GetStartPoint2()), ("end", straight.GetEndPoint2()), ("bore-center", center)]
+        for candidate in owner.GetSketchSegments() or ():
+            candidate_key = _segment_identity(adapter, candidate, stage=stage, role="endpoint-inventory")
+            if candidate_key == key:
+                own_count += 1
+            elif candidate_key[1] == 0:
+                other = _early_bound(candidate, "ISketchLine")
+                points.extend(((f"{candidate_key!r}.start", other.GetStartPoint2()), (f"{candidate_key!r}.end", other.GetEndPoint2())))
+        for label, raw in points:
+            row = {"role": label, "present": raw is not None, "self": None, "owner": None, "coordinates": None}
+            rows.append(row)
+            if raw is None:
+                raise RuntimeError("native witness endpoint unavailable")
+            point = _early_bound(raw, "ISketchPoint")
+            row["self"] = application.IsSame(point, point)
+            row["owner"] = application.IsSame(point.GetSketch(), owner)
+            row["coordinates"] = (float(point.X), float(point.Y), float(point.Z))
+        for index in (0, 1):
+            for other_index in range(index + 1, len(points)):
+                comparisons.append((points[index][0], points[other_index][0], application.IsSame(points[index][1], points[other_index][1])))
+        if key[1] != 0 or own_count != 1:
+            raise RuntimeError("native witness line inventory identity is ambiguous")
+        if any(type(row[field]) is not int or row[field] != 1 for row in rows for field in ("self", "owner")):
+            raise RuntimeError("native witness endpoint self/owner identity unavailable")
+        if any(not math.isfinite(value) for row in rows for value in row["coordinates"]):
+            raise RuntimeError("native witness endpoint coordinates unavailable")
+        if any(type(code) is not int or code != 0 for _left, _right, code in comparisons):
+            raise RuntimeError("native witness endpoints merged or distinctness unavailable")
+    except Exception as exc:
+        error = exc
+    _telemetry.info(
+        f"clamp native witness endpoint identity: stage={stage}, line={key!r}, own_count={own_count}, points={rows!r}, comparisons={comparisons!r}, error={error!r}",
+        operation_stage=stage, witness_line_identity=repr(key), witness_line_inventory_count=own_count,
+        endpoint_identity_rows=repr(rows), endpoint_identity_comparisons=repr(comparisons),
+        endpoint_identity_readback_error=repr(error),
+    )
+    if error is not None:
+        raise RuntimeError(f"{stage}: {error}") from error
+    return _early_bound(points[0][1], "ISketchPoint"), _early_bound(points[1][1], "ISketchPoint")
+
+
 def _assert_relative_witness(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str) -> tuple[Any, Any]:
     """A constrained transverse line measures the actual tap axis to actual rim."""
     import _telemetry
@@ -629,16 +682,9 @@ def _assert_relative_witness(adapter: Any, line: Any, point: Any, circle: Any, *
     if key[1] != 0 or circle_key[1] != 1 or key[0] != circle_key[0] or native.ConstructionGeometry is not True:
         raise RuntimeError(f"{stage}: measurement line is not construction in the actual bore witness")
     owner = _early_bound(native.GetSketch(), "ISketch")
-    straight = _early_bound(native, "ISketchLine")
-    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
-    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
     arc = _early_bound(circle, "ISketchArc")
     center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-    application = _early_bound(adapter.swApp, "ISldWorks")
-    for endpoint in (start, end):
-        codes = (application.IsSame(endpoint, endpoint), application.IsSame(endpoint.GetSketch(), owner))
-        if any(type(code) is not int or code != 1 for code in codes):
-            raise RuntimeError(f"{stage}: measurement endpoint owner/identity unavailable")
+    start, end = _require_independent_witness_endpoints(adapter, native, center, stage=f"{stage}.endpoint-identity")
     _require_witness_relation(adapter, native.GetRelations(), 4, (), native, stage=f"{stage}.horizontal-line")
     _require_witness_relation(adapter, start.GetRelations(), 26, (start, point), stage=f"{stage}.actual-tap-axis")
     _require_witness_relation(adapter, end.GetRelations(), 25, (end, center), stage=f"{stage}.bore-station")
@@ -680,17 +726,23 @@ def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -
     radius = float(arc.GetRadius())
     if not math.isfinite(radius) or radius <= 0.0:
         raise RuntimeError(f"{name}: invalid native bore radius")
+    # AddToDB suppresses inference, but exact-coordinate points still merge in
+    # the database (_sketch.add_line_chain). These provisional coordinates stay
+    # away from the center/rim and prior solved witnesses; only native constraints
+    # below determine the final geometry and dimension value.
+    offset = radius / 2.0
+    seed = (tap[0] + offset, float(center.Y) + offset, 0.0, float(center.X) + radius + offset, float(center.Y) + offset, 0.0)
     manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
     previous = manager.AddToDB
     if type(previous) is not bool:
         raise RuntimeError(f"{name}: native AddToDB state unavailable")
     model.ClearSelection2(True)
     try:
-        manager.AddToDB = True  # Coincident nominal tap witnesses must not infer/merge.
+        manager.AddToDB = True  # Suppress inference; this does NOT prevent exact DB merges.
         if manager.AddToDB is not True:
             raise RuntimeError(f"{name}: native inference isolation failed")
-        _telemetry.info(f"clamp native measurement line request: name={name}, tap={tap!r}", operation_stage=f"{name}.create-line-request", actual_tap_sketch_m=tap)
-        raw = manager.CreateLine(tap[0], float(center.Y), 0.0, float(center.X) + radius, float(center.Y), 0.0)
+        _telemetry.info(f"clamp native measurement line request: name={name}, tap={tap!r}, provisional_seed={seed!r}", operation_stage=f"{name}.create-line-request", actual_tap_sketch_m=tap, provisional_seed_m=seed)
+        raw = manager.CreateLine(seed[0], seed[1], seed[2], seed[3], seed[4], seed[5])
         _telemetry.info(f"clamp native measurement line: name={name}, created={raw is not None}", operation_stage=f"{name}.create-line", native_created=raw is not None)
         if raw is None:
             raise RuntimeError(f"{name}: native measurement line creation failed")
@@ -700,9 +752,14 @@ def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -
         raise RuntimeError(f"{name}: native inference state was not restored")
     line = _early_bound(raw, "ISketchSegment")
     line.ConstructionGeometry = True
-    straight = _early_bound(line, "ISketchLine")
-    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
-    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
+    start, end = _require_independent_witness_endpoints(adapter, line, center, stage=f"{name}.seed-endpoint-identity")
+    actual_seed = (float(start.X), float(start.Y), float(start.Z), float(end.X), float(end.Y), float(end.Z))
+    _telemetry.info(
+        f"clamp native witness seed readback: name={name}, requested={seed!r}, actual={actual_seed!r}",
+        operation_stage=f"{name}.seed-readback", provisional_seed_m=seed, actual_seed_m=actual_seed,
+    )
+    if any(not math.isfinite(value) or abs(value - wanted) > 1e-9 for value, wanted in zip(actual_seed, seed, strict=True)):
+        raise RuntimeError(f"{name}: native witness endpoints do not match the provisional seed")
     relations = _early_bound(sketch.RelationManager, "ISketchRelationManager")
     for kind, points, segment in ((4, (), line), (26, (start, point), None), (25, (end, center), None), (9, (end,), circle)):
         # Prove a new constraint on its actual owning entity, not merely a
