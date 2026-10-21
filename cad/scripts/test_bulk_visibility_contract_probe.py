@@ -576,11 +576,17 @@ def test_stage_transitions_keep_total_normal_time_and_allow_exact_completion(
         subject.tick()
     with subject.stage_scope(probe.Stage.VISUAL):
         clock[0] = origin + 410.0
+        subject.tick()
+        clock[0] = origin + 480.0
+        subject.tick()
+        clock[0] = origin + 481.0
+        subject.tick()
+        clock[0] = origin + 900.0
         subject.run_case(probe.Case.PERSISTENCE, subject.tick)
     for stage, started, seconds in (
         (probe.Stage.CONSTRUCTION, 3.0, 197.0),
         (probe.Stage.FUNDAMENTAL, 200.0, 100.0),
-        (probe.Stage.VISUAL, 300.0, 110.0),
+        (probe.Stage.VISUAL, 300.0, 600.0),
     ):
         row = subject.receipt.data["stages"][stage]
         assert row["status"] is probe.Verdict.PASSED
@@ -597,17 +603,17 @@ def test_stage_transitions_keep_total_normal_time_and_allow_exact_completion(
             subject.tick()
     error = caught.value
     elapsed = clock[0] - origin
-    stage_elapsed = clock[0] - (origin + 410.0)
+    stage_elapsed = clock[0] - (origin + 900.0)
     assert error.verdict is probe.Verdict.DEADLINE
     assert f"{probe.Stage.EXTENDED}/{probe.Case.PERSISTENCE}" in str(error)
     assert "binding=normal_global;" in str(error)
     assert f"global_elapsed={elapsed!r}s" in str(error)
-    assert "global_limit=410.0s" in str(error)
+    assert "global_limit=900.0s" in str(error)
     assert f"stage_elapsed={stage_elapsed!r}s" in str(error)
     assert "cleanup_stage_limit" not in str(error)
     failed = subject.receipt.data["stages"][probe.Stage.EXTENDED]
     assert failed["status"] is probe.Verdict.DEADLINE
-    assert failed["started_seconds"] == 410.0
+    assert failed["started_seconds"] == 900.0
     assert failed["seconds"] == stage_elapsed
     assert failed["reason"] == str(error)
     assert subject.receipt.started == origin
@@ -617,8 +623,8 @@ def test_stage_transitions_keep_total_normal_time_and_allow_exact_completion(
     ("started", "boundary", "binding"),
     [
         (300.0, 370.0, "cleanup_stage"),
-        (430.0, 480.0, "cleanup_global"),
-        (410.0, 480.0, "cleanup_global,cleanup_stage"),
+        (920.0, 970.0, "cleanup_global"),
+        (900.0, 970.0, "cleanup_global,cleanup_stage"),
     ],
 )
 @pytest.mark.parametrize("overrun", [False, True])
@@ -663,7 +669,7 @@ def test_cleanup_enforces_global_and_local_time_independently(
         assert f"{probe.Stage.CLEANUP}/{probe.Case.CLEANUP}" in str(error)
         assert f"binding={binding};" in str(error)
         assert f"global_elapsed={elapsed!r}s" in str(error)
-        assert "global_limit=480.0s" in str(error)
+        assert "global_limit=970.0s" in str(error)
         assert f"stage_elapsed={stage_elapsed!r}s" in str(error)
         assert "cleanup_stage_limit=70.0s" in str(error)
         assert row["status"] is probe.Verdict.DEADLINE
@@ -682,7 +688,7 @@ def test_cleanup_enforces_global_and_local_time_independently(
 
 
 @pytest.mark.parametrize("restore_error", [False, True])
-@pytest.mark.parametrize("restored_elapsed", [410.125, 480.125])
+@pytest.mark.parametrize("restored_elapsed", [900.125, 970.125])
 def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
     tmp_path, monkeypatch, restore_error, restored_elapsed
 ) -> None:
@@ -709,7 +715,7 @@ def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
 
     def expire_inside_guard():
         with subject.selection_guard():
-            clock[0] = origin + 410.125
+            clock[0] = origin + 900.125
             subject.tick()
 
     primary = capture_and_cleanup_failure(subject, expire_inside_guard)
@@ -735,7 +741,7 @@ def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
         restore_error
     )
     cleanup = subject.receipt.data["cleanup"]
-    if restored_elapsed > 480.0:
+    if restored_elapsed > 970.0:
         assert cleanup["status"] is probe.Verdict.RESTORATION
         assert set(cleanup["remaining_owned"]) == {
             probe.Document.DRAWING,

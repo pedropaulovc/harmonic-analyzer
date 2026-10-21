@@ -1698,14 +1698,10 @@ the unvalidated 50-second fundamental-stage allocation. No export ran; that
 attempt did not resolve the earlier missing target ink. Original source/token
 identities and empty-document cleanup were preserved.
 
-Normal stages now share the existing 410-second allowance from receipt creation,
-rather than each having an independent estimated ceiling. The overall
-480-second envelope and cleanup's own 70-second limit remain unchanged; cleanup
-must satisfy both limits. Stage transitions do not replenish time, and stage
-timing uses the receipt's monotonic clock consistently. All setup, observations,
-reporting and restoration time still counts. These cooperative bounds cannot
-interrupt a synchronous COM call. The full workload may still exceed 410 seconds;
-that remains a failed experiment, not permission to retry or drop controls.
+The shared-budget revision replaced independent normal-stage caps with a
+410-second allowance from receipt creation inside a 480-second overall envelope,
+preserving the 70-second cleanup limit. That was a resource allocation, not a
+calibration from a completed native run.
 
 At `42047ee8d`, C00–C12 completed, including the visual and save/reopen controls.
 The exact PDF-derived pages show the intended hide, restore and persisted states;
@@ -1719,12 +1715,29 @@ as unsaved activation; its cost remains charged to the shared budget. The
 ownership and title-refresh contract below governs both. Failure notes retain
 already-read expected/fresh metadata without additional diagnostic COM calls.
 
+At `0e4a82bc64`, C13/C14 and 15 authenticated saved-title transitions passed.
+C23 reached its expected injected exception and restored selection, but the
+410-second normal deadline interrupted its completion checkpoints at 410.838
+seconds. C24–C27 did not run. C28 passed with an empty inventory and preserved
+source/token identities. The [retained report and exact-page inspection](https://github.com/pedropaulovc/harmonic-analyzer/pull/1780#issuecomment-6316563038)
+do not turn that interrupted qualification into a pass.
+
+Normal work now has a finite 900-second allowance; the overall envelope is 970
+seconds and cleanup retains its own 70-second limit. Cleanup must satisfy both
+limits, so restoration overshoot can leave less than 70 seconds available.
+Stage transitions do not replenish time. Setup, observations, reporting and
+restoration all count on the same receipt clock; cooperative checks cannot
+interrupt a synchronous COM call. This is an explicit resource-policy change,
+not a calibrated runtime or guaranteed fit: the remaining-work projection was
+about 515 seconds, with the final four controls still unmeasured. A failure does
+not authorize another retry, budget increase or dropped control.
+
 The actual-function inert smoke and 665 focused tests pass, including changed
 saved hints through activation, E5 export and cleanup, with identity/path/type
 drift still refusing. The obsolete saved-title-immutability-only test was removed.
 All 29 native controls, setter effects/restoration, normal drawing and the complete
-32-output package remain required. Earlier partial coverage does not certify final
-preservation or cleanup. No performance gain is established.
+32-output package remain required. Partial native coverage is not full
+qualification. No performance gain is established.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible
