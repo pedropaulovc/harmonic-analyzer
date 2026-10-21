@@ -118,21 +118,13 @@ HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
 FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 
 # The pocket opens right; the smaller floor-hole dimension nests closest to
-# the floor end, with the body diameter outboard.  Axial sizes remain above
-# (overall) and below (pocket depth), both measured from the face.
+# the floor end, with the body diameter outboard.  Keep the overall below
+# the section and the pocket-depth row: its upper witnesses otherwise strike
+# the three-row functional radius callout.  The radius owns the open upper
+# corridor, above the independent outer-chamfer block, with its native leader
+# still pointing to the real quarter arc.  No model dimension or fit changes.
 #
-# Sheet-mm solve from the 22821a1d2 native r2 findings (2026-10-19), not a
-# symmetric text-box estimate.  All view centres and scales stay unchanged:
-# - R0.1 MAX at keep (217.75,190.75) printed glyphs [207.3,188.9]..[228.3,192.5]
-#   and a 25.9 mm shoulder (231.5,188.0)->(205.6,188.0).  The chamfer's
-#   witness reaches y191.5 and its outside-arrow tail runs x206.8..213.1 at
-#   y190.5.  Raise ONLY the radius row 6.75: shoulder y194.75 is 3.25 above
-#   that witness, and glyph bottom y195.65 is 5.15 above the arrow tail.
-#   Keep X217.75, so the text still faces the real 90..180-degree quarter arc.
-# - Overall's arrow barb bottom y194.3 was 1.87 mm from the radius glyphs;
-#   its glyphs [221.9,195.7]..[227.2,199.2] had only 3.18 mm block separation.
-#   Raise overall 8: the arrow-to-radius gap becomes 3.05 and the text gap
-#   4.45 mm (>3.57).  Both full witnesses remain outside the radius shoulder.
+# Retained sheet-mm solve from the 22821a1d2 native r2 findings (2026-10-19):
 # - PocketDepth's upper row [268.8,140.2]..[286.9,143.8] met PocketDia's
 #   outside-arrow tail x284.2, y142.9..149.2.  Lower the whole depth block
 #   3.5: its top is y140.3, 2.6 below the tail, including its far endpoint.
@@ -156,7 +148,7 @@ SECTION_KEEP = {
         SECTION_CENTER[0] - HALF_LENGTH - 0.003,
         SECTION_CENTER[1] - 0.0125,
     ),
-    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.020),
+    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] - BODY_R - 0.035),
     "PocketDepth": (FACE_X + 0.033, SECTION_CENTER[1] - BODY_R - 0.0115),
     "BodyChamfer": (
         SECTION_CENTER[0] - HALF_LENGTH - 0.0295,
@@ -164,7 +156,7 @@ SECTION_KEEP = {
     ),
     "PocketFloorRadius": (
         FACE_X - POCKET_DEPTH * _S,
-        SECTION_CENTER[1] + BODY_R + 0.012,
+        SECTION_CENTER[1] + BODY_R + 0.041,
     ),
 }
 DIMENSION_CALLOUTS = {
