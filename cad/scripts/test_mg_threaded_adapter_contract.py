@@ -286,6 +286,9 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("ISketchRelationManager", "AddRelation", 2, 9),
     ("ISketchRelation", "GetRelationType", 0, 3),
     ("ISketchRelation", "GetDefinitionEntities2", 0, 12),
+    ("ISketchRelation", "GetEntities", 0, 12),
+    ("ISketchRelation", "GetEntitiesType", 0, 12),
+    ("ISketchPoint", "GetID", 0, 12),
     ("ISketchSegment", "GetRelations", 0, 12),
     ("ISketchPoint", "GetRelations", 0, 12),
     ("ISketchPoint", "GetSketch", 0, 9),
@@ -334,3 +337,15 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
     methods, maps = _native_declaration(interface)
     assert member not in methods
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
+
+
+@pytest.mark.parametrize("interface", ("ISketchPoint", "ISketchSegment", "ISketchLine", "ISketchArc"))
+def test_definition_dispatch_classification_names_exist_in_pinned_typelib(interface) -> None:
+    # IDispatch.GetTypeInfo/GetDocumentation are core COM, not sldworks methods.
+    # Their returned names may only enable a binding to an actual SDK interface;
+    # this census does not claim those names were observed on the farm.
+    methods, _maps = _native_declaration(interface)
+    assert methods
+    if interface in ("ISketchPoint", "ISketchSegment"):
+        assert _native_return_type(methods["GetID"]) == (12, 0)
+        assert _native_return_type(methods["GetSketch"]) == (9, 0)
