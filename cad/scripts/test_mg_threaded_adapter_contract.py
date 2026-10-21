@@ -345,13 +345,14 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
 
 
+@pytest.mark.parametrize("classifier_name", ("_witness_relation_records", "_point_identity"))
 @pytest.mark.parametrize(("interface", "iid"), (
     ("ISketchPoint", "{83A33DBD-27C5-11CE-BFD4-00400513BB57}"),
     ("ISketchSegment", "{83A33DBF-27C5-11CE-BFD4-00400513BB57}"),
 ))
-def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid) -> None:
+def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid, classifier_name) -> None:
     # Parse only: importing the generated module here would load pywin32.
-    # Native QI remains unproven by this import-free declaration census.
+    # Neither point-key agreement nor native QI is proven by this offline census.
     wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
     declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
     assert any(isinstance(base, ast.Name) and base.id == "DispatchBaseClass" for base in declaration.bases)
@@ -363,7 +364,7 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
                     identifiers[target.id] = ast.literal_eval(node.value.args[0])
     assert identifiers["CLSID"] == iid
     assert identifiers["coclass_clsid"] != iid
-    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == "_witness_relation_records")
+    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == classifier_name)
     imported_interfaces = {
         alias.name
         for node in ast.walk(classifier)
