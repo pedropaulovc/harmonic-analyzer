@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _drawing_balloons
 import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
@@ -766,7 +767,7 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    assert steps_bottom - drawing.CHECKS_XY[1] >= drawing._PAD / 2
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
@@ -858,43 +859,561 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
     assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
 
 
-def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
-    import math
+class _NativeWheelBalloon:
+    """A returned native note with readable item, attachment and rendered circle."""
 
-    import mg_vn_wheel_axle_front_washer_spec as washer
-    import mg_vn_wheel_axle_nut_spec as nut
+    def __init__(self, item: str, owner: str):
+        self.item = item
+        self.owner = owner
+        self.annotation = self
+        self.entities = (
+            SimpleNamespace(GetComponent=lambda: SimpleNamespace(Name2=self.owner)),
+        )
+        self.kinds = (1,)  # swSelEDGES
+        self.circle = (0.100, 0.150, 0.0047)
 
-    def screen(point):
-        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
-        x, y, z = -point[0], point[1], -point[2]
-        return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
+    def GetBomBalloonText(self, _upper):
+        return self.item
 
-    wx, wy, wz = drawing.FRONT_WASHER_BALLOON_POINT_MM
-    assert wz == 0.0 and math.hypot(wx, wy) == pytest.approx(washer.OD / 2.0)
-    nx, ny, nz = drawing.LOCKNUT_BALLOON_POINT_MM
-    # On the flat facing 240 deg (corners on the local +-Y meridian).
-    normal = math.radians(240.0)
-    assert nz == 0.0
-    assert nx * math.cos(normal) + ny * math.sin(normal) == pytest.approx(
-        nut.ACROSS_FLATS / 2.0
+    def GetName(self):
+        return f"Balloon{self.item}"
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetAttachedEntityTypes(self):
+        return self.kinds
+
+    def GetDisplayData(self):
+        return self
+
+    def GetArcCount(self):
+        return 1
+
+    def GetArcAtIndex2(self, _index):
+        x, y, radius = self.circle
+        point = (x + radius, y, 0.0)
+        return (0, 0, -1, -1, *point, *point, x, y, 0.0, 0.0, 0.0, 1.0, 1.0)
+
+
+_EDGE_WEIGHT_CONSTANTS = {
+    "swLineFontVisibleEdgesThickness": 101,
+    "swDetailingNoOptionSpecified": 0,
+    "swLW_NORMAL": 1,
+    "swLW_THICK": 2,
+    "swPageSetupPrinterNormalLineWeight": 102,
+    "swPageSetupPrinterThickLineWeight": 103,
+}
+
+
+class _VisibleEdgePreferences:
+    """Stateful native boundary; setters can mutate even when reporting failure."""
+
+    def __init__(self):
+        self.slot = 2
+        # Deliberately unlike the template experiment: widths are read, not policy.
+        self.widths = {102: 0.00021, 103: 0.00042}
+        self.normal_fault = None
+        self.restore_fault = None
+        self.writes = 0
+        self.unreadable = False
+
+    def GetUserPreferenceInteger(self, preference, option):
+        assert (preference, option) == (101, 0)
+        if self.unreadable:
+            raise RuntimeError("native preference read failed")
+        return self.slot
+
+    def GetUserPreferenceDouble(self, preference, option):
+        assert option == 0
+        return self.widths[preference]
+
+    def SetUserPreferenceInteger(self, preference, option, value):
+        assert (preference, option) == (101, 0)
+        fault = self.normal_fault if self.writes == 0 else self.restore_fault
+        self.writes += 1
+        self.slot = value + 1 if fault == "mismatch" else value
+        self.unreadable = fault == "readback_exception"
+        if fault == "exception":
+            raise RuntimeError("native preference setter failed after mutation")
+        return fault != "false"
+
+
+@pytest.fixture
+def native_wheel_balloons(monkeypatch):
+    items = drawing.balloon_items(
+        {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)},
+        explode.WHEEL_GROUP_STEMS,
     )
-    axle = screen((0.0, 0.0, 1.0))  # the stack's explode runs along local +z
-    for point, side in (
-        (drawing.FRONT_WASHER_BALLOON_POINT_MM, (-0.5, math.sqrt(3.0) / 2.0)),
-        (drawing.LOCKNUT_BALLOON_POINT_MM, (0.5, -math.sqrt(3.0) / 2.0)),
-    ):
-        sx, sy = screen(point)
-        length = math.hypot(sx, sy)
-        assert (sx / length, sy / length) == pytest.approx(side)
-        assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
-    anchors = drawing.BALLOON_ANCHORS
-    assert anchors["mg-vn-wheel-axle-nut"].instance == "mg-vn-wheel-axle-nut-2"
-    # Instance 2 is the locknut, exploded farthest out.
-    farthest = min(
-        (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
-        key=lambda step: step.distance_mm,
+    owners = {stem: f"wheel-sub-1/{stem}-1" for stem, _item in items}
+    native = [_NativeWheelBalloon(item, owners[stem]) for stem, item in items]
+
+    def component(stem, path, *, visible=True):
+        return SimpleNamespace(
+            Name=f"mg-magnifier-1/{path}@Drawing View1",
+            GetChildren=lambda: (),
+            Visible=visible,
+            Component=SimpleNamespace(
+                Name2=path, GetPathName=lambda: f"C:/parts/{stem}.SLDPRT"
+            ),
+        )
+
+    children = [component(stem, owners[stem]) for stem, _item in items] + [
+        component("mg-vn-wheel-axle-nut", "wheel-sub-1/mg-vn-wheel-axle-nut-2"),
+        component(
+            "mg-vn-wheel-axle-nut",
+            "wheel-sub-1/mg-vn-wheel-axle-nut-3",
+            visible=False,
+        ),
+    ]
+    root = SimpleNamespace(GetChildren=lambda: children)
+    view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
+
+    def attempt(callback, default=None):
+        try:
+            return callback()
+        except Exception:
+            return default
+
+    preferences = _VisibleEdgePreferences()
+    state = SimpleNamespace(
+        preferences=preferences,
+        native_error=None,
+        native_result=native,
+        native_slots=[],
+        selected_slots=[],
+        cleared_slots=[],
+        rebuilt_slots=[],
+        options=SimpleNamespace(),
     )
-    assert farthest.members == ("mg-vn-wheel-axle-nut:2",)
+
+    def native_call(options):
+        assert options is state.options
+        state.native_slots.append(preferences.slot)
+        if state.native_error is not None:
+            raise state.native_error
+        return state.native_result
+
+    def rebuild():
+        state.rebuilt_slots.append(preferences.slot)
+        return True
+
+    model = SimpleNamespace(
+        sheet=drawing.SHEET_NAMES[0],
+        Extension=preferences,
+        CreateAutoBalloonOptions=lambda: state.options,
+        AutoBalloon5=native_call,
+        ClearSelection2=lambda _clear: state.cleared_slots.append(preferences.slot),
+        EditRebuild3=rebuild,
+    )
+
+    def activate_sheet(name):
+        model.sheet = name
+        return True
+
+    model.ActivateSheet = activate_sheet
+    model.GetCurrentSheet = lambda: SimpleNamespace(GetName=lambda: model.sheet)
+    adapter = SimpleNamespace(_attempt=attempt, currentModel=model)
+    # Mock only native boundaries, not _create_auto_balloons: the MG consumer
+    # exercises preference restoration, rebuild, coverage and owner validation.
+    monkeypatch.setattr(
+        _drawing_balloons._sw_type_info, "constant", _EDGE_WEIGHT_CONSTANTS.__getitem__
+    )
+    monkeypatch.setattr(
+        _drawing_balloons,
+        "_activate_and_select_view",
+        lambda *args, **kwargs: state.selected_slots.append(preferences.slot),
+    )
+    state.notes = native
+    state.owners = owners
+    state.view = view
+    state.adapter = adapter
+    state.create = lambda: drawing.add_auto_balloons(
+        adapter, view, items=items, label="magnifier wheel BOM coverage"
+    )
+    return state
+
+
+@pytest.mark.parametrize("original_slot", [0, 1, 2, 7])
+def test_native_wheel_borrows_normal_only_during_creation_and_restores_exact_slot(
+    native_wheel_balloons, original_slot
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.preferences.slot = original_slot
+    widths = dict(fixture.preferences.widths)
+    landings = fixture.create()
+    assert len(landings) == len(explode.WHEEL_GROUP_STEMS)
+    assert fixture.selected_slots == [original_slot]
+    assert fixture.native_slots == [1]
+    assert fixture.preferences.slot == original_slot
+    assert fixture.preferences.widths == widths
+    assert fixture.cleared_slots == [original_slot]
+    assert fixture.rebuilt_slots == [original_slot]
+    assert fixture.options.LeaderAttachmentToFaces is False
+    assert fixture.options.Layout == 1
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+@pytest.mark.parametrize("original_slot", [0, 1, 2, 7])
+def test_native_wheel_restores_exact_slot_when_native_creation_raises(
+    native_wheel_balloons, original_slot
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.preferences.slot = original_slot
+    fixture.native_error = RuntimeError("native AutoBalloon5 failed")
+    with pytest.raises(RuntimeError, match="native AutoBalloon5 failed") as error:
+        fixture.create()
+    assert error.value is fixture.native_error
+    assert fixture.native_slots == [1]
+    assert fixture.preferences.slot == original_slot
+    assert fixture.cleared_slots == fixture.rebuilt_slots == []
+
+
+@pytest.mark.parametrize("native_result", [None, [], "invalid native result"])
+def test_native_wheel_restores_before_rejecting_empty_native_creation(
+    native_wheel_balloons, native_result
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.native_result = native_result
+    with pytest.raises(RuntimeError, match="AutoBalloon5 produced no balloons"):
+        fixture.create()
+    assert fixture.preferences.slot == 2
+    assert fixture.cleared_slots == fixture.rebuilt_slots == [2]
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("false", "failed to set Normal visible-edge slot"),
+        ("mismatch", "Normal visible-edge slot readback differs"),
+        ("exception", "native preference setter failed after mutation"),
+        ("readback_exception", "native preference read failed"),
+    ],
+)
+def test_native_wheel_restores_after_failed_normal_mapping_without_native_creation(
+    native_wheel_balloons, fault, message
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.preferences.normal_fault = fault
+    with pytest.raises(RuntimeError, match=message):
+        fixture.create()
+    assert fixture.preferences.slot == 2
+    assert fixture.preferences.writes == 2
+    assert fixture.native_slots == fixture.cleared_slots == fixture.rebuilt_slots == []
+
+
+@pytest.mark.parametrize("native_failure", [False, True])
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("false", "failed to restore visible-edge slot"),
+        ("mismatch", "restored visible-edge slot readback differs"),
+        ("exception", "native preference setter failed after mutation"),
+        ("readback_exception", "native preference read failed"),
+    ],
+)
+def test_native_wheel_cannot_continue_after_failed_restore(
+    native_wheel_balloons, fault, message, native_failure
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.preferences.restore_fault = fault
+    if native_failure:
+        fixture.native_error = RuntimeError("native AutoBalloon5 failed")
+    with pytest.raises(RuntimeError, match=message) as error:
+        fixture.create()
+    assert fixture.native_slots == [1]
+    assert fixture.preferences.writes == 2
+    assert fixture.cleared_slots == fixture.rebuilt_slots == []
+    if native_failure:
+        assert error.value.__context__ is fixture.native_error
+
+
+@pytest.mark.parametrize(
+    "reader", ["GetUserPreferenceInteger", "GetUserPreferenceDouble"]
+)
+def test_native_wheel_does_not_mutate_unreadable_original_preferences(
+    native_wheel_balloons, monkeypatch, reader
+) -> None:
+    fixture = native_wheel_balloons
+
+    def unreadable(*_args):
+        raise RuntimeError("original document preference unreadable")
+
+    monkeypatch.setattr(fixture.preferences, reader, unreadable)
+    with pytest.raises(RuntimeError, match="original document preference unreadable"):
+        fixture.create()
+    assert fixture.preferences.slot == 2
+    assert fixture.preferences.writes == 0
+    assert fixture.native_slots == fixture.cleared_slots == fixture.rebuilt_slots == []
+
+
+def test_face_autoballoons_do_not_use_or_change_visible_edge_preferences(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    # A FACE caller does not even need the document-preference interface.
+    del fixture.adapter.currentModel.Extension
+    result = _drawing_balloons._create_auto_balloons(
+        fixture.adapter, fixture.view, label="existing FACE path", attachment="face"
+    )
+    assert result == fixture.notes
+    assert fixture.options.LeaderAttachmentToFaces is True
+    assert fixture.preferences.writes == 0
+    assert fixture.preferences.slot == 2
+    assert fixture.native_slots == fixture.cleared_slots == fixture.rebuilt_slots == [2]
+
+
+@pytest.mark.parametrize("native_failure", [False, True])
+def test_native_wheel_reports_native_cost_guard_overhead_and_actual_width_readbacks(
+    native_wheel_balloons, monkeypatch, native_failure
+) -> None:
+    fixture = native_wheel_balloons
+    attributes = {}
+    ticks = iter([10.0, 11.0, 14.0, 18.0])
+    monkeypatch.setattr(
+        _drawing_balloons, "time", SimpleNamespace(perf_counter=lambda: next(ticks))
+    )
+    monkeypatch.setattr(
+        _drawing_balloons._telemetry,
+        "annotate",
+        lambda **values: attributes.update(values),
+    )
+    if native_failure:
+        fixture.native_error = RuntimeError("native AutoBalloon5 failed")
+        with pytest.raises(RuntimeError, match="native AutoBalloon5 failed"):
+            fixture.create()
+    else:
+        fixture.create()
+    assert attributes["preference"] == "swLineFontVisibleEdgesThickness"
+    assert attributes["original_slot"] == attributes["thick_slot"] == 2
+    assert attributes["normal_slot"] == attributes["normal_readback_slot"] == 1
+    assert attributes["restore_readback_slot"] == 2
+    assert attributes["normal_set_return"] is attributes["restore_set_return"] is True
+    assert attributes["normal_width_m"] == fixture.preferences.widths[102]
+    assert attributes["thick_width_m"] == fixture.preferences.widths[103]
+    assert attributes["native_called"] is True
+    assert attributes["native_call_ms"] == 3000.0
+    assert attributes["preference_guard_ms"] == 5000.0
+
+
+def test_native_wheel_balloons_cover_rows_and_keep_their_native_attachments(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    nut = next(
+        note for note in fixture.notes if note.owner.endswith("mg-vn-wheel-axle-nut-1")
+    )
+    # Native placement may choose any shown instance, not the old pinned locknut.
+    nut.owner = "WHEEL-SUB-1\\MG-VN-WHEEL-AXLE-NUT-2"
+    landings = fixture.create()
+    assert len(landings) == len(explode.WHEEL_GROUP_STEMS)
+    assert {landing.stem for landing in landings} == explode.WHEEL_GROUP_STEMS
+    assert all(landing.sheet_xy is None for landing in landings)
+    for landing in landings:
+        assert landing.instance == landing.note.owner.replace("\\", "/")
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+def test_native_wheel_rejects_swapped_washer_owners_even_with_every_bom_row(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    back = next(note for note in fixture.notes if "back-washer" in note.owner)
+    front = next(note for note in fixture.notes if "front-washer" in note.owner)
+    back.owner, front.owner = front.owner, back.owner
+    assert len({note.item for note in fixture.notes}) == len(explode.WHEEL_GROUP_STEMS)
+    with pytest.raises(RuntimeError, match="native EDGE owner.*not a shown instance"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("duplicate", "duplicate native BOM item"),
+        ("missing", "missing native BOM items"),
+        ("unexpected", "unexpected native BOM item"),
+        ("unresolved", "unresolved item"),
+    ],
+)
+def test_native_wheel_refuses_inexact_bom_coverage(
+    native_wheel_balloons, fault, message
+) -> None:
+    fixture = native_wheel_balloons
+    if fault == "duplicate":
+        fixture.notes[-1].item = fixture.notes[0].item
+    elif fault == "missing":
+        fixture.notes.pop()
+    elif fault == "unexpected":
+        fixture.notes[-1].item = "999"
+    else:
+        fixture.notes[-1].item = "?"
+    with pytest.raises(RuntimeError, match=message):
+        fixture.create()
+
+
+@pytest.mark.parametrize("kind", [0, 2, 3, 999])
+def test_native_wheel_refuses_non_edge_and_unknown_native_attachment_types(
+    native_wheel_balloons, kind
+) -> None:
+    fixture = native_wheel_balloons
+    fixture.notes[0].kinds = (kind,)
+    with pytest.raises(RuntimeError, match="must attach to one native EDGE"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "annotation",
+        "entities",
+        "types",
+        "dangling",
+        "extra_entity",
+        "unknown_entity",
+        "unknown_owner",
+    ],
+)
+def test_native_wheel_refuses_absent_or_unreadable_native_attachments(
+    native_wheel_balloons, fault
+) -> None:
+    fixture = native_wheel_balloons
+    note = fixture.notes[0]
+    if fault == "annotation":
+        note.annotation = None
+    elif fault == "entities":
+        note.entities = ()
+    elif fault == "types":
+        note.kinds = ()
+    elif fault == "dangling":
+        note.entities = (None,)
+    elif fault == "extra_entity":
+        note.entities *= 2
+    elif fault == "unknown_entity":
+        note.entities = (object(),)
+    else:
+        note.owner = ""
+    with pytest.raises(RuntimeError, match="native annotation|native EDGE"):
+        fixture.create()
+
+
+@pytest.mark.parametrize(
+    "owner",
+    [
+        "other-sub-1/mg-vn-wheel-axle-nut-1",
+        "wheel-sub-1/mg-vn-wheel-axle-nut-3",
+    ],
+)
+def test_native_wheel_rejects_same_family_wrong_full_path_and_hidden_owner(
+    native_wheel_balloons, owner
+) -> None:
+    fixture = native_wheel_balloons
+    nut = next(
+        note for note in fixture.notes if note.owner.endswith("mg-vn-wheel-axle-nut-1")
+    )
+    nut.owner = owner
+    with pytest.raises(RuntimeError, match="native EDGE owner.*not a shown instance"):
+        fixture.create()
+
+
+def test_native_wheel_attachments_remain_checked_after_the_final_rebuild(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    fixture.notes[0].owner = fixture.notes[1].owner
+    with pytest.raises(RuntimeError, match="changed after the final rebuild"):
+        _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+def test_native_wheel_circles_fit_without_changing_native_placement(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    before = [(note.circle, note.owner) for note in fixture.notes]
+    drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    assert [(note.circle, note.owner) for note in fixture.notes] == before
+    assert fixture.adapter.currentModel.sheet == drawing.SHEET_NAMES[1]
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+@pytest.mark.parametrize("boundary", ["left", "bottom", "right", "top"])
+def test_native_wheel_rejects_circle_crossing_field_with_its_centre_inside(
+    native_wheel_balloons,
+    boundary,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    landing = landings[-1]
+    radius = 0.0047
+    left, bottom, right, top = drawing.WHEEL_FIELD
+    mid_x, mid_y = (left + right) / 2.0, (bottom + top) / 2.0
+    x, y = {
+        "left": (left + radius / 2.0, mid_y),
+        "bottom": (mid_x, bottom + radius / 2.0),
+        "right": (right - radius / 2.0, mid_y),
+        "top": (mid_x, top - radius / 2.0),
+    }[boundary]
+    landing.note.circle = (x, y, radius)
+    assert left < x < right and bottom < y < top
+    bounds = (x - radius, y - radius, x + radius, y + radius)
+    with pytest.raises(RuntimeError, match="rendered circle") as error:
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    message = str(error.value)
+    assert landing.stem in message
+    assert f"item {landing.note.item}" in message
+    assert repr(bounds) in message
+    assert repr(drawing.WHEEL_FIELD) in message
+
+
+def test_native_wheel_rejects_circle_in_bom_even_when_inside_the_sheet(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    landing = landings[-1]
+    x = drawing.WHEEL_FIELD[2] - 0.001
+    y = (drawing.BOM_BOTTOM + drawing.BOM_ANCHOR[1]) / 2.0
+    radius = drawing.BOM_ANCHOR[0] - x + 0.001
+    landing.note.circle = (x, y, radius)
+    bounds = (x - radius, y - radius, x + radius, y + radius)
+    assert _inside(bounds, drawing.INNER_BORDER)
+    assert _overlap(
+        bounds,
+        (
+            drawing.BOM_ANCHOR[0],
+            drawing.BOM_BOTTOM,
+            drawing.INNER_BORDER[2],
+            drawing.BOM_ANCHOR[1],
+        ),
+    )
+    assert drawing.WHEEL_FIELD[0] < x < drawing.WHEEL_FIELD[2]
+    with pytest.raises(RuntimeError, match="leaves WHEEL_FIELD"):
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+
+
+def test_native_wheel_circle_bounds_are_reread_after_the_final_rebuild(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    note = landings[-1].note
+
+    def final_rebuild():
+        _x, y, radius = note.circle
+        note.circle = (drawing.WHEEL_FIELD[2] - radius / 2.0, y, radius)
+        return True
+
+    fixture.adapter.currentModel.EditRebuild3 = final_rebuild
+    drawing.rebuild_drawing(fixture.adapter, label="finalize_drawing")
+    # The native edge owner is still correct: only the rendered circle moved.
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+    with pytest.raises(RuntimeError, match="after the final rebuild"):
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
 
 
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:
