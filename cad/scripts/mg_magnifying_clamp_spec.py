@@ -8,8 +8,8 @@ plug-tap reach and sheet text. A required finished minimum is not presented
 as a computed certificate for unconstrained supplied-stock form.
 
 The heights run from the bottom shoulder-seat face. An actual diagonal-flat
-distance and a direct transverse distance to the actual bore rim locate each
-tap entry. The bore has its own actual-flat location and bottom-seat height.
+distance and a location from the SAME actual Z flat locate each tap entry.
+The bore uses that common Z-flat baseline and its own bottom-seat height.
 Finished 2.0 MIN wall acceptance and a 15.00 MAX full-length transverse stock
 envelope are explicit requirements, not perfect-hex or Rule #1 assumptions
 for as-supplied STOCK.
@@ -35,7 +35,6 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     LOCATION_BAND,
     LOCATION_FROM_FLAT,
     LOCATION_PLACES,
-    RELATIVE_AXIS_BAND,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_DRILL_POINT,
     ROD_TAP_FLOOR_WALL_WORST,
@@ -188,10 +187,10 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # about the lever is set by hand at the thumb screw.  Nothing is framed.
 
 # --- Marked model dimensions and the places the model authors on them --------
-# Ordinary flat/height dimensions and direct tap-entry-to-bore-rim dimensions
-# are native measured acceptance. Nominal centring is not a manufactured
-# location requirement; the attached stock/wall property owns its explicit
-# receiving/finished inspection requirements.
+# Five ordinary native location measurements remain authoritative even when
+# the three common-flat values print as one explicitly grouped dimension.
+# The attached stock property owns full-height receiving acceptance; the
+# actual bore's callout owns finished-wall acceptance, not nominal stock form.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HexProfile": {"HexAf": HEX_AF_PLACES},
     "Block": {"Height": HEIGHT_PLACES},
@@ -203,8 +202,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodTapLocationProfile": {"RodTapFromDiagonalFlat": LOCATION_PLACES},
     "LeverBoreLocationProfile": {
         "LeverBoreFromZFlat": LOCATION_PLACES,
-        "ThumbTapToBoreRim": LOCATION_PLACES,
-        "RodTapToBoreRim": LOCATION_PLACES,
+        "ThumbTapFromZFlat": LOCATION_PLACES,
+        "RodTapFromZFlat": LOCATION_PLACES,
     },
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -215,15 +214,21 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
+Z_FLAT_DIMENSIONS = ("LeverBoreFromZFlat", "ThumbTapFromZFlat", "RodTapFromZFlat")
+# All members are authored, marked, imported and checked before display grouping.
+DIMENSION_GROUPS = {"LeverBoreFromZFlat": Z_FLAT_DIMENSIONS}
+GROUPED_HIDDEN_DIMENSIONS = frozenset(Z_FLAT_DIMENSIONS[1:])
+VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMENSIONS
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("MHA-MG-02 reference dimension is unprinted")
 
 # --- Sheet text ----------------------------------------------------------------
-# The bore's process and mating body are attached to its own native diameter.
-LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03"))
-HEIGHT_CALLOUT = "MHA-MG-VN-50\nFULL THREAD ENGAGEMENT"
+# Process, mate and finished-wall acceptance belong to the actual bore diameter.
+WALL_NOTE = f"{WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS"
+LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", WALL_NOTE))
+HEIGHT_CALLOUT = "CONTROLS TOP-TAP WALL"
 # Ahead of each native thread row.
-THUMB_TAP_PROCESS = "TAP INTO BORE"
+THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-MG-VN-50"
 ROD_TAP_PROCESS = "TAP"
 # Native Hole Wizard depth variables; both taps print their depths at .XX,
 # the thumb tap's thread depth bracketed REF (the bore ends the thread).
@@ -233,9 +238,9 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
-STOCK_NOTE = f"1/2 HEX BAR; AF {HEX_AF - HEX_AF_BAND:.2f}–{HEX_AF + HEX_AF_BAND:.2f}\nTRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX\nOVER FULL HEIGHT; FLATS AS SUPPLIED\n{WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS"
+STOCK_NOTE = f"1/2 HEX BAR; AF {HEX_AF - HEX_AF_BAND:.2f}–{HEX_AF + HEX_AF_BAND:.2f}; FLATS AS SUPPLIED\nTRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX OVER FULL HEIGHT"
 # The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
-SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT:\nNO CHAMFER OR SPOTFACE AT TAP"
+SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the stock.
 DRAWING_NOTES = STOCK_NOTE
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

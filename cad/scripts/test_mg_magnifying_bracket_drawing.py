@@ -6,7 +6,6 @@ import asyncio
 import itertools
 import math
 from types import SimpleNamespace
-import copy
 
 import pytest
 
@@ -31,7 +30,7 @@ def test_ordinary_locations_bound_the_actual_radial_wall() -> None:
         (joint.NOSE_R - joint.HOLE_LOCATION_TOL, joint.NOSE_R + joint.HOLE_LOCATION_TOL),
     ):
         axis = (from_side - radius, from_tip - radius)
-        walls.append(radius - math.hypot(*axis) - joint.THREAD_BORE_WANDER - joint.THREAD_ROOT_ENVELOPE / 2.0 - joint.MOUTH_CHAMFER_MAX)
+        walls.append(radius - math.hypot(*axis) - joint.THREAD_BORE_WANDER - joint.THREAD_ROOT_ENVELOPE / 2.0 - joint.CHAMFER_LEG_MAX)
     assert joint.WALL_MIN == pytest.approx(min(walls))
     assert 1.5 < min(walls) < 2.0  # floor versus target, not an invented 1.925
     assert joint.AXIS_OFFSET_MAX > joint.HOLE_LOCATION_TOL
@@ -53,7 +52,7 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
 
 def test_every_marked_requirement_has_one_printed_home() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    maps = (drawing.FRONT_KEEP, drawing.BOTTOM_KEEP, drawing.SIDE_KEEP, drawing.MOUTH_KEEP, drawing.MOUNTING_KEEP, drawing.TAP_KEEP)
+    maps = (drawing.FRONT_KEEP, drawing.BOTTOM_KEEP, drawing.SIDE_KEEP, drawing.MOUNTING_KEEP, drawing.TAP_KEEP)
     kept = [name for keep in maps for name in keep]
     assert len(kept) == len(set(kept))
     assert set(kept) == marked
@@ -192,7 +191,7 @@ class _DrawingDisplay:
         self.text[location] = text
 
 
-@pytest.mark.parametrize("missing", (None, "NeckThickness", "FlangeDepth", "RootR", "FootCornerR", "MouthChamfer", "ThreadRootEnvelope"))
+@pytest.mark.parametrize("missing", (None, "NeckThickness", "FlangeDepth", "RootR", "ThreadRootEnvelope"))
 def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypatch, tmp_path, missing) -> None:
     """Exercise the actual build loop and strict callout writer, not copied maps."""
     source = tmp_path / "bracket.SLDPRT"
@@ -218,8 +217,7 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
         assert set(keep) <= set().union(*dimensions_by_feature.values())
         annotations = []
         for name in keep:
-            # Native R5: the chamfer's axial leg collapses in the end view.
-            if name == missing or (name == "MouthChamfer" and view != "section A-A"):
+            if name == missing:
                 continue
             assert name not in displays, "a dimension was imported into two homes"
             imported[view].add(name)
@@ -255,8 +253,6 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
         "NeckThickness": ("*Top", spec.NECK_THICKNESS_CALLOUT),
         "FlangeDepth": ("*Top", spec.FLANGE_DEPTH_CALLOUT),
         "RootR": ("*Top", drawing.ROOT_PRINT_CALLOUT),
-        "FootCornerR": ("*Front", spec.FOOT_CORNER_CALLOUT),
-        "MouthChamfer": ("section A-A", drawing.MOUTH_PRINT_CALLOUT),
         "ThreadRootEnvelope": ("*Right", spec.THREAD_ENVELOPE_CALLOUT),
     }
     actual = {
@@ -265,7 +261,7 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
     }
     assert actual == expected
     assert " ".join(displays["RootR"].text[4].split()) == " ".join(spec.ROOT_CALLOUT.split())
-    assert " ".join(displays["MouthChamfer"].text[4].split()) == " ".join(spec.MOUTH_CALLOUT.split())
+    assert "MouthChamfer" not in displays and "FootCornerR" not in displays
     assert set(displays) == set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -418,60 +414,13 @@ def _native_line(x0, y0, x1, y1):
     return (0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0)
 
 
-class _LayoutDimension:
-    def __init__(self, name, position, *, width=0.034, centered=False, fault=None):
-        self.name = name
-        self.position = (*position, 0.0)
-        self.width = width
-        self.centered = centered
-        self.fault = fault
-        self.value = 0.0002
-        self.tolerance = (-0.00005, 0.00005)
-        self.qualifier = drawing.MOUTH_PRINT_CALLOUT
-        self.attachments = (object(), object())
-
-    def GetPosition(self):
-        return self.position
-
-    def SetPosition2(self, x, y, z):
-        if self.fault == "move_refused":
-            return False
-        if self.fault != "move_ignored":
-            self.position = (x, y, z)
-        return True
-
-    def display(self, section):
-        x, y, _z = self.position
-        left = x - self.width / 2.0 if self.centered else x
-        base = y - 0.0073038
-        qualifier_rows = self.qualifier.splitlines()
-        shoulder = base - (len(qualifier_rows) - 1) * 0.0055563
-        a = section.project((joint.NECK_HALF_X / 1000.0, joint.TAP_DRILL_DIA / 2000.0, 0.0))
-        b = section.project(((joint.NECK_HALF_X - joint.MOUTH_CHAMFER) / 1000.0, joint.TAP_DRILL_DIA / 2000.0, 0.0))
-        # Simulated post-rotation display: fixed model-attached witnesses,
-        # horizontal size line, and R8's native tolerance/qualifier row pitch.
-        return {
-            "texts": [
-                _native_text("0.20 ", left + self.width / 2.0 - 0.0103444, y - 0.0016941, 0.0103444),
-                _native_text("+0.05", left + self.width / 2.0, y + 0.0027781, 0.0118806),
-                _native_text("-0.05", left + self.width / 2.0, y - 0.0017476, 0.0112413),
-                *(_native_text(row, left, base - index * 0.0055563, self.width)
-                  for index, row in enumerate(qualifier_rows)),
-            ],
-            "lines": [
-                _native_line(*a, a[0], shoulder),
-                _native_line(*b, b[0], shoulder),
-                _native_line(left, shoulder, b[0], shoulder),
-            ],
-        }
-
-
 class _LayoutCaption:
     PropertyLinkedText = "<VLNAME> <VLLABEL>\n<VLSCALE> <VLSCALEV>"
 
-    def __init__(self, *, fault=None):
+    def __init__(self, *, fault=None, width=0.070):
         self.position = (0.209, 0.048, 0.0)
         self.fault = fault
+        self.width = width
 
     def GetAnnotation(self):
         return self
@@ -485,93 +434,51 @@ class _LayoutCaption:
         return True
 
     def GetExtent(self):
-        # R8 native six-value note extent relative to its actual GetPosition.
+        # Frozen R8 height/anchor; width simulates the added ROTATED word.
         x, y, _z = self.position
-        return (x - 0.0231238, y - 0.0160045, 0.0, x + 0.0226268, y + 0.0001988, 0.0)
+        return (x - 0.0231238, y - 0.0160045, 0.0, x - 0.0231238 + self.width, y + 0.0001988, 0.0)
 
 
-def _annotation_layout_fixture(monkeypatch, *, width=0.034, centered=False, fault=None):
+def _caption_layout_fixture(monkeypatch, *, fault=None, width=0.070):
     import _section_axis
 
     adapter, parent, section, iso = _mouth_layout_fixture(monkeypatch)
     drawing._mouth_section(adapter, parent, iso)
-    annotation = _LayoutDimension("MouthChamfer", (0.330, 0.190), width=width, centered=centered, fault=fault)
-    caption = _LayoutCaption(fault=fault)
+    caption = _LayoutCaption(fault=fault, width=width)
     section.notes = [caption]
-
-    def mark_display(view, original_y):
-        dx, dy = view.turn((0.0, original_y - 0.080))
-        x, y = view.Position[0] + dx, view.Position[1] + dy
-        # Outer extents of R8's eight native line runs, kept as two complete
-        # crosses. No annotation is deleted and no source identity is guessed.
-        return {"lines": [
-            _native_line(x - 0.0113862, y, x + 0.0113862, y),
-            _native_line(x, y - 0.0113862, x, y + 0.0113862),
-        ]}
-
-    section.marks = [
-        SimpleNamespace(display=lambda view, y=y: mark_display(view, y))
-        for y in (0.100775, 0.141875)
-    ]
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
-    monkeypatch.setattr(drawing, "annotation_display", lambda _a, item: (item.display(section), {}))
     monkeypatch.setattr(_section_axis, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(_section_axis, "rebuild_drawing", lambda *_a, **_kw: None)
-
-    def move(_adapter, item, dx, dy, *, label):
-        x, y, z = item.GetPosition()
-        if not item.SetPosition2(x + dx, y + dy, z):
-            raise RuntimeError(f"failed to move {label}")
-
-    monkeypatch.setattr(drawing, "move_annotation", move)
-    return adapter, section, iso, annotation, caption
+    return adapter, section, iso, caption
 
 
-@pytest.mark.parametrize("width, centered", ((0.034, False), (0.036, True), (0.030, False)))
-def test_native_text_and_caption_fit_beside_complete_mouth_profile(monkeypatch, width, centered):
-    adapter, section, iso, annotation, caption = _annotation_layout_fixture(monkeypatch, width=width, centered=centered)
-    physical = (annotation.value, annotation.tolerance, annotation.attachments, annotation.qualifier)
+@pytest.mark.parametrize("width", (0.070, 0.085))
+def test_rotated_linked_caption_fits_beside_native_section_without_chamfer_size(monkeypatch, width):
+    adapter, section, iso, caption = _caption_layout_fixture(monkeypatch, width=width)
     fields = caption.PropertyLinkedText
-    marks = tuple(section.marks)
-    old_ink = Box(0.290, 0.0876962, 0.3514153, 0.1012781)
-    iso_scale = Box(0.3204, 0.0884, 0.3796, 0.0920)
-    assert old_ink.overlaps(iso_scale, tol=0.0) is not None
-    drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
-    ink = drawing._dimension_layout_ink(adapter, annotation, label="mouth")
+    drawing._layout_mouth_caption(adapter, section, iso)
     profile = Box(*drawing._mouth_profile_box(adapter, section))
     extent = caption.GetExtent()
-    caption_box = Box(extent[0], extent[1], extent[3], extent[4])
-    text = Box(*ink.text)
-    assert profile.xmin - text.xmax == pytest.approx(0.006)
-    assert text.ymin - caption_box.ymax == pytest.approx(0.004)
-    for box in (text, profile, caption_box):
-        assert box.escape(_R8_REGION) is None
-        assert box.ymin > _R8_ISO_OUTLINE[3] + 0.002
-        assert box.gap(iso_scale) > 0.002
-        assert box.ymin > 0.066
-    for line in ink.leader:
-        assert segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), caption_box) == 0.0
-    assert (annotation.value, annotation.tolerance, annotation.attachments, annotation.qualifier) == physical
-    assert tuple(section.marks) == marks
-    assert caption.PropertyLinkedText == fields
+    box = Box(extent[0], extent[1], extent[3], extent[4])
+    assert profile.xmin - box.xmax == pytest.approx(0.004)
+    assert profile.ymax == pytest.approx(box.ymax)
+    assert box.escape(_R8_REGION) is None and box.ymin > _R8_ISO_OUTLINE[3] + 0.003
+    assert caption.PropertyLinkedText == fields.replace("<VLLABEL>", "<VLLABEL> (ROTATED)")
 
 
 @pytest.mark.parametrize("fault, width, message", (
-    ("move_refused", 0.0614153, "failed to move"),
-    ("move_ignored", 0.0614153, "callout placement did not persist"),
-    ("caption_ignored", 0.0614153, "caption position did not persist"),
+    ("caption_ignored", 0.070, "caption position did not persist"),
     (None, 0.150, "crosses the zone frame"),
 ))
-def test_annotation_layout_refuses_ignored_moves_and_unfit_text(monkeypatch, fault, width, message):
-    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch, fault=fault, width=width)
+def test_caption_layout_refuses_ignored_moves_and_unfit_extent(monkeypatch, fault, width, message):
+    adapter, section, iso, _caption = _caption_layout_fixture(monkeypatch, fault=fault, width=width)
     with pytest.raises(RuntimeError, match=message):
-        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+        drawing._layout_mouth_caption(adapter, section, iso)
 
 
 @pytest.mark.parametrize("fault", ("missing_width", "nan_width", "missing_lines", "read_error"))
 def test_native_text_layout_never_substitutes_nominal_boxes_for_missing_readbacks(monkeypatch, fault):
-    adapter, section, _iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
-    display = copy.deepcopy(annotation.display(section))
+    adapter, annotation = object(), object()
+    display = {"texts": [_native_text("12.50", 0.100, 0.200, 0.010)], "lines": [_native_line(0.100, 0.200, 0.110, 0.200)]}
     errors = {}
     if fault == "missing_width":
         display["texts"][-1].pop("w")
@@ -619,62 +526,17 @@ def test_inside_corner_callout_wrap_keeps_all_words_and_fits_actual_border_lane(
 
 
 def test_annotation_rebuild_cannot_restore_the_r8_off_sheet_section_extent(monkeypatch):
-    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
+    adapter, section, iso, _caption = _caption_layout_fixture(monkeypatch)
     monkeypatch.setattr(section, "GetOutline", lambda: _R8_SECTION_OUTLINE)
     with pytest.raises(RuntimeError, match="final complete thread-mouth outline.*crosses the zone frame"):
-        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
+        drawing._layout_mouth_caption(adapter, section, iso)
 
 
-def test_unwrapped_mouth_text_is_rejected_against_retained_native_center_marks(monkeypatch):
-    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch, width=0.0614153)
-    annotation.qualifier = spec.MOUTH_CALLOUT
-    marks = tuple(section.marks)
-    with pytest.raises(RuntimeError, match="mouth callout.*crowds.*section centre mark"):
-        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
-    assert tuple(section.marks) == marks
-
-
-def test_unreadable_center_mark_ink_is_not_treated_as_an_empty_caption_lane(monkeypatch):
-    adapter, section, iso, annotation, _caption = _annotation_layout_fixture(monkeypatch)
-    section.marks[0].display = lambda _view: {}
-    with pytest.raises(RuntimeError, match="centre mark 0 has unreadable native ink"):
-        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
-
-
-@pytest.mark.parametrize("line, intersects", (
-    ((0.310, 0.170, 0.310, 0.190), True),
-    ((0.310, 0.190, 0.310, 0.170), True),
-    ((0.295, 0.170, 0.295, 0.190), False),
-    ((0.305, 0.180, 0.315, 0.180), True),
-))
-def test_retained_mark_dimension_line_intersection_is_independent_of_text_clearance(monkeypatch, line, intersects):
-    adapter, section, iso, annotation, caption = _annotation_layout_fixture(monkeypatch)
-    mark = SimpleNamespace(display=lambda _view: {
-        "lines": [_native_line(0.300, 0.180, 0.320, 0.180)],
-    })
-    section.marks = [mark]
-    original_display = annotation.display
-
-    def display(view):
-        native = original_display(view)
-        native["lines"].append(_native_line(*line))
-        return native
-
-    annotation.display = display
-    if intersects:
-        with pytest.raises(RuntimeError, match="dimension line intersects section centre mark"):
-            drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
-    else:
-        drawing._layout_mouth_annotations(adapter, section, iso, [annotation])
-    # Both text blocks are clear in EVERY case. Only the extra dimension
-    # segment changes the verdict; a text/mark collision cannot mask the bug.
-    mark_box = Box(0.300, 0.180, 0.320, 0.180)
-    ink = drawing._dimension_layout_ink(adapter, annotation, label="mouth")
-    extent = caption.GetExtent()
-    caption_box = Box(extent[0], extent[1], extent[3], extent[4])
-    assert Box(*ink.text).gap(mark_box) >= 0.002
-    assert caption_box.gap(mark_box) >= 0.002
-    assert section.marks == [mark]
+def test_caption_layout_refuses_regenerated_orphan_marks_even_when_text_is_clear(monkeypatch):
+    adapter, section, iso, _caption = _caption_layout_fixture(monkeypatch)
+    section.marks = [object()]
+    with pytest.raises(RuntimeError, match="centre marks returned"):
+        drawing._layout_mouth_caption(adapter, section, iso)
 
 
 def _tap_name_adapter(monkeypatch, *, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
@@ -856,27 +718,27 @@ def test_tap_name_cleanup_requires_native_selection_and_actual_deletion(monkeypa
 @pytest.mark.parametrize("fault", (None, "ignored_wrap", "leader_overshoot", "changed_template"))
 def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(monkeypatch, fault):
     from dataclasses import replace
-    from _drawing_hole_callout import compose_hole_callout_prefix
 
     edge, view = object(), object()
     native_definition = "2X <MOD-DIAM><hw-diam> <hw-thru>"
-    state = SimpleNamespace(definition=None, edge=None, view=None, value=mounting.CLEARANCE_DIA / 1000.0)
-    display = SimpleNamespace(GetAnnotation=lambda: state)
+    state = SimpleNamespace(definition=native_definition, edge=None, view=None, value=mounting.CLEARANCE_DIA / 1000.0)
+    display = SimpleNamespace(
+        GetAnnotation=lambda: state, IsHoleCallout=lambda: True,
+        GetText=lambda part: state.definition if part == 5 else "",
+        SetText=lambda part, text: setattr(state, "definition", text),
+    )
     template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
     if fault == "changed_template":
         template = replace(template, title_block_left_m=0.205)
         monkeypatch.setitem(drawing.DRAWING_TEMPLATES, drawing.SPEC.layout, template)
 
-    def insert(_adapter, actual_view, *, edge, callout_xy, label, process):
-        state.edge, state.view = edge, actual_view
-        state.definition = compose_hole_callout_prefix(process, native_definition)
-        state.position = callout_xy
-        state.wrapped = process.endswith("\n") and fault != "ignored_wrap"
+    def insert(_adapter, actual_view, *, edge, callout_xy, label):
+        state.edge, state.view, state.position = edge, actual_view, callout_xy
         return display
 
     def native_ink(_adapter, annotation):
         assert annotation is state
-        if not state.wrapped:
+        if fault == "ignored_wrap":
             # Exact R9 text runs and shoulder: the last native size row
             # reaches X226.2288 into the title block. No rerun needed.
             texts = [
@@ -887,19 +749,16 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
             ]
             left, right, shoulder = 0.1041837, 0.2262288, 0.048417
         else:
-            # Simulated three-row native reflow, using the old mate+2X width
-            # conservatively for the now shorter mate-only row. This is not
-            # claimed as new native glyph evidence.
+            # Simulated native process/mate reflow. Conservatively retain
+            # the old mate+2X width; this is not new rendered glyph evidence.
             x, y = state.position
-            header, mate = spec.MOUNTING_HOLE_PROCESS.splitlines()
             texts = [
-                _native_text(header, x - 0.0304646 / 2.0, y + 0.0000267, 0.0304646),
-                _native_text(mate, x - 0.0834215 / 2.0, y - 0.0055295, 0.0834215),
-                _native_text("2X <MOD-DIAM> 2.59 THRU ALL", x - 0.048 / 2.0, y - 0.0110858, 0.048),
+                _native_text("DRILL 2X <MOD-DIAM> 2.59 THRU ALL", x - 0.060 / 2.0, y, 0.060),
+                _native_text(spec.MOUNTING_HOLE_PROCESS, x - 0.0834215 / 2.0, y - 0.0055295, 0.0834215),
             ]
             left = x - 0.0834215 / 2.0 - 0.0015875
             right = x + 0.0834215 / 2.0
-            shoulder = y - 0.0111393
+            shoulder = 0.048417
             if fault == "leader_overshoot":
                 right = 0.2262288
         return {"texts": texts, "lines": [
@@ -912,6 +771,7 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
     monkeypatch.setattr(drawing, "add_native_hole_callout", insert)
     monkeypatch.setattr(drawing, "annotation_display", native_ink)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     if fault is None:
         assert drawing._add_mounting_callout(object(), view, edge) is display
         ink = drawing._dimension_layout_ink(object(), state, label="mounting")
@@ -921,15 +781,11 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
         target = "mounting-hole line/leader" if fault == "leader_overshoot" else "mounting-hole callout"
         with pytest.raises(RuntimeError, match=target + ".*crowds.*title block"):
             drawing._add_mounting_callout(object(), view, edge)
-    # Reflow changes only the separator, not the selected mounting edge,
-    # original native format variables, hole value, words or insertion point.
+    # Process/mate rows preserve the selected edge and every native variable.
     assert state.edge is edge and state.view is view
     assert state.value == mounting.CLEARANCE_DIA / 1000.0
     assert state.position == (0.166, 0.054)
-    assert state.definition.splitlines()[-1] == native_definition
-    assert " ".join(state.definition.split()) == " ".join(
-        compose_hole_callout_prefix(spec.MOUNTING_HOLE_PROCESS, native_definition).split()
-    )
+    assert state.definition == "DRILL " + native_definition + "\n" + spec.MOUNTING_HOLE_PROCESS
 
 
 def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_moving_its_tip(monkeypatch, tmp_path) -> None:
@@ -959,8 +815,11 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (adapter.currentModel, object()))
     monkeypatch.setattr(drawing, "place_view", lambda _a, _source, orientation, *_xy, **_kw: side if orientation == "*Right" else object())
     monkeypatch.setattr(drawing, "_mouth_section", lambda *_a: object())
-    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note", "_require_root_callout_inside", "_layout_mouth_annotations", "_add_mounting_callout"):
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note", "_require_root_callout_inside", "_layout_mouth_caption", "_set_hole_process", "_show_mouth_thread", "_remove_out_of_cut_mounting_marks", "_layout_linear_annotations"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    callout.GetAnnotation = lambda: object()
+    monkeypatch.setattr(drawing, "_add_mounting_callout", lambda *_a: callout)
+    monkeypatch.setattr(drawing, "_neck_to_foot_side", lambda *_a: object())
     for name in ("curate_view_dimensions", "curate_hidden_dimensions"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: [])
     monkeypatch.setattr(drawing, "_mounting_rims", lambda _view: (SimpleNamespace(edge=object()), SimpleNamespace(edge=object())))
@@ -986,3 +845,262 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
     for junction_x in (wall["text_xy"][0] - 0.0007, wall["text_xy"][0] + 0.120):
         moved = LeaderSegment("wall", "note", junction_x, wall["text_xy"][1] - 0.0013, *wall["attach_xy"])
         assert not find_leader_leader_crossings([tap, moved])
+
+
+@pytest.mark.parametrize("fault", (None, "missing_edge", "ambiguous_edge", "wrong_attachment", "wrong_value", "basic", "precision"))
+def test_neck_to_foot_location_uses_actual_fillet_tangent_edges_and_plain_native_dimension(monkeypatch, fault):
+    import _drawing_edge_dimensions as edge_dimensions
+
+    neck_edge, foot_edge = object(), object()
+    neck = ViewEdge(neck_edge, ((joint.NECK_HALF_X, -joint.NOSE_R, 0.0), (joint.NECK_HALF_X, -joint.NOSE_R, mounting.SIDE_PLATE_Z[0] - spec.ROOT_R)), None, None)
+    # The real foot edge is displaced inward in X by its physical corner
+    # radius. Selecting X=NECK_HALF_X would pick no straight foot edge.
+    foot = ViewEdge(foot_edge, ((joint.NECK_HALF_X - spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Y[0], mounting.SIDE_PLATE_Z[0]), (joint.NECK_HALF_X - spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Y[0], mounting.SIDE_PLATE_Z[1])), None, None)
+    edges = [neck] if fault == "missing_edge" else [neck, foot]
+    if fault == "ambiguous_edge":
+        edges.append(ViewEdge(object(), foot.line, None, None))
+    attached = (neck_edge, object() if fault == "wrong_attachment" else foot_edge)
+    annotation = SimpleNamespace(GetAttachedEntities3=lambda: attached, GetAttachedEntityTypes=lambda: (1, 1), IsDangling=lambda: False)
+    expected = -joint.NOSE_R - mounting.SIDE_PLATE_Y[0]
+    native = SimpleNamespace(Name="RD1", SystemValue=(expected + (0.1 if fault == "wrong_value" else 0.0)) / 1000.0, Tolerance=SimpleNamespace(Type=1 if fault == "basic" else 0))
+    display = SimpleNamespace(GetAnnotation=lambda: annotation, GetDimension2=lambda _i: native, ShowParenthesis=True, precision=0)
+    display.SetPrecision3 = lambda primary, *_rest: setattr(display, "precision", 0 if fault == "precision" else primary)
+    display.GetPrimaryPrecision2 = lambda: display.precision
+    selected = {}
+
+    def insert(_adapter, _view, **kwargs):
+        selected.update(kwargs)
+        return display
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
+    monkeypatch.setattr(drawing, "add_edge_dimension", insert)
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (0.228 - p[1], 0.2124488 - p[2]))
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    side = SimpleNamespace(GetOutline=lambda: (0.216062, 0.1064632, 0.239938, 0.2235368))
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._neck_to_foot_side(adapter, side, ViewEdges("physical side edges", tuple(edges)))
+    else:
+        assert drawing._neck_to_foot_side(adapter, side, ViewEdges("physical side edges", tuple(edges))) is annotation
+        assert selected["entities"] == (neck_edge, foot_edge)
+        assert selected["orientation"] == "horizontal"
+        assert abs(selected["p0"][0] - selected["p1"][0]) * 1000.0 == pytest.approx(expected)
+        assert native.Name == "NeckToFootSide" and native.Tolerance.Type == 0
+        assert display.precision == 2 and display.ShowParenthesis is False
+
+
+@pytest.mark.parametrize("fault", (
+    None, "in_cut_circle", "wrong_axis", "dangling", "selection_refused", "deletion_ignored",
+    "wrong_document", "wrong_feature", "missing_correspondence", "roundtrip", "unresolved_id",
+))
+def test_section_mark_removal_requires_actual_out_of_cut_mounting_source(monkeypatch, fault):
+    state = SimpleNamespace(selected=None, removed=[])
+    bottom_marks = [object(), object()]
+    marks = []
+    source_edges = []
+    for index, point in enumerate(mounting.BRACKET_HOLE_POINTS):
+        circle = (*tuple(value / 1000.0 for value in (*point[:2], mounting.SIDE_PLATE_Z[1])), 0.0, 0.0, 1.0, mounting.CLEARANCE_DIA / 2000.0)
+        if index == 1 and fault == "in_cut_circle":
+            circle = (*circle[:2], 0.0, *circle[3:])
+        if index == 1 and fault == "wrong_axis":
+            circle = (*circle[:3], 1.0, 0.0, 0.0, circle[6])
+        canonical = SimpleNamespace(identifier=(index + 1,), GetCurve=lambda circle=circle: SimpleNamespace(IsCircle=lambda: True, CircleParams=circle))
+        source_edges.append(canonical)
+        if index == 1 and fault == "wrong_feature":
+            # Identical circle, different physical source feature: geometry
+            # alone would accept this and must not authorize deletion.
+            canonical = SimpleNamespace(identifier=(99,), GetCurve=canonical.GetCurve)
+        edge = SimpleNamespace(canonical=canonical)
+        mark = SimpleNamespace(GetAttachedEntities3=lambda edge=edge: (edge,), GetAttachedEntityTypes=lambda: (1,), IsDangling=lambda: fault == "dangling")
+        def select(_append, _number, mark=mark):
+            state.selected = mark
+            return fault != "selection_refused"
+        mark.Select2 = select
+        marks.append(mark)
+
+    def delete():
+        if fault != "deletion_ignored":
+            state.removed.append(state.selected)
+            marks.remove(state.selected)
+
+    model = SimpleNamespace(ClearSelection2=lambda _all: setattr(state, "selected", None), EditDelete=delete)
+    def corresponding(entity):
+        canonical = entity.canonical
+        return None if fault == "missing_correspondence" and canonical.identifier == (2,) else canonical
+
+    extension = SimpleNamespace(
+        GetCorrespondingEntity2=corresponding,
+        GetPersistReference3=lambda entity: entity.identifier,
+        IsSamePersistentID=lambda a, b: -1 if fault == "unresolved_id" else int(a == b),
+    )
+    # Duplicate faces repeat shared edges; native ID deduplication must not
+    # turn one physical edge into two competing source-inventory matches.
+    feature = SimpleNamespace(GetFaces=lambda: (
+        SimpleNamespace(GetEdges=lambda: tuple(source_edges)),
+        SimpleNamespace(GetEdges=lambda: tuple(source_edges)),
+    ))
+    source = SimpleNamespace(
+        GetType=lambda: 1,
+        GetPathName=lambda: str(drawing.SOURCE.with_name("other.SLDPRT") if fault == "wrong_document" else drawing.SOURCE),
+        FeatureByName=lambda name: feature if name == "MountingHoles" else None,
+        Extension=extension,
+    )
+    section = SimpleNamespace(
+        GetAnnotationsByType=lambda _kind: tuple(marks),
+        GetSection=lambda: SimpleNamespace(GetDisplayOnlySurfaceCut=lambda: True),
+        GetBaseView=lambda: SimpleNamespace(ReferencedDocument=source),
+        GetCorrespondingEntity=lambda canonical: SimpleNamespace(canonical=source_edges[0] if fault == "roundtrip" else canonical),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._remove_out_of_cut_mounting_marks(SimpleNamespace(currentModel=model), section)
+        if fault not in ("selection_refused", "deletion_ignored"):
+            assert not state.removed  # All identities must pass before deletion.
+    else:
+        drawing._remove_out_of_cut_mounting_marks(SimpleNamespace(currentModel=model), section)
+        assert not marks and len(state.removed) == 2
+    assert len(bottom_marks) == 2
+
+
+@pytest.mark.parametrize("fault", (None, "empty", "one_flank", "duplicate_flank", "outside", "hidden", "no_import"))
+def test_section_thread_requires_real_native_longitudinal_ink(monkeypatch, fault):
+    lines = [
+        _native_line(0.300, 0.176, 0.3375, 0.176),
+        _native_line(0.300, 0.197, 0.3375, 0.197),
+    ]
+    if fault == "empty":
+        lines = []
+    elif fault == "one_flank":
+        lines[1] = _native_line(0.300, 0.176, 0.300, 0.197)
+    elif fault == "duplicate_flank":
+        lines[1] = lines[0]
+    elif fault == "outside":
+        lines[1] = _native_line(0.300, 0.207, 0.3375, 0.207)
+    data = SimpleNamespace(GetLineCount=lambda: len(lines), GetLineAtIndex2=lambda i: lines[i])
+    thread = SimpleNamespace(GetDisplayData=lambda: data, GetAnnotation=lambda: SimpleNamespace(Visible=3 if fault == "hidden" else 1, IsDangling=lambda: False))
+    section = SimpleNamespace(GetCThreads=lambda: (thread,))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (0, 0) if fault == "no_import" else (1, 1))
+    monkeypatch.setattr(drawing, "_mouth_profile_box", lambda *_a: (0.300, 0.170, 0.3375, 0.203))
+    for name in ("set_hidden_lines_removed", "rebuild_drawing"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._show_mouth_thread(object(), section)
+    else:
+        drawing._show_mouth_thread(object(), section)
+
+
+@pytest.mark.parametrize("tapped", (False, True))
+@pytest.mark.parametrize("fault", (None, "missing_diameter", "ignored_write"))
+def test_native_process_rows_preserve_all_hole_variables_and_mate(monkeypatch, tapped, fault):
+    import re
+
+    # Established native callout slots: drill above, thread in prefix.
+    drill_token = "<hw-thrutapdrldia>" if tapped else "<hw-diam>"
+    definitions = {5: "<hw-threaddesc> <hw-thru>" if tapped else "", 6: "", 7: f"2X <MOD-DIAM>{drill_token} <hw-thru>", 8: ""}
+    if fault == "missing_diameter":
+        definitions[7] = definitions[7].replace(drill_token, "")
+    original = dict(definitions)
+    def set_text(part, text):
+        if fault != "ignored_write":
+            definitions[part + 4] = text
+    display = SimpleNamespace(IsHoleCallout=lambda: True, GetText=definitions.get, SetText=set_text)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    mate = spec.TAP_PROCESS if tapped else spec.MOUNTING_HOLE_PROCESS
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._set_hole_process(display, mate=mate, tapped=tapped)
+    else:
+        drawing._set_hole_process(display, mate=mate, tapped=tapped)
+        text = "\n".join(definitions.values())
+        assert re.findall(r"<hw-[^>]+>", text) == re.findall(r"<hw-[^>]+>", "\n".join(original.values()))
+        assert text.count("DRILL") == 1 and len(re.findall(r"\bTAP\b", text)) == int(tapped)
+        assert text.count(mate) == 1
+        assert "THRU" not in text.splitlines()  # No standalone literal repeat.
+        if tapped:
+            assert "45°" in text and "BOTH ENDS" in text and "BOTH LEGS" not in text
+
+
+@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing"))
+def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault):
+    """Frozen R10 primitives plus explicit simulated native move responses."""
+    rows = {
+        "NeckThickness": [("12.50 ±0.1", .1070212, .185, .0219576), (spec.NECK_THICKNESS_CALLOUT, .0726118, .1794437, .0907764)],
+        "FlangeDepth": [("3.175", .1667191, .123, .0116375), (spec.FLANGE_DEPTH_CALLOUT, .140, .1174437, .0650757)],
+        "MountingX0": [("4.00 ±0.05", .0327281, .0532219, .0245438)],
+        "MountingX1": [("17.70 ±0.05", .0464351, .0432219, .0271299)],
+        "MountingY0": [("6.35 ±0.05", .0177281, .0772219, .0245438)],
+        "SeatToAxis": [("100.40", .1875951, .1622219, .0168097)],
+        "FlangeWidth": [("49.25", .0718882, .0952219, .0142236)],
+        # Newly authored dimension: simulated native ink, not frozen R10.
+        "NeckToFootSide": [("0.85", .247, .096, .010)],
+    }
+    lines = {
+        "NeckThickness": [(.091125, .2114488, .091125, .1784438), (.103625, .2114488, .103625, .1784438), (.091125, .1794438, .1633882, .1794438)],
+        "FlangeDepth": [(.104625, .1120512, .141, .1120512), (.104625, .1152262, .141, .1152262), (.2050757, .1174438, .140, .1174438), (.140, .1174438, .140, .1152262), (.140, .1120512, .140, .1057012)],
+        "MountingX0": [(.054375, .07265, .054375, .0522219), (.058375, .07265, .058375, .0522219), (.0327281, .0532219, .064725, .0532219)],
+        "MountingX1": [(.054375, .07265, .054375, .0422219), (.072075, .07265, .072075, .0422219), (.048025, .0432219, .078425, .0432219)],
+        "MountingY0": [(.057375, .07365, .029, .07365), (.0535796, .080, .029, .080), (.030, .07365, .030, .0673), (.030, .080, .030, .08635)],
+        "SeatToAxis": [(.2215, .1120512, .195, .1120512), (.2340527, .2124488, .195, .2124488), (.196, .1120512, .196, .1622219), (.196, .2124488, .196, .1677781)],
+        "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
+        "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
+    }
+    items = {name: SimpleNamespace(name=name, dx=0.0, dy=0.0, CenterText=True, OffsetText=False) for name in rows}
+    for item in items.values():
+        item.GetSpecificAnnotation = lambda item=item: item
+
+    def native_display(_adapter, item):
+        native_lines = list(lines[item.name])
+        if item.name == "NeckThickness":
+            native_lines = [(a, b, c, d + item.dy) if i < 2 else (a, b + item.dy, c, d + item.dy) for i, (a, b, c, d) in enumerate(native_lines)]
+        elif item.name == "FlangeDepth":
+            native_lines = [(a if i < 2 else a + item.dx, b, c + item.dx, d) for i, (a, b, c, d) in enumerate(native_lines)]
+        if item.name == "MountingY0" and item.OffsetText:
+            native_lines.append((.030, .08635, rows[item.name][0][1] + item.dx, rows[item.name][0][2] + item.dy))
+        if fault == "own_crossing" and item.name == "MountingX1" and item.dx:
+            x = rows[item.name][0][1] + item.dx + .010
+            native_lines.append((x, .041, x, .050))
+        if fault == "neighbour_crossing" and item.name == "FlangeWidth" and items["MountingX1"].dx:
+            x = rows["MountingX1"][0][1] + items["MountingX1"].dx + .010
+            native_lines.append((x, .041, x, .050))
+        return {
+            "texts": [_native_text(text, x + item.dx, y + item.dy, width) for text, x, y, width in rows[item.name]],
+            "lines": [_native_line(*line) for line in native_lines],
+        }, {}
+
+    def move(_adapter, item, dx, dy, *, label):
+        if fault != "ignored_move":
+            item.dx += dx
+            item.dy += dy
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "annotation_display", native_display)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
+    monkeypatch.setattr(drawing, "move_annotation", move)
+    monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
+    # Causal controls: actual frozen witnesses cross both horizontal size
+    # text boxes, and the 6.35 row is struck at Y80 before placement.
+    for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1])):
+        box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
+        assert segment_box_overlap_length(Segment(*line), box) > 0.0
+    if fault:
+        message = "did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line")
+        with pytest.raises(RuntimeError, match=message):
+            drawing._layout_linear_annotations(object(), front, object(), list(items.values()))
+    else:
+        drawing._layout_linear_annotations(object(), front, object(), list(items.values()))
+        ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
+        assert ink["NeckThickness"].text[1] > .2235368
+        assert ink["FlangeDepth"].text[2] < .196
+        assert ink["MountingX0"].text[2] < .054375
+        assert ink["MountingX1"].text[0] > .072075
+        assert ink["MountingY0"].text[1] > .08635
+        assert items["MountingY0"].OffsetText

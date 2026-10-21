@@ -30,8 +30,6 @@ from _layout_geometry import (
     Segment,
     SheetGeometry,
     find_border_breaches,
-    find_text_on_line,
-    find_text_on_text,
     segment_box_distance,
     segment_box_overlap_length,
 )
@@ -92,14 +90,13 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    # The raw-stock form is not certified by nominal CAD symmetry. The
-    # finished-wall requirement is a separate physical acceptance, while
-    # relative axes are directly measured from the bore rim.
+    # Finished stock form is separately accepted. Bore and tap axes each
+    # have an independent ordinary .XX location from the SAME actual flat.
     import mg_magnifying_clamp_geom as geom
 
     entry_errors = [
-        abs(geom.LEVER_BORE_DIA / 2.0 + radius_change - (geom.LEVER_BORE_DIA / 2.0 + error))
-        for radius_change, error in itertools.product((0.0, 0.05), (-1.02, 1.02))
+        abs(tap_error - bore_error)
+        for tap_error, bore_error in itertools.product((-0.51, 0.51), repeat=2)
     ]
     assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(max(entry_errors))
     assert geom.BORE_FULL_ANGULAR == pytest.approx(15.0 * math.tan(math.radians(0.3)))
@@ -173,23 +170,26 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
     assert old_overlap < joint.ENGAGEMENT_MIN
 
 
-def test_linked_notes_own_finished_acceptance_without_claiming_stock_form() -> None:
+def test_feature_owned_acceptance_retains_stock_envelope_wall_and_seat_requirements() -> None:
     notes = spec.DRAWING_NOTES
     assert float(Fraction(notes.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
     for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "SEAT", "THREAD ENDS"):
         assert gone not in notes
-    assert f"{spec.WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS" in notes
+    assert spec.WALL_NOTE == f"{spec.WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS"
     assert f"TRANSVERSE ENVELOPE {spec.STOCK_WIDTH_MAX:.2f} MAX" in notes
     assert "OVER FULL HEIGHT" in notes
     assert not hasattr(spec, "TAP_TOOL_NOTE")
     assert not hasattr(spec, "BORE_WALL_NOTE")
     # This is finished acceptance, not an AF/Rule#1 form guarantee.
-    assert "WALL" not in spec.LEVER_BORE_CALLOUT
-    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
+    assert "WALL" not in notes
+    assert spec.LEVER_BORE_CALLOUT.splitlines() == ["DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", spec.WALL_NOTE]
     assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
     assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
-    assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE"
+    assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE; MHA-MG-VN-50"
+    assert "AT TAP" in spec.SEAT_NOTE
+    assert len(spec.STOCK_NOTE.splitlines()) + len(spec.WALL_NOTE.splitlines()) + len(spec.SEAT_NOTE.splitlines()) == 4
+    assert spec.HEIGHT_CALLOUT == "CONTROLS TOP-TAP WALL"
     for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):
         assert stale not in notes
     assert "BRASS" not in notes and "C36000" not in notes
@@ -203,20 +203,17 @@ def _front_drawing_layout(monkeypatch):
     view = SimpleNamespace(GetName2=lambda: "front")
     values = {
         "Height": 0.0295, "LeverBoreYDim": 0.01995, "LeverBoreDiaDim": 0.0065,
-        "LeverBoreFromZFlat": 0.00635, "ThumbTapToBoreRim": 0.00325,
-        "RodTapToBoreRim": 0.00325,
+        "LeverBoreFromZFlat": 0.00635, "ThumbTapFromZFlat": 0.00635,
+        "RodTapFromZFlat": 0.00635,
     }
 
     class Annotation:
         def __init__(self, name, value):
             self.owner, self.entities, self.position = view, (object(), object()), None
-            relative = name.endswith("ToBoreRim")
             self.dimension = SimpleNamespace(
                 Name=name, SystemValue=value,
                 Tolerance=SimpleNamespace(
-                    Type=2 if relative else 0,
-                    minimum=-0.00102 if relative else 0.0,
-                    maximum=0.00102 if relative else 0.0,
+                    Type=0, minimum=0.0, maximum=0.0,
                 ),
             )
             self.text = {4: spec.HEIGHT_CALLOUT if name == "Height" else ""}
@@ -295,165 +292,26 @@ def test_front_layout_moves_native_dimensions_and_wraps_only_height_below_text(m
         )
         assert set(item.text) == {4}
     height = state.annotations["Height"].display.GetText(4)
-    assert height.splitlines() == [spec.HEIGHT_CALLOUT.splitlines()[0], "FULL THREAD", "ENGAGEMENT"]
+    assert height.splitlines() == ["CONTROLS TOP-TAP", "WALL"]
     assert height.split() == spec.HEIGHT_CALLOUT.split()
     assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == spec.LEVER_BORE_CALLOUT
-    for name in ("ThumbTapToBoreRim", "RodTapToBoreRim"):
-        assert state.annotations[name].display.GetText(4).split() == [
-            "TAP", "ENTRY", "AXIS", "TO", "BORE", "RIM"
-        ]
+    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
+    for name in spec.GROUPED_HIDDEN_DIMENSIONS:
+        assert state.annotations[name].display.GetText(4) == ""
 
 
-def test_wrapped_native_height_block_retains_air_to_border_witness_and_arrow(monkeypatch) -> None:
+
+
+def test_common_flat_witness_station_clears_the_frozen_native_A_stroke(monkeypatch) -> None:
     state = _front_drawing_layout(monkeypatch)
-    height = state.annotations["Height"]
-    # R18 PDF advances, 3.5653 mm glyph height and 5.5562 mm row pitch.
-    # Reflow is a prediction for the unchanged native font, not new-seat proof.
-    widths = {
-        "29.50": 0.0116375, "MHA-MG-VN-50": 0.0358361,
-        "FULL THREAD ENGAGEMENT": 0.0619257,
-        "FULL THREAD": 0.0283568, "ENGAGEMENT": 0.0322770,
-    }
-    pitch, glyph_height = 0.0055562, 0.0035653
-
-    def ink(anchor, below):
-        rows = ["29.50", *below.splitlines()]
-        first_y = anchor[1] + 0.0037121 + (len(rows) - 3) * pitch / 2.0
-        return tuple(
-            Box(anchor[0] - widths[row] / 2.0, first_y - index * pitch,
-                anchor[0] + widths[row] / 2.0, first_y - index * pitch + glyph_height)
-            for index, row in enumerate(rows)
-        )
-
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    region = DrawableRegion.from_margins(
-        template.width_m, template.height_m,
-        left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
-    )
-    before = SheetGeometry(
-        name="Sheet1", width=template.width_m, height=template.height_m, region=region,
-        annotations=(AnnotationGeometry(
-            label="Height", kind="dim", owner="front",
-            text_boxes=ink((0.032, 0.155), spec.HEIGHT_CALLOUT), exact=True,
-        ),),
-    )
-    assert any(item.kind == "outside-border" for item in find_border_breaches(before))
-    after_boxes = ink(height.GetPosition(), height.display.GetText(4))
-    after = replace(before, annotations=(replace(before.annotations[0], text_boxes=after_boxes),))
-    assert find_border_breaches(after) == []
-    # R18's 19.95 top witness and Height's upper-arrow tail remain fixed.
-    assert min(box.ymin for box in after_boxes) - 0.1428 >= ARROW_TEXT_CLEARANCE_M
-    assert (0.17145 - 0.003556) - max(box.ymax for box in after_boxes) >= ARROW_TEXT_CLEARANCE_M
-
-
-@pytest.mark.parametrize("name, old_y, arrow_y", (
-    ("ThumbTapToBoreRim", 0.185, 0.17745),
-    ("RodTapToBoreRim", 0.072, 0.07695),
-))
-def test_native_rim_blocks_leave_section_arrows_bore_callout_and_own_witness(monkeypatch, name, old_y, arrow_y) -> None:
-    state = _front_drawing_layout(monkeypatch)
-    # Seven exact R18 PDF glyph boxes, including both stacked tolerance rows.
-    thumb_boxes = (
-        Box(0.0810509, 0.1870180, 0.0897335, 0.1905833),
-        Box(0.0914934, 0.1921015, 0.0937997, 0.1944302),
-        Box(0.0920206, 0.1881638, 0.0932724, 0.1884625),
-        Box(0.0947240, 0.1914902, 0.1029445, 0.1950555),
-        Box(0.0947240, 0.1869645, 0.1029445, 0.1905298),
-        Box(0.0750753, 0.1814083, 0.1087006, 0.1849736),
-        Box(0.0776372, 0.1758520, 0.1061808, 0.1794173),
-    )
-
-    def shifted(boxes, dx, dy):
-        return tuple(Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy) for box in boxes)
-
-    old_boxes = shifted(thumb_boxes, 0.0, old_y - 0.185)
-    marker = AnnotationGeometry(
-        label="section-line A", kind="section", owner="front",
-        segments=(Segment(0.085, arrow_y, 0.073, arrow_y, "arrow"),),
-    )
-    rim = AnnotationGeometry(label=name, kind="dim", owner="front", text_boxes=old_boxes, exact=True)
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    before = SheetGeometry(
-        name="Sheet1", width=template.width_m, height=template.height_m,
-        region=DrawableRegion.whole_sheet(template.width_m, template.height_m),
-        annotations=(rim, marker),
-    )
-    assert any(item.a == name and item.b == marker.label for item in find_text_on_line(before))
-    x, y, _z = state.annotations[name].GetPosition()
-    moved = replace(rim, text_boxes=shifted(old_boxes, x - 0.092, y - old_y))
-    assert find_text_on_line(replace(before, annotations=(moved, marker))) == []
-    witness_start = 0.1438 if name == "ThumbTapToBoreRim" else 0.1418
-    witness = Segment(0.09475, witness_start, 0.09475, old_y - 0.0110819, "ext-line")
-    if name == "RodTapToBoreRim":
-        assert any(segment_box_overlap_length(witness, box) > 0.003 for box in old_boxes)
-    assert all(segment_box_overlap_length(witness, box) == 0.0 for box in moved.text_boxes)
-
-    # The native bore block must move too: its original drill row occupies
-    # the new upper-rim text lane. Replay actual rows, not a nominal font box.
-    bore_rows = (
-        Box(0.1431325, 0.1818180, 0.1517218, 0.1853833),
-        Box(0.1561428, 0.1862902, 0.1613944, 0.1898555),
-        Box(0.1268490, 0.1762082, 0.1732583, 0.1797736),
-        Box(0.1126544, 0.1702786, 0.1872289, 0.1742173),
-    )
-    bore = AnnotationGeometry(label="LeverBoreDiaDim", kind="dim", owner="front", text_boxes=bore_rows, exact=True)
-    if name == "ThumbTapToBoreRim":
-        assert find_text_on_text(replace(before, annotations=(moved, bore)))
-    bx, by, _z = state.annotations["LeverBoreDiaDim"].GetPosition()
-    bore = replace(bore, text_boxes=shifted(bore_rows, bx - 0.150, by - 0.1798))
-    assert find_text_on_text(replace(before, annotations=(moved, bore))) == []
-    line_y = y - 0.0100819  # Native R18 rim dimension-line offset below anchor.
-    if name == "ThumbTapToBoreRim":
-        assert 0.17145 + 0.002 < line_y < 0.1955029 - 0.002
-    else:
-        assert 0.0669971 + 0.002 < line_y < 0.07695 - 0.002
-
-
-def test_upper_width_station_clears_a_stroke_and_neighboring_native_ink(monkeypatch) -> None:
-    state = _front_drawing_layout(monkeypatch)
-    # R21's actual A glyph and 6.35 primitives. The arrow-only R18
-    # regression missed the flat witness running through A's left stroke.
+    # R21's actual A stroke and old flat witness prove the original crossing.
+    # The new 3X caption has different ink: only its native settled audit can
+    # certify that new text, not a translated old single-value glyph box.
     a_ink = Box(0.0652137, 0.1761622, 0.0710726, 0.1823344)
-    original_width_ink = Box(0.0712621, 0.1861558, 0.0797953, 0.1897211)
-    original_witness = Segment(0.06595, 0.17245, 0.06595, 0.1862219, "ext-line")
-    marker = AnnotationGeometry(
-        label="section-line A", kind="section", owner="front", text_boxes=(a_ink,),
-        segments=(Segment(0.085, 0.17745, 0.073, 0.17745, "arrow"),), exact=True,
-    )
-    width = AnnotationGeometry(
-        label="LeverBoreFromZFlat", kind="dim", owner="front",
-        text_boxes=(original_width_ink,), segments=(original_witness,), exact=True,
-    )
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    before = SheetGeometry(
-        name="Sheet1", width=template.width_m, height=template.height_m,
-        region=DrawableRegion.from_margins(
-            template.width_m, template.height_m,
-            left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
-        ),
-        annotations=(width, marker),
-    )
-    assert any(
-        item.a == marker.label and item.b == width.label
-        for item in find_text_on_line(before)
-    )
-    assert segment_box_overlap_length(original_witness, a_ink) > 0.006
-
-    # Use the recipe's actual native-curation output. R21 measures the
-    # witness end 1.7781 mm below that station; the regenerated seat must
-    # still prove the predicted hang/reflow outside the witness span.
-    x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
-    dx, dy = x - 0.075475, y - 0.188
-    moved = Box(
-        original_width_ink.xmin + dx, original_width_ink.ymin + dy,
-        original_width_ink.xmax + dx, original_width_ink.ymax + dy,
-    )
+    original = Segment(0.06595, 0.17245, 0.06595, 0.1862219, "ext-line")
+    assert segment_box_overlap_length(original, a_ink) > 0.006
+    _x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
     shortened = Segment(0.06595, 0.17245, 0.06595, y - 0.0017781, "ext-line")
-    after = replace(before, annotations=(
-        replace(width, text_boxes=(moved,), segments=(shortened,)), marker,
-    ))
-    assert find_text_on_line(after) == []
-    assert find_border_breaches(after) == []
     assert segment_box_distance(shortened, a_ink) >= ARROW_TEXT_CLEARANCE_M
 
     def arrow_gap(anchor_y):
@@ -463,14 +321,6 @@ def test_upper_width_station_clears_a_stroke_and_neighboring_native_ink(monkeypa
 
     assert arrow_gap(0.1865) < ARROW_TEXT_CLEARANCE_M
     assert arrow_gap(y) >= ARROW_TEXT_CLEARANCE_M
-    # Whole-view neighbors stay fixed: the wrapped Height, its top
-    # extension, and the top view's separate diagonal 6.35 label.
-    height_top_witness = Segment(0.084, 0.17145, 0.035, 0.17145, "ext-line")
-    height_ink_top = 0.1655555
-    diagonal_ink = Box(0.0387871, 0.1841558, 0.0473203, 0.1877212)
-    assert segment_box_distance(height_top_witness, moved) >= ARROW_TEXT_CLEARANCE_M
-    assert moved.ymin - height_ink_top >= ARROW_TEXT_CLEARANCE_M
-    assert diagonal_ink.ymin - moved.ymax >= ARROW_TEXT_CLEARANCE_M
 
 
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:
@@ -873,8 +723,9 @@ def test_stock_flat_leader_clears_linked_scale_caption_with_r17_actual_ink(monke
     )
     assert caption.GetText() == spec.ISOMETRIC_VIEW_NOTE
 
-    # R17's measured native segment and caption ink, rounded to 0.1 mm by
-    # the audit. Keep the actual flat attachment/stock lane, move only caption ink.
+    # Replay R17's frozen segment and caption ink (0.1 mm audit rounding).
+    # The new two-line stock note can move its leader root: this regression is
+    # historic crossing evidence, NOT a current-note extent/attachment proof.
     original_anchor = (0.335, 0.150)
     original_box = Box(0.3354, 0.1464, 0.3937, 0.1500)
     stock_ink = AnnotationGeometry(
@@ -1155,6 +1006,7 @@ def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mo
 
     class Dimension:
         state, name = 2, ""
+        Tolerance = SimpleNamespace(Type=0)
 
         @property
         def SystemValue(self):
@@ -1190,6 +1042,9 @@ def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mo
         def GetDimension2(self, index):
             assert index == 0
             return dimension
+
+        def GetAnnotation(self):
+            return SimpleNamespace(GetAttachedEntities3=lambda: (center, flat), GetAttachedEntityTypes=lambda: (11, 10), IsDangling=lambda: False)
 
         @property
         def ShowParenthesis(self):
@@ -1278,8 +1133,8 @@ def test_actual_thumb_drill_cone_clears_both_walls_over_its_finite_length() -> N
     point = drill_r / math.tan(math.radians(59.0))
     depth = geom.THUMB_TAP_DRILL_DEPTH + band + point
     bore_wander = 15.0 * slope
-    # Direct rim/axis band includes the bore's radial +0.05 allowance.
-    relative_offset = 1.02 + 0.05 + depth * slope + bore_wander
+    # Two independent common-flat .XX locations, then actual angular travel.
+    relative_offset = 1.02 + depth * slope + bore_wander
 
     def clearance(distance):
         actual_radius = drill_r * (1.0 - distance / point)
@@ -1303,26 +1158,23 @@ def test_actual_thumb_drill_cone_clears_both_walls_over_its_finite_length() -> N
 
 @pytest.mark.parametrize("mode", ("retained", "lost-source", "underdefined", "extra-segment", "wrong-distance", "reference-ink"))
 def test_linked_native_locations_are_rechecked_after_equations_and_rebuild(monkeypatch, mode) -> None:
-    circle, flat = object(), object()
-
-    def converted(source):
-        return SimpleNamespace(GetRelations=lambda: (SimpleNamespace(GetDefinitionEntities2=lambda: (source,)),))
-
-    segments = [converted(circle), converted(flat if mode != "lost-source" else object())]
-    if mode == "extra-segment":
-        segments.append(converted(object()))
-    sketch = SimpleNamespace(GetSketchSegments=lambda: tuple(segments), GetConstrainedStatus=lambda: 2 if mode == "underdefined" else 3)
-    model = SimpleNamespace(FeatureByName=lambda name: SimpleNamespace(GetSpecificFeature2=lambda: sketch))
-    application = SimpleNamespace(IsSame=lambda left, right: int(left is right))
-    adapter = SimpleNamespace(currentModel=model, swApp=application)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"ActualLocationProfile": ("Top", circle, "IEntity", (("ActualFromFlat", flat),))})
-    monkeypatch.setattr(part, "_named_dimension", lambda _adapter, feature, name: (SimpleNamespace(ShowParenthesis=mode == "reference-ink"), SimpleNamespace(DrivenState=1, SystemValue=(spec.HEX_AF / 2.0 + (0.2 if mode == "wrong-distance" else 0.0)) / 1000.0)))
+    fixture = _TapProjectionFixture(monkeypatch)
+    fixture.install_rebuild(monkeypatch, {})
+    if mode == "lost-source":
+        fixture.flat.relations.clear()
+    elif mode == "underdefined":
+        fixture.status = 2
+    elif mode == "extra-segment":
+        fixture.lines.append(fixture.flat)
+    elif mode == "wrong-distance":
+        fixture.mode = "wrong-value"
+    elif mode == "reference-ink":
+        fixture.displays[0].ShowParenthesis = True
     if mode == "retained":
-        part._assert_location_profiles(adapter)
+        part._assert_location_profiles(fixture.adapter)
     else:
         with pytest.raises(RuntimeError):
-            part._assert_location_profiles(adapter)
+            part._assert_location_profiles(fixture.adapter)
 
 
 @pytest.mark.parametrize("mode", ("actual", "missing", "two-points", "profile-not-placement", "underdefined", "unknown"))
@@ -1344,8 +1196,8 @@ def test_relative_locations_use_actual_wizard_points(monkeypatch, mode) -> None:
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=feature))
     if mode == "actual":
         result = part._tap_placement_points(adapter)
-        assert result["ThumbTapToBoreRim"] is points["ThumbTap"]
-        assert result["RodTapToBoreRim"] is points["RodTap"]
+        assert result["ThumbTapFromZFlat"] is points["ThumbTap"]
+        assert result["RodTapFromZFlat"] is points["RodTap"]
     else:
         with pytest.raises(RuntimeError):
             part._tap_placement_points(adapter)
@@ -1410,7 +1262,7 @@ class _WitnessRelation:
         return tuple(2 if isinstance(entity, _WitnessPoint) else 3 if hasattr(entity, "GetType") and entity.GetType() == 0 else 4 for entity in self.GetEntities())
 
 
-class _RelativeWitnessFixture:
+class _TapProjectionFixture:
     """Native-shaped state, distinct sketch frames, and read-only measured value."""
 
     def __init__(self, monkeypatch, *, mode="retained"):
@@ -1426,7 +1278,7 @@ class _RelativeWitnessFixture:
             lambda p: (-p[2], p[1], p[0]), lambda p: (p[2], p[1], -p[0]),
         )
         self.sketch.GetConstrainedStatus = lambda: self.status
-        self.sketch.GetSketchSegments = lambda: (self.circle, *self.lines)
+        self.sketch.GetSketchSegments = lambda: (self.circle, self.flat, *self.lines)
         source = _NativeSketch("top", "ThumbPlacement")
         source.ModelToSketchTransform = _WitnessTransform(
             lambda p: (p[0], -p[2], p[1] - 0.0295),
@@ -1442,11 +1294,20 @@ class _RelativeWitnessFixture:
         self.source_circle = SimpleNamespace(_oleobj_=_WitnessDispatch("IEdge"))
         self.circle.relations = [_WitnessRelation((self.source_circle,), 32)]
         self.circle.GetRelations = lambda: tuple(self.circle.relations)
+        self.flat = _native_sketch_segment(owner=self.sketch.feature_name, kind=0, identifiers=(99, 1))
+        self.flat.owner_sketch = self.sketch
+        self.flat.GetSketch = lambda: self.sketch
+        flat_start, flat_end = _WitnessPoint(self.sketch, -0.00635, 0.0), _WitnessPoint(self.sketch, -0.00635, 0.0295)
+        self.flat.GetStartPoint2, self.flat.GetEndPoint2 = lambda: flat_start, lambda: flat_end
+        self.flat.ConstructionGeometry = True
+        self.source_flat = SimpleNamespace(_oleobj_=_WitnessDispatch("IEdge"))
+        self.flat.relations = [_WitnessRelation((self.source_flat,), 32)]
+        self.flat.GetRelations = lambda: tuple(self.flat.relations)
         self.manager = SimpleNamespace(AddToDB=False, CreateLine=self.create_line)
         self.sketch.RelationManager = SimpleNamespace(AddRelation=self.add_relation)
         selection = SimpleNamespace(
             GetSelectedObjectCount2=lambda _mark: len(self.selections),
-            GetSelectedObjectType3=lambda _index, _mark: 25 if mode == "external-selection" else 11,
+            GetSelectedObjectType3=lambda index, _mark: 11 if isinstance(self.selections[index - 1], _WitnessPoint) else 10,
             GetSelectedObject6=lambda index, _mark: self.selections[index - 1],
         )
         self.model = SimpleNamespace(
@@ -1454,7 +1315,7 @@ class _RelativeWitnessFixture:
             ClearSelection2=lambda _all: self.selections.clear(),
             SelectionManager=selection,
             FeatureManager=SimpleNamespace(GetFeatures=lambda top: _native_inventory(self.circle, self.tap).GetFeatures(top)),
-            AddHorizontalDimension2=self.dimension,
+            AddDimension2=self.dimension,
             GraphicsRedraw2=lambda: None,
             FeatureByName=lambda _name: _NativeFeature(self.sketch),
         )
@@ -1465,9 +1326,14 @@ class _RelativeWitnessFixture:
                 MultiplyTransform=lambda transform: math_point(transform.forward(tuple(coordinates))),
             )
 
+        self.preferences = {}
         self.adapter = SimpleNamespace(
             currentModel=self.model, currentSketchManager=self.manager,
-            swApp=SimpleNamespace(IsSame=_native_same, GetMathUtility=lambda: SimpleNamespace(CreatePoint=math_point)),
+            swApp=SimpleNamespace(
+                IsSame=_native_same, GetMathUtility=lambda: SimpleNamespace(CreatePoint=math_point),
+                SetUserPreferenceToggle=lambda key, value: self.preferences.__setitem__(key, value),
+                GetUserPreferenceToggle=lambda key: self.preferences[key],
+            ),
         )
         monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
         monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, _interface, *, append: self.selections.append(entity))
@@ -1550,72 +1416,86 @@ class _RelativeWitnessFixture:
 
     def dimension(self, *position):
         assert len(self.selections) == 2
-        line = self.lines[-1]
-        assert self.selections == [line.GetStartPoint2(), line.GetEndPoint2()]
-        assert position == pytest.approx((0.0, self.center.Y + 0.01, 0.0))
-        assert [relation.kind for relation in self.relations[-4:]] == [4, 26, 25, 9]
+        measured_point, selected_flat = self.selections
+        assert isinstance(measured_point, _WitnessPoint) and selected_flat is self.flat
+        assert position == pytest.approx((0.02, 0.02, 0.0))
+        if measured_point is not self.center:
+            assert measured_point is self.lines[-1].GetStartPoint2()
+            assert [relation.kind for relation in self.relations[-4:]] == [4, 26, 25, 9]
         if self.mode == "missing-dimension":
             return None
         state = self
 
         class MeasuredDimension:
             DrivenState, Name = 2, ""
-            Tolerance = SimpleNamespace(
-                Type=2, GetMinValue=lambda: -part.RELATIVE_AXIS_BAND / 1000.0,
-                GetMaxValue=lambda: part.RELATIVE_AXIS_BAND / 1000.0,
-            )
+            Tolerance = SimpleNamespace(Type=0)
+
+            @property
+            def FullName(self):
+                return f"{self.Name}@LeverBoreLocationProfile@Clamp.Part"
 
             @property
             def SystemValue(self):
-                return abs(line.GetEndPoint2().X - line.GetStartPoint2().X) + (0.0002 if state.mode == "wrong-value" else 0.0)
+                return abs(measured_point.X - state.flat.GetStartPoint2().X) + (0.0002 if state.mode == "wrong-value" else 0.0)
 
         attached = list(self.selections)
         if self.mode == "coordinate-copy":
             attached[0] = _WitnessPoint(self.sketch, attached[0].X, attached[0].Y)
         annotation = SimpleNamespace(
             GetAttachedEntities3=lambda: tuple(attached[::-1]),
-            GetAttachedEntityTypes=lambda: (11, 11),
+            GetAttachedEntityTypes=lambda: (10, 11),
             IsDangling=lambda: None if self.mode == "unknown-dangling" else self.mode == "dangling",
         )
         measured = MeasuredDimension()
-        display = SimpleNamespace(GetDimension2=lambda _index: measured, GetAnnotation=lambda: annotation, ShowParenthesis=True)
+        display = SimpleNamespace(GetDimension2=lambda _index: measured, GetAnnotation=lambda: annotation, ShowParenthesis=True, GetPrimaryPrecision2=lambda: 2)
+        annotation.GetSpecificAnnotation = lambda: display
+        annotation.Visible = 1
         self.displays.append(display)
         return display
+
+    def install_rebuild(self, monkeypatch, points):
+        part._measure_location(self.adapter, self.center, self.flat, "LeverBoreFromZFlat")
+        dimensions = {display.GetDimension2(0).Name: display for display in self.displays}
+        monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", self.source_circle, "ISketchSegment", (("LeverBoreFromZFlat", self.source_flat),))})
+        monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: dict(points))
+        monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, name: (dimensions[name], dimensions[name].GetDimension2(0)))
+        return dimensions
 
 
 @pytest.mark.parametrize("mode", (
     "retained", "no-active-sketch", "missing-line", "missing-relation", "wrong-definition",
     "segment-dispatch-proxy",
-    "wrong-relation-kind", "underdefined", "external-selection", "missing-dimension",
+    "wrong-relation-kind", "underdefined", "missing-dimension",
     "wrong-value", "coordinate-copy", "dangling", "unknown-dangling",
 ))
-def test_relative_dimension_uses_local_endpoints_with_actual_source_constraints(monkeypatch, mode) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch, mode=mode)
+def test_tap_flat_dimension_uses_actual_source_constrained_projection(monkeypatch, mode) -> None:
+    fixture = _TapProjectionFixture(monkeypatch, mode=mode)
     if mode in ("retained", "segment-dispatch-proxy"):
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
         dimension = fixture.displays[0].GetDimension2(0)
-        assert dimension.Name == "ThumbTapToBoreRim" and dimension.DrivenState == 1
+        assert dimension.Name == "ThumbTapFromZFlat" and dimension.DrivenState == 1
         assert fixture.displays[0].ShowParenthesis is False
-        assert dimension.SystemValue == pytest.approx(0.00325)
+        assert dimension.SystemValue == pytest.approx(0.00635)
         assert fixture.relations[1].entities[1] is fixture.tap
         assert fixture.relations[3].entities[1].GetID() == fixture.circle.GetID()
         assert fixture.lines[0].ConstructionGeometry is True
     else:
         with pytest.raises(RuntimeError):
-            part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+            part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
     assert fixture.manager.AddToDB is False
     if mode in ("retained", "segment-dispatch-proxy", "missing-dimension"):
-        constructor = [fields for _message, fields in fixture.events if fields.get("operation_stage") == "ThumbTapToBoreRim.point-pair-constructor"]
+        constructor = [fields for _message, fields in fixture.events if fields.get("operation_stage") == "ThumbTapFromZFlat.point-flat-constructor"]
         assert len(constructor) == 1
         assert constructor[0]["native_created"] is (mode != "missing-dimension")
-        assert constructor[0]["text_sketch_m"] == constructor[0]["text_model_m"]
+        assert constructor[0]["native_method"] == "IModelDoc2.AddDimension2"
+        assert constructor[0]["placement_m"] == (0.02, 0.02, 0.0)
 
 
 def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     other = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
-    for name, tap in (("ThumbTapToBoreRim", fixture.tap), ("RodTapToBoreRim", other)):
-        part._measure_relative_axis(fixture.adapter, tap, fixture.circle, name)
+    for name, tap in (("ThumbTapFromZFlat", fixture.tap), ("RodTapFromZFlat", other)):
+        part._measure_tap_from_flat(fixture.adapter, tap, fixture.circle, fixture.flat, name)
     first, second = fixture.lines
     assert first.GetID() != second.GetID()
     assert first.GetStartPoint2() is not second.GetStartPoint2()
@@ -1632,7 +1512,7 @@ def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -
     fixture.tap.Y = 0.0004  # Top sketch local Y becomes Right sketch X, not Y.
     assert part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch) == pytest.approx((0.0004, 0.0295, 0.0))
     with pytest.raises(RuntimeError, match="point alignment differs"):
-        part._assert_relative_witness(fixture.adapter, first, fixture.tap, fixture.circle, stage="moved-source")
+        part._assert_tap_projection(fixture.adapter, first, fixture.tap, fixture.circle, stage="moved-source")
 
 
 @pytest.mark.parametrize("point_type", (11, 25))
@@ -1732,9 +1612,10 @@ def test_native_segment_identity_requires_complete_documented_key(monkeypatch, m
     "suppressed-constraint", "unknown-suppression",
     "wrong-branch", "underdefined", "wrong-value", "wrong-band", "nonconstruction",
 ))
-def test_rebuilt_relative_witness_retains_actual_constraints_identity_value_and_band(monkeypatch, mode) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+def test_rebuilt_tap_projection_retains_actual_constraints_identity_value_and_default_band(monkeypatch, mode) -> None:
+    fixture = _TapProjectionFixture(monkeypatch)
+    part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
+    fixture.install_rebuild(monkeypatch, {"ThumbTapFromZFlat": fixture.tap})
     line = fixture.lines[0]
     display = fixture.displays[0]
     dimension = display.GetDimension2(0)
@@ -1761,9 +1642,7 @@ def test_rebuilt_relative_witness_retains_actual_constraints_identity_value_and_
         dimension.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.002, GetMaxValue=lambda: 0.002)
     elif mode == "nonconstruction":
         line.ConstructionGeometry = False
-    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", fixture.source_circle, "ISketchSegment", ())})
-    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": fixture.tap})
-    monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, _name: (display, dimension))
+    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapFromZFlat": fixture.tap})
     if mode == "retained":
         part._assert_location_profiles(fixture.adapter)
     else:
@@ -1913,13 +1792,13 @@ def test_segment_owner_inventory_is_refreshed_after_rename_and_rebuild(monkeypat
 
 @pytest.mark.parametrize("mode", ("retained", "wrong-point", "bad-point-self", "unavailable-readback"))
 def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "TapFromZFlat")
     display = fixture.displays[0]
     annotation = display.GetAnnotation()
-    start, end = fixture.lines[0].GetStartPoint2(), fixture.lines[0].GetEndPoint2()
+    start = fixture.lines[0].GetStartPoint2()
     if mode == "wrong-point":
-        annotation.GetAttachedEntities3 = lambda: (object(), end)
+        annotation.GetAttachedEntities3 = lambda: (fixture.flat, object())
     elif mode == "unavailable-readback":
         def unavailable():
             raise RuntimeError("native attachment readback unavailable")
@@ -1927,16 +1806,16 @@ def test_attachment_failures_report_actual_native_state_before_raising(monkeypat
     elif mode == "bad-point-self":
         fixture.adapter.swApp.IsSame = lambda left, right: -1 if left is start and right is start else _native_same(left, right)
     if mode == "retained":
-        part._assert_relative_attachment(fixture.adapter, display, fixture.tap, fixture.circle, name="TapToBoreRim", stage="after-rebuild")
+        part._assert_tap_flat_attachment(fixture.adapter, display, fixture.tap, fixture.circle, fixture.flat, name="TapFromZFlat", stage="after-rebuild")
     else:
         with pytest.raises(RuntimeError):
-            part._assert_relative_attachment(fixture.adapter, display, fixture.tap, fixture.circle, name="TapToBoreRim", stage="after-rebuild")
-    _message, fields = fixture.events[-1]
+            part._assert_tap_flat_attachment(fixture.adapter, display, fixture.tap, fixture.circle, fixture.flat, name="TapFromZFlat", stage="after-rebuild")
+    _message, fields = next(event for event in reversed(fixture.events) if "attachment_readback_error" in event[1])
     assert fields["operation_stage"] == "after-rebuild"
     assert (fields["attachment_readback_error"] == "None") is (mode == "retained")
     if mode != "unavailable-readback":
         assert fields["attachment_count"] == 2
-        assert fields["attached_types"] == (11, 11)
+        assert fields["attached_types"] == (10, 11)
 
 
 @pytest.mark.parametrize("types", (
@@ -1962,18 +1841,15 @@ def test_location_selection_rejects_other_entity_kinds_even_when_identity_matche
 
 @pytest.mark.parametrize("types", (
     (), (25,), (11, 11, 11), (0, 11), (3, 11), (6, 11), (9, 11),
-    (24, 11), (-1, 11), (11, 24), (25, 24), (11, 10), (10, 10),
+    (24, 11), (-1, 11), (11, 24), (25, 24), (11, 11), (10, 10),
 ))
-def test_attachment_types_require_exactly_two_documented_endpoint_points(monkeypatch, types) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+def test_attachment_types_require_exactly_one_native_point_and_flat(monkeypatch, types) -> None:
+    fixture = _TapProjectionFixture(monkeypatch)
+    part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "TapFromZFlat")
     display = fixture.displays[0]
     display.GetAnnotation().GetAttachedEntityTypes = lambda: types
-    with pytest.raises(RuntimeError, match="invalid native measurement endpoint attachments"):
-        part._assert_relative_attachment(
-            fixture.adapter, display, fixture.tap, fixture.circle,
-            name="TapToBoreRim", stage="wrong-native-kinds",
-        )
+    with pytest.raises(RuntimeError, match="invalid native point/flat attachment"):
+        part._assert_tap_flat_attachment(fixture.adapter, display, fixture.tap, fixture.circle, fixture.flat, name="TapFromZFlat", stage="wrong-native-kinds")
 
 
 @pytest.mark.parametrize("mode", (
@@ -1982,8 +1858,8 @@ def test_attachment_types_require_exactly_two_documented_endpoint_points(monkeyp
     "nonfinite-center", "nonfinite-endpoint", "unknown-status",
 ))
 def test_native_witness_constraints_fail_closed_on_unavailable_identity_or_geometry(monkeypatch, mode) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "TapFromZFlat")
     line = fixture.lines[0]
     if mode in ("unknown-point-self", "unknown-segment-self", "bool-segment-self"):
         target = fixture.tap if mode == "unknown-point-self" else fixture.circle
@@ -2004,51 +1880,39 @@ def test_native_witness_constraints_fail_closed_on_unavailable_identity_or_geome
     elif mode == "unknown-status":
         fixture.status = None
     with pytest.raises(RuntimeError):
-        part._assert_relative_witness(fixture.adapter, line, fixture.tap, fixture.circle, stage="native-unavailable")
+        part._assert_tap_projection(fixture.adapter, line, fixture.tap, fixture.circle, stage="native-unavailable")
 
 
 def test_distinct_tap_names_cannot_share_one_attached_measurement_line(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    for name in ("ThumbTapToBoreRim", "RodTapToBoreRim"):
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, name)
-    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", fixture.source_circle, "ISketchSegment", ())})
-    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": fixture.tap, "RodTapToBoreRim": fixture.tap})
-    first_display = fixture.displays[0]
-    monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, _name: (first_display, first_display.GetDimension2(0)))
+    fixture = _TapProjectionFixture(monkeypatch)
+    for name in ("ThumbTapFromZFlat", "RodTapFromZFlat"):
+        part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, name)
+    dimensions = fixture.install_rebuild(monkeypatch, {"ThumbTapFromZFlat": fixture.tap, "RodTapFromZFlat": fixture.tap})
+    dimensions["RodTapFromZFlat"] = dimensions["ThumbTapFromZFlat"]
     with pytest.raises(RuntimeError, match="distinct tap witnesses merged"):
         part._assert_location_profiles(fixture.adapter)
 
 
 def test_wrong_active_sketch_is_rejected_before_constructing_witness(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     fixture.model.GetActiveSketch2 = lambda: _NativeSketch("wrong-active", "Other")
     with pytest.raises(RuntimeError, match="not owned by the active sketch"):
-        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+        part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     assert fixture.lines == []
-    assert fixture.events[-1][1]["operation_stage"] == "TapToBoreRim.active-sketch"
+    assert fixture.events[-1][1]["operation_stage"] == "TapFromZFlat.active-sketch"
 
 
-def test_dimension_text_does_not_guess_between_model_and_sketch_frames(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
-    monkeypatch.setattr(part, "_create_relative_witness", lambda *_args: line)
-    fixture.sketch.ModelToSketchTransform = _WitnessTransform(
-        lambda p: (p[0] - 0.1, p[1], p[2]), lambda p: (p[0] + 0.1, p[1], p[2]),
-    )
-    with pytest.raises(RuntimeError, match="not common to model and Right sketch frames"):
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
-    assert fixture.displays == []
 
 
 @pytest.mark.parametrize("count, missing, expected_types", (
     (0, False, ()),
     (1, False, (11,)),
-    (3, False, (11, 11)),
+    (3, False, (11, 10, 2)),
     (None, False, ()),
-    (2, True, (11, 11)),
+    (2, True, (11, 10)),
 ))
-def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refusal(monkeypatch, count, missing, expected_types) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+def test_point_flat_selection_logs_actual_count_and_null_handles_before_refusal(monkeypatch, count, missing, expected_types) -> None:
+    fixture = _TapProjectionFixture(monkeypatch)
     manager = fixture.model.SelectionManager
     reads = []
 
@@ -2061,40 +1925,39 @@ def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refu
         return _native_same(left, right)
 
     manager.GetSelectedObjectCount2 = actual_count
-    manager.GetSelectedObject6 = lambda index, _mark: None if missing and index == 1 else fixture.selections[index - 1]
+    extra = object()
+    manager.GetSelectedObjectType3 = lambda index, _mark: (11, 10, 2)[index - 1]
+    manager.GetSelectedObject6 = lambda index, _mark: None if missing and index == 1 else (*fixture.selections, extra)[index - 1]
     fixture.adapter.swApp.IsSame = same
     with pytest.raises(RuntimeError, match=f"count={count!r}"):
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+        part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "TapFromZFlat")
     assert reads == [-1]
     message, fields = fixture.events[-1]
-    assert fields["operation_stage"] == "TapToBoreRim.point-pair-selection"
+    assert fields["operation_stage"] == "TapFromZFlat.point-flat.before-create"
     assert fields["selection_count"] == count
     assert fields["selected_types"] == expected_types
-    endpoints = (fixture.lines[0].GetStartPoint2(), fixture.lines[0].GetEndPoint2())
-    expected_keys = tuple(("LeverBoreLocationProfile", "ISketchPoint", *point.GetID()) for point in endpoints)
-    selected_keys = tuple(None if missing and index == 0 else expected_keys[index] for index in range(len(expected_types)))
-    assert fields["selected_point_identities"] == repr(selected_keys)
-    assert fields["expected_point_identities"] == repr(expected_keys)
+    assert fields["selected_and_expected_point_identities"] == "()"
+    assert fields["selected_segment_identity"] == "None"
     assert f"count={count!r}" in message
     if missing:
-        assert fields["selected_objects_present"] == (False, True)
+        assert fields["selected_available"] == (False, True)
     assert fixture.displays == []
 
 
 def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
 
     def unavailable(_index, _mark):
         raise RuntimeError("native selected handle unavailable")
 
     fixture.model.SelectionManager.GetSelectedObject6 = unavailable
     with pytest.raises(RuntimeError, match="native selected handle unavailable"):
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+        part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "TapFromZFlat")
     fields = fixture.events[-1][1]
-    assert fields["operation_stage"] == "TapToBoreRim.point-pair-selection"
+    assert fields["operation_stage"] == "TapFromZFlat.point-flat.before-create"
     assert fields["selection_count"] == 2
-    assert fields["selected_types"] == (11, 11)
-    assert "native selected handle unavailable" in fields["selection_readback_error"]
+    assert fields["selected_types"] == (11,)
+    assert "native selected handle unavailable" in fields["selection_identity_readback_error"]
     assert fixture.displays == []
 
 
@@ -2102,8 +1965,8 @@ def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch
 def test_relation_kind_mismatch_records_actual_definitions_without_kind_alias(monkeypatch, actual_kind) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     relation = fixture.relations[1]
     relation.kind = actual_kind  # Matching definition identities never authorize a kind alias.
     with pytest.raises(RuntimeError, match="actual kinds="):
@@ -2128,8 +1991,8 @@ def test_relation_kind_mismatch_records_actual_definitions_without_kind_alias(mo
 def test_all_owner_relation_kinds_are_captured_before_any_rejection(monkeypatch) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     first = _WitnessRelation((line.GetStartPoint2(), fixture.tap), 5)
     second = _WitnessRelation((line.GetStartPoint2(), None), 26)
     with pytest.raises(RuntimeError):
@@ -2143,7 +2006,7 @@ def test_all_owner_relation_kinds_are_captured_before_any_rejection(monkeypatch)
 
 
 def test_definition_interfaces_are_classified_before_native_cross_class_equality(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch, mode="segment-dispatch-proxy")
+    fixture = _TapProjectionFixture(monkeypatch, mode="segment-dispatch-proxy")
     checked = []
 
     def same(left, right):
@@ -2153,7 +2016,7 @@ def test_definition_interfaces_are_classified_before_native_cross_class_equality
         return _native_same(left, right)
 
     fixture.adapter.swApp.IsSame = same
-    part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     assert checked
     assert any(left is fixture.tap and right is fixture.tap for left, right in checked)
 
@@ -2161,8 +2024,8 @@ def test_definition_interfaces_are_classified_before_native_cross_class_equality
 def test_internal_entity_type_array_is_not_applied_to_actual_definition_array(monkeypatch) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     relation = fixture.relations[1]
     relation.GetEntities = lambda: (fixture.circle,)
     relation.GetEntitiesType = lambda: (4,)  # A solver-created arc, not either defining point.
@@ -2181,8 +2044,8 @@ def test_internal_entity_type_array_is_not_applied_to_actual_definition_array(mo
 def test_unknown_definition_capability_is_logged_and_never_cast_or_accepted(monkeypatch, mode) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     relation = fixture.relations[1]
     dispatch = fixture.tap._oleobj_
     dispatch.calls.clear()
@@ -2253,8 +2116,8 @@ def test_unknown_definition_capability_is_logged_and_never_cast_or_accepted(monk
 def test_horizontal_definition_uses_native_qi_without_dispatch_type_metadata(monkeypatch) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch, mode="segment-dispatch-proxy")
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch, mode="segment-dispatch-proxy")
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     relation = fixture.relations[0]
     actual, = relation.GetDefinitionEntities2()
     assert actual is not line
@@ -2281,8 +2144,8 @@ def test_horizontal_definition_uses_native_qi_without_dispatch_type_metadata(mon
 def test_optional_internal_metadata_failure_does_not_invalidate_native_horizontal_control(monkeypatch, unavailable_field) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     relation = fixture.relations[0]
 
     def unavailable():
@@ -2302,8 +2165,8 @@ def test_optional_internal_metadata_failure_does_not_invalidate_native_horizonta
 def test_point_id_failure_refuses_relation_despite_matching_dispatch_and_alignment(monkeypatch) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
 
     def unavailable():
         raise RuntimeError("authoritative point ID unavailable")
@@ -2322,8 +2185,8 @@ def test_point_id_failure_refuses_relation_despite_matching_dispatch_and_alignme
 def test_bad_relation_handle_does_not_hide_later_actual_kinds(monkeypatch, mode) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "TapFromZFlat")
     bad = None if mode == "null-handle" else object()
     later = _WitnessRelation((line.GetStartPoint2(), fixture.tap), 5)
 
@@ -2357,7 +2220,7 @@ def test_bad_relation_handle_does_not_hide_later_actual_kinds(monkeypatch, mode)
 def test_constraint_effect_comes_from_owner_inventory_not_useedge_return(monkeypatch, effect) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     original_add = fixture.sketch.RelationManager.AddRelation
     calls = []
     # Match R12's returned USEEDGE definition classes and internal types,
@@ -2396,17 +2259,17 @@ def test_constraint_effect_comes_from_owner_inventory_not_useedge_return(monkeyp
 
     fixture.sketch.RelationManager.AddRelation = add
     if effect == "correct":
-        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
         assert calls == [4, 26, 25, 9]
         assert len(fixture.displays) == 1
     else:
         with pytest.raises(RuntimeError):
-            part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+            part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
         assert calls == [4, 26]
         assert fixture.displays == []
     returned, = [
         fields for _message, fields in fixture.events
-        if fields.get("operation_stage") == "ThumbTapToBoreRim.add-relation" and fields.get("relation_kind") == 26
+        if fields.get("operation_stage") == "ThumbTapFromZFlat.add-relation" and fields.get("relation_kind") == 26
     ]
     assert returned["returned_relation_kinds"] == (32,)
     returned_row, = ast.literal_eval(returned["returned_relation_definitions"])
@@ -2416,12 +2279,12 @@ def test_constraint_effect_comes_from_owner_inventory_not_useedge_return(monkeyp
     assert returned_row["identity_matches"] is False
     before, = [
         fields for _message, fields in fixture.events
-        if fields.get("operation_stage") == "ThumbTapToBoreRim.before-constraint" and fields.get("relation_kind") == 26
+        if fields.get("operation_stage") == "ThumbTapFromZFlat.before-constraint" and fields.get("relation_kind") == 26
     ]
     assert before["actual_relation_kinds"] == ()
     after, = [
         fields for _message, fields in fixture.events
-        if fields.get("operation_stage") == "ThumbTapToBoreRim.created-constraint" and fields.get("relation_kind") == 26
+        if fields.get("operation_stage") == "ThumbTapFromZFlat.created-constraint" and fields.get("relation_kind") == 26
     ]
     if effect == "correct":
         assert after["actual_relation_kinds"] == (26,)
@@ -2448,7 +2311,7 @@ def test_constraint_effect_comes_from_owner_inventory_not_useedge_return(monkeyp
 
 @pytest.mark.parametrize("before", ("existing-kind", "null-handle", "unavailable"))
 def test_constraint_creation_requires_observed_absence_before_single_mutation(monkeypatch, before) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     original_create = fixture.manager.CreateLine
     original_add = fixture.sketch.RelationManager.AddRelation
     calls = []
@@ -2474,10 +2337,10 @@ def test_constraint_creation_requires_observed_absence_before_single_mutation(mo
     fixture.manager.CreateLine = create
     fixture.sketch.RelationManager.AddRelation = add
     with pytest.raises(RuntimeError, match="already exists|pre-constraint relation inventory unavailable"):
-        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     assert calls == [4]  # Never retry or add an unobservably duplicate relation 26.
     fields = fixture.events[-1][1]
-    assert fields["operation_stage"] == "ThumbTapToBoreRim.before-constraint"
+    assert fields["operation_stage"] == "ThumbTapFromZFlat.before-constraint"
     assert fields["relation_kind"] == 26
     assert fields["actual_relation_kinds"] == ((26,) if before == "existing-kind" else (None,) if before == "null-handle" else ())
     if before == "unavailable":
@@ -2485,7 +2348,7 @@ def test_constraint_creation_requires_observed_absence_before_single_mutation(mo
 
 
 def test_constraint_return_cannot_replace_unavailable_native_poststate(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     original_create = fixture.manager.CreateLine
     original_add = fixture.sketch.RelationManager.AddRelation
     calls = []
@@ -2509,16 +2372,16 @@ def test_constraint_return_cannot_replace_unavailable_native_poststate(monkeypat
     fixture.manager.CreateLine = create
     fixture.sketch.RelationManager.AddRelation = add
     with pytest.raises(RuntimeError, match="post-constraint relation inventory unavailable"):
-        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     assert calls == [4, 26]
     fields = fixture.events[-1][1]
-    assert fields["operation_stage"] == "ThumbTapToBoreRim.constraint-poststate"
+    assert fields["operation_stage"] == "ThumbTapFromZFlat.constraint-poststate"
     assert fields["relation_kind"] == 26
     assert "native post-state unavailable" in fields["relation_readback_error"]
 
 
 def test_native_shaped_database_reuses_exact_points_despite_add_to_db(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     fixture.manager.AddToDB = True
     y, radius = fixture.center.Y, fixture.circle.GetRadius()
     first = fixture.create_line(0.0, y, 0.0, radius, y, 0.0)
@@ -2534,7 +2397,7 @@ def test_native_shaped_database_reuses_exact_points_despite_add_to_db(monkeypatc
 def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypatch, failure) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     original_create = fixture.manager.CreateLine
 
     def create(*coordinates):
@@ -2560,14 +2423,14 @@ def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypa
 
     fixture.manager.CreateLine = create
     with pytest.raises(RuntimeError):
-        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     assert fixture.relations == []  # No constraint mutation on an invalid seed.
     fields = fixture.events[-1][1]
     if failure == "source-swap":
-        assert fields["operation_stage"] == "ThumbTapToBoreRim.seed-readback"
+        assert fields["operation_stage"] == "ThumbTapFromZFlat.seed-readback"
         assert fields["actual_seed_m"] != fields["provisional_seed_m"]
     else:
-        assert fields["operation_stage"] == "ThumbTapToBoreRim.seed-endpoint-identity"
+        assert fields["operation_stage"] == "ThumbTapFromZFlat.seed-endpoint-identity"
         assert fields["endpoint_identity_readback_error"] != "None"
         rows = ast.literal_eval(fields["endpoint_identity_rows"])
         assert rows[0]["role"] == "start"
@@ -2575,10 +2438,10 @@ def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypa
 
 @pytest.mark.parametrize("failure", ("center-merge", "previous-start-merge", "previous-end-merge", "source-swap", "invalid-id"))
 def test_solved_overlaid_witnesses_keep_independent_endpoint_authority(monkeypatch, failure) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     other = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
-    first = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
-    second = part._create_relative_witness(fixture.adapter, other, fixture.circle, "RodTapToBoreRim")
+    first = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
+    second = part._create_tap_projection(fixture.adapter, other, fixture.circle, "RodTapFromZFlat")
     start, end = second.GetStartPoint2(), second.GetEndPoint2()
     if failure == "center-merge":
         second.GetStartPoint2 = lambda: fixture.center
@@ -2591,19 +2454,19 @@ def test_solved_overlaid_witnesses_keep_independent_endpoint_authority(monkeypat
     else:
         start.identifiers = None
     with pytest.raises(RuntimeError):
-        part._assert_relative_witness(fixture.adapter, second, other, fixture.circle, stage="after-rebuild")
+        part._assert_tap_projection(fixture.adapter, second, other, fixture.circle, stage="after-rebuild")
 
 
 def test_provisional_seed_is_not_a_substitute_for_actual_constraint_motion(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch, mode="unsolved")
+    fixture = _TapProjectionFixture(monkeypatch, mode="unsolved")
     with pytest.raises(RuntimeError, match="point alignment differs"):
-        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     assert [relation.kind for relation in fixture.relations] == [4, 26]
 
 
 @pytest.mark.parametrize("cross_proxy_result", (0, -1, "exception"))
 def test_all_point_guards_use_documented_keys_not_cross_proxy_dispatch_equality(monkeypatch, cross_proxy_result) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     proxies = []
 
     def proxy(entity):
@@ -2628,8 +2491,8 @@ def test_all_point_guards_use_documented_keys_not_cross_proxy_dispatch_equality(
     manager.GetSelectedObjectType3 = lambda index, _mark: (25, 10)[index - 1]
     fixture.selections[:] = [fixture.tap, fixture.circle]
     part._require_location_selection(fixture.adapter, fixture.circle, point=fixture.tap, stage="point-flat-proxy")
-    manager.GetSelectedObjectType3 = lambda _index, _mark: 11
-    original_dimension = fixture.model.AddHorizontalDimension2
+    manager.GetSelectedObjectType3 = lambda index, _mark: (11, 10)[index - 1]
+    original_dimension = fixture.model.AddDimension2
 
     def dimension(*position):
         display = original_dimension(*position)
@@ -2638,13 +2501,13 @@ def test_all_point_guards_use_documented_keys_not_cross_proxy_dispatch_equality(
         annotation.GetAttachedEntities3 = lambda: tuple(proxy(entity) for entity in original_entities())
         return display
 
-    fixture.model.AddHorizontalDimension2 = dimension
-    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    fixture.model.AddDimension2 = dimension
+    part._measure_tap_from_flat(fixture.adapter, fixture.tap, fixture.circle, fixture.flat, "ThumbTapFromZFlat")
     line = fixture.lines[0]
-    part._assert_relative_witness(fixture.adapter, line, fixture.tap, fixture.circle, stage="after-rebuild-proxy")
-    part._assert_relative_attachment(fixture.adapter, fixture.displays[0], fixture.tap, fixture.circle, name="ThumbTapToBoreRim", stage="attachment-after-rebuild-proxy")
+    part._assert_tap_projection(fixture.adapter, line, fixture.tap, fixture.circle, stage="after-rebuild-proxy")
+    part._assert_tap_flat_attachment(fixture.adapter, fixture.displays[0], fixture.tap, fixture.circle, fixture.flat, name="ThumbTapFromZFlat", stage="attachment-after-rebuild-proxy")
     assert proxies and len(fixture.displays) == 1
-    assert fixture.displays[0].GetDimension2(0).SystemValue == pytest.approx(fixture.circle.GetRadius())
+    assert fixture.displays[0].GetDimension2(0).SystemValue == pytest.approx(0.00635)
 
 
 @pytest.mark.parametrize("failure", (
@@ -2655,7 +2518,7 @@ def test_all_point_guards_use_documented_keys_not_cross_proxy_dispatch_equality(
 def test_point_identity_requires_native_type_ordered_integer_pair_and_unique_actual_owner(monkeypatch, failure) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     point = _point_proxy(fixture.tap)
     if failure in ("short-id", "long-id", "bool-id", "float-id", "null-id"):
         point.identifiers = {"short-id": (1,), "long-id": (1, 2, 3), "bool-id": (True, 2), "float-id": (1, 2.0), "null-id": None}[failure]
@@ -2694,8 +2557,8 @@ def test_point_identity_requires_native_type_ordered_integer_pair_and_unique_act
 def test_relation_point_keys_refuse_coordinate_copies_owner_collisions_and_aliases(monkeypatch, mutation) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     start = line.GetStartPoint2()
     actual = _point_proxy(fixture.tap)
     if mutation == "different-id":
@@ -2716,7 +2579,7 @@ def test_relation_point_keys_refuse_coordinate_copies_owner_collisions_and_alias
 
 
 def test_point_keys_are_refreshed_after_rename_and_native_id_change(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     first = part._point_identity(fixture.adapter, fixture.tap, stage="before", role="source")
     fixture.tap.owner.feature_name = "RenamedPlacement"
     fixture.tap.identifiers = (7, 19)
@@ -2728,10 +2591,10 @@ def test_point_keys_are_refreshed_after_rename_and_native_id_change(monkeypatch)
 
 @pytest.mark.parametrize("alias", ("center", "previous-start", "previous-end"))
 def test_independence_refuses_native_point_key_aliases_even_for_different_dispatches(monkeypatch, alias) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    first = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    first = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     other_tap = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
-    second = part._create_relative_witness(fixture.adapter, other_tap, fixture.circle, "RodTapToBoreRim")
+    second = part._create_tap_projection(fixture.adapter, other_tap, fixture.circle, "RodTapFromZFlat")
     target = {"center": fixture.center, "previous-start": first.GetStartPoint2(), "previous-end": first.GetEndPoint2()}[alias]
     proxy = _point_proxy(target)
     assert _native_same(proxy, target) == 0
@@ -2741,7 +2604,7 @@ def test_independence_refuses_native_point_key_aliases_even_for_different_dispat
 
 
 def test_point_and_segment_ids_can_collide_without_colliding_typed_identity(monkeypatch) -> None:
-    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture = _TapProjectionFixture(monkeypatch)
     fixture.center.identifiers = fixture.circle.GetID()
     point_key = part._point_identity(fixture.adapter, fixture.center, stage="typed-collision", role="point")
     segment_key = part._segment_identity(fixture.adapter, fixture.circle, stage="typed-collision", role="segment")
@@ -2755,8 +2618,8 @@ def test_point_and_segment_ids_can_collide_without_colliding_typed_identity(monk
 def test_unrelated_suppressed_distance_cannot_veto_or_replace_requested_constraint(monkeypatch, requested_kind, inventory) -> None:
     import ast
 
-    fixture = _RelativeWitnessFixture(monkeypatch)
-    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    fixture = _TapProjectionFixture(monkeypatch)
+    line = part._create_tap_projection(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapFromZFlat")
     requested = fixture.relations[1 if requested_kind == 26 else 2]
     points = (line.GetStartPoint2(), fixture.tap) if requested_kind == 26 else (line.GetEndPoint2(), fixture.center)
     unrelated = _WitnessRelation(requested.entities, 1)
@@ -2782,3 +2645,214 @@ def test_unrelated_suppressed_distance_cannot_veto_or_replace_requested_constrai
         assert requested_row["identity_matches"] is True
         assert requested_row["alignment"]["aligned"] is True
         assert fields["relation_readback_error"] == "None"
+
+
+def test_common_flat_cutover_changes_the_accepted_set_without_tightening_dot_xx() -> None:
+    import mg_magnifying_clamp_geom as geom
+
+    low, high = 6.35 - 0.51, 6.35 + 0.51
+    assert spec.LOCATION_PLACES == 2 and spec.LOCATION_BAND == pytest.approx(0.51)
+    assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(high - low)
+
+    def old_accepts(bore, tap, radius):
+        return low <= bore <= high and abs(bore + radius - tap - 3.25) <= 1.02 + 1e-12
+
+    def new_accepts(bore, tap):
+        return low <= bore <= high and low <= tap <= high
+
+    assert old_accepts(6.35, 7.37, 3.25) and not new_accepts(6.35, 7.37)
+    assert new_accepts(high, low) and not old_accepts(high, low, 3.30)
+    # All three positions are independently accepted, not an implied coincidence.
+    assert max(abs(tap - bore) for tap, bore in itertools.product((low, high), repeat=2)) == pytest.approx(1.02)
+    assert geom.BLOCK_HEIGHT == 29.50 and geom.LEVER_BORE_Y == 19.95
+    assert spec.THUMB_ENGAGEMENT_WORST == pytest.approx(4.402888710865)
+    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.092143505152)
+    assert spec.TAP_REACH_NEEDED == pytest.approx(11.901655204897)
+    assert spec.TAP_STOP_WINDOW == pytest.approx(0.668770658377)
+    assert spec.THUMB_DRILL_NEAR_CLEAR == pytest.approx(0.651607939983)
+    assert spec.THUMB_DRILL_FAR_POINT_CLEAR == pytest.approx(0.720010993346)
+
+
+def _flat_group_fixture(monkeypatch):
+    fixture = _TapProjectionFixture(monkeypatch)
+    points = dict(zip(spec.Z_FLAT_DIMENSIONS[1:], (fixture.tap, _WitnessPoint(fixture.tap.owner, 0.0, 0.0)), strict=True))
+    for name, point in points.items():
+        part._measure_tap_from_flat(fixture.adapter, point, fixture.circle, fixture.flat, name)
+    dimensions = fixture.install_rebuild(monkeypatch, points)
+    # Drawing proxies are distinct from model displays. Their native names and
+    # attachments identify the same sources; equal values alone are not enough.
+    annotations = []
+    for name, source_display in dimensions.items():
+        source_dimension = source_display.GetDimension2(0)
+        dimension = SimpleNamespace(
+            Name=name, FullName=source_dimension.FullName, DrivenState=1,
+            SystemValue=source_dimension.SystemValue, Tolerance=SimpleNamespace(Type=0),
+        )
+        text = {}
+        annotation = SimpleNamespace(
+            GetAttachedEntities3=source_display.GetAnnotation().GetAttachedEntities3,
+            GetAttachedEntityTypes=source_display.GetAnnotation().GetAttachedEntityTypes,
+            IsDangling=lambda: False, Visible=1,
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, value=dimension: value,
+            GetPrimaryPrecision2=lambda: 2, ShowParenthesis=False,
+            GetAnnotation=lambda value=annotation: value,
+            SetText=lambda kind, value, state=text: state.__setitem__(kind, value),
+            GetText=lambda kind, state=text: state.get(kind, ""),
+        )
+        annotation.GetSpecificAnnotation = lambda value=display: value
+        annotations.append(annotation)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_named_dimension", part._named_dimension)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetDimension2(0).Name)
+    return fixture, SimpleNamespace(ReferencedDocument=fixture.model), annotations[::-1]
+
+
+def test_grouping_retains_three_distinct_source_measurements_and_one_real_visible_dimension(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    endpoints = [point for line in fixture.lines for point in (line.GetStartPoint2(), line.GetEndPoint2())]
+    before = [(point.GetID(), point.X, point.Y, point.Z) for point in endpoints]
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert [(point.GetID(), point.X, point.Y, point.Z) for point in endpoints] == before
+    assert len({point.GetID() for point in endpoints}) == 4
+    states = {drawing.dimension_name(fixture.adapter, a): a.Visible for a in annotations}
+    assert states == {"LeverBoreFromZFlat": 1, "ThumbTapFromZFlat": 3, "RodTapFromZFlat": 3}
+    leader = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
+    assert leader.GetSpecificAnnotation().GetText(1) == "3X "
+    assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
+    assert len(spec.DRAWING_PRECISION_BY_NAME) == 9 and len(spec.VISIBLE_DIMENSIONS) == 7
+    assert spec.DIMENSION_GROUPS == {"LeverBoreFromZFlat": spec.Z_FLAT_DIMENSIONS}
+    fields = fixture.events[-1][1]
+    assert fields["source_dimension_count"] == 3 and fields["visible_dimension_count"] == 1
+    drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+
+
+@pytest.mark.parametrize("failure", (
+    "missing", "duplicate", "wrong-feature", "wrong-model", "wrong-value",
+    "explicit-band", "wrong-precision", "wrong-point-same-coordinates",
+    "wrong-flat-same-coordinates", "wrong-source-association", "dangling",
+))
+def test_grouping_refuses_unproved_native_members_before_hiding_any_dimension(monkeypatch, failure) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    original_annotations = annotations[:]
+    annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "ThumbTapFromZFlat")
+    display = annotation.GetSpecificAnnotation()
+    dimension = display.GetDimension2(0)
+    if failure == "missing":
+        annotations.remove(annotation)
+    elif failure == "duplicate":
+        annotations.append(annotation)
+    elif failure == "wrong-feature":
+        dimension.FullName = "ThumbTapFromZFlat@OtherProfile@Clamp.Part"
+    elif failure == "wrong-model":
+        dimension.FullName = "ThumbTapFromZFlat@LeverBoreLocationProfile@Other.Part"
+    elif failure == "wrong-value":
+        dimension.SystemValue += 0.0002
+    elif failure == "explicit-band":
+        dimension.Tolerance.Type = 2
+    elif failure == "wrong-precision":
+        display.GetPrimaryPrecision2 = lambda: 3
+    elif failure == "wrong-point-same-coordinates":
+        # The other tap is nominally coincident, but is a DIFFERENT source.
+        annotation.GetAttachedEntities3 = lambda: (fixture.flat, fixture.lines[1].GetStartPoint2())
+    elif failure == "wrong-flat-same-coordinates":
+        other_flat = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=0, identifiers=(99, 2))
+        other_flat.owner_sketch = fixture.sketch
+        other_flat.GetSketch = lambda: fixture.sketch
+        other_flat.GetStartPoint2 = fixture.flat.GetStartPoint2
+        other_flat.GetEndPoint2 = fixture.flat.GetEndPoint2
+        annotation.GetAttachedEntities3 = lambda: (other_flat, fixture.lines[0].GetStartPoint2())
+    elif failure == "wrong-source-association":
+        fixture.lines[0].GetStartPoint2().relations.clear()
+    elif failure == "dangling":
+        annotation.IsDangling = lambda: True
+    with pytest.raises(RuntimeError):
+        drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert all(a.Visible == 1 for a in original_annotations)
+    assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in original_annotations)
+
+
+def test_grouping_accepts_documented_point_and_flat_keys_across_distinct_dispatches(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    proxy_flat = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=0, identifiers=fixture.flat.GetID())
+    proxy_flat.owner_sketch = fixture.sketch
+    proxy_flat.GetSketch = lambda: fixture.sketch
+    assert _native_same(proxy_flat, fixture.flat) == 0
+    for annotation in annotations:
+        flat, point = annotation.GetAttachedEntities3()
+        assert flat is fixture.flat
+        proxy_point = _point_proxy(point)
+        annotation.GetAttachedEntities3 = lambda flat=proxy_flat, point=proxy_point: (point, flat)
+        annotation.GetAttachedEntityTypes = lambda: (11, 10)
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+
+
+@pytest.mark.parametrize("failure", ("hide-refused", "unknown-visible", "prefix-lost", "source-constraint-lost"))
+def test_group_visibility_and_source_proof_remain_strict_after_native_rebuild(monkeypatch, failure) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    if failure == "hide-refused":
+        class RefusingAnnotation:
+            def __init__(self, native):
+                self.native = native
+
+            def __getattr__(self, name):
+                return getattr(self.native, name)
+
+            @property
+            def Visible(self):
+                return self.native.Visible
+
+            @Visible.setter
+            def Visible(self, _value):
+                pass  # Native refusal fixture: the required state never persisted.
+
+        annotations = [RefusingAnnotation(a) if drawing.dimension_name(fixture.adapter, a) == "RodTapFromZFlat" else a for a in annotations]
+        with pytest.raises(RuntimeError, match="native visibility"):
+            drawing._group_flat_locations(fixture.adapter, view, annotations)
+        return
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+    if failure == "unknown-visible":
+        annotations[0].Visible = 0
+    elif failure == "prefix-lost":
+        leader = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat")
+        leader.GetSpecificAnnotation().SetText(1, "")
+    else:
+        fixture.lines[0].GetStartPoint2().relations.clear()
+    with pytest.raises(RuntimeError):
+        drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+
+
+@pytest.mark.parametrize("failure", ("none", "value", "reference", "state", "band", "bool-band", "precision", "unavailable"))
+def test_ordinary_location_readback_reports_actual_metadata_before_refusal(monkeypatch, failure) -> None:
+    import ast
+    import _telemetry
+
+    dimension = SimpleNamespace(
+        DrivenState=2 if failure == "state" else 1,
+        SystemValue=0.00655 if failure == "value" else 0.00635,
+        Tolerance=SimpleNamespace(Type=False if failure == "bool-band" else 2 if failure == "band" else 0),
+    )
+    display = SimpleNamespace(ShowParenthesis=failure == "reference", GetPrimaryPrecision2=lambda: 3 if failure == "precision" else 2)
+    if failure == "unavailable":
+        def unavailable():
+            raise RuntimeError("native precision unavailable")
+        display.GetPrimaryPrecision2 = unavailable
+    events = []
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
+    if failure == "none":
+        part._assert_ordinary_location(display, dimension, "ActualFromFlat")
+    else:
+        with pytest.raises(RuntimeError):
+            part._assert_ordinary_location(display, dimension, "ActualFromFlat")
+    _message, fields = events[-1]
+    assert fields["operation_stage"] == "ActualFromFlat.ordinary-location-readback"
+    actual = ast.literal_eval(fields["native_measurement"])
+    assert actual["value_m"] == dimension.SystemValue
+    assert actual["driven_state"] == dimension.DrivenState
+    assert actual["tolerance_type"] == dimension.Tolerance.Type
+    assert type(actual["tolerance_type"]) is type(dimension.Tolerance.Type)
+    assert (fields["measurement_readback_error"] == "None") is (failure != "unavailable")
+    if failure == "unavailable":
+        assert "places" not in actual and "native precision unavailable" in fields["measurement_readback_error"]

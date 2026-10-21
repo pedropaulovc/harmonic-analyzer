@@ -27,7 +27,7 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
-from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_DIA_BAND, ROD_LENGTH, THREAD, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER, TIP_CHAMFER_BAND
+from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_DIA_BAND, ROD_LENGTH, THREAD, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER, TIP_CHAMFER_BAND, TIP_CHAMFER_MAX
 from mg_magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, ISO_VIEW_NOTE, SINGLE_LIMITS, SURFACE_FINISHES, THREAD_CALLOUT
 
@@ -136,6 +136,17 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X, "Top Plane", KNIFE_LOCAL_Y, "knife axis")
     set_dimension_bilateral_tolerance(adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND))
     set_dimension_bilateral_tolerance(adapter, "RodProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND))
+    # The hidden native distance owns the footer ceiling without changing the
+    # nominal profile. The joint separately charges the ordinary angle band.
+    _, chamfer_dimension = _named_dimension(adapter, "RodProfile", "TipChamfer")
+    chamfer_tolerance = _early_bound(chamfer_dimension.Tolerance, "IDimensionTolerance")
+    chamfer_nominal = float(chamfer_dimension.SystemValue) * 1000.0
+    if not (
+        math.isclose(chamfer_nominal, TIP_CHAMFER, abs_tol=1e-6)
+        and math.isclose(chamfer_nominal + float(chamfer_tolerance.GetMinValue()) * 1000.0, 0.0, abs_tol=1e-6)
+        and math.isclose(chamfer_nominal + float(chamfer_tolerance.GetMaxValue()) * 1000.0, TIP_CHAMFER_MAX, abs_tol=1e-6)
+    ):
+        raise RuntimeError("TipChamfer@RodProfile: native primary-distance limits changed")
     _single_limits(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

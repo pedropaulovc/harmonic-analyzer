@@ -30,7 +30,7 @@ from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_p
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
-from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, NECK_HALF_X, NECK_THICKNESS, NECK_THICKNESS_TOL, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC, THREAD_ROOT_ENVELOPE
+from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NECK_THICKNESS_TOL, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC, THREAD_ROOT_ENVELOPE
 from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, ROOT_R, SINGLE_LIMITS
 
 PART_NAME = "mg-magnifying-bracket"
@@ -196,6 +196,17 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "MouthBreak")
     name_dimensions(adapter, "MouthBreak", ["MouthChamfer"])
     set_dimension_bilateral_tolerance(adapter, "MouthBreak", "MouthChamfer", *deviations(MOUTH_CHAMFER_BAND))
+    # Width is capped natively; the joint charges the ordinary angular band
+    # for the other leg rather than claiming both legs have this same maximum.
+    _, chamfer_dimension = _named_dimension(adapter, "MouthBreak", "MouthChamfer")
+    chamfer_tolerance = _early_bound(chamfer_dimension.Tolerance, "IDimensionTolerance")
+    chamfer_nominal = float(chamfer_dimension.SystemValue) * 1000.0
+    if not (
+        math.isclose(chamfer_nominal, MOUTH_CHAMFER, abs_tol=1e-6)
+        and math.isclose(chamfer_nominal + float(chamfer_tolerance.GetMinValue()) * 1000.0, 0.0, abs_tol=1e-6)
+        and math.isclose(chamfer_nominal + float(chamfer_tolerance.GetMaxValue()) * 1000.0, MOUTH_CHAMFER_MAX, abs_tol=1e-6)
+    ):
+        raise RuntimeError("MouthChamfer@MouthBreak: native primary-distance limits changed")
     await _coordinates(adapter, jobs)
     await force_rebuild(adapter)
     for dimension, expression in jobs:
