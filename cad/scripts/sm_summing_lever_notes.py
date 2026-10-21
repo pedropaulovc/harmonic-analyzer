@@ -142,16 +142,16 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # The finished cavity includes full and partial threads, lead, relief,
 # chamfer, tip, runout and deflection voids. Only the separately dimensioned
 # tap-drill bore and point are excluded; keep that parenthetical exception
-# with the cavity envelope, not the independent rib-step/plate wall minimum.
+# with the cavity envelope, not the independent rib-step/profile wall minimum.
 # The cylinder is about each actual finished-hole axis, from its actual
 # entry. The builder saves this requirement on the SLDPRT; the drawing checks
 # its two native MAX dimensions and wall MIN requirement before printing it.
 BRACKET_THREAD_CUTTING_REQUIREMENT = (
-    f"CAVITY ENVELOPE Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
+    f"CAVITY WITHIN Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
     f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP\n"
     "(EXCEPT TAP-DRILL BORE/POINT)\n"
-    "ACTUAL FINISHED-HOLE AXIS / ENTRY\n"
-    f"RIB-STEP & COEFFICIENT-PLATE WALLS {RECEIVER_WALL_MIN:.1f} MIN\n"
+    "ABOUT ACTUAL AXIS, FROM ACTUAL ENTRY\n"
+    f"RIB-STEP & RIB/PLATE PROFILE WALLS {RECEIVER_WALL_MIN:.1f} MIN\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.

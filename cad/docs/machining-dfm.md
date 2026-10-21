@@ -320,13 +320,15 @@ would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
 callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
 The owner-approved **Ø2.40 MAX × 6.00 MAX** bound occupies four feature-limit rows:
-**CAVITY ENVELOPE Ø2.40 MAX X 6.00 MAX DEEP** /
+**CAVITY WITHIN Ø2.40 MAX X 6.00 MAX DEEP** /
 **(EXCEPT TAP-DRILL BORE/POINT)** /
-**ACTUAL FINISHED-HOLE AXIS / ENTRY** /
-**RIB-STEP & COEFFICIENT-PLATE WALLS 2.0 MIN**.
-The axis/entry row locates the cylinder about each actual finished-hole axis,
-from its actual entry. Only the separately dimensioned tap-drill bore and
-point are excluded from that envelope, not from the independent wall minimum.
+**ABOUT ACTUAL AXIS, FROM ACTUAL ENTRY** /
+**RIB-STEP & RIB/PLATE PROFILE WALLS 2.0 MIN**.
+The native hole callout identifies the individual actual finished hole:
+its actual axis and entry are the cylinder's references, not the nominal
+receiver coordinates or hidden requirement sketch. Only the separately
+dimensioned tap-drill bore and point are excluded from that envelope, not
+from the independent wall minimum.
 This is a flat-ended bounding cylinder, not an ordinary full-diameter
 blind-hole depth: no other smaller-diameter tip or lead cavity may continue
 beyond its **6.00 MAX** end.
@@ -396,10 +398,12 @@ envelope radius**, not a basic external screw radius. Together these bounds
 guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
 step wall** remains controlling at the approved geometry.
 
-The callout names the protected **rib-step and coefficient-plate walls**, with
-an independent **2.0 MIN** requirement. The coefficient-plate walls are the
-longitudinal receiver profile's upper/lower boundaries, including the continuous
-underside; naming only the rib step would omit that wall family.
+The callout names the protected **rib-step and rib/plate profile walls**, with
+an independent **2.0 MIN** requirement. The longitudinal receiver profile's
+upper/lower boundaries include the plate, R1 blend, tangent rib flank and
+R15.24 wrap. The governing **2.7286 mm** longitudinal wall is to the tangent
+rib flank, not the continuous plate underside. Naming only the rib step or
+coefficient plate would omit part of the protected wall family.
 The **1.29 mm** radial separation to the extended top-face plane
 is not the finite sharp-step distance above, nor is it a claim that every
 surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
