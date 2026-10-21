@@ -28,8 +28,10 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import hashlib
 import json
 import math
+from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -1757,8 +1759,8 @@ def _create_sheets(adapter: Any) -> None:
 
 def _annotate_bom_width_boundary(
     table: Any, *, configuration: str | None, stage: str,
-    outcome: dict[str, Any] | None = None,
-) -> None:
+    outcome: dict[str, Any] | None = None, capture_cells: bool = False,
+) -> dict[str, Any] | None:
     """Retain bounded raw measurements, never infer a hidden-column index map."""
     def read(call: Callable[[], Any]) -> dict[str, Any]:
         try:
@@ -1796,7 +1798,7 @@ def _annotate_bom_width_boundary(
             ],
             "caps": {"columns": declared > 8, "rows": rows > 64},
         }
-        if stage == "all_visible_after_widths":
+        if stage == "all_visible_after_widths" or capture_cells:
             try:
                 formats: list[dict[str, Any]] = []
                 format_ids: dict[str, int] = {}
@@ -1874,8 +1876,9 @@ def _annotate_bom_width_boundary(
         _telemetry.info(
             "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
         )
+        return summary
     except Exception:
-        pass  # Observational evidence cannot mask a failure or weaken a guard.
+        return None  # Observational evidence cannot mask or weaken a guard.
 
 
 def _set_bom_column_widths(
@@ -2511,6 +2514,270 @@ def _balloon_collar_on_its_rear_rim(
     )
 
 
+def _probe_native201_row_minimum(
+    adapter: Any, table: Any, reference: Any, *,
+    configuration: str, expected_snapshot: BomSnapshot,
+) -> None:
+    """Temporary PD-only causal width experiment; always stop before saving."""
+    drawing = _early_bound(adapter.currentModel, "IModelDoc2")
+    if drawing.GetType() != 3 or drawing.GetPathName() != "":
+        raise RuntimeError("native201 probe requires its unsaved drawing")
+    physical = _bom_physical_columns(table, label="native201 probe")
+    if physical != ((202, False), (204, False), (204, False), (203, False), (201, True)):
+        raise RuntimeError("native201 probe requires the qualified five-column layout")
+    native_column = next(index for index, (kind, _hidden) in enumerate(physical) if kind == 201)
+    original_hidden = table.ColumnHidden(native_column)
+    if original_hidden is not True:
+        raise RuntimeError("native201 probe original hidden state is not proven")
+    rows = len(expected_snapshot) + 1
+    if rows != 44 or int(table.RowCount) != rows:
+        raise RuntimeError("native201 probe requires all 44 physical rows")
+    control_width = 0.118  # Existing Description width; not a no-wrap guarantee.
+    all_visible = tuple((kind, False) for kind, _hidden in physical)
+
+    def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
+        return (
+            table.GetColumnType3(index, include_hidden),
+            table.GetColumnTitle2(index, include_hidden),
+            table.DisplayedText2(0, index, include_hidden),
+        )
+
+    column_records = tuple(column_record(index, True) for index in range(len(physical)))
+    bom = _early_bound(table, "IBomTableAnnotation")
+
+    def prove_hidden() -> BomSnapshot:
+        if _bom_physical_columns(table, label="native201 hidden probe") != physical:
+            raise RuntimeError("native201 probe column visibility/order changed")
+        raw_feature = bom.BomFeature
+        if raw_feature is None:
+            raise RuntimeError("native201 probe native feature is unavailable")
+        feature = _early_bound(raw_feature, "IBomFeature")
+        if feature.PartConfigurationGrouping != 3 or feature.DisplayAsOneItem is not False:
+            raise RuntimeError("native201 probe native grouping changed")
+        snapshot = validate_bom_number_property(
+            table, configuration=configuration, label="native201 probe",
+            expected_rows=rows, occurrence_quantities=True,
+        )
+        if snapshot != expected_snapshot:
+            raise RuntimeError("native201 probe native membership, Number or quantity changed")
+        return snapshot
+
+    prove_hidden()
+    raw_source = reference.ReferencedDocument
+    if raw_source is None or isinstance(raw_source, str):
+        raise RuntimeError("native201 probe source assembly document is unavailable")
+    source = _early_bound(raw_source, "IModelDoc2")
+    if Path(source.GetPathName()).resolve() != SOURCE.resolve():
+        raise RuntimeError("native201 probe reference does not identify the source assembly")
+    observations = [(0, 0, source)]
+    for row, *_rest in expected_snapshot:
+        for occurrence, raw in enumerate(bom.GetComponents2(row, configuration) or (), 1):
+            component = _early_bound(raw, "IComponent2")
+            model = component.GetModelDoc2()
+            if model is None:
+                raise RuntimeError("native201 probe source document is unresolved")
+            observations.append((row, occurrence, _early_bound(model, "IModelDoc2")))
+    expected_occurrences = sum(
+        count for _row, members, _number, _quantity in expected_snapshot
+        for _path, _member, count in members
+    )
+    if len(observations) != expected_occurrences + 1:
+        raise RuntimeError("native201 probe source document observations are incomplete")
+    source_documents = []
+    for row, occurrence, model in observations:
+        path = model.GetPathName()
+        if type(path) is not str or not path or not Path(path).is_file():
+            raise RuntimeError("native201 probe source path is unavailable")
+        source_documents.append((row, occurrence, model, path))
+    paths = tuple(dict.fromkeys(Path(path) for _row, _occurrence, _model, path in source_documents))
+    path_ids = {path: index for index, path in enumerate(paths)}
+
+    def source_state() -> dict[str, Any]:
+        flags = []
+        # Retain EVERY native model-document observation, not one wrapper per
+        # path. Only disk hashing is deduplicated by physical pathname.
+        for row, occurrence, model, path in source_documents:
+            flag = model.GetSaveFlag()
+            if model.GetPathName() != path or type(flag) is not bool:
+                raise RuntimeError("native201 probe source document identity/flag is unavailable")
+            flags.append((row, occurrence, path_ids[Path(path)], flag))
+        hashes = []
+        for path in paths:
+            with path.open("rb") as stream:
+                hashes.append((str(path), hashlib.file_digest(stream, "sha256").hexdigest()))
+        return {"disk_sha256": hashes, "live_document_flags": flags}
+
+    sources_before = source_state()
+    original_widths: tuple[float, ...] | None = None
+    baseline_cells: Any = None
+    baseline_heights: tuple[float, ...] | None = None
+    width_attempted = False
+    primary_error: BaseException | None = None
+
+    def prove_visible() -> None:
+        if _bom_physical_columns(table, label="native201 visible probe") != all_visible:
+            raise RuntimeError("native201 probe all-visible column identity changed")
+        for index, expected in enumerate(column_records):
+            if column_record(index, True) != expected or column_record(index, False) != expected:
+                raise RuntimeError("native201 probe physical/legacy column identity disagrees")
+
+    def widths_equal(expected: tuple[float, ...]) -> None:
+        actual = tuple(float(table.GetColumnWidth(index)) for index in range(len(physical)))
+        if any(
+            not math.isfinite(value) or abs(value - wanted) > 1e-9
+            for value, wanted in zip(actual, expected, strict=True)
+        ):
+            raise RuntimeError("native201 probe independent width readback changed")
+
+    def observe_visible(phase: str, target: float | None, returned: float | None) -> None:
+        nonlocal baseline_cells
+        record = _annotate_bom_width_boundary(
+            table, configuration=configuration,
+            stage=f"native201_probe_{phase}_all_visible", capture_cells=True,
+            outcome={"requested_201_m": target, "setter_return_m": returned},
+        )
+        census = record.get("cell_census", {}) if record is not None else {}
+        formats = census.get("formats", [])
+        font_fields = {
+            "use_document_format", "IsHeightSpecifiedInPts", "CharHeight",
+            "CharHeightInPts", "TypeFaceName", "WidthFactor", "CharSpacingFactor",
+            "LineSpacing", "Bold", "Italic",
+        }
+        if not formats or census.get("caps") != {"rows": False, "columns": False}:
+            raise RuntimeError("native201 probe cell/font census is incomplete")
+        for font in formats:
+            if set(font) != font_fields or any(
+                not isinstance(value, dict) or "value" not in value
+                or value.get("truncated") is not False
+                for value in font.values()
+            ):
+                raise RuntimeError("native201 probe font readback is unavailable")
+        cells = []
+        if len(census.get("rows", [])) != rows:
+            raise RuntimeError("native201 probe cell census omits rows")
+        for index, row in enumerate(census["rows"]):
+            if row["row"] != index or len(row["cells"]) != len(physical):
+                raise RuntimeError("native201 probe cell census coverage changed")
+            for column, cell in enumerate(row["cells"]):
+                if cell["column"] != column or not all(
+                    isinstance(cell[field], str) for field in ("text", "displayed")
+                ):
+                    raise RuntimeError("native201 probe cell text readback is unavailable")
+                cells.append((index, column, cell["text"], cell["displayed"], formats[cell["format_id"]]))
+        state = (formats[census["table_format_id"]], cells)
+        if baseline_cells is None:
+            baseline_cells = state
+        elif state != baseline_cells:
+            raise RuntimeError("native201 probe cell text or font changed")
+
+    def settle_hidden(phase: str) -> tuple[float, ...]:
+        if _bom_physical_columns(table, label="native201 settling probe") != physical:
+            raise RuntimeError("native201 probe hidden state was not restored before row requests")
+        returned_heights = tuple(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0) for row in range(rows))
+        if drawing.EditRebuild3() is not True:
+            raise RuntimeError("native201 probe drawing rebuild failed")
+        snapshot = prove_hidden()
+        heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
+        if any(not math.isfinite(height) or height <= 0.0 for height in heights):
+            raise RuntimeError("native201 probe physical row heights are unavailable")
+        _annotate_bom_width_boundary(
+            table, configuration=configuration, stage=f"native201_probe_{phase}_settled",
+            outcome={
+                "requested_row_height_m": BOM_ROW_HEIGHT,
+                "row_height_returns": returned_heights, "native_snapshot": snapshot,
+            },
+        )
+        return heights
+
+    try:
+        table.SetColumnHidden(native_column, False)
+        prove_visible()
+        original_widths = tuple(
+            float(table.GetColumnWidth(index)) for index in range(len(physical))
+        )
+        if any(not math.isfinite(width) or width <= 0.0 for width in original_widths):
+            raise RuntimeError("native201 probe original column widths are unavailable")
+        if original_widths[native_column] >= control_width:
+            raise RuntimeError("native201 probe fixed width is not a widening control")
+        widths_equal(tuple(BOM_COLUMN_WIDTHS.values()) + (original_widths[native_column],))
+        observe_visible("baseline", None, None)
+        table.SetColumnHidden(native_column, original_hidden)
+        baseline_heights = settle_hidden("baseline")
+
+        table.SetColumnHidden(native_column, False)
+        prove_visible()
+        widths_equal(original_widths)
+        width_attempted = True
+        returned = float(table.SetColumnWidth(native_column, control_width, 0))
+        if not math.isfinite(returned) or abs(returned - control_width) > 1e-9:
+            raise RuntimeError("native201 probe control width was refused")
+        widths_equal(original_widths[:-1] + (control_width,))
+        prove_visible()
+        observe_visible("treatment", control_width, returned)
+        table.SetColumnHidden(native_column, original_hidden)
+        settle_hidden("treatment")
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        cleanup_errors: list[BaseException] = []
+        try:
+            table.SetColumnHidden(native_column, False)
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            # Prove state independently even if the expose call raised after
+            # taking effect. Never write a width through ambiguous indices.
+            prove_visible()
+            if original_widths is not None:
+                returned = None
+                if width_attempted:
+                    returned = float(table.SetColumnWidth(native_column, original_widths[native_column], 0))
+                    if not math.isfinite(returned) or abs(returned - original_widths[native_column]) > 1e-9:
+                        raise RuntimeError("native201 probe original width restoration was refused")
+                widths_equal(original_widths)
+                observe_visible("restored", original_widths[native_column], returned)
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            # Independent attempt: a failed width restoration must not leave
+            # the retained key exposed, even though this drawing is discarded.
+            table.SetColumnHidden(native_column, original_hidden)
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            restored_heights = settle_hidden("restored")
+            if baseline_heights is not None and any(
+                abs(actual - expected) > 1e-9
+                for actual, expected in zip(restored_heights, baseline_heights, strict=True)
+            ):
+                raise RuntimeError("native201 probe baseline row minima were not restored")
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            sources_after = source_state()
+            try:
+                _telemetry.info("drawing.pd_native201_probe_sources " + json.dumps({
+                    "before": sources_before, "after": sources_after,
+                    "proof_scope": "disk hashes and captured live dirty flags, not whole-memory proof",
+                }, separators=(",", ":")))
+            except Exception:
+                pass
+            if sources_after != sources_before:
+                raise RuntimeError("native201 probe source disk hash or live dirty flag changed")
+        except BaseException as error:
+            cleanup_errors.append(error)
+        if cleanup_errors:
+            if primary_error is None:
+                failure = RuntimeError("native201 probe cleanup failed")
+                for error in cleanup_errors:
+                    failure.add_note(repr(error))
+                raise failure from cleanup_errors[0]
+            for error in cleanup_errors:
+                primary_error.add_note(f"native201 probe cleanup also failed: {error!r}")
+    raise RuntimeError("native201 width diagnostic completed; deliberate stop before split/save")
+
+
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
 ) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
@@ -2590,6 +2857,10 @@ def _place_bom_sheet(
         occurrence_quantities=True,
     )
     _activate_sheet(adapter, SHEET_NAMES[5])
+    _probe_native201_row_minimum(
+        adapter, table, reference,
+        configuration=bom_configuration, expected_snapshot=bom_snapshot,
+    )
     pieces = _split_bom(
         adapter, table, configuration=bom_configuration,
         expected_snapshot=bom_snapshot,
