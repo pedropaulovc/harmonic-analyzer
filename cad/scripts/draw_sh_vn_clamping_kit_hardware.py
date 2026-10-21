@@ -431,6 +431,40 @@ def _installation_flag(
         )
         if len(position) < 3 or not all(math.isfinite(value) for value in position):
             raise RuntimeError(f"{label}: native key position is unreadable")
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+        if (
+            not all(math.isfinite(value) for value in (*bounds, width, height))
+            or width <= 0
+            or height <= 0
+        ):
+            raise RuntimeError(
+                f"{label}: native installation text bounds are invalid: {bounds!r}"
+            )
+        # One micrometre of authoring air keeps the measured ink off hard
+        # boundaries after the native position roundtrip; no guard is relaxed.
+        authoring_air = 1e-6
+        left_min = max(cell[0] + authoring_air, outline[2] + 0.002 + authoring_air)
+        left_max = cell[2] - authoring_air - width
+        center_min = cell[1] + authoring_air + height / 2
+        center_max = cell[3] - authoring_air - height / 2
+        text_fit = {
+            "preferred_left_m": left,
+            "preferred_center_y_m": center_y,
+            "left_interval_m": (left_min, left_max),
+            "center_y_interval_m": (center_min, center_max),
+            "text_size_m": (width, height),
+            "authoring_air_m": authoring_air,
+            "cell_m": tuple(cell),
+            "view_outline_m": outline,
+        }
+        if left_min > left_max or center_min > center_max:
+            raise RuntimeError(
+                f"{label}: measured installation text cannot fit its right lane; "
+                f"text_fit={text_fit!r}"
+            )
+        left = min(max(left, left_min), left_max)
+        center_y = min(max(center_y, center_min), center_max)
         target = (
             position[0] + left - bounds[0],
             position[1] + center_y - (bounds[1] + bounds[3]) / 2,
@@ -564,6 +598,7 @@ def _installation_flag(
             "requested_position_m": target,
             "requested_text_left_m": left,
             "requested_text_center_y_m": center_y,
+            "text_fit": text_fit,
         }
         try:
             observed["position_m"] = tuple(

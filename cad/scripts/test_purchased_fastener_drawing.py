@@ -3365,6 +3365,7 @@ class _KitFlagNativeAnnotation:
         self.leader_count = 1
         self.landing = (*landing, 0.0)
         self.leader_override = None
+        self.leader_start_offset = (0.0, 0.0, 0.0)
         self.position = (0.0, 0.0, 0.0)
         self.moves = []
         self.ignore_movement = False
@@ -3411,11 +3412,15 @@ class _KitFlagNativeAnnotation:
 
     def GetLeaderPointsAtIndex(self, index):
         assert index == 0
-        return (
-            self.leader_override
-            if self.leader_override is not None
-            else (*self.position, *self.landing)
+        if self.leader_override is not None:
+            return self.leader_override
+        start = tuple(
+            value + offset
+            for value, offset in zip(
+                self.position, self.leader_start_offset, strict=True
+            )
         )
+        return (*start, *self.landing)
 
     def IsDangling(self):
         return self.dangling
@@ -3435,6 +3440,7 @@ class _KitFlagNativeNote:
         # must measure native ink rather than trusting requested coordinates.
         self.ink_offset = (-0.0013, -0.0008)
         self.extent_override = None
+        self.extent_includes_leader = False
         self.annotation = _KitFlagNativeAnnotation(self, view, edge, landing)
 
     def GetAnnotation(self):
@@ -3443,16 +3449,25 @@ class _KitFlagNativeNote:
     def GetText(self):
         return self.resolved_text
 
-    def GetExtent(self):
-        if self.extent_override is not None:
-            return self.extent_override
+    def _text_bounds(self):
         x, y, _z = self.annotation.position
         left = x + self.ink_offset[0]
         bottom = y + self.ink_offset[1]
-        return (left, bottom, 0.0, left + self.width, bottom + self.height, 0.0)
+        return (left, bottom, left + self.width, bottom + self.height)
+
+    def GetExtent(self):
+        if self.extent_override is not None:
+            return self.extent_override
+        left, bottom, right, top = self._text_bounds()
+        if self.extent_includes_leader:
+            points = self.annotation.GetLeaderPointsAtIndex(0)
+            xs = (left, right, *points[0::3])
+            ys = (bottom, top, *points[1::3])
+            left, bottom, right, top = min(xs), min(ys), max(xs), max(ys)
+        return (left, bottom, 0.0, right, top, 0.0)
 
     def GetDisplayData(self):
-        x0, y0, _z0, _x1, _y1, _z1 = self.GetExtent()
+        x0, y0, _x1, _y1 = self._text_bounds()
         return SimpleNamespace(
             GetTextCount=lambda: 1,
             GetTextAtIndex=lambda _index: self.resolved_text,
@@ -4994,3 +5009,303 @@ def test_kit_real_note_point_checks_the_named_native_entity_before_insertion(
         assert state.inserted == [note]
         assert note.annotation.landing == pytest.approx((*state.point, 0.0))
         assert not note.annotation.leader_set_calls
+
+
+@pytest.mark.parametrize(
+    ("caption_clearance", "caption_is_clear"),
+    ((0.0019999, False), (0.0020001, True)),
+)
+def test_kit_installation_native2427_measured_ink_clamps_without_moving_fixed_tip(
+    kit_installation_native, monkeypatch, caption_clearance, caption_is_clear
+):
+    state = kit_installation_native("HoldDownStud")
+    # Native2427 task.log: origin, moving leader vertex, printed ink and full
+    # note extent are distinct readbacks. The fixed tip is already correct.
+    cell = (0.018, 0.127, 0.07733333333333334, 0.179)
+    outline = (
+        0.03890366666666667,
+        0.12836199999999998,
+        0.05642966666666667,
+        0.17763800000000002,
+    )
+    initial_origin = (0.06566666666666666, 0.12436199999999997, 0.0)
+    initial_ink = (
+        0.06566666666666666,
+        0.11983630546954271,
+        0.07152916671956579,
+        0.12333630546954272,
+    )
+    old_wrong_origin = (0.06566666666666666, 0.12713769453045723, 0.0)
+    old_moving_vertex = (
+        0.06514923076923078,
+        0.12538167218678598,
+        -8.755355373462207e-16,
+    )
+    old_native_extent = (
+        0.04719472909698996,
+        0.12302010033444818,
+        -8.785551669621263e-16,
+        0.07149972575250835,
+        0.13398117725752512,
+        -9.550959580232207e-16,
+    )
+    fixed_tip = (0.04766666666666667, 0.13394999999999999, 0.0)
+    assert state.cells[0][2] == pytest.approx(cell)
+    state.view.GetOutline = lambda: outline
+    captured = {}
+
+    def measured_native_note(note):
+        note.width = initial_ink[2] - initial_ink[0]
+        note.height = initial_ink[3] - initial_ink[1]
+        note.ink_offset = (
+            initial_ink[0] - initial_origin[0],
+            initial_ink[1] - initial_origin[1],
+        )
+        note.annotation.position = initial_origin
+        note.annotation.leader_start_offset = tuple(
+            vertex - origin
+            for vertex, origin in zip(old_moving_vertex, old_wrong_origin, strict=True)
+        )
+        captured["initial_ink"] = note._text_bounds()
+        captured["initial_tip"] = note.annotation.landing
+
+        def native_extent():
+            dx = note.annotation.position[0] - old_wrong_origin[0]
+            dy = note.annotation.position[1] - old_wrong_origin[1]
+            # Only glyph-owned bounds follow text movement. The left and top
+            # native extent are owned by the already-attached arrowhead.
+            return (
+                old_native_extent[0],
+                old_native_extent[1] + dy,
+                old_native_extent[2],
+                old_native_extent[3] + dx,
+                old_native_extent[4],
+                old_native_extent[5],
+            )
+
+        note.GetExtent = native_extent
+
+    def native_projection(_adapter, view, points, **_kwargs):
+        assert view is state.view
+        for point in points:
+            assert point == pytest.approx(state.model_point)
+        return [fixed_tip[:2] for _point in points]
+
+    state.on_author = measured_native_note
+    monkeypatch.setattr(state.kit, "model_points_in_view", native_projection)
+    settled = state.kit._installation_flag(
+        state.adapter, state.configuration, state.cells, state.views
+    )
+    note = state.note
+    assert captured["initial_ink"] == pytest.approx(initial_ink)
+    assert state.calls[0]["note_xy"] == pytest.approx(initial_origin[:2])
+    assert captured["initial_tip"] == fixed_tip
+    assert note._text_bounds() == pytest.approx(
+        (initial_ink[0], 0.127001, initial_ink[2], 0.130501), abs=1e-13
+    )
+    assert note.annotation.position == pytest.approx(
+        (initial_origin[0], 0.13152669453045726, 0.0), abs=1e-13
+    )
+    assert len(note.annotation.moves) == 1
+    assert note.annotation.GetLeaderPointsAtIndex(0)[1] == pytest.approx(
+        0.129770672186786, abs=1e-13
+    )
+    assert note.annotation.landing == fixed_tip
+    assert not note.annotation.leader_set_calls
+    extent = note.GetExtent()
+    assert extent[0] == old_native_extent[0]
+    assert extent[4] == old_native_extent[4]
+    assert extent[1] == pytest.approx(0.1274091003344482, abs=1e-13)
+    _kit_flag_finish_builder_notes(state)
+    settled()
+    left, bottom, right, _top = note._text_bounds()
+    caption_top = bottom - caption_clearance
+    state.caption._extent = (left, caption_top - 0.001, 0.0, right, caption_top, 0.0)
+    if caption_is_clear:
+        settled()
+    else:
+        with pytest.raises(RuntimeError, match="caption"):
+            settled()
+    assert note.annotation.landing == fixed_tip
+    assert len(note.annotation.moves) == 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("case", ("bottom-and-right", "top"))
+def test_kit_installation_clamps_all_members_once_using_measured_text_size(
+    kit_installation_native, monkeypatch, configuration, case
+):
+    state = kit_installation_native(configuration)
+    cell_left, cell_bottom, cell_right, cell_top = state.view.cell
+    old_outline = state.view.GetOutline()
+    if case == "bottom-and-right":
+        outline = (
+            old_outline[0],
+            cell_bottom + 0.001,
+            old_outline[2],
+            cell_bottom + 0.030,
+        )
+    else:
+        outline = (
+            old_outline[0],
+            cell_top - 0.005,
+            old_outline[2],
+            cell_top - 0.001,
+        )
+    state.view.GetOutline = lambda: outline
+    body_center = ((outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2)
+    px, py, pz = state.model_point
+
+    def project(point):
+        x, y, z = point
+        return (
+            body_center[0] + 0.15 * (x - px) - 0.10 * (z - pz),
+            body_center[1] + 0.01 * (x - px) + 0.01 * (y - py) + 0.02 * (z - pz),
+        )
+
+    def native_projection(_adapter, view, points, **_kwargs):
+        assert view is state.view
+        return [project(point) for point in points]
+
+    captured = {}
+
+    def measured_note(note):
+        note.height = 0.0035 if case == "bottom-and-right" else 0.020
+        lane_width = cell_right - 1e-6 - (outline[2] + 0.002 + 1e-6)
+        note.width = lane_width * 0.85 if case == "bottom-and-right" else 0.0058625
+        note.ink_offset = (-0.0008, -0.00452569453045726)
+        note.extent_includes_leader = True
+        captured["origin"] = note.annotation.position
+        captured["ink"] = note._text_bounds()
+        captured["tip"] = note.annotation.landing
+
+    state.on_author = measured_note
+    monkeypatch.setattr(state.kit, "model_points_in_view", native_projection)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    note = state.note
+    preferred_left, preferred_center = state.calls[0]["note_xy"]
+    air = 1e-6
+    left_min = max(cell_left + air, outline[2] + 0.002 + air)
+    left_max = cell_right - air - note.width
+    center_min = cell_bottom + air + note.height / 2
+    center_max = cell_top - air - note.height / 2
+    expected_left = min(max(preferred_left, left_min), left_max)
+    expected_center = min(max(preferred_center, center_min), center_max)
+    left, bottom, right, top = note._text_bounds()
+    assert left == pytest.approx(expected_left, abs=1e-13)
+    assert (bottom + top) / 2 == pytest.approx(expected_center, abs=1e-13)
+    expected_origin = (
+        captured["origin"][0] + expected_left - captured["ink"][0],
+        captured["origin"][1]
+        + expected_center
+        - (captured["ink"][1] + captured["ink"][3]) / 2,
+        0.0,
+    )
+    assert len(note.annotation.moves) == 1
+    assert note.annotation.moves[0] == pytest.approx(expected_origin, abs=1e-13)
+    if case == "bottom-and-right":
+        assert expected_left < preferred_left
+        assert expected_center > preferred_center
+        assert bottom == pytest.approx(cell_bottom + air, abs=1e-13)
+        assert right == pytest.approx(cell_right - air, abs=1e-13)
+    else:
+        assert expected_center < preferred_center
+        assert top == pytest.approx(cell_top - air, abs=1e-13)
+    assert left - outline[2] >= 0.002
+    assert captured["tip"] == note.annotation.landing
+    assert note.annotation.landing == pytest.approx((*body_center, 0.0))
+    assert not note.annotation.leader_set_calls
+    _kit_flag_finish_builder_notes(state)
+    settled()
+    assert len(note.annotation.moves) == 1
+    assert note.annotation.landing == captured["tip"]
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "size_defect",
+    (
+        "empty-right-lane",
+        "too-wide",
+        "too-tall",
+        "nan-width",
+        "nan-height",
+        "inf-width",
+        "inf-height",
+        "zero-width",
+        "zero-height",
+        "negative-width",
+        "negative-height",
+        "overflow-width",
+        "overflow-height",
+    ),
+)
+def test_kit_installation_refuses_unplaceable_measured_ink_before_custom_move(
+    kit_installation_native, configuration, size_defect
+):
+    state = kit_installation_native(configuration)
+    cell_left, cell_bottom, cell_right, cell_top = state.view.cell
+    if size_defect == "empty-right-lane":
+        outline = state.view.GetOutline()
+        state.view.GetOutline = lambda: (
+            outline[0],
+            outline[1],
+            cell_right - 0.001,
+            outline[3],
+        )
+
+    def invalid_size(note):
+        if size_defect == "too-wide":
+            note.width = cell_right - cell_left
+        elif size_defect == "too-tall":
+            note.height = cell_top - cell_bottom + 0.001
+        elif size_defect.startswith(("nan-", "inf-", "zero-", "negative-")):
+            value, axis = size_defect.split("-")
+            number = {
+                "nan": float("nan"),
+                "inf": float("inf"),
+                "zero": 0.0,
+                "negative": -0.001,
+            }[value]
+            setattr(note, "width" if axis == "width" else "height", number)
+        elif size_defect.startswith("overflow-"):
+            width_axis = size_defect == "overflow-width"
+            cx, cy = state.view.center
+
+            def text_position(index):
+                extreme = -1e308 if index == 0 else 1e308
+                return (extreme, cy, 0.0) if width_axis else (cx, extreme, 0.0)
+
+            note.annotation.GetDisplayData = lambda: SimpleNamespace(
+                GetTextCount=lambda: 2,
+                GetTextAtIndex=lambda index: (
+                    state.key[:1] if index == 0 else state.key[1:]
+                ),
+                GetTextInBoxWidthAtIndex=lambda _index: 0.001,
+                GetTextHeightAtIndex=lambda _index: 0.0035,
+                GetTextPositionAtIndex=text_position,
+                GetTextRefPositionAtIndex=lambda _index: 1,
+                GetTextAngleAtIndex=lambda _index: 0.0,
+            )
+
+    state.on_author = invalid_size
+    match = (
+        "cannot fit its right lane"
+        if size_defect in {"empty-right-lane", "too-wide", "too-tall"}
+        else None
+    )
+    with pytest.raises(RuntimeError, match=match):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert len(state.calls) == 1
+    note = state.note
+    assert not note.annotation.moves
+    assert note.annotation.position == (*state.calls[0]["note_xy"], 0.0)
+    assert note.annotation.landing == (*state.calls[0]["leader_attach_xy"], 0.0)
+    assert not note.annotation.leader_set_calls
+    assert state.active == state.prior_view
+    assert state.sheet == "KitSheet"
+    assert state.selected is None
