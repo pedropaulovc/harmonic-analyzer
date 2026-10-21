@@ -289,7 +289,7 @@ def test_native_summing_rejects_rendered_circle_outside_usable_sheet(
     }[boundary]
     landing = fixture.landings[-1]
     landing.note.circle = (x, y, radius)
-    with pytest.raises(RuntimeError, match="inner border|title block") as error:
+    with pytest.raises(RuntimeError, match=r"inner border|title block") as error:
         _check_native_exploded_bounds(fixture)
     assert landing.stem in str(error.value)
     assert f"item {landing.note.GetBomBalloonText(True)}" in str(error.value)
@@ -334,7 +334,7 @@ def test_native_summing_bounds_reread_settled_ink_table_and_caption(
         fixture.widths[-1] += 0.02
     else:
         fixture.caption.box = (0.09, 0.14, 0.11, 0.154)
-    with pytest.raises(RuntimeError, match="intersects BOM|intersects caption"):
+    with pytest.raises(RuntimeError, match=r"intersects BOM|intersects caption"):
         _check_native_exploded_bounds(fixture)
 
 
