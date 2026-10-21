@@ -353,6 +353,13 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("ICurve", "IsCircle", 0, 11),
     ("IEdge", "GetClosestPointOn", 3, 12),
     ("IComponent2", "GetPathName", 0, 8),
+    ("IComponent2", "GetModelDoc2", 0, 9),
+    ("IComponent2", "GetCorrespondingEntity", 1, 9),
+    ("IView", "GetCorrespondingEntity", 1, 9),
+    ("IEntity", "GetComponent", 0, 9),
+    ("IEdge", "GetBody", 0, 9),
+    ("IBody2", "IsTemporaryBody", 0, 11),
+    ("IModelDocExtension", "GetObjectByPersistReference3", 2, 9),
     ("IView", "GetVisibleDrawingComponents", 0, 12),
     ("IView", "GetVisibleComponents", 0, 12),
     ("IView", "GetVisibleEntities2", 2, 12),
@@ -487,12 +494,53 @@ def test_native_polyline_census_retains_optional_variant_out_parameter() -> None
     assert _can_bind(call, method)
 
 
+def test_persistent_reference_resolution_retains_optional_integer_out_parameter() -> None:
+    method = _native_declaration("IModelDocExtension")[0]["GetObjectByPersistReference3"]
+    invocation = next(
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "_ApplyTypes_"
+    )
+    assert ast.literal_eval(invocation.args[3]) == ((12, 1), (16387, 2))
+    assert _can_bind(ast.parse("native.GetObjectByPersistReference3(reference)").body[0].value, method)
+
+
+@pytest.mark.parametrize(("interface", "iid"), (
+    ("IEdge", "{83A33D42-27C5-11CE-BFD4-00400513BB57}"),
+    ("IEntity", "{83A33D65-27C5-11CE-BFD4-00400513BB57}"),
+))
+def test_projection_diagnostic_qi_uses_pinned_interface_not_coclass(interface, iid) -> None:
+    # Import-free ABI evidence only; actual QI/ownership remains a native gate.
+    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
+    identifiers = {
+        target.id: ast.literal_eval(node.value.args[0])
+        for node in declaration.body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name) and node.value.func.id == "IID"
+        for target in node.targets if isinstance(target, ast.Name)
+    }
+    assert identifiers["CLSID"] == iid
+    assert identifiers["coclass_clsid"] != iid
+    collector = next(
+        node for node in _tree(SCRIPTS / "draw_mg_magnifier_assembly.py").body
+        if isinstance(node, ast.FunctionDef) and node.name == "_capture_projection_identity_failure"
+    )
+    assert interface in {
+        alias.name for node in ast.walk(collector)
+        if isinstance(node, ast.ImportFrom) and node.module == "solidworks_mcp.adapters._generated.sldworks_2026"
+        for alias in node.names
+    }
+
+
 @pytest.mark.parametrize("interface, member, retval, writable", (
     ("IDrawingComponent", "Component", 9, False),
     ("IDrawingComponent", "Visible", 11, True),
     ("IComponent2", "Name2", 8, True),
     ("IComponent2", "Visible", 3, True),
     ("IComponent2", "Transform2", 9, True),
+    ("IComponent2", "ReferencedConfiguration", 8, True),
+    ("IModelDoc2", "Extension", 9, False),
     ("ICurve", "CircleParams", 12, False),
     ("IMathPoint", "ArrayData", 12, True),
     ("ISketchManager", "AddToDB", 11, True),

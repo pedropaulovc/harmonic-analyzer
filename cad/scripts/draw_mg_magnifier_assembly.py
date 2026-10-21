@@ -1157,11 +1157,11 @@ def _unique_projection(adapter: Any, view: Any, *, stage: str) -> Any:
     return matches[0][1]
 
 
-def _projection_error_text(exception: Exception) -> str:
+def _projection_error_text(exception: BaseException) -> str:
     """Readable diagnostic text without trusting a secondary exception's formatter."""
     try:
         message = str(exception)
-    except Exception:
+    except BaseException:
         message = "<diagnostic text unavailable>"
     return f"{type(exception).__name__}: {message}"
 
@@ -1264,7 +1264,7 @@ def _projection_polyline_snapshot(value: Any) -> dict[str, Any]:
         record["python_id"] = id(value)
         try:
             attributes = vars(value)
-        except Exception as exc:
+        except BaseException as exc:
             attributes = {}
             record["attributes_error"] = _projection_error_text(exc)
         dispatch = attributes.get("_oleobj_")
@@ -1272,7 +1272,7 @@ def _projection_polyline_snapshot(value: Any) -> dict[str, Any]:
             record["dispatch_repr" if dispatch is not None else "opaque_repr"] = repr(
                 dispatch if dispatch is not None else value
             )
-        except Exception as exc:
+        except BaseException as exc:
             record["repr_error"] = _projection_error_text(exc)
     return record
 
@@ -1330,6 +1330,254 @@ def _capture_projection_polyline_failure(
         )
     finally:
         raise exception.with_traceback(original_traceback)
+
+
+def _capture_projection_identity_failure(
+    adapter: Any, view: Any, *, stage: str, result: Any,
+    exception: BaseException, evidence: dict[str, Any],
+    components: dict[str, Any], inventory: dict[str, Any],
+) -> NoReturn:
+    """Observe context hypotheses after refusal; NEVER accept a mapping here.
+
+    SDK GetCorrespondingEntity2 maps drawing/assembly -> underlying part;
+    Component.GetCorrespondingEntity maps part -> that instance; View's method
+    maps part/assembly -> view. Persistent IDs are compared only by their owning
+    source Extension, never by bytes. All routes remain diagnostic observations.
+    """
+    original_traceback = exception.__traceback__
+    probe: dict[str, Any] = {
+        "stage": stage, "rendered_status": "DECODED",
+        "decoded_model_edge_count": evidence.get("rendered_model_edges"),
+        "physical_evidence": evidence,
+        "readers": {},
+        "source_import_and_crop": (
+            "NOT_REACHED" if stage == "uncropped physical boundaries" else "NOT_INFERRED"
+        ),
+        "remaining_acceptance_and_export": "NOT_REACHED_AFTER_FAILURE",
+    }
+
+    def error_text(error: BaseException) -> str:
+        try:
+            return _projection_error_text(error)
+        except BaseException:
+            return type(error).__name__
+
+    def observe(key: str, reader: Callable[[], Any], *dependencies: Any) -> Any:
+        if any(value is None for value in dependencies):
+            probe["readers"][key] = {"status": "NOT_REACHED", "reason": "dependency unavailable"}
+            return None
+        try:
+            value = reader()
+        except BaseException as error:
+            row = {"status": "ERROR", "error": error_text(error)}
+            try:
+                row["hresult"] = getattr(error, "hresult", None)
+            except BaseException:
+                pass
+            probe["readers"][key] = row
+            return None
+        row = {"status": "RETURNED_NULL" if value is None else "OBSERVED"}
+        try:
+            row["value"] = _projection_polyline_snapshot(value)
+        except BaseException as error:
+            row["snapshot_error"] = error_text(error)
+        probe["readers"][key] = row
+        return value
+
+    def mapped(key: str, reader: Callable[[], Any], *dependencies: Any) -> Any:
+        raw = observe(key, reader, *dependencies)
+        return observe(f"{key}.IEdge", lambda: _early_bound(raw, "IEdge"), raw)
+
+    def edge_readers(key: str, raw: Any, app: Any) -> tuple[Any, Any]:
+        observe(f"{key}.raw", lambda: raw)
+        dispatch = observe(f"{key}.dispatch", lambda: raw._oleobj_, raw)
+        capabilities: dict[str, Any] = {}
+        if dispatch is not None:
+            try:
+                import pythoncom
+                from solidworks_mcp.adapters._generated.sldworks_2026 import IEdge, IEntity
+
+                # Actual QI, not wrapper-class inference. Only retain IUnknown;
+                # never invoke an edge/entity vtable through this returned pointer.
+                for interface, declaration in (("IEdge", IEdge), ("IEntity", IEntity)):
+                    observe(f"{key}.qi.{interface}.iid", lambda: str(declaration.CLSID))
+                    pointer = observe(
+                        f"{key}.qi.{interface}",
+                        lambda: dispatch.QueryInterface(declaration.CLSID, pythoncom.IID_IUnknown),
+                    )
+                    capabilities[interface] = pointer
+            except BaseException as error:
+                probe["readers"][f"{key}.qi.declarations"] = {
+                    "status": "ERROR", "error": error_text(error),
+                }
+        edge = observe(
+            f"{key}.IEdge", lambda: _early_bound(raw, "IEdge"), raw, capabilities.get("IEdge"),
+        )
+        entity = observe(
+            f"{key}.IEntity", lambda: _early_bound(raw, "IEntity"), raw, capabilities.get("IEntity"),
+        )
+        observe(f"{key}.self", lambda: app.IsSame(edge, edge), app, edge)
+        raw_curve = observe(f"{key}.curve_return", lambda: edge.GetCurve(), edge)
+        curve = observe(f"{key}.curve", lambda: _early_bound(raw_curve, "ICurve"), raw_curve)
+        circular = observe(f"{key}.is_circle", lambda: curve.IsCircle(), curve)
+        if circular is True:
+            observe(f"{key}.circle", lambda: curve.CircleParams, curve)
+        raw_body = observe(f"{key}.body_return", lambda: edge.GetBody(), edge)
+        body = observe(f"{key}.body", lambda: _early_bound(raw_body, "IBody2"), raw_body)
+        observe(f"{key}.temporary_body", lambda: body.IsTemporaryBody(), body)
+        raw_owner = observe(f"{key}.owner_return", lambda: entity.GetComponent(), entity)
+        owner = observe(f"{key}.owner", lambda: _early_bound(raw_owner, "IComponent2"), raw_owner)
+        observe(f"{key}.owner.name", lambda: owner.Name2, owner)
+        observe(f"{key}.owner.path", lambda: owner.GetPathName(), owner)
+        return edge, owner
+
+    try:
+        try:
+            # The original single retrieval, including null slots and all IEEE data.
+            observe("original_return", lambda: result)
+            observe("physical_evidence", lambda: evidence)
+            observe(
+                "evidence_log",
+                lambda: _telemetry.info(f"{LEVER_TIP.title} {stage}: physical model evidence={evidence!r}"),
+            )
+            app = observe("application", lambda: _early_bound(adapter.swApp, "ISldWorks"))
+            for name, reader in (
+                ("name", lambda: view_name(adapter, view)),
+                ("revision", lambda: app.RevisionNumber()),
+                ("orientation", lambda: view.GetOrientationName()),
+                ("configuration", lambda: view.ReferencedConfiguration),
+                ("display_mode", lambda: view.GetDisplayMode2()),
+                ("facetted_hlr", lambda: view.GetFacettedHlrDisplay()),
+                ("scale", lambda: view.ScaleRatio),
+                ("position", lambda: view.Position),
+                ("outline", lambda: view.GetOutline()),
+                ("cropped", lambda: view.IsCropped()),
+                ("transform", lambda: _early_bound(view.ModelToViewTransform, "IMathTransform").ArrayData),
+            ):
+                observe(f"view.{name}", reader)
+            slots = observe("original_slots", lambda: tuple(result[0]))
+            observe("original_slot_count", lambda: len(slots), slots)
+            observe("original_buffer_count", lambda: len(result[1]))
+            rendered = [
+                edge_readers(f"g7[{index}]", raw, app)
+                for index, raw in enumerate(slots if slots is not None else ())
+            ]
+            for name, (stem, component, _shown) in components.items():
+                prefix = f"component[{name}]"
+                observe(f"{prefix}.self", lambda: app.IsSame(component, component), app)
+                observe(f"{prefix}.path", lambda: component.GetPathName())
+                observe(f"{prefix}.configuration", lambda: component.ReferencedConfiguration)
+                observe(f"{prefix}.transform", lambda: _early_bound(component.Transform2, "IMathTransform").ArrayData)
+                raw_source = observe(f"{prefix}.source_return", lambda: component.GetModelDoc2())
+                source = observe(f"{prefix}.source", lambda: _early_bound(raw_source, "IModelDoc2"), raw_source)
+                observe(f"{prefix}.source.path", lambda: source.GetPathName(), source)
+                raw_extension = observe(f"{prefix}.extension_return", lambda: source.Extension, source)
+                extension = observe(f"{prefix}.extension", lambda: _early_bound(raw_extension, "IModelDocExtension"), raw_extension)
+                observed = inventory.get(stem, {})
+                observe(f"{prefix}.visible_circles", lambda: observed.get("circles"))
+                x, radius = (
+                    (NECK_HALF_X / 1000, NOSE_R / 1000)
+                    if stem == "mg-magnifying-bracket"
+                    else ((ROD_LENGTH - TIP_CHAMFER) / 1000, LEVER_ROD_DIA / 2000)
+                )
+                controls = observe(f"{prefix}.control_candidates", lambda: [
+                    edge for edge, params in observed.get("circles", ())
+                    if math.dist(params[:3], (x, 0.0, 0.0)) <= DETAIL_POSITION_TOL_M
+                    and abs(params[6] - radius) <= DETAIL_POSITION_TOL_M
+                ])
+                control = controls[0] if controls is not None and len(controls) == 1 else None
+                seeds = {"target": observed.get("target"), "control": control}
+                observe(f"{prefix}.distinct_negative", lambda: app.IsSame(seeds["target"], control), app, seeds["target"], control)
+                world = observed.get("world")
+                observe(f"{prefix}.paper_points", lambda: model_points_in_view(adapter, view, world, label=prefix), world)
+
+                def persistent(key: str, edge: Any) -> Any:
+                    reference = observe(key, lambda: extension.GetPersistReference3(edge), extension, edge)
+                    length = observe(f"{key}.length", lambda: len(reference), reference)
+                    available = reference if type(length) is int and length > 0 else None
+                    observe(f"{key}.self", lambda: extension.IsSamePersistentID(available, available), extension, available)
+                    return available
+
+                def routes(key: str, edge: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+                    part = mapped(f"{key}.part", lambda: extension.GetCorrespondingEntity2(edge), extension, edge)
+                    assembly = mapped(f"{key}.component", lambda: component.GetCorrespondingEntity(edge), edge)
+                    drawing = mapped(f"{key}.view", lambda: view.GetCorrespondingEntity(edge), edge)
+                    via_component = mapped(f"{key}.part_via_component", lambda: extension.GetCorrespondingEntity2(assembly), extension, assembly)
+                    via_view = mapped(f"{key}.part_via_view", lambda: extension.GetCorrespondingEntity2(drawing), extension, drawing)
+                    canonical = {"part": part, "part_via_component": via_component, "part_via_view": via_view}
+                    entities = {"raw": edge, "component": assembly, "view": drawing, **canonical}
+                    references = {route: persistent(f"{key}.{route}.pid", value) for route, value in canonical.items()}
+                    return entities, references
+
+                g7_routes = []
+                for index, (edge, owner) in enumerate(rendered):
+                    key = f"{prefix}.g7[{index}]"
+                    observe(f"{key}.owner_same", lambda: app.IsSame(owner, component), app, owner)
+                    g7_routes.append(routes(key, edge))
+                seed_routes = {}
+                for seed_name, raw in seeds.items():
+                    key = f"{prefix}.{seed_name}"
+                    edge, _owner = edge_readers(key, raw, app)
+                    entities, references = routes(key, edge)
+                    seed_routes[seed_name] = references
+                    for index, ((g7_edge, _), (_, g7_references)) in enumerate(zip(rendered, g7_routes, strict=True)):
+                        for route, candidate in entities.items():
+                            observe(f"{key}.{route}.g7[{index}].same", lambda: app.IsSame(candidate, g7_edge), app, candidate, g7_edge)
+                        for left_route, left in references.items():
+                            for right_route, right in g7_references.items():
+                                observe(f"{key}.{left_route}.g7[{index}].{right_route}.pid_same", lambda: extension.IsSamePersistentID(left, right), extension, left, right)
+                    # Source -> this component instance -> drawing -> source.
+                    # This is a recorded hypothesis, never a fallback acceptance.
+                    for route, reference in references.items():
+                        route_key = f"{key}.{route}.roundtrip"
+                        source_edge = entities[route]
+                        answer = observe(f"{route_key}.resolve", lambda: extension.GetObjectByPersistReference3(reference), extension, reference)
+                        resolved = state = None
+                        if isinstance(answer, (tuple, list)) and len(answer) == 2:
+                            resolved, state = answer
+                        observe(f"{route_key}.state", lambda: state)
+                        resolved_edge = observe(f"{route_key}.resolved", lambda: _early_bound(resolved, "IEdge"), resolved)
+                        observe(f"{route_key}.resolved_same", lambda: app.IsSame(source_edge, resolved_edge), app, source_edge, resolved_edge)
+                        resolved_id = persistent(f"{route_key}.resolved.pid", resolved_edge)
+                        observe(f"{route_key}.resolved_pid_same", lambda: extension.IsSamePersistentID(reference, resolved_id), extension, reference, resolved_id)
+                        # Correspondence does not depend on persistence readers.
+                        # A failed ID/resolution still permits the independent
+                        # source -> component -> view context observations.
+                        assembly = mapped(f"{route_key}.component", lambda: component.GetCorrespondingEntity(source_edge), source_edge)
+                        owner = observe(f"{route_key}.owner", lambda: _early_bound(_early_bound(assembly, "IEntity").GetComponent(), "IComponent2"), assembly)
+                        observe(f"{route_key}.owner_same", lambda: app.IsSame(owner, component), app, owner)
+                        drawing = mapped(f"{route_key}.view", lambda: view.GetCorrespondingEntity(assembly), assembly)
+                        back = mapped(f"{route_key}.back", lambda: extension.GetCorrespondingEntity2(drawing), extension, drawing)
+                        observe(f"{route_key}.same", lambda: app.IsSame(source_edge, back), app, source_edge, back)
+                        back_id = persistent(f"{route_key}.back.pid", back)
+                        observe(f"{route_key}.pid_same", lambda: extension.IsSamePersistentID(reference, back_id), extension, reference, back_id)
+                        for index, (g7_edge, _) in enumerate(rendered):
+                            for context, candidate in (("source", source_edge), ("component", assembly), ("view", drawing)):
+                                observe(f"{route_key}.{context}.g7[{index}].same", lambda: app.IsSame(candidate, g7_edge), app, candidate, g7_edge)
+                for left_route, left in seed_routes["target"].items():
+                    for right_route, right in seed_routes["control"].items():
+                        observe(f"{prefix}.negative.{left_route}.{right_route}", lambda: extension.IsSamePersistentID(left, right), extension, left, right)
+            observe("paper_installation_chain", lambda: model_points_in_view(
+                adapter, view,
+                ((stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+                 (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0)),
+                label=f"{LEVER_TIP.title} diagnostic chain",
+            ))
+        except BaseException as error:
+            probe["collector_error"] = error_text(error)
+        # Even an unexpected collector/formatter/logging failure must attempt the
+        # complete existing forensic path, then preserve the original exception.
+        try:
+            message = str(exception)
+        except BaseException:
+            message = f"{type(exception).__name__}: <original message unavailable>"
+        _seat_forensics.capture_com_failure(
+            adapter, "mg-magnifier-thread-projection-identity", message,
+            api="ISldWorks.IsSame", exception=exception, sheet_png=True,
+            native_identity_probe=probe,
+        )
+    finally:
+        raise BaseException.with_traceback(exception, original_traceback)
 
 
 @_telemetry.traced("drawing.mg_projection_model_ink", label_param="stage")
@@ -1410,6 +1658,7 @@ def _projection_model_ink(
         "mg-magnifying-bracket": (-NECK_HALF_X / 1000, NOSE_R / 1000, -1),
     }
     found = {}
+    native_inventory: dict[str, Any] = {}
     app = _early_bound(adapter.swApp, "ISldWorks")
     utility = _early_bound(app.GetMathUtility(), "IMathUtility")
     for raw in values.get("visible_components") or ():
@@ -1427,6 +1676,7 @@ def _projection_model_ink(
             candidates, circles = [], []
             edges = visible_component_entities(view, visible, 1)  # swViewEntityType_Edge
             diagnostic["edge_count"] = len(edges)
+            observed = native_inventory[stem] = {"circles": []}
             diagnostic["circles"] = circles
             for raw_edge in edges:
                 edge = _early_bound(raw_edge, "IEdge")
@@ -1437,6 +1687,7 @@ def _projection_model_ink(
                 circles.append(params)
                 if len(params) != 7 or not all(math.isfinite(value) for value in params):
                     raise RuntimeError("invalid native circular edge parameters")
+                observed["circles"].append((edge, params))
                 if (
                     math.dist(params[:3], (x, 0.0, 0.0)) <= DETAIL_POSITION_TOL_M
                     and abs(params[6] - radius) <= DETAIL_POSITION_TOL_M
@@ -1446,6 +1697,7 @@ def _projection_model_ink(
             if not shown or len(candidates) != 1 or stem in found:
                 raise RuntimeError("expected one shown physical boundary for this component")
             edge, params = candidates[0]
+            observed["target"] = edge
             # Both arguments are the same supported IEdge interface. Retain the
             # self-positive-control and every native comparison code on refusal.
             diagnostic["identity_self"] = app.IsSame(edge, edge)
@@ -1468,6 +1720,7 @@ def _projection_model_ink(
                     raise RuntimeError("invalid transformed physical boundary point")
                 world.append(actual)
             diagnostic["assembly_points"] = world
+            observed["world"] = world
             found[stem] = world
             if (
                 type(diagnostic["identity_self"]) is not int or diagnostic["identity_self"] != 1
@@ -1475,11 +1728,22 @@ def _projection_model_ink(
             ):
                 raise RuntimeError("physical boundary has no native solid-model polyline")
         except Exception as exc:
-            errors.append(f"visible component: {type(exc).__name__}: {exc}")
+            errors.append(f"visible component: {_projection_error_text(exc)}")
     evidence["errors"] = errors
-    _telemetry.info(f"{label}: physical model evidence={evidence!r}")
     if errors or set(found) != set(targets):
-        raise RuntimeError(f"{label}: physical model proof failed; {evidence!r}")
+        try:
+            raise RuntimeError(f"{label}: physical model proof failed; {evidence!r}")
+        except BaseException as original:
+            original_traceback = original.__traceback__
+            try:
+                _capture_projection_identity_failure(
+                    adapter, view, stage=stage, result=values.get("polylines"),
+                    exception=original, evidence=evidence,
+                    components=full, inventory=native_inventory,
+                )
+            finally:
+                raise BaseException.with_traceback(original, original_traceback)
+    _telemetry.info(f"{label}: physical model evidence={evidence!r}")
     points = tuple(point for stem in targets for point in found[stem])
     paper = model_points_in_view(adapter, view, points, label=label)
     if len(paper) != 4 or any(len(point) != 2 or not all(map(math.isfinite, point)) for point in paper):

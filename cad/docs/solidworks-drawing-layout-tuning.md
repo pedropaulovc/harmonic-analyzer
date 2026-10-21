@@ -1835,6 +1835,18 @@ the left stroke of the upper A cutting-plane label. Clearance above an arrow
 does not prove clearance from its label: inspect the actual glyph ink against
 the dimension's complete extension segments as well.
 
+R27 proved all three common-flat imports and their final rebuilt owners, but
+its complete three-row qualifier collided with the section label and height
+extension. Keep the cleared vertical witness station; move the common-flat
+text station from `(50, 175.5)` to `(150, 175.5)` mm instead of lifting it back
+through the A stroke. Bring the seat note to `(260, 116)` mm and the stock note
+to `(285, 140)` mm so their entire native extents stay inside the frame.
+Use the stock note's supported bent/right leader, require integer-zero
+`SetLeader3` success, rebuild, and prove the same native face attachment again.
+These placements preserve every qualifier, value and manufacturing band.
+Predicted translated text boxes are not native clearance proof: inspect the
+rebuilt whole sheet, full leader paths and all neighbouring ink after export.
+
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
 then bind the matching concrete string interface for `String`. Merely wrapping
@@ -1896,6 +1908,20 @@ an ignored size field nor residual zeros prove geometry. Do not special-case a
 record index, the observed size 17 or the observed residual length 34. A null
 return channel is unavailable, not an observed empty array; decoder success
 still does not replace actual model-edge identity or final render inspection.
+
+Raw objects from visible-edge enumeration and rendered polyline arrays do not
+establish a shared identity namespace merely because both bind as `IEdge`.
+Before choosing a correspondence route, obtain a known native-visible
+non-target edge positive and a distinct-edge negative, preserve the component
+instance, and prove the supported part/component/view mappings and persistent
+identity in the owning document. Do not replace failed identity with matching
+circle coordinates, component visibility or an unverified OR of mappings.
+On a physical-identity refusal, preserve the single original polyline return,
+including null slots and numeric bytes, actual transforms and independent
+reader errors. Capture the native drawing, image and whole evidence packet
+without labeling successful decoding unavailable. Formatting, logging or
+capture failures must never replace the original refusal or its traceback.
+
 Suppress sketch inference while creating the crop boundary, restore the prior
 `AddToDB` state, and read the persisted native circle with
 `IView.GetDetailCircleInfo2`. Requested centre/radius are not measured bounds.

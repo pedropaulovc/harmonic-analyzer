@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -139,11 +140,13 @@ BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
 # (x > ~0.216, y < ~0.066); the isometric right of it, inside the border.
 SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
-# Note positions are their text's top-left corners.
-STOCK_NOTE_XY = (0.305, 0.140)
+# R27's complete native stock text reached x423.9 mm (border x419.1).
+# These remain top-left text anchors, not leader-tip coordinates.
+STOCK_NOTE_XY = (0.285, 0.140)
 # Above the iso: R17's real stock-flat leader crosses the lower caption lane.
 ISO_NOTE_XY = (0.335, 0.245)
-SEAT_NOTE_XY = (0.287, 0.116)
+# R27's 146.5 mm seat row needs the full right-hand text lane inside the border.
+SEAT_NOTE_XY = (0.260, 0.116)
 
 _HALF_AF = HEX_AF / 2.0 * _S
 _HALF_AC = HEX_AC / 2.0 * _S
@@ -168,8 +171,10 @@ RIGHT_KEEP = {
 # vertices.
 TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
 RIGHT_LOCATION_KEEP = {
+    # Move R27's whole three-row label right, away from A and the height witness.
+    # Keep its vertical station: raising the flat witness crosses A (R21).
     # All three values are imported/read back; only the verified group leader prints.
-    name: (0.050, 0.1755) for name in Z_FLAT_DIMENSIONS
+    name: (0.150, 0.1755) for name in Z_FLAT_DIMENSIONS
 }
 TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
 BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
@@ -515,6 +520,19 @@ def _add_stock_note(adapter: Any, view: Any) -> None:
         audit["stage"] = "stock.attach"
         emit()
         note = add_attached_note(adapter, view, text=property_link("Manufacturing Notes"), entity_type="FACE", entity=face, attached_to=face, note_xy=STOCK_NOTE_XY, label="supplied hex stock flat")
+        # R27's straight leader crossed the first stock glyph. Use the existing
+        # native bent/right note style; never move or replace its actual face tip.
+        audit["stage"] = "stock.leader_style"
+        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+        status = annotation.SetLeader3(2, 2, True, False, False, False)  # swBENT, swLS_RIGHT
+        audit["leader_status"] = status
+        if type(status) is not int or status != 0:
+            raise RuntimeError(f"supplied hex stock flat: bent/right leader refused: {status!r}")
+        rebuild_drawing(adapter, label="bend supplied hex stock flat leader")
+        _assert_attached_to(
+            adapter, annotation, face, entity_type="FACE",
+            what="stock note", label="supplied hex stock flat",
+        )
         audit["stage"] = "stock.resolved_property"
         resolved = str(_early_bound(note, "INote").GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
         if resolved != STOCK_NOTE:
