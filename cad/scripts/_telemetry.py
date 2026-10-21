@@ -953,6 +953,10 @@ class _FarmIdentitySpanProcessor(SpanProcessor):
             if key not in span.attributes:
                 span.set_attribute(key, value)
 
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        # No buffered work; permit the provider to flush subsequent exporters.
+        return True
+
 
 class _FarmIdentityLogProcessor(LogRecordProcessor):
     def __init__(self, resource: Resource) -> None:

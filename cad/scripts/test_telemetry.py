@@ -34,7 +34,7 @@ from opentelemetry.sdk._logs.export import (
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
 from opentelemetry.trace import NonRecordingSpan
@@ -660,6 +660,31 @@ def test_every_resource_identifies_the_machine(capture):
     for name in ("task part:cone_gear", "com.seat.wait part:cone_gear"):
         instance = finished[name].resource.attributes.get("service.instance.id")
         assert instance, f"{name} has no service.instance.id"
+
+
+@pytest.mark.parametrize("service", [None, _telemetry.BUILD_INFRA_SERVICE])
+def test_farm_identity_does_not_short_circuit_provider_force_flush(monkeypatch, service):
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=flush-execution")
+    _telemetry.configure(console=False, force=True)
+    provider = (
+        _telemetry.trace.get_tracer_provider()
+        if service is None
+        else _telemetry._provider_for_service(service)
+    )
+    exporter = InMemorySpanExporter()
+    processor = BatchSpanProcessor(exporter, schedule_delay_millis=600000)
+    provider.add_span_processor(processor)
+    try:
+        with provider.get_tracer("flush-proof").start_as_current_span("buffered"):
+            pass
+        assert not exporter.get_finished_spans()
+        assert provider.force_flush(timeout_millis=2000) is True
+        finished = exporter.get_finished_spans()
+        assert len(finished) == 1
+        assert finished[0].name == "buffered"
+        assert finished[0].attributes["farm.execution"] == "flush-execution"
+    finally:
+        processor.shutdown()
 
 
 @pytest.mark.parametrize("service", [None, _telemetry.BUILD_INFRA_SERVICE])
