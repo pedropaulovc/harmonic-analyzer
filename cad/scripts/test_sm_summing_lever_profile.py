@@ -276,6 +276,9 @@ def test_exact_added_area_and_first_moments_match_independent_section_integratio
 
 def _legacy_rib_bounds(x: float, middle: bool) -> tuple[float, float]:
     radius, reach = spec.RIB_WRAP_R, spec.RIB_REACH
+    if x < 0.0:
+        half_height = math.sqrt(max(0.0, radius * radius - x * x))
+        return -half_height, half_height
     if middle:
         tangent_x = radius * radius / reach
         if x <= tangent_x:
@@ -347,22 +350,6 @@ def _legacy_section(middle: bool) -> profile.SectionMoments:
     ))
 
 
-def _positive_rib_added_section(section: profile.RibProfile) -> profile.SectionMoments:
-    """R1 rib union minus existing cylinder/slab, only on the receiver's +X arm.
-
-    The closed profile also contains the -X wrap semicircle. Its annulus outside
-    the cylinder belongs to the unchanged counter web, not the receiver strip.
-    Subtract its exact area and signed X moment; symmetry gives zero Y moment.
-    """
-    wrap, cylinder = section.wrap_radius, section.cylinder_radius
-    negative_web = profile.SectionMoments(
-        math.pi * (wrap**2 - cylinder**2) / 2.0,
-        -2.0 * (wrap**3 - cylinder**3) / 3.0,
-        0.0,
-    )
-    return section.section_moments() - section.base_section_moments() - negative_web
-
-
 def _ideal_prism_change(receiver_depth: float = joint.RIB_DEPTH) -> _IdealPrismChange:
     """Source-only material/gravity delta with the frozen 8.20 legacy receiver.
 
@@ -370,9 +357,10 @@ def _ideal_prism_change(receiver_depth: float = joint.RIB_DEPTH) -> _IdealPrismC
     The old plate was 5.08 with a 10 mm-wide, 7 mm-deep spring seat; its
     clipped edge slants and pointed positive middle profile are removed.
     The approved receiver adds an inward-only 0.80 strip beyond the historical
-    8.20 cutover; the opposite/middle ribs stay 5.08 in both geometries.
-    Negative-X web, boss, knives and unchanged holes cancel. The spring
-    catalog span supplies no reserve and is deliberately absent here.
+    8.20 cutover across the WHOLE closed edge-rib profile, including the -X wrap
+    outside the cylinder. The opposite/middle ribs stay 5.08. The long negative-X
+    counterweb, boss, knives and unchanged holes cancel; the receiver wrap does
+    not. The spring catalog span supplies no reserve and is absent here.
     """
     # A wrap-radius mutation would also change the negative middle arm, which
     # this approved nominal cutover preserves.
@@ -390,7 +378,7 @@ def _ideal_prism_change(receiver_depth: float = joint.RIB_DEPTH) -> _IdealPrismC
     old_back, front, middle = 8.20, spec.COUNTER_WEB_T, spec.COUNTER_WEB_T
     ordinary_length = spec.PLATE_L - old_back - front - middle
     receiver_extension = receiver_depth - old_back
-    extra_section = _positive_rib_added_section(section)
+    extra_section = section.section_moments() - section.base_section_moments()
     total = (
         base_delta.scaled(ordinary_length)
         + edge_delta.scaled(old_back + front)
@@ -410,21 +398,24 @@ def _ideal_prism_change(receiver_depth: float = joint.RIB_DEPTH) -> _IdealPrismC
     return _IdealPrismChange(total.area_mm2, total.x_mm3, total.y_mm3, z_moment)
 
 
-def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_reserve() -> None:
+@pytest.mark.parametrize("receiver_depth", [8.20, 8.60, joint.RIB_DEPTH])
+def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_reserve(
+    receiver_depth: float,
+) -> None:
     section = profile.PROFILE
     tx = spec.RIB_WRAP_R**2 / spec.RIB_REACH
     ny = math.sqrt(1.0 - (spec.RIB_WRAP_R / spec.RIB_REACH) ** 2)
     middle_plate_x = (spec.RIB_WRAP_R - ny * 2.54) / (spec.RIB_WRAP_R / spec.RIB_REACH)
     breaks = [
-        0.0, spec.CYL_R, tx, middle_plate_x,
+        -spec.RIB_WRAP_R, -spec.CYL_R, 0.0, spec.CYL_R, tx, middle_plate_x,
         math.sqrt(spec.CYL_R**2 - 2.54**2), math.sqrt(spec.CYL_R**2 - 4.46**2),
         section.upper.wrap_xy[0], section.lower.wrap_xy[0],
         section.upper.flank_xy[0], section.lower.flank_xy[0],
         spec.PLATE_W - 10.0, section.reach, spec.PLATE_W,
     ]
     old_receiver_depth = 8.20
-    new_depths = (spec.PLATE_L - joint.RIB_DEPTH - 2.0 * spec.COUNTER_WEB_T,
-                  joint.RIB_DEPTH + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
+    new_depths = (spec.PLATE_L - receiver_depth - 2.0 * spec.COUNTER_WEB_T,
+                  receiver_depth + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
     old_depths = (spec.PLATE_L - old_receiver_depth - 2.0 * spec.COUNTER_WEB_T,
                   old_receiver_depth + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
 
@@ -437,8 +428,8 @@ def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_re
         if kind == "z":
             front = spec.COUNTER_WEB_T
             front_moment = front * (spec.PLATE_L / 2.0 - front / 2.0)
-            new_end_moment = joint.RIB_DEPTH * (
-                -spec.PLATE_L / 2.0 + joint.RIB_DEPTH / 2.0
+            new_end_moment = receiver_depth * (
+                -spec.PLATE_L / 2.0 + receiver_depth / 2.0
             ) + front_moment
             old_end_moment = old_receiver_depth * (
                 -spec.PLATE_L / 2.0 + old_receiver_depth / 2.0
@@ -464,49 +455,13 @@ def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_re
             value += delta
         return value
 
-    delta = _ideal_prism_change()
+    delta = _ideal_prism_change(receiver_depth)
     assert delta.volume_mm3 == pytest.approx(_integral(lambda x: change(x, "area"), breaks), abs=0.03)
     assert delta.x_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "x"), breaks), abs=0.2)
     assert delta.y_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "y"), breaks), abs=0.03)
     assert delta.z_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "z"), breaks), abs=2.0)
     historical = _ideal_prism_change(old_receiver_depth)
     assert historical.volume_mm3 / 1000.0 == pytest.approx(6.768846, abs=0.01)
-    extension = joint.RIB_DEPTH - old_receiver_depth
-    assert extension == pytest.approx(0.80)
-
-    def extension_slice(x: float, kind: str) -> float:
-        # Independent +X union slices retain the R1 boundary while excluding
-        # material already present in the cylinder and the uniform plate.
-        lo, hi = section.rib_bounds(x) if x <= section.reach else (-4.46, 2.54)
-        blo, bhi = _base_bounds(x, 2.54, -4.46)
-        if kind == "y":
-            return (hi**2 - lo**2 - bhi**2 + blo**2) / 2.0
-        area = hi - lo - bhi + blo
-        return x * area if kind == "x" else area
-
-    extra_section = profile.SectionMoments(*(
-        extension * _integral(lambda x: extension_slice(x, kind), breaks)
-        for kind in ("area", "x", "y")
-    ))
-    assert delta.volume_mm3 - historical.volume_mm3 == pytest.approx(extra_section.area_mm2)
-    assert delta.x_moment_mm4 - historical.x_moment_mm4 == pytest.approx(extra_section.x_mm3)
-    assert delta.y_moment_mm4 - historical.y_moment_mm4 == pytest.approx(extra_section.y_mm3)
-    # A full closed-section extrusion would incorrectly add the existing -X
-    # web outside the cylinder: precisely the half-annulus below.
-    full_extension = (section.section_moments() - section.base_section_moments()).scaled(extension)
-    assert full_extension.area_mm2 - extra_section.area_mm2 == pytest.approx(
-        extension * math.pi * (section.wrap_radius**2 - section.cylinder_radius**2) / 2.0,
-        abs=0.003,
-    )
-    assert full_extension.x_mm3 - extra_section.x_mm3 == pytest.approx(
-        -extension * 2.0 * (section.wrap_radius**3 - section.cylinder_radius**3) / 3.0,
-        abs=0.02,
-    )
-    extension_center = -spec.PLATE_L / 2.0 + old_receiver_depth + extension / 2.0
-    assert delta.z_moment_mm4 - historical.z_moment_mm4 == pytest.approx(
-        extra_section.area_mm2 * extension_center
-    )
-    assert delta.volume_mm3 > historical.volume_mm3
     assert delta.centroid_mm[0] > 0.0
     assert delta.centroid_mm[1] < 0.0
     assert delta.gravity_moment_increment_n_mm(7200.0) == pytest.approx(
@@ -516,6 +471,89 @@ def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_re
     # Root fillets are excluded; this is a delta CG, not a claim about the
     # complete lever's CG, spring extension, or available catalog travel.
     assert delta.gravity_moment_increment_n_mm(0.0) == 0.0
+
+
+def test_receiver_extension_includes_both_x_halves_and_matches_native_increment() -> None:
+    section = profile.PROFILE
+    old_depth = 8.20
+    extension = joint.RIB_DEPTH - old_depth
+    assert extension == pytest.approx(0.80)
+    entry = -spec.PLATE_L / 2.0
+    start, end = entry + old_depth, entry + joint.RIB_DEPTH
+    center = (start + end) / 2.0
+    assert (start, end) == pytest.approx((-68.00, -67.20))
+
+    def extension_slice(x: float, kind: str) -> float:
+        # The actual closed sketch wraps behind the cylinder as well as
+        # flaring into the +X slab. Only the existing cylinder/slab cancels.
+        lo, hi = section.rib_bounds(x)
+        blo, bhi = _base_bounds(x, section.top_y, section.bottom_y)
+        if kind == "y":
+            return (hi**2 - lo**2 - bhi**2 + blo**2) / 2.0
+        area = hi - lo - bhi + blo
+        return x * area if kind == "x" else area
+
+    negative_breaks = [-section.wrap_radius, -section.cylinder_radius, 0.0]
+    positive_breaks = [
+        0.0, section.cylinder_radius,
+        math.sqrt(section.cylinder_radius**2 - section.top_y**2),
+        math.sqrt(section.cylinder_radius**2 - section.bottom_y**2),
+        section.upper.wrap_xy[0], section.lower.wrap_xy[0],
+        section.upper.flank_xy[0], section.lower.flank_xy[0], section.reach,
+    ]
+    negative, positive = (
+        profile.SectionMoments(*(
+            extension * _integral(lambda x: extension_slice(x, kind), breaks)
+            for kind in ("area", "x", "y")
+        ))
+        for breaks in (negative_breaks, positive_breaks)
+    )
+    wrap, cylinder = section.wrap_radius, section.cylinder_radius
+    # A point left of the cylinder is real receiver material: the long
+    # counterweb is not an excuse to omit the edge rib's negative half-wrap.
+    x = -(wrap + cylinder) / 2.0
+    assert _base_bounds(x, section.top_y, section.bottom_y) == (0.0, 0.0)
+    assert extension_slice(x, "area") == pytest.approx(
+        2.0 * math.sqrt(wrap**2 - x**2)
+    )
+    assert extension_slice(-wrap, "area") == pytest.approx(0.0)
+    assert negative.area_mm2 == pytest.approx(
+        extension * math.pi * (wrap**2 - cylinder**2) / 2.0, abs=1e-8
+    )
+    assert negative.x_mm3 == pytest.approx(
+        -extension * 2.0 * (wrap**3 - cylinder**3) / 3.0, abs=1e-8
+    )
+    assert negative.y_mm3 == pytest.approx(0.0, abs=1e-10)
+    full_extension = negative + positive
+    delta, historical = _ideal_prism_change(), _ideal_prism_change(old_depth)
+    assert delta.volume_mm3 - historical.volume_mm3 == pytest.approx(
+        full_extension.area_mm2, abs=0.003
+    )
+    assert delta.x_moment_mm4 - historical.x_moment_mm4 == pytest.approx(
+        full_extension.x_mm3, abs=0.02
+    )
+    assert delta.y_moment_mm4 - historical.y_moment_mm4 == pytest.approx(
+        full_extension.y_mm3, abs=0.003
+    )
+    assert delta.z_moment_mm4 - historical.z_moment_mm4 == pytest.approx(
+        full_extension.area_mm2 * center, abs=0.2
+    )
+    assert negative.area_mm2 > 0.0
+    assert negative.x_mm3 < 0.0
+    assert negative.area_mm2 * center < 0.0
+
+    # Captured native evidence: r3/r8-part-task.log in
+    # C:/temp/summing-lever-simplify-20261020, respectively lines 219/219
+    # (before counterweb and roots), 341/342 (after blind taps), and
+    # 334/335 (the only changed R1-root allowance). Each volume is rounded to
+    # 0.1 mm^3, so two readbacks permit at most 0.1 mm^3 difference error.
+    before_roots = 118747.2 - 118432.3
+    finished = 146204.8 - 145889.9
+    changed_root = 38.398222 - 38.398143
+    assert full_extension.area_mm2 == pytest.approx(before_roots, rel=0.0, abs=0.1)
+    assert full_extension.area_mm2 + changed_root == pytest.approx(
+        finished, rel=0.0, abs=0.1
+    )
 
 
 @pytest.mark.parametrize("changes", [
