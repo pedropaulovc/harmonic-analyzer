@@ -873,10 +873,23 @@ class _RelativeWitnessFixture:
         monkeypatch.setattr(_telemetry, "info", lambda message, **fields: self.events.append((message, fields)))
 
     def create_line(self, x1, y1, z1, x2, y2, z2):
-        assert self.manager.AddToDB is True, "nominally coincident lines must not infer or merge"
+        assert self.manager.AddToDB is True, "database insertion must suppress inference"
         if self.mode == "missing-line":
             return None
-        start, end = _WitnessPoint(self.sketch, x1, y1, z1), _WitnessPoint(self.sketch, x2, y2, z2)
+        # AddToDB does not prevent exact-coordinate database point reuse.
+        existing = [self.center]
+        for old in self.lines:
+            existing.extend((old.GetStartPoint2(), old.GetEndPoint2()))
+
+        def point_at(x, y, z):
+            for point in existing:
+                if (point.X, point.Y, point.Z) == (x, y, z):
+                    return point
+            point = _WitnessPoint(self.sketch, x, y, z)
+            existing.append(point)
+            return point
+
+        start, end = point_at(x1, y1, z1), point_at(x2, y2, z2)
         line = _native_sketch_segment(owner=self.sketch.feature_name, identifiers=(len(self.lines) + 2, 1))
         line.owner_sketch = self.sketch
         line.GetSketch = lambda: self.sketch
@@ -909,6 +922,25 @@ class _RelativeWitnessFixture:
         for entity in entities:
             entity.relations.append(relation)
         self.relations.append(relation)
+        # A small stateful model of these four equations, not a native-success
+        # claim. Constraints move independent point objects without merging them.
+        if self.mode != "unsolved":
+            if kind == 4:
+                entities[0].GetEndPoint2().Y = entities[0].GetStartPoint2().Y
+            elif kind == 26:
+                source = entities[1]
+                model = source.owner.ModelToSketchTransform.Inverse().forward((source.X, source.Y, source.Z))
+                entities[0].X = self.sketch.ModelToSketchTransform.forward(model)[0]
+            elif kind == 25:
+                end, center = entities
+                end.Y = center.Y
+                line = next(line for line in self.lines if line.GetEndPoint2() is end)
+                line.GetStartPoint2().Y = end.Y
+            elif kind == 9:
+                end, circle = entities
+                center = circle.GetCenterPoint2()
+                half_chord = math.sqrt(circle.GetRadius() ** 2 - (end.Y - center.Y) ** 2)
+                end.X = center.X + math.copysign(half_chord, end.X - center.X)
         if self.mode == "underdefined":
             self.status = 2
         return relation
@@ -985,6 +1017,14 @@ def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -
     assert first.GetID() != second.GetID()
     assert first.GetStartPoint2() is not second.GetStartPoint2()
     assert first.GetEndPoint2() is not second.GetEndPoint2()
+    assert first.GetStartPoint2() is not fixture.center
+    assert second.GetStartPoint2() is not fixture.center
+    seeds = [fields for _message, fields in fixture.events if fields.get("operation_stage", "").endswith(".seed-readback")]
+    assert len(seeds) == 2
+    for seed in seeds:
+        assert seed["provisional_seed_m"] == seed["actual_seed_m"]
+        assert seed["actual_seed_m"][0] != first.GetStartPoint2().X
+        assert seed["actual_seed_m"][1] != fixture.center.Y
     assert first.GetStartPoint2().X == second.GetStartPoint2().X == 0.0
     fixture.tap.Y = 0.0004  # Top sketch local Y becomes Right sketch X, not Y.
     assert part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch) == pytest.approx((0.0004, 0.0295, 0.0))
@@ -1846,3 +1886,91 @@ def test_constraint_return_cannot_replace_unavailable_native_poststate(monkeypat
     assert fields["operation_stage"] == "ThumbTapToBoreRim.constraint-poststate"
     assert fields["relation_kind"] == 26
     assert "native post-state unavailable" in fields["relation_readback_error"]
+
+
+def test_native_shaped_database_reuses_exact_points_despite_add_to_db(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture.manager.AddToDB = True
+    y, radius = fixture.center.Y, fixture.circle.GetRadius()
+    first = fixture.create_line(0.0, y, 0.0, radius, y, 0.0)
+    second = fixture.create_line(0.0, y, 0.0, radius, y, 0.0)
+    assert first.GetStartPoint2() is fixture.center
+    assert second.GetStartPoint2() is first.GetStartPoint2()
+    assert second.GetEndPoint2() is first.GetEndPoint2()
+    with pytest.raises(RuntimeError, match="endpoints merged"):
+        part._require_independent_witness_endpoints(fixture.adapter, first, fixture.center, stage="nominal-seed-control")
+
+
+@pytest.mark.parametrize("failure", ("center-reuse", "null-start", "foreign-owner", "source-swap", "unknown-self", "unknown-distinctness"))
+def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypatch, failure) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    original_create = fixture.manager.CreateLine
+
+    def create(*coordinates):
+        line = original_create(*coordinates)
+        start, end = line.GetStartPoint2(), line.GetEndPoint2()
+        if failure == "center-reuse":
+            line.GetStartPoint2 = lambda: fixture.center
+        elif failure == "null-start":
+            line.GetStartPoint2 = lambda: None
+        elif failure == "foreign-owner":
+            start.owner = _NativeSketch("foreign", "WrongSketch")
+        elif failure == "source-swap":
+            line.GetStartPoint2, line.GetEndPoint2 = lambda: end, lambda: start
+        else:
+            def same(left, right):
+                if failure == "unknown-self" and left is start and right is start:
+                    return -1
+                if failure == "unknown-distinctness" and left is start and right is fixture.center:
+                    return -1
+                return _native_same(left, right)
+            fixture.adapter.swApp.IsSame = same
+        return line
+
+    fixture.manager.CreateLine = create
+    with pytest.raises(RuntimeError):
+        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    assert fixture.relations == []  # No constraint mutation on an invalid seed.
+    fields = fixture.events[-1][1]
+    if failure == "source-swap":
+        assert fields["operation_stage"] == "ThumbTapToBoreRim.seed-readback"
+        assert fields["actual_seed_m"] != fields["provisional_seed_m"]
+    else:
+        assert fields["operation_stage"] == "ThumbTapToBoreRim.seed-endpoint-identity"
+        assert fields["endpoint_identity_readback_error"] != "None"
+        rows = ast.literal_eval(fields["endpoint_identity_rows"])
+        assert rows[0]["role"] == "start"
+
+
+@pytest.mark.parametrize("failure", ("center-merge", "previous-start-merge", "previous-end-merge", "source-swap", "unknown"))
+def test_solved_overlaid_witnesses_keep_independent_endpoint_authority(monkeypatch, failure) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    other = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
+    first = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    second = part._create_relative_witness(fixture.adapter, other, fixture.circle, "RodTapToBoreRim")
+    start, end = second.GetStartPoint2(), second.GetEndPoint2()
+    if failure == "center-merge":
+        second.GetStartPoint2 = lambda: fixture.center
+    elif failure == "previous-start-merge":
+        second.GetStartPoint2 = first.GetStartPoint2
+    elif failure == "previous-end-merge":
+        second.GetEndPoint2 = first.GetEndPoint2
+    elif failure == "source-swap":
+        second.GetStartPoint2, second.GetEndPoint2 = lambda: end, lambda: start
+    else:
+        def same(left, right):
+            if left is start and right is first.GetStartPoint2():
+                return -1
+            return _native_same(left, right)
+        fixture.adapter.swApp.IsSame = same
+    with pytest.raises(RuntimeError):
+        part._assert_relative_witness(fixture.adapter, second, other, fixture.circle, stage="after-rebuild")
+
+
+def test_provisional_seed_is_not_a_substitute_for_actual_constraint_motion(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch, mode="unsolved")
+    with pytest.raises(RuntimeError, match="point alignment differs"):
+        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    assert [relation.kind for relation in fixture.relations] == [4, 26]

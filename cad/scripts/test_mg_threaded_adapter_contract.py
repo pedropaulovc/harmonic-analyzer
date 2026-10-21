@@ -285,6 +285,8 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
 
 @pytest.mark.parametrize("interface, member, arity, retval", (
     ("ISketchManager", "CreateLine", 6, 9),
+    ("ISketch", "GetSketchSegments", 0, 12),
+    ("ISldWorks", "IsSame", 2, 3),
     ("ISketchRelationManager", "AddRelation", 2, 9),
     ("ISketchRelation", "GetRelationType", 0, 3),
     ("ISketchRelation", "GetDefinitionEntities2", 0, 12),
@@ -336,6 +338,8 @@ def test_bracket_layout_native_properties_are_not_methods(interface, member) -> 
     ("ISketchSegment", "ConstructionGeometry"),
 ))
 def test_witness_native_mutators_are_declared_read_write_properties(interface, member) -> None:
+    # Declaration/read-write support does not imply endpoint uniqueness:
+    # AddToDB suppresses inference, but exact-coordinate DB points still merge.
     methods, maps = _native_declaration(interface)
     assert member not in methods
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]

@@ -1558,7 +1558,13 @@ local construction line: its start is vertically aligned with the actual
 Wizard point, its end is horizontally aligned with the actual bore centre
 and coincident with the actual circle, and the line itself is horizontal.
 These four native constraints define the projected tap-axis-to-positive-rim
-span. Seed coordinates choose the positive branch, not measurement authority.
+span. Provisional seeds choose the positive branch, not measurement authority.
+Create the endpoints away from the actual bore centre and previous witness
+endpoints. `AddToDB` suppresses inference, **not exact-coordinate database
+merging**: `_sketch.add_line_chain` and `set_sketch_direct_db` document this
+live-proven distinction. Require native endpoint identity/ownership and
+distinctness at creation, then retain independent identities through the
+constraints and rebuild even where the final coordinates coincide.
 Require fully defined status, actual relation definition entities, unchanged
 source identities and the positive-rim readback before and after rebuild.
 The native dimension attaches to both local line endpoints, carrying the
@@ -1585,6 +1591,14 @@ Require the exact intended kind, actual source entities and native alignment,
 not a relaxed returned-kind check. Classify actual definition entities before
 identity comparisons; the separate GetEntities/GetEntitiesType inventory is
 not the definition-entity inventory.
+R13 observed only the same suppressed DISTANCE1 on the retrieved start before
+and after requesting26; the required relation was absent there. The old start
+seed exactly matched the already-converted bore centre, contrary to that
+creation contract. Reuse of that particular centre is consistent with the
+inventory but was not directly identity-tested in R13. This is not evidence
+that all cross-sketch point relations are unsupported; the same run successfully
+used26 with an external origin. Correct the creation collision without changing
+the four intended constraints, sources, dimensional bands or final geometry.
 R11 regressed the already-passed HORIZONTAL4 check because mandatory runtime
 type information returned `Invalid index`; that optional metadata is not an
 interface-capability contract. Classify each actual definition with native
