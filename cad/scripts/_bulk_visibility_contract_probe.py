@@ -620,7 +620,7 @@ class Receipt:
         self.data: dict[str, Any] = {
             "schema_version": 1,
             "run_id": root.name,
-            "arm": "suspended_add_selection_list_objects",
+            "arm": "active_list_add_selection_list_objects",
             "approved_base": "8fc78122da64b4b8a79a1aba5d94e84b912d1efc",
             "probe_controls_status": Controls.RUNNING,
             "handoff_allowed": False,
@@ -2778,7 +2778,12 @@ class NativeProbe:
             "active sheet readback",
         )
 
-    def selection(self, views: Any) -> list[dict[str, Any]]:
+    def selection(
+        self,
+        views: Any,
+        *,
+        selection_capture: list[tuple[Any, int, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         manager = self.bind(
             self.model(Document.DRAWING).SelectionManager, "ISelectionMgr"
         )
@@ -2809,25 +2814,24 @@ class NativeProbe:
             # Identity to an independently enumerated DC precedes DC-specific access.
             dc = self.bind(raw, "IDrawingComponent")
             self.identical(dc.View, views[view_id][0], "selected own view")
-            self.identical(
-                manager.GetSelectedObjectsDrawingView2(index, -1),
-                views[view_id][0],
-                "selected manager view",
-            )
-            result.append(
-                {
-                    "view": view_id,
-                    "node": key,
-                    "mark": api_int(
-                        manager.GetSelectedObjectMark(index), "selected mark"
-                    ),
-                    "type": 20,
-                }
-            )
+            selected_view = manager.GetSelectedObjectsDrawingView2(index, -1)
+            if selected_view is not None:
+                self.identical(selected_view, views[view_id][0], "selected manager view")
+            mark = api_int(manager.GetSelectedObjectMark(index), "selected mark")
+            row = {"view": view_id, "node": key, "mark": mark, "type": 20}
+            if selected_view is None:
+                # Manager association can be null despite the component's own view.
+                row["selection_view"] = None
+            result.append(row)
+            if selection_capture is not None:
+                selection_capture.append((raw, mark, selected_view))
         return result
 
     def _context_observations(
-        self, views: Any
+        self,
+        views: Any,
+        *,
+        selection_capture: list[tuple[Any, int, Any]] | None = None,
     ) -> tuple[dict[str, Any], BaseException | None]:
         context: dict[str, Any] = {"observations": {}}
         observations = context["observations"]
@@ -2880,7 +2884,12 @@ class NativeProbe:
         for key, reader in (
             ("sheet", sheet),
             ("view", active_view),
-            ("selection", lambda: self.selection(views)),
+            (
+                "selection",
+                lambda: self.selection(views, selection_capture=selection_capture)
+                if selection_capture is not None
+                else self.selection(views),
+            ),
         ):
             try:
                 value = reader()
@@ -2904,8 +2913,15 @@ class NativeProbe:
             context["observation_error"] = error_record(errors[0])
         return context, errors[0] if errors else None
 
-    def context(self, views: Any) -> dict[str, Any]:
-        context, error = self._context_observations(views)
+    def context(
+        self,
+        views: Any,
+        *,
+        selection_capture: list[tuple[Any, int, Any]] | None = None,
+    ) -> dict[str, Any]:
+        context, error = self._context_observations(
+            views, selection_capture=selection_capture
+        )
         if error is not None:
             raise error
         # Restoration compares semantic state, not diagnostic wrapper provenance.
@@ -3117,7 +3133,7 @@ class NativeProbe:
             )
 
     def nested_selection_case(self) -> None:
-        """Discriminate only two levels with an empty intermediate selection."""
+        """Require an untouched caller-owned hidden L0 behind exposed empty L1."""
         original = self.context(self.views())
         require(
             original["sheet"] is ViewId.B
@@ -3132,7 +3148,7 @@ class NativeProbe:
         )
         row = self.receipt.data["cases"][self.receipt.case]
         nested = row["nested_selection"] = {
-            "scope": "two_levels_empty_intermediate_only",
+            "scope": "caller_suspended_empty_intermediate",
             "phase": "outer_suspend_entered",
             "L0": original,
             "outer_resume": {"attempted": False},
@@ -3162,7 +3178,7 @@ class NativeProbe:
         with self.selection_guard() as inner:
             nested["phase"] = "inner_selection_entered"
             self.receipt.checkpoint()
-            self.model(Document.DRAWING).ClearSelection2(True)
+            self.clear_active_selection(inner)
             view, nodes = self.views()[ViewId.A]
             data = self.bind(inner.CreateSelectData(), "ISelectData")
             data.View, data.Mark = view, 0
@@ -3184,7 +3200,7 @@ class NativeProbe:
         require(
             nested["inner_restored_context"] == empty,
             Verdict.RESTORATION,
-            "C29 inner resume did not reproduce exact empty L1",
+            "C29 inner active-list restoration did not reproduce exact empty L1",
         )
         nested["phase"] = "outer_resume_entered"
         nested["outer_resume"]["attempted"] = True
@@ -3202,53 +3218,71 @@ class NativeProbe:
         nested["phase"] = "outer_restored"
         self.checkpoint("C29-outer-resumed")
 
+    def clear_active_selection(self, manager: Any) -> None:
+        """Remove only currently exposed entries; never clear or pop saved lists."""
+        count = api_int(
+            manager.GetSelectedObjectCount2(-1),
+            "current selection count",
+            Verdict.SELECTION,
+        )
+        require(count >= 0, Verdict.SELECTION, "negative current selection count")
+        if count == 0:
+            return
+        for index in range(count, 0, -1):
+            result = api_int(
+                manager.DeSelect2(index, -1), "DeSelect2", Verdict.SELECTION
+            )
+            self.receipt.counts["selection_deselect"] += 1
+            require(result == 1, Verdict.SELECTION, "current entry not deselected")
+        require(
+            api_int(
+                manager.GetSelectedObjectCount2(-1),
+                "drained current selection count",
+                Verdict.SELECTION,
+            )
+            == 0,
+            Verdict.SELECTION,
+            "current selection not empty after indexed removal",
+        )
+
     @contextmanager
     def selection_guard(self) -> Iterator[Any]:
-        original = self.context(self.views())
+        captured: list[tuple[Any, int, Any]] = []
+        original = self.context(self.views(), selection_capture=captured)
         manager = self.bind(
             self.model(Document.DRAWING).SelectionManager, "ISelectionMgr"
         )
-        suspended = False
+        initial_drained = body_entered = False
         primary: BaseException | None = None
         nested = (
             self.receipt.data["cases"][self.receipt.case].get("nested_selection")
             if self.receipt.case is Case.NESTED_SELECTION
             else None
         )
-
-        def resume_selection() -> None:
-            if suspended:
-                if nested is not None:
-                    nested["inner_resume"] = {"attempted": True}
-                raw = manager.ResumeSelectionList2(False)
-                if nested is not None:
-                    nested["inner_resume"].update(
-                        completed=True, raw=repr(raw), type=type(raw).__name__
-                    )
+        if nested is not None:
+            nested["inner_restore"] = {
+                "mode": "active_list_no_suspend_or_resume",
+                "attempted": False,
+                "completed": False,
+                "restored_entries": 0,
+            }
 
         try:
-            raw_result = manager.SuspendSelectionList()
-            suspended = True
-            if nested is not None:
-                nested["inner_suspend"] = {
-                    "raw": repr(raw_result),
-                    "type": type(raw_result).__name__,
-                }
-                self.receipt.checkpoint()
-            result = api_int(raw_result, "SuspendSelectionList", Verdict.SELECTION)
+            self.clear_active_selection(manager)
+            initial_drained = True
+            self.receipt.counts["selection_guard"] += 1
+            self.activate_view(ViewId.A)
             require(
-                result == (1 if original["selection"] else 0)
-                and api_int(
+                api_int(
                     manager.GetSelectedObjectCount2(-1),
-                    "suspended selection count",
+                    "target activation current selection count",
                     Verdict.SELECTION,
                 )
                 == 0,
                 Verdict.SELECTION,
-                "suspension did not preserve list/clear temporary list",
+                "target activation exposed unexpected current selections",
             )
-            self.receipt.counts["selection_guard"] += 1
-            self.activate_view(ViewId.A)
+            body_entered = True
             yield manager
         except BaseException as error:
             primary = error
@@ -3257,14 +3291,57 @@ class NativeProbe:
             restoration_errors = []
             previous_mode, self.mode = self.mode, RunMode.RESTORING
             restore_started = time.monotonic()
+            can_restore_selection = initial_drained
+
+            def remove_temporary_selection() -> None:
+                nonlocal can_restore_selection
+                if body_entered:
+                    can_restore_selection = False
+                    self.clear_active_selection(manager)
+                    can_restore_selection = True
+
+            def restore_selection() -> None:
+                if not can_restore_selection:
+                    return
+                if nested is not None:
+                    nested["inner_restore"]["attempted"] = True
+                require(
+                    api_int(
+                        manager.GetSelectedObjectCount2(-1),
+                        "pre-restoration current selection count",
+                        Verdict.RESTORATION,
+                    )
+                    == 0,
+                    Verdict.RESTORATION,
+                    "caller entries cannot be appended onto a residual selection",
+                )
+                for raw, mark, view in captured:
+                    data = self.bind(manager.CreateSelectData(), "ISelectData")
+                    data.Mark = mark
+                    if view is not None:
+                        data.View = view
+                    added = manager.AddSelectionListObject(raw, data)
+                    self.receipt.counts["selection_restore_add"] += 1
+                    require(
+                        added is True,
+                        Verdict.RESTORATION,
+                        "original current selection entry not re-added",
+                    )
+                    if nested is not None:
+                        nested["inner_restore"]["restored_entries"] += 1
+                if nested is not None:
+                    nested["inner_restore"]["completed"] = True
+
             try:
-                # Each independent restoration runs even if an earlier one fails.
+                # No report write can suppress mandatory current-list cleanup.
+                # Independent update/context restoration still runs after a drain error.
                 for restore in (
+                    remove_temporary_selection,
                     lambda: self.restore_a_update(original["flags"]["A_disable"]),
                     lambda: self.activate_view(
                         original["sheet"], sheet_only=original["view"] is None
                     ),
-                    resume_selection,
+                    restore_selection,
                 ):
                     try:
                         restore()
@@ -3411,7 +3488,7 @@ class NativeProbe:
             self.restore_a_update(True)
             for batch_index, (shown, keys) in enumerate(batches):
                 with self.timed("selection"):
-                    self.model(Document.DRAWING).ClearSelection2(True)
+                    self.clear_active_selection(manager)
                     view, nodes = self.views()[ViewId.A]
                     data = self.bind(manager.CreateSelectData(), "ISelectData")
                     data.View, data.Mark = view, 0
@@ -3794,8 +3871,8 @@ class NativeProbe:
         require(not pdf.exists(), Verdict.VISUAL, "PDF overwrite refused")
         self.checkpoint(f"{export}-before-export")
         print(f"BULK_VISIBILITY_EXPORT {self.receipt.case} {export}", flush=True)
-        with self.selection_guard():
-            self.model(Document.DRAWING).ClearSelection2(True)
+        with self.selection_guard() as manager:
+            self.clear_active_selection(manager)
             with self.timed("export"):
                 extension = self.bind(
                     self.model(Document.DRAWING).Extension, "IModelDocExtension"

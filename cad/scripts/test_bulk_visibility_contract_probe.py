@@ -702,15 +702,15 @@ def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
     original = prepare_sheet_mode_export(fixture)
     secondary = OSError("inert late selection restoration")
     if restore_error:
-        fixture.controls.resume_error = secondary
+        fixture.controls.restore_add_error = secondary
     manager = fixture.drawing.SelectionManager
-    resume = manager.ResumeSelectionList2
+    restore_add = manager.AddSelectionListObject
 
-    def late_resume(append):
+    def late_restore_add(raw, data):
         clock[0] = origin + restored_elapsed
-        return resume(append)
+        return restore_add(raw, data)
 
-    monkeypatch.setattr(manager, "ResumeSelectionList2", late_resume)
+    monkeypatch.setattr(manager, "AddSelectionListObject", late_restore_add)
     fixture.mode_events.clear()
 
     def expire_inside_guard():
@@ -726,7 +726,7 @@ def test_deadline_keeps_mandatory_restoration_and_owned_cleanup_semantics(
     assert fixture.drawing.ActiveDrawingView is None
     assert not manager.suspended
     assert manager.selected[0][2] == 16
-    assert ("ResumeSelectionList2",) in fixture.mode_events
+    assert any(event[0] == "AddSelectionListObject" for event in fixture.mode_events)
     restoration = subject.receipt.data["cases"][probe.Case.CONSTRUCTION]["operations"]
     (restoration,) = [row for row in restoration if row["bucket"] == "restore"]
     assert restoration["status"] is (
@@ -1625,7 +1625,9 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
     fixture.controls.edit_error = None
     fixture.controls.edit_normalizes = True
     fixture.controls.edit_return = None
-    fixture.controls.resume_error = None
+    fixture.controls.restore_add_error = None
+    fixture.selection_events = []
+    fixture.dispatch_arrays = []
 
     inert_insert_note = fixture.drawing.InsertNote
 
@@ -1663,7 +1665,7 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
         def save_pdf(self, path, *arguments):
             self.assert_live("SaveAs3")
             assert arguments == (0, 1, None, None, 0, 0)
-            assert self.SelectionManager.suspended
+            assert self.SelectionManager.selected == []
             assert self.current is probe.ViewId.A
             fixture.mode_events.append(("SaveAs3", self.current))
             fixture.saved_pdfs.append(Path(path))
@@ -1674,6 +1676,10 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
         def __init__(self):
             self.selected = []
             self.suspended = False
+            self.pop_count = 0
+            self.deselect_failure = None
+            self.add_failure = None
+            self.add_corruption = None
 
         def GetSelectedObjectCount2(self, mark):
             assert mark == -1
@@ -1694,9 +1700,52 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
             assert mark == -1
             return self.selected[index - 1][1]
 
+        def CreateSelectData(self):
+            fixture.selection_events.append(("CreateSelectData",))
+            return SimpleNamespace(View=None, Mark=0)
+
+        def DeSelect2(self, index, mark):
+            assert mark == -1 and 1 <= index <= len(self.selected)
+            fixture.mode_events.append(("DeSelect2", index, mark))
+            fixture.selection_events.append(("deselect", index, mark))
+            if isinstance(self.deselect_failure, BaseException):
+                raise self.deselect_failure
+            if self.deselect_failure is not None:
+                return self.deselect_failure
+            del self.selected[index - 1]
+            return 1
+
+        def AddSelectionListObject(self, raw, data):
+            fixture.mode_events.append(("AddSelectionListObject", raw, data.Mark))
+            fixture.selection_events.append(("restore_add", raw, data.View, data.Mark))
+            if isinstance(self.add_failure, BaseException):
+                raise self.add_failure
+            if self.add_failure is not None:
+                return self.add_failure
+            row = (raw, data.View, data.Mark)
+            if self.add_corruption == "mark":
+                row = (raw, data.View, data.Mark + 1)
+            elif self.add_corruption == "view":
+                row = (raw, fixture.views[probe.ViewId.A], data.Mark)
+            if self.add_corruption == "order":
+                self.selected.insert(0, row)
+            else:
+                self.selected.append(row)
+            if fixture.controls.restore_add_error is not None:
+                raise fixture.controls.restore_add_error
+            return True
+
+        def AddSelectionListObjects(self, array, data):
+            assert array is fixture.dispatch_arrays[-1]
+            assert array.vt == subject.pythoncom.VT_ARRAY | subject.pythoncom.VT_DISPATCH
+            fixture.selection_events.append(("bulk_add", array.values))
+            self.selected.extend((raw, data.View, data.Mark) for raw in array.values)
+            return len(array.values)
+
         def SuspendSelectionList(self):
             assert not self.suspended
             fixture.mode_events.append(("SuspendSelectionList",))
+            fixture.selection_events.append(("suspend", tuple(self.selected)))
             self.original, self.selected = self.selected, []
             self.suspended = True
             return int(bool(self.original))
@@ -1704,10 +1753,10 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
         def ResumeSelectionList2(self, append):
             assert append is False and self.suspended
             fixture.mode_events.append(("ResumeSelectionList2",))
+            self.pop_count += 1
+            fixture.selection_events.append(("resume", append))
             self.selected = self.original
             self.suspended = False
-            if fixture.controls.resume_error is not None:
-                raise fixture.controls.resume_error
 
     def install_receiver(drawing, *, sheet_qualified_titles=True):
         """Install receiver-local ports; no closure retains an earlier generation."""
@@ -1785,6 +1834,27 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
 
     fixture.install_mode_receiver = install_receiver
     install_receiver(fixture.drawing)
+    for view_id, nodes in fixture.components.items():
+        for component in nodes.values():
+
+            def select(append, data, component=component, view_id=view_id):
+                manager = fixture.drawing.SelectionManager
+                assert data.View is fixture.views[view_id]
+                if not append:
+                    manager.selected = []
+                manager.selected.append((component, data.View, data.Mark))
+                fixture.selection_events.append(("select", component, data.Mark, append))
+                return True
+
+            component.Select = select
+    subject.pythoncom = SimpleNamespace(VT_ARRAY=0x2000, VT_DISPATCH=9)
+
+    def variant(vt, values):
+        array = SimpleNamespace(vt=vt, values=values)
+        fixture.dispatch_arrays.append(array)
+        return array
+
+    subject.variant = variant
 
     def rename_sheet(name):
         fixture.mode_events.append(("SetName", name))
@@ -1838,88 +1908,10 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
 
 @pytest.fixture
 def nested_selection_contract(sheet_mode_contract, monkeypatch):
-    """C29-only alternative native ports, not a claim about vendor nesting."""
+    """C29 uses the same active-list ports as every other guard caller."""
     fixture = sheet_mode_contract
     subject = fixture.subject
     subject.create_drawing()
-    fixture.controls.nesting = "stack"
-    fixture.selection_events = []
-    fixture.dispatch_arrays = []
-    original_manager = type(fixture.drawing.SelectionManager)
-
-    class NestedSelectionManager(original_manager):
-        def __init__(self):
-            super().__init__()
-            self.saved = []
-            self.pop_count = 0
-
-        def CreateSelectData(self):
-            fixture.selection_events.append(("CreateSelectData",))
-            return SimpleNamespace(View=None, Mark=None)
-
-        def SuspendSelectionList(self):
-            fixture.selection_events.append(("suspend", tuple(self.selected)))
-            previous, self.selected = self.selected, []
-            self.saved.append(previous)
-            self.suspended = True
-            return int(bool(previous))
-
-        def ResumeSelectionList2(self, append):
-            assert append is False and self.saved
-            self.pop_count += 1
-            fixture.selection_events.append(("resume", append))
-            restored = self.saved.pop()
-            if fixture.controls.nesting == "single_slot_loss":
-                # Alternative port: inner resume unexpectedly exposes L0.
-                restored = self.saved[0]
-            elif fixture.controls.nesting == "wrong_l1":
-                restored = self.selected
-            self.selected = restored
-            self.suspended = bool(self.saved)
-            if fixture.controls.nesting == "inner_throw":
-                raise OSError("inert inner resume threw after restoring empty L1")
-
-        def AddSelectionListObjects(self, array, data):
-            assert array is fixture.dispatch_arrays[-1]
-            assert (
-                array.vt == subject.pythoncom.VT_ARRAY | subject.pythoncom.VT_DISPATCH
-            )
-            assert data.View is fixture.views[probe.ViewId.A] and data.Mark == 0
-            assert self.selected == [] and len(self.saved) == 2
-            assert array.values == tuple(
-                fixture.components[probe.ViewId.A][key]
-                for key in (probe.NodeId.P1, probe.NodeId.P2)
-            )
-            fixture.selection_events.append(("bulk_add", array.values))
-            self.selected = [
-                (component, data.View, data.Mark) for component in array.values
-            ]
-            return len(array.values)
-
-    manager = fixture.drawing.SelectionManager = NestedSelectionManager()
-    for view_id, nodes in fixture.components.items():
-        for key, component in nodes.items():
-
-            def select(append, data, component=component, view_id=view_id):
-                assert data.View is fixture.views[view_id]
-                if not append:
-                    manager.selected = []
-                manager.selected.append((component, data.View, data.Mark))
-                fixture.selection_events.append(
-                    ("select", component, data.Mark, append)
-                )
-                return True
-
-            component.Select = select
-
-    subject.pythoncom = SimpleNamespace(VT_ARRAY=0x2000, VT_DISPATCH=9)
-
-    def variant(vt, values):
-        array = SimpleNamespace(vt=vt, values=values)
-        fixture.dispatch_arrays.append(array)
-        return array
-
-    subject.variant = variant
     monkeypatch.setattr(
         subject, "case_checkpoint", probe.NativeProbe.case_checkpoint.__get__(subject)
     )
@@ -1954,37 +1946,32 @@ def test_c29_modeled_nested_success_retains_exact_marked_context_and_six_full_re
         {"view": probe.ViewId.B, "node": probe.NodeId.P1, "mark": 16, "type": 20},
         {"view": probe.ViewId.B, "node": probe.NodeId.P2, "mark": 32, "type": 20},
     ]
-    assert nested["scope"] == "two_levels_empty_intermediate_only"
+    assert nested["scope"] == "caller_suspended_empty_intermediate"
     assert nested["phase"] == "outer_restored"
     assert nested["L1"] == nested["inner_restored_context"] == empty
     assert nested["L0_restored"] == subject.context(subject.views()) == original
     assert nested["outer_suspend"] == {"raw": "1", "type": "int"}
-    assert nested["inner_suspend"] == {"raw": "0", "type": "int"}
+    assert "inner_suspend" not in nested and "inner_resume" not in nested
+    assert nested["inner_restore"] == {
+        "mode": "active_list_no_suspend_or_resume",
+        "attempted": True,
+        "completed": True,
+        "restored_entries": 0,
+    }
     assert nested["bulk_add"] == {"raw": "2", "type": "int"}
-    assert (
-        nested["inner_resume"]
-        == nested["outer_resume"]
-        == {
-            "attempted": True,
-            "completed": True,
-            "raw": "None",
-            "type": "NoneType",
-        }
-    )
+    assert nested["outer_resume"] == {
+        "attempted": True, "completed": True, "raw": "None", "type": "NoneType"
+    }
     manager = fixture.drawing.SelectionManager
-    assert manager.pop_count == 2 and manager.saved == [] and not manager.suspended
-    assert [event[0] for event in fixture.selection_events] == [
-        "CreateSelectData",
-        "select",
-        "CreateSelectData",
-        "select",
-        "suspend",
-        "suspend",
-        "CreateSelectData",
-        "bulk_add",
-        "resume",
-        "resume",
-    ]
+    assert manager.pop_count == 1 and not manager.suspended
+    names = [event[0] for event in fixture.selection_events]
+    assert names.count("suspend") == names.count("resume") == 1
+    assert names.count("bulk_add") == 1
+    assert names.count("restore_add") == 0
+    assert [event[1] for event in fixture.selection_events if event[0] == "deselect"] == [2, 1]
+    outer_start = fixture.mode_events.index(("SuspendSelectionList",))
+    outer_end = fixture.mode_events.index(("ResumeSelectionList2",))
+    assert not any(event[0] in ("SuspendSelectionList", "ResumeSelectionList2", "ClearSelection2") for event in fixture.mode_events[outer_start + 1 : outer_end])
     assert len(fixture.dispatch_arrays) == 1
     assert row["selections"] == [
         {
@@ -1998,17 +1985,11 @@ def test_c29_modeled_nested_success_retains_exact_marked_context_and_six_full_re
         }
     ]
     assert row["status"] is probe.Verdict.PASSED
-    assert row["candidate_operation_counts"] == {
-        "hide": 0,
-        "show": 0,
-        "bulk_add": 1,
-        "single_select": 0,
-        "selection_guard": 1,
-        "rebuild": 0,
-        "harness_setup_rebuild": 0,
-        "setup_scalar_visibility": 0,
-        "candidate_scalar_visibility": 0,
-    }
+    for name, expected in (
+        ("hide", 0), ("show", 0), ("bulk_add", 1), ("single_select", 0),
+        ("selection_guard", 1), ("rebuild", 0), ("candidate_scalar_visibility", 0),
+    ):
+        assert row["candidate_operation_counts"][name] == expected
     assert row["operation_counts"]["marked_select"] == 2
     assert (
         subject.receipt.counts[probe.SnapshotKind.FULL]
@@ -2053,77 +2034,36 @@ def test_c29_modeled_nested_success_retains_exact_marked_context_and_six_full_re
     assert ("rebuild",) not in fixture.mode_events
 
 
-@pytest.mark.parametrize("nesting", ["single_slot_loss", "wrong_l1", "inner_throw"])
-def test_c29_modeled_inner_restore_failure_never_guesses_outer_pop(
-    nested_selection_contract,
-    nesting,
+@pytest.mark.parametrize("failure", [0, OSError("inert deselect failure")])
+def test_c29_direct_drain_failure_never_guesses_outer_pop(
+    nested_selection_contract, failure,
 ):
     fixture = nested_selection_contract
     subject = fixture.subject
-    fixture.controls.nesting = nesting
+    manager = fixture.drawing.SelectionManager
+    manager.deselect_failure = failure
     with pytest.raises(probe.ProbeFailure) as caught:
         subject.run_case(
             probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
         )
     primary = caught.value
-    row = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]
-    nested = row["nested_selection"]
-    observed = subject.context(subject.views())
-    assert primary.verdict is row["status"] is probe.Verdict.RESTORATION
+    nested = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]["nested_selection"]
     assert subject.receipt.primary is primary
-    assert nested["phase"] == "inner_restore_entered"
+    assert primary.verdict is probe.Verdict.RESTORATION
     assert nested["outer_resume"] == {"attempted": False}
     assert "L0_restored" not in nested
-    assert nested["inner_resume"]["attempted"] is True
-    assert nested["inner_suspend"] == {"raw": "0", "type": "int"}
-    assert nested["inner_restored_context"] == observed
-    assert nested["L1"] == {**nested["L0"], "selection": []}
-    if nesting == "inner_throw":
-        assert "completed" not in nested["inner_resume"]
-        assert "inert inner resume threw" in str(primary)
-        assert observed == nested["L1"]
-    else:
-        assert nested["inner_resume"] == {
-            "attempted": True,
-            "completed": True,
-            "raw": "None",
-            "type": "NoneType",
-        }
-        assert observed != nested["L1"]
-        if nesting == "single_slot_loss":
-            assert observed == nested["L0"]
-        else:
-            assert [item["view"] for item in observed["selection"]] == [
-                probe.ViewId.A
-            ] * 2
-    assert fixture.drawing.SelectionManager.pop_count == 1
-    assert len(fixture.drawing.SelectionManager.saved) == 1
-    assert [event[0] for event in fixture.selection_events].count("resume") == 1
-    events = subject.receipt.data["observations"]
-    assert [event["label"] for event in events] == [
-        "case-fresh-precondition",
-        "C29-outer-suspended",
-        "C29-inner-selected",
-        "selection-guard-restored",
-    ]
-    post = subject.receipt.data["snapshots"][events[-1]["content"]]
-    assert post["context"]["selection"] == observed["selection"]
+    assert nested["inner_restored_context"] == subject.context(subject.views())
+    assert nested["inner_restored_context"] != nested["L1"]
+    assert manager.pop_count == 0 and manager.suspended
+    assert manager.original[0][2] == 16
+    assert [event[1] for event in fixture.selection_events if event[0] == "deselect"] == [2]
+    assert not any(event[0] in ("resume", "restore_add") for event in fixture.selection_events)
     persisted = json.loads((subject.receipt.root / "report.json").read_text())
     assert persisted["primary_error"]["message"] == str(primary)
-    assert (
-        persisted["cases"]["C29"]["nested_selection"]["L0"]["selection"]
-        == nested["L0"]["selection"]
-    )
-    assert (
-        persisted["cases"]["C29"]["nested_selection"]["inner_restored_context"][
-            "selection"
-        ]
-        == observed["selection"]
-    )
     assert persisted["handoff_allowed"] is False
 
 
-def test_c29_report_failure_before_inner_exit_still_resumes_once_without_outer_pop(
+def test_c29_report_failure_persists_until_visible_cleanup_without_outer_pop(
     nested_selection_contract,
     monkeypatch,
 ):
@@ -2133,13 +2073,13 @@ def test_c29_report_failure_before_inner_exit_still_resumes_once_without_outer_p
     checkpoint = subject.receipt.checkpoint
     injected = []
 
-    def fail_inner_restore_report_until_resume():
+    def fail_inner_restore_report_until_empty():
         nested = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION].get(
             "nested_selection", {}
         )
         if (
             nested.get("phase") == "inner_restore_entered"
-            and fixture.drawing.SelectionManager.pop_count == 0
+            and fixture.drawing.SelectionManager.selected
         ):
             injected.append(original)
             assert fixture.drawing.SelectionManager.pop_count == 0
@@ -2147,30 +2087,28 @@ def test_c29_report_failure_before_inner_exit_still_resumes_once_without_outer_p
         checkpoint()
 
     monkeypatch.setattr(
-        subject.receipt, "checkpoint", fail_inner_restore_report_until_resume
+        subject.receipt, "checkpoint", fail_inner_restore_report_until_empty
     )
     with pytest.raises(OSError) as caught:
         subject.run_case(
             probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
         )
     assert caught.value is subject.receipt.primary is original
-    assert injected == [original]
+    assert injected and all(error is original for error in injected)
     row = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]
     nested = row["nested_selection"]
     assert nested["phase"] == "inner_restore_entered"
-    assert nested["inner_resume"] == {
-        "attempted": True,
-        "completed": True,
-        "raw": "None",
-        "type": "NoneType",
+    assert nested["inner_restore"] == {
+        "mode": "active_list_no_suspend_or_resume",
+        "attempted": True, "completed": True, "restored_entries": 0,
     }
     assert nested["outer_resume"] == {"attempted": False}
     assert "L0_restored" not in nested
     assert nested["inner_restored_context"] == nested["L1"]
     assert subject.context(subject.views()) == nested["L1"]
     manager = fixture.drawing.SelectionManager
-    assert manager.pop_count == 1 and len(manager.saved) == 1
-    assert [event[0] for event in fixture.selection_events].count("resume") == 1
+    assert manager.pop_count == 0 and manager.suspended
+    assert not any(event[0] == "resume" for event in fixture.selection_events)
     (restoration,) = [
         operation for operation in row["operations"] if operation["bucket"] == "restore"
     ]
@@ -2183,7 +2121,7 @@ def test_c29_report_failure_before_inner_exit_still_resumes_once_without_outer_p
     persisted = json.loads((subject.receipt.root / "report.json").read_text())
     assert persisted["primary_error"]["message"] == str(original)
     recorded = persisted["cases"]["C29"]["nested_selection"]
-    assert recorded["inner_resume"] == nested["inner_resume"]
+    assert recorded["inner_restore"] == nested["inner_restore"]
     assert recorded["outer_resume"] == {"attempted": False}
     assert recorded["inner_restored_context"]["selection"] == []
     assert persisted["handoff_allowed"] is False
@@ -2194,7 +2132,7 @@ def test_c29_failed_case_owned_cleanup_closes_without_another_selection_pop(
 ):
     fixture = nested_selection_contract
     subject = fixture.subject
-    fixture.controls.nesting = "single_slot_loss"
+    fixture.drawing.SelectionManager.deselect_failure = 0
     primary = capture_and_cleanup_failure(
         subject,
         lambda: subject.run_case(
@@ -2204,8 +2142,8 @@ def test_c29_failed_case_owned_cleanup_closes_without_another_selection_pop(
     )
     assert primary.verdict is probe.Verdict.RESTORATION
     assert subject.receipt.primary is primary
-    assert fixture.drawing.SelectionManager.pop_count == 1
-    assert [event[0] for event in fixture.selection_events].count("resume") == 1
+    assert fixture.drawing.SelectionManager.pop_count == 0
+    assert not any(event[0] == "resume" for event in fixture.selection_events)
     assert subject.app.closed == [fixture.drawing, fixture.source]
     assert not subject.app.models and not subject.documents and not subject.acquisitions
     assert subject.app.ActiveDoc is None
@@ -2225,6 +2163,238 @@ def test_c29_failed_case_owned_cleanup_closes_without_another_selection_pop(
     assert persisted["primary_error"]["message"] == str(primary)
     assert persisted["cleanup"]["remaining_owned"] == []
     assert persisted["handoff_allowed"] is False
+
+
+@pytest.mark.parametrize("marked", [False, True])
+@pytest.mark.parametrize("manager_view", [None, probe.ViewId.B])
+def test_active_guard_preserves_raw_order_marks_nullable_view_and_typed_batch(
+    nested_selection_contract, marked, manager_view,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=marked)
+    manager = fixture.drawing.SelectionManager
+    if marked:
+        manager.selected = [
+            (raw, None if manager_view is None else view, mark)
+            for raw, view, mark in manager.selected
+        ]
+    original_rows = list(manager.selected)
+    original = subject.context(subject.views())
+    fixture.selection_events.clear()
+    fixture.mode_events.clear()
+    before = subject.receipt.counts.copy()
+    with subject.selection_guard() as active:
+        assert active is manager and manager.selected == [] and not manager.suspended
+        view = fixture.views[probe.ViewId.A]
+        raw = tuple(fixture.components[probe.ViewId.A][key] for key in (probe.NodeId.P1, probe.NodeId.P2))
+        data = manager.CreateSelectData()
+        data.View, data.Mark = view, 0
+        assert manager.AddSelectionListObjects(subject.dispatches(raw), data) == 2
+        subject.verify_batch(manager, (probe.NodeId.P1, probe.NodeId.P2))
+    assert manager.selected == original_rows
+    assert all(actual[0] is expected[0] and actual[1] is expected[1] for actual, expected in zip(manager.selected, original_rows))
+    assert subject.context(subject.views()) == original
+    events = fixture.selection_events
+    assert [event[1] for event in events if event[0] == "deselect"] == ([2, 1] if marked else []) + [2, 1]
+    assert [event[1:] for event in events if event[0] == "restore_add"] == [
+        (raw, view, mark) for raw, view, mark in original_rows
+    ]
+    assert subject.receipt.counts["selection_restore_add"] - before["selection_restore_add"] == len(original_rows)
+    assert subject.receipt.counts["selection_deselect"] - before["selection_deselect"] == len(original_rows) + 2
+    assert not any(event[0] in ("SuspendSelectionList", "ResumeSelectionList2", "ClearSelection2") for event in fixture.mode_events)
+
+
+@pytest.mark.parametrize("failure", [0, True, OSError("initial drain failed")])
+def test_active_guard_initial_drain_failure_does_not_retry_or_readd(
+    nested_selection_contract, failure,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    original = subject.context(subject.views())
+    manager = fixture.drawing.SelectionManager
+    original_rows = list(manager.selected)
+    manager.deselect_failure = failure
+    fixture.selection_events.clear()
+    with pytest.raises(OSError if isinstance(failure, OSError) else probe.ProbeFailure):
+        with subject.selection_guard():
+            pytest.fail("failed initial drain yielded")
+    assert manager.selected == original_rows
+    assert subject.context(subject.views()) == original
+    assert fixture.selection_events == [("deselect", 2, -1)]
+    assert manager.pop_count == 0 and not manager.suspended
+
+
+@pytest.mark.parametrize("failure", [False, 1, OSError("restore add failed")])
+@pytest.mark.parametrize("partial", [False, True])
+def test_active_guard_restore_add_failure_retains_actual_partial_state(
+    nested_selection_contract, monkeypatch, failure, partial,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    original_rows = list(manager.selected)
+    add = manager.AddSelectionListObject
+
+    def fail_add(raw, data):
+        if not partial or manager.selected:
+            manager.add_failure = failure
+        return add(raw, data)
+
+    monkeypatch.setattr(manager, "AddSelectionListObject", fail_add)
+    fixture.selection_events.clear()
+    with pytest.raises(probe.ProbeFailure) as caught:
+        with subject.selection_guard():
+            pass
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert manager.selected == original_rows[: int(partial)]
+    assert len([event for event in fixture.selection_events if event[0] == "restore_add"]) == 1 + int(partial)
+    assert manager.pop_count == 0 and not manager.suspended
+    assert not any(event[0] == "resume" for event in fixture.selection_events)
+
+
+@pytest.mark.parametrize("corruption", ["mark", "order", "view"])
+def test_active_guard_rejects_inexact_restored_context(
+    nested_selection_contract, corruption,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    original_rows = list(manager.selected)
+    manager.add_corruption = corruption
+    with pytest.raises(probe.ProbeFailure) as caught:
+        with subject.selection_guard():
+            pass
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert manager.selected != original_rows
+    assert manager.pop_count == 0 and not manager.suspended
+
+
+def test_active_guard_report_failure_cannot_block_nonempty_reinsertion(
+    nested_selection_contract, monkeypatch,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    original_rows = list(manager.selected)
+    original = subject.context(subject.views())
+    primary = OSError("report unavailable until original visible selection returns")
+    checkpoint = subject.receipt.checkpoint
+    injected = []
+    armed = []
+
+    def fail_until_restored():
+        if armed and manager.selected != original_rows:
+            injected.append(primary)
+            raise primary
+        checkpoint()
+
+    monkeypatch.setattr(subject.receipt, "checkpoint", fail_until_restored)
+
+    def action():
+        with subject.selection_guard():
+            armed.append(True)
+            subject.receipt.checkpoint()
+
+    caught = capture_and_cleanup_failure(subject, action)
+    assert caught is subject.receipt.primary is primary
+    assert injected and all(error is primary for error in injected)
+    assert manager.selected == original_rows
+    assert subject.receipt.data["handoff_allowed"] is False
+    assert manager.pop_count == 0
+    assert subject.app.closed == [fixture.drawing, fixture.source]
+    assert subject.receipt.data["cleanup"]["inventory_empty"] is True
+    post = next(
+        subject.receipt.data["snapshots"][event["content"]]
+        for event in subject.receipt.data["observations"]
+        if event["label"] == "selection-guard-restored"
+    )
+    assert post["context"] == original
+
+
+@pytest.mark.parametrize("exposure", ["entry", "restore"])
+def test_active_guard_never_drains_or_appends_to_activation_exposed_entries(
+    nested_selection_contract, monkeypatch, exposure,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    activate = fixture.drawing.ActivateView
+    unexpected = (fixture.components[probe.ViewId.A][probe.NodeId.Q2], fixture.views[probe.ViewId.A], 0)
+    fixture.selection_events.clear()
+
+    def expose(name):
+        result = activate(name)
+        if name == fixture.views[probe.ViewId.A if exposure == "entry" else probe.ViewId.B].Name:
+            manager.selected.append(unexpected)
+        return result
+
+    monkeypatch.setattr(fixture.drawing, "ActivateView", expose)
+    with pytest.raises(probe.ProbeFailure):
+        with subject.selection_guard():
+            assert exposure == "restore"
+    assert manager.selected == [unexpected]
+    assert [event[1] for event in fixture.selection_events if event[0] == "deselect"] == [2, 1]
+    assert not any(event[0] in ("restore_add", "resume", "suspend") for event in fixture.selection_events)
+    assert fixture.drawing.current is probe.ViewId.B
+
+
+def test_active_guard_partial_initial_drain_preserves_actual_remainder_without_retry(
+    nested_selection_contract, monkeypatch,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    original_rows = list(manager.selected)
+    deselect = manager.DeSelect2
+
+    def fail_second(index, mark):
+        if index == 1:
+            manager.deselect_failure = 0
+        return deselect(index, mark)
+
+    monkeypatch.setattr(manager, "DeSelect2", fail_second)
+    fixture.selection_events.clear()
+    with pytest.raises(probe.ProbeFailure):
+        with subject.selection_guard():
+            pytest.fail("partly drained original list yielded")
+    assert manager.selected == original_rows[:1]
+    assert fixture.selection_events == [("deselect", 2, -1), ("deselect", 1, -1)]
+    assert fixture.drawing.current is probe.ViewId.B
+    assert manager.pop_count == 0
+
+
+def test_active_guard_body_primary_survives_restore_failure_and_owned_disposal(
+    nested_selection_contract,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    subject.prepare_context(marked=True)
+    manager = fixture.drawing.SelectionManager
+    primary = OSError("inert body primary")
+    secondary = OSError("inert restoration secondary")
+
+    def action():
+        with subject.selection_guard():
+            fixture.views[probe.ViewId.A].DisableAutoUpdate = True
+            manager.add_failure = secondary
+            raise primary
+
+    caught = capture_and_cleanup_failure(subject, action)
+    assert caught is subject.receipt.primary is primary
+    assert any(row["message"] == str(secondary) for row in subject.receipt.data["secondary_errors"])
+    assert manager.selected == []
+    assert manager.pop_count == 0 and not manager.suspended
+    assert fixture.views[probe.ViewId.A].DisableAutoUpdate is False
+    assert subject.app.closed == [fixture.drawing, fixture.source]
+    assert subject.receipt.data["cleanup"]["inventory_empty"] is True
+    assert subject.receipt.data["handoff_allowed"] is False
 
 
 def sheet_mode_record(subject):
@@ -2576,11 +2746,10 @@ def test_sheet_mode_actual_export_observes_inside_guard_and_restores_context(
     fixture.subject.export(export)
     events = fixture.mode_events
     mode_index = next(i for i, event in enumerate(events) if event[0] == "GetEditSheet")
-    assert events[mode_index] == ("GetEditSheet", probe.ViewId.A, True)
-    assert events[mode_index - 2 : mode_index + 2] == [
-        ("ClearSelection2", probe.ViewId.A),
+    assert events[mode_index] == ("GetEditSheet", probe.ViewId.A, False)
+    assert events[mode_index - 1 : mode_index + 2] == [
         ("Extension", probe.ViewId.A),
-        ("GetEditSheet", probe.ViewId.A, True),
+        ("GetEditSheet", probe.ViewId.A, False),
         ("SaveAs3", probe.ViewId.A),
     ]
     assert (
@@ -2591,8 +2760,9 @@ def test_sheet_mode_actual_export_observes_inside_guard_and_restores_context(
         )
         < mode_index
     )
-    assert events.index(("SuspendSelectionList",)) < mode_index
-    assert events.index(("ResumeSelectionList2",)) > mode_index
+    assert next(i for i, event in enumerate(events) if event[0] == "DeSelect2") < mode_index
+    assert next(i for i, event in enumerate(events) if event[0] == "AddSelectionListObject") > mode_index
+    assert not any(event[0] in ("SuspendSelectionList", "ResumeSelectionList2", "ClearSelection2") for event in events)
     assert fixture.subject.context(fixture.subject.views()) == original
     assert fixture.edit_calls == [fixture.drawing]
     assert len(fixture.saved_pdfs) == 1
@@ -2633,9 +2803,9 @@ def test_sheet_mode_export_failure_restores_guard_keeps_evidence_and_cleans_up(
     fixture.mode_results[:] = [
         {"format": False, "invalid": "True", "native_error": native}[failure]
     ]
-    secondary = OSError("selection resume reported failure")
+    secondary = OSError("selection re-add reported failure")
     if restore_error:
-        fixture.controls.resume_error = secondary
+        fixture.controls.restore_add_error = secondary
     fixture.mode_events.clear()
     primary = capture_and_cleanup_failure(
         fixture.subject, lambda: fixture.subject.export(probe.Export.BASELINE)
@@ -2643,7 +2813,7 @@ def test_sheet_mode_export_failure_restores_guard_keeps_evidence_and_cleans_up(
     assert probe.failure_verdict(primary) is probe.Verdict.VISUAL
     assert fixture.saved_pdfs == fixture.rendered_exports == []
     assert not (fixture.subject.receipt.root / "E0.pdf").exists()
-    assert ("ResumeSelectionList2",) in fixture.mode_events
+    assert any(event[0] == "AddSelectionListObject" for event in fixture.mode_events)
     assert fixture.drawing.current is original["sheet"]
     assert fixture.drawing.ActiveDrawingView is None
     assert not fixture.drawing.SelectionManager.suspended

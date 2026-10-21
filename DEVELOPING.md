@@ -1740,28 +1740,50 @@ controls with 174 FULL and 15 SOURCE observations and all 32 outputs. That
 retained native/visual evidence belongs to that exact historical source; it is
 not current C29 native proof or an old/new performance comparison.
 
-The current candidate adds selection-only C29 after C25 and before C26/C27,
-preserving all original controls and their relative order. Exact marked L0 is
-B/P1 mark16 followed by B/P2 mark32. Outer suspension must expose empty L1;
-the existing inner selection guard adds exactly A/P1,P2 through the typed
-dispatch array with View A/Mark0, validates identity/type20/mark/view/count,
-then must restore exact empty L1 and context/flags. Only successful inner
-restoration permits one outer resume and exact marked L0 restoration. Unexpected
-inner restoration refuses without a guessed outer pop/retry; existing owned
-drawing disposal handles failure, not visibility rollback. No visibility command,
-rebuild, save, export, ownership query or production cutover is added.
+The `f6451ecf` C29 native attempt **failed**. Its caller suspension returned
+integer 1 and exposed empty L1; the inner suspension returned integer 0, the
+typed add returned 2, and inner resume returned `None`. Readback nevertheless
+found marked L0 instead of empty L1, so restoration refused. No outer resume
+was attempted; independent C28 owned cleanup passed. Integer 0 is the documented
+empty-list result, not a refusal or ownership token. This observation does not
+establish a general native nesting limit or identify an internal cause.
 
-Current C29 native qualification is **PENDING**. The parent-run offline batch
-passed 927 tests across the probe and recipe tests; the actual canonical-template,
-function and cache-admission smoke passed with the unchanged 19,046-byte input
-and exact SHA-256 above. Persistent report-failure coverage verifies mandatory
-inner restoration cannot be blocked by added reporting. These inert results do
-not establish native nesting. The source-derived normal schedule is 180 FULL
-and 15 SOURCE observations for 30 controls, within unchanged 192 FULL/16 SOURCE
-caps and 32 case slots; all 32 outputs and the 900-second normal/70-second cleanup/
-970-second overall policy remain required. A future C29 pass would establish
-only this two-level, empty-intermediate fixture behavior, not arbitrary nesting
-or foreign-ownership semantics. No performance gain is established.
+The current, **native-unqualified** candidate instead uses a visible-current-list
+transaction in every existing selection guard. It retains the exact raw entries,
+order, marks and associated views from current-list readback, removes exposed
+entries with descending `ISelectionMgr.DeSelect2(index, -1)` calls (each exact
+integer 1, then exposed count 0), and retains the existing typed target bulk add.
+Mandatory cleanup removes temporary current entries before independently restoring
+updates and drawing context. Caller entries are re-added in their original order
+with fresh selection data and `AddSelectionListObject(raw, data)` (exact `True`),
+then exact selection/context/flags are verified. No inner `SuspendSelectionList`,
+`ResumeSelectionList2` or `ClearSelection2`, hidden-list query, guessed pop,
+fallback or production helper change is introduced. Failed drain/restoration
+refuses; captured entries are never appended onto an unverified residual list.
+Reporting cannot precede mandatory cleanup in a way that suppresses it.
+
+Selection-only C29 remains after C25 and before C26/C27, preserving all original
+controls and their relative order. Exact marked L0 is B/P1 mark16 followed by
+B/P2 mark32. The simulated caller's sole outer suspension must expose empty L1.
+The same new guard adds exactly A/P1,P2 with View A/Mark0 and verifies native
+identity/type20/mark/view/count. Its indexed cleanup must reproduce exact empty
+L1 and context/flags before one caller-owned outer resume may restore exact L0.
+Failure does not authorize another outer pop; existing owned drawing disposal
+handles failure, not visibility rollback. No visibility command, rebuild, save
+or export is added to C29.
+
+The historical parent-run 927-test batch and actual canonical-template/function/
+cache-admission smoke passed for `f6451ecf`, not this changed mechanism. The
+committed template remains the unchanged 19,046-byte input with the exact SHA-256
+above. Changed-source offline checks and native qualification are **PENDING**;
+neither historical evidence nor inert ports establish unsuspended command
+suitability or hidden-owner preservation. The intended normal schedule remains
+180 FULL and 15 SOURCE observations for 30 controls, within unchanged 192 FULL/
+16 SOURCE caps and 32 case slots. All 32 outputs and the 900-second normal/
+70-second cleanup/970-second overall policy remain required. A future C29 pass
+would establish only this caller-suspended, empty-intermediate fixture behavior,
+not arbitrary selection classes, nesting or foreign-ownership semantics.
+No old/new performance gain or production readiness is established.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible
@@ -1872,9 +1894,10 @@ blocks normal drawing. Preserve the finalized terminal report size/digest receip
 even on failure, without masking the original error. Probe-control success, the
 subsequent normal drawing result, artifact retrieval and parent all-page visual
 acceptance are separate gates. This small fixture establishes contracts, not
-production readiness or a performance/build-speed claim. Offline behavior tests:
-`uv run --frozen pytest -q cad/scripts/test_bulk_visibility_contract_probe.py`
-(no COM imports or native work).
+production readiness or a performance/build-speed claim. Parent-owned offline
+checks use the already-existing dedicated environment, for example
+`& $BulkTitleRefreshPython -m pytest -q cad/scripts/test_bulk_visibility_contract_probe.py`
+(no COM imports, native work or environment sync). Do not use the shared launcher.
 
 ### Debugging a miss (provenance & diagnostics)
 
