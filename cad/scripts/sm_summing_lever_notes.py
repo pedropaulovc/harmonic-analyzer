@@ -125,6 +125,9 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
+    # Boss length and counter-web thickness share Y0, not the asymmetric
+    # coefficient plate's midplane. View G carries both native dimensions.
+    "AnchorHeight": "CENTRED ON 5.08 WEB",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
     "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
     # The plan's 152.40 is the body's end-face span, not the part's overall:
@@ -134,20 +137,18 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "PlateLength": "BODY\nEND FACES",
 }
 
-# This finished-hole acceptance limit retains the receiver rib walls; it is
-# not a claim that the Hole Wizard's pilot and cosmetic thread model the
-# complete cavity. ENTIRE includes partial threads and every void left by
-# lead, chamfer, tip, runout or deflection. Only the separately dimensioned
-# pilot bore and cone are excluded. The cylinder is about each actual
-# finished-hole axis, from its actual entry. The builder saves the complete
-# requirement on the SLDPRT; the drawing checks its two native MAX dimensions
-# before placing the source property ahead of the native pilot/thread rows.
+# The finished cavity includes full and partial threads, lead, relief,
+# chamfer, tip, runout and deflection voids. Only the separately dimensioned
+# tap-drill bore and point are excluded; name that exception before the
+# 6.00 MAX bound so it cannot be mistaken for the deeper pilot's limit.
+# The cylinder is about each actual finished-hole axis, from its actual
+# entry. The builder saves this requirement on the SLDPRT; the drawing checks
+# its two native MAX dimensions before the native pilot/thread rows.
 BRACKET_THREAD_CUTTING_REQUIREMENT = (
-    "ENTIRE FINISHED HOLE CAVITY WITHIN\n"
-    f"Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
-    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY\n"
-    "ABOUT ACTUAL FINISHED-HOLE AXIS;\n"
-    "PILOT BORE/CONE EXCLUDED; RETAINS RIB WALLS\n"
+    "EXCEPT TAP-DRILL BORE AND POINT,\n"
+    f"FINISHED CAVITY WITHIN Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X\n"
+    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY,\n"
+    "ABOUT ACTUAL FINISHED-HOLE AXIS\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.

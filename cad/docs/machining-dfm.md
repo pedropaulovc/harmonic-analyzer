@@ -319,10 +319,10 @@ MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
 would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
 callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
-The owner-approved **Ø2.40 MAX × 6.00 MAX** bound is printed as finished-part
-acceptance: **ENTIRE FINISHED HOLE CAVITY WITHIN** the cylinder, **FROM ACTUAL
-ENTRY ABOUT ACTUAL FINISHED-HOLE AXIS; PILOT BORE/CONE EXCLUDED; RETAINS RIB
-WALLS**. Only the separately dimensioned pilot bore and cone are excluded.
+The owner-approved **Ø2.40 MAX × 6.00 MAX** bound prints the tap-drill exception
+first: **EXCEPT TAP-DRILL BORE AND POINT, FINISHED CAVITY WITHIN Ø2.40 MAX X
+6.00 MAX DEEP FROM ACTUAL ENTRY, ABOUT ACTUAL FINISHED-HOLE AXIS**. Only the
+separately dimensioned tap-drill bore and point are excluded.
 Every other part of the finished hole cavity must lie inside the cylinder:
 full and partial threads, lead/chamfer/tip recesses, reliefs, and any extra
 void left by runout or deflection. This is geometrically equivalent to bounding
@@ -380,8 +380,8 @@ envelope radius**, not a basic external screw radius. Together these bounds
 guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
 step wall** remains controlling at the approved geometry.
 
-The callout names retained rib walls without inventing a single global wall
-minimum. The **1.29 mm** radial separation to the extended top-face plane
+The callout states the finished-cavity bound, not a global wall minimum.
+The **1.29 mm** radial separation to the extended top-face plane
 is not the finite sharp-step distance above, nor is it a claim that every
 surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
 proofs remain independent; the finished-cavity acceptance preserves their
@@ -417,6 +417,11 @@ the **Ø0.15 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
 underside seats** are unchanged, as are all #1769 mounting/joint installation
 coordinates. World spring top remains **982.24 mm** and nut seat **975.24 mm**.
 The full-width lower face eliminates the integral underside pad and its step.
+
+View G locates the boss's axial ends through the **CENTRED ON 5.08 WEB**
+caption attached to its native **19.05** length dimension. The boss and
+counter web share Y=0; this does not centre either feature on the asymmetric
+7.00 coefficient plate.
 
 The receiver's new Z span already overlaps the first spring station; the
 source-neighbour intent is **X reach 35.75 mm before the worst nut footprint

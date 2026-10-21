@@ -12,10 +12,11 @@ sm-summing-lever:
   # R1 MAX ceiling; bounded native profile-blend and rib inner-cap-root proofs
   # against plate, cylinder and counter web remain, without tangent propagation
   # onto receiver entry caps or knife shoulders. Not a general body-fillet claim.
-  # Spring/nut seats, Ø0.15 pattern, receiver8.20 and #1769 footprint stay put.
+  # Spring/nut seats, Ø0.15 pattern and #1769 footprint stay put.
+  # The 9.00 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge exceptions are eliminated; unchanged-junction RV-02 remains.
   # Knife-root radius/hardness debt stays separate from the proved rib roots.
-  # Intended drawing reduction 9 -> 6 views awaits native regeneration.
+  # Native drawing contains six views on two sheets, reduced from nine views.
   # Native underside/swept-clearance and measured installed balance remain open.
   machinist_exceptions:
     - id: "RV-01"

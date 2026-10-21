@@ -1,9 +1,10 @@
 """Two fillister screws seat MHA-MG-01 on MHA-SM-03's front face.
 
-Pure joint data: no assembly or COM imports enter either part recipe. Machine
-seat coordinates are pinned to the live summing installation by the offline
-contract and the magnifier assembly. Photo stations: ch30 page002_img01 front
-view and ch20 page001_img01, top-right close-up.
+Pure joint geometry depends on the shared sm_summing_lever_spec geometry;
+no assembly or COM imports enter either part recipe. Machine seat coordinates
+are pinned to the live summing installation by the offline contract and the
+magnifier assembly. Photo stations: ch30 page002_img01 front view and
+ch20 page001_img01, top-right close-up.
 """
 
 from __future__ import annotations
@@ -131,8 +132,9 @@ TAP_LEAD_MARGIN_MIN = (
 )
 DRILL_POINT_RIB_MARGIN = RIB_DEPTH - DRILL_DEPTH - DRILL_POINT_DEPTH
 # Lateral pilot drift at its deepest reach (fr_top_frame_spec's 0.3 deg
-# realistic wander, restated so this stays a pure leaf module). Thread-cutting
-# runout/deflection are already contained by the separate required envelope.
+# realistic wander, kept local to avoid adding that spec to the shared pure
+# geometry dependency). Thread-cutting runout/deflection are already contained
+# by the separate required envelope.
 DRILL_WANDER_DEG = 0.3
 DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX

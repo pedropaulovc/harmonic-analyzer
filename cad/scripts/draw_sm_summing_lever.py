@@ -1486,11 +1486,11 @@ BACK_KEEP = {
     "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
 # R8's complete four-row receiver block measured about 110 x 47 mm including
-# its leader at (360,115). The finished-cavity requirement adds two text rows,
-# not width; reserve 11 mm more below it. Fresh native ink must still be checked.
+# its leader at (360,115). Reserve two additional rows for the finished-cavity
+# bound and up-front pilot exception. Fresh native ink must still be checked.
 MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
-# Lower the caption below that six-row callout. Its predicted bottom is Y80.4,
-# leaving 14.4 mm to the title rule and over 8 mm above it to the callout text.
+# Keep the caption below the complete receiver callout; native regeneration
+# must check its clearance after any wording change.
 BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.066)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is

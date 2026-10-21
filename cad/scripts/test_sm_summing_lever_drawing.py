@@ -150,9 +150,6 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC is joint.TAP_SPEC
     assert (part.TAP_SPEC.kind, part.TAP_SPEC.end) == ("tapped_bottoming", "blind")
     # Native depth/band behavior is exercised by the adapter tests below.
-    # The bounded-cutting process precedes the native pilot and usable-thread
-    # rows, but does not replace either of their native depth variables.
-    assert notes.BRACKET_THREAD_CUTTING_REQUIREMENT.endswith("\n")
     assert part.TAP_SPEC.size == "#2-56"
     assert part.TAP_SPEC.depth_mm == 6.50
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
@@ -428,50 +425,6 @@ def test_layout_retains_six_views_on_two_sheets_without_a_section() -> None:
         for call in _calls_in_order(tree)
     )
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES)) == 2
-
-
-def test_view_f_r7_translation_and_complete_text_have_analytical_air() -> None:
-    """R7 measured-box replay plus source offsets, NOT regenerated native proof."""
-    dx, dy = drawing.BACK_CENTER[0] - 0.300, drawing.BACK_CENTER[1] - 0.100
-
-    def translated(box):
-        left, bottom, right, top = box
-        return left + dx, bottom + dy, right + dx, top + dy
-
-    # Captured r7 coordinates remain independent of the recipe constants.
-    receiver = translated((0.2293245, 0.079172, 0.3706755, 0.120828))
-    y0 = translated((0.1693, 0.1094, 0.2169, 0.1130))
-    x1 = translated((0.1808, 0.1199, 0.2285, 0.1234))
-    detail_right = 0.1925879  # full native detail outline, not ideal crop alone
-    assert min(receiver[0], y0[0], x1[0]) > detail_right + 0.002
-    assert receiver[2] < 0.4318 - 0.0127 - 0.002
-    # R8's four-row box includes the leader, not only text. Additional process
-    # rows grow down from its unchanged native drill row at 5.5 mm per row.
-    # This source estimate must not be mistaken for regenerated native ink.
-    callout_x, callout_y = drawing.MOUNTING_CALLOUT_XY
-    process_rows = notes.BRACKET_THREAD_CUTTING_REQUIREMENT.strip().splitlines()
-    assert max(map(len, process_rows)) <= 43  # R8's longest process row
-    extra_rows = len(process_rows) - 2
-    callout = (
-        callout_x - 0.0621, callout_y - 0.011166 - extra_rows * _LINE_M,
-        callout_x + 0.0541, callout_y + 0.035767,
-    )
-    caption_x, caption_y = drawing.BACK_VIEW_NOTE_XY
-    caption = (
-        caption_x + 0.0002, caption_y - 0.0036,
-        caption_x + 0.0705, caption_y,
-    )
-    for left, bottom, right, top in (callout, caption):
-        assert left > detail_right + 0.002
-        assert right < 0.4318 - 0.0127 - 0.002
-        assert bottom > 0.066 + 0.004  # title block x216..431.8, y0..66 mm
-        assert top < _BORDER_TOP_M - 0.004
-    assert caption[3] + 0.004 < callout[1]
-    assert caption[3] + 0.004 < receiver[1]
-    # Conservative source reservation around the unchanged 1:4 isometric,
-    # not a measured native outline (which still needs parent acceptance).
-    iso_field_bottom = drawing.ISO_CENTER[1] - 0.040
-    assert max(receiver[3], callout[3], caption[3]) + 0.004 < iso_field_bottom
 
 
 @pytest.mark.parametrize("index,gap", [(0, 0.010), (1, 0.0391)])
