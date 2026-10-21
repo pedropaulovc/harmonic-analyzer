@@ -99,6 +99,18 @@ The package recipes own sheet counts and locations:
   wrapped rows, rather than an estimated row pitch. Its actual native note
   extent must leave at least 4 mm below the table and remain clear of the border
   and title block, including after the final rebuild.
+  Native BOM-associated balloons cover the main exploded view (11 rows),
+  north bracket detail B (4 rows) and north keeper detail C (3 rows) on
+  sheet 2, plus the fulcrum shaft (BOM row 2) in the existing 1:1 lever-bank
+  view on sheet 4. All four views link to the same native BOM and must read
+  that association back. Anchors select the source assembly's greatest-Z instance
+  for each family, including the northmost pins, without a frozen bracket
+  point. The final rebuilt drawing must independently account for exactly
+  those 19 native item-number balloons, each attached to one non-dangling
+  edge of its assigned north instance, with a proven sheet landing and the
+  public landing audit retained. This is a guarded restoration candidate,
+  not a claim that the underlying native placement root cause is resolved;
+  acceptance still requires all four native pages and their visual diff.
 
 Earlier selected-image page indices remain unchanged. Native note extents,
 table growth and view outlines still determine containment; offline wrapping
