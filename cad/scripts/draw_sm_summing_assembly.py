@@ -13,6 +13,10 @@ comes from ``sm_summing_explode_spec`` and every printed text comes from
 
 Usage:
     uv run python cad\scripts\draw_sm_summing_assembly.py sm-summing-assembly
+
+NEVER MERGE this diagnostic branch: the CLI runs the SM-only display-update
+discriminator and intentionally fails before save/export/cache success.
+``build`` retains the ordinary merged-hotfix caption path without balloons.
 """
 
 from __future__ import annotations
@@ -832,11 +836,10 @@ def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
         )
 
 
-def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """Place the exploded isometric and BOM; return its settled caption check.
-
-    Balloons are intentionally omitted pending deterministic placement (#1667).
-    """
+def _prepare_exploded_sheet(
+    adapter: Any,
+) -> tuple[Any, Any, tuple[tuple[str, str], ...]]:
+    """Actual production prefix, ending at the formatted, validated BOM."""
     label = "summing exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -860,7 +863,16 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         configuration_grouping="same-part",
         label="summing",
     )
-    _validate_bom(adapter, table)
+    items = _validate_bom(adapter, table)
+    return exploded, table, items
+
+
+def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
+    """Place the exploded isometric and BOM; return its settled caption check.
+
+    Balloons are intentionally omitted pending deterministic placement (#1667).
+    """
+    _exploded, table, _items = _prepare_exploded_sheet(adapter)
     # TODO(#1667): Restore after deterministic farm balloon placement;
     # balloons intentionally omitted meanwhile.
     # items = _validate_bom(adapter, table)
@@ -930,8 +942,7 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set summing sheet scale: {name}")
 
 
-@_telemetry.traced("drawing.sm_summing_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+async def _open_source(adapter: Any) -> None:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open summing drawing source", await adapter.open_model(str(SOURCE)))
@@ -946,6 +957,11 @@ async def build(adapter: Any) -> dict[str, str]:
             f"summing source Number {properties['Number']!r} != {notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
+
+
+@_telemetry.traced("drawing.sm_summing_assembly")
+async def build(adapter: Any) -> dict[str, str]:
+    await _open_source(adapter)
 
     _create_sheets(adapter)
     assembled_settled = _place_assembled_sheet(adapter)
@@ -969,6 +985,27 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
 
+async def _build_display_update_probe(adapter: Any) -> dict[str, str]:
+    """NEVER MERGE: fresh display-update discriminator, no export."""
+    from _drawing_sm_display_update_probe import run_probe
+
+    async def prepare() -> tuple[Any, Any, tuple[tuple[str, str], ...]]:
+        await _open_source(adapter)
+        _create_sheets(adapter)
+        _place_assembled_sheet(adapter)
+        return _prepare_exploded_sheet(adapter)
+
+    await run_probe(
+        adapter,
+        prepare,
+        source=SOURCE,
+        bom_cells=_bom_cells,
+        bom_column=_bom_column,
+        anchors=BALLOON_ANCHORS,
+    )
+    raise AssertionError("SM display-update diagnostic returned without its intentional stop")
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("part", choices=[ARTIFACT_STEM])
@@ -978,4 +1015,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_build(_build_display_update_probe))
