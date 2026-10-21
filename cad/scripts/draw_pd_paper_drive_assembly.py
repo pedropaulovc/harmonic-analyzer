@@ -1755,17 +1755,55 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
 
 
+def _observe_bom_display_text(display: Any) -> dict[str, Any]:
+    """Temporary raw text evidence; its display-origin offsets are not transformed."""
+    census: dict[str, Any] = {
+        "position_frame": "raw SDK offsets from display-data origin; sheet mapping unknown",
+        "height_units": "m", "angle_units": "radians CCW from X",
+        "record_cap": 512, "records": [],
+    }
+
+    def read(call: Callable[[], Any]) -> dict[str, Any]:
+        try:
+            value = repr(call())
+            return {"value": value[:256], "truncated": len(value) > 256}
+        except Exception as error:
+            return {"error": f"{type(error).__name__}: {error}"[:256]}
+
+    try:
+        count = display.GetTextCount()
+    except Exception as error:
+        census["count"] = {"error": f"{type(error).__name__}: {error}"[:256]}
+        return census
+    census["count"] = read(lambda: count)
+    if type(count) is not int or count < 0:
+        census["unsupported_count"] = True
+        return census
+    census["truncated"] = count > 512
+    for index in range(min(count, 512)):
+        census["records"].append({
+            "index": index,
+            "text": read(lambda: display.GetTextAtIndex(index)),
+            "position_offsets": read(lambda: display.GetTextPositionAtIndex(index)),
+            "reference": read(lambda: display.GetTextRefPositionAtIndex(index)),
+            "font": read(lambda: display.GetTextFontAtIndex(index)),
+            "height_m": read(lambda: display.GetTextHeightAtIndex(index)),
+            "angle_ccw_rad": read(lambda: display.GetTextAngleAtIndex(index)),
+        })
+    return census
+
+
 def _annotate_bom_width_boundary(
     table: Any, *, configuration: str | None, stage: str,
     outcome: dict[str, Any] | None = None,
 ) -> None:
     """Retain bounded raw measurements, never infer a hidden-column index map."""
-    def read(call: Callable[[], Any]) -> dict[str, Any]:
+    def read(call: Callable[[], Any], *, cap: int = 192) -> dict[str, Any]:
         try:
             value = repr(call())
-            return {"value": value[:192], "truncated": len(value) > 192}
+            return {"value": value[:cap], "truncated": len(value) > cap}
         except Exception as error:
-            return {"error": f"{type(error).__name__}: {error}"[:192]}
+            return {"error": f"{type(error).__name__}: {error}"[:cap]}
 
     try:
         rows = int(table.RowCount)
@@ -1796,6 +1834,63 @@ def _annotate_bom_width_boundary(
             ],
             "caps": {"columns": declared > 8, "rows": rows > 64},
         }
+        # Temporary rendering discriminator at the existing mutation boundaries.
+        if stage in {
+            "all_visible_after_widths", "after_width_visibility_restore", "after_rebuild",
+        }:
+            display_census: dict[str, Any] = {
+                "cell_projection_contract": "raw IncludeHidden=True typed columns / False visible indices",
+                "cell_row_cap": 44, "cell_column_cap": 8, "line_cap": 1024,
+            }
+            summary["display_census"] = display_census
+            try:
+                physical_count = len(_bom_physical_columns(table, label="paper-drive display observation"))
+                display_census["physical_columns"] = physical_count
+                if not (0 <= rows <= 44 and 0 <= visible <= physical_count <= 8):
+                    raise RuntimeError("display cell observation cap exceeded")
+                display_census["cells"] = [
+                    {
+                        "global_row": row,
+                        "include_hidden_true": [
+                            read(lambda: table.DisplayedText2(row, column, True))
+                            for column in range(physical_count)
+                        ],
+                        "include_hidden_false": [
+                            read(lambda: table.DisplayedText2(row, column, False))
+                            for column in range(visible)
+                        ],
+                    }
+                    for row in range(rows)
+                ]
+            except Exception as error:
+                display_census["cell_read_error"] = f"{type(error).__name__}: {error}"[:256]
+            try:
+                raw_annotation = table.GetAnnotation()
+                if raw_annotation is None:
+                    raise RuntimeError("native annotation is unavailable")
+                annotation = _early_bound(raw_annotation, "IAnnotation")
+                display_census["annotation_position"] = read(lambda: annotation.GetPosition())
+                raw_display = annotation.GetDisplayData()
+                if raw_display is None:
+                    raise RuntimeError("native display data is unavailable")
+                display = _early_bound(raw_display, "IDisplayData")
+                try:
+                    count = display.GetLineCount()
+                except Exception as error:
+                    display_census["line_count"] = {"error": f"{type(error).__name__}: {error}"[:256]}
+                else:
+                    display_census["line_count"] = read(lambda: count)
+                    if type(count) is not int or count < 0:
+                        display_census["unsupported_line_count"] = True
+                    else:
+                        display_census["lines_truncated"] = count > 1024
+                        display_census["lines"] = [
+                            read(lambda: display.GetLineAtIndex3(index), cap=512)
+                            for index in range(min(count, 1024))
+                        ]
+                display_census["text"] = _observe_bom_display_text(display)
+            except Exception as error:
+                display_census["display_read_error"] = f"{type(error).__name__}: {error}"[:256]
         if stage == "all_visible_after_widths":
             try:
                 formats: list[dict[str, Any]] = []
@@ -2204,6 +2299,10 @@ def _bom_piece_grid_bounds(
         if raw_display is None:
             raise RuntimeError("paper-drive BOM displayed grid display data is unavailable")
         display = _early_bound(raw_display, "IDisplayData")
+        try:
+            evidence["display_text"] = _observe_bom_display_text(display)
+        except Exception as error:
+            evidence["display_text"] = {"read_error": f"{type(error).__name__}: {error}"[:256]}
         count = display.GetLineCount()
         evidence["line_count"] = count
         if type(count) is not int or not 1 <= count <= 1024:
