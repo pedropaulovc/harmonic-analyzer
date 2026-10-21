@@ -1547,7 +1547,7 @@ inputs are byte-identical.
 
 ### Branch-only bulk visibility contract experiment
 
-The isolated `perf/com-bulk-visibility-probe-20261020` branch runs a bounded
+The isolated `perf/com-bulk-visibility-probe-20261020` branch runs an experimental
 contract probe after pure spring-preset validation and before normal native
 `drawing:ch_channel_assembly` work. Implementation
 approval is **not native-launch or production-cutover approval**; the parent must
@@ -1555,9 +1555,70 @@ authorize any farm run separately. Do not run this probe locally. It uses two
 declared read-only channel parts, disposable nested assemblies and two diagnostic
 drawing views; it never replaces production outputs or production isolation.
 
+The observed execution of `d61076a` (probe `b548ab8ab5174c1c`) failed in C00,
+`construction_identity`, with `ProbeFailure: explicit assembly template
+unavailable`, **before `NewDocument` or any visibility/selection control**.
+All visibility APIs remain untested by that execution. The original
+`GetUserPreferenceStringValue(9)` value/type and individual path predicates were
+not recorded: this is neither a missing-file diagnosis nor evidence that
+preference enum 9 is wrong. Separately, C28 cleanup raised `0x800401FD`
+(`Object is not connected to server`) in `IsSame` after `CloseDoc`, using a stale
+document handle. That secondary cleanup failure must not replace the original
+C00 error or be treated as a visibility failure or proof of an application crash.
+
+Fixture setup uses one explicit deployment-seeded experiment input:
+`C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/templates/Assembly.ASMDOT`,
+required size **19,046 bytes**, SHA-256
+`1950533a66f08e77a710016d6dca1523bbe4ada8c294d37c0998b90208a58ea6`.
+A later read-only filesystem observation on instance 10 (`swmaker00000A`, the
+failed worker) proved that file and byte identity, matching deployment seed
+metadata. It did not observe the interactive preference or diagnose the original
+failure's predicate. Availability on other workers and native document creation
+remain unproved; a worker with a missing or different seed must fail closed.
+The path/size/hash constants live in the probe recipe input, not worker settings.
+
+Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
+admission, require the explicit input's nonempty, fully-qualified, worker-visible
+regular-file, case-insensitive `.asmdot`, exact-size and exact-hash predicates.
+The receipt retains the original `GetUserPreferenceStringValue(9)` escaped
+value/type and independent path predicates **informationally**, not as the
+creation input or a gate on its returned value. It also checkpoints the explicit
+input predicates, expected and observed file identity, and admitted chosen path
+before refusal or creation. There is no guessed template, other preference slot,
+fallback chain, `NewAssembly` route or worker-configuration change.
+An exception from the informational native preference lookup remains a real
+failure: record it and rethrow the exact original exception. Only returned
+preference values are non-gating; native failures are not suppressed or retried.
+
+The proposed `GetDocumentTemplate(2, "", 0, 0.0, 0.0)` resolver is **rejected for
+this unattended route**, not implemented or launched. Its historical candidate
+ABI is `(Mode, TemplateName, PaperSize, Width, Height)`,
+`int/string/int/double/double -> string` (assembly document type 2, not preference
+9; no tuple unpacking). The SDK/example confirm this shape, not noninteractive
+behavior; for assemblies, arguments after Mode are unused. The actual generated
+docstring says **"Displays new doc dialog and returns the name of selected
+document template"**. No resolver call/receipt or separate resolver span is
+part of this fixture repair.
+
+A cooperative probe deadline cannot interrupt blocking COM. Existing
+`cad/scripts/_watchdog.py` protections, also recorded in the failed task log,
+are crash detection via new `sldexitapp.exe`, modal-dialog detection after two
+polls, a 900-second telemetry-idle operation timeout, 15-second polling and
+hung-window warnings throttled to 300 seconds. Modal detection targets a
+`#32770` dialog titled exactly `SOLIDWORKS Design` with a disabled owner.
+Official documentation instead names the template picker `New SOLIDWORKS
+Document`; the actual seat's resolver dialog was never observed. Picker coverage
+cannot be claimed. Idle detection nominally occurs 900–915 seconds after the
+last qualifying telemetry activity, conditional on progressing polling/probes
+and no renewed activity; this is **not a strict exit bound**. Abort flushes
+telemetry before exit without an enclosing hard deadline. No new watchdog is
+introduced, and neither these protections nor this repair authorize native or
+unattended execution. Resolver dialog/hang risk remains unresolved.
+
 Evidence is written under
 `cad/out/reports/failures/com-perf-bulk-visibility/<run-id>/`: a checkpointed JSON
-report, six all-page PDFs, full-page renders/overlays and owned native fixtures.
+report and, for a successful run, six all-page PDFs, full-page renders/overlays
+and owned native fixtures. The observed failed run published only its report.
 The terminal task-log receipt carries the finalized report digest (the report
 does not hash itself). Exact head/tree metadata is read only during an authorized
 farm-native execution. Any failed/unsupported control blocks the normal drawing;
@@ -1566,23 +1627,41 @@ does not execute the probe and is not new native evidence. No forced cache miss,
 new task prefix, pool deployment or alternative selector is provided.
 
 `CloseDoc` is documented to also close non-active hidden documents. Before every
-probe-owned close, the probe therefore requires positive ownership of **every live
-document**, including owned acquisitions still awaiting admission. A foreign or
-unresolved live identity forbids probe-owned closes: owned models may remain
-resident **at probe exit**, the report records held-model diagnostics, and
-normal-drawing handoff stays blocked. There is no alternate probe close API or
-blanket-close recovery. These are probe-local guarantees, not final seat-residency
-claims: the surrounding `run_build` owns the entire farm seat and its mandatory
-outer session teardown remains enabled, including discard of remaining documents.
+probe-owned close, the probe therefore requires fresh, positive ownership of
+**every live document**, including owned acquisitions still awaiting admission.
+Pre-close proof must bind unique live identities to the acquisition ledger;
+duplicate, foreign or unresolved identities forbid the close. Invalidate usable
+model/view references before closing, retaining pre-close native identity
+witnesses only for possible non-target survivors. Fresh inventory metadata and
+pathname lookup only locate a survivor candidate: it must also compare equal to
+its pre-close owner, not merely to another fresh alias. Never invoke the known
+closed target or an absent dependency's witness. A replaced or disconnected
+candidate witness refuses reconciliation rather than adopting the replacement.
+Account for implicitly closed owned dependencies as well as the named target;
+do not silently drop an unresolved acquisition. Refused or failed reconciliation
+retains held/unresolved ledger evidence and blocks normal-drawing handoff. Source
+cleanliness and read-only disk identities remain mandatory.
+
+Owned models may remain resident **at probe exit** on refusal; the report
+records held-model diagnostics. There is no alternate probe close API or
+blanket-close recovery, and cleanup errors remain secondary to the primary
+failure. These are probe-local guarantees, not final seat-residency claims:
+the surrounding `run_build` owns the entire farm seat and its mandatory outer
+session teardown remains enabled, including discard of remaining documents.
 The probe cannot observe that later cleanup; receipts state
 `held_model_scope=probe_exit` and `outer_session_teardown=not_observed_by_probe`.
+The observed outer teardown logged all documents closed, but that does not turn
+the failed C28 receipt into a successful owned-cleanup/source-preservation proof.
 Offline fakes model the documented collateral behavior; they are not native proof.
 
-The 29-case experiment includes seven separately timed checked setup rebuilds;
-its eight-minute envelope is unvalidated. Probe-control success, the subsequent
-normal drawing result, artifact retrieval and parent all-page visual acceptance
-are separate claims. This small fixture establishes contracts, not a build-speed
-percentage. Offline behavior tests:
+All 29 controls remain required, including seven separately timed checked setup
+rebuilds; the eight-minute envelope is unvalidated and is not a hard COM bound.
+Any unsupported/failed control, unresolved cleanup or source-cleanliness failure
+blocks normal drawing. Preserve the finalized terminal report size/digest receipt
+even on failure, without masking the original error. Probe-control success, the
+subsequent normal drawing result, artifact retrieval and parent all-page visual
+acceptance are separate gates. This small fixture establishes contracts, not
+production readiness or a performance/build-speed claim. Offline behavior tests:
 `uv run --frozen pytest -q cad/scripts/test_bulk_visibility_contract_probe.py`
 (no COM imports or native work).
 

@@ -230,6 +230,15 @@ DPI = 300
 MAX_IMAGE_BYTES = 256 * 1024 * 1024
 MAX_FILES_BYTES = 192 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
+# Deployment-seeded input observed read-only on failed worker swmaker00000A.
+# Keep the exact identity in this recipe input; other workers must match or refuse.
+ASSEMBLY_TEMPLATE_PATH = Path(
+    "C:/ProgramData/SOLIDWORKS/SOLIDWORKS 2026/templates/Assembly.ASMDOT"
+)
+ASSEMBLY_TEMPLATE_SIZE = 19046
+ASSEMBLY_TEMPLATE_SHA256 = (
+    "1950533a66f08e77a710016d6dca1523bbe4ada8c294d37c0998b90208a58ea6"
+)
 
 
 def require(condition: bool, verdict: Verdict, message: str) -> None:
@@ -467,6 +476,39 @@ def sha256(path: Path) -> str:
 
 def normalized(path: str | Path) -> str:
     return os.path.normcase(str(Path(path).resolve()))
+
+
+def assembly_template_evidence(value: Any) -> dict[str, Any]:
+    """Record independent admission facts, not an inferred missing-file cause."""
+    predicates: dict[str, bool | None] = {
+        "is_string": type(value) is str,
+        "nonempty": bool(value) if type(value) is str else None,
+        "fully_qualified": None,
+        "exists": None,
+        "is_file": None,
+        "assembly_suffix": None,
+    }
+    evidence = {
+        "value": (
+            value
+            if type(value) in (str, int, bool, type(None))
+            or (type(value) is float and math.isfinite(value))
+            else repr(value)
+        ),
+        "type": type(value).__name__,
+        "repr": repr(value),
+        "predicates": predicates,
+    }
+    if type(value) is str and value:
+        try:
+            path = Path(value)
+            predicates["fully_qualified"] = path.is_absolute()
+            predicates["assembly_suffix"] = path.suffix.casefold() == ".asmdot"
+            predicates["exists"] = path.exists()
+            predicates["is_file"] = path.is_file()
+        except (OSError, ValueError) as error:
+            evidence["path_error"] = error_record(error)
+    return evidence
 
 
 def error_record(error: BaseException) -> dict[str, Any]:
@@ -1467,124 +1509,221 @@ class NativeProbe:
         self.receipt.artifact(path, "native_fixture")
         self.freeze_disk(target)
 
+    def discard_inventory(self) -> dict[Document, dict[str, Any]]:
+        """Freeze ownership while every handle is live; return no native refs."""
+        require(
+            all(
+                owned.state in (AcquisitionState.PENDING, AcquisitionState.ADMITTED)
+                and owned.native is not None
+                for owned in self.acquisitions.values()
+            ),
+            Verdict.RESTORATION,
+            "discard held: unresolved acquisition or prior close not reconciled",
+        )
+        current = array(self.app.GetDocuments(), "pre-discard inventory", empty=True)
+        frozen: dict[Document, dict[str, Any]] = {}
+        for raw in current:
+            owners = [
+                key
+                for key, owned in self.acquisitions.items()
+                if self.same(raw, owned.native) == 1
+            ]
+            require(
+                len(owners) == 1,
+                Verdict.RESTORATION,
+                "discard held: foreign/unresolved live identity; CloseDoc can close hidden documents",
+            )
+            key = owners[0]
+            require(
+                key not in frozen,
+                Verdict.RESTORATION,
+                "duplicate owned identity before discard",
+            )
+            owned = self.acquisitions[key]
+            model = self.bind(raw, "IModelDoc2")
+            title = api_string(model.GetTitle(), "fresh owned discard title")
+            path = api_string(
+                model.GetPathName(), "fresh owned discard path", empty=True
+            )
+            kind = api_int(model.GetType(), "fresh owned discard type")
+            require(
+                owned.title is None or title == owned.title,
+                Verdict.RESTORATION,
+                f"owned discard title changed: {key}",
+            )
+            if owned.state is AcquisitionState.ADMITTED:
+                require(
+                    kind == owned.kind
+                    and (
+                        normalized(path) == normalized(owned.path)
+                        if owned.path is not None
+                        else path == ""
+                    ),
+                    Verdict.RESTORATION,
+                    f"owned discard path/type changed: {key}",
+                )
+            require(
+                all(
+                    row["title"].casefold() != title.casefold()
+                    for row in frozen.values()
+                ),
+                Verdict.RESTORATION,
+                "ambiguous discard title; no foreign close permitted",
+            )
+            frozen[key] = {
+                "title": title,
+                "path": path,
+                "kind": kind,
+                "generation": owned.generation,
+                "state": owned.state,
+            }
+        require(
+            set(frozen) == set(self.acquisitions),
+            Verdict.RESTORATION,
+            "owned/unresolved acquisition unexpectedly absent before discard",
+        )
+        return frozen
+
+    def reconcile_discard(
+        self,
+        label: Document,
+        frozen: Mapping[Document, Mapping[str, Any]],
+        owners: Mapping[Document, Any],
+    ) -> None:
+        """Require surviving candidates to retain their pre-close native owner."""
+        survivors: dict[Document, Any] = {}
+        for raw in array(self.app.GetDocuments(), "post-close inventory", empty=True):
+            model = self.bind(raw, "IModelDoc2")
+            title = api_string(model.GetTitle(), "post-close title")
+            path = api_string(model.GetPathName(), "post-close path", empty=True)
+            kind = api_int(model.GetType(), "post-close type")
+            matches = [
+                key
+                for key, row in frozen.items()
+                if title == row["title"]
+                and kind == row["kind"]
+                and (
+                    normalized(path) == normalized(row["path"])
+                    if path and row["path"]
+                    else path == row["path"]
+                )
+            ]
+            require(
+                len(matches) == 1,
+                Verdict.RESTORATION,
+                "unexpected/ambiguous post-close survivor; no adoption permitted",
+            )
+            key = matches[0]
+            require(
+                key is not label,
+                Verdict.RESTORATION,
+                f"close retained owned target: {label}",
+            )
+            require(
+                key not in survivors,
+                Verdict.RESTORATION,
+                "duplicate post-close survivor",
+            )
+            require(
+                bool(path) and Path(path).is_absolute(),
+                Verdict.RESTORATION,
+                "pathless post-close survivor cannot be safely reacquired",
+            )
+            # Metadata only locates a candidate; two fresh aliases of a replaced
+            # document do not prove continuity with the acquired native owner.
+            lookup = self.app.GetOpenDocumentByName(path)
+            require(
+                lookup is not None and self.same(model, lookup) == 1,
+                Verdict.RESTORATION,
+                "post-close survivor lacks fresh canonical identity",
+            )
+            require(
+                self.same(model, owners[key]) == 1,
+                Verdict.RESTORATION,
+                "post-close survivor changed pre-close owner identity",
+            )
+            survivors[key] = model
+        for key, row in frozen.items():
+            if key not in survivors and row["path"]:
+                require(
+                    self.app.GetOpenDocumentByName(row["path"]) is None,
+                    Verdict.RESTORATION,
+                    f"closed pathname still loaded: {key}",
+                )
+        active = self.app.ActiveDoc
+        require(
+            active is None
+            or sum(self.same(active, model) for model in survivors.values()) == 1,
+            Verdict.RESTORATION,
+            "unexpected post-close active document",
+        )
+        # Commit reconciliation only after the complete fresh inventory passes.
+        # Unknown, retained or ambiguous models leave the invalidated ledger held.
+        for key, row in frozen.items():
+            if key in survivors:
+                self.acquisitions[key].native = survivors[key]
+                continue
+            self.acquisitions.pop(key)
+            self.documents.pop(key, None)
+            self.receipt.data["ledger"].append(
+                {
+                    "event": "discard",
+                    "document": key,
+                    "title": row["title"],
+                    "generation": row["generation"],
+                    "implicit": key is not label,
+                    "remaining": sorted(self.acquisitions),
+                }
+            )
+
     def close(self, label: Document) -> None:
         if label not in self.acquisitions:
             return
         self.tick()
-        owned = self.acquisitions[label]
-        require(
-            owned.state is not AcquisitionState.UNRESOLVED,
-            Verdict.RESTORATION,
-            f"unresolved acquisition cannot be safely closed: {label}",
-        )
-        # CloseDoc also closes non-active hidden documents. Admission metadata
-        # may be invalid, but EVERY live identity must be positively ours before
-        # even a named close is safe. Never adopt a foreign inventory delta.
-        current = array(self.app.GetDocuments(), "pre-discard inventory", empty=True)
         try:
-            for raw in current:
-                owners = [
-                    key
-                    for key, candidate in self.acquisitions.items()
-                    if candidate.state is not AcquisitionState.UNRESOLVED
-                    and self.same(raw, candidate.native) == 1
-                ]
-                require(
-                    len(owners) == 1,
-                    Verdict.RESTORATION,
-                    "discard held: foreign/unresolved live identity; CloseDoc can close hidden documents",
-                )
-                require(
-                    not any(
-                        candidate.state is AcquisitionState.UNRESOLVED
-                        and candidate.native is not None
-                        and self.same(raw, candidate.native) == 1
-                        for candidate in self.acquisitions.values()
-                    ),
-                    Verdict.RESTORATION,
-                    "discard held: unresolved live acquisition",
-                )
+            frozen = self.discard_inventory()
         except BaseException as error:
             self.receipt.data["ledger"].append(
                 {
                     "event": "discard_held",
                     "document": label,
-                    "live_count": len(current),
                     "remaining_acquisitions": sorted(self.acquisitions),
                     "error": error_record(error),
                 }
             )
             raise
-        matches = [raw for raw in current if self.same(raw, owned.native) == 1]
-        require(
-            len(matches) <= 1,
-            Verdict.RESTORATION,
-            "duplicate owned identity before discard",
+        owned = self.acquisitions[label]
+        owned.state = AcquisitionState.DISCARD_ATTEMPTED
+        self.receipt.data["ledger"].append(
+            {
+                "event": "discard_attempt",
+                "document": label,
+                "title": frozen[label]["title"],
+                "generation": owned.generation,
+                "preclose_inventory": frozen,
+            }
         )
-        if matches:
-            target = self.bind(matches[0], "IModelDoc2")
-            title = api_string(target.GetTitle(), "fresh owned discard title")
-            require(
-                sum(
-                    api_string(
-                        self.bind(raw, "IModelDoc2").GetTitle(),
-                        "discard inventory title",
-                    ).casefold()
-                    == title.casefold()
-                    for raw in current
-                )
-                == 1,
-                Verdict.RESTORATION,
-                "ambiguous discard title; no foreign close permitted",
-            )
-            require(
-                owned.state is not AcquisitionState.DISCARD_ATTEMPTED,
-                Verdict.RESTORATION,
-                f"owned discard already attempted: {label}",
-            )
-            owned.state = AcquisitionState.DISCARD_ATTEMPTED
-            self.receipt.data["ledger"].append(
-                {
-                    "event": "discard_attempt",
-                    "document": label,
-                    "title": title,
-                    "generation": owned.generation,
-                }
-            )
-            self.app.CloseDoc(title)
-        remaining = array(self.app.GetDocuments(), "post-close inventory", empty=True)
-        require(
-            not any(self.same(raw, owned.native) == 1 for raw in remaining),
-            Verdict.RESTORATION,
-            f"close retained owned target: {label}",
-        )
-        # Named CloseDoc may also close other owned hidden models or unload
-        # owned references. Reconcile every disappeared identity without retry.
-        for key, candidate in tuple(self.acquisitions.items()):
-            if candidate.state is AcquisitionState.UNRESOLVED:
-                continue
-            if not any(self.same(raw, candidate.native) == 1 for raw in remaining):
-                self.acquisitions.pop(key)
-                self.documents.pop(key, None)
-                self.receipt.data["ledger"].append(
-                    {
-                        "event": "discard",
-                        "document": key,
-                        "title": candidate.title,
-                        "generation": candidate.generation,
-                        "remaining": sorted(self.acquisitions),
-                    }
-                )
-                if key is Document.DRAWING:
-                    self.view_handles.clear()
-                    self.node_handles.clear()
+        # Keep identity witnesses only for possible survivors, never the named
+        # target. A disappeared dependency's witness is not called; a matching
+        # live candidate must still prove continuity, or fail closed if its old
+        # owner is disconnected. These witnesses never restore ownership alone.
+        owners = {
+            key: candidate.native
+            for key, candidate in self.acquisitions.items()
+            if key is not label
+        }
+        # Invalidate all usable model/view references before CloseDoc. A throwing
+        # or partially effective close remains failed and non-retryable.
+        for candidate in self.acquisitions.values():
+            candidate.native = None
         self.adapter.currentModel = None
-        if owned.path is not None:
-            require(
-                self.app.GetOpenDocumentByName(str(owned.path)) is None,
-                Verdict.RESTORATION,
-                f"closed pathname still loaded: {label}",
-            )
+        self.view_handles.clear()
+        self.node_handles.clear()
+        try:
+            self.app.CloseDoc(frozen[label]["title"])
+            self.reconcile_discard(label, frozen, owners)
+        finally:
+            owners.clear()
 
     def close_all_owned(self) -> None:
         errors = []
@@ -1629,13 +1768,55 @@ class NativeProbe:
             raise errors[0]
 
     def new_assembly(self, label: Document) -> Any:
-        template = self.app.GetUserPreferenceStringValue(9)
+        # swDefaultTemplateAssembly=9 remains diagnostic only. Creation uses one
+        # deployment-backed, byte-pinned input, never a resolver or fallback.
+        template = str(ASSEMBLY_TEMPLATE_PATH)
+        evidence = assembly_template_evidence(template)
+        predicates = evidence["predicates"]
+        predicates.update(size_matches=None, sha256_matches=None)
+        event: dict[str, Any] = {
+            "document": label,
+            "preference": {"status": "not_returned"},
+            "explicit_input": evidence,
+            "expected_identity": {
+                "path": template,
+                "size": ASSEMBLY_TEMPLATE_SIZE,
+                "sha256": ASSEMBLY_TEMPLATE_SHA256,
+            },
+        }
+        self.receipt.data.setdefault("assembly_templates", []).append(event)
+        try:
+            preference = self.app.GetUserPreferenceStringValue(9)
+        except BaseException as error:
+            event["preference"] = {"status": "error", "error": error_record(error)}
+            # Use the existing failure recorder so checkpoint failure cannot
+            # replace the exact native lookup exception being rethrown.
+            self.receipt.failure(error)
+            raise
+        event["preference"] = assembly_template_evidence(preference)
+        if predicates["fully_qualified"] is True and predicates["is_file"] is True:
+            path = Path(template)
+            event["file_identity"] = {
+                "path": template,
+                "size": path.stat().st_size,
+                "sha256": sha256(path),
+            }
+            predicates["size_matches"] = (
+                event["file_identity"]["size"] == ASSEMBLY_TEMPLATE_SIZE
+            )
+            predicates["sha256_matches"] = (
+                event["file_identity"]["sha256"] == ASSEMBLY_TEMPLATE_SHA256
+            )
+        failed = [name for name, passed in predicates.items() if passed is not True]
+        if not failed:
+            event["chosen"] = event["file_identity"]
+        # Persist preference diagnostics and independent input predicates BEFORE
+        # refusal. A suffix/hash mismatch must not be labelled a missing file.
+        self.receipt.checkpoint()
         require(
-            type(template) is str
-            and Path(template).is_file()
-            and Path(template).suffix.casefold() == ".asmdot",
+            not failed,
             Verdict.CONSTRUCTION,
-            "explicit assembly template unavailable",
+            f"explicit assembly template refused: {', '.join(failed)}",
         )
         with self.acquiring(label) as before:
             self.acquired(label, self.app.NewDocument(template, 0, 0.0, 0.0), before)
