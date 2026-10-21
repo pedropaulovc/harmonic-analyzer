@@ -186,12 +186,18 @@ CAP_REGISTER_LOCATION_PLACES = retention.CAP_REGISTER_LOCATION_PLACES
 CAP_REGISTER_DIA = retention.BLOCK_REGISTER_DIAMETER
 CAP_REGISTER_DIA_BAND = retention.BLOCK_REGISTER_DIAMETER_BAND
 CAP_REGISTER_DEPTH = retention.BLOCK_REGISTER_DEPTH
+# At the unchanged 2 mm nominal, .XXX is the loosest decimal class whose
+# lower limit clears the cap through rock: .XX permits 1.49 mm, below the
+# 1.649708 mm required depth. This does not make the 2.13 mm upper limit critical.
 CAP_REGISTER_DEPTH_PLACES = retention.BLOCK_REGISTER_DEPTH_PLACES
 CAP_REGISTER_CALLOUT = "LOCATING RECESS FOR TL-30\nXY FROM BEARING AXIS"
 CAP_REGISTER_DEPTH_CALLOUT = (
-    "2X FLAT BOTTOM; MHA-CH-06-TL-30\n"
-    "REGISTER BOTTOM CLEARANCE\n"
-    "THROUGH CAP ROCK; NO BOTTOMING"
+    "2X FLAT BOTTOM\n"
+    "MHA-CH-06-TL-30\n"
+    "REGISTER BOTTOM\n"
+    "CLEARANCE THROUGH\n"
+    "CAP ROCK;\n"
+    "NO BOTTOMING"
 )
 GENERAL_ANGULAR_BAND_DEGREES = retention.GENERAL_ANGULAR_BAND_DEGREES
 # Public cartridge-interface names shared by the integrated boundary checks.
@@ -293,6 +299,7 @@ SCREW_LENGTH = 20.0  # M4 x 20 ISO 4762 SHCS
 SCREW_LENGTH_TOL = 0.42  # ISO 4762 js15 at 20, +/-
 SCREW_HEAD_DIA = 7.0
 SCREW_HEAD_HEIGHT = 4.0
+CARRIAGE_MODEL = "HGH15CA"
 CARRIAGE_THREAD_DEPTH = 5.0  # HGH15CA M4 x 5
 # The counterbore floor stands CBORE_FLOOR above the carriage seat: the block
 # under the head, so it alone sets the screw's engagement in the carriage.
@@ -335,21 +342,21 @@ SCREW_HOLE_SPEC = HoleSpec(
     },
 )
 # The hole callout's mate row (rule 4): the three-place stations serve it.
-SCREW_MATE_CALLOUT = "MATCHES HGH15CA\nCARRIAGE M4 HOLES"
+SCREW_MATE_CALLOUT = f"MATCHES {CARRIAGE_MODEL}\nCARRIAGE {trammel.CARRIAGE_BOLT} HOLES"
 # The floor's functional callout names the mate it sets (rule 4) and states
 # the engagement shortfall the vendor's 5 deep thread leaves (rule 20): the
 # same worst case as ENGAGEMENT_MIN, the shortest screw over the highest floor.
 ENGAGEMENT_TARGET = 1.5 * SCREW_DIA  # drawing-guidelines.md rule 18
 if ENGAGEMENT_MAX >= ENGAGEMENT_TARGET:
     raise AssertionError("the M4 engagement meets rule 18: drop the shortfall")
-# One row over its value: review r8 found the three-row callout never
-# printed (layout audit text-unmatched), while one-row callouts
-# print; the HGH15CA mate is already the hole callout's. Both limits print
-# (review r11 read the three places as rescuing the minimum alone): the
-# floor's band holds the screw between that minimum and the thread's bottom.
+# RV-04: state the actual minimum as a feature-owned plain fact. The native
+# CalloutAbove channel prints one row; embedded newlines survive GetText and
+# display-data collection but disappear from the exported PDF (7f008ec06).
+# The unchanged floor band also keeps ENGAGEMENT_MAX below the vendor's
+# CARRIAGE_THREAD_DEPTH; that upper-bottoming contract remains enforced above.
 CBORE_FLOOR_CALLOUT = (
-    f"SETS M4 X 20 ENGAGEMENT {ENGAGEMENT_MIN:.2f}-{ENGAGEMENT_MAX:.2f}\n"
-    f"IN {CARRIAGE_THREAD_DEPTH:.1f} DEEP THREAD"
+    f"{trammel.CARRIAGE_BOLT} ENGAGEMENT {ENGAGEMENT_MIN:.2f} MIN "
+    f"({ENGAGEMENT_MIN / SCREW_DIA:.2f}D) IN {CARRIAGE_MODEL} CARRIAGE"
 )
 
 # --- Side screws (PR C4): the TL-29 nut bracket ------------------------------
@@ -747,11 +754,12 @@ def cap_register_margins(
 ) -> dict[str, float]:
     """Conservative material gaps at the *printed* source bands.
 
-    Direct receiver XY and wing-step reach use .XXX from the bearing axis.
-    The bearing axis to the original edges stays .XX. Receiver diameter
-    carries its explicit +.10/0 band; depth is .XXX. Tap walls use the thread major
-    envelope, carriage counterbores their .XX band, and side counterbores
-    their existing .XXX band. Independent source locations add, never RSS.
+    Direct receiver XY uses .XXX and wing-step reach .XX from the same
+    bearing axis. The bearing axis to the original edges stays .XX.
+    Receiver diameter carries its explicit +.10/0 band; depth is .XXX.
+    Tap walls use the thread major envelope, carriage counterbores their .XX
+    band, and side counterbores their existing .XXX band. Independent source
+    locations add, never RSS.
     The general angular band sweeps both top-entered axes through the deepest
     receiver; a full block-height sweep bounds the lower bearing seat.
     """
@@ -856,7 +864,7 @@ WIDTH_WALL_CALLOUT = (
 PULLER_GAP_CALLOUT = (
     f"SETS WEB\n{_min_text(PULLER_GAP_MIN)} MIN\nPULLER\nNEEDS {PULLER_SPACE_MIN:.1f}"
 )
-SHOULDER_HOLE_CALLOUT = "THRU WEB\nPULLER CLEARANCE\nBEHIND 6200\nINNER RACES"
+SHOULDER_HOLE_CALLOUT = "THRU WEB\nPULLER\nCLEARANCE\nBEHIND 6200\nINNER RACES"
 # A horizontal dimension's line runs along its LAST row's baseline, so B-B's
 # floor height carries its rows over the value (review r7: under it, its
 # line, shorter than the rows, struck "(5 DEEP THREAD)"; draw_ch_rocker_arm_
@@ -867,14 +875,9 @@ CALLOUTS_ABOVE = {
     "SeatFilletR": "2X",
     "CboreFloor": CBORE_FLOOR_CALLOUT,
 }
-# The side row's 9.000 reads from the bottom face (c4 review), named by the
-# carriage it seats on (close-c4 review). In A-A since close-c4-r4 (owner
-# ruling: the section names its own top face), it hangs beyond its span, so
-# narrow rows keep the block clear of the side view. Its three places serve
-# the #8 float to the bracket (rule 4, close-c4-r5): the mate prints by its
-# short number (owner ruling 2026-10-17), the full one too wide for the gap.
-SIDE_ROW_MATE = SIDE_SCREW_MATE.removeprefix("MHA-CH-06-")
-SIDE_ROW_CALLOUT = f"FROM\nCARRIAGE\nSEAT FACE;\nMATCHES\n{SIDE_ROW_MATE}"
+# The side row reads from the carriage seat and names the complete bracket
+# identity. Its independent native shelf has room for all three rows.
+SIDE_ROW_CALLOUT = f"FROM CARRIAGE\nSEAT FACE; MATCHES\n{SIDE_SCREW_MATE}"
 CALLOUTS_BELOW = {
     "BlockLength": LENGTH_WALL_CALLOUT,
     "BlockWidth": WIDTH_WALL_CALLOUT,

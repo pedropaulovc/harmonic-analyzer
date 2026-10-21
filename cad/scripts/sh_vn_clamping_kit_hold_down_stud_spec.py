@@ -18,7 +18,9 @@ FROM C4: ``THREAD``, selected kit ``STOCK_LENGTH`` / ``STOCK_LENGTH_MM``,
 finished ``LENGTH`` and its ordinary printed band come from the fasteners
 spec; ``MAJOR_DIA`` comes from the base-bar stud clearance authority. The
 selected 3 in kit stock length remains UNVERIFIED against the delivered kit;
-57.2 is a manufactured finished length, not a vendor SKU or a kit dimension.
+57.2 is the fixed manufactured finished length under the title-block tolerance,
+not a vendor SKU, a kit dimension or an assembly-set length. HD1-HD3 qualify
+the measured installed setup against that full printed length band.
 Main selected default B after the illustrated-choice timeout; this records
 that implementation ruling, not explicit user approval.
 
@@ -105,18 +107,19 @@ DIMENSION_TOLERANCE_TYPES = {"FinishedLength": 0, "CutEndChamfer": 6}  # NONE / 
 # The drawing refreshes the angle text from the saved native chamfer definition;
 # these labels do not substitute typed values for the associated MAX driver.
 DIMENSION_CALLOUTS = {
-    "FinishedLength": "FINISHED; UPPER FREE END ONLY",
+    "FinishedLength": "FINISHED CUT LENGTH;\nTITLE-BLOCK TOLERANCE;\nUPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
 }
 STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; PM {SKU} KIT"
 LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
 DRAWING_NOTES = "\n".join((STOCK_NOTE, LOWER_END_NOTE))
 
-# REWORK carries the native fabrication controls. MHA-CH-06-TL-00, steps
-# HD1-HD3 on sheet 10, owns the measured stack and installed acceptance.
-# The drawing imports that assembly's reference; no duplicate saved note
-# properties compete with it. The conditional geometric helper below remains
-# the numeric contract, not a claim of verified delivered-kit measurements.
+# REWORK carries the native fabrication controls and their title-block band.
+# MHA-CH-06-TL-00, steps HD1-HD3 on sheet 10, qualifies the actual installed
+# setup against that band; it does not substitute a different cut-length range.
+# The drawing imports that assembly's reference for installed acceptance only;
+# no duplicate saved note properties compete with it. The conditional helper
+# below is not a claim of verified delivered-kit measurements.
 
 
 @dataclass(frozen=True)

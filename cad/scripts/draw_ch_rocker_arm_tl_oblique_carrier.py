@@ -150,7 +150,14 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # Carrier r11: A2DY's text crossed the top border; it stands ~17 under it.
     "A2DY": _xy(_LEFT[1], 139.0),
     "B2DY": _xy(_RIGHT[1], 70.7),
-    "PinHoleDia": _xy(-332.0, -74.3),
+    # DRAW7f measured the complete REAM shoulder at sheet x 20.6..93.0,
+    # y 111.1: it crossed both genuine stock witnesses at x 92. Move only
+    # the native text 3.5 mm left; the intended shoulder is 17.1..89.5,
+    # clear of the border and witnesses. The diagonal intentionally crosses
+    # both genuine witness extensions (conventional under rule 14), not the
+    # 520/260 dimension lines or station text. The next native run must
+    # confirm the regenerated elbow and full text bounds.
+    "PinHoleDia": _xy(-339.0, -74.3),
     # The spots: each its own diameter callout; HUB by Y right, CL by X
     # below and Y left.
     "SpotDia": _xy(50.0, 98.0),

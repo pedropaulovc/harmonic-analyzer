@@ -123,12 +123,10 @@ if ENGAGEMENT_MIN < ENGAGEMENT_REQUIRED:
 # --- Below the carrier: the factory tip is never trimmed ------------------------
 # The longest screw at the nominal seat in the thinnest plates reaches this
 # far past the carrier underside (+0.001; 1.599 short of it on nominal
-# plates).  No tip is shortened: besides the carrier's own HUB pin head and
-# CL dowel (40.0 and 41.9 away in plan), no part lies within
-# PIN_COLLAR_PROUD (3.0) below the underside, the highest being the pivot
-# block tops, and in plan each riser axis is clear of every pivot block
-# anyway (each block within its bounding radius of its pin axis, whichever
-# pin pair carries the carrier); the rails lie CARRIER_TO_RAIL_GAP down.
+# plates). No tip is shortened. The checks below cover the pivot-block
+# footprints; they are not a whole-fixture clearance proof. The retention
+# caps sit above the block tops, and the assembly's complete material
+# envelopes and installed tooling acceptance remain authoritative.
 STAND_OUT_MAX_NOMINAL_SEAT = (
     DIMS.length
     + HEAD_RECESS_NOMINAL

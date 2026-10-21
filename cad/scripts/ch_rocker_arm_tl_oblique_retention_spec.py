@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import _config
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
@@ -94,7 +95,10 @@ CAP_REGISTER_DIAMETER = 6.0
 CAP_REGISTER_DIAMETER_BAND = (0.10, -0.10)
 CAP_REGISTER_PROJECTION = 1.000
 CAP_REGISTER_PROJECTION_PLACES = 3
-CAP_REGISTER_END_CHAMFER_MAX = 0.20
+# cad/config/title_block.yaml edge_break.chamfer_max_mm governs the free end.
+# The capture proof subtracts that full chamfer from straight engagement;
+# the locating roots remain unrelieved. No separate tighter cap callout.
+CAP_REGISTER_END_CHAMFER_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
 BLOCK_REGISTER_DIAMETER = 7.20
 BLOCK_REGISTER_DIAMETER_BAND = (0.10, 0.0)
 BLOCK_REGISTER_DEPTH = 2.000

@@ -19,7 +19,6 @@ import _process_plans as plans
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_oblique_retention_spec as retention
 
 PINNED = {
     "R_C1": (trammel.R_C1, 795.238),
@@ -70,16 +69,6 @@ def test_inputs_come_from_the_rocker_spec() -> None:
     assert rocker.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
     assert trammel.HUB_TO_TOP_EDGE == pytest.approx(8.25)
     assert trammel.ALPHA_DEG == 16.4405
-
-
-def test_captured_pivot_raises_the_carrier_without_moving_the_carriages() -> None:
-    assert trammel.PIN_COLLAR_HEIGHT == trammel.BEARING_RECESS + trammel.PIN_COLLAR_PROUD
-    assert trammel.CARRIAGE_TOP_Z == pytest.approx(40.7)
-    assert trammel.PIVOT_BLOCK_HEIGHT == 24.0
-    assert trammel.CARRIER_UNDERSIDE_Z - trammel.PIVOT_BLOCK_TOP_Z == trammel.PIN_COLLAR_PROUD
-    former_seat = trammel.PIVOT_BLOCK_TOP_Z + 3.0
-    assert trammel.CARRIER_UNDERSIDE_Z - former_seat == pytest.approx(12.5)
-    assert trammel.PIN_COLLAR_PROUD - retention.CAP_HEIGHT == pytest.approx(4.0)
 
 
 def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:

@@ -36,8 +36,7 @@ def test_cap_and_integral_registers_fit_inside_the_available_stock() -> None:
     assert spec.STOCK_LENGTH_MIN > spec.LENGTH + 2.0 * printed_band_mm(spec.OUTLINE_PLACES)
 
 
-@pytest.mark.parametrize("missing_chamfer", (False, True))
-def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatch, tmp_path, missing_chamfer) -> None:
+def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatch, tmp_path) -> None:
     source = tmp_path / "cap.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
@@ -46,12 +45,6 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     view_labels = []
     near_sides = []
     active_sheet = None
-    native = SimpleNamespace(
-        FullName="RegisterEndChamfer@RegisterEndChamfers@cap",
-        SystemValue=spec.REGISTER_END_CHAMFER_MAX / 1000.0,
-        Tolerance=SimpleNamespace(Type=6, lower=-spec.REGISTER_END_CHAMFER_MAX / 1000.0, upper=0.0),
-    )
-    chamfer = SimpleNamespace(name="RegisterEndChamfer", dimension=native)
 
     async def open_model(path):
         assert path == str(source)
@@ -108,15 +101,7 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
         assert current is adapter and dimensions_by_feature is spec.DRAWING_DIMENSIONS
         assert view.sheet == active_sheet and view_label
         imports.append((view, keep))
-        if "RegisterEndChamfer" in keep:
-            assert view.orientation == "*Top" and view.sheet == drawing.SHEET_NAMES[3]
-            assert view.center == drawing.REGISTER_END_CENTER
-            assert keep == drawing.REGISTER_END_KEEP
-            if missing_chamfer:
-                raise RuntimeError("missing model dimensions: ['RegisterEndChamfer']")
-            view.annotations[:] = [chamfer]
-        else:
-            view.annotations[:] = [SimpleNamespace(name=name) for name in keep]
+        view.annotations[:] = [SimpleNamespace(name=name) for name in keep]
         return list(view.annotations)
 
     def precision(_adapter, annotations, expected):
@@ -163,24 +148,13 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
 
-    if missing_chamfer:
-        with pytest.raises(RuntimeError, match="RegisterEndChamfer"):
-            asyncio.run(drawing.build(adapter))
-        assert not finalized
-        assert not any(item is chamfer for item in precision_checks + callouts)
-    else:
-        assert asyncio.run(drawing.build(adapter)) == {"slddrw": "cap.SLDDRW"}
-        profile, = [view for view in views if view.orientation == "*Top"]
-        assert profile.annotations == [chamfer] and profile.hidden_removed
-        assert profile.scale == drawing.VIEW_SCALE
-        assert sum(item is chamfer for item in precision_checks) == 1
-        assert sum(item is chamfer for item in callouts) == 1
-        assert {annotation.name for annotation in precision_checks} == set(spec.DRAWING_PRECISION_BY_NAME)
-        assert len(precision_checks) == len(spec.DRAWING_PRECISION_BY_NAME)
-        assert finalized == [drawing.OUTPUTS]
-        assert len(views) == 10 and all(view.hidden_removed for view in views)
-        assert len(centre_checks) == 5
-        assert all(sheet == drawing.SHEET_NAMES[3] for sheet, _text in view_labels)
+    assert asyncio.run(drawing.build(adapter)) == {"slddrw": "cap.SLDDRW"}
+    assert {annotation.name for annotation in precision_checks} == set(spec.DRAWING_PRECISION_BY_NAME)
+    assert len(precision_checks) == len(spec.DRAWING_PRECISION_BY_NAME)
+    assert finalized == [drawing.OUTPUTS]
+    assert len(views) == 9 and all(view.hidden_removed for view in views)
+    assert len(centre_checks) == 5
+    assert all(sheet == drawing.SHEET_NAMES[3] for sheet, _text in view_labels)
     assert tuple(sheets) == drawing.SHEET_NAMES == tuple(activations)
     assert [sheet for sheet, _text in headings] == sheets
     owners = {name: view for view, keep in imports for name in keep}
@@ -190,16 +164,9 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     assert owners["PocketDepth"].sheet == drawing.SHEET_NAMES[1]
     assert all(owners[f"Bolt{i}{axis}"].sheet == drawing.SHEET_NAMES[2] for i in range(1, 5) for axis in ("X", "Y"))
     assert all(owners[f"Register{i}{axis}"].sheet == drawing.SHEET_NAMES[3] for i in range(1, 3) for axis in ("X", "Y"))
-    assert owners["RegisterEndChamfer"].orientation == "*Top"
     assert owners["RegisterProjection"].orientation == "*Right"
-    assert owners["RegisterEndChamfer"].sheet == owners["RegisterProjection"].sheet
-    assert chamfer.dimension is native
     assert [annotation.name for annotation in near_sides] == ["CounterboreDia"]
     assert all(annotation in owners[annotation.name].annotations for annotation in near_sides)
-    assert native.SystemValue == spec.REGISTER_END_CHAMFER_MAX / 1000.0
-    assert (native.Tolerance.Type, native.Tolerance.lower, native.Tolerance.upper) == (
-        6, -spec.REGISTER_END_CHAMFER_MAX / 1000.0, 0.0,
-    )
 
 
 @pytest.mark.parametrize("names", [
@@ -729,6 +696,13 @@ def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptanc
             whole_floor_min=recess["whole_floor_min"],
         )
     channel_band = printed_band_mm(spec.CHANNEL_PLACES)
+    channel = features["wire_channel"]
+    assert set(channel["requirements"]) == {"width", "depth", "depth_over_whole_floor", "note"}
+    assert "normal_installed_wire_recess_min" not in channel
+    assert channel["width"] == pytest.approx([
+        spec.CHANNEL_WIDTH - channel_band, spec.CHANNEL_WIDTH + channel_band,
+    ])
+    assert channel["depth_over_whole_floor"] is True
     assert features["wire_channel"]["depth"] == pytest.approx([
         spec.CHANNEL_DEPTH - channel_band, spec.CHANNEL_DEPTH + channel_band,
     ])
@@ -746,12 +720,13 @@ def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptanc
         assert {"dia", "station", "width"} <= set(feature["requirements"])
 
 
-def test_requirement_manifest_binds_integral_cylinders_and_real_end_chamfers() -> None:
+def test_requirement_manifest_binds_integral_cylinders() -> None:
     manifest = export_features.requirement_manifest(STEM)
     features, selectors = manifest["features"], export_features.feature_selectors(STEM)
     assert manifest["construction"] == "one_piece"
     assert manifest["material"]["thickness"] == spec.TOTAL_HEIGHT
     assert manifest["volume_mm3"] == spec.VOLUME_MM3
+    assert not any(name.startswith("register_end_chamfer_") for name in features)
     error = printed_band_mm(spec.REGISTER_LOCATION_PLACES)
     projection_error = printed_band_mm(spec.REGISTER_PROJECTION_PLACES)
     for index, (x, y) in enumerate(spec.REGISTER_POINTS, 1):
@@ -767,13 +742,6 @@ def test_requirement_manifest_binds_integral_cylinders_and_real_end_chamfers() -
         cylinder, = selectors[name]
         assert (cylinder.diameter_mm, cylinder.contains_x_mm, cylinder.contains_y_mm) == (spec.REGISTER_DIA, x, y)
         assert cylinder.contains_z_mm == -spec.REGISTER_PROJECTION / 2.0
-        chamfer = features[f"register_end_chamfer_{index}"]
-        assert chamfer["kind"] == "chamfer"
-        assert chamfer["length"] == [0.0, spec.REGISTER_END_CHAMFER_MAX]
-        assert chamfer["at"] == [x, y, -spec.REGISTER_PROJECTION]
-        cone, = selectors[f"register_end_chamfer_{index}"]
-        assert cone.half_angle_degrees == 45.0 and cone.contains_x_mm == x
-        assert feature["cite"]["length"] and chamfer["cite"]["length"]
 
 
 class _CircleAdapter:
@@ -1147,7 +1115,7 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     maps = (
         drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP,
         drawing.SECTION_KEEP, drawing.BOLT_KEEP,
-        drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP, drawing.REGISTER_END_KEEP,
+        drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP,
     )
     for keep in maps:
         for x, y in keep.values():
@@ -1156,21 +1124,15 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
             assert x < title_left or y > title_top + 0.004
     top_right = drawing.TOP_CENTER[0] + spec.WIDTH / 2000.0
     top_bottom = drawing.TOP_CENTER[1] - spec.LENGTH / 2000.0
-    assert top_right + 0.006 < drawing.TOP_KEEP["ApertureCenterY"][0] < drawing.TOP_KEEP["CapLength"][0]
+    top_left = drawing.TOP_CENTER[0] - spec.WIDTH / 2000.0
+    assert drawing.TOP_KEEP["CapLength"][0] + 0.006 < drawing.TOP_KEEP["ApertureCenterY"][0] < top_left - 0.006
+    assert drawing.TOP_KEEP["WireWidth"][0] > top_right + 0.006
     assert drawing.TOP_KEEP["CapWidth"][1] + 0.006 < drawing.TOP_KEEP["ApertureCenterX"][1] < top_bottom - 0.006
     underside_left = drawing.BOTTOM_CENTER[0] - spec.WIDTH / 2000.0
     assert drawing.BOTTOM_KEEP["PocketCenterY"][0] < underside_left - 0.006
     assert drawing.RIGHT_CENTER[1] == drawing.TOP_CENTER[1]
-    # The permanent XZ projection is aligned to its own face-view context,
-    # not to the mirrored underside or the access view on a different sheet.
-    profile_half_width = spec.WIDTH / 2000.0
-    profile_half_height = spec.TOTAL_HEIGHT / 2000.0
-    profile_x, profile_y = drawing.REGISTER_END_CENTER
-    assert profile_x == drawing.REGISTER_FRONT_CENTER[0]
-    face_top = drawing.REGISTER_FRONT_CENTER[1] + spec.LENGTH / 2000.0
-    assert profile_y - profile_half_height > face_top + 0.010
+    # The remaining YZ projection stays aligned to its front context.
     assert drawing.REGISTER_RIGHT_CENTER[1] == drawing.REGISTER_FRONT_CENTER[1]
-    assert drawing.REGISTER_END_KEEP["RegisterEndChamfer"][0] > profile_x + profile_half_width + 0.006
 
 
 def _cap_paper_box(box_mm, old_anchor_mm, new_anchor):
@@ -1201,12 +1163,25 @@ def test_cap_head_acceptance_lane_clears_the_overall_and_native_depth_witnesses(
     # Reserve the whole folded block, not a translation of its obsolete text.
     x, y = (value * 1000.0 for value in drawing.RIGHT_KEEP["CounterboreDepth"])
     left, bottom, right, top = x - 40.0, y - 27.5, x + 40.0, y + 25.0
-    overall_extension_end = drawing.TOP_KEEP["CapLength"][0] * 1000.0 + 1.0
+    overall_extension_end = max(
+        drawing.TOP_CENTER[0] * 1000.0 - spec.WIDTH / 2.0 + 1.0,
+        drawing.TOP_KEEP["CapLength"][0] * 1000.0 + 1.0,
+    )
     assert left - overall_extension_end > 5.0
     assert 328.7 - right > 3.0  # actual native depth witness, not view padding
     assert left > 210.588 + 5.0  # actual access-view padded right edge
     assert bottom > 190.0 + 5.0
     assert top < 266.7 - 5.0
+    # 7f's unchanged six-row Ø21 block moves as a whole into the right lane.
+    # These measured text bounds allocate room, not a simulated COM landing.
+    counterbore = _cap_paper_box(
+        (22.2174, 158.3045, 107.7827, 189.6392),
+        (65.0, 175.0), drawing.TOP_KEEP["CounterboreDia"],
+    )
+    assert counterbore[0] > 210.588 + 5.0  # padded access-view right edge
+    assert 323.112 - counterbore[2] > 3.0  # padded depth-view left edge
+    assert 199.9969 - counterbore[3] > 5.0  # native fitted-head block
+    assert counterbore[0] - drawing.TOP_KEEP["WireWidth"][0] * 1000.0 > 5.0
 
 
 def test_cap_upper_register_x_block_clears_both_native_extension_lines() -> None:
@@ -1267,12 +1242,6 @@ def test_cap_section_and_register_complete_blocks_clear_context_and_heading() ->
         (153.0, 207.6, 213.1, 223.74), (215.0, 215.0), drawing.REGISTER_KEEP["Register2Y"],
     )
     assert register[1] > drawing.REGISTER_RIGHT_CENTER[1] * 1000.0 + spec.LENGTH / 2.0 + 5.0
-    chamfer = _cap_paper_box(
-        (134.6, 240.1, 225.4, 249.5), (180.0, 245.0), drawing.REGISTER_END_KEEP["RegisterEndChamfer"],
-    )
-    assert chamfer[0] > 151.0 + 5.0  # register-sheet heading's right edge
-    assert chamfer[1] > 240.2 + 5.0  # actual free-end projection edge
-    assert chamfer[3] < 266.7 - 5.0
 
 
 @pytest.mark.parametrize(("keep", "name", "old", "row", "witness_x", "side"), [

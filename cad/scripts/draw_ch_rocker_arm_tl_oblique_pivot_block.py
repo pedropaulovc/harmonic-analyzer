@@ -99,10 +99,14 @@ SHEET_NAMES = (
 CAPTURE_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
 PLAN_CENTER = (0.130, 0.192)
-# A-A remains vertically aligned with the plan.
-SECTION_A_CENTER = (PLAN_CENTER[0], 0.088)
+# Lower A-A 17 mm to reserve a complete outer overall tier below 67.500.
+SECTION_A_CENTER = (PLAN_CENTER[0], 0.071)
 ISO_CENTER = (0.385, 0.232)
+# The single-row, 134 mm floor qualifier owns the upper lane over B-B.
+# Keep sheet 1's pictorial 8 mm lower; the other sheets retain ISO_CENTER.
+BEARING_ISO_CENTER = (ISO_CENTER[0], ISO_CENTER[1] - 0.008)
 ISO_NOTE_XY = (0.355, 0.200)
+BEARING_ISO_NOTE_XY = (ISO_NOTE_XY[0], ISO_NOTE_XY[1] - 0.008)
 CAPTION_A_XY = (0.155, 0.035)
 # View C no longer shares B-B's caption/dimension lanes.
 SIDE_CENTER = (0.210, 0.155)
@@ -134,14 +138,17 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BoreStationX": (-41.0, -part_spec.WING_WIDTH / 2.0 - 4.0, _H),
     "HoleColumn1X": (-25.0, -part_spec.WING_WIDTH / 2.0 - 8.0, _H),
     "HoleColumn2X": (-5.0, -part_spec.WING_WIDTH / 2.0 - 12.0, _H),
-    "BlockLength": (2.5, -part_spec.WING_WIDTH / 2.0 - 19.0, _H),
+    "BlockLength": (2.5, -part_spec.WING_WIDTH / 2.0 - 22.0, _H),
     # Y stations reference the original tail-side datum plane, not the wing.
     "HoleRow1Y": (30.0, -16.5, _H),
     "BoreStationY": (35.0, -10.0, _H),
     "HoleRow2Y": (40.0, -3.5, _H),
     "BlockWidth": (52.0, 8.0, _H),
-    "BoreDia": (BLOCK_X0 - 11.5, 15.5, _H),
+    "BoreDia": (BLOCK_X0 - 15.5, 15.5, _H),
 }
+# The 9 mm witnesses stay with A-A; its complete bracket identity has an
+# independent shelf to the right of the folded web callout.
+SECTION_A_TEXT_POSITIONS = {"SideScrewRowZ": (0.267, 0.126)}
 CAPTURE_KEEP = {
     "WingAxisReach": ((BORE_X + part_spec.WING_X1) / 2.0, 41.0, _H),
     "WingWidth": (59.0, 0.0, _H),
@@ -155,13 +162,12 @@ CAPTURE_KEEP = {
 CAPTURE_TEXT_POSITIONS = {
     "WingAxisReach": (0.300, 0.250),
     "CapTapLeftX": (0.070, 0.100),
-    "CapTapRightX": (0.310, 0.090),
+    "CapTapRightX": (0.310, 0.105),
 }
 REGISTER_PLAN_CENTER = (0.170, 0.190)
 REGISTER_SECTION_PLAN_CENTER = (0.140, 0.170)
 REGISTER_SECTION_CENTER = (0.325, 0.165)
 REGISTER_SECTION_REGION = (0.240, 0.070, 0.410, 0.260)
-REGISTER_CAPTION_XY = (0.140, 0.065)
 REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     "CapRegisterLeftX": (BORE_X - 8.0, -41.0, _H),
     "CapRegisterRightX": (BORE_X + 8.0, -49.0, _H),
@@ -172,39 +178,25 @@ REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     # above the upper-Y station's witness/line (native top Y238 mm).
     "CapRegister2Dia": (BLOCK_X1 + 10.0, 33.0, _H),
 }
-REGISTER_SECTION_KEEP = {"CapRegisterDepth": (0.140, 0.095)}
-# One straight vertical section through both receivers and the bearing axis.
-# Extending beyond both wing sides makes the cylindrical flat floors visible.
-_REGISTER_FIRST, _REGISTER_SECOND = part_spec.CAP_REGISTER_POINTS
-_REGISTER_DELTA = tuple(
-    b - a for a, b in zip(_REGISTER_FIRST, _REGISTER_SECOND, strict=True)
-)
+# Paper offsets from the first register's projected mid-depth, after fitting.
+# The native dimension LINE is pinned here; its text has a separate shelf.
+REGISTER_SECTION_KEEP = {"CapRegisterDepth": (0.0, -0.012)}
+# A constant-X plane cuts the first register diametrically, not both skewed
+# stations. The unchanged common cut depth still controls both recesses (2X).
+_REGISTER_FIRST = part_spec.CAP_REGISTER_POINTS[0]
 _REGISTER_CUT_Y_CLEARANCE = max(BLOCK_WIDTH, part_spec.WING_WIDTH) / 2.0 + 7.0
-_REGISTER_START_FACTOR = (
-    -_REGISTER_CUT_Y_CLEARANCE - _REGISTER_FIRST[1]
-) / _REGISTER_DELTA[1]
-_REGISTER_END_FACTOR = (
-    _REGISTER_CUT_Y_CLEARANCE - _REGISTER_FIRST[1]
-) / _REGISTER_DELTA[1]
-REGISTER_CUT_START = tuple(
-    a + _REGISTER_START_FACTOR * d
-    for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
-)
-REGISTER_CUT_END = tuple(
-    a + _REGISTER_END_FACTOR * d
-    for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
-)
+REGISTER_CUT_START = (_REGISTER_FIRST[0], -_REGISTER_CUT_Y_CLEARANCE)
+REGISTER_CUT_END = (_REGISTER_FIRST[0], _REGISTER_CUT_Y_CLEARANCE)
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # In A-A, the carriage seat is model Z0, not the counterbored top face.
-    "SideScrewRowZ": (BLOCK_X1 + 4.0, 0.0, -10.5),
+    "SideScrewRowZ": (BLOCK_X1 + 60.0, 0.0, -10.5),
     # Hang each seat-depth block outside its span, beside the left end face.
     "TopBoreDepth": (BLOCK_X0 - 7.0, 0.0, _H + 8.25),
     "BottomBoreDepth": (BLOCK_X0 - 7.0, 0.0, -8.75),
-    # A short near-side diameter leader puts the full puller callout in the
-    # open lane right of A-A, not on its lower edge or between its witnesses.
-    "ShoulderHoleDia": (BLOCK_X1 + 25.0, 0.0, -1.0),
-    # Seat-corner fillets share one native maximum-radius callout.
-    "SeatFilletR": (-20.0, 0.0, -4.0),
+    # Folded web text occupies its own lane above the row's witnesses.
+    "ShoulderHoleDia": (BLOCK_X1 + 25.0, 0.0, -15.0),
+    # Route the actual corner-radius leader right of A-A, below its dimension tiers.
+    "SeatFilletR": (31.0, 0.0, 18.0),
 }
 # Hung under the top face, the top seat's block runs beside its dimension
 # line from the face down to its shoulder, the block's right edge on the
@@ -261,18 +253,12 @@ SCREW_HOLE_PROCESS = "DRILL"
 # SolidWorks sets a datum triangle level with its box (jig-r11: over the
 # seat's mouth it went onto the -X wall's extension above the face, read as
 # "face A"), so the box stands left of the end wall, level with the bottom
-# seat (z 5, y 87): its leader edge here (x 57, between the depths' line at
-# x 46 and the outline at x 60; the box x ~50..57, y ~84..91, between the
-# seat's witness lines at y 77 and 97), the triangle on the -X wall (x 66)
-# across the 3 mm end wall.
+# seat. These model-space targets follow the lowered A-A, rather than old
+# sheet coordinates; the triangle lands across the unchanged 3 mm end wall.
 SEAT_DATUM_EDGE = (BORE_X - part_spec.BORE_DIA / 2.0, 0.0, 3.0)
 SEAT_DATUM_SYMBOL = (BLOCK_X0 - 1.5, 0.0, 5.0)
-# The frame (~29 x 7 mm, its top-left corner here: x ~123..152, y ~38..45)
-# under the top face, right of the Ø25's right witness line (x 121) and
-# over the caption (y <= 24). Its leader rises from the frame's left end
-# through the top seat's open mouth (crossing the face's y 49 ~2 mm inside
-# the +X wall at x 126) to that wall 1.5 mm over the floor (sheet ~(126,
-# 66)), crossing no line.
+# The frame stays below A-A's top face and above its native caption. Its
+# unchanged attachment lands 1.5 mm above the top seat floor on the +X wall.
 SEAT_FRAME_EDGE = (
     BORE_X + part_spec.BORE_DIA / 2.0,
     0.0,
@@ -1070,8 +1056,8 @@ def _register_recess_sheet(adapter: Any) -> Any:
     return plan
 
 
-def _fit_register_section(adapter: Any, section: Any) -> None:
-    """Fit the native outline while retaining its section-parent alignment."""
+def _fit_register_section(adapter: Any, section: Any) -> tuple[float, ...]:
+    """Fit the native outline without changing its orientation or scale."""
     native = _early_bound(section, "IView")
     x0, y0, x1, y1 = REGISTER_SECTION_REGION
     target = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
@@ -1082,16 +1068,90 @@ def _fit_register_section(adapter: Any, section: Any) -> None:
             raise RuntimeError(f"register-depth section exceeds its reserved region: {outline}")
         center = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
         if x0 <= outline[0] < outline[2] <= x1 and y0 <= outline[1] < outline[3] <= y1:
-            return
+            return outline
         position = tuple(float(value) for value in native.Position)
         moved = [position[axis] + target[axis] - center[axis] for axis in (0, 1)]
-        # SetViewPosition preserves native alignment and may constrain this
-        # request to its alignment vector. Accept any clear aligned result,
-        # not an unattainable preferred centre; never break the alignment.
+        # Respect whatever native movement constraints exist. The shared
+        # section creator requests NotAligned; no alignment is inferred here.
         if not native.SetViewPosition(double_array(moved), False):
             raise RuntimeError("failed to centre register-depth section")
         rebuild_drawing(adapter, label=f"register-depth section centred {attempt}")
-    raise RuntimeError("aligned register-depth section cannot fit its reserved region")
+    raise RuntimeError("native register-depth section cannot fit its reserved region")
+
+
+def _register_section_layout(
+    outline: tuple[float, ...], register_xy: tuple[float, float]
+) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]], tuple[float, float]]:
+    """Paper anchors following the fitted outline and the actual cut register."""
+    keep = {
+        name: (register_xy[0] + dx, register_xy[1] + dy)
+        for name, (dx, dy) in REGISTER_SECTION_KEEP.items()
+    }
+    text = {"CapRegisterDepth": (outline[2] + 0.030, register_xy[1] + 0.020)}
+    caption = ((outline[0] + outline[2]) / 2.0, outline[1])
+    return keep, text, caption
+
+
+def _position_register_depth(
+    adapter: Any,
+    annotations: list[Any],
+    *,
+    line_xy: tuple[float, float],
+    text_positions: dict[str, tuple[float, float]],
+    witnesses: tuple[tuple[float, float], tuple[float, float]],
+) -> None:
+    """Place the real depth line near its witnesses, then move only its text."""
+    matches = [
+        annotation for annotation in annotations
+        if dimension_name(adapter, annotation) == "CapRegisterDepth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("D-D needs exactly one native register-depth dimension")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    expected_x = sorted(point[0] for point in witnesses)
+    if abs(witnesses[0][1] - witnesses[1][1]) > 1e-7:
+        raise RuntimeError("straight register section has skewed depth witnesses")
+
+    def arrows() -> list[tuple[float, float]]:
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        if int(data.GetArrowHeadCount()) != 2:
+            raise RuntimeError("register depth lost its two native dimension arrows")
+        points = sorted(
+            tuple(float(value) for value in data.GetArrowHeadAtIndex2(index)[:2])
+            for index in range(2)
+        )
+        if (
+            any(abs(point[0] - x) > 1e-6 for point, x in zip(points, expected_x, strict=True))
+            or abs(points[0][1] - points[1][1]) > 1e-7
+        ):
+            raise RuntimeError(f"register depth arrows left the actual section witnesses: {points}")
+        return points
+
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError("register depth cannot move its native dimension line")
+    rebuild_drawing(adapter, label="register-depth dimension line")
+    for _attempt in range(3):
+        points = arrows()
+        miss = line_xy[1] - points[0][1]
+        if abs(miss) <= 1e-6:
+            break
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(position[0], position[1] + miss, 0.0):
+            raise RuntimeError("failed to place register-depth dimension line")
+        rebuild_drawing(adapter, label="register-depth dimension line placed")
+    if any(abs(point[1] - line_xy[1]) > 1e-6 for point in arrows()):
+        raise RuntimeError("register-depth dimension line did not reach its paper lane")
+    offset_dimension_text(adapter, annotations, text_positions)
+    points = arrows()
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if (
+        not bool(display.OffsetText)
+        or any(abs(point[1] - line_xy[1]) > 1e-6 for point in points)
+        or math.dist(position[:2], text_positions["CapRegisterDepth"]) > 1e-6
+    ):
+        raise RuntimeError("register-depth text move changed its native line or missed its shelf")
 
 
 def _register_section_sheet(adapter: Any) -> Any:
@@ -1110,9 +1170,14 @@ def _register_section_sheet(adapter: Any) -> Any:
         label="flat-bottom register recess section",
     )
     set_hidden_lines_removed(adapter, section)
-    _fit_register_section(adapter, section)
+    outline = _fit_register_section(adapter, section)
+    on_section = _view_mapper(adapter, section)
+    register_xy = on_section(
+        (*_REGISTER_FIRST, _H - part_spec.CAP_REGISTER_DEPTH / 2.0)
+    )
+    keep, text_positions, caption_xy = _register_section_layout(outline, register_xy)
     annotations = curate_view_dimensions(
-        adapter, section, keep=REGISTER_SECTION_KEEP,
+        adapter, section, keep=keep,
         view_label="register recess section D-D",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -1122,7 +1187,16 @@ def _register_section_sheet(adapter: Any) -> Any:
     assert_imported_precision(
         adapter, annotations, {name: DRAWING_PRECISION_BY_NAME[name] for name in REGISTER_SECTION_KEEP},
     )
-    position_section_caption(adapter, section, REGISTER_CAPTION_XY, label="pivot block D")
+    _position_register_depth(
+        adapter, annotations,
+        line_xy=keep["CapRegisterDepth"],
+        text_positions=text_positions,
+        witnesses=(
+            on_section((*_REGISTER_FIRST, _H)),
+            on_section((*_REGISTER_FIRST, _H - part_spec.CAP_REGISTER_DEPTH)),
+        ),
+    )
+    position_section_caption(adapter, section, caption_xy, label="pivot block D")
     if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
         raise RuntimeError("failed to identify the register-ordinate sheet")
     return plan
@@ -1238,7 +1312,7 @@ async def build(adapter: Any) -> dict[str, str]:
     thread_note_views = [plan]
     on_plan = _view_mapper(adapter, plan)
     # finalize_drawing shades the pictorial isometric with edges.
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *BEARING_ISO_CENTER, scale=ISO_SCALE)
     for view in (plan, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -1260,6 +1334,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations,
         {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in _OTHER_SHEET_DIMENSIONS},
     )
+    offset_dimension_text(adapter, annotations, SECTION_A_TEXT_POSITIONS)
     for name in ("BoreDia", "ShoulderHoleDia"):
         diameters = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(diameters) != 1:
@@ -1285,7 +1360,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _seat_gdt(adapter, section_a, on_a)
     _label_side_view(adapter, plan, on_plan)
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *BEARING_ISO_NOTE_XY)
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate captured-wing sheet")

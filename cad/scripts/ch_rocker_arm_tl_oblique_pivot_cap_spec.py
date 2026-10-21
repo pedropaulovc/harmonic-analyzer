@@ -8,16 +8,19 @@ local face variation govern the fitted stop chamber, with the screws fully
 seated. Bearing axial behavior is not part of this acceptance.
 
 Two integral underside registers locate the cap in the block's flat-bottom
-receivers. Their free ends are chamfered; the roots remain unrelieved.
+receivers. Their real 45-degree free-end chamfers use the title-block edge-break
+maximum; the roots remain unrelieved for straight locating engagement.
 
 The four circular counterbores are fitted to the actual installed screw heads;
 their nominal depth is reference-only. Their FULL width and depth open to the
 nearest X edge, with the actual whole floor and mouths retained. Separate,
 shallower channels carry the doubled wire and tails between X pairs. No head
-or installed wire may project above the cap plane. The representative normal
-wire route is only a diagnostic. The separate whole-route capture proof is
-conditional on actual continuous-route acceptance and fixed heads; it gives
-no wire/contact stop, structural, universal head-clocking or elastic credit.
+or installed wire may project above the cap plane. Physical acceptance of the
+whole installed wire/tail route belongs to assembly C3C, not this bare cap.
+The representative normal wire route is only a diagnostic. The separate
+whole-route capture proof is conditional on actual continuous-route acceptance
+and fixed heads; it gives no wire/contact stop, structural, universal
+head-clocking or elastic credit.
 Each screw has one cylindrical through bore below its head counterbore.
 That same bore clears the sourced underhead fillet; there is no intermediate
 entry shelf and no preload/load-capacity certification.
@@ -354,7 +357,6 @@ DRAWING_DIMENSIONS = {
     SECTION_REFERENCE: {"CapHeight", "PocketDepth"},
     "RegisterProfile": {"RegisterDia", *(f"Register{index}{axis}" for index in range(1, 3) for axis in ("X", "Y"))},
     "Registers": {"RegisterProjection"},
-    "RegisterEndChamfers": {"RegisterEndChamfer"},
 }
 DRAWING_PRECISION = {
     "CapProfile": {"CapWidth": OUTLINE_PLACES, "CapLength": OUTLINE_PLACES},
@@ -368,7 +370,6 @@ DRAWING_PRECISION = {
     SECTION_REFERENCE: {"CapHeight": HEIGHT_PLACES, "PocketDepth": 2},
     "RegisterProfile": {"RegisterDia": 2, **{f"Register{index}{axis}": REGISTER_LOCATION_PLACES for index in range(1, 3) for axis in ("X", "Y")}},
     "Registers": {"RegisterProjection": REGISTER_PROJECTION_PLACES},
-    "RegisterEndChamfers": {"RegisterEndChamfer": 2},
 }
 DRAWING_PRECISION_BY_NAME = {name: places for row in DRAWING_PRECISION.values() for name, places in row.items()}
 DIMENSION_CALLOUTS = {
@@ -401,15 +402,11 @@ DIMENSION_CALLOUTS = {
         "MHA-CH-06-TL-VN-76\n"
         "GROOVE CLEARANCE"
     ),
-    "WireWidth": (
-        "2X X-PAIR; WHOLE INSTALLED WIRE/TAILS\n"
-        f"NORMAL {wire_capture.NORMAL_WIRE_RECESS_MIN:.2f} MIN BELOW ACTUAL CAP TOP FACE"
-    ),
+    "WireWidth": "2X X-PAIR WIRE GROOVE;\nMHA-CH-06-TL-VN-76",
     "WireDepth": "2X NORMAL TO\nACTUAL CAP TOP FACE;\nDEPTH LIMITS OVER\nWHOLE GROOVE FLOOR",
     **{f"Bolt{index}{axis}": "FROM POCKET AXIS;\nLOCATES TL-22 CAP SCREW" for index in range(1, 5) for axis in ("X", "Y")},
     "RegisterDia": "2X INTEGRAL; LOCATES IN TL-22 RECEIVERS",
-    "RegisterProjection": "2X BELOW BLOCK SEATING FACE;\nLOCATES IN TL-22 RECEIVERS",
-    "RegisterEndChamfer": "2X FREE END ONLY; NO ROOT UNDERCUT",
+    "RegisterProjection": "2X BELOW BLOCK SEATING FACE;\nLOCATES IN TL-22 RECEIVERS;\nNO ROOT UNDERCUT",
     **{f"Register{index}{axis}": "FROM ACTUAL POCKET AXIS;\nLOCATES IN TL-22 RECEIVER" for index in range(1, 3) for axis in ("X", "Y")},
 }
 SURFACE_FINISHES = (SurfaceFinishControl("block_seat", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),)

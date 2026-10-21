@@ -94,9 +94,6 @@ def test_web_hole_keeps_the_abutment_and_clears_a_puller() -> None:
     # room behind the first inner race: over the TMIC C10-12 collet's 3 mm.
     assert math.isclose(spec.PULLER_GAP_MIN, 23.49 - 2 * 10.13, abs_tol=1e-9)
     assert spec.PULLER_GAP_MIN >= spec.PULLER_SPACE_MIN == 3.0
-    assert spec.CALLOUTS_BELOW["ShoulderHoleDia"] == (
-        "THRU WEB\nPULLER CLEARANCE\nBEHIND 6200\nINNER RACES"
-    )
     assert spec.DRAWING_PRECISION_BY_NAME["BlockHeight"] == 2
     # Review r8: the web's minimum stands once on each seat depth (the
     # 3-place sizes that set it), named as the web the Ø25 goes through;
@@ -217,17 +214,6 @@ def test_side_screw_walls_at_worst_case() -> None:
         assert worst[name] >= spec.WALL_TARGET, name
     # 23.49 - 9.13 - 4.035 on the 24 mm block.
     assert math.isclose(worst["side counterbore to top face"], 10.325, abs_tol=1e-9)
-    assert spec.SIDE_WALL_CALLOUT == "SETS C'BORE WALL 1.67 MIN"
-    assert spec.SIDE_CALLOUT_BELOW == (
-        "MATCHES MHA-CH-06-TL-29\nSETS C'BORE WALL 1.67 MIN"
-    )
-    # c4 review: the row's 9.000 says which face it reads from; close-c4-r5:
-    # and the mate its three places serve (rule 4), by its short number.
-    assert spec.CALLOUTS_BELOW["SideScrewRowZ"] == (
-        "FROM\nCARRIAGE\nSEAT FACE;\nMATCHES\nTL-29"
-    )
-    assert "SideScrewRowZ" in drawing.SECTION_A_KEEP
-    assert "SideScrewRowZ" not in drawing.SIDE_KEEP
     side_hole = _features()["side_screw_hole_1"]
     assert side_hole["height_from"] == "bottom_face"
     # RV-05: the owner accepted the three-place counterbores that hold the
@@ -324,7 +310,6 @@ def test_side_screw_head_sinks_and_spacing_fits_the_float() -> None:
         )
         for i in (1, 2)
     ) == sorted((x - spec.DATUM_X, z) for x, z in spec.SIDE_SCREW_HOLES)
-    assert "MHA-CH-06-TL-29" in features["side_screw_hole_1"]["note"]
 
 
 def test_carriage_screws_seat_and_reach_the_carriage_thread() -> None:
@@ -960,15 +945,222 @@ def test_register_gap_checks_detect_lost_material(changes: dict, key: str) -> No
     assert spec.cap_register_margins(**changes)[key] < spec.WALL_TARGET
 
 
-def test_register_section_passes_through_both_flat_floors() -> None:
+def test_register_section_diametrically_cuts_only_the_first_flat_floor() -> None:
     start, end = drawing.REGISTER_CUT_START, drawing.REGISTER_CUT_END
-    dx, dy = end[0] - start[0], end[1] - start[1]
-    for x, y in spec.REGISTER_POINTS:
-        assert (x - start[0]) * dy - (y - start[1]) * dx == pytest.approx(0.0)
+    first, second = spec.REGISTER_POINTS
+    assert start[0] == end[0] == first[0]
     assert start[1] < -spec.WING_WIDTH / 2.0
     assert end[1] > spec.WING_WIDTH / 2.0
-    assert set(drawing.REGISTER_SECTION_KEEP) == {"CapRegisterDepth"}
-    assert spec.CAP_REGISTER_PROFILE not in spec.REFERENCE_SKETCHES
+    radius = (spec.REGISTER_DIA + spec.REGISTER_DIA_BAND[0]) / 2.0
+    assert abs(second[0] - start[0]) > radius
+    assert start[1] < first[1] - radius < first[1] + radius < end[1]
+    # The shown profile remains the actual shared blind cut, not a second
+    # handwritten depth or a diagonal cutting plane through both stations.
+    assert spec.BLOCK_HEIGHT - spec.REGISTER_DEPTH > 0.0
+    assert part.V_CAP_REGISTERS == pytest.approx(
+        2.0 * math.pi * (spec.REGISTER_DIA / 2.0) ** 2 * spec.REGISTER_DEPTH
+    )
+
+
+@pytest.mark.parametrize("translation", [(0.0, 0.0), (-0.011, 0.007)])
+def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(translation) -> None:
+    dx, dy = translation
+    outline = (0.295, 0.087, 0.355, 0.243)
+    register = (0.347, 0.117)
+    original = drawing._register_section_layout(outline, register)
+    moved = drawing._register_section_layout(
+        tuple(value + (dx if axis % 2 == 0 else dy) for axis, value in enumerate(outline)),
+        (register[0] + dx, register[1] + dy),
+    )
+    for original_positions, moved_positions in zip(original[:2], moved[:2], strict=True):
+        for name, point in original_positions.items():
+            assert moved_positions[name] == pytest.approx((point[0] + dx, point[1] + dy))
+    assert moved[2] == pytest.approx((original[2][0] + dx, original[2][1] + dy))
+    line = original[0]["CapRegisterDepth"]
+    text = original[1]["CapRegisterDepth"]
+    assert line[0] == register[0]
+    assert 0.0 < register[1] - line[1] < 0.015
+    assert text[0] > outline[2]
+    assert original[2] == pytest.approx(((outline[0] + outline[2]) / 2.0, outline[1]))
+
+
+@pytest.mark.parametrize(
+    "failure,arrow_count,error",
+    [
+        (None, 2, None),
+        ("arrow-count", 1, "two native dimension arrows"),
+        ("arrow-count", 3, "two native dimension arrows"),
+        ("off-witness", 2, "actual section witnesses"),
+        ("line-refuses-lane", 2, "did not reach its paper lane"),
+        ("text-moves-line", 2, "text move changed its native line"),
+    ],
+)
+def test_register_depth_placement_refuses_bad_native_readbacks(
+    monkeypatch, failure, arrow_count, error
+) -> None:
+    import _drawing_dimensions as dimensions
+
+    # SDK contracts: OffsetText=False translates the line with the annotation;
+    # True moves text alone. Arrowhead records expose their actual tip XYZ.
+    # These doubles exercise refusal logic, not SOLIDWORKS rendering semantics.
+    tips = [[0.349, 0.080], [0.345, 0.080]]
+    if arrow_count == 1:
+        tips.pop()
+    elif arrow_count == 3:
+        tips.append([0.347, 0.080])
+    if failure == "off-witness":
+        tips[0][0] += 0.000002  # Two micrometres must fail the unchanged 1 µm guard.
+    position = [0.347, 0.090, 0.0]
+    moves = []
+
+    class DisplayData:
+        def GetArrowHeadCount(self):
+            return len(tips)
+
+        def GetArrowHeadAtIndex2(self, index):
+            return (
+                *tips[index], 0.0, 1.0, 0.0, 0.0,
+                0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0,
+            )
+
+    class DisplayDimension:
+        OffsetText = True
+
+        def GetDisplayData(self):
+            return data
+
+    class Annotation:
+        def GetSpecificAnnotation(self):
+            return display
+
+        def GetPosition(self):
+            return tuple(position)
+
+        def SetPosition2(self, x, y, z):
+            moves.append((display.OffsetText, (x, y, z)))
+            if not display.OffsetText:
+                if failure == "line-refuses-lane":
+                    return True  # A successful setter is not placement evidence.
+                dy = y - position[1]
+                for tip in tips:
+                    tip[1] += dy
+            elif failure == "text-moves-line":
+                for tip in tips:
+                    tip[1] += 0.000002
+            position[:] = (x, y, z)
+            return True
+
+    data, display, annotation = DisplayData(), DisplayDimension(), Annotation()
+    interfaces = {
+        "IAnnotation": annotation,
+        "IDisplayDimension": display,
+        "IDisplayData": data,
+    }
+
+    def bind(value, interface, *members):
+        assert value is interfaces[interface]
+        assert all(hasattr(value, member) for member in members)
+        return value
+
+    def name(_adapter, value):
+        assert value is annotation
+        return "CapRegisterDepth"
+
+    def rebuild(_adapter, *, label):
+        pass  # Native outputs are the explicit mutable records above.
+
+    adapter = SimpleNamespace(_attempt=lambda operation: operation())
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(dimensions._sw_type_info, "early_bound_or_flag", bind)
+    monkeypatch.setattr(drawing, "dimension_name", name)
+    monkeypatch.setattr(dimensions, "dimension_name", name)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(dimensions, "rebuild_drawing", rebuild)
+    line_xy = (0.347, 0.105)
+    text_xy = (0.385, 0.137)
+
+    def place():
+        drawing._position_register_depth(
+            adapter, [annotation],
+            line_xy=line_xy,
+            text_positions={"CapRegisterDepth": text_xy},
+            witnesses=((0.349, 0.117), (0.345, 0.117)),
+        )
+
+    if error is None:
+        place()
+        for tip, expected in zip(
+            sorted(tips), ((0.345, 0.105), (0.349, 0.105)), strict=True
+        ):
+            assert tip == pytest.approx(expected)
+        assert position == pytest.approx((*text_xy, 0.0))
+        assert display.OffsetText is True
+        assert [offset for offset, _position in moves] == [False, True]
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            place()
+        phases = [offset for offset, _position in moves]
+        if failure in ("arrow-count", "off-witness"):
+            assert phases == []
+        elif failure == "line-refuses-lane":
+            assert phases == [False, False, False]
+            assert all(tip[1] == 0.080 for tip in tips)
+        else:
+            assert phases == [False, True]
+            assert position == pytest.approx((*text_xy, 0.0))
+            assert all(tip[1] == pytest.approx(0.105002) for tip in tips)
+
+
+def test_outer_overall_tier_clears_the_recorded_section_and_inner_baseline() -> None:
+    # 7f008ec06 actual PDF/audit union, paper metres. This replays source
+    # translations only; the main agent must prove the rebuilt native ink.
+    overall = (0.1393, 0.1021, 0.1799, 0.1168)
+    inner = (0.1416, 0.1182, 0.1553, 0.1217)
+    old_a_outline_top = 0.111588
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    overall_dy = (drawing.PLAN_KEEP["BlockLength"][1] - (-55.0)) * scale / 1000.0
+    section_dy = drawing.SECTION_A_CENTER[1] - 0.088
+    assert overall[1] + overall_dy >= old_a_outline_top + section_dy + 0.003
+    assert overall[3] + overall_dy <= inner[1] - 0.003
+
+
+def test_corner_radius_route_clears_the_recorded_dimension_tiers() -> None:
+    # Actual 7f008ec06 arrow/shoulder endpoint, replaying only the requested
+    # view and radial-text translations; rebuilt routing remains native proof.
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1] / 1000.0
+    section_dy = drawing.SECTION_A_CENTER[1] - 0.088
+    x, _y, z = drawing.SECTION_A_KEEP["SeatFilletR"]
+    arrow = (0.129974, 0.0849594 + section_dy)
+    shoulder = (
+        0.1383076 + (x - (-20.0)) * scale,
+        0.1064438 + section_dy - (z - (-4.0)) * scale,
+    )
+    overall_y = 0.1011656 + (drawing.PLAN_KEEP["BlockLength"][1] - (-55.0)) * scale
+    dimensions = [
+        ((0.074125, overall_y), (0.185875, overall_y)),
+        ((0.075125, 0.106 + section_dy), (0.276875, 0.106 + section_dy)),
+        ((0.1398915, 0.0925 + section_dy), (0.276875, 0.0925 + section_dy)),
+    ]
+    assert all(not segments_cross((arrow, shoulder), line) for line in dimensions)
+
+
+def test_seat_fit_stack_moves_clear_of_the_recorded_left_outline() -> None:
+    # Both printed tolerance limits ended at X74.506 beside the X74.125 edge.
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    dx = (drawing.PLAN_KEEP["BoreDia"][0] - (spec.BLOCK_X0 - 11.5)) * scale / 1000.0
+    assert 0.0745059 > 0.074125
+    assert 0.0745059 + dx <= 0.074125 - 0.003
+    assert 0.0392441 + dx > 0.0127 + 0.003
+
+
+def test_cap_fastener_text_clears_the_recorded_height_extension() -> None:
+    # OffsetText moves this entire printed qualifier, not its native line.
+    old_row_bottom = 0.0881558
+    extension_y = 0.088
+    dy = drawing.CAPTURE_TEXT_POSITIONS["CapTapRightX"][1] - 0.090
+    assert old_row_bottom - extension_y < 0.002
+    assert old_row_bottom + dy - extension_y > 0.003
+
 
 
 def test_upper_register_diameter_shoulder_sits_above_the_y_station() -> None:
@@ -995,9 +1187,9 @@ def test_upper_register_diameter_shoulder_sits_above_the_y_station() -> None:
     assert not segments_cross(moved, upper_y_line)
 
 
-@pytest.mark.parametrize("failure", [None, "aligned", "oversized", "rejected", "ignored"])
-def test_register_section_fits_native_outline_without_rotation_or_breaking_alignment(monkeypatch, failure) -> None:
-    position = [0.230, 0.155] if failure == "aligned" else [0.285, 0.064]
+@pytest.mark.parametrize("failure", [None, "oversized", "rejected", "ignored"])
+def test_register_section_fits_native_outline_without_rotation(monkeypatch, failure) -> None:
+    position = [0.285, 0.064]
     width, height = (0.060, 0.160) if failure != "oversized" else (0.180, 0.160)
     native = SimpleNamespace(
         Position=position, Angle=0.19, ScaleDecimal=2.0,
@@ -1014,9 +1206,7 @@ def test_register_section_fits_native_outline_without_rotation_or_breaking_align
         moves.append(tuple(values))
         if failure == "rejected":
             return False
-        if failure == "aligned":
-            position[0] = values[0]  # Native horizontal alignment fixes Y.
-        elif failure != "ignored":
+        if failure != "ignored":
             position[:] = values
         return True
 
@@ -1024,15 +1214,14 @@ def test_register_section_fits_native_outline_without_rotation_or_breaking_align
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    if failure in (None, "aligned"):
-        drawing._fit_register_section(object(), native)
+    if failure is None:
+        fitted = drawing._fit_register_section(object(), native)
         x0, y0, x1, y1 = drawing.REGISTER_SECTION_REGION
         outline = native.GetOutline()
         assert x0 <= outline[0] < outline[2] <= x1
         assert y0 <= outline[1] < outline[3] <= y1
         assert len(moves) == 1
-        if failure == "aligned":
-            assert position[1] == 0.155
+        assert fitted == outline
     else:
         with pytest.raises(RuntimeError):
             drawing._fit_register_section(object(), native)

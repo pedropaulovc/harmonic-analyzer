@@ -4,16 +4,15 @@ Access and envelope, fitted chamber, cap-screw locations, and integral
 registers have separate full-scale sheets. The underside views show the actual
 flange pocket, bolt holes and registers in solid lines. A-A shows the fitted
 pocket.
-The register sheet's aligned XZ (*Top) projection retains the register
-free-end chamfer's native dimension; it cannot transfer into the YZ view.
+The register sheet's front context and YZ projection show the integral bosses.
+Their free-end edge break is governed by the title block, not a local size.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
 coordinates remain ordinary native dimensions from the actual pocket axis.
 
-Paper-layout repair uses the 20261021T192326153Z native PDF/audit: the
-isometric and caption translate independently from their measured bounds;
-the overall length stays left of the fitted-head callout lane, and the upper
-register X callout stays right of its own witnesses. Requested placements
-are not a claim of native after-fix acceptance.
+Paper-layout repair uses the native PDF/audits, including 7f008ec06db9:
+the complete counterbore callout stands right of its retained inner arc;
+the ordinary Y/overall lanes stand left of the plan. Native after-fix
+attachment and full printed extents remain the integration owner's proof.
 """
 
 from __future__ import annotations
@@ -38,7 +37,6 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
-from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
@@ -67,9 +65,6 @@ BOLT_CENTER = (0.210, 0.170)
 REGISTER_FRONT_CENTER = (0.115, 0.175)
 REGISTER_BOTTOM_CENTER = (0.320, 0.175)
 REGISTER_RIGHT_CENTER = (0.205, REGISTER_FRONT_CENTER[1])
-# The native circular-rim chamfer imports in XZ, not the YZ side view.
-# Its undimensioned *Front parent context keeps this a true third-angle set.
-REGISTER_END_CENTER = (REGISTER_FRONT_CENTER[0], 0.235)
 # The native outline was Y5.524..112.476 mm at Y59; lift it 15 mm.
 ISO_CENTER = (0.080, 0.074)
 ISO_SCALE = (1, 1)
@@ -77,18 +72,21 @@ ISO_SCALE = (1, 1)
 # leaves more than 8 mm above the translated pictorial's padded outline.
 ISO_NOTE_XY = (0.025, 0.140)
 SHEET_HEADING_XY = (0.025, 0.260)
-# The long head and aperture callouts fan out left of their rims.
-# Ordinary centre coordinates and the mouth-width lane occupy the right/bottom.
+# Keep the complete counterbore block right of the lower-left recess, so its
+# existing near-side leader approaches the retained +X semicircle, not the
+# full-width outward mouth. The 7f text box translates to X233.217..318.783,
+# Y163.304..194.639 mm, below the head-fit block's Y199.997 lower edge and
+# left of the side view's X323.112 padded outline. Native attachment must be
+# proved after all moves; a text-lane allocation is not arrow-tip evidence.
+# Move the 43/86 dimension lines left, and keep WireWidth's line at X220,
+# outside that text block, with its 157.5..165.5 arrow gap beside the route.
 TOP_KEEP = {
-    "CapWidth": (0.180, 0.110), "CapLength": (0.235, 0.190),
-    "CounterboreDia": (0.065, 0.175), "ApertureDia": (0.080, 0.245),
-    "ApertureCenterX": (0.1675, 0.140), "ApertureCenterY": (0.225, 0.175),
-    "WireWidth": (0.265, 0.105),
+    "CapWidth": (0.180, 0.110), "CapLength": (0.125, 0.190),
+    "CounterboreDia": (0.276, 0.180), "ApertureDia": (0.080, 0.245),
+    "ApertureCenterX": (0.1675, 0.140), "ApertureCenterY": (0.140, 0.175),
+    "WireWidth": (0.220, 0.105),
 }
-# Keep the head-diameter leader on its near rim, away from the bore centre.
-# The complete fitted-head block has an 80 x 52.5 mm lane, left of the
-# measured X328.7/337.1 depth witnesses. The 86 overall's upper extension
-# now ends at X236 mm, before this lane; native extents remain the gate.
+# The fitted-head block keeps its measured lane left of the depth witnesses.
 RIGHT_KEEP = {"CounterboreDepth": (0.284, 0.225), "WireDepth": (0.370, 0.145)}
 # A dedicated underside owns the corner-to-pocket coordinates and fitted
 # sections; neither bolt nor register callout shoulders share these lanes.
@@ -124,7 +122,6 @@ REGISTER_KEEP = {
 # moves only the complete upper X callout to the lower X block's text lane.
 REGISTER_TEXT_POSITIONS = {"Register2X": (0.370, 0.240)}
 REGISTER_PROJECTION_KEEP = {"RegisterProjection": (0.160, 0.110)}
-REGISTER_END_KEEP = {"RegisterEndChamfer": (0.220, 0.252)}
 SECTION_LINE_MODEL = ((-part_spec.WIDTH / 2.0 - 4.0, 0.0, 0.0), (part_spec.WIDTH / 2.0 + 4.0, 0.0, 0.0))
 
 part_metadata(
@@ -206,8 +203,8 @@ for _index, (_x, _y) in enumerate(part_spec.BOLT_POINTS, 1):
         precision={"dia": part_spec.COUNTERBORE_DIAMETER_PLACES, "depth_ref": part_spec.DRAWING_PRECISION_BY_NAME["CounterboreDepth"]},
     )
 requirement(
-    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "depth_over_whole_floor", "normal_installed_wire_recess_min", "note"),
-    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "depth_over_whole_floor": (True, ("DIMENSION_CALLOUTS", "WIRE_CAPTURE_BOUNDS")), "normal_installed_wire_recess_min": (part_spec.wire_capture.NORMAL_WIRE_RECESS_MIN, (("ch_rocker_arm_tl_oblique_cap_wire_clearance", "NORMAL_WIRE_RECESS_MIN"), "WIRE_CAPTURE_BOUNDS")), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS", "WIRE_CAPTURE_BOUNDS", ("ch_rocker_arm_tl_oblique_cap_wire_clearance", "NORMAL_WIRE_RECESS_MIN")))},
+    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "depth_over_whole_floor", "note"),
+    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "depth_over_whole_floor": (True, ("DIMENSION_CALLOUTS",)), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS",))},
     precision={"width": part_spec.CHANNEL_PLACES, "depth": part_spec.CHANNEL_PLACES},
 )
 
@@ -230,19 +227,6 @@ for _index, (_x, _y) in enumerate(part_spec.REGISTER_POINTS, 1):
             "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["RegisterDia"], part_spec.DIMENSION_CALLOUTS[f"Register{_index}X"], part_spec.DIMENSION_CALLOUTS["RegisterProjection"])), ("DIMENSION_CALLOUTS",)),
         },
         precision={"dia": 2, "station": part_spec.REGISTER_LOCATION_PLACES, "width": part_spec.REGISTER_LOCATION_PLACES, "length": part_spec.REGISTER_PROJECTION_PLACES},
-    )
-    requirement(
-        f"register_end_chamfer_{_index}", kind="chamfer",
-        faces=(ConeFace(45.0, contains_x_mm=_x),),
-        requirements=("length", "note"),
-        fields={
-            "at": ([_x, _y, -part_spec.REGISTER_PROJECTION], ("REGISTER_POINTS", "REGISTER_PROJECTION", "__frame__")),
-            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "length": ([0.0, part_spec.REGISTER_END_CHAMFER_MAX], ("REGISTER_END_CHAMFER_MAX",)),
-            "length_nominal": (part_spec.REGISTER_END_CHAMFER_MAX, ("REGISTER_END_CHAMFER_MAX",)),
-            "note": (part_spec.DIMENSION_CALLOUTS["RegisterEndChamfer"], ("DIMENSION_CALLOUTS", "nominal_register_volume_mm3")),
-        },
-        precision={"length": part_spec.DRAWING_PRECISION_BY_NAME["RegisterEndChamfer"]},
     )
 
 
@@ -353,20 +337,17 @@ async def build(adapter: Any) -> dict[str, str]:
     _annotate_views(adapter, ((bolts, BOLT_KEEP, "underside cap-screw coordinates"),))
     _assert_template_center_marks(bolts, expected=underside_centres, label="cap-screw underside")
 
-    _activate_sheet(adapter, drawing, SHEET_NAMES[3], "INTEGRAL REGISTERS - UNDERSIDE AND FREE-END PROFILE")
+    _activate_sheet(adapter, drawing, SHEET_NAMES[3], "INTEGRAL REGISTERS - UNDERSIDE AND PROJECTION")
     register_front = place_view(adapter, str(SOURCE), "*Front", *REGISTER_FRONT_CENTER, scale=VIEW_SCALE)
     register_bottom = place_view(adapter, str(SOURCE), "*Back", *REGISTER_BOTTOM_CENTER, scale=VIEW_SCALE)
     register_right = place_view(adapter, str(SOURCE), "*Right", *REGISTER_RIGHT_CENTER, scale=VIEW_SCALE)
-    register_ends = place_view(adapter, str(SOURCE), "*Top", *REGISTER_END_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, register_front)
     _annotate_views(adapter, (
         (register_bottom, REGISTER_KEEP, "underside integral-register coordinates"),
         (register_right, REGISTER_PROJECTION_KEEP, "integral-register projection"),
-        (register_ends, REGISTER_END_KEEP, "register free-end XZ profile"),
     ))
     for text, xy in (
         ("TOP FACE", (0.090, 0.125)),
-        ("REGISTER FREE ENDS", (0.075, 0.223)),
         ("UNDERSIDE", (0.300, 0.260)),
     ):
         if add_note(adapter, text, *xy) is None:

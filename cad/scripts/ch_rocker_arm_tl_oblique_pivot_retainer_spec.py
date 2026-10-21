@@ -3,7 +3,7 @@
 Turn from 3/8-in steel, SUPPLY 7 MIN. This is a blank allowance, NOT a
 finished 7-mm washer: the native installed model uses the calculated fitted
 nominal. Its actual-thickness REF callout carries the supply allowance;
-there is no dimension to an undrawn blank. Face the marked underside to the
+there is no dimension to an undrawn blank. Face the Ra 1.6 underside to the
 actual loaded carrier/pin running gap with the headed clevis HELD AGAINST
 THE UPPER EDGE of the pin cross-hole, including the complete drilled-hole/
 clevis clearance.
@@ -83,7 +83,7 @@ DRAWING_PRECISION_BY_NAME = {name: places for row in DRAWING_PRECISION.values() 
 DIMENSION_CALLOUTS = {
     "WasherBore": "DRILL THRU; CLEARS TL-23 JOURNAL",
     "FinishedThickness": (
-        f"REF; SUPPLY {SUPPLY_MIN_THICKNESS:.1f} MIN THICK; FACE MARKED SIDE\n"
+        f"REF; SUPPLY {SUPPLY_MIN_THICKNESS:.1f} MIN THICK; FACE Ra {MACHINED_UM:.1f} SIDE\n"
         f"TO ACTUAL LOADED RUNNING GAP {RUNNING_GAP_MIN:.2f}-{RUNNING_GAP_MAX:.2f}\n"
         "ON MHA-CH-06-TL-21 CARRIER / TL-23 PIN;\n"
         "HOLD CLEVIS AGAINST UPPER CROSS-HOLE EDGE"

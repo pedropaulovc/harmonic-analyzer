@@ -204,6 +204,24 @@ translations; they are not native after-fix proof. Parent validation must
 rebuild and inspect the full text blocks, leaders and border clearance on both
 sheets, with the existing layout enforcement unchanged.
 
+The five-sheet `7f008ec06db9` PDF also exposed native text/ownership traps.
+The diagonal D-D cut through the staggered receivers really produces an
+approximately 6° oblique section; it is not a view-angle error. A square
+depth section can cut the first receiver at constant model X, with the
+existing `2X` depth applying to both recesses in the same cut feature.
+Project its cutting endpoints through the parent view, but pass keeper and
+section-owned linked-caption positions directly in **sheet coordinates**.
+Reusing the plan's paper anchors leaves the depth text and caption beneath
+the plan even when their native owner is the section.
+
+Allocate lanes for complete callouts, not just values: the 9.000 mate block
+overprinted the web-hole callout, and the 74.50 wall qualifier printed in
+A-A's hatch. On the same export, `CboreFloor`'s audit text already contained
+the M4 engagement qualifier above 15.600, but the PDF omitted that multiline
+qualifier. `GetText` is therefore not printed-ink proof. Keep the accepted
+short-engagement fact attached to the native floor dimension and inspect
+its full exported text, witnesses and neighbouring ink.
+
 ### TL-30 capture-cap functional sheets
 
 The `d349b99300c6` native cap drawing imported all 32 model dimensions, including
@@ -219,14 +237,17 @@ Keep the full source text and 1:1 scale, with these separate ASME B sheets:
 | Sheet | Native dimension ownership |
 | --- | --- |
 | `ACCESS` | Outline, aperture coordinates/size, head and wire access, mouth depths |
-| `SECTIONS` | Underside pocket size/corner coordinates, fitted A-A and flat-bottom entry-relief B-B |
-| `BOLT-LOCATIONS` | Clearance-hole size and all eight actual pocket-axis bolt coordinates |
-| `REGISTERS` | Both bosses' size/coordinates/projection and the native free-end chamfer |
+| `SECTIONS` | Underside pocket size/corner coordinates, A-A pocket section and cap thickness |
+| `BOLT-LOCATIONS` | Through-clearance size and all eight actual pocket-axis bolt coordinates |
+| `REGISTERS` | Both bosses' size/coordinates/projection and no-root-undercut requirement |
 
-The circular-rim chamfer imports in `*Top`, not `*Right`; native transfer to
-`*Right` refused. Retain its permanent XZ view above an unmirrored `*Front`
-context on `REGISTERS`, rather than manufacturing text or changing the MAX.
-The separate `*Back` views retain visible native pocket-axis witnesses.
+The formerly explicit circular-rim chamfer imported in `*Top`, not `*Right`;
+native transfer to `*Right` refused. Do not preserve its extra XZ view or marked
+MAX dimension after the free-end chamfer adopts the general 0.25 mm edge-break
+limit. Keep the native 45-degree feature and geometry readback, and charge that
+whole general limit to the coupled register-engagement bound. The unmirrored
+`*Front`/`*Right` context owns the projection; separate `*Back` views retain
+visible native pocket-axis witnesses.
 Every sheet takes precision and complete callouts from the same part-spec maps.
 
 Remove the unconditional second `auto_center_marks` pass. The existing template

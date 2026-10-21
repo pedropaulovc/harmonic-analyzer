@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
-from math import atan, hypot, tan
+from math import atan, cos, hypot, pi, sin, tan
 from types import SimpleNamespace
 
 import pytest
@@ -311,6 +311,46 @@ def test_full_face_runout_does_not_accept_radial_dish_hidden_by_one_circle() -> 
     assert all(max(row) - min(row) <= runout for row in readings_by_radius)
     entire_face = [value for row in readings_by_radius for value in row]
     assert max(entire_face) - min(entire_face) > runout
+
+
+def _nearest_on_journal_generatrix(symbol, axis, landing):
+    """Independent perpendicular-foot oracle for a projected straight flank."""
+    nx, ny = landing[0] - axis[0], landing[1] - axis[1]
+    fraction = ((symbol[0] - landing[0]) * nx + (symbol[1] - landing[1]) * ny) / (
+        nx * nx + ny * ny
+    )
+    return (symbol[0] - fraction * nx, symbol[1] - fraction * ny)
+
+
+@pytest.mark.parametrize("view_scale", (1.0, 3.0, 7.5))
+@pytest.mark.parametrize("angle", (0.0, 0.47, pi / 2.0))
+def test_straight_datum_keeps_the_projected_landing_under_view_rotation_and_scale(
+    view_scale, angle,
+) -> None:
+    axis = (0.2465, 0.164)
+    radius = spec.BEARING_DIA * view_scale / 2000.0
+    landing = (axis[0] + radius * sin(angle), axis[1] - radius * cos(angle))
+    symbol = drawing._bearing_datum_symbol_xy(axis, landing)
+    assert _nearest_on_journal_generatrix(symbol, axis, landing) == pytest.approx(
+        landing, abs=1e-12
+    )
+    assert hypot(symbol[0] - landing[0], symbol[1] - landing[1]) == pytest.approx(0.004)
+    # Normal alignment alone also admits an inward, body-crossing request.
+    assert (
+        (symbol[0] - landing[0]) * (landing[0] - axis[0])
+        + (symbol[1] - landing[1]) * (landing[1] - axis[1])
+    ) > 0.0
+
+
+def test_requested_datum_clear_lane_preserves_the_literal_journal_generatrix() -> None:
+    axis = (drawing._x(drawing.BEARING_DATUM_STATION_MM), drawing.PROFILE_CENTER[1])
+    landing = (axis[0], axis[1] - spec.BEARING_DIA * drawing._S / 2.0)
+    assert landing == pytest.approx((0.2615, 0.1489985), abs=1e-12)
+    symbol = drawing._bearing_datum_symbol_xy(axis, landing)
+    assert symbol == pytest.approx((0.2615, 0.1449985), abs=1e-12)
+    assert _nearest_on_journal_generatrix(symbol, axis, landing) == pytest.approx(
+        landing, abs=1e-12
+    )
 
 
 @pytest.fixture
@@ -663,6 +703,57 @@ def test_lower_boss_witnesses_stop_above_both_native_radius_leader_runs() -> Non
         witness = Segment(x, 0.18205, x, line_y + 0.001)
         for stroke in radius:
             assert segment_box_distance(stroke, witness.box()) >= 0.002
+
+
+def test_normal_datum_footprint_clears_complete_known_native_dimension_ink() -> None:
+    # Native display data from the 20261021T125148010Z pin layout-audit JSON,
+    # not just dimension text boxes. The 12 x 9 mm box allowance is deliberately
+    # conservative, not an assertion that native glyph/box ink has been seen.
+    # Final native triangle, box and literal-landing readbacks must still pass.
+    station = drawing.BEARING_DATUM_STATION_MM
+    assert spec.LEAD_CHAMFER < station < spec.BEARING_LENGTH - spec.SHOULDER_FILLET_RADIUS
+    axis = (drawing._x(station), drawing.PROFILE_CENTER[1])
+    landing = (axis[0], axis[1] - spec.BEARING_DIA * drawing._S / 2.0)
+    symbol = drawing._bearing_datum_symbol_xy(axis, landing)
+    box_allowance = Box(symbol[0] - 0.006, symbol[1] - 0.009, symbol[0] + 0.006, symbol[1])
+    footprint = Box(
+        box_allowance.xmin, box_allowance.ymin, box_allowance.xmax, landing[1] + 0.0005,
+    )
+    assert box_allowance.ymax < landing[1]  # box below body; only triangle touches flank
+    assert 0.0127 < footprint.xmin < footprint.xmax < 0.4191
+    assert 0.0127 < footprint.ymin < footprint.ymax < 0.2667
+    for name in ("BearingDia", "BottomChamfer", "LowerBossHeight"):
+        assert footprint.gap(_d349_box_at(name, _D349_BLOCKS[name])) >= 0.0035
+    # Complete BearingDia lines, including the flank witnesses, arrow line
+    # and its continuation down to the text; then both chamfer witnesses
+    # and their lower line; then the full SeatFilletR leader and underline.
+    for line in (
+        (0.2145, 0.1489985, 0.2475, 0.1489985),
+        (0.2145, 0.1790015, 0.2475, 0.1790015),
+        (0.2978139, 0.0911399, 0.2465, 0.0911399),
+        (0.2465, 0.0911399, 0.2465, 0.1489985),
+        (0.2465, 0.1489985, 0.2465, 0.1790015),
+        (0.2795, 0.1765015, 0.2795, 0.1234438),
+        (0.278, 0.1780015, 0.278, 0.1234438),
+        (0.2795, 0.1244438, 0.3338292, 0.1244438),
+        (0.2795, 0.1244438, 0.278, 0.1244438),
+        (0.278, 0.1244438, 0.27165, 0.1244438),
+        (0.2140693, 0.1790023, 0.2117743, 0.1342219),
+        (0.2141, 0.1796015, 0.2140693, 0.1790023),
+        (0.2117743, 0.1342219, 0.2376382, 0.1342219),
+    ):
+        assert segment_box_distance(Segment(*line), footprint) >= 0.0035
+    # The five native arrow records have length 3.556 mm and width 0.762 mm.
+    # A square of radius equal to the larger extent covers either direction.
+    for x, y in (
+        (0.2465, 0.1489985), (0.2465, 0.1790015),
+        (0.2795, 0.1244438), (0.278, 0.1244438),
+        (0.2140693, 0.1790023),
+    ):
+        arrow_allowance = Box(x - 0.003556, y - 0.003556, x + 0.003556, y + 0.003556)
+        assert footprint.gap(arrow_allowance) >= 0.0035
+    fillet_text_allowance = Box(0.2133618, 0.1307219, 0.2376382, 0.1377219)
+    assert footprint.gap(fillet_text_allowance) >= 0.0035
 
 
 def test_end_callouts_and_cross_hole_route_have_clear_paper_not_padded_view_boxes() -> None:

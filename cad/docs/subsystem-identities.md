@@ -122,18 +122,30 @@ The capture stack raises the carrier/work setup by **12.5 mm**, including the
 1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
 end remains nominally **4 mm above the finished work**; the actual-fit
 qualification does not change pin or retainer geometry or raise the setup.
-The cap is 50 × 75 ×
-11.50 mm, with the ordinary ±0.51 mm thickness band, not a new precision
-control, machined from 5/8 in stock. Its bolt coordinates are X = ±14.5 mm,
-Y = ±25.5 mm; the two register centres are (−4.5, −24) and (4.5, 24) mm.
-The block wing is 67 mm wide and starts at −54.5 mm, machined from
-1 × 3 in flat bar. Its nominal −10.8 mm end is controlled directly by
-the **21.200 mm bearing-axis-to-wing-edge reach**, using the ordinary
-three-place ±0.13 mm band, not a competing wing-length/end chain.
-The worst-case nut-bracket clearance is 0.525 mm, above the 0.50 mm
-minimum, while preserving the 2 mm body-wall targets and the existing
-two-rectangle block topology. Existing anchors, rails, leadline and
-nut-bracket placement are unchanged.
+The cap is **50 × 86 × 11.60 mm**, with ordinary outline ±0.8 mm and
+thickness ±0.51 mm bands, machined from the unchanged 5/8 in stock.
+Its bolt coordinates are X = ±13.25 mm, Y = ±28.50 mm; the two register
+centres are (−2.50, −24) and (2.50, 24) mm. The head counterbores are
+**8.40 mm REF**, fitted to the actual seated NAS heads: the highest head
+must be **0.50–0.60 mm normal below the actual cap top face**, with
+**2.00 mm minimum whole-floor thickness under each counterbore, including
+the full-width edge openings**. The recess upper limit controls fixed
+head/wire height for the VN-76 groove clearance, not merely floor thickness.
+The block wing is **72 mm wide**, starts at −54.5 mm and retains the
+1 × 3 in flat-bar stock. Its end is controlled directly by the
+**20.60 mm bearing-axis-to-wing-edge reach**, ordinary two-place ±0.51 mm,
+not a competing wing-length/end chain. The source retains the 2 mm
+thread-wall target and 0.50 mm wing/bracket-clearance contract without
+changing the two-rectangle topology, anchors, rails, leadline or bracket pose.
+
+Both flat-bottom register receivers retain **2.000 ±0.13 mm depth**.
+For this unchanged 2 mm nominal, the ordinary two-place band would allow
+1.49 mm, below the source's 1.649708 mm positive-clearance threshold through
+full cap rock. The present band gives source lower bounds of **0.220259 mm
+register-bottom clearance** and **0.124936 mm assembly clearance**.
+These are analytical bounds from `capture_bounds`, not installed readings.
+The tight upper limit is not claimed to be necessary for floor thickness,
+and an unbounded MIN depth is not the receiver's material contract.
 
 TL-29's height is **33.3 mm**, with the existing ordinary .X ±0.8 mm
 band, independent of the raised carrier. This cuts unused upper bracket
@@ -460,14 +472,31 @@ that proof to displaced source wire/head/cap frames. This is the representative
 0/180 route, not a universal actual head-clock family. The wire/carrier
 plane separator likewise uses represented source geometry only. Actual
 C3C keeps the same authoritative .50 whole-route/tail normal recess below
-the actual roof, unforced; never loosen/over-torque heads to clock holes.
-Roof recess or contour length alone cannot qualify the actual lateral
+the actual cap top face, unforced; never loosen/over-torque heads to clock holes.
+Top-face recess or contour length alone cannot qualify the actual lateral
 formed route through full captured cap motion. No executable full-free-cap
 hand-sweep is claimed after the heads clamp the cap. Explicit
 `ActualWireCaptureEvidence` must identify the actual full-capture swept-void
 proof, its state/scope, real open-mouth/counterbore/groove envelope and every
 physical row's matched C2A support reference. Missing proof remains unverified;
 no invented bench routine or strength claim substitutes for it.
+
+The representative VN-76 native sweep requires physical forward-tangent
+blends at every independently authored cubic-route join. In
+`_pivot_retention_stock_geometry.bezier_spline_parameters`, keep the exact
+Bezier controls and triple interior knots; normalize the parameter domain
+to the SDK-required `[0, 1]`. Adjacent span lengths follow the outgoing/
+incoming endpoint-handle ratio, making the first derivative continuous
+without fitting or moving the real straight head passages. On 2026-10-21,
+source `7f008ec06db9` freshly created `PairedLockWire`, rebuilt its one
+configuration cleanly, and saved the SLDPRT, 8 MB STL and isometric PNG
+before storing cache key `7f6d0341ba7b`. The native image shows the formed
+loops, twisted bridge and tucked tails; it cannot resolve the approximately
+17 µm closest strand gap. This confirms native feature/solid creation and
+export, not installed fit, locking strength or an independent body-validity
+inspection. The earlier `695c4b02eebe` run created the path but returned no
+sweep feature; correcting both its sharp joins and out-of-domain knots does
+not isolate which defect caused that failure.
 
 `source_tooling_clearance` retains the nominal-frame CAD prism diagnostic
 but cannot return an installed VERIFIED status. `installed_tooling_clearance`

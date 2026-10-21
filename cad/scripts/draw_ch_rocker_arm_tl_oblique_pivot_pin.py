@@ -37,6 +37,7 @@ journal outline.
 from __future__ import annotations
 
 import argparse
+from math import hypot
 import sys
 from typing import Any, Callable
 
@@ -111,7 +112,13 @@ STOP_FACE_FRAME_XY = {
     "flange_upper_stop": (0.176, 0.104),
     "flange_lower_stop": (0.214, 0.104),
 }
-BEARING_DATUM_XY = (0.296, 0.145)
+# Native BearingDia ink occupies X246.5 mm, not just its lower text block.
+# z=6 mm gives X261.5 between that line/arrow and the X278/279.5 chamfer
+# witnesses, allowing for the complete datum box, on the same k5 face.
+BEARING_DATUM_STATION_MM = 6.0
+# Four paper millimetres outside the journal: retain the old Y145 mm lane,
+# but derive its normal from the live projection instead of an outboard X.
+BEARING_DATUM_STANDOFF_M = 0.004
 _ABOVE = PROFILE_CENTER[1] + part_spec.FLANGE_DIA / 2.0 * _S
 _BELOW = PROFILE_CENTER[1] - part_spec.FLANGE_DIA / 2.0 * _S
 
@@ -432,6 +439,25 @@ def _stop_faces_in_view(
     return {key: candidates[0] for key, candidates in matches.items()}
 
 
+def _bearing_datum_symbol_xy(
+    axis_xy: tuple[float, float], landing_xy: tuple[float, float],
+) -> tuple[float, float]:
+    """Request a straight datum on the literal landing's outward normal.
+
+    SDK IAnnotation::SetPosition2 moves the leader/symbol junction, subject
+    to datum constraints. The 7f008ec06 request put it 49.5 mm axially away
+    from the requested landing; the closest rendered datum ink missed that
+    landing by 28.2841 mm. That readback does not identify the true triangle
+    tip or prove a native axial re-solve. Reuse the normal-aligned straight
+    datum in draw_ch_rocker_arm._hub_face_datum: the perpendicular foot of
+    the symbol request stays on the literal landing, while the existing
+    native identity and rendered-landing guards remain authoritative.
+    """
+    dx, dy = landing_xy[0] - axis_xy[0], landing_xy[1] - axis_xy[1]
+    scale = BEARING_DATUM_STANDOFF_M / hypot(dx, dy)
+    return (landing_xy[0] + scale * dx, landing_xy[1] + scale * dy)
+
+
 def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
     """Attach A to its real cylinder and each native frame to its stop face.
 
@@ -453,7 +479,8 @@ def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
     # annular faces. Projection supplies only the landing, never ownership or
     # a visibility/pick proof; the mapped topology and native readbacks do.
     points = (
-        (0.0, -part_spec.BEARING_DIA / 2000.0, part_spec.BEARING_LENGTH / 2000.0),
+        (0.0, -part_spec.BEARING_DIA / 2000.0, BEARING_DATUM_STATION_MM / 1000.0),
+        (0.0, 0.0, BEARING_DATUM_STATION_MM / 1000.0),
         *(
             (0.0, -part_spec.STOP_FACE_MEASUREMENT_DIAMETER / 2000.0,
              row.face.offset_mm / row.face.normal[2] / 1000.0)
@@ -461,10 +488,10 @@ def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
         ),
     )
     projected = model_points_in_view(adapter, profile, points, label="pivot stop controls")
-    datum_landing, *stop_landings = projected
+    datum_landing, journal_axis, *stop_landings = projected
     tag = add_datum_feature(
         adapter, profile, entity=faces[datum.key], entity_type="FACE",
-        symbol_xy=BEARING_DATUM_XY, datum=datum.letter,
+        symbol_xy=_bearing_datum_symbol_xy(journal_axis, datum_landing), datum=datum.letter,
         leader_attach_xy=datum_landing, label="k5 bearing-journal datum axis",
     )
     frames = {}

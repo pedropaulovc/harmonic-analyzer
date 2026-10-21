@@ -475,7 +475,12 @@ def test_register_engagement_boundary_includes_end_chamfer(
     monkeypatch.setattr(retention, "CAP_REGISTER_END_CHAMFER_MAX",
                         cap.REGISTER_END_CHAMFER_MAX + fraction * bounds.register_engagement)
     if fraction < 1.0:
-        assert retention.capture_bounds().register_engagement > 0.0
+        actual = retention.capture_bounds()
+        assert actual.register_engagement == pytest.approx((1.0 - fraction) * bounds.register_engagement)
+        assert actual.register_engagement > 0.0
+        for field in bounds.__dataclass_fields__:
+            if field != "register_engagement":
+                assert getattr(actual, field) == getattr(bounds, field)
     else:
         with pytest.raises(ValueError, match="register"):
             retention.capture_bounds()

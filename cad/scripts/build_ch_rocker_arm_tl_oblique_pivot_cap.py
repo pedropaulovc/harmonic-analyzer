@@ -137,7 +137,7 @@ async def _integral_registers(adapter, pocket_circle):
 
 
 def _register_chamfer_maximum(adapter):
-    """The native nominal is the printed MAX, with a recorded zero-to-max band."""
+    """Read back the real chamfer at the title-block maximum, not a local callout."""
     _, dimension = _named_dimension(adapter, "RegisterEndChamfers", "RegisterEndChamfer")
     maximum = spec.REGISTER_END_CHAMFER_MAX / 1000.0
     if not math.isclose(float(dimension.SystemValue), maximum, abs_tol=1e-9):

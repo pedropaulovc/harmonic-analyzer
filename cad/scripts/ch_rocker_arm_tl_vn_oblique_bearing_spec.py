@@ -25,9 +25,10 @@ Sources:
   (downloaded 2026-10-17) is read for dimensions only and NOT replica-gated
   (user ruling 2026-10-17); the recipe's standalone run is catalog-only.
 * RECEIVING: the VN-52 purchased drawing owns the catalogue OD/width limits.
-  The purchased 9 mm nominal bearing width controls the bearing stack in
-  pivot block MHA-CH-06-TL-22, which seats two bearings; this does not model
-  the complete internal axial endplay or retention geometry.
+  The OD acceptance names its press fit in the bearing bores of pivot block
+  MHA-CH-06-TL-22. The purchased 9 mm nominal bearing width controls that
+  block's two-bearing stack; this does not model the complete internal axial
+  endplay or retention geometry.
   The drawing also requires an intact full-circumference cylindrical OD land
   including its axial mid-plane. Actual identity traceable to valid SKU-specific
   supplier dimensional authority can establish the catalogue size bands;

@@ -172,8 +172,11 @@ def test_native_dimension_maps_cover_every_manufacturing_control_once() -> None:
 
 
 def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> None:
-    # Captured native sheet: approximately 2.45 mm/character, border X12.7,
-    # Front outline X101.7. This 2.50 approximation is not native ink proof.
+    # Stud audit 20261021T125148010Z: the old 29-character row occupied
+    # X24.6..95.7 mm about X60, approximately 2.45 mm per character.
+    # Round UP to 2.50 for this offline heuristic, not an exact glyph proof.
+    # The same native sheet had inner border X12.7 and Front outline X101.7.
+    # Fresh PDF/layout inspection still owns the actual wrapped glyph bounds.
     advance_mm = 2.50
     width_mm = max(map(len, spec.DIMENSION_CALLOUTS["FinishedLength"].splitlines())) * advance_mm
     centre_mm = draw.FRONT_KEEP["FinishedLength"][0] * 1000.0
@@ -188,7 +191,6 @@ def test_thread_callout_screen_fits_between_native_length_line_and_left_barrel()
     width_mm = max(map(len, draw.THREAD_CALLOUT.splitlines())) * 2.50
     assert draw.FRONT_KEEP["FinishedLength"][0] * 1000.0 < left_mm
     assert left_mm + width_mm < 107.3
-
 
 def test_feature_selector_distinguishes_actual_cut_end_from_factory_chamfer() -> None:
     selector = requirements_for(draw)["cut_end_chamfer"].faces[0]
@@ -535,38 +537,89 @@ def test_local_title_fit_preserves_full_name_number_and_never_touches_material(m
             check_title()
 
 
-@pytest.mark.parametrize("failure", [None, "missing", "duplicate"])
-def test_existing_thread_callout_targets_upper_cylindrical_boundary_not_cut_face(monkeypatch, failure):
-    radius = spec.RADIUS / 1000
-    y = (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
+@pytest.mark.parametrize("failure", [
+    None, "lower_attachment", "thread_attachment", "landing", "late_landing", "annotation",
+])
+def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monkeypatch, failure):
+    monkeypatch.setattr(spec, "LOWER_FACTORY_CHAMFER", 0.6)
+    monkeypatch.setattr(spec, "CUT_END_CHAMFER_MAX", 1.2)
+    lower_rim, barrel_face, neighbour = object(), object(), object()
+    flank = SimpleNamespace(GetFace=lambda: barrel_face)
+    other_flank = SimpleNamespace(GetFace=lambda: neighbour)
+    front = object()
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0))
+    projected, inserted = [], []
+    late = False
 
-    def edge(at_y, at_radius):
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            CircleParams=(0.0, at_y, 0.0, 0.0, 1.0, 0.0, at_radius),
+    def project(owner, view, points, *, label):
+        assert owner is adapter and view is front
+        projected.append(points)
+        return [(0.120 + 2.0 * x, 0.093 + 2.0 * y) for x, y, _z in points]
+
+    def silhouettes(owner, view, picks, *, label):
+        assert owner is adapter and view is front
+        cylinder, xy = picks["thread"]
+        assert cylinder.diameter_mm == spec.MAJOR_DIA
+        assert cylinder.contains_y_mm == pytest.approx(
+            (spec.LOWER_FACTORY_CHAMFER + spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 2.0
         )
-        return SimpleNamespace(GetCurve=lambda: curve)
+        assert xy == pytest.approx((0.120 + 2.0 * spec.RADIUS / 1000, 0.093 + 2.0 * cylinder.contains_y_mm / 1000))
+        return {"thread": flank}
 
-    thread_rim = edge(y, radius)
-    edges = [
-        edge(0.0, radius - spec.LOWER_FACTORY_CHAMFER / 1000),
-        edge(spec.LOWER_FACTORY_CHAMFER / 1000, radius),
-        edge(spec.LENGTH / 1000, radius - spec.CUT_END_CHAMFER_MAX / 1000),
-        edge(y, radius - spec.CUT_END_CHAMFER_MAX / 1000),
-    ]
-    if failure != "missing":
-        edges.append(thread_rim)
-    if failure == "duplicate":
-        edges.append(edge(y, radius))
-    monkeypatch.setattr(draw, "visible_view_entities", lambda *_args, **_kwargs: edges)
+    def attached(owner, view, **kwargs):
+        assert owner is adapter and view is front
+        inserted.append(kwargs)
+        thread = kwargs["entity_type"] == "SILHOUETTE"
+        expected = flank if thread else lower_rim
+        assert kwargs["attached_to"] is expected
+        actual = expected
+        if failure == "thread_attachment" and thread:
+            actual = other_flank
+        elif failure == "lower_attachment" and not thread:
+            actual = neighbour
+
+        def leader(_index):
+            x, y = kwargs["entity_xy"]
+            if thread and (failure == "landing" or (failure == "late_landing" and late)):
+                y += 0.010
+            return (*kwargs["note_xy"], 0.0, x, y, 0.0)
+
+        annotation = SimpleNamespace(
+            GetAttachedEntities3=lambda: (actual,),
+            GetAttachedEntityCount3=lambda: 1,
+            GetAttachedEntityTypes=lambda: (46 if thread else 1,),
+            GetLeaderCount=lambda: 1,
+            IsDangling=lambda: False,
+            GetLeaderPointsAtIndex=leader,
+        )
+        return SimpleNamespace(GetAnnotation=lambda: None if failure == "annotation" else annotation)
+
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
-    if failure:
-        with pytest.raises(RuntimeError, match="expected one visible native rim"):
-            draw.upper_thread_blank_edge(object())
+    monkeypatch.setattr(draw, "model_points_in_view", project)
+    monkeypatch.setattr(draw, "face_silhouettes_through", silhouettes)
+    monkeypatch.setattr(draw, "lower_factory_end_edge", lambda view: lower_rim)
+    monkeypatch.setattr(draw, "add_attached_note", attached)
+    if failure and failure != "late_landing":
+        with pytest.raises(RuntimeError):
+            draw.add_rework_notes(adapter, front)
+        return
+    settled = draw.add_rework_notes(adapter, front)
+    lower, thread = projected[0]
+    rim_radius = (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
+    assert lower[1] == 0.0 and 0.0 < lower[0] < rim_radius
+    assert math.hypot(lower[0], lower[2]) == pytest.approx(rim_radius)
+    assert thread[0] == spec.RADIUS / 1000 and thread[2] == 0.0
+    assert spec.LOWER_FACTORY_CHAMFER / 1000 < thread[1] < (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
+    assert [row["text"] for row in inserted] == [draw.property_link("Lower End Note"), draw.THREAD_CALLOUT]
+    assert spec.THREAD in inserted[1]["text"]
+    assert "2A" not in inserted[1]["text"]  # No fabricated kit-stock qualification.
+    late = True
+    if failure == "late_landing":
+        with pytest.raises(RuntimeError, match="leader attachment moved"):
+            settled()
     else:
-        assert draw.upper_thread_blank_edge(object()) is thread_rim
-    assert spec.THREAD in draw.THREAD_CALLOUT
-    assert "2A" not in draw.THREAD_CALLOUT  # No fabricated qualification of kit stock.
+        settled()
+        assert len(projected) == 3  # Insertion, immediate proof, settled proof.
 
 
 @pytest.mark.parametrize("failure", [
@@ -814,6 +867,8 @@ def test_native_callouts_keep_length_governance_and_feature_derived_angle(monkey
     monkeypatch.setattr(draw, "dimension_name", lambda _adapter, note: note.display.name)
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(draw, "set_dimension_callouts", apply)
+    # A different angle readback proves derivation; production validates the
+    # saved feature before this call. The nominal dimensions remain native.
     if failure:
         with pytest.raises(RuntimeError):
             draw.set_machining_callouts(object(), annotations, math.pi / 6)
@@ -1003,6 +1058,7 @@ def test_drawing_keeps_native_chamfer_end_view_and_part_only_rework_sheet(monkey
         return lambda: title_settled.append(sheet_name)
 
     monkeypatch.setattr(draw, "fit_stud_title_block", fit_title)
+
     monkeypatch.setattr(draw, "add_property_linked_note", lambda _adapter, name, *position, **kwargs: notes.append((active[-1], name, kwargs.get("char_height"))))
     captions = []
     monkeypatch.setattr(draw, "add_note", lambda _adapter, text, *xy: captions.append((text, xy)) or object())

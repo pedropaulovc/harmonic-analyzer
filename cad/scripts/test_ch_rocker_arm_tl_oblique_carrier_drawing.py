@@ -19,6 +19,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _drawing_layout_check import LeaderSegment, _proper_crossing
 from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
@@ -647,6 +648,66 @@ def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
     assert b2x + half_width < _BORDER[2] - 3.0
     iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
     assert b2y - 8.0 - 3.0 > iso_top
+
+
+def test_ream_native_shoulder_clears_stock_witnesses_without_border_spill() -> None:
+    """Replay DRAW7f's measured shoulder, not an estimated character width.
+
+    The actual 7f008ec06db9 leaf (artifact 1104) supplied the original native
+    text anchor, shoulder and two stock-witness spans below. The fixture
+    translates those captured primitives by the proposed text displacement;
+    it does not prove how SolidWorks regenerates the elbow or glyph bounds.
+    """
+    tx, ty = _top_text("PinHoleDia")
+    dx, dy = tx - 56.0, ty - 137.85
+
+    def segment(label, coordinates):
+        return LeaderSegment(label, "dim", *(value / 1000.0 for value in coordinates))
+
+    original = segment("REAM shoulder", (93.0, 111.1, 20.6, 111.1))
+    translated = segment(
+        "REAM shoulder", (93.0 + dx, 111.1 + dy, 20.6 + dx, 111.1 + dy)
+    )
+    witnesses = (
+        segment("520 witness", (92.0, 151.5, 92.0, 74.0)),
+        segment("260 witness", (92.0, 151.5, 92.0, 96.5)),
+    )
+    assert all(_proper_crossing(original, line, tol=1e-4) for line in witnesses)
+    assert all(_proper_crossing(translated, line, tol=1e-4) is None for line in witnesses)
+    assert _BORDER[0] + 3.0 < 20.6 + dx
+    assert 93.0 + dx < _on_sheet(spec.OUTLINE_X[0], 0.0)[0] - 2.0
+
+    elbow = (93.0 + dx, 111.1 + dy)
+    bore = _on_sheet(*spec.PIN_HOLES["A1"])
+    diagonal = segment("REAM diameter run", (*elbow, *bore))
+    # Unlike its horizontal text shoulder, the diameter approach crosses
+    # both genuine witness extensions conventionally (guideline rule 14).
+    assert all(_proper_crossing(diagonal, line, tol=1e-4) for line in witnesses)
+    # The witnesses extend 1 mm beyond their real horizontal dimension lines.
+    # Both horizontal lanes must stay below the entire diameter approach.
+    for line, far_x in zip(witnesses, (spec.OUTLINE_X[1], 0.0), strict=True):
+        lane = segment(
+            line.label,
+            (92.0, line.y1 * 1000.0 + 1.0, _on_sheet(far_x, 0.0)[0], line.y1 * 1000.0 + 1.0),
+        )
+        assert _proper_crossing(diagonal, lane, tol=1e-4) is None
+    # Other station values must not be struck by the rerouted diameter run.
+    # Extending the check to the bore centre is conservative at its rim.
+    for name in drawing.TOP_KEEP:
+        if name == "PinHoleDia":
+            continue
+        x, y = _top_text(name)
+        assert not _segment_hits_box(elbow, bore, (x - 12.0, y - 3.0, x + 12.0, y + 3.0)), name
+    # The other leaders' full feature-to-callout envelopes are separated
+    # from this diameter approach; no assumed tap/spot elbow is needed.
+    for hole, anchor in (
+        (spec.CR, drawing.CR_CALLOUT_XY),
+        (spec.RISER_SCREWS[3], drawing.RISER_CALLOUT_XY),
+        (spec.LEVER_HOLES[1], drawing.LEVER_CALLOUT_XY),
+    ):
+        assert max(elbow[0], bore[0]) < min(_on_sheet(*hole)[0], _callout_box(anchor)[0])
+    for name, spot in (("SpotDia", spec.SPOTS["Hub"]), ("SpotDiaCl", spec.SPOTS["Cl"])):
+        assert max(elbow[1], bore[1]) < min(_on_sheet(*spot)[1], _top_text(name)[1] - 6.0)
 
 
 def _native_axis_fixture(monkeypatch):
