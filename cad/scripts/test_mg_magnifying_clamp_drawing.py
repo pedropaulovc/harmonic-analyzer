@@ -468,12 +468,54 @@ def test_converted_location_geometry_requires_actual_source_identity(monkeypatch
             part._convert_location_source(adapter, source, "IEntity")
 
 
+class _NativeSketch:
+    """A sketch has native identity, but deliberately no IFeature.Name member."""
+
+    def __init__(self, token, feature_name):
+        self.token = token
+        self.feature_name = feature_name
+
+
+class _NativeFeature:
+    def __init__(self, sketch, *, kind="ProfileFeature"):
+        self.sketch = sketch
+        self.Name = sketch.feature_name
+        self.kind = kind
+
+    def GetTypeName2(self):
+        return self.kind
+
+    def GetSpecificFeature2(self):
+        return self.sketch
+
+
+def _native_same(left, right):
+    if isinstance(left, _NativeSketch) and isinstance(right, _NativeSketch):
+        return int(left.token == right.token)
+    return int(left is right)
+
+
 def _native_sketch_segment(*, owner="ActualLocationProfile", kind=0, identifiers=(1, 2)):
+    sketch = _NativeSketch(owner, owner)
     return SimpleNamespace(
-        GetSketch=lambda: SimpleNamespace(Name=owner),
+        owner_sketch=sketch,
+        GetSketch=lambda: sketch,
         GetType=lambda: kind,
         GetID=lambda: identifiers,
     )
+
+
+def _native_inventory(*segments):
+    owners = {}
+    for segment in segments:
+        sketch = segment.owner_sketch
+        owners.setdefault(sketch.token, _NativeFeature(_NativeSketch(sketch.token, sketch.feature_name)))
+
+    def features(top_level_only):
+        assert top_level_only is False, "absorbed sketch owners must be inventoried"
+        return tuple(reversed(tuple(owners.values())))
+
+    return SimpleNamespace(GetFeatures=features)
 
 
 @pytest.mark.parametrize("mode", ("measured", "missing", "wrong-distance", "not-driven", "name-refused", "reference-ink", "input-dialog"))
@@ -540,11 +582,11 @@ def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mo
         GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
         GetSelectedObjectType3=lambda index, _mark: (11, 10)[index - 1],
     )
-    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddDimension2=add_dimension, SelectionManager=manager)
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddDimension2=add_dimension, SelectionManager=manager, FeatureManager=_native_inventory(flat))
     application = SimpleNamespace(
         SetUserPreferenceToggle=lambda preference, value: toggles.__setitem__(preference, value),
         GetUserPreferenceToggle=lambda preference: mode == "input-dialog" or toggles[preference],
-        IsSame=lambda left, right: int(left is right),
+        IsSame=_native_same,
     )
     adapter = SimpleNamespace(currentModel=model, swApp=application)
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
@@ -727,8 +769,8 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
         GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
         GetSelectedObjectType3=lambda index, _mark: (11, 10)[index - 1],
     )
-    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None, SelectionManager=manager)
-    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None, SelectionManager=manager, FeatureManager=_native_inventory(circle, attached_circle))
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=_native_same))
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selections.append((entity, interface, append)))
     monkeypatch.setattr(part, "_select_bore_rim", lambda _adapter, actual: picks.append(actual))
@@ -741,9 +783,13 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
             part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
 
 
-@pytest.mark.parametrize("mode", ("retained", "bad-radius", "wrong-count", "wrong-circle", "set-refused", "stale-pick", "bad-transform"))
+@pytest.mark.parametrize("mode", ("retained", "bad-radius", "wrong-count", "wrong-circle", "set-refused", "stale-pick", "unavailable-pick", "bad-transform"))
 def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkeypatch, mode) -> None:
     from solidworks_mcp.adapters import com_variant
+    import _telemetry
+
+    events = []
+    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
 
     local = (0.00425, 0.01995, 0.0)
     inverse = object()
@@ -775,13 +821,13 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
         GetSelectedObject6=lambda index, _mark: point if index == 1 else object() if mode == "wrong-circle" else circle,
         GetSelectedObjectType3=lambda index, _mark: (11, 10)[index - 1],
         SetSelectionPoint2=set_point,
-        GetSelectionPointInSketchSpace2=lambda _index, _mark: (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
+        GetSelectionPointInSketchSpace2=lambda _index, _mark: None if mode == "unavailable-pick" else (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
     )
     sketch = SimpleNamespace(ModelToSketchTransform=SimpleNamespace(Inverse=lambda: inverse))
-    model = SimpleNamespace(GetActiveSketch2=lambda: sketch, SelectionManager=manager)
+    model = SimpleNamespace(GetActiveSketch2=lambda: sketch, SelectionManager=manager, FeatureManager=_native_inventory(circle))
     application = SimpleNamespace(
         GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point),
-        IsSame=lambda left, right: int(left is right),
+        IsSame=_native_same,
     )
     adapter = SimpleNamespace(currentModel=model, swApp=application)
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
@@ -792,6 +838,13 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
     else:
         with pytest.raises(RuntimeError):
             part._select_bore_rim(adapter, circle)
+    if mode in ("retained", "set-refused", "stale-pick", "unavailable-pick"):
+        message, fields = events[-1]
+        assert fields["operation_stage"] == "bore-rim.selection-point-readback"
+        assert fields["rim_sketch_m"] == pytest.approx(local)
+        assert fields["requested_model_m"] == pytest.approx((0.4, 0.21995, 0.29575))
+        assert fields["selection_point_accepted"] is (mode != "set-refused")
+        assert "retained_sketch=" in message
 
 
 @pytest.mark.parametrize("mode", ("retained", "different-segment-dispatch", "unknown-segment-dispatch", "unknown-segment-self", "one-selected", "missing-object", "wrong-point", "unknown-point", "unknown-point-self", "wrong-selection-type", "wrong-owner", "wrong-kind", "wrong-id", "unknown-owner", "invalid-id"))
@@ -820,7 +873,7 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
             return -1
         if left is returned_circle and right is circle:
             return 1 if mode == "retained" else -1 if mode == "unknown-segment-dispatch" else 0
-        return int(left is right)
+        return _native_same(left, right)
 
     manager = SimpleNamespace(
         GetSelectedObjectCount2=lambda _mark: len(selected),
@@ -828,7 +881,7 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
         GetSelectedObjectType3=lambda index, _mark: selected_types[index - 1],
     )
     adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(SelectionManager=manager),
+        currentModel=SimpleNamespace(SelectionManager=manager, FeatureManager=_native_inventory(circle, returned_circle)),
         swApp=SimpleNamespace(IsSame=same),
     )
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
@@ -852,8 +905,9 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
         }[mode]
         with pytest.raises(RuntimeError, match=reason):
             part._require_location_selection(adapter, circle, point=point, stage="native-positive-control")
-    assert len(events) == 1
-    message, fields = events[0]
+    selection_events = [(message, fields) for message, fields in events if "selection_count" in fields]
+    assert len(selection_events) == 1
+    message, fields = selection_events[0]
     assert fields["operation_stage"] == "native-positive-control"
     assert fields["selection_count"] == len(selected)
     assert fields["selected_types"] == selected_types
@@ -879,11 +933,12 @@ def test_native_segment_identity_requires_complete_documented_key(monkeypatch, m
     if mode == "missing-owner":
         segment.GetSketch = lambda: None
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureManager=_native_inventory(segment)), swApp=SimpleNamespace(IsSame=_native_same))
     if mode == "valid":
-        assert part._segment_identity(segment) == ("ActualLocationProfile", 1, 1, 2)
+        assert part._segment_identity(adapter, segment, stage="key-control", role="selected") == ("ActualLocationProfile", 1, 1, 2)
     else:
         with pytest.raises(RuntimeError, match="native segment"):
-            part._segment_identity(segment)
+            part._segment_identity(adapter, segment, stage="key-control", role="selected")
 
 
 @pytest.mark.parametrize("mode", ("native-proxy", "wrong-point", "wrong-circle-id", "dangling", "unknown-dangling", "missing-attachment", "wrong-value", "wrong-band", "wrong-end"))
@@ -916,8 +971,8 @@ def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end
         GetArcEndCondition=lambda index: 0 if index == 1 else 1 if mode == "wrong-end" else 2,
     )
     sketch = SimpleNamespace(GetSketchSegments=lambda: (circle,), GetConstrainedStatus=lambda: 3)
-    model = SimpleNamespace(FeatureByName=lambda _name: SimpleNamespace(GetSpecificFeature2=lambda: sketch))
-    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    model = SimpleNamespace(FeatureByName=lambda _name: SimpleNamespace(GetSpecificFeature2=lambda: sketch), FeatureManager=_native_inventory(circle, attached_circle))
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=_native_same))
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", source_circle, "ISketchSegment", ())})
     monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": point})
@@ -930,3 +985,174 @@ def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end
     else:
         with pytest.raises(RuntimeError):
             part._assert_location_profiles(adapter)
+
+
+@pytest.mark.parametrize("mode", (
+    "child-owner", "3d-owner", "no-match", "ambiguous", "unknown-match",
+    "bool-match", "bad-owner-self", "bad-candidate-self", "null-specific",
+    "null-inventory", "null-feature", "bad-feature-type", "matrix-name", "readback-error",
+))
+def test_segment_owner_is_resolved_only_through_actual_feature_inventory(monkeypatch, mode) -> None:
+    import _telemetry
+
+    segment = _native_sketch_segment(kind=1)
+    owner = segment.GetSketch()
+    candidate = _NativeSketch(owner.token, "ActualLocationProfile")
+    if mode == "no-match":
+        # Same feature name and coincident geometry cannot establish ownership.
+        candidate.token = "unrelated-native-sketch"
+    feature = _NativeFeature(candidate, kind="3DProfileFeature" if mode == "3d-owner" else "ProfileFeature")
+    unrelated = _NativeFeature(_NativeSketch("other", "OtherProfile"))
+    parent = _NativeFeature(_NativeSketch("boss", "Boss"), kind="Boss")
+    parent.GetSpecificFeature2 = lambda: pytest.fail("non-sketch feature must not be cast to ISketch")
+    children = [unrelated, feature]
+    if mode == "ambiguous":
+        children.append(_NativeFeature(_NativeSketch(owner.token, "SecondClaimedOwner")))
+    if mode == "null-specific":
+        feature.GetSpecificFeature2 = lambda: None
+    if mode == "matrix-name":
+        feature.Name = (1.0, 0.0, 0.0, 0.0) * 4  # frozen R7 failure shape
+    if mode == "bad-feature-type":
+        feature.kind = None
+    if mode == "readback-error":
+        def fail_specific():
+            raise RuntimeError("native specific sketch readback unavailable")
+        feature.GetSpecificFeature2 = fail_specific
+    calls, events, bindings = [], [], []
+
+    def features(top_level_only):
+        calls.append(top_level_only)
+        if mode == "null-inventory":
+            return None
+        if mode == "null-feature":
+            return (parent, None)
+        # The owner is an absorbed child and deliberately not first.
+        return (parent,) if top_level_only else (parent, *children)
+
+    def same(left, right):
+        if left is owner and right is owner and mode == "bad-owner-self":
+            return -1
+        if left is candidate and right is candidate and mode == "bad-candidate-self":
+            return 0
+        if left is owner and right is candidate:
+            if mode == "unknown-match":
+                return -1
+            if mode == "bool-match":
+                return True
+        return _native_same(left, right)
+
+    def bind(value, interface):
+        bindings.append((value, interface))
+        if isinstance(value, _NativeSketch):
+            assert interface == "ISketch", "a sketch is not an IFeature dispatch"
+        if isinstance(value, _NativeFeature):
+            assert interface == "IFeature"
+        return value
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureManager=SimpleNamespace(GetFeatures=features)),
+        swApp=SimpleNamespace(IsSame=same),
+    )
+    monkeypatch.setattr(part, "_early_bound", bind)
+    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
+    if mode in ("child-owner", "3d-owner"):
+        assert part._segment_identity(adapter, segment, stage="owner-control", role="selected") == ("ActualLocationProfile", 1, 1, 2)
+        assert calls == [False]
+        assert (feature, "IFeature") in bindings
+    else:
+        reason = {
+            "no-match": "no matching sketch feature",
+            "ambiguous": "ambiguous sketch features",
+            "unknown-match": "comparison unavailable",
+            "bool-match": "comparison unavailable",
+            "bad-owner-self": "owner identity positive control",
+            "bad-candidate-self": "inventory sketch identity positive control",
+            "null-specific": "sketch unavailable",
+            "null-inventory": "inventory unavailable",
+            "null-feature": "inventory contains null",
+            "bad-feature-type": "feature type unavailable",
+            "matrix-name": "invalid native segment owner feature name",
+            "readback-error": "specific sketch readback unavailable",
+        }[mode]
+        with pytest.raises(RuntimeError, match=reason):
+            part._segment_identity(adapter, segment, stage="owner-control", role="selected")
+    assert len(events) == 1
+    message, fields = events[0]
+    assert fields["operation_stage"] == "owner-control"
+    assert fields["identity_role"] == "selected"
+    assert fields["segment_type"] == 1 and fields["segment_ids"] == (1, 2)
+    assert "candidates=" in message and "owner_self=" in message
+    if mode == "ambiguous":
+        assert fields["owner_matches"] == ("ActualLocationProfile", "SecondClaimedOwner")
+    if mode == "no-match":
+        assert fields["owner_matches"] == ()
+
+
+def test_segment_owner_inventory_is_refreshed_after_rename_and_rebuild(monkeypatch) -> None:
+    segment = _native_sketch_segment(kind=1)
+    feature = _NativeFeature(segment.GetSketch())
+    features = [feature]
+    calls = []
+
+    def inventory(top_level_only):
+        calls.append(top_level_only)
+        return tuple(features)
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureManager=SimpleNamespace(GetFeatures=inventory)),
+        swApp=SimpleNamespace(IsSame=_native_same),
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    assert part._segment_identity(adapter, segment, stage="before-rebuild", role="expected")[0] == "ActualLocationProfile"
+    feature.Name = "RenamedProfile"
+    assert part._segment_identity(adapter, segment, stage="after-rename", role="expected")[0] == "RenamedProfile"
+    features.clear()
+    with pytest.raises(RuntimeError, match="no matching sketch feature"):
+        part._segment_identity(adapter, segment, stage="after-rebuild", role="expected")
+    assert calls == [False, False, False]
+
+
+@pytest.mark.parametrize("mode", ("retained", "wrong-point", "bad-point-self", "wrong-owner", "unavailable-readback"))
+def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode) -> None:
+    import _telemetry
+
+    point = object()
+    circle = _native_sketch_segment(kind=1)
+    attached_circle = _native_sketch_segment(owner="OtherProfile" if mode == "wrong-owner" else "ActualLocationProfile", kind=1)
+    attached_point = object() if mode == "wrong-point" else point
+
+    def entities():
+        if mode == "unavailable-readback":
+            raise RuntimeError("native attachment readback unavailable")
+        return attached_circle, attached_point
+
+    def same(left, right):
+        if mode == "bad-point-self" and left is point and right is point:
+            return -1
+        return _native_same(left, right)
+
+    annotation = SimpleNamespace(GetAttachedEntities3=entities, GetAttachedEntityTypes=lambda: (10, 11), IsDangling=lambda: False)
+    display = SimpleNamespace(GetAnnotation=lambda: annotation)
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureManager=_native_inventory(circle, attached_circle)),
+        swApp=SimpleNamespace(IsSame=same),
+    )
+    events = []
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
+    if mode == "retained":
+        part._assert_relative_attachment(adapter, display, point, circle, name="TapToBoreRim", stage="after-rebuild")
+    else:
+        with pytest.raises(RuntimeError, match="readback unavailable" if mode == "unavailable-readback" else "attachment identity differs"):
+            part._assert_relative_attachment(adapter, display, point, circle, name="TapToBoreRim", stage="after-rebuild")
+    message, fields = events[-1]
+    assert fields["operation_stage"] == "after-rebuild"
+    assert "point_self=" in message and "segment=" in message
+    if mode == "unavailable-readback":
+        assert "readback unavailable" in fields["attachment_readback_error"]
+    else:
+        assert fields["attachment_count"] == 2
+        assert fields["attached_types"] == (10, 11)
+        assert fields["expected_segment_identity"] == repr(("ActualLocationProfile", 1, 1, 2))
+    if mode == "wrong-owner":
+        assert fields["attached_segment_identity"] == repr(("OtherProfile", 1, 1, 2))
