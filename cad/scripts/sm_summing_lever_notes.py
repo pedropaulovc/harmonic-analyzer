@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from magnifying_bracket_joint_layout import (
     LINEAR_BAND,
+    RECEIVER_WALL_MIN,
     SCREW_THREAD,
     THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
     THREAD_CUTTING_ENVELOPE_DIA_MAX,
@@ -126,9 +127,9 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
-    # Boss length and counter-web thickness share Y0, not the asymmetric
-    # coefficient plate's midplane. View G carries both native dimensions.
-    "AnchorHeight": "CENTRED ON 5.08 WEB",
+    # Both locations start on real faces, not the asymmetric plate's midplane:
+    # View G measures boss top from coefficient top; the web shares that top.
+    "WebThickness": "TOP FACE FLUSH WITH\nCOEFFICIENT TOP",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
     "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
     # The plan's 152.4 is the body's end-face span, not the part's overall:
@@ -144,12 +145,13 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # 6.00 MAX bound so it cannot be mistaken for the deeper pilot's limit.
 # The cylinder is about each actual finished-hole axis, from its actual
 # entry. The builder saves this requirement on the SLDPRT; the drawing checks
-# its two native MAX dimensions before the native pilot/thread rows.
+# its two native MAX dimensions and wall MIN requirement before printing it.
 BRACKET_THREAD_CUTTING_REQUIREMENT = (
     "EXCEPT TAP-DRILL BORE AND POINT,\n"
     f"FINISHED CAVITY WITHIN Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X\n"
     f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP FROM ACTUAL ENTRY,\n"
     "ABOUT ACTUAL FINISHED-HOLE AXIS\n"
+    f"TO MAINTAIN {RECEIVER_WALL_MIN:.1f} MIN WALL\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
@@ -174,6 +176,10 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# Sheet 2 looks from +X/-Y/-Z: the existing pictorial shows the coefficient
+# backing from below and the receiver end, instead of repeating the top view.
+RECEIVER_ISOMETRIC_OCTANT = (1, -1, -1)
+RECEIVER_ISOMETRIC_VIEW_NOTE = "UNDERSIDE ISOMETRIC VIEW SCALE 1:4"
 # Sheet 2's view looks at the -Z end face (the bracket receiver): sheet 1's
 # plan carries a lettered viewing arrow onto that face, and the view is
 # named by the letter (machinist review r10 read "BACK VIEW" as looking from

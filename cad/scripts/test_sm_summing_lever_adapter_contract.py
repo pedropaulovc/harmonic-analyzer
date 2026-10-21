@@ -384,6 +384,51 @@ def _plane_face(height: float):
     return SimpleNamespace(GetSurface=lambda: surface)
 
 
+def _native_boss_face_graph():
+    levels = {
+        "SummationAnchor": (-spec.ANCHOR_H / 2.0, spec.ANCHOR_H / 2.0),
+        "SummationPlate": (-spec.COUNTER_WEB_T / 2.0, spec.COUNTER_WEB_T / 2.0),
+        "CoefficientsPlate": (spec.COEFFICIENT_BOTTOM_Y, spec.COEFFICIENT_TOP_Y),
+    }
+    features = {
+        name: _NativeFeature(faces=[_plane_face(level) for level in heights])
+        for name, heights in levels.items()
+    }
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureByName=features.get),
+    )
+    namespace = _source_helpers(("_assert_boss_face_graph",), ANCHOR_H=spec.ANCHOR_H)
+    return namespace["_assert_boss_face_graph"], adapter, features
+
+
+def test_extracted_boss_face_graph_uses_real_asymmetric_plate_and_flush_web_faces() -> None:
+    check, adapter, _features = _native_boss_face_graph()
+    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y
+    assert spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y == pytest.approx(6.985)
+    check(adapter)
+
+
+@pytest.mark.parametrize("owner", ["SummationAnchor", "SummationPlate", "CoefficientsPlate"])
+@pytest.mark.parametrize("side", [0, 1], ids=["lower", "upper"])
+@pytest.mark.parametrize("damage", ["missing_owner", "missing_face", "shift", "wrong_normal"])
+def test_extracted_boss_face_graph_rejects_wrong_native_faces(owner, side, damage) -> None:
+    check, adapter, features = _native_boss_face_graph()
+    feature = features[owner]
+    if damage == "missing_owner":
+        del features[owner]
+    elif damage == "missing_face":
+        feature.faces.pop(side)
+    else:
+        surface = feature.faces[side].GetSurface()
+        normal_x, normal_y, normal_z, x, y, z = surface.PlaneParams
+        if damage == "shift":
+            surface.PlaneParams = (normal_x, normal_y, normal_z, x, y + 0.001, z)
+        else:
+            surface.PlaneParams = (1.0, 0.0, 0.0, x, y, z)
+    with pytest.raises(RuntimeError):
+        check(adapter)
+
+
 def _native_slab_fixture():
     features = {
         "PlateProfile": _NativeFeature([
@@ -970,7 +1015,7 @@ def test_extracted_hidden_envelope_reference_emits_independent_construction_requ
         anchors.append((entity, x, y))
 
     async def fully_defined(adapter, label):
-        assert len(anchors) == 2
+        assert len(anchors) == 3
 
     class Dims:
         def record(self, name, expression):
@@ -999,50 +1044,70 @@ def test_extracted_hidden_envelope_reference_emits_independent_construction_requ
     assert list(recorder.primitives.values()) == [
         ("line", (x - 1.2, -z, x + 1.2, -z)),
         ("line", (x, -z, x, -z - 6.0)),
+        ("line", (x + 1.2, -z - 6.0, x + 1.2 + joint.RECEIVER_WALL_MIN, -z - 6.0)),
     ]
-    assert construction == ["line0", "line1"]
-    assert recorder.constraints == [("line0", None, "horizontal"), ("line1", None, "vertical")]
-    assert anchors == [("line0.start", x - 1.2, -z), ("line1.start", x, -z)]
+    assert construction == ["line0", "line1", "line2"]
+    assert recorder.constraints == [
+        ("line0", None, "horizontal"), ("line1", None, "vertical"),
+        ("line2", None, "horizontal"),
+    ]
+    assert anchors == [
+        ("line0.start", x - 1.2, -z), ("line1.start", x, -z),
+        ("line2.start", x + 1.2, -z - 6.0),
+    ]
     assert recorder.dimensions == [
         ("line0.start", "line0.end", "horizontal_distance", 2.4),
         ("line1.start", "line1.end", "vertical_distance", 6.0),
+        ("line2.start", "line2.end", "horizontal_distance", joint.RECEIVER_WALL_MIN),
     ]
     assert jobs == [
         ("BracketThreadCuttingEnvelopeDiameter@BracketThreadCuttingEnvelope", '"ThreadCuttingEnvelopeDiameter"'),
         ("BracketThreadCuttingEnvelopeDepth@BracketThreadCuttingEnvelope", '"ThreadCuttingEnvelopeDepth"'),
+        ("BracketReceiverWallMinimum@BracketThreadCuttingEnvelope", '"ReceiverWallMinimum"'),
     ]
     assert hidden == [
         ("name", "BracketThreadCuttingEnvelope"), ("blank", ("BracketThreadCuttingEnvelope",)),
     ]
 
 
+@pytest.mark.parametrize("target", [
+    "BracketThreadCuttingEnvelopeDiameter", "BracketThreadCuttingEnvelopeDepth",
+    "BracketReceiverWallMinimum",
+])
 @pytest.mark.parametrize("failure", [None, "nominal", "refused", "type", "minimum", "maximum"])
-def test_extracted_envelope_max_metadata_authors_and_reads_back_real_limits(failure) -> None:
+def test_extracted_envelope_native_limits_author_and_read_back_max_and_min(target, failure) -> None:
+    import magnifying_bracket_joint_layout as joint
+
     dimensions = {}
     precision = []
 
     class Tolerance:
         Type = 0
 
+        def __init__(self, name):
+            self.failure = failure if name == target else None
+
         def SetValues(self, minimum, maximum):
             self.minimum, self.maximum = minimum, maximum
-            if failure == "type":
+            if self.failure == "type":
                 self.Type = 2
-            return failure != "refused"
+            return self.failure != "refused"
 
         def GetMinValue(self):
-            return 0.0 if failure == "minimum" else self.minimum
+            return self.minimum + 0.001 if self.failure == "minimum" else self.minimum
 
         def GetMaxValue(self):
-            return 0.001 if failure == "maximum" else self.maximum
+            return 0.001 if self.failure == "maximum" else self.maximum
 
-    for name, maximum in (
-        ("BracketThreadCuttingEnvelopeDiameter", 2.4),
-        ("BracketThreadCuttingEnvelopeDepth", 6.0),
-    ):
+    expected = {
+        "BracketThreadCuttingEnvelopeDiameter": (joint.THREAD_CUTTING_ENVELOPE_DIA_MAX, 6, 2),
+        "BracketThreadCuttingEnvelopeDepth": (joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX, 6, 2),
+        "BracketReceiverWallMinimum": (joint.RECEIVER_WALL_MIN, 5, 1),
+    }
+    for name, (nominal, _kind, _places) in expected.items():
         dimensions[name] = SimpleNamespace(
-            SystemValue=(maximum + (0.1 if failure == "nominal" else 0.0)) / 1000.0,
-            Tolerance=Tolerance(),
+            SystemValue=(nominal + (0.1 if failure == "nominal" and name == target else 0.0)) / 1000.0,
+            Tolerance=Tolerance(name),
         )
     namespace = _source_helpers(
         ("_thread_cutting_envelope_max_limits",),
@@ -1050,15 +1115,16 @@ def test_extracted_envelope_max_metadata_authors_and_reads_back_real_limits(fail
         set_dimension_display_precision=lambda adapter, owner, name, places: precision.append((owner, name, places)),
     )
     if failure:
-        with pytest.raises(RuntimeError, match="removal-envelope"):
+        with pytest.raises(RuntimeError):
             namespace["_thread_cutting_envelope_max_limits"](object())
         return
     namespace["_thread_cutting_envelope_max_limits"](object())
     for name, dimension in dimensions.items():
-        assert dimension.Tolerance.Type == 6  # SDK swTolMAX, not swTolBILAT.
-        assert dimension.Tolerance.GetMinValue() == -dimension.SystemValue
+        _nominal, kind, places = expected[name]
+        assert dimension.Tolerance.Type == kind
+        assert dimension.Tolerance.GetMinValue() == (-dimension.SystemValue if kind == 6 else 0.0)
         assert dimension.Tolerance.GetMaxValue() == 0.0
-        assert ("BracketThreadCuttingEnvelope", name, 2) in precision
+        assert ("BracketThreadCuttingEnvelope", name, places) in precision
 
 
 @pytest.mark.parametrize("invalid", [(0.0, 0.0, 0.0), (math.nan, 0.0, 0.0, 0.0, 0.0)])

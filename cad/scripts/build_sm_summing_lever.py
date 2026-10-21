@@ -73,6 +73,7 @@ from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
+from _named_views import name_octant_views
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import IN
@@ -99,6 +100,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_POINT_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     THREAD_DEPTH_BAND,
+    RECEIVER_WALL_MIN,
     THREAD_CUTTING_ENVELOPE_DIA_MAX,
     THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
     RIB_DEPTH as RECEIVER_RIB_T,
@@ -130,6 +132,8 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    RECEIVER_ISOMETRIC_OCTANT,
+    RECEIVER_ISOMETRIC_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
@@ -319,6 +323,40 @@ def _assert_coefficient_slab(adapter) -> None:
     _telemetry.success(
         f"uniform coefficient slab: native Y{COEFFICIENT_BOTTOM_Y}..{COEFFICIENT_TOP_Y}, "
         f"thickness {COEFFICIENT_T}"
+    )
+
+
+def _assert_boss_face_graph(adapter) -> None:
+    """Real Y faces tie the boss and counterweb to the coefficient top.
+
+    The plate is not symmetric about Y0. Its actual top is the common web
+    top; the boss top stands ANCHOR_H/2 above Y0, not above the plate centre.
+    This proves the flush caption without inventing a midplane datum.
+    """
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    for owner, expected in (
+        ("SummationAnchor", (-ANCHOR_H / 2.0, ANCHOR_H / 2.0)),
+        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y)),
+        ("CoefficientsPlate", (COEFFICIENT_BOTTOM_Y, COEFFICIENT_TOP_Y)),
+    ):
+        raw_feature = model.FeatureByName(owner)
+        if raw_feature is None:
+            raise RuntimeError(f"{owner}: missing native face-graph owner")
+        heights = []
+        for raw in _early_bound(raw_feature, "IFeature").GetFaces() or ():
+            surface = _early_bound(_early_bound(raw, "IFace2").GetSurface(), "ISurface")
+            if surface.IsPlane():
+                values = tuple(float(value) for value in surface.PlaneParams)
+                if abs(abs(values[1]) - 1.0) < 1e-8:
+                    heights.append(values[4] * 1000.0)
+        if not all(
+            any(math.isclose(actual, level, abs_tol=1e-5) for actual in heights)
+            for level in expected
+        ):
+            raise RuntimeError(f"{owner}: native Y faces {heights} do not contain {expected}")
+    _telemetry.success(
+        "boss face graph: boss top above coefficient top by "
+        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; counterweb top flush"
     )
 
 
@@ -1840,12 +1878,13 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
 async def _bracket_thread_cutting_envelope_reference(
     adapter, drive_jobs: list[tuple[str, str]]
 ) -> None:
-    """Hidden construction dimensions own the manufacturing removal limits.
+    """Hidden construction dimensions own removal limits and the wall target.
 
-    This is requirement PMI, never a cylindrical cut or a claim that native
-    cosmetic threads model actual removal. Top-plane sketch Y is minus model
-    Z. The first nominal hole locates the reference; the requirement applies
-    independently about each actual finished-hole axis/from its actual entry.
+    This is requirement PMI, never a cylindrical cut, an actual-wall
+    measurement or qualification of a physical tap. Top-plane sketch Y is
+    minus model Z. The first nominal hole locates the envelope reference;
+    the requirement applies about each actual finished-hole axis/from its
+    actual entry. The separate wall dimension owns the functional minimum.
     """
     reference = SketchDims()
     check("create thread-cutting envelope reference", await adapter.create_sketch("Top"))
@@ -1861,8 +1900,13 @@ async def _bracket_thread_cutting_envelope_reference(
         "thread-cutting envelope depth reference",
         await adapter.add_line(x, entry, x, entry - THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
     )
+    wall_start = (x + radius, entry - THREAD_CUTTING_ENVELOPE_DEPTH_MAX)
+    wall = check(
+        "receiver wall minimum reference",
+        await adapter.add_line(*wall_start, wall_start[0] + RECEIVER_WALL_MIN, wall_start[1]),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (diameter, depth):
+    for entity in (diameter, depth, wall):
         _as_construction(adapter, entity)
     check(
         "thread-cutting envelope diameter horizontal",
@@ -1892,6 +1936,20 @@ async def _bracket_thread_cutting_envelope_reference(
     )
     reference.record("ThreadEnvelopeDepthX", None)
     reference.record("ThreadEnvelopeDepthZ", None)
+    check(
+        "receiver wall requirement horizontal",
+        await adapter.add_sketch_constraint(wall, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter, f"{wall}.start", f"{wall}.end", "horizontal_distance",
+        RECEIVER_WALL_MIN, "receiver wall minimum",
+    )
+    reference.record("BracketReceiverWallMinimum", '"ReceiverWallMinimum"')
+    await anchor_point_to_origin(
+        adapter, f"{wall}.start", *wall_start, "receiver wall requirement start"
+    )
+    reference.record("ReceiverWallRequirementX", None)
+    reference.record("ReceiverWallRequirementZ", None)
     await ensure_fully_defined(adapter, "thread-cutting envelope reference sketch")
     check("exit thread-cutting envelope reference", await adapter.exit_sketch())
     name_last_feature(adapter, "BracketThreadCuttingEnvelope")
@@ -1900,26 +1958,28 @@ async def _bracket_thread_cutting_envelope_reference(
 
 
 def _thread_cutting_envelope_max_limits(adapter) -> None:
-    """Native MAX-only requirement dimensions, not title-block ordinary bands."""
+    """Native MAX cavity bounds and MIN wall requirement, never ordinary bands."""
     feature = "BracketThreadCuttingEnvelope"
-    for name, maximum in (
-        ("BracketThreadCuttingEnvelopeDiameter", THREAD_CUTTING_ENVELOPE_DIA_MAX),
-        ("BracketThreadCuttingEnvelopeDepth", THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
+    for name, nominal, kind, precision in (
+        ("BracketThreadCuttingEnvelopeDiameter", THREAD_CUTTING_ENVELOPE_DIA_MAX, 6, 2),
+        ("BracketThreadCuttingEnvelopeDepth", THREAD_CUTTING_ENVELOPE_DEPTH_MAX, 6, 2),
+        ("BracketReceiverWallMinimum", RECEIVER_WALL_MIN, 5, 1),
     ):
         _, dimension = _named_dimension(adapter, feature, name)
-        if not math.isclose(float(dimension.SystemValue) * 1000.0, maximum, abs_tol=1e-6):
-            raise RuntimeError(f"{name}@{feature}: native removal-envelope limit changed")
+        if not math.isclose(float(dimension.SystemValue) * 1000.0, nominal, abs_tol=1e-6):
+            raise RuntimeError(f"{name}@{feature}: native manufacturing requirement changed")
+        lower = -nominal / 1000.0 if kind == 6 else 0.0
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = 6  # swTolType_e.swTolMAX
-        if not tolerance.SetValues(-maximum / 1000.0, 0.0):
-            raise RuntimeError(f"{name}@{feature}: removal-envelope MAX limits refused")
+        tolerance.Type = kind  # swTolMAX=6, swTolMIN=5
+        if not tolerance.SetValues(lower, 0.0):
+            raise RuntimeError(f"{name}@{feature}: manufacturing requirement limit refused")
         if (
-            int(tolerance.Type) != 6
-            or not math.isclose(float(tolerance.GetMinValue()), -maximum / 1000.0, abs_tol=1e-12)
+            int(tolerance.Type) != kind
+            or not math.isclose(float(tolerance.GetMinValue()), lower, abs_tol=1e-12)
             or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
         ):
-            raise RuntimeError(f"{name}@{feature}: removal-envelope MAX limits did not persist")
-        set_dimension_display_precision(adapter, feature, name, 2)
+            raise RuntimeError(f"{name}@{feature}: manufacturing requirement limit did not persist")
+        set_dimension_display_precision(adapter, feature, name, precision)
 
 
 def _hex_width_reference(adapter) -> None:
@@ -2131,6 +2191,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "ThreadCuttingEnvelopeDiameter", f"{THREAD_CUTTING_ENVELOPE_DIA_MAX}mm")
     await set_global(adapter, "ThreadCuttingEnvelopeDepth", f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX}mm")
+    await set_global(adapter, "ReceiverWallMinimum", f"{RECEIVER_WALL_MIN}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
@@ -2189,6 +2250,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _assert_knife_sides_coplanar(adapter)
     _assert_coefficient_slab(adapter)
+    _assert_boss_face_graph(adapter)
     for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib"):
         _assert_native_rib_profile(adapter, stem)
 
@@ -2229,6 +2291,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Receiver Isometric View Note": RECEIVER_ISOMETRIC_VIEW_NOTE,
             "Bracket Thread-Cutting Requirement": BRACKET_THREAD_CUTTING_REQUIREMENT,
         },
     )
@@ -2240,6 +2303,11 @@ async def build(adapter) -> dict[str, str]:
     _assert_edge_rib_end_planes(adapter)
     for name, picks, _ in rib_root_edge_families():
         _assert_root_feature_bounds(adapter, name, len(picks))
+    name_octant_views(
+        adapter,
+        octants={"REAR-BOTTOM-RIGHT": RECEIVER_ISOMETRIC_OCTANT},
+        label=PART_NAME,
+    )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -2251,6 +2319,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
             "Bracket Thread-Cutting Requirement",
         ),
     )

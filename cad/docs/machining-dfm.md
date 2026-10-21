@@ -389,7 +389,7 @@ envelope radius**, not a basic external screw radius. Together these bounds
 guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
 step wall** remains controlling at the approved geometry.
 
-The callout states the finished-cavity bound, not a global wall minimum.
+The callout connects the finished-cavity bound to maintaining **2.0 MIN WALL**.
 The **1.29 mm** radial separation to the extended top-face plane
 is not the finite sharp-step distance above, nor is it a claim that every
 surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
@@ -398,9 +398,15 @@ required thread-cutting bound.
 
 The hidden `BracketThreadCuttingEnvelope` construction sketch owns the two
 MAX-only native dimensions `BracketThreadCuttingEnvelopeDiameter` and
-`BracketThreadCuttingEnvelopeDepth`, with two-place display. They share joint
-authority with the model-owned **Bracket Thread-Cutting Requirement** drawing
-property; the drawing validates their native limits before consuming it.
+`BracketThreadCuttingEnvelopeDepth`, with two-place display, and the one-place
+`BracketReceiverWallMinimum` **2.0 MIN** requirement driven by the
+`ReceiverWallMinimum` global from `RECEIVER_WALL_MIN`. The MAX dimensions
+retain `swTolMAX=6` and deviations −nominal/0; the MIN dimension uses
+`swTolMIN=5` with zero stored deviations.
+All three share joint authority with the model-owned **Bracket Thread-Cutting
+Requirement** drawing property; the drawing validates native ownership,
+values, limits and precision before consuming it. This is a wall-function
+requirement, not a measured physical tap qualification.
 Feature enumeration yields raw COM dispatches, so each display dimension is
 bound through `_bind` before reading its dimension and tolerance interfaces.
 The sketch is not cut into the solid and stays hidden in part images.
@@ -427,12 +433,15 @@ underside seats** are unchanged, as are all #1769 mounting/joint installation
 coordinates. World spring top remains **982.24 mm** and nut seat **975.24 mm**.
 The full-width lower face eliminates the integral underside pad and its step.
 
-View G locates the boss's axial ends through the **CENTRED ON 5.08 WEB**
-caption attached to its native **19.05** length dimension. The boss and
-counter web share Y=0; this does not centre either feature on the asymmetric
-7.00 coefficient plate.
-The combined length/caption text sits left of View G, clear of the boss and
-web outlines; R14's original text position overlapped those outlines.
+View G locates the boss's upper axial face at **Y=+9.525 mm** relative to the
+coefficient top at **Y=+2.54 mm**: the actual-edge native vertical dimension
+measures **6.985 mm**, printed **6.99** under the ordinary `.XX` band. Its
+attachments are the boss upper rim and the actual +Z coefficient-top edge,
+with projected +Y checked before annotation and attachment/value rechecked
+after settling. The separate **19.05 mm** boss length and **5.08 mm** counter
+web thickness remain; the web top is flush with the coefficient top.
+The boss and counter web still share Y=0, and neither is located from the
+asymmetric 7.00 coefficient plate's midplane.
 
 The receiver's new Z span already overlaps the first spring station; the
 source-neighbour intent is **X reach 35.75 mm before the worst nut footprint
@@ -521,8 +530,10 @@ The drawing retains **6 views**, reduced from 9 by removing C-C and H-H and
 combining knife detail D and ridge detail E into **D at 10:1**, with the
 knife dimensions, ridge **R0.1 MAX** and datum A together. The rib-side/profile
 R1 ceiling comes from the title block, not a redundant local VIEW G callout.
-The six views are the sheet-1 top/plan view, VIEW G, sheet-1 isometric,
-sheet-2 VIEW F, Detail D, and sheet-2 isometric; there are no sections.
+The six views are the sheet-1 top/plan view, VIEW G, sheet-1 standard isometric,
+sheet-2 VIEW F, Detail D, and the existing sheet-2 isometric reoriented to
+underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**. This exposes the receiver
+underside without adding a seventh view; there are no sections.
 `PlateThickness@PlateProfile` remains model-owned at **7.00 mm** under the
 ordinary two-place band. Changes to wording or annotations still require
 fresh native acceptance.

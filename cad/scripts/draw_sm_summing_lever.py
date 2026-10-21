@@ -13,7 +13,7 @@ anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
-view, and the repeated shaded isometric. VIEW F carries the blind bracket
+view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
 the receiver row's centreline through the hex centre.
 The ordinary views and native receiver drill/thread-depth callout retain
@@ -74,6 +74,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -84,6 +85,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH_DEVIATIONS,
     LEVER_HOLE_POINTS,
     TAP_DRILL_DIA,
+    RECEIVER_WALL_MIN,
     THREAD_DEPTH,
     THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
     THREAD_CUTTING_ENVELOPE_DIA_MAX,
@@ -98,6 +100,7 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
     SPRING_TAP_CALLOUT_PROCESS,
+    RECEIVER_ISOMETRIC_OCTANT,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
@@ -107,6 +110,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
     COUNTER_HOLE_SPEC,
+    COUNTER_WEB_T,
     DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
@@ -123,6 +127,7 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_W,
+    RIB_REACH,
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
@@ -226,6 +231,90 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
             f"{[item.line for item in matches]}"
         )
     return matches[0]
+
+
+def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
+    """Locate the boss from two actual Y faces, not the plate midplane.
+
+    The +Y boss rim is edge-on in VIEW G; its native circle still identifies
+    the real end face Y=ANCHOR_H/2. The other pick is the coefficient top's
+    straight +Z end edge, beyond the rib reach, at Y=COEFFICIENT_TOP_Y.
+    The builder independently proves the counterweb's actual top is flush
+    with that plate top. Together with the imported boss height and web
+    thickness, this closes the face graph without a construction datum.
+    """
+    label = "boss upper face above coefficient top"
+    edges = scan_view_edges(front, label="VIEW G face locations")
+    boss = edges.circle_at(
+        (TIP_X, ANCHOR_H / 2.0, 0.0), ANCHOR_R,
+        axis=(0.0, 1.0, 0.0), label="boss upper-face rim",
+    )
+    plate_point = (
+        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0,
+    )
+    plate = edges.exact_line_through(plate_point, label="coefficient top end edge")
+    points_mm = (
+        (TIP_X, ANCHOR_H / 2.0, ANCHOR_R),
+        plate_point,
+    )
+    expected_mm = ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y
+    if expected_mm <= 0.0 or not math.isclose(
+        COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y, abs_tol=1e-9,
+    ):
+        raise RuntimeError(f"{label}: source face graph is not upper/flush")
+
+    def project_faces() -> list[tuple[float, float]]:
+        points = model_points_in_view(
+            adapter, front,
+            [tuple(value / 1000.0 for value in point) for point in points_mm],
+            label=label,
+        )
+        scale = tuple(_early_bound(front, "IView").ScaleRatio)
+        if len(scale) != 2 or any(
+            type(value) not in (int, float) or not math.isfinite(value) or value <= 0.0
+            for value in scale
+        ):
+            raise RuntimeError(f"{label}: invalid native view scale {scale!r}")
+        projected_rise = points[0][1] - points[1][1]
+        if not math.isclose(
+            projected_rise, expected_mm / 1000.0 * scale[0] / scale[1],
+            rel_tol=0.0, abs_tol=1e-8,
+        ):
+            raise RuntimeError(
+                f"{label}: VIEW G does not project the actual boss top above the plate top"
+            )
+        return points
+
+    boss_xy, plate_xy = project_faces()
+    dimension = add_edge_dimension(
+        adapter, front, p0=boss_xy, p1=plate_xy,
+        text_xy=BOSS_FACE_LOCATION_XY, label=label, orientation="vertical",
+        entities=(boss.edge, plate.edge),
+    )
+
+    def check_faces() -> None:
+        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+            raise RuntimeError(f"{label}: cannot activate its native owner sheet")
+        project_faces()
+        measured = assert_dimension_measures(
+            adapter, dimension, expected_mm=expected_mm, label=label,
+            entities=(boss.edge, plate.edge),
+        )
+        display = _early_bound(dimension, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+        places = display.GetPrimaryPrecision2()
+        if places == -2:  # swPrecisionFollowsDocumentSetting
+            extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+            # Same linear-document precision readback as draw_ch_pivot_bracket.
+            places = extension.GetUserPreferenceInteger(24, 206)
+        if places != 2 or tolerance.Type != 0:  # ordinary .XX, no explicit band
+            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
+        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XX")
+
+    check_faces()
+    return check_faces
 
 
 def _knife_detail(adapter: Any, back: Any) -> Any:
@@ -1404,13 +1493,17 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
 
 
 # VIEW G carries the shared positive rib profile and its derived reach.
-# The title block owns the R1 MAX ceiling; the counter web stays independently sized.
+# The title block owns the R1 MAX ceiling. The web's flush caption stands
+# entirely above the boss's upper witness; 19.05 has no centering caption.
 FRONT_KEEP = {
     "AnchorHeight": (0.145, 0.235),
-    "WebThickness": (0.215, 0.247),
+    "WebThickness": (0.168, 0.258),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),
 }
+# The native 6.985 mm face span uses the ordinary document .XX precision:
+# its text is above the profile and right of RibReach's complete callout.
+BOSS_FACE_LOCATION_XY = (0.284, 0.250)
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout
 # outside its own model-side span. Back reverses X: RidgeFromLeft prints
@@ -1490,9 +1583,9 @@ BACK_KEEP = {
     "ReceiverX1": (BACK_CENTER[0] - 0.095, BACK_CENTER[1] + 0.0245),
     "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
-# R8's complete four-row receiver block measured about 110 x 47 mm including
-# its leader at (360,115). Reserve two additional rows for the finished-cavity
-# bound and up-front pilot exception. Fresh native ink must still be checked.
+# The receiver block keeps its full cavity bounds and explicit pilot exception.
+# Five qualifier rows, at the established width, include the wall function;
+# the native drill/thread rows stay independent. Fresh ink still needs review.
 MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
 # Keep the caption below the complete receiver callout; native regeneration
 # must check its clearance after any wording change.
@@ -1533,11 +1626,11 @@ FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 
 
 def _bracket_thread_cutting_requirement(source_model: Any) -> str:
-    """Admit the saved source requirement only with its native bounded envelope.
+    """Admit the saved requirement only with native cavity bounds and wall MIN.
 
-    The hidden reference sketch describes a finished-hole acceptance limit,
-    not a solid cut or qualification of any particular tap. Read both owned
-    dimensions and MAX limits; a matching string cannot prove the contract.
+    The hidden sketch owns acceptance requirements, not a solid cut, an actual
+    wall measurement or qualification of a physical tap. Verify all three
+    model-owned dimensions and limit types; a matching string is insufficient.
     """
     property_name = "Bracket Thread-Cutting Requirement"
     properties = read_required_properties(
@@ -1553,8 +1646,9 @@ def _bracket_thread_cutting_requirement(source_model: Any) -> str:
         raise RuntimeError("bracket thread-cutting requirement has no native envelope owner")
     feature = _early_bound(raw_feature, "IFeature")
     expected = {
-        "BracketThreadCuttingEnvelopeDiameter": THREAD_CUTTING_ENVELOPE_DIA_MAX,
-        "BracketThreadCuttingEnvelopeDepth": THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
+        "BracketThreadCuttingEnvelopeDiameter": (THREAD_CUTTING_ENVELOPE_DIA_MAX, 6, 2),
+        "BracketThreadCuttingEnvelopeDepth": (THREAD_CUTTING_ENVELOPE_DEPTH_MAX, 6, 2),
+        "BracketReceiverWallMinimum": (RECEIVER_WALL_MIN, 5, 1),
     }
     found = []
     for raw_display in _feature_display_dimensions(feature):
@@ -1571,22 +1665,24 @@ def _bracket_thread_cutting_requirement(source_model: Any) -> str:
             continue
         raw_tolerance = dimension.Tolerance
         if raw_tolerance is None:
-            raise RuntimeError(f"{name}: missing native MAX limit")
+            raise RuntimeError(f"{name}: missing native manufacturing requirement limit")
         tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
-        nominal_m = expected[name] / 1000.0
+        nominal, kind, precision = expected[name]
+        nominal_m = nominal / 1000.0
+        lower_limit = -nominal_m if kind == 6 else 0.0
         value = dimension.SystemValue
         lower, upper = tolerance.GetMinValue(), tolerance.GetMaxValue()
         if (
             full_name.split("@")[:2] != [name, feature_name]
-            or type(tolerance.Type) is not int or tolerance.Type != 6  # swTolMAX
+            or type(tolerance.Type) is not int or tolerance.Type != kind
             or any(type(item) not in (int, float) or not math.isfinite(item)
                    for item in (value, lower, upper))
             or not math.isclose(value, nominal_m, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
-            or not math.isclose(lower, -nominal_m, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
+            or not math.isclose(lower, lower_limit, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
             or not math.isclose(upper, 0.0, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M)
-            or display.GetPrimaryPrecision2() != 2
+            or display.GetPrimaryPrecision2() != precision
         ):
-            raise RuntimeError(f"{name}: lost native owner, two-place value or MAX envelope limit")
+            raise RuntimeError(f"{name}: lost native owner, precision or manufacturing requirement limit")
         found.append(name)
     if sorted(found) != sorted(expected):
         raise RuntimeError(f"bracket thread-cutting envelope dimensions missing or duplicated: {found}")
@@ -1671,6 +1767,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
         ),
         required=(
             "Number",
@@ -1680,6 +1777,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1738,6 +1836,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_callouts(
         adapter, [*front_annotations, *top_annotations], label="lever geometry",
     )
+    check_boss_faces = _boss_face_location_check(adapter, front)
     _clear_plate_width_witnesses(adapter, top, top_annotations)
     # The boss's Ø19.05 takes one arrow on its near rim, no line through the
     # centre: there it crossed the anchor tap callout's leader, which runs
@@ -2071,7 +2170,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate bracket receiver sheet")
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
     receiver_iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
+        adapter, str(SOURCE), octant_view_name(*RECEIVER_ISOMETRIC_OCTANT),
+        *ISO_CENTER, scale=(1, 4),
     )
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
@@ -2122,9 +2222,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _receiver_axis_centerline(adapter, back)
     # Keep the removed-view identity below the actual end profile.
     add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
-    # The repeated isometric's label, where sheet 1 puts its own (machinist
-    # review r12: unlabelled on this sheet).
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
+    # The existing sheet-2 pictorial now shows the continuous backing from
+    # below, through the part's persisted and natively read-back octant view.
+    add_property_linked_note(adapter, "Receiver Isometric View Note", 0.322, 0.205)
     check_thread_annotations = _finished_thread_annotation_check(
         adapter,
         (
@@ -2165,6 +2265,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             check_thread_annotations, check_plate_thickness, check_dimension_ownership,
             check_bracket_thread_cutting_requirement,
+            check_boss_faces,
         ),
     )
 

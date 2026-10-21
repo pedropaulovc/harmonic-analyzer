@@ -561,8 +561,13 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   the **1.20 mm** required radius. These bounds guarantee walls for a
   **conforming process**, rather than assuming a maximum internal root from
   external screw size or treating native full-thread metadata as cutting reach.
-  Hidden construction dimensions own the two native MAX limits, and the
-  **Bracket Thread-Cutting Requirement** property supplies the drawing text.
+  Hidden construction dimensions own the two native MAX limits and the
+  **2.0 MIN** `BracketReceiverWallMinimum` requirement (global
+  `ReceiverWallMinimum` from `RECEIVER_WALL_MIN`),
+  with native `swTolMIN=5`, zero stored deviations and one-place precision.
+  The **Bracket Thread-Cutting Requirement** property ties the cavity bound
+  to this wall function; drawing admission reads all three owned native
+  limits, not just the property text. This does not qualify a physical tap.
   Printed **4.95 MIN** usable full thread leaves **1.05 mm** within the
   envelope for all remaining axial removal; a two-pitch design allowance
   consumes **0.907143 mm**, leaving **0.142857 mm**, or **0.092857 mm** after
@@ -615,6 +620,12 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
   boss-through trim and top jam nut; neither counter anchor nor boss pose
   changes. Existing upper lever holes are retained, with no upper pins.
+  View G's actual-edge boss-top/coefficient-top location is
+  **9.525−2.54 = 6.985 mm**, printed **6.99** under the ordinary `.XX` band.
+  The **19.05 mm** boss and **5.08 mm** web remain centered on Y=0; the web
+  top is flush with the coefficient top. Neither feature is referenced to
+  the asymmetric slab midplane. The existing sheet-2 isometric shows the
+  underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**, keeping six views.
   The gooseneck head remains Ø12 mm to retain the counter's double loop.
   Option A's historical source-union estimate at the prior **8.20 mm** receiver
   depth is **+6.769 cm³**, approximately **49–53 g**,

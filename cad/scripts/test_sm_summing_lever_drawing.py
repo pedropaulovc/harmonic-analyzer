@@ -143,6 +143,138 @@ def test_pitch_proof_rejects_an_equal_pitch_between_other_holes(identity) -> Non
         )
 
 
+def _native_boss_face_location(monkeypatch, identity):
+    spec = sm_summing_lever_spec
+    upper = ViewEdge(
+        object(), None,
+        (spec.TIP_X, spec.ANCHOR_H / 2.0, 0.0, 0.0, 1.0, 0.0, spec.ANCHOR_R),
+        None,
+    )
+    lower = ViewEdge(
+        object(), None,
+        (spec.TIP_X, -spec.ANCHOR_H / 2.0, 0.0, 0.0, 1.0, 0.0, spec.ANCHOR_R),
+        None,
+    )
+    wrong_axis = ViewEdge(
+        object(), None,
+        (spec.TIP_X, spec.ANCHOR_H / 2.0, 0.0, 0.0, 0.0, 1.0, spec.ANCHOR_R),
+        None,
+    )
+    plate = _line(
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
+    )
+    inboard = _line(
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
+    )
+    state = SimpleNamespace(
+        edges=[lower, wrong_axis, inboard, plate, upper],
+        attached=(upper.edge, plate.edge), value=(spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
+        sign=1.0, projection_factor=1.0, precision=2, document_precision=2,
+        tolerance=SimpleNamespace(Type=0), activate=True, sheets=[], picks=[], projections=[],
+    )
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: state.attached,
+        GetAttachedEntityTypes=lambda: (1, 1), IsDangling=lambda: False,
+    )
+
+    class NativeDimension:
+        SystemValue = property(lambda self: state.value)
+        Tolerance = property(lambda self: state.tolerance)
+
+    dimension = NativeDimension()
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
+        GetPrimaryPrecision2=lambda: state.precision,
+    )
+
+    def activate(sheet):
+        state.sheets.append(sheet)
+        return state.activate
+
+    def preference(preference, option):
+        assert (preference, option) == (24, 206)
+        return state.document_precision
+
+    identity.currentModel = SimpleNamespace(
+        ActivateSheet=activate,
+        Extension=SimpleNamespace(GetUserPreferenceInteger=preference),
+    )
+    front = SimpleNamespace(ScaleRatio=(1.0, 2.0))
+
+    def project(adapter, view, points, **_kwargs):
+        assert adapter is identity and view is front
+        state.projections.append(points)
+        return [
+            (0.2 + x / 2.0, 0.1 + state.sign * y * state.projection_factor / 2.0)
+            for x, y, _z in points
+        ]
+
+    def add(adapter, view, **kwargs):
+        assert adapter is identity and view is front
+        state.picks.append(kwargs)
+        return display
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        drawing, "scan_view_edges",
+        lambda _view, **_kwargs: ViewEdges(label="front", edges=tuple(state.edges)),
+    )
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    return SimpleNamespace(
+        capture=lambda: drawing._boss_face_location_check(identity, front),
+        state=state, upper=upper, plate=plate, front=front,
+    )
+
+
+@pytest.mark.parametrize("missing", ["upper", "plate"])
+def test_boss_face_location_refuses_nearby_but_wrong_actual_edges(monkeypatch, identity, missing):
+    case = _native_boss_face_location(monkeypatch, identity)
+    case.state.edges.remove(getattr(case, missing))
+    with pytest.raises(RuntimeError):
+        case.capture()
+    assert not case.state.picks
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize(
+    "damage", ["sign", "scale", "association", "value", "precision", "tolerance", "sheet"],
+)
+def test_boss_face_location_rechecks_native_authority(monkeypatch, identity, settled, damage):
+    case = _native_boss_face_location(monkeypatch, identity)
+    check = case.capture() if settled else case.capture
+    if damage == "sign":
+        case.state.sign = -1.0
+    elif damage == "scale":
+        case.state.projection_factor = 2.0
+    elif damage == "association":
+        case.state.attached = (case.upper.edge, object())
+    elif damage == "value":
+        case.state.value += 0.0001
+    elif damage == "precision":
+        case.state.precision = 1
+    elif damage == "tolerance":
+        case.state.tolerance.Type = 2
+    else:
+        case.state.activate = False
+    with pytest.raises(RuntimeError):
+        check()
+
+
+@pytest.mark.parametrize("places", [1, 2, 3])
+def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch, identity, places):
+    case = _native_boss_face_location(monkeypatch, identity)
+    case.state.precision = -2
+    case.state.document_precision = places
+    if places == 2:
+        case.capture()()
+    else:
+        with pytest.raises(RuntimeError):
+            case.capture()
+
+
 def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() -> None:
     import build_sm_summing_lever as part
     import magnifying_bracket_joint_layout as joint
@@ -1295,25 +1427,28 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
 
 
 def _native_thread_cutting_envelope(monkeypatch):
-    """Exercise source property + native MAX identity, not renderer string wiring."""
+    """Exercise source property + native MAX/MIN identity, not renderer wiring."""
     import magnifying_bracket_joint_layout as joint
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     properties = {"Bracket Thread-Cutting Requirement": notes.BRACKET_THREAD_CUTTING_REQUIREMENT}
     dimensions = {}
     displays = []
-    for name, value_mm in (
-        ("BracketThreadCuttingEnvelopeDiameter", joint.THREAD_CUTTING_ENVELOPE_DIA_MAX),
-        ("BracketThreadCuttingEnvelopeDepth", joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX),
+    for name, value_mm, kind, precision in (
+        ("BracketThreadCuttingEnvelopeDiameter", joint.THREAD_CUTTING_ENVELOPE_DIA_MAX, 6, 2),
+        ("BracketThreadCuttingEnvelopeDepth", joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX, 6, 2),
+        ("BracketReceiverWallMinimum", joint.RECEIVER_WALL_MIN, 5, 1),
     ):
-        tolerance = SimpleNamespace(Type=6, lower=-value_mm / 1000.0, upper=0.0)
+        tolerance = SimpleNamespace(
+            Type=kind, lower=-value_mm / 1000.0 if kind == 6 else 0.0, upper=0.0,
+        )
         tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
         tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
         dimension = SimpleNamespace(
             FullName=f"{name}@BracketThreadCuttingEnvelope@sm-summing-lever.SLDPRT",
             SystemValue=value_mm / 1000.0, Tolerance=tolerance,
         )
-        display = SimpleNamespace(precision=2, dimension=dimension)
+        display = SimpleNamespace(precision=precision, dimension=dimension)
         display.GetDimension2 = lambda _index, display=display: display.dimension
         display.GetPrimaryPrecision2 = lambda display=display: display.precision
         dimensions[name] = display
@@ -1330,7 +1465,7 @@ def _native_thread_cutting_envelope(monkeypatch):
     )
 
 
-def test_cutting_requirement_reads_the_saved_model_and_both_native_maxima(monkeypatch) -> None:
+def test_cutting_requirement_reads_saved_model_and_all_three_native_limits(monkeypatch) -> None:
     case = _native_thread_cutting_envelope(monkeypatch)
     assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
     # SolidWorks may serialize the property with Windows line endings; it is
@@ -1340,7 +1475,7 @@ def test_cutting_requirement_reads_the_saved_model_and_both_native_maxima(monkey
     assert case.read() == value
 
 
-@pytest.mark.parametrize("damaged_limit", [False, True], ids=["valid", "lost-max"])
+@pytest.mark.parametrize("damaged_limit", [None, 1, 2], ids=["valid", "lost-max", "lost-min"])
 def test_cutting_requirement_binds_raw_enumerated_dispatches(
     monkeypatch, damaged_limit,
 ) -> None:
@@ -1373,8 +1508,8 @@ def test_cutting_requirement_binds_raw_enumerated_dispatches(
         wrapped("IDimension", dimension)
         wrapped("IDisplayDimension", display)
         raw_displays.append(display._oleobj_)
-    if damaged_limit:
-        case.displays[1].dimension.Tolerance.Type = 2
+    if damaged_limit is not None:
+        case.displays[damaged_limit].dimension.Tolerance.Type = 2
 
     walked = []
 
@@ -1404,15 +1539,16 @@ def test_cutting_requirement_binds_raw_enumerated_dispatches(
     )
     monkeypatch.setattr(drawing, "_early_bound", actual_com._early_bound)
     monkeypatch.setattr(drawing, "_feature_display_dimensions", _dimensions._feature_display_dimensions)
-    if damaged_limit:
-        with pytest.raises(RuntimeError, match="MAX envelope limit"):
+    if damaged_limit is not None:
+        with pytest.raises(RuntimeError):
             case.read()
     else:
         assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
         assert walked == raw_displays
+    visited = case.displays if damaged_limit is None else case.displays[:damaged_limit + 1]
     assert bindings == [
         (owner._oleobj_, interface)
-        for display in case.displays
+        for display in visited
         for owner, interface in (
             (display, "IDisplayDimension"),
             (display.dimension, "IDimension"),
@@ -1472,6 +1608,53 @@ def test_cutting_requirement_rejects_wrong_native_association_or_limits(
         case.read()
 
 
+@pytest.mark.parametrize(
+    "damage",
+    ["owner", "name", "value", "nonfinite", "missing_tolerance", "maximum",
+     "bilateral", "lower_limit", "upper_limit", "precision", "duplicate", "missing"],
+)
+def test_cutting_requirement_rejects_wrong_native_wall_minimum(monkeypatch, damage) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    display = case.dimensions["BracketReceiverWallMinimum"]
+    dimension = display.dimension
+    if damage == "owner":
+        dimension.FullName = dimension.FullName.replace(
+            "@BracketThreadCuttingEnvelope@", "@UnrelatedReference@",
+        )
+    elif damage == "name":
+        dimension.FullName = "SameSizeButWrongMeaning@BracketThreadCuttingEnvelope@lever"
+    elif damage == "value":
+        dimension.SystemValue += 0.00001
+    elif damage == "nonfinite":
+        dimension.SystemValue = math.nan
+    elif damage == "missing_tolerance":
+        dimension.Tolerance = None
+    elif damage == "maximum":
+        dimension.Tolerance.Type = 6
+    elif damage == "bilateral":
+        dimension.Tolerance.Type = 2
+    elif damage == "lower_limit":
+        dimension.Tolerance.lower = -0.00001
+    elif damage == "upper_limit":
+        dimension.Tolerance.upper = 0.00001
+    elif damage == "precision":
+        display.precision = 2
+    elif damage == "duplicate":
+        case.displays.append(display)
+    else:
+        case.displays.remove(display)
+    with pytest.raises(RuntimeError):
+        case.read()
+
+
+def test_cutting_requirement_rechecks_native_wall_minimum_after_admission(monkeypatch) -> None:
+    case = _native_thread_cutting_envelope(monkeypatch)
+    case.read()
+    case.dimensions["BracketReceiverWallMinimum"].dimension.Tolerance.Type = 6
+    with pytest.raises(RuntimeError):
+        case.read()
+
+
 def test_cutting_requirement_rejects_an_unbacked_source_property(monkeypatch) -> None:
     case = _native_thread_cutting_envelope(monkeypatch)
     case.source.FeatureByName = lambda _name: None
@@ -1483,7 +1666,7 @@ def test_cutting_requirement_rechecks_source_limits_after_initial_admission(monk
     case = _native_thread_cutting_envelope(monkeypatch)
     case.read()
     case.displays[1].dimension.Tolerance.upper = 0.00005
-    with pytest.raises(RuntimeError, match="MAX envelope limit"):
+    with pytest.raises(RuntimeError):
         case.read()
 
 
