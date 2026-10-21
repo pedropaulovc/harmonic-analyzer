@@ -757,7 +757,7 @@ def pin_tip_inspection_labels() -> tuple[tuple[str, tuple[float, float]], ...]:
         ("+Z INTO BLOCK", (x, top - 0.014)),
         ("PIN", (x + 0.047, top - 0.020)),
         ("Z=0 MOUNTING PLANE", (x, top - 0.070)),
-        (f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN RECESS",
+        (spec.PIN_TIP_MIN_RECESS_CALLOUT,
          (x + 0.069, top - 0.070)),
         ("GROUND BRIDGE + FEELER", (x, top - 0.078)),
         ("NO PROUD CARRIAGE FEATURE", (x, top - 0.086)),

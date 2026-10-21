@@ -117,8 +117,13 @@ LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
 # The stud's drawing package is the sole complete rework/installed-fit
 # instruction authority. Numeric fabrication controls remain native dimensions
 # on REWORK; these are measured acceptance instructions on MEASURE-AND-FIT.
+# Named keys keep required-property declarations statically readable while the
+# instruction mapping remains the single authority for their source values.
+STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY = "Stud Measurement Instructions"
+STUD_FIT_LIMITS_PROPERTY = "Stud Fit Limits"
+STUD_REWORK_ACCEPTANCE_PROPERTY = "Stud Rework Acceptance"
 REWORK_INSTRUCTION_PROPERTIES = {
-    "Stud Measurement Instructions": (
+    STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY: (
         "BEFORE CUTTING - RECORD MEASURED MIN/MAX (mm)\n"
         "Use actual kit parts; include measurement uncertainty.\n"
         "Kit D/H/N and complete-thread bands remain UNVERIFIED.\n"
@@ -133,7 +138,7 @@ REWORK_INSTRUCTION_PROPERTIES = {
         "Record original lower loaded complete-thread interval.\n"
         "Inspect full nut-thread span; body height is not thread depth."
     ),
-    "Stud Fit Limits": (
+    STUD_FIT_LIMITS_PROPERTY: (
         "PRE-CUT CONDITIONAL LIMITS - EACH STUD\n"
         "Lmin/Lmax: finished-length limits on REWORK, NOT stock length.\n"
         "Gmin = Bmin + Hmin + Dmin - Lmax\n"
@@ -146,7 +151,7 @@ REWORK_INSTRUCTION_PROPERTIES = {
         "No cut through engaged threads; no deeper insertion rescue.\n"
         "Unknown measurements or failed limits: REJECT INCOMPATIBLE SETUP."
     ),
-    "Stud Rework Acceptance": (
+    STUD_REWORK_ACCEPTANCE_PROPERTY: (
         "REWORK AND INSTALLED ACCEPTANCE\n"
         f"Apply to all {QUANTITY} hold-down studs; retain each original lower end.\n"
         "Shorten unused UPPER end only; protect lower/loaded threads.\n"

@@ -49,6 +49,11 @@ from _drawing_leader_notes import add_attached_note, add_property_linked_callout
 from _drawing_notes import add_property_linked_note, property_link
 from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
+from sh_vn_clamping_kit_hold_down_stud_spec import (
+    STUD_FIT_LIMITS_PROPERTY,
+    STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY,
+    STUD_REWORK_ACCEPTANCE_PROPERTY,
+)
 import sh_vn_clamping_kit_t_nut_spec as tnut
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 from _layout_audit import display_box, estimated_text_runs
@@ -81,9 +86,9 @@ STOCK_NOTE_XY = (0.025, 0.077)
 MANUFACTURING_NOTES_XY = (0.025, 0.056)
 LOWER_END_NOTE_XY = (0.155, 0.095)
 INSTRUCTION_PLACEMENTS = {
-    "Stud Measurement Instructions": (0.025, 0.252),
-    "Stud Fit Limits": (0.225, 0.252),
-    "Stud Rework Acceptance": (0.025, 0.170),
+    STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY: (0.025, 0.252),
+    STUD_FIT_LIMITS_PROPERTY: (0.225, 0.252),
+    STUD_REWORK_ACCEPTANCE_PROPERTY: (0.025, 0.170),
 }
 INSTRUCTION_TEXT_HEIGHT = 0.0035
 INSTRUCTION_ISO_CENTER = (0.340, 0.125)
