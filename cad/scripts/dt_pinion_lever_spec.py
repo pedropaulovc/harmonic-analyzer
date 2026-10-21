@@ -116,14 +116,10 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # static slip fit -- so no surface carries a roughness symbol.
 SURFACE_FINISHES = ()
 
-# The match-drill requirement rides the pin hole's own callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method): matched
-# fits belong on the feature).  ENFORCE r1 (#1011) struck the crown-root
-# "leave sharp" note (the title-block edge break serves the crown root like
-# any other edge); the one note left is the shop's inside-corner ceiling for
-# the grip rod's root on the hub, owner ruling 2026-10-18 (fr-top-frame
-# precedent, dt_arbor_pedestal_spec) until #1625 puts it in the title block.
-# The callout is the hole specification only: the grip-parked pose and the
-# drive and peen are dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
+# The match-drill requirement rides the pin hole's own callout (drawing-guidelines.md
+# rule 7: notes belong on the feature). The title block supplies the shop's
+# inside-corner ceiling; RV-01 preserves the accepted sharp rod-to-hub geometry.
+# The grip-parked pose and the drive and peen belong to
+# dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
 PIN_HOLE_CALLOUT = f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER}"
-DRAWING_NOTES = "INSIDE CORNERS R1.0 MAX."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

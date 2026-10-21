@@ -134,20 +134,6 @@ def test_sheet_carries_no_gdt_finish_or_literal_precision() -> None:
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 3
 
 
-def test_notes_are_one_inside_corner_ceiling() -> None:
-    # Owner ruling 2026-10-18 (fr-top-frame precedent): the shop's inside-
-    # corner ceiling prints as a note until #1625 moves it to the title block;
-    # the crown-root "leave sharp" note went in ENFORCE r1 (#1011).
-    assert dt_pinion_lever_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    import _config
-
-    (exception,) = _config.parts("dt-pinion-lever")["machinist_exceptions"]
-    assert exception["id"] == "RV-01"
-    assert "#1625" in exception["reason"]
-
-
 def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.SECTION_SCALE == (1, 1)
