@@ -101,6 +101,13 @@ cannot ask for what the authors were told to leave out.
   title-block keep-out; the machinist review judges containment, balance and
   fit of every visible element. An eye pass never substitutes for it (merge
   gate 3 in the root `AGENTS.md`).
+  Purchased drawings may opt into a recipe-local title-block setup after the
+  source links resolve, returning final-rebuild checks through the existing
+  `settled_checks` contract. The TL-VN-74 clevis sheet widens only its existing
+  linked Name and Material notes to their actual native ruled cells, then fits
+  each to one row using native font metres and strict readable-height floors.
+  It preserves the complete linked values, anchors, typefaces and source-model
+  association; no saved template, model property or reference-view scale changes.
 - **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
   and match-drilling open space for sloppy work, so avoid them as much as
   possible: prefer geometry whose loose bands hold the stack at the worst

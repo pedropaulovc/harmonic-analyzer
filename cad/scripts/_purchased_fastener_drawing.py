@@ -1639,6 +1639,7 @@ async def _build_reference_sheet(
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     source_checkpoint: Callable[[str], None] | None = None,
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1877,6 +1878,8 @@ async def _build_reference_sheet(
                     adapter, draw, layout=spec.layout, number=properties["Number"]
                 ),
             )
+        if title_block_setup is not None:
+            final_checks = (*final_checks, title_block_setup(adapter))
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:
