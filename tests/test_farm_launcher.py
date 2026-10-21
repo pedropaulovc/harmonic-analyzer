@@ -1843,9 +1843,13 @@ finally {{
     finally {{ $child.Dispose() }}
 }}
 """
+    # The normal guard rejects every inline shell Process.Start, whatever its
+    # target. Keep this stdin-only Python fixture transparent as a script file.
+    script_path = tmp_path / "owned-inventory-job.ps1"
+    script_path.write_text(script, encoding="utf-8")
     result = _run_launcher(
         fixture,
-        [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script],
+        [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-File", str(script_path)],
         fixture["environment"],
     )
     assert result.returncode == 0, (result.stdout, result.stderr)

@@ -885,6 +885,8 @@ process inventories, and real-provider integration:
   `test_owned_process_inventory_rejects_unexpected_queries` and
   `test_owned_process_inventory_refreshes_job_members_and_liveness` protect that
   boundary and require fresh native membership/liveness observations.
+  The native job-refresh probe runs a readable temporary `.ps1` file with the
+  normal NoSW guard enabled; its only child is Python waiting for stdin EOF.
 - Orphan fixtures record their parent's own PID and wait for an explicit socket
   release; they do not need a CIM lookup or expire during slow test startup.
   Cleanup waits on a handle whose creation time matches the one the spawning
