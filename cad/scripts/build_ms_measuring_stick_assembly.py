@@ -5,13 +5,12 @@ re-derivation, 2026-10-09; sketch stop_rederive_v2): the graduated bar
 ms-stick, the brass block ms-stop-block, its cover ms-stop-plate, two brass
 #2-56 ms-vn-stop-plate-screw fillisters and one #4-40 ms-vn-thumb-screw.
 
-Authored in the stop frame of ``ms_stop_spec`` (X along the stick, Y up the
-thumbscrew axis from its face to the roof, Z from the cover into the block),
-which the block and cover share, so both sit at the identity. Every other pose
-is ``ms_measuring_stick_assembly_spec``'s, derived from the part contracts:
-the bar bears on the roof graduations up, centred across the 8.4 window, its
-2.0 division on the thumbscrew axis; the thumbscrew's tip sits on the bar's
-underside; each plate screw's bearing plane sits on the cover's outer face.
+Authored thumbscrew-up (+Y), with the block below the stick: the stop's part
+frame is turned halfway about the stick's X axis. Every pose is
+``ms_measuring_stick_assembly_spec``'s, derived from the part contracts. The
+graduated face still bears on the window wall opposite the screw, the plain
+face meets the tip, and the 2.0 division lies on the screw axis. The cover
+and its screws turn with the block; no part geometry or contact changes.
 The clamped stop has no operational freedom, so every component is fixed
 (the fix-all strategy of the other sub-assemblies): 0 DOF, fully defined.
 
@@ -40,6 +39,7 @@ from _assembly import (
     assert_components_fully_defined,
     author_in_drawing_configurations,
     check_no_interference,
+    component_transform,
     place_component,
     save_assembly_and_images,
 )
@@ -56,6 +56,8 @@ from _drawing_tolerances import (
 )
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
+from _assembly_named_views import name_standard_views
+from _named_views import name_octant_views
 from _sketch import (
     SketchDims, anchor_point_to_origin, blank_sketch, dimension_between,
     ensure_fully_defined, set_sketch_direct_db,
@@ -307,26 +309,26 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
 
 async def _author_clamped_setting(adapter: Any) -> None:
     """No solid/pose edits: a source-owned chord between physical face stations."""
-    (left_x, roof_y), (face_x, _) = spec.SETTING_CHORD
+    (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     for name, value in (
         ("SettingStickLeft", left_x),
         ("SettingBlockFace", face_x),
-        ("SettingRoof", roof_y),
+        ("SettingContact", contact_y),
     ):
         await set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
     check("create clamped setting sketch", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    line = check("setting chord", await adapter.add_line(left_x, roof_y, face_x, roof_y))
+    line = check("setting chord", await adapter.add_line(left_x, contact_y, face_x, contact_y))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError("clamped setting chord is not construction")
     check("setting horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{line}.start", left_x, roof_y, "setting left end")
+    await anchor_point_to_origin(adapter, f"{line}.start", left_x, contact_y, "setting left end")
     dims.record("SettingLeftX", '-"SettingStickLeft"')
-    dims.record("SettingRoofY", '"SettingRoof"')
+    dims.record("SettingContactY", '-"SettingContact"')
     await dimension_between(
         adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
         spec.SETTING_NEAR_FACE_MM, "near face from left stick end",
@@ -350,28 +352,34 @@ async def _author_clamped_setting(adapter: Any) -> None:
     blank_sketch(adapter, spec.SETTING_FEATURE)
 
 
+def _assert_working_pose(adapter: Any, thumbscrew: str) -> None:
+    # Read the final solved native pose, not the camera or the expected spec.
+    spec.assert_thumbscrew_up(
+        tuple(component_transform(adapter, thumbscrew)[:3]), label=ASM_NAME
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     check("create_assembly", await adapter.create_assembly())
 
-    # The block first (SolidWorks fixes the first insert); the cover shares
-    # its frame and closes the window's open side.
-    await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.IDENTITY_ROWS)
-    await _place_fixed(adapter, "ms-stop-plate", spec.PLATE_ORIGIN, spec.IDENTITY_ROWS)
-    # The bar through the window, graduated face on the roof, its STOP_MARK
-    # division on the thumbscrew axis.
+    # The block and cover share the stop's turned, thumbscrew-up frame.
+    await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)
+    await _place_fixed(adapter, "ms-stop-plate", spec.PLATE_ORIGIN, spec.PLATE_ROWS)
+    # The graduated face still bears on the fixed wall opposite the screw.
     await _place_fixed(adapter, "ms-stick", spec.STICK_ORIGIN, spec.STICK_ROWS)
-    # The stop thumbscrew clamps the stick: up the #4-40 tapped wall, tip on
-    # the bar's underside (MHA-MS-00 step 5).
-    await _place_fixed(adapter, "ms-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS)
+    # The stop thumbscrew points down onto the stick's plain face.
+    thumbscrew = await _place_fixed(
+        adapter, "ms-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS
+    )
     # The cover plate screws into the block: heads on the cover's outer face,
     # threads in the #2-56 blind taps (MHA-MS-00 step 4).
     for origin in spec.PLATE_SCREW_ORIGINS:
         await _place_fixed(adapter, "ms-vn-stop-plate-screw", origin, spec.PLATE_SCREW_ROWS)
     _telemetry.info(
         f"stop clamped at mark {spec.stop.STOP_MARK:.1f}: bar x {spec.STICK_X_MIN:.2f}.."
-        f"{spec.STICK_X_MAX:.2f}, top y {spec.STICK_TOP_Y:.2f} on the roof, "
+        f"{spec.STICK_X_MAX:.2f}, graduated face y {spec.STICK_BOTTOM_Y:.2f}, "
         f"{spec.STICK_SIDE_CLEARANCE:.2f} clear each side; thumbscrew face y "
         f"{spec.THUMB_HEAD_FACE_Y:.3f}, {spec.THUMB_EXPOSED_THREAD:.3f} thread exposed; "
         f"plate screws {spec.PLATE_SCREW_TAP_RESERVE:.2f} short of the tapped depth"
@@ -379,7 +387,7 @@ async def build(adapter) -> dict[str, str]:
 
     await _author_clamped_setting(adapter)
     assert_components_fully_defined(adapter)
-    # Only the two thread engagements may overlap; the bar's roof contact,
+    # Only the two thread engagements may overlap; the bar's fixed-wall contact,
     # the tip contact and the cover's seat are faces, not volume.
     check_no_interference(
         adapter,
@@ -408,7 +416,20 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter, ASM_NAME, lambda configuration: _create_ms_explode(adapter, configuration)
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    name_standard_views(
+        adapter,
+        views=spec.DRAWING_STANDARD_VIEWS,
+        label=ASM_NAME,
+        model_rotation=spec.WORKING_ROWS,
+    )
+    name_octant_views(
+        adapter, octants=spec.DRAWING_EXPLODED_OCTANTS, label=ASM_NAME
+    )
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        solved_gates=lambda current: _assert_working_pose(current, thumbscrew),
+    )
 
 
 if __name__ == "__main__":

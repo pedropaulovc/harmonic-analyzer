@@ -3754,7 +3754,10 @@ def _body(points):
     return SimpleNamespace(GetExtremePoint=extreme)
 
 
-def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
+def _balloon(
+    monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),), *,
+    explode_offsets=None,
+):
     """Run the real balloon path with the sheet projection = model (x, y).
 
     A pick miss's screenshots are recorded on ``sheet.screens`` as (label,
@@ -3787,7 +3790,8 @@ def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
         _telemetry, "event", lambda name, **kw: events.append((name, kw))
     )
     landings = _drawing_balloons.add_component_bom_balloons(
-        _FakeAdapter(sheet), view, items=items, anchors=anchors, label="t"
+        _FakeAdapter(sheet), view, items=items, anchors=anchors, label="t",
+        explode_offsets=explode_offsets,
     )
     sheet.landings = landings
     balloons = [landing.note for landing in landings]
@@ -3818,6 +3822,50 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
         }
     ]
     assert sheet.redraws == 0 and sheet.screens == []
+
+
+@pytest.mark.parametrize("method", ("frozen", "walk"))
+@pytest.mark.parametrize("provided", (None, {}, {"sub-2": (0.03, 0.25, 0.04)}))
+def test_builder_offsets_bypass_native_reads_and_reach_anchor_projection(
+    monkeypatch, method, provided
+):
+    """An explicit empty mapping is authoritative, not a native-read request."""
+    path = "sub-2/dt-cone-gear-1"
+    children = _instances(
+        path, bodies={path: _body([(0.001, 0.002, 0.003)])}
+    )
+    view = _exploded_view(children, [])
+    native_reads = []
+    native_offsets = {"sub-2": (0.06, 0.07, 0.08)}
+
+    def native_read(*args, **kwargs):
+        native_reads.append(True)
+        assert provided is None, "supplied offsets must bypass the native reader"
+        return native_offsets
+
+    monkeypatch.setattr(_drawing_balloons, "_view_explode_offsets", native_read)
+    offsets = native_offsets if provided is None else provided
+    dx, dy, dz = offsets.get("sub-2", (0.0, 0.0, 0.0))
+    expected = (round(0.001 + dx, 9), round(0.002 + dy, 9))
+    sheet = _AnchorSheet({expected: _AnchorEdge(path)})
+    anchor = _drawing_balloons.BalloonAnchor(
+        point_mm=(1.0, 2.0, 3.0) if method == "frozen" else None,
+        instance=path,
+    )
+    balloons, projected, anchors = _balloon(
+        monkeypatch, sheet, view, {"dt-cone-gear": anchor},
+        explode_offsets=provided,
+    )
+    assert native_reads == ([True] if provided is None else [])
+    assert len(balloons) == 1
+    assert projected[0][0][0] == pytest.approx(
+        (0.001 + dx, 0.002 + dy, 0.003 + dz)
+    )
+    assert sheet.hits == [expected]
+    assert anchors[0]["method"] == method
+    assert sheet.landings[0].instance == path
+    assert sheet.landings[0].sheet_xy == expected
+    assert view.ReferencedDocument.shown == []
 
 
 def test_frozen_anchor_that_hits_nothing_fails_after_redrawn_picks(monkeypatch):
