@@ -605,7 +605,7 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
 def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     """Step 9's spot-through fit-up is an owner-accepted rule-19 departure:
     the nominal screw float cannot absorb independent plate/base stations."""
-    import _mcmaster_90114a511 as screw
+    import sh_vn_brass_fillister_screw_spec as screw
     import fr_nameplate_drawing_spec as plate
     from _assembly_contract import assembly_contract
     from _drawing_registry import DRAWINGS_BY_NAME

@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import math
 
-import _mcmaster_90114a511 as _screw
+import sh_vn_brass_fillister_screw_spec as _screw
 from _printed_tolerance import printed_deviations
 
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---

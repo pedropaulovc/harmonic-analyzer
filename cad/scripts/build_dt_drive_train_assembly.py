@@ -2756,7 +2756,7 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 1e-6:
 
 # The collarless knurled head controls both notch-exit travel and external
 # clearance. The stock stop (the foot screw's #4-40 SKU) seats its head on the
-# base top; dt_vn_swing_stop_screw_spec owns the embed/proud split.
+# base top; dt_swing_stop_screw_spec owns the embed/proud split.
 DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
 # Keep nominal mates/stop locations distinct from the conditional, fully
 # seated manufacturing-corner sweep used by clearance consumers.

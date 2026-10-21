@@ -1935,15 +1935,19 @@ def test_module_deps_are_transitive():
 
 def test_swing_stop_stock_builder_does_not_reach_receiver_validation():
     """Track stock authority without re-keying the native screw for base edits."""
-    stock_authorities = {"dt_vn_swing_stop_screw_spec", "_mcmaster_90280a108"}
-    receiver_geometry = {"fr_harmonic_base_fasteners", "fr_harmonic_base_spec"}
-    native = _helper_names("build_dt_vn_swing_stop_screw.py")
+    stock_authorities = {"sh_vn_fillister_screw_90280a108_spec"}
+    receiver_inputs = {
+        "fr_harmonic_base_fasteners",
+        "fr_harmonic_base_spec",
+        "dt_swing_stop_screw_spec",
+    }
+    native = _helper_names("build_sh_vn_fillister_screw_90280a108.py")
     assert stock_authorities <= native, native
-    assert native.isdisjoint(receiver_geometry), native & receiver_geometry
+    assert native.isdisjoint(receiver_inputs), native & receiver_inputs
 
     # Receiver validation remains a real assembly input, not a graph exclusion.
     assembly = _helper_names("build_dt_drive_train_assembly.py")
-    assert stock_authorities | receiver_geometry <= assembly, assembly
+    assert stock_authorities | receiver_inputs <= assembly, assembly
 
 
 def test_specialized_helper_blast_radius_is_narrow():
