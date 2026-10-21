@@ -187,7 +187,7 @@ def _cap_motion(
     yaw = 2.0 * math.asin(sine)
     head_z = CAP_HEIGHT + printed_band_mm(CAP_HEIGHT_PLACES) - (
         CAP_COUNTERBORE_DEPTH - printed_band_mm(CAP_COUNTERBORE_DEPTH_PLACES)
-    ) + CAP_BASE_SEATING_GAP_MAX
+    ) + CAP_BASE_SEATING_GAP_MAX + CAP_HEAD_SEATING_GAP_MAX
     flat_radius = CAP_BOLT_HEAD_BEARING_DIAMETER_MIN / 2.0
     if (CAP_ENTRY_RELIEF_DIAMETER + CAP_ENTRY_RELIEF_BAND[0]) / 2.0 >= flat_radius:
         raise ValueError("entry relief removes the guaranteed flat head circle")

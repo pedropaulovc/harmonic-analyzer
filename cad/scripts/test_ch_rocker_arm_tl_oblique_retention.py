@@ -230,7 +230,7 @@ def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.Mo
     )
     head_z = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES) - (
         cap.COUNTERBORE_DEPTH - printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
-    ) + retention.CAP_BASE_SEATING_GAP_MAX
+    ) + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX
     head_radius = (
         cap.HEAD_BEARING_DIAMETER_MIN / 2.0 + retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX
         + math.sqrt(2.0) * printed_band_mm(cap.POSITION_PLACES) + head_z * math.tan(gamma)
@@ -255,11 +255,13 @@ def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.Mo
     head_gap = retention.CAP_HEAD_SEATING_GAP_MAX
     monkeypatch.setattr(retention, "CAP_HEAD_SEATING_GAP_MAX", 0.0)
     seated_head = retention.capture_bounds()
-    assert bounds.cap_head_release - seated_head.cap_head_release == pytest.approx(head_gap)
+    # Head clearance also raises the screw-axis lever slightly; its full
+    # independent allowance must survive even before that extra migration.
+    assert bounds.cap_head_release - seated_head.cap_head_release >= head_gap
     # A separately accepted cap/block base gap survives even with the head
     # seated. Neither inspection may silently stand in for the other.
     migration_release = (
-        expected * math.tan(gamma)
+        seated_head.cap_floor_migration * math.tan(gamma)
         + 2.0 * (cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)) * (1.0 - math.cos(rock))
     )
     assert seated_head.cap_head_release == pytest.approx(retention.CAP_BASE_SEATING_GAP_MAX + migration_release)
