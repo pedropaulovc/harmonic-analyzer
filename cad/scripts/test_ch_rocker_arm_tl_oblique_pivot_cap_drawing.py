@@ -124,7 +124,6 @@ def test_material_checks_reject_breakthrough_and_thin_wall_mutants(change) -> No
 
 
 @pytest.mark.parametrize("change,margin", [
-    ({"channel_width": 8.6}, "channel_to_chamber"),
     ({"channel_depth": 9.0}, "channel_floor"),
     ({"counterbore_dia": spec.COUNTERBORE_DIA + 1.0}, "counterbore_to_y_edge"),
 ])
@@ -132,6 +131,25 @@ def test_void_enlargement_rejects_thin_land_floor_and_outer_wall(change, margin)
     assert spec.clearance_geometry(**change)[margin] < 2.0
     with pytest.raises(ValueError):
         spec.require_clearance_geometry(**change)
+
+
+@pytest.mark.parametrize("width_delta", (-0.01, 0.01))
+def test_channel_land_uses_actual_two_mm_boundary(width_delta: float) -> None:
+    target = 2.0
+    pocket_radius = (spec.POCKET_DIA + spec.POCKET_BAND[0]) / 2.0
+    nearest_row = min(abs(y) for _x, y in spec.BOLT_POINTS) - spec.POSITION_TOLERANCE
+    boundary_width = (
+        2.0 * (nearest_row - pocket_radius - target)
+        - printed_band_mm(spec.CHANNEL_PLACES)
+    )
+    width = boundary_width + width_delta
+    margin = spec.clearance_geometry(channel_width=width)["channel_to_chamber"]
+    assert margin == pytest.approx(target - width_delta / 2.0)
+    if width_delta < 0.0:
+        assert spec.require_clearance_geometry(channel_width=width)["channel_to_chamber"] > target
+    else:
+        with pytest.raises(ValueError, match="channel_to_chamber"):
+            spec.require_clearance_geometry(channel_width=width)
 
 
 @pytest.mark.parametrize("width,length", [(spec.WIDTH, spec.LENGTH), (62.0, 86.0)])

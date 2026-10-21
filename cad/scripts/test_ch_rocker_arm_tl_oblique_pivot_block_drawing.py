@@ -539,10 +539,10 @@ def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
     assert spec.SIDE_UNDER_HEAD == 35.6
     assert spec.BORE_X == -32.0
     assert spec.BOLT_POINTS == ((-13.0, -13.0), (-13.0, 13.0), (13.0, -13.0), (13.0, 13.0))
-    assert part.V_BLOCK == (
+    assert part.V_BLOCK == pytest.approx((
         spec.BLOCK_LENGTH * spec.BLOCK_WIDTH
         + spec.WING_LENGTH * (spec.WING_WIDTH - spec.BLOCK_WIDTH)
-    ) * spec.BLOCK_HEIGHT
+    ) * spec.BLOCK_HEIGHT, rel=1e-12, abs=1e-9)
     assert spec.BEARING_AXIS_NAME == "BearingAxis"
 
 
