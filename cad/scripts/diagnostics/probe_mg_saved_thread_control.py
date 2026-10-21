@@ -6,6 +6,8 @@ The cache archives install ALL their members in this source tree's cad/out;
 outputs passed to restore are neither relocation destinations nor filters.
 No recipes, saves, settings, rebuilds, startup, or session-wide document closes.
 The imported diagnostic performs its existing single display-generation boundary.
+Every inventory uses the native first/next document cursor, null termination,
+and matching strictly typed counts before/after; no array-result fallback.
 """
 
 from __future__ import annotations
@@ -248,36 +250,52 @@ def main():
 
             def inventory(label):
                 rows = []
-                report["inventories"][label] = {"enumerated": False, "documents": []}
-                snapshot = report["inventories"][label]
-                count = attempt(f"{label}.GetDocumentCount", lambda: app.GetDocumentCount())
-                raw_docs = attempt(f"{label}.GetDocuments", lambda: app.GetDocuments())
-                if type(count) is int and count >= 0:
-                    snapshot["native_count"] = count
-                else:
-                    if count is not MISSING:
-                        failure(f"{label}.GetDocumentCount", RuntimeError("native document count is not a nonnegative integer"))
-                    return None
-                if raw_docs is MISSING:
-                    return None
-                if raw_docs is None:
-                    snapshot["null_document_array"] = True
-                    failure(f"{label}.GetDocuments", RuntimeError("null document array is unavailable, not complete empty-session proof"))
-                    return None
-                if not isinstance(raw_docs, (tuple, list)) or len(raw_docs) != count:
-                    failure(f"{label}.GetDocuments", RuntimeError("document array unavailable or cardinality differs from native count"))
-                    return None
-                snapshot["enumerated"] = True
-                for index, raw in enumerate(raw_docs):
+                error_start = len(report["errors"])
+                snapshot = {
+                    "method": "GetFirstDocument/GetNext",
+                    "enumerated": False,
+                    "documents": [],
+                    "visited_count": 0,
+                    "cursor_terminated": False,
+                }
+                report["inventories"][label] = snapshot
+                count = attempt(f"{label}.GetDocumentCount.before", lambda: app.GetDocumentCount())
+                raw = attempt(f"{label}.GetFirstDocument", lambda: app.GetFirstDocument())
+                snapshot["first_document_state"] = (
+                    "UNAVAILABLE" if raw is MISSING else "NULL" if raw is None else "PRESENT"
+                )
+                count_valid = type(count) is int and count >= 0
+                if count_valid:
+                    snapshot["native_count_before"] = count
+                elif count is not MISSING:
+                    failure(f"{label}.GetDocumentCount.before",
+                            RuntimeError("native document count is not a nonnegative integer"))
+                # The count bounds traversal, but never substitutes for a
+                # successful native null cursor. Visit one excess entry only
+                # to retain its metadata/identity evidence before refusing.
+                while count_valid and raw is not MISSING and raw is not None:
+                    index = len(rows)
                     tag = f"{label}[{index}]"
                     data = {"handle_token": tag}
-                    report["inventories"][label]["documents"].append(data)
+                    snapshot["documents"].append(data)
                     doc = attempt(f"{tag}.bind", lambda: _early_bound(raw, "IModelDoc2"))
-                    rows.append({"native": doc, "data": data})
                     if doc is MISSING or doc is None:
                         if doc is None:
-                            failure(f"{tag}.bind", RuntimeError("null document in inventory"))
-                        continue
+                            failure(f"{tag}.bind", RuntimeError("null document in cursor inventory"))
+                        break
+                    self_same = attempt(f"{tag}.identity.self", lambda: same(doc, doc, f"{tag}.identity.self"))
+                    identity_valid = self_same is True
+                    if self_same is False:
+                        failure(f"{tag}.identity.self", RuntimeError("document is not natively identical to itself"))
+                    for previous_index, previous in enumerate(rows):
+                        identity_label = f"{tag}.identity.previous[{previous_index}]"
+                        duplicate = attempt(identity_label, lambda: same(doc, previous["native"], identity_label))
+                        if duplicate is True:
+                            failure(identity_label, RuntimeError("duplicate/cyclic native document cursor"))
+                        if duplicate is not False:
+                            identity_valid = False
+                    rows.append({"native": doc, "data": data})
+                    snapshot["visited_count"] = len(rows)
                     # Each metadata reader is independent, including during cleanup.
                     for key, reader, expected_type in (
                         ("path", lambda: doc.GetPathName(), str),
@@ -291,7 +309,28 @@ def main():
                                 data[key] = value
                             else:
                                 failure(f"{tag}.{key}", RuntimeError("native metadata result has an unavailable or unexpected type"))
-                return rows
+                    if index >= count:
+                        failure(f"{label}.cursor.cardinality", RuntimeError("native cursor exceeded the initial document count"))
+                        break
+                    if not identity_valid:
+                        break
+                    raw = attempt(f"{tag}.GetNext", lambda: doc.GetNext())
+                snapshot["cursor_terminated"] = raw is None
+                after = attempt(f"{label}.GetDocumentCount.after", lambda: app.GetDocumentCount())
+                after_valid = type(after) is int and after >= 0
+                if after_valid:
+                    snapshot["native_count_after"] = after
+                elif after is not MISSING:
+                    failure(f"{label}.GetDocumentCount.after",
+                            RuntimeError("native document count is not a nonnegative integer"))
+                if count_valid and after_valid and not count == after == len(rows):
+                    failure(f"{label}.cursor.cardinality",
+                            RuntimeError("document count changed or differs from the visited cursor length"))
+                snapshot["enumerated"] = (
+                    count_valid and after_valid and count == after == len(rows)
+                    and snapshot["cursor_terminated"] and len(report["errors"]) == error_start
+                )
+                return rows if snapshot["enumerated"] else None
 
             def complete(rows):
                 return rows is not None and all(
@@ -412,7 +451,7 @@ def main():
                     "UNAVAILABLE" if handle is MISSING else "NULL" if handle is None else "PRESENT"
                 )
             require(complete(initial) and initial == [] and not report["errors"],
-                    "control requires a proven empty initial count AND complete native document array")
+                    "control requires stable zero native counts AND a complete null-terminated document cursor")
             require(initial_active is None and initial_current is None,
                     "control requires measured-null initial ActiveDoc and currentModel")
             require(initial_control is True, "control requires actual UserControl=True; no setter/repair permitted")

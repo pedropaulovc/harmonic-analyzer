@@ -27,6 +27,7 @@ from unittest.mock import patch
 
 DRIVER_PATH = Path(__file__).parent / "diagnostics/probe_mg_saved_thread_control.py"
 HELPER_PATH = Path(__file__).parent / "diagnostics/_owned_native_session.py"
+DEFAULT = object()
 
 
 class ProbeError(RuntimeError):
@@ -151,6 +152,8 @@ class Document:
         self.readonly = readonly
         self.dirty = False
         self.part = None
+        self.app = None
+        self.native_identity = object()
 
     def GetPathName(self):
         return self.path
@@ -188,14 +191,21 @@ class Document:
     def GetCurrentSheet(self):
         return Sheet()
 
+    def GetNext(self):
+        return self.app.next_document(self)
+
+
 
 class Application:
     def __init__(self):
         self.documents = []
         self.active = None
         self.control = True
-        self.null_array = False
-        self.count_override = None
+        self.count_override = DEFAULT
+        self.count_results = []
+        self.count_values = []
+        self.first_override = DEFAULT
+        self.next_overrides = {}
         self.readonly = {1: True, 3: True}
         self.attach_error = None
         self.identity_override = None
@@ -219,10 +229,17 @@ class Application:
         return "34.3.0"
 
     def GetDocumentCount(self):
-        return len(self.documents) if self.count_override is None else self.count_override
+        self.events.append("GetDocumentCount")
+        value = self.count_results.pop(0) if self.count_results else self.count_override
+        if value is DEFAULT:
+            value = len(self.documents)
+        self.count_values.append(value)
+        if isinstance(value, BaseException):
+            trip(value)
+        return value
 
     def GetDocuments(self):
-        return None if self.null_array else tuple(self.documents)
+        raise AssertionError("array inventory acceptance/fallback is forbidden")
 
     @property
     def ActiveDoc(self):
@@ -236,7 +253,10 @@ class Application:
         return self.control
 
     def IsSame(self, left, right):
-        return self.identity_override if self.identity_override is not None else int(left is right)
+        self.events.append("IsSame")
+        if callable(self.identity_override):
+            return self.identity_override(left, right)
+        return self.identity_override if self.identity_override is not None else int(left.native_identity is right.native_identity)
 
     def OpenDoc6(self, path, kind, options, configuration, errors, warnings):
         self.open_calls.append((path, kind, options, configuration, errors, warnings))
@@ -268,6 +288,33 @@ class Application:
             self.documents[:] = [doc for doc in self.documents if doc.kind != 1]
         self.active = self.documents[-1] if self.documents else None
         self.control = self.control_after_first_close
+
+    def GetFirstDocument(self):
+        self.events.append("GetFirstDocument")
+        for doc in self.documents:
+            doc.app = self
+        value = self.first_override
+        if value is DEFAULT:
+            value = self.documents[0] if self.documents else None
+        if isinstance(value, BaseException):
+            trip(value)
+        if isinstance(value, Document):
+            value.app = self
+        return value
+
+    def next_document(self, doc):
+        self.events.append("GetNext")
+        if doc in self.next_overrides:
+            value = self.next_overrides[doc]
+        else:
+            index = self.documents.index(doc) + 1
+            value = self.documents[index] if index < len(self.documents) else None
+        if isinstance(value, BaseException):
+            trip(value)
+        if isinstance(value, Document):
+            value.app = self
+        return value
+
 
 
 class Adapter:
@@ -526,16 +573,22 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertTrue(captures[0]["primary_traceback"]["available"])
             self.assertEqual(env.cache_calls, [])
 
-    def test_initial_null_array_refuses_before_restore_or_close(self):
+    def test_initial_null_cursor_and_two_zero_counts_prove_empty(self):
         with Environment().installed() as env:
-            env.app.null_array = True
             code, report, captures = env.run_driver()
-            self.assertEqual(code, 1)
-            self.assertEqual(report["isolation_gate"], "refused")
-            self.assertEqual(env.cache_calls, [])
-            self.assertEqual(env.app.open_calls, [])
-            self.assertEqual(env.app.close_calls, [])
-            self.assertEqual(len(captures), 1)
+            self.assertEqual(code, 0)
+            self.assertEqual(report["isolation_gate"], "accepted")
+            initial = report["inventories"]["initial"]
+            self.assertEqual(initial["method"], "GetFirstDocument/GetNext")
+            self.assertEqual(initial["native_count_before"], 0)
+            self.assertEqual(initial["native_count_after"], 0)
+            self.assertEqual(initial["visited_count"], 0)
+            self.assertEqual(initial["first_document_state"], "NULL")
+            self.assertIs(initial["cursor_terminated"], True)
+            self.assertIs(initial["enumerated"], True)
+            self.assertEqual(env.app.count_values[:2], [0, 0])
+            self.assertEqual(env.app.events[:3], ["GetDocumentCount", "GetFirstDocument", "GetDocumentCount"])
+            self.assertEqual(captures, [])
 
     def test_any_initial_document_refuses_without_touching_it(self):
         with Environment().installed() as env:
@@ -547,6 +600,14 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(env.cache_calls, [])
             self.assertEqual(env.app.close_calls, [])
             self.assertEqual(env.app.documents, [foreign])
+            self.assertIsNone(env.app.active)
+            initial = report["inventories"]["initial"]
+            self.assertEqual(initial["native_count_before"], 1)
+            self.assertEqual(initial["native_count_after"], 1)
+            self.assertEqual(initial["visited_count"], 1)
+            self.assertIs(initial["enumerated"], True)
+            self.assertIs(initial["cursor_terminated"], True)
+            self.assertEqual(initial["documents"][0]["path"], foreign.path)
 
     def test_initial_user_control_must_be_actual_true(self):
         for value in (False, None, 1, ProbeError("unreadable UserControl")):
@@ -587,6 +648,19 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW"])
             self.assertEqual(report["closures"][1]["status"], "already_unloaded")
+            two_owned = report["inventories"]["after_open_drawing"]
+            self.assertEqual(two_owned["native_count_before"], 2)
+            self.assertEqual(two_owned["native_count_after"], 2)
+            self.assertEqual(two_owned["visited_count"], 2)
+            self.assertIs(two_owned["cursor_terminated"], True)
+            self.assertIs(two_owned["enumerated"], True)
+            unloaded = report["inventories"]["before_close_1"]
+            self.assertEqual(unloaded["native_count_before"], 0)
+            self.assertEqual(unloaded["native_count_after"], 0)
+            self.assertEqual(unloaded["visited_count"], 0)
+            self.assertEqual(unloaded["first_document_state"], "NULL")
+            self.assertIs(unloaded["cursor_terminated"], True)
+            self.assertIs(unloaded["enumerated"], True)
 
     def test_each_open_requires_actual_read_only_readback(self):
         for kind in (1, 3):
@@ -676,6 +750,186 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(env.app.close_calls, [])
             self.assertTrue(any(row.get("raw") == -1 for row in report["identity_comparisons"]))
             self.assertEqual(len(captures), 1)
+
+    def test_initial_cursor_rejects_invalid_count_before_and_after(self):
+        for phase in ("before", "after"):
+            for value in (True, False, None, -1, 0.0, "0", ProbeError("count reader failed")):
+                with self.subTest(phase=phase, value_type=type(value).__name__), Environment().installed() as env:
+                    env.app.count_results = [value, 0] if phase == "before" else [0, value]
+                    code, report, captures = env.run_driver()
+                    self.assertEqual(code, 1)
+                    self.assertEqual(report["isolation_gate"], "refused")
+                    self.assertFalse(report["inventories"]["initial"]["enumerated"])
+                    self.assertEqual(report["inventories"]["initial"]["first_document_state"], "NULL")
+                    self.assertEqual(len(env.app.count_values), 2)
+                    self.assertTrue(any(row["operation"] == f"initial.GetDocumentCount.{phase}" for row in report["errors"]))
+                    self.assertEqual(env.cache_calls, [])
+                    self.assertEqual(env.app.open_calls, [])
+                    self.assertEqual(env.app.close_calls, [])
+                    self.assertEqual(len(captures), 1)
+
+    def test_initial_cursor_count_drift_and_cardinality_mismatch_refuse(self):
+        for shape in ("drift", "positive_count_null_first", "zero_count_nonnull_first", "short_chain", "null_first_with_resident"):
+            with self.subTest(shape=shape), Environment().installed() as env:
+                foreign = Document("C:/foreign/hidden.SLDPRT", 1)
+                if shape == "drift":
+                    env.app.count_results = [0, 1]
+                elif shape == "positive_count_null_first":
+                    env.app.count_override = 1
+                elif shape == "zero_count_nonnull_first":
+                    env.app.documents.append(foreign)
+                    env.app.count_override = 0
+                elif shape == "short_chain":
+                    env.app.documents.append(foreign)
+                    env.app.count_override = 2
+                else:
+                    env.app.documents.append(foreign)
+                    env.app.first_override = None
+                initial_documents = list(env.app.documents)
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["isolation_gate"], "refused")
+                self.assertFalse(report["inventories"]["initial"]["enumerated"])
+                self.assertTrue(any(row["operation"] == "initial.cursor.cardinality" for row in report["errors"]))
+                self.assertEqual(len(env.app.count_values), 2)
+                self.assertEqual(env.app.documents, initial_documents)
+                self.assertEqual(env.cache_calls, [])
+                self.assertEqual(env.app.open_calls, [])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(len(captures), 1)
+
+    def test_initial_cursor_cycles_and_native_duplicate_wrappers_refuse(self):
+        for shape in ("self_loop", "cycle", "duplicate_wrapper"):
+            with self.subTest(shape=shape), Environment().installed() as env:
+                first = Document("C:/foreign/hidden-a.SLDPRT", 1)
+                second = Document("C:/foreign/hidden-b.SLDPRT", 1)
+                env.app.documents[:] = [first, second]
+                if shape == "self_loop":
+                    env.app.next_overrides[first] = first
+                elif shape == "cycle":
+                    env.app.next_overrides[second] = first
+                else:
+                    second.native_identity = first.native_identity
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertFalse(report["inventories"]["initial"]["enumerated"])
+                self.assertFalse(report["inventories"]["initial"]["cursor_terminated"])
+                self.assertTrue(any(row["message"] == "duplicate/cyclic native document cursor" for row in report["errors"]))
+                self.assertLessEqual(report["inventories"]["initial"]["visited_count"], 3)
+                self.assertEqual(len(env.app.count_values), 2)
+                self.assertEqual(env.app.documents, [first, second])
+                self.assertEqual(env.cache_calls, [])
+                self.assertEqual(env.app.open_calls, [])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(len(captures), 1)
+
+    def test_initial_cursor_reader_failure_is_not_null_termination(self):
+        for member in ("GetFirstDocument", "GetNext"):
+            with self.subTest(member=member), Environment().installed() as env:
+                primary = ProbeError("actual cursor read failure")
+                if member == "GetFirstDocument":
+                    env.app.first_override = primary
+                else:
+                    foreign = Document("C:/foreign/hidden.SLDPRT", 1)
+                    env.app.documents.append(foreign)
+                    env.app.next_overrides[foreign] = primary
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertFalse(report["inventories"]["initial"]["enumerated"])
+                self.assertFalse(report["inventories"]["initial"]["cursor_terminated"])
+                self.assertEqual(len(env.app.count_values), 2)
+                self.assertEqual(report["primary_failure"]["type"], "ProbeError")
+                self.assertTrue(report["primary_failure"]["operation"].endswith(member))
+                self.assertTrue(captures[0]["primary_traceback"]["available"])
+                self.assertEqual(env.cache_calls, [])
+                self.assertEqual(env.app.open_calls, [])
+                self.assertEqual(env.app.close_calls, [])
+
+    def test_cleanup_cursor_requires_native_self_and_distinct_identity(self):
+        for result in (0, -1, 7, None, True, "1"):
+            with self.subTest(result=result), Environment().installed() as env:
+                env.after_diagnostic = lambda: setattr(env.app, "identity_override", lambda _left, _right: result)
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertTrue(report["collection_completed"])
+                self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(len(env.app.documents), 2)
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+        with Environment().installed() as env:
+            env.after_diagnostic = lambda: setattr(
+                env.app, "identity_override", lambda left, right: 1 if left is right else -1
+            )
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertTrue(report["collection_completed"])
+            self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
+            self.assertTrue(any(row.get("raw") == -1 and ".identity.previous[" in row["operation"] for row in report["identity_comparisons"]))
+            self.assertEqual(env.app.close_calls, [])
+            self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+
+    def test_cleanup_cursor_drift_cardinality_cycles_and_duplicates_never_close(self):
+        for shape in ("drift", "cardinality", "cycle", "duplicate_wrapper"):
+            with self.subTest(shape=shape), Environment().installed() as env:
+                def change_inventory():
+                    first, second = env.app.documents
+                    if shape == "drift":
+                        env.app.count_results = [2, 3, 2, 3, 2, 3]
+                    elif shape == "cardinality":
+                        env.app.count_override = 3
+                    elif shape == "cycle":
+                        env.app.next_overrides[second] = first
+                    else:
+                        duplicate = Document(first.path, first.kind)
+                        duplicate.native_identity = first.native_identity
+                        env.app.documents.append(duplicate)
+
+                env.after_diagnostic = change_inventory
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertTrue(report["collection_completed"])
+                self.assertFalse(report["inventories"]["before_close_0"]["enumerated"])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+
+    def test_cleanup_cursor_readers_preserve_error_and_independent_after_count(self):
+        for member in ("GetFirstDocument", "GetNext", "count_before", "count_after",
+                       "GetPathName", "GetTitle", "GetType", "GetSaveFlag"):
+            with self.subTest(member=member), Environment().installed() as env:
+                primary = ProbeError("original inventory reader")
+
+                def fail_reader():
+                    if member == "GetFirstDocument":
+                        env.app.first_override = primary
+                    elif member == "GetNext":
+                        env.app.next_overrides[env.app.documents[0]] = primary
+                    elif member == "count_before":
+                        env.app.count_results = [primary, 2, primary, 2, primary, 2]
+                    elif member == "count_after":
+                        env.app.count_results = [2, primary, 2, primary, 2, primary]
+                    else:
+                        setattr(env.app.documents[0], member, lambda: trip(primary))
+
+                env.after_diagnostic = fail_reader
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["runner_exit_code"], 0)
+                self.assertTrue(report["collection_completed"])
+                initial_cleanup = report["inventories"]["before_close_0"]
+                self.assertFalse(initial_cleanup["enumerated"])
+                if member != "count_after":
+                    self.assertEqual(initial_cleanup["native_count_after"], 2)
+                self.assertEqual(report["primary_failure"]["type"], "ProbeError")
+                self.assertEqual(report["primary_failure"]["message"], "original inventory reader")
+                self.assertTrue(captures[0]["primary_traceback"]["available"])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(len(env.app.documents), 2)
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["closures"]))
+                if member == "GetPathName":
+                    self.assertEqual(initial_cleanup["documents"][0]["title"], "sm-summing-lever.SLDPRT")
+                    self.assertIs(initial_cleanup["documents"][0]["dirty"], False)
+                    self.assertEqual(len(initial_cleanup["documents"]), 2)
+
 
 
 if __name__ == "__main__":
