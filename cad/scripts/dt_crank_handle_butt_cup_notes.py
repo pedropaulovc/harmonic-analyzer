@@ -42,6 +42,9 @@ POCKET_FIT_CALLOUT = "\n".join(
 # The depth band's mate and reason (r1 finding 4).  The floor corner's
 # separate model-owned radial MAX dimension controls head seating (finding 5).
 POCKET_DEPTH_CALLOUT = "\n".join((f"KEEPS {SCREW_NUMBER} HEAD", "BELOW FACE"))
+# The local corner limit is tighter than the title block: identify the head
+# and its flat seating function at the radius itself (rules 4 and 7).
+POCKET_FLOOR_RADIUS_CALLOUT = "\n".join((f"{SCREW_NUMBER} HEAD", "SEATS ON FLOOR"))
 # The bottom chamfer's band reason: it clears the rounded corner of the
 # MHA-DT-08 counterbore floor, so the cup seats with its face flush.
 BODY_CHAMFER_CALLOUT = "\n".join(

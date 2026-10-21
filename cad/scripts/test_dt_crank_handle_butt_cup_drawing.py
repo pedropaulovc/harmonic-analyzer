@@ -49,6 +49,7 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
         "FloorHoleDia": "DRILL THRU",
         "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
         "PocketDia": notes.POCKET_FIT_CALLOUT,
+        "PocketFloorRadius": notes.POCKET_FLOOR_RADIUS_CALLOUT,
     }
     # Three symmetric bands, plus the separate native radial MAX limit.
     assert model_toleranced_dimensions(part) == {
@@ -156,6 +157,10 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
         "KEEPS MHA-DT-32 HEAD",
         "BELOW FACE",
+    ]
+    assert notes.POCKET_FLOOR_RADIUS_CALLOUT.splitlines() == [
+        "MHA-DT-32 HEAD",
+        "SEATS ON FLOOR",
     ]
     assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
     assert spec.POCKET_FLOOR_CORNER_R_MAX <= spec.POCKET_CLEARANCE[0] / 2

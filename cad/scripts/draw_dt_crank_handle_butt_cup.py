@@ -9,6 +9,8 @@ MHA-DT-35 machinist review).  The body diameter and the pocket depth are the
 bands; the pocket is bored to suit the MHA-DT-32 head (a reference size whose
 callout states the fit), and the floor hole carries its drill callout.  Every
 band names its mate at the callout (MHA-DT-35 machinist ENFORCE, r1).
+The local radial MAX callout also names the MHA-DT-32 head and its floor
+seating function; it does not change the model's corner or clearance.
 Owner ruling B on #1375 restores the pocket-wall floor in the model, so its
 former shortfall note and property are not part of the sheet.
 
@@ -62,6 +64,7 @@ from dt_crank_handle_butt_cup_notes import (
     FLOOR_HOLE_CALLOUT,
     POCKET_DEPTH_CALLOUT,
     POCKET_FIT_CALLOUT,
+    POCKET_FLOOR_RADIUS_CALLOUT,
 )
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
@@ -170,6 +173,7 @@ DIMENSION_CALLOUTS = {
     "FloorHoleDia": FLOOR_HOLE_CALLOUT,
     "PocketDepth": POCKET_DEPTH_CALLOUT,
     "PocketDia": POCKET_FIT_CALLOUT,
+    "PocketFloorRadius": POCKET_FLOOR_RADIUS_CALLOUT,
 }
 # *Left reverses *Right's horizontal basis.  Reverse the cut as well to
 # retain the section's physical viewing direction and +X-right orientation.
