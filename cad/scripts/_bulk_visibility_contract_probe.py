@@ -542,12 +542,16 @@ def assembly_template_evidence(value: Any) -> dict[str, Any]:
 
 
 def error_record(error: BaseException) -> dict[str, Any]:
-    return {
+    record = {
         "type": type(error).__name__,
         "message": str(error),
         "traceback": "".join(traceback.format_exception(error)),
         "notes": list(getattr(error, "__notes__", ())),
     }
+    for name in ("hresult", "strerror", "excepinfo", "argerror"):
+        if hasattr(error, name):
+            record[name] = getattr(error, name)
+    return record
 
 
 def fixture_instances(
@@ -806,7 +810,15 @@ class Receipt:
                 payload = json.dumps(
                     {
                         "run_id": self.root.name,
-                        "primary": item,
+                        "primary": (
+                            {
+                                **self.data["primary_error"],
+                                **error_record(self.primary),
+                            }
+                            if self.primary is not None
+                            else item
+                        ),
+                        "reported_error": item,
                         "report_error": repr(report_error),
                     },
                     default=str,
@@ -2140,8 +2152,7 @@ class NativeProbe:
         self.classify_root()
         self.source_checkpoint("K11")
         self.create_drawing()
-        self.identity_controls()
-        self.checkpoint("constructed-drawing")
+        self._constructed_drawing_checkpoint()
 
     def create_drawing(self) -> None:
         template = self.root / "cad/templates/harmonic-analyzer-landscape.DRWDOT"
@@ -2252,12 +2263,30 @@ class NativeProbe:
         self.rebuild()
         self.activate_view(ViewId.A)
         self.views()
-        self.harness_flags = self.flags()
         self.receipt.data["fixture"] = {
             "paths": {key: str(path) for key, path in self.paths.items()},
             "native_generations": dict(self.generations),
-            "initial_flags": self.harness_flags,
         }
+
+    def _constructed_drawing_checkpoint(self) -> None:
+        primary = None
+        try:
+            self.identity_controls()
+        except BaseException as error:
+            primary = error
+            self.receipt.failure(primary)
+        try:
+            context = self.checkpoint("constructed-drawing")
+        except BaseException as error:
+            if primary is None:
+                raise
+            primary.add_note(f"constructed-drawing readback also failed: {error!r}")
+            self.receipt.failure(error, secondary=True)
+        if primary is not None:
+            raise primary
+        # The complete checkpoint, including its final receipt write, passed.
+        self.harness_flags = dict(context["flags"])
+        self.receipt.data["fixture"]["initial_flags"] = dict(self.harness_flags)
 
     def views(self) -> dict[ViewId, tuple[Any, dict[NodeId, DrawingNode]]]:
         result = {}
@@ -2418,29 +2447,125 @@ class NativeProbe:
         )
         return result
 
-    def flags(self) -> dict[str, bool]:
-        views = self.views()
-        model = self.model(Document.DRAWING)
-        model_view = self.bind(model.IActiveView, "IModelView")
-        tree = self.bind(model.FeatureManager, "IFeatureManager")
-        return {
-            "A_disable": api_bool(
-                views[ViewId.A][0].DisableAutoUpdate, "A DisableAutoUpdate"
-            ),
-            "B_disable": api_bool(
-                views[ViewId.B][0].DisableAutoUpdate, "B DisableAutoUpdate"
-            ),
-            "automatic": api_bool(
-                self.draw().AutomaticViewUpdate, "AutomaticViewUpdate"
-            ),
-            "graphics": api_bool(
-                model_view.EnableGraphicsUpdate, "EnableGraphicsUpdate"
-            ),
-            "tree": api_bool(tree.EnableFeatureTree, "EnableFeatureTree"),
-            "tree_window": api_bool(
-                tree.EnableFeatureTreeWindow, "EnableFeatureTreeWindow"
-            ),
+    def _flag_observations(
+        self, views: Any, *, receiver_error: BaseException | None = None
+    ) -> tuple[dict[str, bool], dict[str, Any], BaseException | None]:
+        values: dict[str, bool] = {}
+        evidence: dict[str, Any] = {
+            "receiver": {
+                "document": Document.DRAWING,
+                "generation": self.generations[Document.DRAWING],
+            },
+            "dependencies": {},
+            "values": {},
         }
+        errors: list[BaseException] = []
+        try:
+            if receiver_error is not None:
+                raise receiver_error
+            model = self.model(Document.DRAWING)
+            identity = self.identical(
+                self.app.ActiveDoc, model, "active owned drawing for flags"
+            )
+            evidence["receiver"].update(status="passed", native_identity=identity)
+        except BaseException as error:
+            evidence["receiver"].update(status="failed", error=error_record(error))
+            for key, owner, member in (
+                ("A_disable", f"IView/{ViewId.A}", "DisableAutoUpdate"),
+                ("B_disable", f"IView/{ViewId.B}", "DisableAutoUpdate"),
+                ("automatic", "IDrawingDoc", "AutomaticViewUpdate"),
+                ("graphics", "IModelView", "EnableGraphicsUpdate"),
+                ("tree", "IFeatureManager", "EnableFeatureTree"),
+                ("tree_window", "IFeatureManager", "EnableFeatureTreeWindow"),
+            ):
+                evidence["values"][key] = {
+                    "owner": owner,
+                    "member": member,
+                    "provenance": {
+                        "document": Document.DRAWING,
+                        "generation": self.generations[Document.DRAWING],
+                    },
+                    "status": "blocked",
+                    "dependency": "receiver",
+                }
+            return values, evidence, error
+
+        provenance = {
+            "document": Document.DRAWING,
+            "generation": self.generations[Document.DRAWING],
+        }
+
+        def dependency(member: str, interface: str) -> Any:
+            row = {
+                "owner": "IModelDoc2",
+                "member": member,
+                "provenance": provenance,
+            }
+            evidence["dependencies"][member] = row
+            try:
+                raw = model if member == "drawing" else getattr(model, member)
+                row.update(type=type(raw).__name__, is_null=raw is None)
+                receiver = self.bind(raw, interface)
+                row["status"] = "passed"
+                return receiver
+            except BaseException as error:
+                row.update(status="failed", error=error_record(error))
+                errors.append(error)
+                return None
+
+        drawing = dependency("drawing", "IDrawingDoc")
+        model_view = dependency("ActiveView", "IModelView")
+        tree = dependency("FeatureManager", "IFeatureManager")
+
+        def read(
+            key: str, receiver: Any, owner: str, member: str, depends_on: str
+        ) -> None:
+            row = {"owner": owner, "member": member, "provenance": provenance}
+            evidence["values"][key] = row
+            if receiver is None:
+                row.update(status="blocked", dependency=depends_on)
+                return
+            try:
+                raw = getattr(receiver, member)
+                row.update(type=type(raw).__name__, repr=repr(raw))
+                value = api_bool(raw, f"{owner}.{member}")
+                row.update(status="passed", value=value)
+                values[key] = value
+            except BaseException as error:
+                row.update(status="failed", error=error_record(error))
+                errors.append(error)
+
+        read(
+            "A_disable",
+            views[ViewId.A][0],
+            f"IView/{ViewId.A}",
+            "DisableAutoUpdate",
+            "views",
+        )
+        read(
+            "B_disable",
+            views[ViewId.B][0],
+            f"IView/{ViewId.B}",
+            "DisableAutoUpdate",
+            "views",
+        )
+        read("automatic", drawing, "IDrawingDoc", "AutomaticViewUpdate", "drawing")
+        read("graphics", model_view, "IModelView", "EnableGraphicsUpdate", "ActiveView")
+        read("tree", tree, "IFeatureManager", "EnableFeatureTree", "FeatureManager")
+        read(
+            "tree_window",
+            tree,
+            "IFeatureManager",
+            "EnableFeatureTreeWindow",
+            "FeatureManager",
+        )
+        return values, evidence, errors[0] if errors else None
+
+    def flags(self) -> dict[str, bool]:
+        values, _evidence, error = self._flag_observations(self.views())
+        if error is not None:
+            raise error
+        return values
 
     def set_flags(self, flags: Mapping[str, bool]) -> None:
         before = self.flags()
@@ -2451,17 +2576,21 @@ class NativeProbe:
             "invalid harness flag vector",
         )
         views = self.views()
+        model = self.model(Document.DRAWING)
+        self.identical(
+            self.app.ActiveDoc, model, "active owned drawing for flag writes"
+        )
+        drawing = self.bind(model, "IDrawingDoc")
+        model_view = self.bind(model.ActiveView, "IModelView")
+        tree = self.bind(model.FeatureManager, "IFeatureManager")
         if before["A_disable"] != flags["A_disable"]:
             views[ViewId.A][0].DisableAutoUpdate = flags["A_disable"]
         if before["B_disable"] != flags["B_disable"]:
             views[ViewId.B][0].DisableAutoUpdate = flags["B_disable"]
         if before["automatic"] != flags["automatic"]:
-            self.draw().AutomaticViewUpdate = flags["automatic"]
-        model = self.model(Document.DRAWING)
-        model_view = self.bind(model.IActiveView, "IModelView")
+            drawing.AutomaticViewUpdate = flags["automatic"]
         if before["graphics"] != flags["graphics"]:
             model_view.EnableGraphicsUpdate = flags["graphics"]
-        tree = self.bind(model.FeatureManager, "IFeatureManager")
         if before["tree"] != flags["tree"]:
             tree.EnableFeatureTree = flags["tree"]
         if before["tree_window"] != flags["tree_window"]:
@@ -2551,18 +2680,46 @@ class NativeProbe:
             )
         return result
 
-    def context(self, views: Any) -> dict[str, Any]:
-        self.identical(
-            self.app.ActiveDoc, self.model(Document.DRAWING), "active owned drawing"
-        )
-        drawing = self.draw()
-        sheet_name = self.bind(drawing.GetCurrentSheet(), "ISheet").GetName()
-        require(
-            sheet_name in tuple(ViewId), Verdict.PRESERVATION, "foreign active sheet"
-        )
-        raw = drawing.ActiveDrawingView
-        active = None
-        if raw is not None:
+    def _context_observations(
+        self, views: Any
+    ) -> tuple[dict[str, Any], BaseException | None]:
+        context: dict[str, Any] = {"observations": {}}
+        observations = context["observations"]
+        errors: list[BaseException] = []
+        try:
+            model = self.model(Document.DRAWING)
+            identity = self.identical(self.app.ActiveDoc, model, "active owned drawing")
+            drawing = self.bind(model, "IDrawingDoc")
+            observations["receiver"] = {
+                "status": "passed",
+                "document": Document.DRAWING,
+                "generation": self.generations[Document.DRAWING],
+                "native_identity": identity,
+            }
+        except BaseException as error:
+            observations["receiver"] = {
+                "status": "failed",
+                "error": error_record(error),
+            }
+            for key in ("sheet", "view", "selection", "flags"):
+                observations[key] = {"status": "blocked", "dependency": "receiver"}
+            flags, evidence, _error = self._flag_observations(
+                views, receiver_error=error
+            )
+            context["flags"] = flags
+            context["flag_observations"] = evidence
+            context["observation_error"] = error_record(error)
+            return context, error
+
+        def sheet() -> ViewId:
+            name = self.bind(drawing.GetCurrentSheet(), "ISheet").GetName()
+            require(name in tuple(ViewId), Verdict.PRESERVATION, "foreign active sheet")
+            return ViewId(name)
+
+        def active_view() -> ViewId | None:
+            raw = drawing.ActiveDrawingView
+            if raw is None:
+                return None
             matches = [
                 view_id
                 for view_id, (view, _) in views.items()
@@ -2571,13 +2728,42 @@ class NativeProbe:
             require(
                 len(matches) == 1, Verdict.IDENTITY, "unidentified active drawing view"
             )
-            active = matches[0]
-        return {
-            "sheet": ViewId(sheet_name),
-            "view": active,
-            "selection": self.selection(views),
-            "flags": self.flags(),
-        }
+            return matches[0]
+
+        # These safe branches are independent once their owned receiver is proved.
+        for key, reader in (
+            ("sheet", sheet),
+            ("view", active_view),
+            ("selection", lambda: self.selection(views)),
+        ):
+            try:
+                value = reader()
+                context[key] = value
+                observations[key] = {"status": "passed", "value": value}
+            except BaseException as error:
+                observations[key] = {"status": "failed", "error": error_record(error)}
+                errors.append(error)
+        flags, evidence, flag_error = self._flag_observations(views)
+        context["flags"] = flags
+        context["flag_observations"] = evidence
+        if flag_error is not None:
+            observations["flags"] = {
+                "status": "failed",
+                "error": error_record(flag_error),
+            }
+            errors.append(flag_error)
+        else:
+            observations["flags"] = {"status": "passed"}
+        if errors:
+            context["observation_error"] = error_record(errors[0])
+        return context, errors[0] if errors else None
+
+    def context(self, views: Any) -> dict[str, Any]:
+        context, error = self._context_observations(views)
+        if error is not None:
+            raise error
+        # Restoration compares semantic state, not diagnostic wrapper provenance.
+        return {key: context[key] for key in ("sheet", "view", "selection", "flags")}
 
     def checkpoint(
         self,
@@ -2585,7 +2771,7 @@ class NativeProbe:
         *,
         changed: tuple[NodeId, ...] = (),
         effect_verdict: Verdict = Verdict.PRESERVATION,
-    ) -> None:
+    ) -> dict[str, Any]:
         with self.timed("readback"):
             views = self.views()
             observed = {}
@@ -2629,24 +2815,45 @@ class NativeProbe:
                 sources = {"observation_error": error_record(error)}
             context_error = None
             try:
-                context = self.context(views)
+                context, context_error = self._context_observations(views)
             except BaseException as error:
                 context_error = error
                 context = {"observation_error": error_record(error)}
-            self.receipt.observe(
-                SnapshotKind.FULL,
-                label,
-                {
-                    "views": observed,
-                    "source": sources,
-                    "context": context,
-                    "visibility_mismatches": [
-                        {"verdict": verdict, "message": message}
-                        for verdict, message in mismatches
-                    ],
-                },
+            primary = (
+                source_error
+                or context_error
+                or (ProbeFailure(*mismatches[0]) if mismatches else None)
             )
-            self.receipt.checkpoint()
+            if source_error is not None and context_error is not None:
+                if self.receipt.primary is None:
+                    self.receipt.failure(source_error)
+                source_error.add_note(
+                    f"context readback also failed: {context_error!r}"
+                )
+                self.receipt.failure(context_error, secondary=True)
+            try:
+                self.receipt.observe(
+                    SnapshotKind.FULL,
+                    label,
+                    {
+                        "views": observed,
+                        "source": sources,
+                        "context": context,
+                        "visibility_mismatches": [
+                            {"verdict": verdict, "message": message}
+                            for verdict, message in mismatches
+                        ],
+                    },
+                )
+                self.receipt.checkpoint()
+            except BaseException as report_error:
+                if primary is None:
+                    raise
+                if self.receipt.primary is None:
+                    self.receipt.failure(primary)
+                primary.add_note(f"readback checkpoint also failed: {report_error!r}")
+                self.receipt.failure(report_error, secondary=True)
+                raise primary
             if source_error is not None:
                 raise source_error
             if context_error is not None:
@@ -2654,45 +2861,54 @@ class NativeProbe:
             if mismatches:
                 raise ProbeFailure(*mismatches[0])
         self.receipt.checkpoint()
+        return context
 
     def identity_controls(self) -> None:
-        first, second = self.views(), self.views()
-        positives = {}
-        for view_id in ViewId:
-            positives[f"{view_id}/view_self"] = self.identical(
-                first[view_id][0], first[view_id][0], "view self"
-            )
-            positives[f"{view_id}/fresh_view"] = self.identical(
-                first[view_id][0], second[view_id][0], "fresh view positive"
-            )
-            for key in NodeId:
-                positives[f"{view_id}/fresh_component/{key}"] = self.identical(
-                    first[view_id][1][key].drawing_component,
-                    second[view_id][1][key].drawing_component,
-                    "fresh component positive",
+        positives: dict[str, int] = {}
+        negatives: dict[str, int] = {}
+        row = {
+            "drawing_generation": self.generations[Document.DRAWING],
+            "positive_is_same": positives,
+            "negative_is_same": negatives,
+        }
+        self.receipt.data.setdefault("native_identity_controls", []).append(row)
+        try:
+            first, second = self.views(), self.views()
+            for view_id in ViewId:
+                positives[f"{view_id}/view_self"] = self.same(
+                    first[view_id][0], first[view_id][0]
                 )
-        negatives = {
-            "distinct_views": self.same(first[ViewId.A][0], first[ViewId.B][0]),
-            "distinct_same_part_instances": self.same(
+                positives[f"{view_id}/fresh_view"] = self.same(
+                    first[view_id][0], second[view_id][0]
+                )
+                for key in NodeId:
+                    positives[f"{view_id}/fresh_component/{key}"] = self.same(
+                        first[view_id][1][key].drawing_component,
+                        second[view_id][1][key].drawing_component,
+                    )
+            negatives["distinct_views"] = self.same(
+                first[ViewId.A][0], first[ViewId.B][0]
+            )
+            negatives["distinct_same_part_instances"] = self.same(
                 first[ViewId.A][1][NodeId.P1].drawing_component,
                 first[ViewId.A][1][NodeId.P2].drawing_component,
-            ),
-        }
-        require(
-            all(value == 0 for value in negatives.values()),
-            Verdict.IDENTITY,
-            "distinct native positive-control objects compare equal",
-        )
-        positives["drawing_self"] = self.identical(
-            self.model(Document.DRAWING), self.model(Document.DRAWING), "drawing self"
-        )
-        self.receipt.data.setdefault("native_identity_controls", []).append(
-            {
-                "drawing_generation": self.generations[Document.DRAWING],
-                "positive_is_same": positives,
-                "negative_is_same": negatives,
-            }
-        )
+            )
+            positives["drawing_self"] = self.same(
+                self.model(Document.DRAWING), self.model(Document.DRAWING)
+            )
+            require(
+                all(value == 1 for value in positives.values()),
+                Verdict.IDENTITY,
+                "native positive-control objects compare different",
+            )
+            require(
+                all(value == 0 for value in negatives.values()),
+                Verdict.IDENTITY,
+                "distinct native positive-control objects compare equal",
+            )
+        except BaseException as error:
+            row["error"] = error_record(error)
+            raise
 
     def setup_visibility(
         self, changes: Mapping[NodeId, bool], *, rebuild: bool = True

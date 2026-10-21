@@ -1222,11 +1222,35 @@ def test_activate_view_refuses_late_group_failure_before_view_activation(
     assert fixture.drawing.ActiveDrawingView is None
 
 
+class InertWriteOnlyError(Exception):
+    """Retained server-shaped failure without importing pywin32 or the SDK."""
+
+    def __init__(self):
+        super().__init__("Unable to read write-only property.")
+        self.hresult = -2147352567
+        self.excepinfo = (
+            61836,
+            "SOLIDWORKS Design",
+            "Unable to read write-only property.",
+            r"C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\lang\english\sldworks.chm",
+            455052,
+            0,
+        )
+        self.argerror = None
+
+
+class OfflineReadinessDrawing(OfflineDrawing):
+    @property
+    def IActiveView(self):
+        raise InertWriteOnlyError()
+
+
 @pytest.fixture
 def sheet_scale_construction(sheet_inventory, monkeypatch):
     """Run actual create_drawing/readback/views with inert native object ports."""
     fixture = sheet_inventory
     subject, drawing = fixture.subject, fixture.drawing
+    drawing.__class__ = OfflineReadinessDrawing
     fixture.controls.scale_result = False
     fixture.scale_writes = []
     fixture.created_views = []
@@ -1278,7 +1302,7 @@ def sheet_scale_construction(sheet_inventory, monkeypatch):
     drawing.ClearSelection2 = lambda _all: None
     drawing.InsertNote = insert_note
     drawing.AutomaticViewUpdate = True
-    drawing.IActiveView = SimpleNamespace(EnableGraphicsUpdate=True)
+    drawing.ActiveView = SimpleNamespace(EnableGraphicsUpdate=True)
     drawing.FeatureManager = SimpleNamespace(
         EnableFeatureTree=True, EnableFeatureTreeWindow=True
     )
@@ -1361,6 +1385,889 @@ def test_sheet_scale_constructor_readback_reaches_complete_fixture(
         for state in fixture.subject.view_baselines.values()
     )
     assert "fixture" in fixture.subject.receipt.data
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    assert not hasattr(fixture.subject, "harness_flags")
+
+
+@pytest.fixture
+def readiness(sheet_inventory, monkeypatch):
+    """Actual readback/orchestration; only native receiver ports are inert."""
+    fixture = sheet_inventory
+    subject, drawing = fixture.subject, fixture.drawing
+    fixture.reads = []
+    fixture.faults = {}
+    fixture.writes = []
+    fixture.accept_writes = False
+    fixture.ignored_writes = set()
+
+    def write_flag(key, value):
+        assert fixture.accept_writes, f"unexpected inert flag write: {key}"
+        assert type(value) is bool
+        fixture.writes.append((key, value))
+        if key not in fixture.ignored_writes:
+            fixture.flag_values[key] = value
+
+    fixture.flag_values = {
+        "A_disable": False,
+        "B_disable": True,
+        "automatic": True,
+        "graphics": False,
+        "tree": True,
+        "tree_window": False,
+    }
+
+    class ReadPort:
+        def __init__(self, members):
+            self.members = members
+
+        def __getattr__(self, member):
+            key = self.members[member]
+            fixture.reads.append(key)
+            if key in fixture.faults:
+                raise fixture.faults[key]
+            return fixture.flag_values[key]
+
+        def __setattr__(self, member, value):
+            if member == "members":
+                object.__setattr__(self, member, value)
+            else:
+                write_flag(self.members[member], value)
+
+    viewport = ReadPort({"EnableGraphicsUpdate": "graphics"})
+    tree = ReadPort(
+        {"EnableFeatureTree": "tree", "EnableFeatureTreeWindow": "tree_window"}
+    )
+    ports = {"ActiveView": viewport, "FeatureManager": tree}
+
+    class ReadinessDrawing(OfflineReadinessDrawing):
+        def __getattribute__(self, member):
+            if member == "ActiveDrawingView" and "view" in fixture.faults:
+                raise fixture.faults["view"]
+            if member in ports or member == "AutomaticViewUpdate":
+                key = "automatic" if member == "AutomaticViewUpdate" else member
+                fixture.reads.append(key)
+                if key in fixture.faults:
+                    raise fixture.faults[key]
+                return fixture.flag_values[key] if key == "automatic" else ports[key]
+            return super().__getattribute__(member)
+
+        def __setattr__(self, member, value):
+            if member == "AutomaticViewUpdate":
+                write_flag("automatic", value)
+            elif member in ports:
+                raise AssertionError(
+                    f"viewport/tree receiver must not be assigned: {member}"
+                )
+            else:
+                super().__setattr__(member, value)
+
+    class ReadinessView(OfflineModel):
+        @property
+        def DisableAutoUpdate(self):
+            key = f"{probe.ViewId(self.Sheet.GetName()).name}_disable"
+            fixture.reads.append(key)
+            if key in fixture.faults:
+                raise fixture.faults[key]
+            return fixture.flag_values[key]
+
+        @DisableAutoUpdate.setter
+        def DisableAutoUpdate(self, value):
+            write_flag(f"{probe.ViewId(self.Sheet.GetName()).name}_disable", value)
+
+    drawing.__class__ = ReadinessDrawing
+    for view in fixture.views.values():
+        view.__class__ = ReadinessView
+    fixture.ports = ports
+    fixture.selection_reads = []
+
+    def selected_count(mark):
+        fixture.selection_reads.append(("count", mark))
+        if "selection" in fixture.faults:
+            raise fixture.faults["selection"]
+        return 0
+
+    drawing.SelectionManager = SimpleNamespace(GetSelectedObjectCount2=selected_count)
+    full_views = drawing.GetViews
+    drawing.GetViews = lambda: ((object(),),)
+    try:
+        with subject.acquiring(probe.Document.DRAWING) as before:
+            subject.app.models.append(drawing)
+            subject.app.ActiveDoc = drawing
+            subject.acquired(probe.Document.DRAWING, drawing, before)
+            subject.claim(probe.Document.DRAWING, 3, None)
+    finally:
+        drawing.GetViews = full_views
+    admitted_model = probe.NativeProbe.model
+    monkeypatch.setattr(
+        subject,
+        "model",
+        lambda label: (
+            admitted_model(subject, label)
+            if label is probe.Document.DRAWING
+            else fixture.source
+        ),
+    )
+    monkeypatch.setattr(subject, "sources", lambda: {"inert_source_inventory": True})
+    subject.expected = {
+        view_id: {key: True for key in probe.NodeId} for view_id in probe.ViewId
+    }
+    subject.receipt.data["fixture"] = {
+        "paths": {key: str(path) for key, path in subject.paths.items()},
+        "native_generations": dict(subject.generations),
+    }
+    return fixture
+
+
+def readiness_snapshot(subject, *, full_count=1):
+    (event,) = [
+        event
+        for event in subject.receipt.data["observations"]
+        if event["label"] == "constructed-drawing"
+    ]
+    assert event["id"] == "F001"
+    assert subject.receipt.counts[probe.SnapshotKind.FULL] == full_count
+    construction = subject.receipt.data["cases"][probe.Case.CONSTRUCTION]
+    assert not any(
+        identifier.startswith(probe.SnapshotKind.SOURCE)
+        for identifier in construction["checkpoints"]
+    )
+    return subject.receipt.data["snapshots"][event["content"]]
+
+
+def assert_full_readiness_views(snapshot):
+    assert set(snapshot["views"]) == set(probe.ViewId)
+    for view_id, observed in snapshot["views"].items():
+        assert set(observed["nodes"]) == set(probe.NodeId)
+        assert observed["effective"] == {key: True for key in probe.NodeId}
+        assert observed["view"]["use_sheet_scale"] == 0
+        assert observed["nodes"][probe.NodeId.P1]["parent"] == probe.NodeId.N
+        assert observed["nodes"][probe.NodeId.Q2]["parent"] is None
+
+
+def test_readiness_flags_use_active_view_and_exact_six_values(readiness):
+    fixture = readiness
+    with pytest.raises(InertWriteOnlyError) as caught:
+        _ = fixture.drawing.IActiveView
+    assert caught.value.hresult == -2147352567
+    assert caught.value.excepinfo[2] == "Unable to read write-only property."
+    assert caught.value.argerror is None
+    assert fixture.subject.flags() == fixture.flag_values
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    assert fixture.context_calls == []
+    assert fixture.subject.app.activation_calls == []
+
+
+def test_readiness_late_flag_error_retains_six_independent_receipts(readiness):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    fixture.faults["tree_window"] = original
+    values, evidence, error = fixture.subject._flag_observations(
+        fixture.subject.views()
+    )
+    assert error is original
+    assert values == {
+        key: value for key, value in fixture.flag_values.items() if key != "tree_window"
+    }
+    assert set(evidence["values"]) == set(fixture.flag_values)
+    assert evidence["receiver"]["document"] == probe.Document.DRAWING
+    assert evidence["receiver"]["generation"] == 1
+    assert evidence["receiver"]["status"] == "passed"
+    for key, row in evidence["values"].items():
+        assert row["owner"] and row["member"] and row["provenance"]
+        if key != "tree_window":
+            assert row["status"] == "passed"
+            assert type(row["value"]) is bool
+            assert row["value"] is fixture.flag_values[key]
+            assert row["type"] == "bool"
+            assert row["repr"] == repr(fixture.flag_values[key])
+        else:
+            assert row["status"] == "failed"
+            assert row["error"]["message"] == str(original)
+            assert row["error"]["traceback"]
+            assert row["error"]["hresult"] == original.hresult
+            assert tuple(row["error"]["excepinfo"]) == original.excepinfo
+            assert row["error"]["argerror"] is None
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    fixture.reads.clear()
+    with pytest.raises(InertWriteOnlyError) as caught:
+        fixture.subject.flags()
+    assert caught.value is original
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+@pytest.mark.parametrize(
+    ("dependency", "blocked"),
+    [
+        ("ActiveView", {"graphics"}),
+        ("FeatureManager", {"tree", "tree_window"}),
+    ],
+)
+def test_readiness_failed_dependency_only_blocks_its_own_flags(
+    readiness, dependency, blocked
+):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    fixture.faults[dependency] = original
+    values, evidence, error = fixture.subject._flag_observations(
+        fixture.subject.views()
+    )
+    assert error is original
+    assert values == {
+        key: value for key, value in fixture.flag_values.items() if key not in blocked
+    }
+    assert evidence["dependencies"][dependency]["status"] == "failed"
+    for key, row in evidence["values"].items():
+        assert row["status"] == ("blocked" if key in blocked else "passed")
+    assert Counter(fixture.reads) == Counter(
+        (
+            *(key for key in fixture.flag_values if key not in blocked),
+            "ActiveView",
+            "FeatureManager",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "key", ["A_disable", "B_disable", "automatic", "graphics", "tree", "tree_window"]
+)
+@pytest.mark.parametrize("value", [0, 1, None, "False", 0.0])
+def test_readiness_nonboolean_is_failed_receipt_not_a_default(readiness, key, value):
+    fixture = readiness
+    fixture.flag_values[key] = value
+    values, evidence, error = fixture.subject._flag_observations(
+        fixture.subject.views()
+    )
+    assert isinstance(error, probe.ProbeFailure)
+    assert key not in values
+    assert set(values) == set(fixture.flag_values) - {key}
+    assert evidence["values"][key]["status"] == "failed"
+    assert evidence["values"][key]["error"]["message"]
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.flags()
+
+
+@pytest.mark.parametrize("fault", ["foreign_active", "null_active", "unadmitted"])
+def test_readiness_owner_failure_blocks_all_unsafe_reads_without_activation(
+    readiness, fault
+):
+    fixture = readiness
+    if fault == "foreign_active":
+        fixture.subject.app.ActiveDoc = OfflineDrawing()
+    elif fault == "null_active":
+        fixture.subject.app.ActiveDoc = None
+    else:
+        fixture.subject.documents.clear()
+    values, evidence, error = fixture.subject._flag_observations(
+        fixture.subject.views()
+    )
+    assert isinstance(error, probe.ProbeFailure)
+    assert values == {}
+    assert evidence["receiver"]["status"] == "failed"
+    assert all(row["status"] == "blocked" for row in evidence["values"].values())
+    assert fixture.reads == []
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.flags()
+    assert fixture.reads == []
+    assert fixture.subject.app.activation_calls == []
+    assert fixture.context_calls == []
+
+
+def test_readiness_null_viewport_blocks_graphics_without_substitution(readiness):
+    fixture = readiness
+    fixture.ports["ActiveView"] = None
+    fixture.drawing.ActiveDrawingView = fixture.views[probe.ViewId.A]
+    values, evidence, error = fixture.subject._flag_observations(
+        fixture.subject.views()
+    )
+    assert isinstance(error, probe.ProbeFailure)
+    assert set(values) == set(fixture.flag_values) - {"graphics"}
+    assert evidence["dependencies"]["ActiveView"]["status"] == "failed"
+    assert evidence["values"]["graphics"]["status"] == "blocked"
+    assert "graphics" not in fixture.reads
+    assert fixture.subject.app.activation_calls == []
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.flags()
+
+
+def test_readiness_context_observes_zero_selection_and_sheet_context(readiness):
+    fixture = readiness
+    context = fixture.subject.context(fixture.subject.views())
+    assert set(context) == {"sheet", "view", "selection", "flags"}
+    assert context["sheet"] == probe.ViewId.A
+    assert context["view"] is None
+    assert context["selection"] == []
+    assert context["flags"] == fixture.flag_values
+    assert fixture.selection_reads == [("count", -1)]
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+@pytest.mark.parametrize("branch", ["sheet", "view", "selection", "tree_window"])
+def test_readiness_checkpoint_retains_full_views_and_independent_context(
+    readiness, monkeypatch, branch
+):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    if branch == "sheet":
+
+        def fail_sheet():
+            raise original
+
+        monkeypatch.setattr(fixture.drawing, "GetCurrentSheet", fail_sheet)
+    else:
+        fixture.faults[branch] = original
+    with pytest.raises(InertWriteOnlyError) as caught:
+        fixture.subject.checkpoint("constructed-drawing")
+    assert caught.value is original
+    snapshot = readiness_snapshot(fixture.subject)
+    assert_full_readiness_views(snapshot)
+    context = snapshot["context"]
+    if branch != "view":
+        assert context["view"] is None
+    if branch != "sheet":
+        assert context["sheet"] == probe.ViewId.A
+    if branch != "selection":
+        assert context["selection"] == []
+    if branch != "tree_window":
+        assert context["flags"] == fixture.flag_values
+    evidence = context["flag_observations"]
+    assert set(evidence["values"]) == set(fixture.flag_values)
+    assert evidence["values"]["tree_window"]["status"] == (
+        "failed" if branch == "tree_window" else "passed"
+    )
+    assert fixture.selection_reads == [("count", -1)]
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    persisted = json.loads((fixture.subject.receipt.root / "report.json").read_text())
+    event = persisted["observations"][0]
+    assert persisted["snapshots"][event["content"]]["views"]
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    assert not hasattr(fixture.subject, "harness_flags")
+
+
+def test_readiness_success_initializes_only_from_single_validated_checkpoint(readiness):
+    fixture = readiness
+    fixture.subject._constructed_drawing_checkpoint()
+    snapshot = readiness_snapshot(fixture.subject)
+    assert_full_readiness_views(snapshot)
+    assert fixture.subject.harness_flags == snapshot["context"]["flags"]
+    assert (
+        fixture.subject.receipt.data["fixture"]["initial_flags"] == fixture.flag_values
+    )
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    (identity,) = fixture.subject.receipt.data["native_identity_controls"]
+    assert all(value == 1 for value in identity["positive_is_same"].values())
+    assert set(identity["negative_is_same"].values()) == {0}
+
+
+@pytest.mark.parametrize("later", ["none", "flags", "report"])
+def test_readiness_identity_primary_survives_later_checkpoint_failure(
+    readiness, monkeypatch, later
+):
+    fixture = readiness
+    original = probe.ProbeFailure(probe.Verdict.IDENTITY, "identity closure refused")
+    secondary = InertWriteOnlyError()
+
+    def fail_identity():
+        raise original
+
+    monkeypatch.setattr(fixture.subject, "identity_controls", fail_identity)
+    if later == "flags":
+        fixture.faults["tree_window"] = secondary
+    elif later == "report":
+
+        def fail_report():
+            raise secondary
+
+        monkeypatch.setattr(fixture.subject.receipt, "checkpoint", fail_report)
+    with pytest.raises(probe.ProbeFailure) as caught:
+        fixture.subject._constructed_drawing_checkpoint()
+    assert caught.value is original
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    assert not hasattr(fixture.subject, "harness_flags")
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    if later != "none":
+        assert any(
+            row["message"] == str(secondary)
+            for row in fixture.subject.receipt.data["secondary_errors"]
+        )
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+def test_readiness_failure_stops_actual_run_before_c01_or_candidate(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    fixture.faults["tree_window"] = original
+    fixture.subject.construction_action = (
+        fixture.subject._constructed_drawing_checkpoint
+    )
+    reached = []
+    monkeypatch.setattr(
+        fixture.subject, "apply", lambda *args, **kwargs: reached.append("candidate")
+    )
+    with pytest.raises(InertWriteOnlyError) as caught:
+        fixture.subject.run()
+    assert caught.value is original
+    assert reached == []
+    assert fixture.subject.receipt.primary is original
+    assert fixture.subject.receipt.data["handoff_allowed"] is False
+    assert all(
+        row["status"] is probe.Verdict.NOT_EXECUTED
+        for case, row in fixture.subject.receipt.data["cases"].items()
+        if case is not probe.Case.CONSTRUCTION
+    )
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    assert not hasattr(fixture.subject, "harness_flags")
+
+
+def test_readiness_context_owner_failure_blocks_all_dependent_branches(readiness):
+    fixture = readiness
+    fixture.subject.app.ActiveDoc = OfflineDrawing()
+    context, error = fixture.subject._context_observations(fixture.subject.views())
+    assert isinstance(error, probe.ProbeFailure)
+    assert fixture.reads == []
+    assert fixture.selection_reads == []
+    assert fixture.context_calls == []
+    assert fixture.subject.app.activation_calls == []
+    assert not any(key in context for key in ("sheet", "view", "selection"))
+    assert context["observations"]["receiver"]["status"] == "failed"
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.context(fixture.subject.views())
+    assert fixture.reads == []
+    assert fixture.selection_reads == []
+
+
+def test_readiness_context_preserves_first_error_and_later_branch_receipts(readiness):
+    fixture = readiness
+    primary = InertWriteOnlyError()
+    secondary = OSError("later tree-window getter")
+    fixture.faults["selection"] = primary
+    fixture.faults["tree_window"] = secondary
+    context, error = fixture.subject._context_observations(fixture.subject.views())
+    assert error is primary
+    assert context["sheet"] == probe.ViewId.A
+    assert context["view"] is None
+    assert context["observations"]["selection"]["error"]["message"] == str(primary)
+    assert context["flag_observations"]["values"]["tree_window"]["error"][
+        "message"
+    ] == str(secondary)
+    assert context["flags"] == {
+        key: value for key, value in fixture.flag_values.items() if key != "tree_window"
+    }
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+    with pytest.raises(InertWriteOnlyError) as caught:
+        fixture.subject.context(fixture.subject.views())
+    assert caught.value is primary
+
+
+def test_readiness_checkpoint_returns_the_complete_validated_context(readiness):
+    fixture = readiness
+    context = fixture.subject.checkpoint("constructed-drawing")
+    assert context == readiness_snapshot(fixture.subject)["context"]
+    assert context["flags"] == fixture.flag_values
+    assert context["selection"] == []
+    assert fixture.selection_reads == [("count", -1)]
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+def test_readiness_source_error_keeps_context_and_report_failures_secondary(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    primary = OSError("source readback failed first")
+    context_error = InertWriteOnlyError()
+    reporting = OSError("report persistence failed last")
+
+    def fail_sources():
+        raise primary
+
+    def fail_report():
+        raise reporting
+
+    monkeypatch.setattr(fixture.subject, "sources", fail_sources)
+    monkeypatch.setattr(fixture.subject.receipt, "checkpoint", fail_report)
+    fixture.faults["selection"] = context_error
+    with pytest.raises(OSError) as caught:
+        fixture.subject.checkpoint("constructed-drawing")
+    assert caught.value is primary
+    snapshot = readiness_snapshot(fixture.subject)
+    assert_full_readiness_views(snapshot)
+    assert snapshot["source"]["observation_error"]["message"] == str(primary)
+    assert snapshot["context"]["flags"] == fixture.flag_values
+    assert snapshot["context"]["observations"]["selection"]["error"]["message"] == str(
+        context_error
+    )
+    messages = [
+        row["message"] for row in fixture.subject.receipt.data["secondary_errors"]
+    ]
+    assert str(context_error) in messages
+    assert str(reporting) in messages
+
+
+def test_readiness_failed_actual_identity_control_keeps_comparison_evidence(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    same = fixture.subject.same
+
+    def wrong_distinct_result(left, right):
+        if (
+            left is fixture.views[probe.ViewId.A]
+            and right is fixture.views[probe.ViewId.B]
+        ):
+            return 1
+        return same(left, right)
+
+    monkeypatch.setattr(fixture.subject, "same", wrong_distinct_result)
+    with pytest.raises(probe.ProbeFailure) as caught:
+        fixture.subject._constructed_drawing_checkpoint()
+    assert caught.value.verdict is probe.Verdict.IDENTITY
+    (identity,) = fixture.subject.receipt.data["native_identity_controls"]
+    assert identity["negative_is_same"] == {
+        "distinct_views": 1,
+        "distinct_same_part_instances": 0,
+    }
+    assert identity["positive_is_same"]
+    assert all(value == 1 for value in identity["positive_is_same"].values())
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    assert not hasattr(fixture.subject, "harness_flags")
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+
+
+def test_readiness_entry_keeps_getter_primary_through_reporting_and_owned_cleanup(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    reporting = OSError("case-final report failed after readiness")
+    fixture.faults["tree_window"] = original
+    fixture.subject.construction_action = (
+        fixture.subject._constructed_drawing_checkpoint
+    )
+    with pytest.raises(InertWriteOnlyError) as caught:
+        invoke_offline_entry(fixture.subject, monkeypatch, reporting)
+    assert caught.value is original
+    assert fixture.subject.receipt.primary is original
+    assert fixture.subject.receipt.data["handoff_allowed"] is False
+    assert fixture.subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+    assert fixture.subject.app.closed == [fixture.drawing]
+    assert all(
+        row["status"] is probe.Verdict.NOT_EXECUTED
+        for case, row in fixture.subject.receipt.data["cases"].items()
+        if case not in (probe.Case.CONSTRUCTION, probe.Case.CLEANUP)
+    )
+    assert any(
+        row["message"] == str(reporting)
+        for row in fixture.subject.receipt.data["secondary_errors"]
+    )
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    receipt = fixture.subject.receipt
+    cleanup = receipt.data["cases"][probe.Case.CLEANUP]
+    (source,) = [
+        event
+        for event in receipt.data["observations"]
+        if event["id"] in cleanup["checkpoints"]
+        and event["id"].startswith(probe.SnapshotKind.SOURCE)
+    ]
+    assert source["id"] == "S001"
+    assert source["label"] == "cleanup-final-empty-and-source-disk"
+    assert source["content"] in receipt.data["snapshots"]
+    assert receipt.counts[probe.SnapshotKind.SOURCE] == 1
+    assert receipt.data["observations"].index(source) > next(
+        index
+        for index, event in enumerate(receipt.data["observations"])
+        if event["id"] == "F001"
+    )
+
+
+def test_readiness_flags_reacquire_and_bind_the_current_viewport(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    first = SimpleNamespace(EnableGraphicsUpdate=False)
+    second = SimpleNamespace(EnableGraphicsUpdate=True)
+    bound = []
+    bind = fixture.subject.bind
+
+    def capture_binding(raw, interface):
+        if interface == "IModelView":
+            bound.append(raw)
+        return bind(raw, interface)
+
+    monkeypatch.setattr(fixture.subject, "bind", capture_binding)
+    fixture.ports["ActiveView"] = first
+    assert fixture.subject.flags()["graphics"] is False
+    fixture.ports["ActiveView"] = second
+    assert fixture.subject.flags()["graphics"] is True
+    assert bound == [first, second]
+    assert fixture.reads.count("ActiveView") == 2
+    assert fixture.subject.app.activation_calls == []
+
+
+@pytest.mark.parametrize("failure", ["tree_window", "report"])
+def test_readiness_helper_never_initializes_after_incomplete_checkpoint(
+    readiness, monkeypatch, failure
+):
+    fixture = readiness
+    original = InertWriteOnlyError()
+    if failure == "report":
+
+        def fail_report():
+            raise original
+
+        monkeypatch.setattr(fixture.subject.receipt, "checkpoint", fail_report)
+    else:
+        fixture.faults[failure] = original
+    with pytest.raises(InertWriteOnlyError) as caught:
+        fixture.subject._constructed_drawing_checkpoint()
+    assert caught.value is original
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    assert not hasattr(fixture.subject, "harness_flags")
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+def test_readiness_semantic_context_ignores_valid_receiver_wrapper_types(readiness):
+    fixture = readiness
+    views = fixture.subject.views()
+    before = fixture.subject.context(views)
+    first, error = fixture.subject._context_observations(views)
+    assert error is None
+
+    class FreshViewport(SimpleNamespace):
+        pass
+
+    class FreshTree(SimpleNamespace):
+        pass
+
+    fixture.ports["ActiveView"] = FreshViewport(
+        EnableGraphicsUpdate=fixture.flag_values["graphics"]
+    )
+    fixture.ports["FeatureManager"] = FreshTree(
+        EnableFeatureTree=fixture.flag_values["tree"],
+        EnableFeatureTreeWindow=fixture.flag_values["tree_window"],
+    )
+    after = fixture.subject.context(views)
+    second, error = fixture.subject._context_observations(views)
+    assert error is None
+    assert (
+        before
+        == after
+        == {
+            "sheet": probe.ViewId.A,
+            "view": None,
+            "selection": [],
+            "flags": fixture.flag_values,
+        }
+    )
+    for dependency in ("ActiveView", "FeatureManager"):
+        first_row = first["flag_observations"]["dependencies"][dependency]
+        second_row = second["flag_observations"]["dependencies"][dependency]
+        assert first_row["status"] == second_row["status"] == "passed"
+        assert first_row["type"] != second_row["type"]
+    assert first["flags"] == second["flags"] == fixture.flag_values
+    assert fixture.subject.app.activation_calls == []
+
+
+def test_readiness_noop_set_flags_reacquires_viewport_and_checks_whole_vector(
+    readiness,
+):
+    fixture = readiness
+    fixture.subject.set_flags(dict(fixture.flag_values))
+    assert Counter(fixture.reads) == Counter(
+        {
+            **{key: 2 for key in fixture.flag_values},
+            "ActiveView": 3,
+            "FeatureManager": 3,
+        }
+    )
+    assert fixture.subject.receipt.counts["harness_flag_writes"] == 0
+    assert fixture.subject.app.activation_calls == []
+    assert fixture.context_calls == []
+    assert (
+        sum(
+            left is fixture.drawing and right is fixture.drawing
+            for left, right in fixture.subject.app.identity_calls
+        )
+        >= 3
+    )
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        {"A_disable", "B_disable", "automatic", "graphics", "tree", "tree_window"},
+        {"graphics"},
+        {"A_disable", "tree_window"},
+    ],
+)
+def test_readiness_set_flags_changes_only_requested_fields_and_reads_whole_vector(
+    readiness, changed
+):
+    fixture = readiness
+    fixture.accept_writes = True
+    requested = {
+        key: not value if key in changed else value
+        for key, value in fixture.flag_values.items()
+    }
+    fixture.subject.set_flags(requested)
+    assert fixture.flag_values == requested
+    assert dict(fixture.writes) == {key: requested[key] for key in changed}
+    assert len(fixture.writes) == len(changed)
+    assert fixture.subject.receipt.counts["harness_flag_writes"] == len(changed)
+    assert Counter(fixture.reads) == Counter(
+        {
+            **{key: 2 for key in requested},
+            "ActiveView": 3,
+            "FeatureManager": 3,
+        }
+    )
+    assert fixture.subject.app.activation_calls == []
+
+
+def test_readiness_set_flags_refuses_unconsumed_write_after_full_readback(readiness):
+    fixture = readiness
+    fixture.accept_writes = True
+    fixture.ignored_writes.add("graphics")
+    requested = {**fixture.flag_values, "graphics": not fixture.flag_values["graphics"]}
+    with pytest.raises(probe.ProbeFailure) as caught:
+        fixture.subject.set_flags(requested)
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert fixture.writes == [("graphics", requested["graphics"])]
+    assert fixture.flag_values["graphics"] is not requested["graphics"]
+    assert Counter(fixture.reads) == Counter(
+        {
+            **{key: 2 for key in requested},
+            "ActiveView": 3,
+            "FeatureManager": 3,
+        }
+    )
+
+
+@pytest.mark.parametrize("invalid", ["missing", "extra", "nonbool"])
+def test_readiness_set_flags_rejects_malformed_vector_before_writes(readiness, invalid):
+    fixture = readiness
+    requested = dict(fixture.flag_values)
+    if invalid == "missing":
+        del requested["graphics"]
+    elif invalid == "extra":
+        requested["foreign"] = True
+    else:
+        requested["graphics"] = 1
+    with pytest.raises(probe.ProbeFailure):
+        fixture.subject.set_flags(requested)
+    assert fixture.writes == []
+    assert Counter(fixture.reads) == Counter(
+        (*fixture.flag_values, "ActiveView", "FeatureManager")
+    )
+
+
+def test_readiness_successful_actual_c00_keeps_existing_two_full_checkpoints(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    monkeypatch.setattr(
+        fixture.subject,
+        "case_checkpoint",
+        probe.NativeProbe.case_checkpoint.__get__(fixture.subject),
+    )
+    fixture.subject.run_case(
+        probe.Case.CONSTRUCTION, fixture.subject._constructed_drawing_checkpoint
+    )
+    snapshot = readiness_snapshot(fixture.subject, full_count=2)
+    assert_full_readiness_views(snapshot)
+    assert fixture.subject.receipt.counts[probe.SnapshotKind.SOURCE] == 0
+    assert [
+        event["label"] for event in fixture.subject.receipt.data["observations"]
+    ] == ["constructed-drawing", "case-candidate-complete"]
+    assert (
+        fixture.subject.receipt.data["cases"][probe.Case.CONSTRUCTION]["status"]
+        is probe.Verdict.PASSED
+    )
+    assert (
+        fixture.subject.receipt.data["fixture"]["initial_flags"]
+        == snapshot["context"]["flags"]
+    )
+    assert fixture.subject.harness_flags == fixture.flag_values
+    assert fixture.writes == []
+    assert Counter(fixture.reads) == Counter(
+        {
+            **{key: 2 for key in fixture.flag_values},
+            "ActiveView": 2,
+            "FeatureManager": 2,
+        }
+    )
+
+
+def test_readiness_emergency_report_keeps_identity_primary_after_later_failures(
+    readiness, monkeypatch
+):
+    fixture = readiness
+    primary = probe.ProbeFailure(
+        probe.Verdict.IDENTITY, "identity closure failed first"
+    )
+    later = InertWriteOnlyError()
+    reporting = OSError("persistent readiness report failure")
+
+    def fail_identity():
+        raise primary
+
+    def fail_report():
+        raise reporting
+
+    monkeypatch.setattr(fixture.subject, "identity_controls", fail_identity)
+    monkeypatch.setattr(fixture.subject.receipt, "checkpoint", fail_report)
+    fixture.faults["tree_window"] = later
+    with pytest.raises(probe.ProbeFailure) as caught:
+        fixture.subject._constructed_drawing_checkpoint()
+    assert caught.value is primary
+    assert fixture.subject.receipt.primary is primary
+    assert_full_readiness_views(readiness_snapshot(fixture.subject))
+    emergency = json.loads(
+        (fixture.subject.receipt.root / "emergency.json").read_text()
+    )
+    assert emergency["primary"]["type"] == "ProbeFailure"
+    assert emergency["primary"]["message"] == str(primary)
+    assert any(
+        "constructed-drawing readback also failed" in note
+        for note in emergency["primary"]["notes"]
+    )
+    assert emergency["reported_error"]["type"] == "InertWriteOnlyError"
+    assert emergency["reported_error"]["message"] == str(later)
+    assert emergency["reported_error"]["hresult"] == later.hresult
+    assert tuple(emergency["reported_error"]["excepinfo"]) == later.excepinfo
+    assert emergency["report_error"] == repr(reporting)
+    messages = [
+        row["message"] for row in fixture.subject.receipt.data["secondary_errors"]
+    ]
+    assert str(later) in messages
+    assert str(reporting) in messages
+    assert "initial_flags" not in fixture.subject.receipt.data["fixture"]
+    assert not hasattr(fixture.subject, "harness_flags")
 
 
 @pytest.mark.parametrize("value", [True, 1])

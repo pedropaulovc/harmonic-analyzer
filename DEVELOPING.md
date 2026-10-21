@@ -1656,11 +1656,29 @@ property-local normalization of exact Boolean or exact integer 0/1 to integer
 0/1. Both constructor and inventory readbacks use it; the integer-zero setter,
 independent-scale guard and strict integer validation for other APIs remain
 unchanged. Floats, strings, nulls, out-of-domain integers and subclasses fail
-closed. The actual-function inert before/after smoke and 349 focused tests pass.
-The native correction, all 29 controls and complete 32-output acceptance remain
-unproved. The failed run passed C28 with empty owned-document inventory, no
-secondary errors and all original source/token hashes unchanged; normal drawing
-generation was not reached.
+closed. At `e63343178`, execution passed that rejection and reached the flag
+reader, where the `IModelDoc2.IActiveView` getter raised "Unable to read write-only
+property." This was an observed IDispatch-route refusal, not proof that the API
+is unavailable to every client. C28 passed with no secondary errors, empty
+owned-document inventory and unchanged original source/token hashes. C00 did not
+pass; the remaining controls and normal drawing were not reached.
+
+Both flag-reader and flag-writer paths now use the production `ActiveView`
+getter with explicit `IModelView` binding, fresh admitted/current-drawing identity
+checks and no fallback. The existing constructed-drawing checkpoint retains
+complete view evidence and independently attempts the six safe flag reads.
+An unavailable receiver blocks only its dependent reads; any missing, malformed
+or failed value still refuses the whole readiness gate. Initial harness flags
+come only from that successfully persisted checkpoint, without an extra getter
+sequence or snapshot. Diagnostic metadata does not change semantic context
+equality. Primary errors remain primary through later read/report failures,
+including emergency receipts; the existing C00 two-full-snapshot budget and C28
+source checkpoint remain unchanged.
+
+The actual-function inert before/after smoke and 417 focused tests pass. They
+do not establish native availability or acceptance: all 29 controls, setter
+effects/restoration, normal drawing and the complete 32-output package remain
+required.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible
