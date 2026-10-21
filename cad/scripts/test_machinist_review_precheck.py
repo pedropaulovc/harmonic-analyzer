@@ -504,6 +504,53 @@ def test_cli_baseline_inputs_reach_real_precheck_harness(
     assert [call["phase"] for call in harness.calls] == ["precheck"]
 
 
+@pytest.mark.parametrize("mode", ["explicit", "registry"])
+@pytest.mark.parametrize("missing", ["before", "after"])
+@pytest.mark.parametrize("force", [False, True])
+def test_cli_missing_ok_filters_required_pdfs_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    mode: str, missing: str, force: bool,
+) -> None:
+    if mode == "explicit":
+        package = _package(tmp_path)
+        name = package.name
+        before, after = package.before_sources[0], package.sources[0]
+        args = ["--pdf", str(after), "--before-pdf", str(before), "--name", name]
+    else:
+        name = next(iter(mr.DRAWINGS_BY_NAME))
+        filename = mr.DRAWINGS_BY_NAME[name].outputs["pdf"].name
+        before_dir, after_dir = tmp_path / "old", tmp_path / "new"
+        before_dir.mkdir()
+        after_dir.mkdir()
+        before = _pdf_source(before_dir / filename, [(100, 100)])
+        after = after_dir / filename
+        after.write_bytes(before.read_bytes())
+        args = [name, "--pdf-dir", str(after_dir), "--before-pdf-dir", str(before_dir)]
+    (before if missing == "before" else after).unlink()
+    harness = _Reviewer()
+    monkeypatch.setattr(mr, "_run_reviewer", harness)
+    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    directory = tmp_path / "reports"
+    if force:
+        args.append("--force")
+    assert mr.main([
+        *args, "--missing-ok", "--runs", "1", "--report-dir", str(directory),
+    ]) == 0
+    stderr = capsys.readouterr().err
+    aggregate_path = directory / f"{name}.aggregate.json"
+    if force and missing == "before":
+        assert "skipping" not in stderr
+        aggregate = json.loads(aggregate_path.read_text(encoding="utf-8"))
+        assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
+        assert aggregate["precheck"]["forced"]
+        assert aggregate["before_source_sha256"] == []
+        assert [call["phase"] for call in harness.calls] == ["review"]
+    else:
+        assert f"skipping 1 packages with unrendered sources: ['{name}']" in stderr
+        assert not aggregate_path.exists()
+        assert not harness.calls
+
+
 def test_cli_pairs_repeated_pdfs_by_position_not_by_basename(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

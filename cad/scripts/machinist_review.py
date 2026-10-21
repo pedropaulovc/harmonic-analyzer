@@ -2790,7 +2790,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--missing-ok",
         action="store_true",
-        help="skip packages with an unrendered source instead of failing",
+        help="skip packages with missing AFTER or BEFORE PDFs (only AFTER is required with --force)",
     )
     args = parser.parse_args(argv)
     if args.runs < 1:
@@ -2861,21 +2861,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             for package in packages
         ]
     if args.missing_ok:
-        skipped = [
-            package.name
-            for package in packages
-            if not all(source.is_file() for source in package.sources)
-        ]
+        skipped: list[str] = []
+        rendered: list[ReviewPackage] = []
+        for package in packages:
+            required_sources = (
+                package.sources if args.force
+                else (*package.sources, *package.before_sources)
+            )
+            if all(source.is_file() for source in required_sources):
+                rendered.append(package)
+            else:
+                skipped.append(package.name)
         if skipped:
             print(
                 f"skipping {len(skipped)} packages with unrendered sources: {skipped}",
                 file=sys.stderr,
             )
-        packages = [
-            package
-            for package in packages
-            if all(source.is_file() for source in package.sources)
-        ]
+        packages = rendered
     prompt_text = (
         args.prompt_file.read_text(encoding="utf-8")
         if args.prompt_file is not None
