@@ -275,7 +275,7 @@ LEVER_LABEL = "lever group exploded"
 # centred over it. The wider column keeps full parent-scoped vendor Numbers
 # intact without reducing the default text size or its line pitch.
 # The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
-STEPS_XY = (0.018, 0.258)
+STEPS_XY = (0.018, 0.2595)
 STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
@@ -501,10 +501,9 @@ ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
-CHECKS_XY = (
-    STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
-)
+# Native combined-run extents leave 4.05 mm above the title block and
+# 4.05 mm below the sequence at this position; see the layout-tuning doc.
+CHECKS_XY = (STEPS_XY[0], 0.0926)
 if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
     raise AssertionError("the assembly sequence and checks overrun the sheet")
 
