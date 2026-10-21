@@ -21,7 +21,10 @@ pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
 ring fits the sheet, each family ballooned once on one ring, on no other sheet.
 Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
 in two columns, and the checks. Sheet 8 carries cartridge manufacture/pressing,
-joint acceptance and wiring. Sheet 9 carries operation and machine acceptance,
+joint acceptance and wiring. Both instruction sheets retain a small, visible
+collapsed reference isometric at 1:20 below the right-column text: their native
+model views supply the live ``$PRPSHEET`` title-block links, just as the other
+seven sheets' views do. Sheet 9 carries operation and machine acceptance,
 with the finished isometric below the right-column checks at 1:15. Every view
 is one the builder named in the machine frame (``spec.VIEW_AXES``), its mapping
 proven on the sheet before anything is placed by it. Every text,
@@ -222,12 +225,12 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
-# finished isometric on the capture sheet, and 1:6 for the BOM's collapsed
-# reference in the room right of the table. The steps sheet is text only:
-# its continued steps and checks no longer constrain the finished view.
+# finished isometric on the capture sheet, 1:20 for the instruction sheets'
+# references, and 1:6 for the BOM's collapsed reference right of the table.
 ASSEMBLED_SCALE = (1.0, 4.0)
 REFERENCE_SCALE = (1.0, 6.0)
 ISOMETRIC_SCALE = (1.0, 15.0)
+NOTES_REFERENCE_SCALE = (1.0, 20.0)
 # The exploded clusters' scales, largest first. Every one is at most 1:2, so
 # every rung references the simplified configuration (the view policy) and
 # re-scaling a cluster never switches its configuration or its explode.
@@ -254,8 +257,8 @@ def package_sheet_scales(
     fixed = {
         ASSEMBLED_SHEET: ASSEMBLED_SCALE,
         BOM_SHEET: REFERENCE_SCALE,
-        STEPS_SHEET: (1.0, 1.0),
-        CARTRIDGE_SHEET: (1.0, 1.0),
+        STEPS_SHEET: NOTES_REFERENCE_SCALE,
+        CARTRIDGE_SHEET: NOTES_REFERENCE_SCALE,
         CAPTURE_SHEET: ISOMETRIC_SCALE,
     }
     return {
@@ -607,7 +610,7 @@ def _note_height(text: str) -> float:
 
 @dataclass(frozen=True)
 class StepsLayout:
-    """A text-only two-column instruction layout, with checks below the continuation."""
+    """Two-column instructions, with checks below the continuation."""
 
     steps: str  # the heading and the steps the left column holds
     continued: str  # the rest, atop the right column; "" when none
@@ -620,7 +623,7 @@ def steps_sheet_layout(
 ) -> StepsLayout:
     """Lay out the heading and whole steps above ``STEPS_FLOOR`` in the left
     column, the rest atop the right column, and the checks below them.
-    No view room is reserved: only the capture sheet carries a finished view."""
+    The reference views use the unused right-column room without reflowing text."""
     for count in range(len(steps), 0, -1):
         left = _wrapped(
             tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading
@@ -658,6 +661,25 @@ FINISHED_REGION = (
     SHEET_INNER_BORDER[2],
     CAPTURE_LAYOUT.checks_xy[1] - _note_height(CAPTURE_LAYOUT.checks) - REGION_GAP,
 )
+
+# draw_dt_drive_train_assembly._reference_iso keeps an actual collapsed model
+# view on every instruction sheet for finalize_drawing's per-sheet
+# CustomPropertyView association. Follow that visible-reference convention:
+# no hidden/off-sheet geometry, copied property text or second instruction
+# authority. The original notes and their placements above stay unchanged.
+# Reserve one caption line below each reference, clear of the title block.
+NOTES_REFERENCE_REGIONS = {
+    sheet: (
+        STEPS_CONTINUED_XY[0],
+        TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
+        SHEET_INNER_BORDER[2],
+        layout.checks_xy[1] - _note_height(layout.checks) - REGION_GAP,
+    )
+    for sheet, layout in (
+        (STEPS_SHEET, STEPS_LAYOUT),
+        (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT),
+    )
+}
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -1703,14 +1725,19 @@ def _region_center(region: tuple[float, float, float, float]) -> tuple[float, fl
     return ((region[0] + region[2]) / 2.0, (region[1] + region[3]) / 2.0)
 
 
-def _place_reference_view(adapter: Any) -> Any:
-    """The BOM's parent view: the jig collapsed, centred right of the table
-    and above the title block, unballooned."""
-    _activate_sheet(adapter, BOM_SHEET)
-    label = "jig reference"
-    center = _region_center(REFERENCE_REGION)
+def _place_reference_view(
+    adapter: Any,
+    *,
+    sheet_name: str = BOM_SHEET,
+    region: tuple[float, float, float, float] = REFERENCE_REGION,
+    scale: tuple[float, float] = REFERENCE_SCALE,
+    label: str = "jig reference",
+) -> Any:
+    """A visible collapsed source-assembly view, on the BOM or a notesheet."""
+    _activate_sheet(adapter, sheet_name)
+    center = _region_center(region)
     view = _place_named_view(
-        adapter, spec.ISOMETRIC_VIEW, center, REFERENCE_SCALE, label=label
+        adapter, spec.ISOMETRIC_VIEW, center, scale, label=label
     )
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     configuration = apply_view_configuration(adapter, view, label=label)
@@ -1718,8 +1745,30 @@ def _place_reference_view(adapter: Any) -> Any:
         adapter, view, False, configuration=configuration, label=label
     )
     _center_view_outline(adapter, view, center, label=label)
-    _assert_view_on_sheet(view, bounds=REFERENCE_REGION, label=label)
+    _assert_view_on_sheet(view, bounds=region, label=label)
     return view
+
+
+def _place_notes_reference_views(adapter: Any) -> None:
+    """Keep both instruction sheets' title blocks linked to the live assembly."""
+    caption = f"REFERENCE {_scale_text(NOTES_REFERENCE_SCALE)}"
+    for sheet_name, region in NOTES_REFERENCE_REGIONS.items():
+        label = f"jig {sheet_name.lower()} reference"
+        view = _place_reference_view(
+            adapter,
+            sheet_name=sheet_name,
+            region=region,
+            scale=NOTES_REFERENCE_SCALE,
+            label=label,
+        )
+        x0, y0, x1, _y1 = _view_outline(view, label=label)
+        _add_note_block(
+            adapter,
+            sheet_name,
+            caption,
+            ((x0 + x1 - len(caption) * NOTE_CHAR_M) / 2.0, y0 - VIEW_LABEL_GAP),
+            label=f"{label} caption",
+        )
 
 
 def _place_finished_view(adapter: Any) -> None:
@@ -2113,6 +2162,7 @@ def _place_package(
     cl_tip_settled = _place_assembled_sheet(adapter)
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
+    _place_notes_reference_views(adapter)
     placed = [(cluster, *_place_cluster_view(adapter, cluster)) for cluster in CLUSTERS]
     _activate_sheet(adapter, BOM_SHEET)
     table = insert_bom_table(

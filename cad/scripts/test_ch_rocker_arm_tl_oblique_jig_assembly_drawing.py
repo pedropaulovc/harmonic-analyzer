@@ -3,11 +3,13 @@
 The sheet text comes from the jig spec, the BOM prints every family made and
 bought with its registry number, numbered as the steps cite it, every BOM row
 carries a balloon, and each sheet's budgeted regions stay inside the border,
-out of the title block and clear of one another.
+out of the title block and clear of one another. Actual view creation and the
+shared finalizer must leave all nine physical sheets linked to the live source.
 """
 
 from __future__ import annotations
 
+import asyncio
 import math
 from types import SimpleNamespace
 
@@ -18,6 +20,8 @@ import _config
 import _drawing_balloons
 import _component_references
 import _drawing_tables
+import _drawing_common
+import _drawing_view_configuration
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
@@ -251,7 +255,8 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
     assert drawing.SHEET_SCALES[drawing.BOM_SHEET] == drawing.REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.CAPTURE_SHEET] == drawing.ISOMETRIC_SCALE
-    assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == (1.0, 1.0)
+    assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -683,6 +688,33 @@ def _lines(text: str) -> int:
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
     _assert_steps_sheet_fits(drawing.CARTRIDGE_LAYOUT)
+
+
+@pytest.mark.parametrize(
+    "sheet,layout",
+    (
+        (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
+        (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
+    ),
+)
+def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layout) -> None:
+    region = drawing.NOTES_REFERENCE_REGIONS[sheet]
+    view = _view_box(
+        _center(region), *_iso_size(0.0), drawing.NOTES_REFERENCE_SCALE
+    )
+    text = "REFERENCE 1:20"
+    caption = _note_box(
+        text,
+        ((view[0] + view[2] - len(text) * CHAR_M) / 2.0,
+         view[1] - drawing.VIEW_LABEL_GAP),
+    )
+    assert drawing.NOTES_REFERENCE_SCALE == (1.0, 20.0)
+    assert _inside(view, region)
+    assert _inside_sheet(view) and _inside_sheet(caption)
+    assert not _overlap(view, caption)
+    for note in _steps_sheet_boxes(layout):
+        assert not _overlap(view, note)
+        assert not _overlap(caption, note)
 
 
 def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
@@ -1673,3 +1705,251 @@ def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
     assert _inside_sheet(text)
     for other in others:
         assert not _overlap(text, other)
+
+
+@pytest.fixture
+def native_property_package(monkeypatch):
+    """Double the COM boundary, not recipe view placement or property linking.
+
+    The real place_view, configuration policy, iter_views and finalizer operate
+    on these sheet-owned views. Export is an explicit stop, never a fake success.
+    """
+    physical_names = (
+        "ASSEMBLED AT INNER PASS",
+        "BILL OF MATERIALS",
+        "RAIL BARS EXPLODED",
+        "PIVOTCAPTUREEXPLODED",
+        "LEADSCREW FEED EXPLODED",
+        "CARRIER EXPLODED",
+        "ASSEMBLY STEPS",
+        "CARTRIDGEASSEMBLY",
+        "CAPTUREANDOPERATION",
+    )
+    properties = {
+        name: f"live {name}"
+        for name in (
+            *_drawing_common.TITLE_BLOCK_TOLERANCE_PROPERTIES,
+            _drawing_common.TITLE_BLOCK_COPYRIGHT_PROPERTY,
+            "Number", "Title",
+        )
+    }
+    properties["Revision"] = _config.release_revision()
+    source = SimpleNamespace(
+        properties=properties,
+        GetCustomInfoValue=lambda _configuration, name: properties[name],
+    )
+    doc = SimpleNamespace(active=physical_names[0], sheets={}, notes=[], oversized=None)
+    for name in physical_names:
+        sheet = SimpleNamespace(
+            name=name, views=[], CustomPropertyView="",
+            properties=[0, 0, 1.0, 1.0, True, 0.4318, 0.2794, True],
+        )
+        sheet.GetName = lambda sheet=sheet: sheet.name
+        sheet.GetViews = lambda sheet=sheet: tuple(sheet.views)
+        sheet.GetProperties2 = lambda sheet=sheet: tuple(sheet.properties)
+        sheet.SetProperties2 = lambda *values, sheet=sheet: setattr(
+            sheet, "properties", list(values)
+        )
+
+        def set_scale(numerator, denominator, _positions, _text, *, sheet=sheet):
+            sheet.properties[2:4] = [numerator, denominator]
+            return True
+
+        sheet.SetScale = set_scale
+        doc.sheets[name] = sheet
+
+    def activate(name):
+        if name not in doc.sheets:
+            return False
+        doc.active = name
+        return True
+
+    def create_view(model_path, orientation, x, y, z):
+        sheet = doc.sheets[doc.active]
+        index = len(sheet.views)
+        view = SimpleNamespace(
+            model_path=model_path, Sheet=sheet, Position=(x, y),
+            ScaleRatio=(1.0, 1.0), ReferencedDocument=source,
+            ReferencedConfiguration=drawing.ASSEMBLY_VIEW_CONFIGURATION,
+            exploded=False,
+        )
+        view.GetName2 = lambda: f"DrawingView-{sheet.name}-{index}"
+        view.GetOrientationName = lambda: orientation
+        view.GetDisplayMode2 = lambda: _drawing_common._SW_SHADED_EDGES
+        view.IsExploded = lambda: view.exploded
+        view.UpdateViewDisplayGeometry = lambda: None
+        view.GetNextView = lambda: (
+            sheet.views[index + 1] if index + 1 < len(sheet.views) else None
+        )
+
+        def show_exploded(show):
+            view.exploded = show
+            return True
+
+        def move(position, move_children):
+            assert move_children is False
+            view.Position = tuple(position)
+            return True
+
+        def outline():
+            (x0, x1), (y0, y1), (z0, z1) = spec.MODEL_EXTENT
+            if orientation == spec.PLAN_VIEW:
+                size = (x1 - x0, y1 - y0)
+            elif orientation == spec.ELEVATION_VIEW:
+                size = (x1 - x0, z1 - z0)
+            else:
+                size = _iso_size(0.0)
+            box = _view_box(view.Position, *size, view.ScaleRatio)
+            if doc.oversized == sheet.name:
+                # A native outline larger than the recipe's estimated room.
+                return (box[0], box[1], box[2], box[3] + 0.3)
+            return box
+
+        view.ShowExploded = show_exploded
+        view.SetViewPosition = move
+        view.GetOutline = outline
+        sheet.views.append(view)
+        return view
+
+    doc.ActivateSheet = activate
+    doc.GetCurrentSheet = lambda: doc.sheets[doc.active]
+    doc.GetSheetNames = lambda: physical_names
+    doc.Sheet = lambda name: doc.sheets[name]
+    doc.GetFirstView = lambda: SimpleNamespace(
+        GetNextView=lambda: (
+            doc.sheets[doc.active].views[0] if doc.sheets[doc.active].views else None
+        )
+    )
+    doc.CreateDrawViewFromModelView3 = create_view
+    doc.ClearSelection2 = lambda _all: None
+    doc.EditRebuild3 = lambda: True
+
+    def member(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+    adapter = SimpleNamespace(
+        currentModel=doc, _attempt=lambda callback: callback(), _get_attr_or_call=member
+    )
+    for module in (drawing, _drawing_common, _drawing_view_configuration):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag",
+        lambda value, *_interface: value,
+    )
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound", lambda value, _interface: value
+    )
+    for module in (drawing, _drawing_common._sw_drawing):
+        monkeypatch.setattr(module, "double_array", lambda values: values)
+    for module in (drawing, _drawing_common):
+        monkeypatch.setattr(
+            module, "set_high_quality_shaded_with_edges", lambda *args, **kwargs: None
+        )
+    for module in (_drawing_common, _drawing_view_configuration):
+        monkeypatch.setattr(module, "rebuild_drawing", lambda *args, **kwargs: None)
+    for name in ("_create_package_sheets", "_require_view_axes", "_add_plan_tags",
+                 "set_hidden_lines_removed", "isolate_drawing_view_components"):
+        monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "_cl_tip_setting", lambda *_args: lambda: None)
+    monkeypatch.setattr(
+        drawing, "_fit_cluster_view",
+        lambda _adapter, _view, cluster, _configuration, *, label: cluster.scale,
+    )
+    monkeypatch.setattr(drawing, "insert_bom_table", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        drawing, "_validate_bom",
+        lambda *_args: tuple(drawing.BOM_ITEM_NUMBERS.items()),
+    )
+    monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "JigBOM")
+    monkeypatch.setattr(
+        drawing, "_balloon_cluster",
+        lambda _adapter, _view, cluster, _items, _bom:
+        [SimpleNamespace(stem=stem) for stem in cluster.stems],
+    )
+
+    def note(_adapter, text, x, y):
+        doc.notes.append((doc.active, text, (x, y)))
+        return SimpleNamespace(GetText=lambda: text)
+
+    monkeypatch.setattr(drawing, "add_note", note)
+    monkeypatch.setattr(
+        _drawing_common, "apply_custom_properties", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        _drawing_common, "assert_asme_b_sheet", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(_drawing_common, "_build_id", lambda: "offline-property-contract")
+
+    class SaveBoundary(Exception):
+        pass
+
+    def stop_before_save(*args, **kwargs):
+        raise SaveBoundary
+
+    monkeypatch.setattr(_drawing_common, "save_drawing", stop_before_save)
+    return SimpleNamespace(
+        adapter=adapter, doc=doc, source=source, save_boundary=SaveBoundary
+    )
+
+
+def test_all_nine_physical_sheets_link_to_their_actual_live_model_view(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    scales, _settled = drawing._place_package(package.adapter)
+    with pytest.raises(package.save_boundary):
+        asyncio.run(drawing.finalize_drawing(
+            package.adapter,
+            drawing.OUTPUTS,
+            layout=drawing.SPEC.layout,
+            pdf_title="offline property association",
+            scale=drawing.SHEET_SCALE,
+            expected_sheet_names=drawing.SHEET_NAMES,
+            sheet_layouts=drawing.SHEET_LAYOUTS,
+            sheet_scales=scales,
+        ))
+    links = []
+    for name, sheet in package.doc.sheets.items():
+        assert len(sheet.views) == (2 if name == drawing.ASSEMBLED_SHEET else 1)
+        # Read what the real finalizer wrote, resolving the name against this
+        # physical sheet's real placement results, not a recipe-owned mapping.
+        linked = next(
+            view for view in sheet.views
+            if view.GetName2() == sheet.CustomPropertyView
+        )
+        assert linked is sheet.views[0]
+        assert linked.Sheet is sheet
+        assert linked.model_path == str(drawing.SOURCE)
+        assert linked.ReferencedDocument is package.source
+        assert sheet.properties[7] is False  # no inherited template source
+        assert linked.ReferencedConfiguration == (
+            drawing.ASSEMBLY_VIEW_CONFIGURATION if name == drawing.CAPTURE_SHEET
+            else drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        )
+        assert linked.IsExploded() == (name in {c.sheet for c in drawing.CLUSTERS})
+        links.append(linked)
+    # A source-property edit is seen through every native association. No
+    # snapshot of today's Title (or its other model properties) is substituted.
+    package.source.properties["Title"] = "changed after property association"
+    assert all(
+        view.ReferencedDocument.GetCustomInfoValue("", "Title")
+        == "changed after property association"
+        for view in links
+    )
+    for sheet, region in drawing.NOTES_REFERENCE_REGIONS.items():
+        view = package.doc.sheets[sheet].views[0]
+        assert tuple(view.ScaleRatio) == drawing.NOTES_REFERENCE_SCALE
+        assert _inside(view.GetOutline(), region)
+        assert [text for name, text, _xy in package.doc.notes
+                if name == sheet and text.startswith("REFERENCE ")] == ["REFERENCE 1:20"]
+
+
+@pytest.mark.parametrize("sheet", (drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET))
+def test_instruction_reference_refuses_a_native_outline_outside_its_room(
+    native_property_package, sheet,
+) -> None:
+    package = native_property_package
+    package.doc.oversized = sheet
+    with pytest.raises(RuntimeError, match="leaves"):
+        drawing._place_package(package.adapter)

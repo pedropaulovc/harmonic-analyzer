@@ -139,6 +139,41 @@ translations; they are not native after-fix proof. Parent validation must
 rebuild and inspect the full text blocks, leaders and border clearance on both
 sheets, with the existing layout enforcement unchanged.
 
+### TL-30 capture-cap functional sheets
+
+The `d349b99300c6` native cap drawing imported all 32 model dimensions, including
+the real `RegisterEndChamfer`, but packed their complete manufacturing callouts
+into seven views on one sheet. Its log recorded 108 gating findings. The
+enforced pair was `WireWidth`'s shoulder `(217.5,83.7) -> (137,83.7)` mm crossing
+`PocketDepth`'s witness `(215,87) -> (215,80.6)` mm. The failed leaf published no
+paper/audit artifacts, and the worker's next source preparation had removed
+them: the remaining 107 records cannot honestly be classified from that log.
+
+Keep the full source text and 1:1 scale, with these separate ASME B sheets:
+
+| Sheet | Native dimension ownership |
+| --- | --- |
+| `ACCESS` | Outline, aperture coordinates/size, head and wire access, mouth depths |
+| `SECTIONS` | Underside pocket size/corner coordinates, fitted A-A and flat-bottom entry-relief B-B |
+| `BOLT-LOCATIONS` | Clearance-hole size and all eight actual pocket-axis bolt coordinates |
+| `REGISTERS` | Both bosses' size/coordinates/projection and the native free-end chamfer |
+
+The circular-rim chamfer imports in `*Top`, not `*Right`; native transfer to
+`*Right` refused. Retain its permanent XZ view above an unmirrored `*Front`
+context on `REGISTERS`, rather than manufacturing text or changing the MAX.
+The separate `*Back` views retain visible native pocket-axis witnesses.
+Every sheet takes precision and complete callouts from the same part-spec maps.
+
+Remove the unconditional second `auto_center_marks` pass. The existing template
+inserts centre marks; the replacement census requires one for the central bore
+and each visible pattern feature (five in `*Front`, seven in `*Back`), refusing
+missing or duplicate marks. The 12 duplicate records are consistent with that
+second pass, but their individual native records were not recovered. Fresh
+native validation must confirm the census and inspect **all four** printed
+sheets and the full audit, not only the formerly enforced pair. Requested
+coordinates and offline routing tests are not zero-collision native evidence;
+all existing audit kinds, fit guards and model-owned tolerance controls remain.
+
 ### Rocker R19 regression and local placement contract
 
 R19 at `81ac56b26598b63c0c9a11a467208ac4176ce646`, farm run

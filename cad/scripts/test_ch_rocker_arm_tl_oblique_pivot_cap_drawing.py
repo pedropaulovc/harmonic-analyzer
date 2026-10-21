@@ -67,11 +67,14 @@ def test_integral_register_geometry_has_one_shared_owner() -> None:
 
 
 @pytest.mark.parametrize("missing_chamfer", (False, True))
-def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkeypatch, tmp_path, missing_chamfer) -> None:
+def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatch, tmp_path, missing_chamfer) -> None:
     source = tmp_path / "cap.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
     views, imports, precision_checks, callouts, finalized = [], [], [], [], []
+    sheets, activations, headings, centre_checks = [], [], [], []
+    view_labels = []
+    active_sheet = None
     native = SimpleNamespace(
         FullName="RegisterEndChamfer@RegisterEndChamfers@cap",
         SystemValue=spec.REGISTER_END_CHAMFER_MAX / 1000.0,
@@ -83,24 +86,59 @@ def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkey
         assert path == str(source)
         return SimpleNamespace(is_success=True, data=None, error=None)
 
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+    def activate(name):
+        nonlocal active_sheet
+        assert name in sheets
+        active_sheet = name
+        activations.append(name)
+        return True
+
+    model = object()
+    document = SimpleNamespace(ActivateSheet=activate)
+    adapter = SimpleNamespace(currentModel=model, open_model=open_model)
+
+    def bind(obj, interface):
+        assert obj is model and interface == "IDrawingDoc"
+        return document
+
+    def create_sheets(current, names, *, label):
+        nonlocal active_sheet
+        assert current is adapter and not views and label
+        sheets.extend(names)
+        active_sheet = names[-1]
+
+    def heading(current, text, x, y):
+        assert current is adapter
+        if (x, y) == drawing.SHEET_HEADING_XY:
+            headings.append((active_sheet, text))
+        else:
+            view_labels.append((active_sheet, text))
+        return object()
 
     def place(current, path, orientation, x, y, *, scale):
-        assert current is adapter and path == str(source)
-        view = SimpleNamespace(orientation=orientation, center=(x, y), scale=scale, annotations=[])
+        assert current is adapter and path == str(source) and active_sheet in sheets
+        view = SimpleNamespace(
+            orientation=orientation, center=(x, y), scale=scale,
+            sheet=active_sheet, annotations=[],
+        )
         views.append(view)
         return view
 
-    def section(_adapter, _parent, **kwargs):
-        view = SimpleNamespace(orientation=kwargs["section_label"], annotations=[])
+    def section(_adapter, parent, **kwargs):
+        assert parent.sheet == active_sheet and parent.orientation == "*Back"
+        view = SimpleNamespace(
+            orientation=kwargs["section_label"], sheet=active_sheet,
+            scale=kwargs["scale"], parent=parent, annotations=[],
+        )
         views.append(view)
         return view
 
     def curate(current, view, *, keep, view_label, dimensions_by_feature):
         assert current is adapter and dimensions_by_feature is spec.DRAWING_DIMENSIONS
+        assert view.sheet == active_sheet and view_label
         imports.append((view, keep))
         if "RegisterEndChamfer" in keep:
-            assert view.orientation == "*Top"
+            assert view.orientation == "*Top" and view.sheet == drawing.SHEET_NAMES[3]
             assert view.center == drawing.REGISTER_END_CENTER
             assert keep == drawing.REGISTER_END_KEEP
             if missing_chamfer:
@@ -111,20 +149,32 @@ def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkey
         return list(view.annotations)
 
     def precision(_adapter, annotations, expected):
-        assert expected is spec.DRAWING_PRECISION_BY_NAME
+        assert expected == {item.name: spec.DRAWING_PRECISION_BY_NAME[item.name] for item in annotations}
         precision_checks.extend(annotations)
 
     def set_callouts(_adapter, annotations, expected, *, location):
-        assert expected is spec.DIMENSION_CALLOUTS and location == "below"
+        names = {item.name for item in annotations}
+        assert expected == {name: text for name, text in spec.DIMENSION_CALLOUTS.items() if name in names}
+        assert location == "below"
         callouts.extend(annotations)
 
-    async def finalize(_adapter, outputs, **_kwargs):
+    def centres(view, *, expected, label):
+        assert view.sheet == active_sheet and label
+        assert expected == (5 if view.orientation == "*Front" else 7)
+        centre_checks.append(view)
+
+    async def finalize(_adapter, outputs, **kwargs):
+        assert kwargs["expected_sheet_names"] == drawing.SHEET_NAMES
+        assert kwargs["sheet_scales"] == {name: drawing.SHEET_SCALE for name in drawing.SHEET_NAMES}
         finalized.append(outputs)
         return {"slddrw": "cap.SLDDRW"}
 
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (adapter.currentModel, object()))
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (model, object()))
+    monkeypatch.setattr(drawing, "create_blank_drawing_sheets", create_sheets)
     monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "add_note", heading)
     monkeypatch.setattr(drawing, "place_view", place)
     monkeypatch.setattr(drawing, "create_section_view", section)
     monkeypatch.setattr(drawing, "_project", lambda *_args: (0.0, 0.0))
@@ -133,7 +183,7 @@ def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkey
     monkeypatch.setattr(drawing, "assert_imported_precision", precision)
     monkeypatch.setattr(drawing, "set_dimension_callouts", set_callouts)
     monkeypatch.setattr(drawing, "_assert_pocket_corner_callout", lambda *_args: None)
-    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(drawing, "_assert_template_center_marks", centres)
     monkeypatch.setattr(drawing, "add_surface_finish", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "add_property_linked_note", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
@@ -141,7 +191,8 @@ def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkey
     if missing_chamfer:
         with pytest.raises(RuntimeError, match="RegisterEndChamfer"):
             asyncio.run(drawing.build(adapter))
-        assert not finalized and not precision_checks and not callouts
+        assert not finalized
+        assert not any(item is chamfer for item in precision_checks + callouts)
     else:
         assert asyncio.run(drawing.build(adapter)) == {"slddrw": "cap.SLDDRW"}
         profile, = [view for view in views if view.orientation == "*Top"]
@@ -152,15 +203,63 @@ def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkey
         assert {annotation.name for annotation in precision_checks} == set(spec.DRAWING_PRECISION_BY_NAME)
         assert len(precision_checks) == len(spec.DRAWING_PRECISION_BY_NAME)
         assert finalized == [drawing.OUTPUTS]
-        assert len(views) == 7
-    side, = [view for view in views if view.orientation == "*Right"]
-    assert next(keep for view, keep in imports if view is side) == drawing.RIGHT_KEEP
-    assert "RegisterEndChamfer" not in drawing.RIGHT_KEEP
+        assert len(views) == 11 and all(view.hidden_removed for view in views)
+        assert len(centre_checks) == 5
+        assert view_labels == [
+            (drawing.SHEET_NAMES[3], "TOP FACE"),
+            (drawing.SHEET_NAMES[3], "REGISTER FREE ENDS"),
+            (drawing.SHEET_NAMES[3], "UNDERSIDE"),
+        ]
+    assert tuple(sheets) == drawing.SHEET_NAMES == tuple(activations)
+    assert [sheet for sheet, _text in headings] == sheets
+    owners = {name: view for view, keep in imports for name in keep}
+    # Native d349's WireWidth shoulder crossed PocketDepth's witness. These
+    # manufacturing groups now occupy different actual sheets, not a waiver.
+    assert owners["WireWidth"].sheet == drawing.SHEET_NAMES[0]
+    assert owners["PocketDepth"].sheet == drawing.SHEET_NAMES[1]
+    assert all(owners[f"Bolt{i}{axis}"].sheet == drawing.SHEET_NAMES[2] for i in range(1, 5) for axis in ("X", "Y"))
+    assert all(owners[f"Register{i}{axis}"].sheet == drawing.SHEET_NAMES[3] for i in range(1, 3) for axis in ("X", "Y"))
+    assert owners["RegisterEndChamfer"].orientation == "*Top"
+    assert owners["RegisterProjection"].orientation == "*Right"
+    assert owners["RegisterEndChamfer"].sheet == owners["RegisterProjection"].sheet
     assert chamfer.dimension is native
     assert native.SystemValue == spec.REGISTER_END_CHAMFER_MAX / 1000.0
     assert (native.Tolerance.Type, native.Tolerance.lower, native.Tolerance.upper) == (
         6, -spec.REGISTER_END_CHAMFER_MAX / 1000.0, 0.0,
     )
+
+
+@pytest.mark.parametrize("expected", (5, 7))
+@pytest.mark.parametrize("difference", (-1, 0, 1))
+def test_template_centre_mark_census_refuses_missing_or_overdrawn_features(monkeypatch, expected, difference) -> None:
+    requested_types = []
+
+    def get_annotations(kind):
+        requested_types.append(kind)
+        return tuple(object() for _ in range(expected + difference))
+
+    view = SimpleNamespace(GetAnnotationsByType=get_annotations)
+    bindings = []
+
+    def bind(obj, interface):
+        bindings.append((obj, interface))
+        return obj
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    if difference:
+        with pytest.raises(RuntimeError, match="template centre marks"):
+            drawing._assert_template_center_marks(view, expected=expected, label="cap view")
+    else:
+        drawing._assert_template_center_marks(view, expected=expected, label="cap view")
+    assert bindings == [(view, "IView")] and requested_types == [13]
+
+
+@pytest.mark.parametrize("unreadable", (None, False, "five", 5))
+def test_template_centre_mark_census_does_not_treat_unreadable_arrays_as_empty(monkeypatch, unreadable) -> None:
+    view = SimpleNamespace(GetAnnotationsByType=lambda _kind: unreadable)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    with pytest.raises(RuntimeError, match="template centre marks"):
+        drawing._assert_template_center_marks(view, expected=5, label="cap view")
 
 
 @pytest.mark.parametrize("persisted", (True, False))
@@ -483,7 +582,11 @@ def test_pocket_depth_is_fitted_to_actual_flange_not_a_loose_fixed_band() -> Non
 
 
 def test_each_model_dimension_is_printed_once_with_authored_precision() -> None:
-    keep_maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.REGISTER_END_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
+    keep_maps = (
+        drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP,
+        drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP, drawing.BOLT_KEEP,
+        drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP, drawing.REGISTER_END_KEEP,
+    )
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert sum(map(len, keep_maps)) == len(marked)
     assert set().union(*keep_maps) == marked == set(spec.DRAWING_PRECISION_BY_NAME)
@@ -493,12 +596,12 @@ def test_each_model_dimension_is_printed_once_with_authored_precision() -> None:
     assert {"PocketCenterX", "PocketCenterY"} <= drawing.BOTTOM_KEEP.keys()
     assert {"ApertureCenterX", "ApertureCenterY"} <= drawing.TOP_KEEP.keys()
     bolt_stations = {f"Bolt{i}{axis}" for i in range(1, 5) for axis in ("X", "Y")}
-    assert bolt_stations <= drawing.BOTTOM_KEEP.keys()
+    assert bolt_stations <= drawing.BOLT_KEEP.keys()
     assert not bolt_stations & drawing.TOP_KEEP.keys()
     register_locations = {f"Register{i}{axis}" for i in range(1, 3) for axis in ("X", "Y")}
-    assert register_locations <= drawing.BOTTOM_KEEP.keys()
+    assert register_locations <= drawing.REGISTER_KEEP.keys()
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.REGISTER_LOCATION_PLACES for name in register_locations)
-    assert "RegisterProjection" in drawing.RIGHT_KEEP
+    assert "RegisterProjection" in drawing.REGISTER_PROJECTION_KEEP
     assert "RegisterEndChamfer" in drawing.REGISTER_END_KEEP
     assert spec.DRAWING_PRECISION_BY_NAME["RegisterProjection"] == spec.REGISTER_PROJECTION_PLACES
     assert "EntryReliefDia" in drawing.TOP_KEEP
@@ -872,31 +975,32 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     # Landscape ASME B template's inner border and title-block keep-out.
     left, bottom, right, top = 0.0124, 0.0124, 0.4194, 0.267
     title_left, title_top = 0.216, 0.0652
-    maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.REGISTER_END_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
+    maps = (
+        drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP,
+        drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP, drawing.BOLT_KEEP,
+        drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP, drawing.REGISTER_END_KEEP,
+    )
     for keep in maps:
         for x, y in keep.values():
             assert left + 0.004 < x < right - 0.004
             assert bottom + 0.004 < y < top - 0.004
             assert x < title_left or y > title_top + 0.004
-    top_left = drawing.TOP_CENTER[0] - spec.WIDTH / 2000.0
+    top_right = drawing.TOP_CENTER[0] + spec.WIDTH / 2000.0
     top_bottom = drawing.TOP_CENTER[1] - spec.LENGTH / 2000.0
-    assert drawing.TOP_KEEP["ApertureCenterY"][0] < top_left - 0.006
+    assert top_right + 0.006 < drawing.TOP_KEEP["ApertureCenterY"][0] < drawing.TOP_KEEP["CapLength"][0]
     assert drawing.TOP_KEEP["CapWidth"][1] + 0.006 < drawing.TOP_KEEP["ApertureCenterX"][1] < top_bottom - 0.006
-    bottom_right = drawing.BOTTOM_CENTER[0] + spec.WIDTH / 2000.0
-    right_view_left = drawing.RIGHT_CENTER[0] - spec.HEIGHT / 2000.0
-    assert bottom_right + 0.006 < drawing.BOTTOM_KEEP["PocketCenterY"][0] < right_view_left - 0.006
-    section_top = drawing.SECTION_CENTER[1] + spec.HEIGHT / 2000.0
-    assert section_top + 0.008 < drawing.BOTTOM_KEEP["PocketCenterX"][1]
-    assert drawing.BOTTOM_KEEP["PocketCenterX"][1] + 0.006 < drawing.BOTTOM_KEEP["Bolt3X"][1]
-    # The permanent XZ projection is third-angle aligned above the face view.
+    underside_left = drawing.BOTTOM_CENTER[0] - spec.WIDTH / 2000.0
+    assert drawing.BOTTOM_KEEP["PocketCenterY"][0] < underside_left - 0.006
+    assert drawing.RIGHT_CENTER[1] == drawing.TOP_CENTER[1]
+    # The permanent XZ projection is aligned to its own face-view context,
+    # not to the mirrored underside or the access view on a different sheet.
     profile_half_width = spec.WIDTH / 2000.0
     profile_half_height = spec.TOTAL_HEIGHT / 2000.0
     profile_x, profile_y = drawing.REGISTER_END_CENTER
-    assert profile_x == drawing.TOP_CENTER[0]
-    assert profile_y - profile_half_height > drawing.TOP_KEEP["ApertureDia"][1] + 0.006
-    # Leave the counterbore's two-line note above the added profile, while
-    # the chamfer text sits wholly beyond its right-hand stock edge.
-    assert drawing.TOP_KEEP["CounterboreDia"][1] - 0.010 > profile_y + profile_half_height
+    assert profile_x == drawing.REGISTER_FRONT_CENTER[0]
+    face_top = drawing.REGISTER_FRONT_CENTER[1] + spec.LENGTH / 2000.0
+    assert profile_y - profile_half_height > face_top + 0.010
+    assert drawing.REGISTER_RIGHT_CENTER[1] == drawing.REGISTER_FRONT_CENTER[1]
     assert drawing.REGISTER_END_KEEP["RegisterEndChamfer"][0] > profile_x + profile_half_width + 0.006
 
 
