@@ -157,9 +157,9 @@ RIGHT_KEEP = {
 # vertices.
 TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
 RIGHT_LOCATION_KEEP = {
-    # The width above A clears its real arrow/text ink without reaching the
-    # top hex. The rim dimensions hang right of the front, not over A-A.
-    "LeverBoreFromZFlat": (RIGHT_CENTER[0] - _HALF_AF / 2.0, 0.188),
+    # Hang the width left: its flat witness stops below the upper A's ink.
+    # The rim dimensions hang right of the front, not over A-A.
+    "LeverBoreFromZFlat": (0.050, 0.1755),
     "ThumbTapToBoreRim": (0.150, 0.185),
     "RodTapToBoreRim": (0.150, 0.083),
 }

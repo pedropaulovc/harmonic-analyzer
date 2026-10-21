@@ -1714,6 +1714,11 @@ block, not just the numeric value, clear of the border, section markers and
 neighbouring dimensions. Preserve every qualifier word, value, band and
 attachment; final PNG inspection remains required even after audit success.
 
+R21 still passed the native audit with the upper 6.35 extension line touching
+the left stroke of the upper A cutting-plane label. Clearance above an arrow
+does not prove clearance from its label: inspect the actual glyph ink against
+the dimension's complete extension segments as well.
+
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
 then bind the matching concrete string interface for `String`. Merely wrapping
@@ -1739,6 +1744,12 @@ inspect the exact final PNG/PDF before calling the sheet SHIP.
 Check dimension-line/centre-mark crossings as actual segments: horizontal and
 vertical marks have zero-area bounding boxes, which area-overlap helpers can
 correctly ignore even when the native ink crosses.
+
+The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel
+despite native audit success. Wrap that CHECK separately from the other checks,
+preserving every word, its row count and the note insertion point. Use the
+actual native text-run widths and panel bounds, then inspect the rebuilt
+whole sheet; a character-count limit alone is not a physical clearance proof.
 
 For a long native mounting-hole callout, the existing process-prefix trailing
 newline puts the associative quantity/diameter/extent on its own row; do not

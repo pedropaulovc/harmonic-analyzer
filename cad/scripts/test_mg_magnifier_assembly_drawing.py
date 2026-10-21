@@ -1222,6 +1222,73 @@ def test_the_steps_and_checks_fit_their_column() -> None:
             assert number in drawing.ASSEMBLY_STEPS
 
 
+def test_wire_check_rewrap_clears_r21_panel_without_moving_neighbour_rows(
+    monkeypatch,
+) -> None:
+    # Native R21 PDF, sheet 4, run 20261021T101437536Z-89db3ab3:
+    # CenturyGothic 13.2286 pt. Glyph advances below are measured PDF char
+    # boxes, not a copy of the wrapping implementation or a post-fix render.
+    # The original first row ends at x=637.604 pt; the panel starts at
+    # x=612.002258 pt and y=607.371826 pt, cutting that row's y600.216..618.300.
+    advances = {
+        " ": 3.664459, "'": 2.619370, ",": 3.664474, ".": 3.664459,
+        "1": 7.328949, ":": 3.664391, "A": 9.789551, "B": 7.593353,
+        "C": 10.755066, "D": 9.842468, "E": 7.090820, "F": 6.416138,
+        "G": 11.535583, "H": 9.035492, "I": 2.989777, "K": 7.818237,
+        "L": 6.111862, "M": 12.157562, "N": 9.789551, "O": 11.496124,
+        "P": 7.831635, "R": 8.030090, "S": 6.588104, "T": 5.635620,
+        "U": 8.665070, "V": 9.286850, "W": 12.699966, "Y": 7.831650,
+    }
+    old_wire_rows = drawing._wrapped(
+        notes.ASSEMBLY_CHECKS[-1:], width=drawing.STEPS_LINE_WIDTH
+    ).splitlines()
+    preceding_rows = drawing._wrapped(
+        notes.ASSEMBLY_CHECKS[:-1], width=drawing.STEPS_LINE_WIDTH
+    ).splitlines()
+    adapter = object()
+    calls = []
+    monkeypatch.setattr(
+        drawing, "_activate_sheet",
+        lambda actual_adapter, name: calls.append(("sheet", actual_adapter, name)),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+
+    def add_note(actual_adapter, text, x, y):
+        calls.append(("note", actual_adapter, x, y))
+        return SimpleNamespace(GetText=lambda: text.replace("\n", "\r\n"))
+
+    monkeypatch.setattr(drawing, "add_note", add_note)
+    note = drawing._add_note_block(
+        adapter, drawing.SHEET_NAMES[3], drawing.ASSEMBLY_CHECKS,
+        drawing.CHECKS_XY, label="assembly checks",
+    )
+    assert calls == [
+        ("sheet", adapter, drawing.SHEET_NAMES[3]),
+        ("note", adapter, *drawing.CHECKS_XY),
+    ]
+    printed_rows = note.GetText().splitlines()
+    assert printed_rows[:len(preceding_rows)] == preceding_rows
+    wire_rows = printed_rows[len(preceding_rows):]
+    assert " ".join(wire_rows).split() == notes.ASSEMBLY_CHECKS[-1].split()
+    # Same two rows, same insertion point: no encroachment on the steps
+    # above, sheet border below, or finished-view/balloon field to the right.
+    assert len(wire_rows) == len(old_wire_rows) == 2
+    assert drawing.CHECKS_XY == (
+        drawing.STEPS_XY[0],
+        drawing.STEPS_XY[1]
+        - len(drawing.ASSEMBLY_STEPS.splitlines()) * drawing.NOTE_LINE_PITCH
+        - 2 * drawing._PAD,
+    )
+    points_per_m = 72 / 0.0254
+    native_left = 51.023
+    native_panel_left = 612.002258
+    old_right = native_left + max(sum(advances[c] for c in row) for row in old_wire_rows)
+    new_right = native_left + max(sum(advances[c] for c in row) for row in wire_rows)
+    assert old_right > native_panel_left  # positive control: the actual defect
+    assert new_right + drawing._PAD * points_per_m < native_panel_left
+    assert new_right / points_per_m < drawing.FINISHED_FIELD[0]
+
+
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
     from _drawing_common import _SW_SHADED_EDGES
     from _drawing_view_configuration import (
