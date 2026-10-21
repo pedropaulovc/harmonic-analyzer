@@ -1154,6 +1154,9 @@ and retain unproved automatic centre marks as measured line obstacles. Wrap
 qualifiers without changing words, dimensions or bands. Native export/audit
 success alone does not prove border/title-block clearance or readable ink:
 inspect the exact final PNG/PDF before calling the sheet SHIP.
+Check dimension-line/centre-mark crossings as actual segments: horizontal and
+vertical marks have zero-area bounding boxes, which area-overlap helpers can
+correctly ignore even when the native ink crosses.
 
 Keep nominal model travel separate from published operating capacity. The
 accepted shortest rod and longest thread move nominal runout X149.50 to
