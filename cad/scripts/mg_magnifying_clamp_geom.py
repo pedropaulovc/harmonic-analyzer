@@ -65,13 +65,14 @@ LOCATION_FROM_FLAT = round(HEX_AF / 2.0, LOCATION_PLACES)
 DRILL_WANDER_DEG = 0.3
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
 BORE_FULL_ANGULAR = STOCK_WIDTH_MAX * _DRILL_SLOPE
-# Each tap entry is located directly from the actual bore rim, not by
-# subtracting two stock-face locations at different longitudinal stations.
-# The ordinary ±1.02 band is the former two independent .XX bands, not a
-# precision increase. Native measurements print 3.25 ±1.02; the drilled
-# bore's +0.10/0 diameter contributes another 0.05 to the true axis bound.
-RELATIVE_AXIS_BAND = 2.0 * LOCATION_BAND
-TAP_TO_BORE_ENTRY_Z_MAX = RELATIVE_AXIS_BAND + drilled_oversize_mm() / 2.0
+# Bore and both tap entry axes use ONE actual Z-flat baseline at .XX.
+# Two independent ordinary ±0.51 locations bound their relative offset by
+# 1.02; diameter variation does not enter a center-to-center location.
+# This intentionally replaces the former radius-correlated acceptance set:
+# tap absolute locations are now 5.84..6.86, not the former 4.82..7.93 union.
+# At maximum bore radius a small opposite-offset corner is newly admitted;
+# all functional bounds below use the conservative absolute offset.
+TAP_TO_BORE_ENTRY_Z_MAX = 2.0 * LOCATION_BAND
 
 
 # --- heights from the bottom face (two-place prints, the .XX band) -----------

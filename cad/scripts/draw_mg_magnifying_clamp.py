@@ -7,9 +7,9 @@ blind #4-40 rod tap from the bottom face, both on the hex axis.
 Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 
 * FRONT (``*Right``, looking along the lever bore at a corner): the block
-  height, the bore's height from the bottom seat and its Ø callout.  The bore
-  is centred between the flats by symmetry: its centre stands on the corner's
-  line and the A-A cutting line, with no location from a flat.
+  height, the bore's height from the bottom seat and its Ø callout. One grouped
+  common-flat location applies to the bore and both tap entry axes; all three
+  native source measurements remain independently checked.
 * TOP and BOTTOM, turned and pinned into third-angle projection above and
   below the front (corners up and down, the flats square to the sheet): the
   flats (stock REF) over the top view, and each tap's native callout.
@@ -32,6 +32,7 @@ import json
 import math
 import sys
 from typing import Any
+from types import SimpleNamespace
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -60,6 +61,7 @@ from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dim
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note, property_link
+from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -72,11 +74,16 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from build_mg_magnifying_clamp import _assert_location_profiles, _assert_ordinary_location, _point_flat_attachment
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DIMENSION_GROUPS,
+    GROUPED_HIDDEN_DIMENSIONS,
+    Z_FLAT_DIMENSIONS,
+    VISIBLE_DIMENSIONS,
     HEIGHT_CALLOUT,
     HEX_AC,
     HEX_AF,
@@ -87,7 +94,6 @@ from mg_magnifying_clamp_spec import (
     PREF_MATERIAL_HATCH_STYLE,
     PREF_NO_OPTION,
     REFERENCE_DIMENSIONS,
-    RELATIVE_AXIS_BAND,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_PROCESS,
     SEAT_NOTE,
@@ -112,8 +118,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A nominal 14.66 x 12.70 x 29.50 hex: the three views share one column,
-# with room for ordinary relative-axis dimensions between the end views.
+# A nominal 14.66 x 12.70 x 29.50 hex with one common-flat location group.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 ISO_SCALE = (2, 1)
@@ -157,26 +162,19 @@ RIGHT_KEEP = {
 # vertices.
 TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
 RIGHT_LOCATION_KEEP = {
-    # Hang the width left: its flat witness stops below the upper A's ink.
-    # The rim dimensions hang right of the front, not over A-A.
-    "LeverBoreFromZFlat": (0.050, 0.1755),
-    "ThumbTapToBoreRim": (0.150, 0.185),
-    "RodTapToBoreRim": (0.150, 0.083),
+    # All three values are imported/read back; only the verified group leader prints.
+    name: (0.050, 0.1755) for name in Z_FLAT_DIMENSIONS
 }
 TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
 BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 
-# Only the drawing's native below-text wraps; the model's functional contract
-# and every word stay intact. The extra row clears the 19.95 top witness.
-HEIGHT_DRAWING_CALLOUT = HEIGHT_CALLOUT.replace(
-    "FULL THREAD ENGAGEMENT", "FULL THREAD\nENGAGEMENT"
-)
+# Preserve the honest height function while wrapping its native below-text.
+HEIGHT_DRAWING_CALLOUT = HEIGHT_CALLOUT.replace("TOP-TAP WALL", "TOP-TAP\nWALL")
 
 DIMENSION_CALLOUTS = {
     "Height": HEIGHT_DRAWING_CALLOUT,
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
-    "ThumbTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
-    "RodTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
+    "LeverBoreFromZFlat": "BORE AND BOTH\nTAP ENTRY AXES",
 }
 
 # The tap callouts (their text centres) out to the right of each end view,
@@ -587,6 +585,71 @@ def _add_stock_note(adapter: Any, view: Any) -> None:
         raise
 
 
+def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> dict[str, Any]:
+    """Read all three genuine imported dimensions and their independently checked source."""
+    native_view = _early_bound(view, "IView")
+    source = _early_bound(native_view.ReferencedDocument, "IModelDoc2")
+    if source is None:
+        raise RuntimeError("common-flat group has no referenced part")
+    source_adapter = SimpleNamespace(currentModel=source, swApp=adapter.swApp)
+    _assert_location_profiles(source_adapter)
+    found = {name: [] for name in Z_FLAT_DIMENSIONS}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name in found:
+            found[name].append(annotation)
+    if any(len(values) != 1 for values in found.values()):
+        raise RuntimeError(f"common-flat group requires all three native imports: { {name: len(values) for name, values in found.items()} }")
+    result = {}
+    for name, (annotation,) in found.items():
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        _assert_ordinary_location(display, dimension, name)
+        full_name = dimension.FullName
+        source_display, source_dimension = _named_dimension(source_adapter, "LeverBoreLocationProfile", name)
+        source_full_name = _early_bound(source_dimension, "IDimension").FullName
+        if type(full_name) is not str or full_name.split("@")[:2] != [name, "LeverBoreLocationProfile"] or full_name != source_full_name:
+            raise RuntimeError(f"{name}: imported source owner differs: actual={full_name!r}, source={source_full_name!r}")
+        source_annotation = _early_bound(_early_bound(source_display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
+        source_entities = tuple(source_annotation.GetAttachedEntities3() or ())
+        source_types = tuple(source_annotation.GetAttachedEntityTypes() or ())
+        if len(source_entities) != 2 or len(source_types) != 2:
+            raise RuntimeError(f"{name}: source attachment census changed during drawing readback")
+        flats = [entity for entity, kind in zip(source_entities, source_types, strict=True) if type(kind) is int and kind == 10]
+        if len(flats) != 1:
+            raise RuntimeError(f"{name}: source common flat unavailable: types={source_types!r}")
+        source_point = _point_flat_attachment(source_adapter, source_display, flats[0], stage=f"{name}.drawing-source")
+        imported_point = _point_flat_attachment(source_adapter, display, flats[0], stage=f"{name}.drawing-import")
+        if imported_point != source_point:
+            raise RuntimeError(f"{name}: imported native point identity differs: actual={imported_point!r}, source={source_point!r}")
+        result[name] = annotation
+    return result
+
+
+def _assert_grouped_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> None:
+    group = _flat_group_annotations(adapter, view, annotations)
+    visibility = {name: annotation.Visible for name, annotation in group.items()}
+    wanted = {name: 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1 for name in group}
+    if any(type(value) is not int for value in visibility.values()) or visibility != wanted:
+        raise RuntimeError(f"common-flat group native visibility differs: {visibility!r}")
+    for leader, members in DIMENSION_GROUPS.items():
+        display = _early_bound(group[leader].GetSpecificAnnotation(), "IDisplayDimension")
+        if display.GetText(1) != f"{len(members)}X ":
+            raise RuntimeError("common-flat group lost its actual member-count prefix")
+    _telemetry.info("clamp common-flat group: three measured sources, one visible native dimension", source_dimension_count=len(group), visible_dimension_count=sum(value == 1 for value in visibility.values()), native_visibility=repr(visibility))
+
+
+def _group_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> None:
+    group = _flat_group_annotations(adapter, view, annotations)
+    for leader, members in DIMENSION_GROUPS.items():
+        _early_bound(group[leader].GetSpecificAnnotation(), "IDisplayDimension").SetText(1, f"{len(members)}X ")
+    for name, annotation in group.items():
+        annotation.Visible = 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1
+    _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
+    _assert_grouped_flat_locations(adapter, view, annotations)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -705,18 +768,20 @@ async def build(adapter: Any) -> dict[str, str]:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        expected = LEVER_BORE_DIA / 2.0 if name.endswith("ToBoreRim") else HEX_AF / 2.0
-        if bool(display.ShowParenthesis) or not math.isclose(float(dimension.SystemValue) * 1000.0, expected, abs_tol=0.005):
-            raise RuntimeError(f"{name}: imported ordinary location lost its native measurement/acceptance ink")
-        if name.endswith("ToBoreRim"):
-            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
-                raise RuntimeError(f"{name}: imported relative-axis acceptance band changed")
+        _assert_ordinary_location(display, dimension, name)
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    _group_flat_locations(adapter, right, right_annotations)
+    bore_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "LeverBoreDiaDim")
+    bore_display = _early_bound(_early_bound(bore_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    bore_dimension = _early_bound(bore_display.GetDimension2(0), "IDimension")
+    if int(_early_bound(bore_dimension.Tolerance, "IDimensionTolerance").Type) != 0 or not math.isclose(float(bore_dimension.SystemValue) * 1000.0, LEVER_BORE_DIA, abs_tol=1e-5):
+        raise RuntimeError("LeverBoreDiaDim: drilled diameter/title-block acceptance changed")
+    if bore_display.GetText(4) != LEVER_BORE_CALLOUT:
+        raise RuntimeError("LeverBoreDiaDim: native process/mate/finished-wall callout did not persist")
     height_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "Height")
     height_display = _early_bound(_early_bound(height_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
     if str(height_display.GetText(4) or "") != HEIGHT_DRAWING_CALLOUT:
-        raise RuntimeError("Height: thumb-screw engagement reason did not remain attached")
+        raise RuntimeError("Height: truthful top-tap wall function did not remain attached")
     # The flats are the bar's as supplied: a stock reference.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
@@ -778,6 +843,23 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_stock_note(adapter, iso)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
+    def settled_dimensions() -> None:
+        _assert_grouped_flat_locations(adapter, right, right_annotations)
+        visibility = {}
+        for raw in (*right_annotations, *top_annotations, *bottom_annotations):
+            annotation = _early_bound(raw, "IAnnotation")
+            name = dimension_name(adapter, annotation)
+            if name in visibility:
+                raise RuntimeError(f"{name}: duplicate native drawing dimension")
+            visibility[name] = annotation.Visible
+        if set(visibility) != set(DRAWING_PRECISION_BY_NAME) or any(type(value) is not int or value not in (1, 3) for value in visibility.values()):
+            raise RuntimeError(f"clamp native dimension census changed: {visibility!r}")
+        if {name for name, state in visibility.items() if state == 1} != VISIBLE_DIMENSIONS:
+            raise RuntimeError(f"clamp visible native dimension census changed: {visibility!r}")
+        if height_display.GetText(4) != HEIGHT_DRAWING_CALLOUT or bore_display.GetText(4) != LEVER_BORE_CALLOUT or int(_early_bound(bore_dimension.Tolerance, "IDimensionTolerance").Type) != 0:
+            raise RuntimeError("clamp settled height function, bore wall callout or title-block acceptance changed")
+        _telemetry.info("clamp native dimension census after final rebuild", source_dimension_count=len(visibility), visible_dimension_count=sum(value == 1 for value in visibility.values()), native_visibility=repr(visibility))
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -786,6 +868,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=0,
+        settled_checks=(settled_dimensions,),
     )
 
 

@@ -1,9 +1,9 @@
 r"""Native manufacturing sheet for the simple threaded L bracket.
 
-All sizes/locations import from the saved SLDPRT, including the ordinary
-side/tip hole-location chain and the independent internal-root MAX envelope.
-Each dimension's callout is applied only after its owning view imports it;
-the bore's axial/radial mouth chamfer belongs in its true-profile section.
+Model sizes import from the saved SLDPRT; the foot-to-neck location measures
+its two physical edges using the native drawing-edge dimensional contract.
+The true-profile section exposes the thread mouths; their edge-break limit
+is title-block-owned and their 45-degree shape rides the native tap callout.
 The associative tap callout owns its thread description and extent; its class
 is owned by the title block. The duplicate Wizard name leaves the wall's lane.
 No press-fit, collar, finish-land or GD&T-frame convention remains.
@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -21,10 +23,11 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_vie
 
 from _check import check
 from _com import _early_bound
-from _drawing_annotation_extent import CalloutInk, move_annotation, require_clear, require_inside, require_leader_clear, sheet_region
+from _drawing_annotation_extent import CalloutInk, move_annotation, require_clear, require_inside, sheet_region
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout
@@ -37,15 +40,15 @@ from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sections import create_section_view
 from _hole_callout_thread_class import omit_title_block_thread_class
-from _layout_audit import _collinear_overlap, _display_segments, _segment_crossing
-from _layout_geometry import Segment, estimate_text_box, union_boxes
+from _layout_audit import _display_segments
+from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
 from _paths import CAD_ROOT
 from _session import run_build
 from _section_axis import position_section_caption
 import _telemetry
-from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_Z
+from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, FLANGE_DEPTH_CALLOUT, FOOT_CORNER_CALLOUT, MOUNTING_HOLE_PROCESS, MOUTH_CALLOUT, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
+from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, FLANGE_DEPTH_CALLOUT, MOUNTING_HOLE_PROCESS, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -63,15 +66,13 @@ ISO_SCALE = (1, 2)
 MOUTH_SECTION_SEED = (0.228, 0.080)
 MOUTH_SECTION_SCALE = (3, 1)
 FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.140, 0.123), "RootR": (0.045, 0.145)}
-BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080), "FootCornerR": (0.040, 0.100)}
+BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
-MOUTH_KEEP = {"MouthChamfer": (0.330, 0.190)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240), "ThreadRootEnvelope": (0.292, 0.214)}
 WALL_TEXT_XY = (0.140, 0.250)
 # Whitespace only; keep the native radius/MAX and all controlled corners.
 ROOT_PRINT_CALLOUT = ROOT_CALLOUT.replace(" INSIDE ", "\nINSIDE ")
-MOUTH_PRINT_CALLOUT = MOUTH_CALLOUT.replace(", ", ",\n", 1)
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:
@@ -219,25 +220,14 @@ def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> Callo
     return CalloutInk(label, (box.xmin, box.ymin, box.xmax, box.ymax), lines)
 
 
-def _layout_mouth_annotations(adapter: Any, section: Any, iso: Any, annotations: list[Any]) -> None:
-    """Seat the unchanged native dimension and linked caption beside the cut."""
-    if len(annotations) != 1 or dimension_name(adapter, annotations[0]) != "MouthChamfer":
-        raise RuntimeError("thread-mouth layout requires its one imported MouthChamfer")
+def _layout_mouth_caption(adapter: Any, section: Any, iso: Any) -> None:
+    """Seat the linked ROTATED caption beside the true-profile native section."""
     region = sheet_region(adapter)
     iso_outline = tuple(float(value) for value in _early_bound(iso, "IView").GetOutline())
     if len(iso_outline) != 4 or not all(math.isfinite(value) for value in iso_outline):
         raise RuntimeError("thread-mouth layout has invalid isometric outline")
     lane = DrawableRegion(0.250, iso_outline[3] + 0.003, region.xmax - 0.004, 0.207)
     profile = _mouth_profile_box(adapter, section)
-    annotation = annotations[0]
-    rebuild_drawing(adapter, label="measure complete thread-mouth callout")
-    ink = _dimension_layout_ink(adapter, annotation, label="both mouth legs/ends")
-    # The complete text block sits left of both real mouth ends; moving the
-    # dimension leaves its model attachments, tolerance and qualifier intact.
-    move_annotation(adapter, annotation, profile[0] - 0.006 - ink.text[2], profile[3] - ink.text[3], label="both mouth legs/ends")
-    ink = _dimension_layout_ink(adapter, annotation, label="both mouth legs/ends")
-    if math.dist((ink.text[2], ink.text[3]), (profile[0] - 0.006, profile[3])) > 0.00005:
-        raise RuntimeError("thread-mouth callout placement did not persist")
     notes = [
         note for note in (_early_bound(raw, "INote") for raw in (_early_bound(section, "IView").GetNotes() or ()))
         if "<VLLABEL>" in str(note.PropertyLinkedText or "")
@@ -245,17 +235,20 @@ def _layout_mouth_annotations(adapter: Any, section: Any, iso: Any, annotations:
     if len(notes) != 1:
         raise RuntimeError("thread-mouth layout requires one native linked section caption")
     note = notes[0]
+    linked = str(note.PropertyLinkedText or "")
+    rotated = linked.replace("<VLLABEL>", "<VLLABEL> (ROTATED)", 1)
+    if "(ROTATED)" not in linked:
+        note.PropertyLinkedText = rotated
+        rebuild_drawing(adapter, label="identify rotated native thread-mouth section")
+        if str(note.PropertyLinkedText or "") != rotated:
+            raise RuntimeError("thread-mouth rotated caption lost its native linked fields")
     extent = tuple(float(value) for value in note.GetExtent())
     if len(extent) != 6 or not all(math.isfinite(value) for value in extent) or extent[0] >= extent[3] or extent[1] >= extent[4]:
         raise RuntimeError("thread-mouth caption has invalid native extent")
     position = tuple(float(value) for value in _early_bound(note.GetAnnotation(), "IAnnotation").GetPosition())
-    caption_center_x = min(
-        (ink.text[0] + ink.text[2]) / 2.0,
-        profile[0] - 0.004 - (extent[3] - extent[0]) / 2.0,
-    )
     target = (
-        position[0] + caption_center_x - (extent[0] + extent[3]) / 2.0,
-        position[1] + ink.text[1] - 0.004 - extent[4],
+        position[0] + profile[0] - 0.004 - extent[3],
+        position[1] + profile[3] - extent[4],
     )
     position_section_caption(adapter, section, target, label="thread mouth A-A")
     extent = tuple(float(value) for value in note.GetExtent())
@@ -268,38 +261,14 @@ def _layout_mouth_annotations(adapter: Any, section: Any, iso: Any, annotations:
     require_inside("final complete thread-mouth outline", outline, lane)
     require_inside("final complete thread-mouth outline", outline, region)
     require_clear("final complete thread-mouth outline", outline, {"isometric": iso_outline})
-    for label, box in (("mouth profile", profile), ("mouth callout", ink.text), ("mouth caption", caption)):
+    for label, box in (("mouth profile", profile), ("mouth caption", caption)):
         require_inside(label, box, lane)
         require_inside(label, box, region)
         require_clear(label, box, {"isometric": iso_outline})
-    require_clear("mouth callout", ink.text, {"profile": profile, "caption": caption})
     require_clear("mouth caption", caption, {"profile": profile})
-    # R8 also retained the two uncut-foot centre marks in this section.
-    # Keep them: screen position alone does not prove removable attachments.
-    # The wrapped qualifier sits right of their arms; the caption sits below.
-    mark_lines = {}
-    mark_segments = []
-    for index, mark in enumerate(_early_bound(section, "IView").GetAnnotationsByType(13) or ()):
-        display, errors = annotation_display(adapter, mark)
-        lines = display.get("lines", ())
-        if errors or not lines or any(len(row) != 10 or not all(math.isfinite(value) for value in row) for row in lines):
-            raise RuntimeError(f"thread-mouth centre mark {index} has unreadable native ink: {errors}")
-        for line_index, line in enumerate(_display_segments(display)):
-            mark_lines[f"section centre mark {index}/{line_index}"] = (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1))
-            mark_segments.append((f"section centre mark {index}/{line_index}", line))
-    require_clear("mouth callout", ink.text, mark_lines)
-    require_clear("mouth caption", caption, mark_lines)
-    # Text clearance accepts zero-area line bounds; box-interior crossing
-    # does not. Keep the actual segments for dimension-line/mark crossings.
-    for line in ink.leader:
-        segment = Segment(line.x0, line.y0, line.x1, line.y1)
-        for label, mark_segment in mark_segments:
-            if _segment_crossing(segment, mark_segment) is not None or _collinear_overlap(segment, mark_segment, tol=0.0) is not None:
-                raise RuntimeError(f"thread-mouth dimension line intersects {label}")
-    require_leader_clear(ink, {"caption": caption, "isometric": iso_outline})
-    for line in ink.leader:
-        require_inside("mouth dimension line/witness", (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), lane)
-    _telemetry.info(f"thread-mouth annotation layout: profile={profile}, text={ink.text}, caption={caption}")
+    if _early_bound(section, "IView").GetAnnotationsByType(13):
+        raise RuntimeError("out-of-cut centre marks returned after native section layout")
+    _telemetry.info(f"thread-mouth caption layout: profile={profile}, caption={caption}")
 
 
 def _require_root_callout_inside(adapter: Any, front: Any, annotations: list[Any]) -> None:
@@ -374,13 +343,291 @@ def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
     return len(notes)
 
 
+def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
+    """Keep every native hole variable, adding process words to its own row."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    tokens = re.findall(r"<hw-[^>]+>", "\n".join(definitions.values()))
+    drill_tokens = ("<hw-tapdrldia>", "<hw-thrutapdrldia>") if tapped else ("<hw-diam>",)
+    if not display.IsHoleCallout() or sum(tokens.count(token) for token in drill_tokens) != 1 or "<hw-thru>" not in tokens:
+        raise RuntimeError("hole process requires native diameter and through variables")
+    if tapped != ("<hw-threaddesc>" in tokens):
+        raise RuntimeError("hole process does not match its native thread definition")
+    revised = {}
+    drill_rows = tap_rows = 0
+    for part, text in definitions.items():
+        rows = []
+        for row in text.splitlines():
+            if "<hw-threaddesc>" in row:
+                if not re.search(r"\bTAP\b", row):
+                    row = "TAP " + row
+                tap_rows += 1
+            elif any(token in row for token in drill_tokens):
+                if not re.search(r"\bDRILL\b", row):
+                    row = "DRILL " + row
+                drill_rows += 1
+            rows.append(row)
+        revised[part] = "\n".join(rows)
+    if drill_rows != 1 or tap_rows != int(tapped):
+        raise RuntimeError("hole process requires one native drill row and its optional tap row")
+    # The native drill is CalloutAbove (7), the thread is Prefix (5).
+    # Put mate/shape BELOW the prefix, never above the drill or in a suffix.
+    revised[5] = "\n".join(text for text in (revised[5], mate) if text)
+    if re.findall(r"<hw-[^>]+>", "\n".join(revised.values())) != tokens:
+        raise RuntimeError("hole process changed native quantity/size/extent variables")
+    for part, text in revised.items():
+        if text != definitions[part]:
+            display.SetText(part - 4, text)
+    if {part: str(display.GetText(part) or "") for part in revised} != revised:
+        raise RuntimeError("native hole process words did not persist")
+
+
+def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
+    """Ordinary .XX location between physical sides; radius/parallelism owns width."""
+    selected = []
+    for level, neck in ((-NOSE_R, True), (SIDE_PLATE_Y[0], False)):
+        candidates = []
+        for item in edges.lines:
+            a, b = item.line
+            if max(abs(a[1] - level), abs(b[1] - level), abs(a[0] - b[0])) > 1e-6 or abs(a[2] - b[2]) < 0.001:
+                continue
+            if neck:
+                if abs(a[0] - NECK_HALF_X) > 1e-6 or min(a[2], b[2]) > 1e-6:
+                    continue
+            elif min(a[2], b[2]) < SIDE_PLATE_Z[0] - 1e-6 or max(a[2], b[2]) > SIDE_PLATE_Z[1] + 1e-6:
+                continue
+            candidates.append(item)
+        # The visible +X foot-side edge is tangent to its actual corner
+        # round, not at X=NECK_HALF_X. No screen hit-test or proxy IsSame.
+        if not candidates:
+            raise RuntimeError("neck-to-foot location has no physical side edge")
+        front_x = max(item.midpoint_mm[0] for item in candidates)
+        candidates = [item for item in candidates if abs(item.midpoint_mm[0] - front_x) < 1e-6]
+        if len(candidates) != 1:
+            raise RuntimeError("neck-to-foot location has ambiguous physical side edges")
+        selected.append(candidates[0])
+    measured = selected[0].midpoint_mm[1] - selected[1].midpoint_mm[1]
+    if measured <= 0.0 or abs(measured - (-NOSE_R - SIDE_PLATE_Y[0])) > 1e-6:
+        raise RuntimeError("neck-to-foot physical lateral offset changed")
+    picks = [model_point_in_view(adapter, side, tuple(v / 1000.0 for v in item.midpoint_mm), label="physical neck/foot side") for item in selected]
+    outline = tuple(float(v) for v in _early_bound(side, "IView").GetOutline())
+    display = _early_bound(add_edge_dimension(
+        adapter, side, p0=picks[0], p1=picks[1], text_xy=(outline[2] + 0.012, outline[1] - 0.010),
+        entities=tuple(item.edge for item in selected), orientation="horizontal", label="NeckToFootSide",
+    ), "IDisplayDimension")
+    assert_dimension_measures(adapter, display, expected_mm=measured, entities=tuple(item.edge for item in selected), label="NeckToFootSide")
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    native.Name = "NeckToFootSide"
+    display.SetPrecision3(DRAWING_EDGE_PRECISION["NeckToFootSide"], -1, -1, -1)
+    display.ShowParenthesis = False
+    if str(native.Name) != "NeckToFootSide" or int(display.GetPrimaryPrecision2()) != DRAWING_EDGE_PRECISION["NeckToFootSide"] or display.ShowParenthesis is not False or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError("neck-to-foot location is not an ordinary title-band dimension")
+    return display.GetAnnotation()
+
+
+def _remove_out_of_cut_mounting_marks(adapter: Any, section: Any) -> None:
+    """Prove source/view correspondence and MountingHoles ownership before deletion."""
+    view = _early_bound(section, "IView")
+    if _early_bound(view.GetSection(), "IDrSection").GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError("mounting-mark removal requires the proven Z=0 cut-only section")
+    # A section has no ReferencedDocument (SDK); its base view owns it.
+    base = _early_bound(view.GetBaseView(), "IView")
+    reference = base.ReferencedDocument if base is not None else None
+    if reference is None or reference == "":
+        raise RuntimeError("section mounting-mark proof has no base-view source")
+    source = _early_bound(reference, "IModelDoc2")
+    source_path = str(source.GetPathName() or "")
+    if int(source.GetType()) != 1 or not source_path or Path(source_path).resolve() != SOURCE.resolve():
+        raise RuntimeError(f"section mounting-mark proof references wrong source: {source_path!r}")
+    feature = _early_bound(source, "IPartDoc").FeatureByName("MountingHoles")
+    if feature is None:
+        raise RuntimeError(f"section mounting-mark source {source_path!r} has no MountingHoles")
+    extension = _early_bound(source.Extension, "IModelDocExtension")
+
+    def persistent(entity: Any, label: str) -> Any:
+        if entity is None:
+            raise RuntimeError(f"{label}: missing source correspondence in {source_path!r}")
+        reference_id = extension.GetPersistReference3(entity)
+        if reference_id is None or len(reference_id) == 0 or int(extension.IsSamePersistentID(reference_id, reference_id)) != 1:
+            raise RuntimeError(f"{label}: unresolved source persistent identity in {source_path!r}")
+        return reference_id
+
+    # Inventory real edges of the named physical source feature. Shared face
+    # boundaries repeat an edge; deduplicate native IDs, not circle geometry.
+    inventory = []
+    for face in _early_bound(feature, "IFeature").GetFaces() or ():
+        for edge in _early_bound(face, "IFace2").GetEdges() or ():
+            identity = persistent(edge, "MountingHoles inventory edge")
+            comparisons = [int(extension.IsSamePersistentID(identity, known)) for known in inventory]
+            if any(value not in (0, 1) for value in comparisons):
+                raise RuntimeError("MountingHoles inventory has unresolved native identity comparisons")
+            if 1 not in comparisons:
+                inventory.append(identity)
+    if not inventory:
+        raise RuntimeError(f"MountingHoles has no native source-edge inventory in {source_path!r}")
+    removable = []
+    for index, raw in enumerate(view.GetAnnotationsByType(13) or ()):
+        mark = _early_bound(raw, "IAnnotation")
+        entities = tuple(mark.GetAttachedEntities3() or ())
+        types = tuple(mark.GetAttachedEntityTypes() or ())
+        if len(entities) != 1 or types != (1,) or entities[0] is None or mark.IsDangling():
+            raise RuntimeError(f"section mark {index}: unresolved attachment count={len(entities)}, types={types!r}, source={source_path!r}")
+        canonical = extension.GetCorrespondingEntity2(entities[0])
+        identity = persistent(canonical, f"section mark {index} attached edge")
+        comparisons = [int(extension.IsSamePersistentID(identity, known)) for known in inventory]
+        if any(value not in (0, 1) for value in comparisons) or comparisons.count(1) != 1:
+            raise RuntimeError(f"section mark {index}: attached edge is not uniquely owned by source MountingHoles; matches={comparisons}, source={source_path!r}")
+        roundtrip = view.GetCorrespondingEntity(canonical)
+        if roundtrip is None:
+            raise RuntimeError(f"section mark {index}: MountingHoles edge has no correspondence in this section")
+        back = persistent(extension.GetCorrespondingEntity2(roundtrip), f"section mark {index} view roundtrip")
+        if int(extension.IsSamePersistentID(identity, back)) != 1:
+            raise RuntimeError(f"section mark {index}: source/view persistent identity roundtrip changed")
+        # Only now do centre/axis/radius establish which mounting rim this
+        # owned edge is and that it lies beyond the actual Z=0 cut.
+        curve = _early_bound(_early_bound(canonical, "IEdge").GetCurve(), "ICurve")
+        if curve.IsCircle() is not True:
+            raise RuntimeError("section centre mark source is not a circle")
+        values = tuple(float(v) for v in curve.CircleParams)
+        if len(values) != 7 or not all(math.isfinite(v) for v in values):
+            raise RuntimeError("section centre mark has unreadable native circle geometry")
+        x, y, z, nx, ny, nz, radius = values
+        mounting = any(math.dist((x, y), tuple(v / 1000.0 for v in p[:2])) < 1e-7 for p in BRACKET_HOLE_POINTS)
+        mounting = mounting and min(abs(z - v / 1000.0) for v in SIDE_PLATE_Z) < 1e-7 and abs(z) > CLEARANCE_DIA / 1000.0
+        mounting = mounting and max(abs(nx), abs(ny), abs(abs(nz) - 1.0), abs(radius - CLEARANCE_DIA / 2000.0)) < 1e-7
+        if not mounting:
+            raise RuntimeError("section centre mark is not an out-of-cut mounting-hole rim")
+        removable.append(mark)
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    for mark in removable:
+        draw.ClearSelection2(True)
+        if not mark.Select2(False, 0):
+            raise RuntimeError("could not select out-of-cut mounting centre mark")
+        draw.EditDelete()  # Void; view-scoped native re-read is the proof.
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="remove proven out-of-cut mounting marks")
+    if view.GetAnnotationsByType(13):
+        raise RuntimeError("out-of-cut mounting centre mark survived deletion")
+
+
+def _show_mouth_thread(adapter: Any, section: Any) -> None:
+    """Import the model's native thread; refuse an empty/plain-bore representation."""
+    if import_cosmetic_threads(adapter, section) != (1, 1):
+        raise RuntimeError("thread-mouth section requires its one native through thread")
+    set_hidden_lines_removed(adapter, section)
+    rebuild_drawing(adapter, label="regenerate native thread-mouth cosmetic thread")
+    threads = tuple(_early_bound(section, "IView").GetCThreads() or ())
+    if len(threads) != 1:
+        raise RuntimeError("thread-mouth section has no unique native cosmetic thread")
+    thread = _early_bound(threads[0], "ICThread")
+    annotation = _early_bound(thread.GetAnnotation(), "IAnnotation")
+    if int(annotation.Visible) != 1 or annotation.IsDangling():
+        raise RuntimeError("thread-mouth native cosmetic thread is hidden or dangling")
+    data = _early_bound(thread.GetDisplayData(), "IDisplayData")
+    if data is None or int(data.GetLineCount()) < 2:
+        raise RuntimeError("native through-thread has no longitudinal section ink")
+    profile = _mouth_profile_box(adapter, section)
+    lines = [tuple(float(v) for v in data.GetLineAtIndex2(i)) for i in range(int(data.GetLineCount()))]
+    if any(len(row) != 10 or not all(math.isfinite(v) for v in row) for row in lines):
+        raise RuntimeError("native through-thread has unreadable section ink")
+    longitudinal = [row for row in lines if abs(row[5] - row[8]) < 1e-7 and abs(row[4] - row[7]) > (profile[2] - profile[0]) / 2.0]
+    centre_y = (profile[1] + profile[3]) / 2.0
+    if not any(row[5] < centre_y - 1e-7 for row in longitudinal) or not any(row[5] > centre_y + 1e-7 for row in longitudinal):
+        raise RuntimeError("native thread does not show both longitudinal flanks")
+    for row in longitudinal:
+        require_inside("native section thread", (min(row[4], row[7]), min(row[5], row[8]), max(row[4], row[7]), max(row[5], row[8])), DrawableRegion(*profile))
+
+
+def _layout_linear_annotations(adapter: Any, front: Any, bottom: Any, annotations: list[Any]) -> None:
+    """Place the five reviewed text blocks from native ink, then guard neighbours."""
+    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NeckToFootSide")
+    by_name = {}
+    for name in (*names, "SeatToAxis"):
+        matches = [item for item in annotations if dimension_name(adapter, item) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"bracket layout requires exactly one {name}")
+        by_name[name] = matches[0]
+    rebuild_drawing(adapter, label="measure bracket linear callouts")
+    before = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
+
+    def verticals(name: str) -> list[LeaderSegment]:
+        lines = [line for line in before[name].leader if abs(line.x0 - line.x1) < 1e-7 and abs(line.y0 - line.y1) > 0.001]
+        if not lines:
+            raise RuntimeError(f"{name} has no native vertical witness/extension line")
+        return lines
+
+    left_foot = min(line.x0 for line in verticals("MountingX0"))
+    last_hole = max(line.x0 for line in verticals("MountingX1"))
+    seat_line = min(line.x0 for line in verticals("SeatToAxis"))
+    front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
+    targets = {
+        "NeckThickness": (before["NeckThickness"].text[0], front_outline[3] + 0.004),
+        "FlangeDepth": (seat_line - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]), before["FlangeDepth"].text[1]),
+        "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
+        "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
+        "MountingY0": (
+            left_foot - 0.004 - (before["MountingY0"].text[2] - before["MountingY0"].text[0]),
+            max(max(line.y0, line.y1) for line in before["MountingY0"].leader) + 0.0022,
+        ),
+    }
+    for name, target in targets.items():
+        annotation = by_name[name]
+        display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+        display.CenterText = False
+        if name == "MountingY0":
+            # Keep its real dimension/witness lines fixed while moving the
+            # horizontal text off their centreline, using the native jog.
+            display.OffsetText = True
+        if display.CenterText is not False or (name == "MountingY0" and display.OffsetText is not True):
+            raise RuntimeError(f"{name}: native text placement mode did not persist")
+        for _attempt in range(3):
+            ink = _dimension_layout_ink(adapter, annotation, label=name)
+            delta = (target[0] - ink.text[0], target[1] - ink.text[1])
+            if max(abs(v) for v in delta) < 0.00005:
+                break
+            move_annotation(adapter, annotation, *delta, label=name)
+        ink = _dimension_layout_ink(adapter, annotation, label=name)
+        if math.dist(ink.text[:2], target) > 0.00005:
+            raise RuntimeError(f"{name}: native text placement did not settle")
+    settled = [(item, _dimension_layout_ink(adapter, item, label=f"bracket dimension {index}")) for index, item in enumerate(annotations)]
+    region = sheet_region(adapter)
+    for name in names:
+        annotation = by_name[name]
+        ink = next(value for item, value in settled if item is annotation)
+        require_inside(name, ink.text, region)
+        inner = Box(ink.text[0] + 0.00015, ink.text[1] + 0.00015, ink.text[2] - 0.00015, ink.text[3] - 0.00015)
+        # Own underline may touch the text baseline, never cross glyph ink.
+        if any(segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), inner) > 1e-7 for line in ink.leader):
+            raise RuntimeError(f"{name}: own native line/arrow crosses its text")
+        expanded = Box(ink.text[0] - 0.002, ink.text[1] - 0.002, ink.text[2] + 0.002, ink.text[3] + 0.002)
+        for other, other_ink in settled:
+            if other is annotation:
+                continue
+            require_clear(name, ink.text, {other_ink.label: other_ink.text})
+            if any(segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), expanded) > 1e-7 for line in other_ink.leader):
+                raise RuntimeError(f"{name}: neighbouring native line crowds its text")
+        for line in ink.leader:
+            require_inside(name, (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), region)
+        _telemetry.info(f"{name} settled native text={ink.text}")
+    require_clear("NeckThickness", next(ink.text for item, ink in settled if item is by_name["NeckThickness"]), {"front silhouette": front_outline})
+    require_clear("FlangeDepth", next(ink.text for item, ink in settled if item is by_name["FlangeDepth"]), {"front silhouette": front_outline})
+    foot_points = [
+        model_point_in_view(adapter, bottom, (x / 1000.0, y / 1000.0, SIDE_PLATE_Z[1] / 1000.0), label="mounting-face silhouette")
+        for x in SIDE_PLATE_X for y in SIDE_PLATE_Y
+    ]
+    foot_box = (min(p[0] for p in foot_points), min(p[1] for p in foot_points), max(p[0] for p in foot_points), max(p[1] for p in foot_points))
+    for name in ("MountingX0", "MountingX1", "MountingY0"):
+        require_clear(name, next(ink.text for item, ink in settled if item is by_name[name]), {"mounting-face silhouette": foot_box})
+
+
 def _add_mounting_callout(adapter: Any, bottom: Any, edge: Any) -> Any:
-    # A trailing process newline leaves the associative native quantity/size/
-    # extent on its own row. R9's joined row ended at X226.2288, in the block.
+    # Native quantity/diameter/extent remain live on their own process row.
     display = add_native_hole_callout(
         adapter, bottom, edge=edge, callout_xy=(0.166, 0.054),
-        label="two mounting clearance holes", process=MOUNTING_HOLE_PROCESS + "\n",
+        label="two mounting clearance holes",
     )
+    _set_hole_process(display, mate=MOUNTING_HOLE_PROCESS, tapped=False)
+    rebuild_drawing(adapter, label="settle native mounting drill process")
     annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
     ink = _dimension_layout_ink(adapter, annotation, label="mounting-hole callout")
     template = DRAWING_TEMPLATES[SPEC.layout]
@@ -414,27 +661,36 @@ async def build(adapter: Any) -> dict[str, str]:
     imported = {}
     for view, keep, label, callouts in (
         (front, FRONT_KEEP, "front", {"NeckThickness": NECK_THICKNESS_CALLOUT, "FlangeDepth": FLANGE_DEPTH_CALLOUT, "RootR": ROOT_PRINT_CALLOUT}),
-        (bottom, BOTTOM_KEEP, "mounting face", {"FootCornerR": FOOT_CORNER_CALLOUT}),
+        (bottom, BOTTOM_KEEP, "mounting face", {}),
         (side, SIDE_KEEP, "thread-axis end", {}),
-        (mouth, MOUTH_KEEP, "thread-mouth section", {"MouthChamfer": MOUTH_PRINT_CALLOUT}),
     ):
         annotations = curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=DRAWING_DIMENSIONS)
         set_dimension_callouts(adapter, annotations, callouts)
         imported[label] = annotations
-    curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
+    mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations and root limit", dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature] for feature in ("TapCoordinates", "ThreadEnvelope")})
     set_dimension_callouts(adapter, annotations, {"ThreadRootEnvelope": THREAD_ENVELOPE_CALLOUT})
     rim = _mounting_rims(bottom)[1]
-    _add_mounting_callout(adapter, bottom, rim.edge)
+    mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)
     edges = scan_view_edges(side, label="bracket through thread")
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")
-    tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap", process=TAP_PROCESS)
+    tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap")
     _curate_tap_callout(adapter, side, tap)
+    _set_hole_process(tap, mate=TAP_PROCESS, tapped=True)
+    neck_location = _neck_to_foot_side(adapter, side, edges)
+    _show_mouth_thread(adapter, mouth)
+    _remove_out_of_cut_mounting_marks(adapter, mouth)
     landing = model_point_in_view(adapter, side, (NECK_HALF_X / 1000.0, 0.0, -4.5e-3), label="minimum thread-mouth wall")
     add_leader_note(adapter, WALL_CALLOUT, text_xy=WALL_TEXT_XY, attach_xy=landing, view=side, label="honest manufactured minimum wall")
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.092)
+    _layout_linear_annotations(adapter, front, bottom, [
+        *imported["front"], *imported["mounting face"], *imported["thread-axis end"],
+        *mounting_dimensions, *annotations, neck_location,
+        _early_bound(mounting_callout, "IDisplayDimension").GetAnnotation(),
+        _early_bound(tap, "IDisplayDimension").GetAnnotation(),
+    ])
     _require_root_callout_inside(adapter, front, imported["front"])
-    _layout_mouth_annotations(adapter, mouth, iso, imported["thread-mouth section"])
+    _layout_mouth_caption(adapter, mouth, iso)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 

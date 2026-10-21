@@ -1014,19 +1014,46 @@ axis error is `hypot(0.10, 0.10)`, not the conditional sketch's 0.05. A
 separate native **Ø6.45 MAX internal thread-root envelope** bounds the
 thread mouth; a nominal 2B tap and its tap drill do not establish that maximum.
 Include start wander 0.10 plus 0.3° run-off over the maximum 12.6 hole depth,
-an additional 0.165974. With both native 0.20 ±0.05 ×45° mouth breaks, each
-leg bounded, the actual wall bound is **1.667605**: above the 1.5 floor, below
-the 2.0 target. Round a printed MIN
-down, never to a value above the computed bound. No FCF or tighter radius
-band was authorized to recover the superseded sketch's 1.925 figure.
+an additional 0.165974. The 2026-10-21 approved joint cutover retains the
+modeled 0.20 chamfers but replaces their unsupported 0.15 minimum with hidden
+native primary-distance limits 0..0.25. The one ceiling comes from structured
+`title_block.edge_break.chamfer_max_mm`; the existing bilateral setter owns
+the deviations, and each builder checks the nominal plus its native lower and
+upper deviations against 0 and 0.25. Do not substitute an unbanded printed
+0.2 or claim both manufactured legs are capped at 0.25. The retained 45° entry
+indication takes `angular_band_deg()` (±1°), giving the conservative projected
+leg envelope `q = 0.25 tan46° = 0.258882578`. `_part_save` already invokes
+`apply_block_tolerances`, which verifies the template-owned native angular
+preference 126 against the configured value and fails on drift.
+The revised conservative wall bound is **1.658722017**, printed **1.658 MIN**:
+above the 1.5 floor, below the 2.0 target. This explicitly supersedes the
+former 1.667605/1.667 MIN claim, and the approved RV-01 declaration records
+the change. Round a printed MIN down. No FCF, tighter radius or tighter angle
+was authorized to recover the superseded sketch's 1.925 figure.
+
+The lever no longer imports or prints its local numeric `TipChamfer` size,
+band or `LIMIT RETAINS FULL ENGAGEMENT` text. The existing thread-feature
+callout is the sole local shape indication: thread designation, then
+`45° ENTRY CHAMFER`, then `MATES MHA-MG-01 BRACKET`. Its drawing layout may
+wrap the mate onto two rows without dropping words; keeping the short
+`BRACKET` row last avoids the reported leader departure through a long
+bottom row. The hidden native primary-distance cap remains in the part,
+while the title block supplies the printed edge maximum. Callout reflow
+still requires the final native-PNG visual gate; source layout is not
+evidence that the rendered text and leaders are clear.
 
 MHA-MG-03 now has one free hemisphere and a flat threaded end. Import the
 small thread/lead dimensions before circularly cropping its enlarged
 independent Front model view, then prove every kept native dimension survives
 the crop (the MHA-MG-04 pattern). The assembly's native ThreadProjection
 specifies installation depth: the flat tip reaches through the far face,
-with no shoulder or added relief groove. Full engaged overlap excludes
-mouth chamfers, incomplete male thread at both ends, and root runout.
+with no shoulder or added relief groove. Full engaged overlap excludes `q`
+at each female mouth, incomplete male thread at both ends, and an ADDITIVE
+`q` male tip loss: the print does not explicitly define a chamfer/die-lead
+union. The fixed useful pose guarantees **10.477234843** full overlap and
+the independent installed projection guarantees **10.717234843**, both above
+1.5D = 9.525. These replace the earlier 10.745/10.985 bounds; root-runout
+clearance remains 0.985 in the fixed frame.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
 Keep the assembly's complete thread-projection qualifier attached to that native
@@ -1056,10 +1083,27 @@ stays at **919.7**; neither `.XX` ±0.51 band tightens. Nominal AF is 12.70,
 but the attached stock property explicitly requires AF12.57–12.83 and a
 **15.00 MAX transverse envelope over the full height**. Inspect that envelope
 with straightedges/calipers; do not infer it from exact60° flats or Rule#1,
-which does not automatically control as-supplied STOCK form. The same attached
-flag requires **2.0 MIN finished net wall at bore/taps throughout their depth**.
-This is a finished-part acceptance requirement, not a claim that AF alone
-computes a guaranteed wall for arbitrarily bowed/twisted stock.
+which does not automatically control as-supplied STOCK form. The separate
+bore-callout-owned requirement is **2.0 MIN finished net wall at bore/taps
+throughout their depth**, not a claim that AF alone computes a guaranteed wall
+for arbitrarily bowed/twisted stock. Retain the four physical acceptance lines:
+
+- `1/2 HEX BAR; AF 12.57–12.83; FLATS AS SUPPLIED`
+- `TRANSVERSE ENVELOPE 15.00 MAX OVER FULL HEIGHT`
+- `2.0 MIN FINISHED WALL AT BORE/TAPS`
+- `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`
+
+The stock-face property note owns only the first two lines: AF/flats and the
+full-height envelope. The existing actual-bore native callout owns the single
+finished-wall line as below-text (`SetText(4)` / `GetText(4)`), not as part of
+the stock-face property note. The actual shoulder-seat note owns the fourth
+line. `AT TAP` scopes the no-chamfer/spotface requirement; do not broaden it to
+unrelated edges. These are receiving/finished acceptances, not fabricated
+native measurements of nominal 15 or 2. Native wrapping and attachment
+readback, not source-string count, determine whether four readable lines fit.
+The unchanged 29.50 height and its .XX band control **TOP-TAP WALL**; do not
+label the height FULL THREAD ENGAGEMENT. Identify MHA-MG-VN-50 at its actual
+top-tap callout.
 
 Spend 15.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
 an unowned nominal half-depth. Intersect actual male/female full-profile
@@ -1070,34 +1114,84 @@ finite118° drill cone, collar clearance and FULL≥1.5D=4.2675 must all pass.
 The rod's 8.55/12.75 depths and FULL4.605 are unchanged, conditional on its
 actual shoulder seating. This is not an alloy/temper strength certificate.
 
-Five ordinary native measurements locate the manufactured axes with no new
-FCF: the bore's normal distance from its actual flat; each tap's normal
-distance from its actual diagonal flat; and each actual Wizard entry point's
-transverse distance to the actual bore rim. The last two print **3.25±1.02**:
-the former two independent .XX bands summed, not a precision increase. Check
-these with bore/tap gage pins and a height gage/micrometer; use actual gage
-diameters when reconstructing the rim-to-axis distance. The drilled bore's
-radial+0.05 is still charged in the actual axis-error bound.
+The approved R22 datum change retains five ordinary native measurements,
+with no new FCF or tighter band. `LeverBoreFromZFlat`, `ThumbTapFromZFlat` and
+`RodTapFromZFlat`, all in `LeverBoreLocationProfile`, each measure **6.35**
+from the **same actual full-height +Z stock flat** with the title block's
+.XX ±0.51. The two tap-to-diagonal-flat measurements remain separate 6.35
+controls with the same ordinary band. Do not imply that all five dimensions
+share a datum. The common datum is the converted full-height edge at
+`(corner_radius/2, Y, +AF/2)` owned by the resolved +Z stock face, not a
+computed midplane or independently picked top/bottom boundaries.
 
-The native witnesses select the real Wizard placement points and externally
-convert the actual stock edges and cut-producing bore circle. No detached
-coordinate copy counts as measurement. Each relative-axis measurement uses a
-local construction line: its start is vertically aligned with the actual
-Wizard point, its end is horizontally aligned with the actual bore centre
-and coincident with the actual circle, and the line itself is horizontal.
-These four native constraints define the projected tap-axis-to-positive-rim
-span. Provisional seeds choose the positive branch, not measurement authority.
-Create the endpoints away from the actual bore centre and previous witness
-endpoints. `AddToDB` suppresses inference, **not exact-coordinate database
-merging**: `_sketch.add_line_chain` and `set_sketch_direct_db` document this
-live-proven distinction. Require native endpoint identity/ownership and
-distinctness at creation, then retain independent identities through the
-constraints and rebuild even where the final coordinates coincide.
-Require fully defined status, actual relation definition entities, unchanged
-source identities and the positive-rim readback before and after rebuild.
-The native dimension attaches to both local line endpoints, carrying the
-actual value, driven ownership, explicit band and unparenthesized ordinary ink
-through equations/rebuild and per-view hidden-sketch import.
+This is an explicitly approved **change of manufacturing acceptance**, not an
+equivalent rewording. With `s = bore_radius - 3.25`, the old feasible set was
+`B in [5.84,6.86]`, `T_i - B in [s-1.02,s+1.02]` and
+`D_i in [5.84,6.86]`. The new set independently bounds
+`B, T_thumb, T_rod, D_thumb, D_rod in [5.84,6.86]`. Each tap's absolute
+common-flat interval narrows from the old union [4.82,7.93] to [5.84,6.86].
+For positive `s` the new joint set is not even a strict subset:
+`B=6.86,T=5.84,r=3.30` satisfies the new limits but gives old rim distance
+4.32, above 4.27; conversely `B=6.35,T=7.37,r=3.25` satisfies the old rim
+control but fails the new direct tap interval. The conservative maximum
+tap/bore centre offset falls from **1.07 to 1.02**; do not add a diameter
+half-band to that centre-to-centre location. The tap/tap entry offset maximum
+is also 1.02, rather than the former 2.04.
+
+The native witnesses still select the real Wizard points and externally
+convert the actual stock edge and cut-producing bore circle. Retain the
+four-constraint construction projection: VERTPOINTS26 aligns its start with
+the actual tap; HORIZONTAL4 makes the line horizontal; HORIZPOINTS25 aligns
+its end with the actual bore centre; COINCIDENT9 places that end on the actual
+circle. This geometry remains an association/projection device, **not a
+printed rim acceptance**. Measure the projected local start to the same
+converted flat segment through the existing point-to-flat constructor; the
+bore uses its converted circle centre and that identical flat. Remove the
+obsolete rim dimension names, tolerance metadata and point-pair acceptance
+contracts rather than retaining them as secondary controls.
+
+Provisional seeds choose the positive projection branch, not measurement
+authority. Create endpoints away from the actual bore centre and previous
+witness endpoints: `AddToDB` suppresses inference, not exact-coordinate
+database merging. Preserve fully defined status, actual relation definition
+entities, source identity, ordered point/segment IDs, self/owner controls,
+endpoint distinctness and rebuild checks. The new dimension's attachment
+proof is the actual projected point plus the actual converted flat segment,
+not both line endpoints. The source measurements retain ordinary unboxed,
+nonreference authority through equations/rebuild and hidden-sketch import.
+
+A grouped front-view `3X 6.35` identifies `BORE AND BOTH TAP ENTRY AXES`.
+The spec's explicit group-to-members contract must cover all three source
+measurements. Read back each native value and its appropriate point plus the
+same flat identity before suppressing duplicate displayed values. Three
+printed instances are unnecessary, but a 3X prefix backed only by the bore
+measurement is invalid. The retained projection and point-to-flat primitives
+were exercised separately before this change; their new combination and
+grouped imported attachments still require Main-owned native validation.
+
+All functional bounds were recomputed for the new 1.02 entry-offset envelope,
+retaining the full-height 15 MAX and finished 2 MIN requirements:
+
+| Revised clamp quantity | Conservative bound (mm) |
+|---|---:|
+| Thumb contact transverse offset including run-offs | 1.151215052279 |
+| Finite contact chord loss | 0.020171769145 |
+| Thumb FULL engagement | 4.402888710865 |
+| Thumb collar clearance | 3.346574403725 |
+| Plug-tap transverse offset | 1.173350392802 |
+| Plug-tap half chord | 1.921885329188 |
+| Maximum required plug-tap reach | 11.901655204897 |
+| Plug-tap stop window | 0.668770658377 |
+| Thumb drill transverse offset | 1.154929055905 |
+| Thumb drill near-wall/far-cylinder clearance | 0.651607939983 |
+| Thumb drill finite-point far-wall clearance | 0.720010993346 |
+| Rod floor, unchanged | 2.092144 |
+
+These are arithmetic bounds, not new native measurements or executed test
+results. Thumb engagement remains height-limited; the bore's unchanged
+flat-location/diameter/height retains its conditional 2.331459 wall bound.
+The global finished-wall acceptance remains necessary. The 15 MAX/2 MIN
+acceptances and component travel interval are unchanged.
 
 Keep the three actual witness feature names in the builder's literal
 `REFERENCE_SKETCHES` tuple. `_location_sources` uses that declaration to name
@@ -1304,8 +1398,8 @@ part packages. The user's exact2026-10-20 direction was “no further thread
 locking needed because mg-magnifying-lever does not experience rotational
 forces”. The approved implementation has no added lock; that is not native
 test proof of immunity to vibration, projection drift or backout. The bracket's
-approved1.667MIN mouth wall is separately declared RV-01, kind minor, for its
-sub-2.0 target while retaining the1.5 floor and original dimensional bands.
+approved1.658MIN mouth wall is separately declared RV-01, kind minor, for its
+sub-2.0 target while retaining the1.5 floor and original location/radius bands.
 
 The retention and wall checks are not a brass strength certification. Wire
 force below the lever produces bending even though there is no torque about

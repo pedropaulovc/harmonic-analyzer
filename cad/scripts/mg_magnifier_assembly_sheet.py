@@ -56,10 +56,11 @@ DIMENSION_CALLOUTS = {
 LEVER_CALLOUTS = {
     CLAMP_STATION_DIMENSION: "CLAMP STATION: SETS MAGNIFICATION",
     FIXTURE_DROP_DIMENSION: "FIXTURE DROP:\nSETS TRACE HEIGHT",
-    # Below-text supports line breaks; keep the qualifier on the native
-    # dimension while fitting the narrow lane left of the assembled bracket.
+    # Below-text supports line breaks on the enlarged native lever-tip detail.
+    # The complete qualifier remains part of the imported dimension.
     THREAD_PROJECTION_DIMENSION: "FLAT LEVER TIP\nPROUD OF FAR\nBRACKET FACE",
 }
+THREAD_PROJECTION_DETAIL_TITLE = "LEVER TIP DETAIL"
 
 # --- Fitter package -----------------------------------------------------------
 DRAWING_NUMBER = _steps.DRAWING_NUMBER
@@ -183,10 +184,11 @@ STEP_TEXT = {
         "THE ENDSHAKE."
     ),
     _steps.LEVER_THREADED_KEY: (
-        "SCREW THE MHA-MG-03 LEVER INTO THE MHA-MG-01 BRACKET TO THE THREAD "
-        "PROJECTION (SHEET 1). THE FLAT THREADED TIP MUST REACH THROUGH THE "
-        "FAR FACE; THE PLAIN ROD HAS NO SHOULDER. NO LOCKNUT, SET "
-        "SCREW OR ADHESIVE. THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
+        "SCREW THE MHA-MG-03 LEVER INTO THE MHA-MG-01 BRACKET TO THE FLAT LEVER "
+        "TIP PROUD OF FAR BRACKET FACE SETTING "
+        f"(SHEET 1, {THREAD_PROJECTION_DETAIL_TITLE}). "
+        "THE PLAIN ROD HAS NO SHOULDER. NO LOCKNUT, SET SCREW OR ADHESIVE. "
+        "THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
         "MHA-HA-00 DRIVES THEM INTO THE SUMMING LEVER."
     ),
     _steps.CLAMP_SET_KEY: (
