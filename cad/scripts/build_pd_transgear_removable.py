@@ -444,6 +444,7 @@ def gap_dimension_value(
     }[kind]
 
 
+@_telemetry.traced("sketch.gap")
 async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     """Draw, relate and dimension the seed gap in the active sketch at
     ``teeth``, recording each dimension's name and drive in ``dims``."""
@@ -593,6 +594,7 @@ def chamfer_point(points: dict[str, Point], ref: str) -> Point:
     return points[CHAMFER_ENTITIES[entity][{"start": 0, "end": 1}[suffix]]]
 
 
+@_telemetry.traced("sketch.chamfer")
 async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     """Two closed, fully dimensioned triangles and one Z rotation axis."""
     points = chamfer_points(teeth)
@@ -1002,15 +1004,16 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-    for name, teeth in spec.CONFIGS:
-        check(
-            f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="ToothCount", expression=str(teeth), configuration=name
-                )
-            ),
-        )
+    with _telemetry.span("param.tooth_count_configurations"):
+        for name, teeth in spec.CONFIGS:
+            check(
+                f"ToothCount = {teeth} in {name}",
+                await adapter.set_global_variable(
+                    SetGlobalVariableParameters(
+                        name="ToothCount", expression=str(teeth), configuration=name
+                    )
+                ),
+            )
 
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)

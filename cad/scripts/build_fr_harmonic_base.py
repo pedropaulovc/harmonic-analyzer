@@ -1308,6 +1308,7 @@ def _verify_uncut_material(adapter, tag: str, seat: HoleSpec, stations) -> None:
         _require_native_segments(segments, expected, f"{tag} at {point}")
 
 
+@_telemetry.traced("check.through_breakthrough", label_param="tag")
 def _verify_through_breakthrough(adapter, tag: str, seat: HoleSpec, stations) -> None:
     """Prove an open bore and its real retained bounds, not just Wizard flags."""
     radius = blind_cut_dia_mm(seat) / 2.0
@@ -1365,6 +1366,7 @@ def _verify_through_breakthrough(adapter, tag: str, seat: HoleSpec, stations) ->
         raise RuntimeError(f"{tag}: missing retained tap-drill cylinder at stations {set(range(len(stations))) - found}")
 
 
+@_telemetry.traced("check.rib_material")
 def _verify_rib_material(adapter) -> None:
     """Read both retained ribs, their shared crossing and end-wall joins.
 

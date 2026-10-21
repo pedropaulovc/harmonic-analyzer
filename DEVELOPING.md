@@ -149,6 +149,36 @@ survive, so the child cannot prune other sessions' evidence. Child stdout/stderr
 are retained under the outer test's temporary directory even on timeout; the
 30-second deadline is unchanged.
 
+### Recipe-local COM gap spans
+
+The saved App Insights control at `e2b4513ea20c257b85c4d1b995eafe1984d7360f`
+(2026-10-21 UTC) brackets 62.452929 s between the driven frame-base
+neutral-equation volume check and height-reference sketch creation
+(19:12:06.170038–19:13:08.622967). The intervening source runs
+`_verify_rib_material` and eight `_verify_through_breakthrough` groups.
+`check.rib_material` and tag-labelled `check.through_breakthrough` now measure
+those aggregates: nine spans in that post-drive block, plus spans for earlier
+calls to the same helpers. The block requests 585 source-derived rays in 17
+batches, but also checks dimensions, enumerates faces and reads closest points;
+the saved interval is not a measurement of raycast-only cost.
+
+For the removable transgear, `param.tooth_count_configurations` encloses the
+existing three-configuration `ToothCount` assignment loop, not configuration
+creation or later activation. The control brackets that loop and small
+subsequent setup in 4.706267 s (19:10:17.858861–19:10:22.565128).
+`sketch.gap` and `sketch.chamfer` each wrap their complete existing sketch
+helper; their corresponding control gaps were 2.901140 s and 1.828733 s.
+These are aggregate measurements, not per-ray, per-face, per-point, per-entity
+or global-variable instrumentation. Existing `traced`/`span` wrappers record
+failures and re-raise the original exception.
+
+The saved exported coverage cannot rule out sampling, exporter loss, late
+arrival or lost trace context. These spans target source-attributed blind spots;
+they establish neither an internal COM bottleneck nor a speedup. Recipe-local
+source edits re-key these two native recipes and their dependents: unlike
+recipe-skipped telemetry infrastructure edits, this instrumentation is not
+cache-inert. Native validation remains a separate gate.
+
 ### Finite stock-envelope endpoint reuse
 
 `paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's
