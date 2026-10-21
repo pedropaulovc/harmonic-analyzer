@@ -76,10 +76,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
-# Give the full-length tooth flanks twice the printed separation of the
-# unreadable 1:2 pictorial. Keep every tooth and the finalizer's precise
-# Shaded With Edges mode; do not mutate the source part's appearance.
-ISO_SCALE = (1, 1)
+# The actual 1:1 trial struck the border and tooth note. At 1:2 the complete
+# pictorial fits the upper-right field; its view-local fine visible edges keep
+# the brass shading readable without hiding any tooth or changing the part.
+ISO_SCALE = (1, 2)
 # The side view is the lathe view at the sheet scale; the end view projects
 # to its left (third angle) at 2:1 so the teeth and bore read, and says so
 # under itself (machinist review r1: an unlabelled 2:1 projected view).
@@ -259,6 +259,40 @@ def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
         )
 
 
+def _set_isometric_edge_weight(view: Any) -> Any:
+    """Use fine visible edges only on this dense, full-tooth pictorial.
+
+    The failed PDF overlaid 994 0.35 mm strokes on readable brass shading.
+    IDrawingComponent's component line-font override is view-local, unlike
+    drawing-document line defaults or source-model appearance changes.
+    """
+    bound = _early_bound(view, "IView")
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment isometric has no drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
+    component.UseDocumentDefaults = False
+    # swDrawingComponentLineFontVisible=1; swLW_CUSTOM=10. The documented
+    # thickness unit is metres (the SDK example uses 0.0003 for 0.3 mm).
+    component.SetLineThickness(1, 10, 0.0001)
+    _assert_isometric_edge_weight(component)
+    return component
+
+
+def _assert_isometric_edge_weight(component: Any) -> None:
+    weight, thickness = component.GetLineThickness(1)
+    if (
+        bool(component.UseDocumentDefaults)
+        or int(weight) != 10
+        or abs(float(thickness) - 0.0001) > 1e-9
+    ):
+        raise RuntimeError(
+            "alignment isometric fine edges did not persist: "
+            f"default={component.UseDocumentDefaults}, "
+            f"weight={weight}, thickness={thickness}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -383,6 +417,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
+    iso_component = _set_isometric_edge_weight(iso)
+    rebuild_drawing(adapter, label="isometric fine visible edges")
+    _assert_isometric_edge_weight(iso_component)
 
     return await finalize_drawing(
         adapter,
@@ -390,6 +427,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: _assert_isometric_edge_weight(iso_component),),
     )
 
 
