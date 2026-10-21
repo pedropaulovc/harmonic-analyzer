@@ -99,10 +99,11 @@ The package recipes own sheet counts and locations:
   wrapped rows, rather than an estimated row pitch. Its actual native note
   extent must leave at least 4 mm below the table and remain clear of the border
   and title block, including after the final rebuild.
-  Sheet 2 restores native BOM-associated balloons across the main exploded
-  view (12 rows), north bracket detail B (4 rows) and north keeper detail C
-  (3 rows). All three views link to the same native BOM and must read that
-  association back. Anchors select the source assembly's greatest-Z instance
+  Native BOM-associated balloons cover the main exploded view (11 rows),
+  north bracket detail B (4 rows) and north keeper detail C (3 rows) on
+  sheet 2, plus the fulcrum shaft (BOM row 2) in the existing 1:1 lever-bank
+  view on sheet 4. All four views link to the same native BOM and must read
+  that association back. Anchors select the source assembly's greatest-Z instance
   for each family, including the northmost pins, without a frozen bracket
   point. The final rebuilt drawing must independently account for exactly
   those 19 native item-number balloons, each attached to one non-dangling

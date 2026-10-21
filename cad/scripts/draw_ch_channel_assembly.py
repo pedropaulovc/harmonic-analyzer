@@ -6,7 +6,7 @@ r"""Create the MHA-CH-00 channel assembly fitter package (four sheets).
    (ch_channel_explode_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    native balloon per BOM row on its north-most instance. Details B/C carry
-   the seven small-hardware rows; the main exploded view carries the rest.
+   the seven bracket/keeper rows; the 1:1 lever bank carries the fulcrum shaft.
 3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
    length, a cropped 4:1 detail of the south end with the spring set, and
    steps 1-8. The south bracket is set off a wave disc spring that preloads
@@ -53,6 +53,7 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
+    position_bom_balloon,
 )
 from _drawing_common import (
     DrawingOutputs,
@@ -180,20 +181,9 @@ ASSEMBLED_CAPTION = "\n".join(
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
 # 10 mm below the sheet's middle, so the ring can grow at the top.
 EXPLODED_ISO_CENTER = (0.100, 0.140)
-# The lever balloon's leader runs along the bank axis, and the exploded fulcrum
-# shaft lies on that axis's south extension. The shaft has no hit-testable
-# edge, so SolidWorks picks where its leader lands (listed-edge), and that
-# landing moved 15 mm between r8 and r9. The view is tall and narrow, so 8 of
-# the 19 balloons crowd its top. At 14 mm the ring's push-apart swung balloon
-# 14 down over the shaft, and a south-end landing crossed leader 2 (r9 audit).
-# A replay of the ring with the anchor-nut balloon added covers every landing
-# on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
-# and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
-# leader 14 2.1-4.4 mm off the shaft, but the ring's centres ran 5.5 mm inside
-# the border at the top, so balloon 4's 5.6 mm circle touched it (machinist
-# review, #1660 r1). At 26 mm the top circle clears the border by about 2 mm;
-# _assert_view_on_sheet now grows the outline by the ring plus the largest
-# balloon radius, so a balloon circle can never reach the border.
+# Retain the proven 26 mm ring margin for the tall, narrow main view.
+# _assert_view_on_sheet reserves the ring plus the largest balloon radius;
+# the small bracket/keeper rows now have their own enlarged detail rings.
 BALLOON_MARGIN = 0.026
 BALLOON_MAX_RADIUS = 0.0056
 BOM_ANCHOR = (0.190, 0.262)
@@ -216,6 +206,7 @@ EXPLODED_CAPTION = "\n".join(
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
         "NORTH; ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE.",
         f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
+        "FULCRUM SHAFT BALLOON: SHEET 4, LEVER BANK.",
     )
 )
 
@@ -607,7 +598,7 @@ EXPLODED_DETAIL_SCALE = (1, 2)
 # The BOM ends at x348 mm. Reserve the right-hand column for the detail
 # circles AND their native balloons, rather than ringing into the table or
 # the sheet border. The enlarged views retain their scales and crop radii.
-EXPLODED_DETAIL_X = 0.383
+EXPLODED_DETAIL_X = 0.384
 DETAIL_BALLOON_MARGIN = 0.004
 NORTH_BRACKET_DETAIL = BankView(
     "DETAIL B",
@@ -658,7 +649,11 @@ EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 DETAIL_BALLOON_STEMS = frozenset().union(
     *(detail.stems for detail in EXPLODED_DETAILS)
 )
-MAIN_BALLOON_STEMS = frozenset(BOM_COMPONENTS) - DETAIL_BALLOON_STEMS
+SHAFT_BALLOON_STEMS = frozenset({"ch-fulcrum-shaft"})
+MAIN_BALLOON_STEMS = (
+    frozenset(BOM_COMPONENTS) - DETAIL_BALLOON_STEMS - SHAFT_BALLOON_STEMS
+)
+SHAFT_BALLOON_XY = (0.027, 0.239)
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
 # rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
@@ -1401,8 +1396,13 @@ def _assert_bom_balloon_coverage(
             if not note.IsBomBalloon():
                 continue
             item = str(note.GetBomBalloonText(True) or "").strip()
-            if item not in by_item or int(note.GetBomBalloonTextStyle(True)) != 1:
-                raise RuntimeError(f"{label}: unexpected native BOM balloon {item!r}")
+            # GetBomBalloonTextStyle uses swDetailingNoteTextContent_e:
+            # ItemNumber=2, unlike IBalloonOptions' writing enum (ItemNumber=1).
+            style = int(note.GetBomBalloonTextStyle(True))
+            if item not in by_item or style != 2:
+                raise RuntimeError(
+                    f"{label}: unexpected native BOM balloon {item!r}, text style {style}"
+                )
             stem = by_item[item]
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
             entities = tuple(annotation.GetAttachedEntities3() or ())
@@ -1442,8 +1442,8 @@ def _assert_bom_balloon_coverage(
 
 def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
-) -> Callable[[], None]:
-    """Place one BOM and its 19 pinned native balloons; return the save check."""
+) -> tuple[Callable[[], None], Callable[[Any], None]]:
+    """Place the exploded balloons; return the final check and shaft placer."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1473,19 +1473,43 @@ def _place_exploded_sheet(
         label="channel",
     )
     items = _validate_bom(adapter, table)
-    _link_view_to_bom(exploded, table, label="channel exploded")
+    view_items: list[tuple[Any, tuple[tuple[str, str], ...]]] = []
+    landings: list[BalloonLanding] = []
+
+    def balloon_view(
+        view: Any,
+        selected: tuple[tuple[str, str], ...],
+        *,
+        label: str,
+        margin: float,
+    ) -> list[BalloonLanding]:
+        _link_view_to_bom(view, table, label=label)
+        # #1667's fixed-point screen pick is viewport-sensitive; discover
+        # currently hit-tested ink of the exact pin instead. This does not
+        # change the shared picker or claim that bug fixed.
+        placed = add_component_bom_balloons(
+            adapter,
+            view,
+            items=selected,
+            anchors={
+                stem: BalloonAnchor(instance=north_instances[stem]) for stem, _ in selected
+            },
+            label=label,
+            margin=margin,
+        )
+        for landing in placed:
+            if landing.sheet_xy is None:
+                raise RuntimeError(
+                    f"{label}: {landing.stem} balloon has no proven visible landing"
+                )
+        view_items.append((view, selected))
+        landings.extend(placed)
+        return placed
+
     main_items = tuple((stem, item) for stem, item in items if stem in MAIN_BALLOON_STEMS)
-    view_items = [(exploded, main_items)]
-    # #1667's fixed-point screen pick is viewport-sensitive; this candidate
-    # instead discovers a currently hit-tested edge on the exact pinned
-    # instance. It does not change the shared picker or claim that bug fixed.
-    landings = add_component_bom_balloons(
-        adapter,
+    balloon_view(
         exploded,
-        items=main_items,
-        anchors={
-            stem: BalloonAnchor(instance=north_instances[stem]) for stem, _ in main_items
-        },
+        main_items,
         label="channel exploded-view BOM coverage",
         margin=BALLOON_MARGIN,
     )
@@ -1504,21 +1528,12 @@ def _place_exploded_sheet(
     _activate_sheet(adapter, SHEET_NAMES[1])
     for detail in EXPLODED_DETAILS:
         view = _exploded_detail(adapter, detail)
-        _link_view_to_bom(view, table, label=detail.title)
         detail_items = tuple((stem, item) for stem, item in items if stem in detail.stems)
-        view_items.append((view, detail_items))
-        landings.extend(
-            add_component_bom_balloons(
-                adapter,
-                view,
-                items=detail_items,
-                anchors={
-                    stem: BalloonAnchor(instance=north_instances[stem])
-                    for stem, _ in detail_items
-                },
-                label=f"channel {detail.title} BOM coverage",
-                margin=DETAIL_BALLOON_MARGIN,
-            )
+        balloon_view(
+            view,
+            detail_items,
+            label=f"channel {detail.title} BOM coverage",
+            margin=DETAIL_BALLOON_MARGIN,
         )
     _activate_sheet(adapter, SHEET_NAMES[1])
     if not adapter.currentModel.EditRebuild3():
@@ -1531,7 +1546,26 @@ def _place_exploded_sheet(
         )
         _assert_exploded_caption(adapter, table, caption)
 
-    return settled
+    def place_shaft_balloon(view: Any) -> None:
+        # At 1:7 the historical walk could only return an unproved listed
+        # shaft edge. Use its actual larger 1:1 bank view instead, retaining
+        # the same source-validated instance and native BOM row.
+        shaft_items = tuple((stem, item) for stem, item in items if stem in SHAFT_BALLOON_STEMS)
+        placed = balloon_view(
+            view,
+            shaft_items,
+            label="channel lever-bank shaft BOM coverage",
+            margin=DETAIL_BALLOON_MARGIN,
+        )
+        position_bom_balloon(
+            adapter,
+            [landing.note for landing in placed],
+            item_number=shaft_items[0][1],
+            position_xy=SHAFT_BALLOON_XY,
+            label="channel lever-bank shaft",
+        )
+
+    return settled, place_shaft_balloon
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
@@ -1770,13 +1804,13 @@ def _dimensioned_bank(
     pointers: tuple[
         tuple[str, tuple[float, float], tuple[float, float]], ...
     ] = (),
-) -> list[Any]:
+) -> tuple[list[Any], Any]:
     """Place ``bank``, show its own settings sketch in it (the other bank's
     lies off the sheet), import ``keep``, crop it if it is a detail, prove the
     kept dimensions survived, and label it. ``detail``, a detail taken from
     ``bank``, gets its boundary circle and letter drawn in ``bank``; each of
     ``pointers`` (text, text point, tip) names a body with a view-owned
-    leader."""
+    leader. Return the imported annotations and their actual native view."""
     view = _placed_bank_view(adapter, bank)
     features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
     _show_base_view_sketches(adapter, view, features, label=bank.title)
@@ -1820,7 +1854,7 @@ def _dimensioned_bank(
             label=f"{bank.title} {text.splitlines()[0]}",
             view=view,
         )
-    return annotations
+    return annotations, view
 
 
 def _displays(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
@@ -1872,21 +1906,27 @@ def _place_steps(adapter: Any, sheet: str, text: str, *, label: str) -> None:
     _add_note_block(adapter, sheet, text, STEPS_XY, label=label)
 
 
-def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
+def _place_fitup_sheets(
+    adapter: Any, place_shaft_balloon: Callable[[Any], None]
+) -> Callable[[], None]:
     """Sheets 3 and 4: the isolated banks with their settings, the steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
-    annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
-    annotations += _dimensioned_bank(
+    annotations, _view = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
+    south_annotations, _view = _dimensioned_bank(
         adapter, SOUTH_END, SPRING_KEEP, pointers=DETAIL_POINTERS
     )
+    annotations += south_annotations
     _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
 
     _activate_sheet(adapter, SHEET_NAMES[3])
-    annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
-    annotations += _dimensioned_bank(
+    lever_annotations, lever_view = _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
+    annotations += lever_annotations
+    place_shaft_balloon(lever_view)
+    plan_annotations, _view = _dimensioned_bank(
         adapter, KEEPER_PLAN, PLAN_KEEP, pointers=PLAN_POINTERS
     )
+    annotations += plan_annotations
     _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
 
@@ -1967,8 +2007,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _create_sheets(adapter)
     _place_assembled_sheet(adapter)
-    balloons_settled = _place_exploded_sheet(adapter, north_instances)
-    settings_settled = _place_fitup_sheets(adapter)
+    balloons_settled, place_shaft_balloon = _place_exploded_sheet(adapter, north_instances)
+    settings_settled = _place_fitup_sheets(adapter, place_shaft_balloon)
 
     def settled() -> None:
         balloons_settled()

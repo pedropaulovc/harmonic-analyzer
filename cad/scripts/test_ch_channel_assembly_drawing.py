@@ -433,20 +433,21 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
         for point in points:
             u, v = _iso(point)
             assert ((u - cu) ** 2 + (v - cv) ** 2) ** 0.5 < detail.crop_radius_mm - 5.0
-    # The column right of the BOM, inside the border and above the title
-    # block, the circles apart and each label (under its circle) inside it.
+    # Keep the complete balloon envelope clear of the BOM, border, title
+    # block and the next detail; account for each selected label as rendered.
     template = drawing._TEMPLATE
     bom_right = drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values())
     right = template.width_m - drawing.BORDER
     previous_bottom = template.height_m - drawing.BORDER
     for detail in drawing.EXPLODED_DETAILS:
         (x, y), radius = detail.centre, detail.crop_radius_mm * detail.mm
+        radius += drawing.DETAIL_BALLOON_MARGIN + drawing.BALLOON_MAX_RADIUS
         assert bom_right + 0.004 < x - radius and x + radius < right
         assert y + radius < previous_bottom
         lines = detail.label_text.splitlines()
-        lx, ly = detail.crop_label_xy
+        lx, ly = detail.label_xy or detail.crop_label_xy
         assert lx + max(map(len, lines)) * NOTE_CHAR_WIDTH < right
-        previous_bottom = ly - len(lines) * NOTE_LINE_PITCH
+        previous_bottom = min(y - radius, ly - len(lines) * NOTE_LINE_PITCH)
     assert previous_bottom > template.title_block_top_m
 
 
@@ -760,7 +761,9 @@ class _BalloonView:
 class _NativeBalloon:
     def __init__(self, stem: str, item: str, instance: str) -> None:
         self.item = item
-        self.style = 1
+        # Readback uses swDetailingNoteTextContent_e: ItemNumber=2, Custom=1,
+        # not the distinct balloon-option write enum's ItemNumber=1.
+        self.style = 2
         self.is_bom = True
         self.attached = True
         self.dangling = False
@@ -800,10 +803,12 @@ class _NativeBalloon:
 def _balloon_partition(items):
     bracket = set(drawing.NORTH_BRACKET_DETAIL.stems)
     keeper = set(drawing.NORTH_KEEPER_DETAIL.stems)
+    shaft = {drawing.explode.FULCRUM_SHAFT}
     return (
-        tuple(pair for pair in items if pair[0] not in bracket | keeper),
+        tuple(pair for pair in items if pair[0] not in bracket | keeper | shaft),
         tuple(pair for pair in items if pair[0] in bracket),
         tuple(pair for pair in items if pair[0] in keeper),
+        tuple(pair for pair in items if pair[0] in shaft),
     )
 
 
@@ -821,7 +826,7 @@ def native_balloon_coverage(monkeypatch):
     north = {stem: f"bank-1/{stem}-20" for stem in drawing.BOM_COMPONENTS}
     views = []
     landings = []
-    for name, assigned in zip(("main", "B", "C"), _balloon_partition(items)):
+    for name, assigned in zip(("main", "B", "C", "shaft"), _balloon_partition(items)):
         notes = []
         for stem, item in assigned:
             note = _NativeBalloon(stem, item, north[stem])
@@ -852,14 +857,14 @@ def test_native_balloon_inventory_covers_exactly_the_assigned_19_items(
     native_balloon_coverage,
 ) -> None:
     case = native_balloon_coverage
-    assert [len(items) for _view, items in case.view_items] == [12, 4, 3]
+    assert [len(items) for _view, items in case.view_items] == [11, 4, 3, 1]
     # Ordinary detail labels are not inventory and must not count as balloons.
     case.view_items[1][0].notes.append(SimpleNamespace(IsBomBalloon=lambda: False))
     _check_native_coverage(case)
     assert case.audit_calls == [(case.adapter, case.landings)]
 
 
-@pytest.mark.parametrize("view_index", (0, 1, 2))
+@pytest.mark.parametrize("view_index", (0, 1, 2, 3))
 @pytest.mark.parametrize(
     "damage",
     (
@@ -884,7 +889,7 @@ def test_final_native_inventory_refuses_incomplete_or_false_coverage(
     elif damage == "wrong_native_item":
         note.item = "9999"
     elif damage == "wrong_style":
-        note.style = 2
+        note.style = 1
     elif damage == "wrong_north":
         note.component.Name2 = note.component.Name2.replace("-20", "-1")
     elif damage == "wrong_family":
@@ -902,7 +907,9 @@ def test_final_native_inventory_refuses_incomplete_or_false_coverage(
     elif damage == "not_edge":
         note.entity_types = (2,)
     elif damage == "wrong_view":
-        case.view_items[(view_index + 1) % 3][0].notes.append(main.notes.pop(0))
+        case.view_items[(view_index + 1) % len(case.view_items)][0].notes.append(
+            main.notes.pop(0)
+        )
     elif damage == "unlinked":
         main.linked = False
     elif damage == "wrong_bom":
@@ -949,12 +956,13 @@ def test_view_bom_association_requires_both_native_readbacks(
     assert view.link_calls == [(True, "Channel BOM")]
 
 
+@pytest.mark.parametrize("unproven_view", (None, "main", "B", "C", "shaft"))
 def test_exploded_sheet_places_native_balloons_once_per_assigned_view(
-    monkeypatch, native_balloon_coverage,
+    monkeypatch, native_balloon_coverage, unproven_view,
 ) -> None:
     case = native_balloon_coverage
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
-    main, bracket, keeper = (view for view, _items in case.view_items)
+    main, bracket, keeper, shaft = (view for view, _items in case.view_items)
     items = tuple(pair for _view, assigned in case.view_items for pair in assigned)
     monkeypatch.setattr(drawing, "place_view", lambda *args, **kwargs: main)
     monkeypatch.setattr(
@@ -975,14 +983,24 @@ def test_exploded_sheet_places_native_balloons_once_per_assigned_view(
     monkeypatch.setattr(drawing, "_bom_vertical_limits", lambda *args: (0.1, 0.2))
     monkeypatch.setattr(drawing, "_add_note_block", lambda *args, **kwargs: object())
     placements = []
+    positioned = []
+    monkeypatch.setattr(
+        drawing, "position_bom_balloon",
+        lambda *args, **kwargs: positioned.append((args, kwargs)),
+    )
 
     def place(_adapter, view, *, items, anchors, **kwargs):
         placements.append((view, tuple(items), anchors))
         assert view.link_calls == [(True, case.table.BomFeature.Name)]
-        return [
+        result = [
             landing for landing in case.landings
             if landing.stem in {stem for stem, _item in items}
         ]
+        if view.Name == unproven_view:
+            from dataclasses import replace
+
+            result[0] = replace(result[0], sheet_xy=None)
+        return result
 
     monkeypatch.setattr(drawing, "add_component_bom_balloons", place)
     final_calls = []
@@ -990,11 +1008,23 @@ def test_exploded_sheet_places_native_balloons_once_per_assigned_view(
         drawing, "_assert_bom_balloon_coverage",
         lambda *args: final_calls.append(args),
     )
-    settled = drawing._place_exploded_sheet(adapter, case.north)
+    if unproven_view in ("main", "B", "C"):
+        with pytest.raises(RuntimeError):
+            drawing._place_exploded_sheet(adapter, case.north)
+        return
+    settled, place_shaft_balloon = drawing._place_exploded_sheet(adapter, case.north)
     assert len(placements) == 3
+    if unproven_view == "shaft":
+        with pytest.raises(RuntimeError):
+            place_shaft_balloon(shaft)
+        return
+    place_shaft_balloon(shaft)
+    assert len(placements) == 4
+    assert len(positioned) == 1
+    assert positioned[0][1]["item_number"] == case.view_items[3][1][0][1]
     assigned = {view.Name: pairs for view, pairs, _anchors in placements}
     assert assigned == {view.Name: pairs for view, pairs in case.view_items}
-    assert sorted(len(pairs) for pairs in assigned.values()) == [3, 4, 12]
+    assert sorted(len(pairs) for pairs in assigned.values()) == [1, 3, 4, 11]
     assert {stem for pairs in assigned.values() for stem, _item in pairs} == set(
         drawing.BOM_COMPONENTS
     )
