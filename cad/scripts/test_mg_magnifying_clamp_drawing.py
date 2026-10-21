@@ -495,9 +495,18 @@ def _native_same(left, right):
     return int(left is right)
 
 
+def _native_type_info(interface):
+    def documentation(member_id):
+        assert member_id == -1
+        return interface, "", 0, ""
+
+    return SimpleNamespace(GetTypeInfo=lambda: SimpleNamespace(GetDocumentation=documentation))
+
+
 def _native_sketch_segment(*, owner="ActualLocationProfile", kind=0, identifiers=(1, 2)):
     sketch = _NativeSketch(owner, owner)
     return SimpleNamespace(
+        _oleobj_=_native_type_info("ISketchSegment"),
         owner_sketch=sketch,
         GetSketch=lambda: sketch,
         GetType=lambda: kind,
@@ -734,6 +743,10 @@ class _WitnessPoint:
     def __init__(self, owner, x, y, z=0.0):
         self.owner, self.X, self.Y, self.Z = owner, x, y, z
         self.relations = []
+        self._oleobj_ = _native_type_info("ISketchPoint")
+
+    def GetID(self):
+        return id(self), 0
 
     def GetSketch(self):
         return self.owner
@@ -753,6 +766,13 @@ class _WitnessRelation:
     def GetDefinitionEntities2(self):
         # Native definition order is not part of the relation contract.
         return self.entities[::-1]
+
+    def GetEntities(self):
+        return self.entities[::-1]
+
+    def GetEntitiesType(self):
+        # These describe the internal entities, not the definition array.
+        return tuple(2 if isinstance(entity, _WitnessPoint) else 3 if hasattr(entity, "GetType") and entity.GetType() == 0 else 4 for entity in self.GetEntities())
 
 
 class _RelativeWitnessFixture:
@@ -935,7 +955,7 @@ def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -
     assert first.GetStartPoint2().X == second.GetStartPoint2().X == 0.0
     fixture.tap.Y = 0.0004  # Top sketch local Y becomes Right sketch X, not Y.
     assert part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch) == pytest.approx((0.0004, 0.0295, 0.0))
-    with pytest.raises(RuntimeError, match="axis-to-positive-rim witness changed"):
+    with pytest.raises(RuntimeError, match="point alignment differs"):
         part._assert_relative_witness(fixture.adapter, first, fixture.tap, fixture.circle, stage="moved-source")
 
 
@@ -1384,3 +1404,174 @@ def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch
     assert fields["selected_types"] == (11, 11)
     assert "native selected handle unavailable" in fields["selection_readback_error"]
     assert fixture.displays == []
+
+
+@pytest.mark.parametrize("returned_kind", (5, 17, 0, 999, None, True))
+def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without_alias(monkeypatch, returned_kind) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    relation = fixture.relations[1]
+    relation.kind = returned_kind  # A discriminator, NOT a claim about R10's unknown value.
+    with pytest.raises(RuntimeError, match="actual kinds="):
+        part._require_witness_relation(
+            fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap),
+            stage="returned-kind-mismatch",
+        )
+    message, fields = fixture.events[-1]
+    assert fields["relation_kind"] == 26
+    assert fields["actual_relation_kinds"] == (returned_kind,)
+    assert fields["relation_matches"] == 0
+    row, = ast.literal_eval(fields["relation_definitions"])
+    assert row["kind"] == returned_kind and row["count"] == 2
+    assert row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
+    assert all(len(entity["id"]) == 2 for entity in row["definition_fields"])
+    assert row["identity_matches"] is True
+    assert row["alignment"]["aligned"] is True
+    assert row["alignment"]["delta_m"] == 0.0
+    assert "requested_kind=26" in message and "actual_kinds=" in message
+
+
+def test_all_returned_relation_kinds_are_captured_before_any_rejection(monkeypatch) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    first = _WitnessRelation((line.GetStartPoint2(), fixture.tap), 5)
+    second = _WitnessRelation((line.GetStartPoint2(), None), 26)
+    with pytest.raises(RuntimeError):
+        part._require_witness_relation(fixture.adapter, (first, second), 26, (line.GetStartPoint2(), fixture.tap), stage="all-kinds")
+    fields = fixture.events[-1][1]
+    assert fields["actual_relation_kinds"] == (5, 26)
+    rows = ast.literal_eval(fields["relation_definitions"])
+    assert len(rows) == 2
+    assert rows[0]["identity_matches"] is True
+    assert rows[1]["definition_fields"][0]["present"] is False
+
+
+def test_definition_interfaces_are_classified_before_native_cross_class_equality(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch, mode="segment-dispatch-proxy")
+    checked = []
+
+    def same(left, right):
+        if isinstance(left, _WitnessPoint) != isinstance(right, _WitnessPoint):
+            pytest.fail("native point-versus-segment IsSame must never be attempted")
+        checked.append((left, right))
+        return _native_same(left, right)
+
+    fixture.adapter.swApp.IsSame = same
+    part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    assert checked
+    assert any(left is fixture.tap and right is fixture.tap for left, right in checked)
+
+
+def test_internal_entity_type_array_is_not_applied_to_actual_definition_array(monkeypatch) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    relation = fixture.relations[1]
+    relation.GetEntities = lambda: (fixture.circle,)
+    relation.GetEntitiesType = lambda: (4,)  # A solver-created arc, not either defining point.
+    part._require_witness_relation(fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap), stage="separate-arrays")
+    row, = ast.literal_eval(fixture.events[-1][1]["relation_definitions"])
+    assert row["internal_count"] == 1 and row["internal_entity_types"] == (4,)
+    assert row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
+    assert row["identity_matches"] is True
+
+
+@pytest.mark.parametrize("mode", ("unknown-interface", "unavailable-typeinfo", "unavailable-definitions"))
+def test_unknown_definition_classification_is_logged_and_never_cast_or_accepted(monkeypatch, mode) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    relation = fixture.relations[1]
+
+    def unavailable():
+        raise RuntimeError("native metadata unavailable")
+
+    if mode == "unknown-interface":
+        fixture.tap._oleobj_ = _native_type_info("IUnexpectedNativeEntity")
+    elif mode == "unavailable-typeinfo":
+        fixture.tap._oleobj_ = SimpleNamespace(GetTypeInfo=unavailable)
+    else:
+        relation.GetDefinitionEntities2 = unavailable
+    with pytest.raises(RuntimeError):
+        part._require_witness_relation(fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap), stage="metadata-unavailable")
+    fields = fixture.events[-1][1]
+    assert fields["actual_relation_kinds"] == (26,)
+    row, = ast.literal_eval(fields["relation_definitions"])
+    assert row["identity_matches"] is False
+    if mode == "unknown-interface":
+        assert "IUnexpectedNativeEntity" in row["definition_interfaces"]
+    else:
+        assert row["readback_errors"]
+        assert row["mandatory_readback_errors"]
+
+
+@pytest.mark.parametrize("unavailable_field", ("GetEntities", "GetEntitiesType"))
+def test_optional_internal_metadata_failure_does_not_invalidate_native_horizontal_control(monkeypatch, unavailable_field) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    relation = fixture.relations[0]
+
+    def unavailable():
+        raise RuntimeError("optional internal metadata unavailable")
+
+    setattr(relation, unavailable_field, unavailable)
+    part._require_witness_relation(fixture.adapter, (relation,), 4, (), line, stage="horizontal-control")
+    fields = fixture.events[-1][1]
+    assert fields["relation_matches"] == 1
+    row, = ast.literal_eval(fields["relation_definitions"])
+    assert row["readback_errors"]
+    assert row["mandatory_readback_errors"] == []
+    assert row["identity_matches"] is True
+    assert row["segment_key"] == ("LeverBoreLocationProfile", 0, 2, 1)
+
+
+def test_optional_point_id_failure_preserves_actual_identity_and_alignment_contract(monkeypatch) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+
+    def unavailable():
+        raise RuntimeError("optional point ID unavailable")
+
+    fixture.tap.GetID = unavailable
+    part._require_witness_relation(fixture.adapter, (fixture.relations[1],), 26, (line.GetStartPoint2(), fixture.tap), stage="point-id-unavailable")
+    fields = fixture.events[-1][1]
+    assert fields["relation_matches"] == 1
+    row, = ast.literal_eval(fields["relation_definitions"])
+    assert row["readback_errors"] and row["mandatory_readback_errors"] == []
+    assert row["identity_matches"] is True and row["alignment"]["aligned"] is True
+
+
+@pytest.mark.parametrize("mode", ("null-handle", "binding-failure", "missing-members"))
+def test_bad_relation_handle_does_not_hide_later_actual_kinds(monkeypatch, mode) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    bad = None if mode == "null-handle" else object()
+    later = _WitnessRelation((line.GetStartPoint2(), fixture.tap), 5)
+
+    def bind(value, _interface):
+        if value is bad and mode == "binding-failure":
+            raise RuntimeError("native relation binding unavailable")
+        return value
+
+    monkeypatch.setattr(part, "_early_bound", bind)
+    with pytest.raises(RuntimeError, match="actual kinds="):
+        part._require_witness_relation(fixture.adapter, (bad, later), 26, (line.GetStartPoint2(), fixture.tap), stage="bad-handle-first")
+    fields = fixture.events[-1][1]
+    assert fields["actual_relation_kinds"] == (None, 5)
+    first, second = ast.literal_eval(fields["relation_definitions"])
+    assert first["readback_errors"] and first["mandatory_readback_errors"]
+    assert {"kind", "definitions", "suppressed", "internal_types", "internal_entities"} <= set(first["unavailable_fields"])
+    assert first["definitions_available"] is False
+    assert second["identity_matches"] is True and second["alignment"]["aligned"] is True

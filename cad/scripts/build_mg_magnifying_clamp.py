@@ -463,58 +463,118 @@ def _point_in_location_sketch(adapter: Any, point: Any, sketch: Any) -> tuple[fl
 
 
 def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str) -> None:
-    """Match actual definition entities, not solver-created auxiliary entities."""
+    """Read every actual kind/definition before filtering; never infer enum aliases.
+
+    AddRelation and GetRelationType both document swConstraintType_e, not an
+    input/output normalization map. A different returned kind remains a failure,
+    even when its actual entities and geometric alignment match the request.
+    """
     import _telemetry
 
     application = _early_bound(adapter.swApp, "ISldWorks")
-    matches, rows = 0, []
+    matches, rows, definitions = 0, [], []
     error = None
     try:
+        for raw in relations or ():
+            row = {"kind": None, "count": None, "definition_interfaces": [], "definition_fields": [], "internal_entity_types": None, "internal_count": None, "suppressed": None, "point_codes": [], "segment_key": None, "identity_matches": False, "alignment": None, "readback_errors": [], "mandatory_readback_errors": [], "unavailable_fields": []}
+            rows.append(row)
+
+            def capture(field, getter, *, mandatory=False):
+                try:
+                    return getter()
+                except Exception as exc:
+                    detail = f"{field}: {exc!r}"
+                    row["readback_errors"].append(detail)
+                    if mandatory:
+                        row["mandatory_readback_errors"].append(detail)
+                    row["unavailable_fields"].append(field)
+                    return None
+
+            relation = capture("binding", lambda: _early_bound(raw, "ISketchRelation"), mandatory=True)
+            if relation is None:
+                row["readback_errors"].append("binding: native relation unavailable")
+                row["mandatory_readback_errors"].append("binding: native relation unavailable")
+                row["unavailable_fields"].extend(("kind", "definitions", "suppressed", "internal_types", "internal_entities"))
+                row["definitions_available"] = False
+                definitions.append(())
+                continue
+            row["kind"] = capture("kind", lambda: relation.GetRelationType(), mandatory=True)
+            actual = capture("definitions", lambda: tuple(relation.GetDefinitionEntities2()), mandatory=True)
+            entities = actual or ()
+            row["count"] = len(entities)
+            row["definitions_available"] = actual is not None
+            row["suppressed"] = capture("suppressed", lambda: relation.Suppressed, mandatory=True)
+            # These optional diagnostics describe GetEntities, NOT the actual
+            # definitions. Their availability must not change relation acceptance.
+            row["internal_entity_types"] = capture("internal_types", lambda: relation.GetEntitiesType())
+            row["internal_count"] = capture("internal_entities", lambda: len(relation.GetEntities()))
+            for index, entity in enumerate(entities):
+                fields = {"present": entity is not None, "interface": None}
+                row["definition_fields"].append(fields)
+                if entity is not None:
+                    # Native IDispatch type information, not a Python wrapper's
+                    # class or a speculative ISketchPoint/ISketchSegment cast.
+                    fields["interface"] = capture(f"definition[{index}].type", lambda: entity._oleobj_.GetTypeInfo().GetDocumentation(-1)[0], mandatory=True)
+                row["definition_interfaces"].append(fields["interface"])
+                if fields["interface"] == "ISketchPoint":
+                    point = capture(f"definition[{index}].diagnostic-binding", lambda: _early_bound(entity, "ISketchPoint"))
+                    fields["id"] = capture(f"definition[{index}].id", lambda: point.GetID())
+                    fields["coordinates"] = capture(f"definition[{index}].coordinates", lambda: (float(point.X), float(point.Y), float(point.Z)))
+            definitions.append(entities)
         for point in points:
             code = application.IsSame(point, point)
             if type(code) is not int or code != 1:
                 raise RuntimeError("native relation point self-identity unavailable")
         expected_key = _segment_identity(adapter, segment, stage=stage, role="relation-source") if segment is not None else None
-        for raw in relations or ():
-            relation = _early_bound(raw, "ISketchRelation")
-            actual_kind = relation.GetRelationType()
-            if type(actual_kind) is not int:
-                raise RuntimeError("native relation type unavailable")
-            if actual_kind != kind:
+        for row, entities in zip(rows, definitions, strict=True):
+            interfaces = row["definition_interfaces"]
+            if row["mandatory_readback_errors"] or len(entities) != len(points) + (segment is not None) or any(value is None for value in entities):
                 continue
-            entities = list(relation.GetDefinitionEntities2() or ())
-            row = {"kind": actual_kind, "count": len(entities), "point_codes": [], "segment_key": None}
-            rows.append(row)
-            if len(entities) != len(points) + (segment is not None) or any(value is None for value in entities):
+            actual_points = [entity for entity, interface in zip(entities, interfaces, strict=True) if interface == "ISketchPoint"]
+            actual_segments = [entity for entity, interface in zip(entities, interfaces, strict=True) if interface in ("ISketchSegment", "ISketchLine", "ISketchArc")]
+            if len(actual_points) != len(points) or len(actual_segments) != (segment is not None):
                 continue
+            if kind in (25, 26) and len(actual_points) == 2:
+                local = _early_bound(points[0], "ISketchPoint")
+                target = _early_bound(local.GetSketch(), "ISketch")
+                coordinates = tuple(_point_in_location_sketch(adapter, entity, target) for entity in actual_points)
+                axis = 0 if kind == 26 else 1
+                delta = coordinates[0][axis] - coordinates[1][axis]
+                row["alignment"] = {"target_coordinates": coordinates, "axis": axis, "delta_m": delta, "aligned": abs(delta) <= 1e-9}
             for point in points:
-                codes = tuple(application.IsSame(entity, point) for entity in entities)
+                # Only classified point-to-point comparisons reach IsSame.
+                codes = tuple(application.IsSame(entity, point) for entity in actual_points)
                 row["point_codes"].append(codes)
                 if any(type(code) is not int or code not in (0, 1) for code in codes):
                     raise RuntimeError("native relation point identity unavailable")
                 if codes.count(1) != 1:
                     break
-                entities.pop(codes.index(1))
+                actual_points.pop(codes.index(1))
             else:
-                if relation.Suppressed is not False:
-                    raise RuntimeError("native defining constraint is suppressed or unavailable")
                 if segment is not None:
-                    self_codes = (application.IsSame(segment, segment), application.IsSame(entities[0], entities[0]))
+                    actual_segment = actual_segments[0]
+                    self_codes = (application.IsSame(segment, segment), application.IsSame(actual_segment, actual_segment))
                     row["segment_self_codes"] = self_codes
                     if any(type(code) is not int or code != 1 for code in self_codes):
                         raise RuntimeError("native relation segment self-identity unavailable")
-                    actual_key = _segment_identity(adapter, entities[0], stage=stage, role="relation-definition")
+                    actual_key = _segment_identity(adapter, actual_segment, stage=stage, role="relation-definition")
                     row["segment_key"] = actual_key
                     if actual_key != expected_key:
                         continue
-                matches += 1
+                row["identity_matches"] = True
+                if row["suppressed"] is not False:
+                    raise RuntimeError("native defining constraint is suppressed or unavailable")
+                if row["alignment"] is not None and not row["alignment"]["aligned"]:
+                    raise RuntimeError("native defining point alignment differs")
+                if type(row["kind"]) is int and row["kind"] == kind:
+                    matches += 1
         if matches != 1:
-            raise RuntimeError(f"expected exactly one native constraint {kind}, found {matches}")
+            raise RuntimeError(f"expected exactly one native constraint {kind}, found {matches}; actual kinds={[row['kind'] for row in rows]!r}")
     except Exception as exc:
         error = exc
     _telemetry.info(
-        f"clamp native witness relation: stage={stage}, kind={kind}, matches={matches}, definitions={rows!r}, error={error!r}",
-        operation_stage=stage, relation_kind=kind, relation_matches=matches,
+        f"clamp native witness relation: stage={stage}, requested_kind={kind}, actual_kinds={[row['kind'] for row in rows]!r}, matches={matches}, definitions={rows!r}, error={error!r}",
+        operation_stage=stage, relation_kind=kind, actual_relation_kinds=tuple(row["kind"] for row in rows), relation_matches=matches,
         relation_definitions=repr(rows), relation_readback_error=repr(error),
     )
     if error is not None:
