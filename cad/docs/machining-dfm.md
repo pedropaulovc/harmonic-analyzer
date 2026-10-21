@@ -96,11 +96,13 @@ geometry is casting-shaped, not milling-shaped.
 
 - `fr-rocker-arm-support` carries four **5/16 through clearance drills**. Four
   McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
-  top into blind UNC-2B taps in `fr-harmonic-base`: the exact vendor under-head
-  washer transition seats on the support, leaving 12.422 mm installed
-  engagement (1.956D). The seat is sized at its printed .XX worst case:
-  13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
-  cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
+  top into **through-tapped** UNC-2B seats in `fr-harmonic-base`. The exact
+  vendor under-head washer transition still seats on the support, leaving
+  **12.422 mm nominal insertion**. Insertion is not useful engagement: the
+  retained casting limits full-thread overlap, and any excess shank projects
+  into the underside pocket. The seat contracts account separately for the
+  printed material limits, edge breaks, full thread, protrusion and bench
+  clearance; there is no blind drill depth or tap-lead reserve at these seats.
   Other receivers are threaded too; the `sm-knife-mount` #10-24 bottoming hanger-bolt tap is one
   example. The 20 `dt-cone-gear`s and the 64T `dt-crank-drive-gear` transmit torque
   through matching D-bores on the shaft's D-flat lands; the cylinder gears
@@ -124,10 +126,158 @@ geometry is casting-shaped, not milling-shaped.
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
   lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
-  in one setup without repeating the numeric offsets, and states that D1
-  table X/Y are reference. The generated native hole-table coordinates remain
-  unchanged; the D1 row carries the same `SEE NOTE 1` flag in a custom NOTE
-  column (#1744), because generated hole-table cells are not editable.
+  without prescribing a setup or repeating the numeric offsets, and states
+  that the pivot's table X/Y are reference. Its actual native tag is resolved from the
+  physical pivot station, not a fixed family letter. The generated native
+  hole-table coordinates remain unchanged; that same physical row carries
+  `SEE NOTE 1` in a custom NOTE column (#1744), because generated hole-table
+  cells are not editable. Both the numbered note and curated view-tag layout
+  follow station identity if native size families re-letter or merge.
+
+Owner exception **RV-02**, selected **2026-10-20** and registered under
+`fr-harmonic-base` in its package YAML, permits redundant default **2B** only
+in the generated native hole-table **SIZE cells** on sheet 2. The cells stay
+model-linked and are not rewritten; all physical Hole Wizard threads remain
+class 2B. The five separate native tap callouts still omit the duplicated
+class token. This presentation-only exception does not extend to other
+callouts, packages, tolerances, engagement or clearance limits. The existing
+reviewer and judge consume the package declaration through their standard
+owner-exception mechanism; the general drawing rubric is unchanged.
+
+The flange perimeter remains the hole table's coordinate origin, not a
+specified mating seat. A layout reference alone does not justify Ra 3.2 under
+drawing-guidelines rule 6, so the four flange-side roughness controls are
+removed from both the native part and drawing. The deck, underside and matched
+column-socket finish controls remain; neither the flange shape nor the native
+hole-table origin changes.
+
+The modeled stamped ID must read **2** in the native top projection. Its
+3.5 mm artwork stays centered at machine X161.0/Z124.25 and cuts 0.3 mm deep.
+The DXF generator accounts for both the Top-sketch Y/part-Z mapping and the
+plan's downward-positive Z projection; the artwork is reflected in sketch Y
+to avoid a reflected numeral on the actual part. This changes orientation,
+not the glyph area, cut volume, location or drawing-view orientation.
+
+The base's **18 deck seats** are through-tapped at their existing stations
+and thread designations: four rocker-support, one cone-pivot, one cone-lock,
+one swing-stop, four pinion-block, one spring-foot, two arbor-pedestal and four
+nameplate seats. All **11 round interior islands and five rectangular pads**
+formerly backing those seats are removed. The perimeter, four socket bosses,
+two relieved ribs and four horizontal cross-tap lugs remain. A through tap
+continues through any retained rib or other casting in its path; it is not a
+clearance hole, and no underside nut is introduced. The cross taps remain
+blind and retain their independent manufacturing and engagement contracts.
+
+Owner ruling **2026-10-20** retains a **13.0 mm nominal deck skin** by making
+the underside pocket **1.0 mm shallower** (37.8 mm pocket depth). The deck
+top, mounting stations, hardware and existing loose tolerance scheme stay
+unchanged. The controlling dimensions remain green-top height, deck rise and
+pocket depth, each with the title block's `.X` ±0.8 mm band; the skin is not
+silently made a directly controlled or tighter dimension. The worst-case
+female full-thread depth at a skin-only seat is
+`(47.8−0.8)+(3.0−0.8)−(37.8+0.8)−2×0.25 = 10.10 mm`.
+That exceeds the 1/4-20 receiver's **1.5D = 9.525 mm** requirement by
+**0.575 mm**, after both edge breaks. The former 12 mm skin would retain
+only 9.10 mm under the same chain and was not accepted for this conversion.
+
+The retained cross-tap lugs extend from Y26.5 to the pocket ceiling Y37.8,
+where they join the green skin up to Y47.8. The unchanged cross-tap axis at
+Y38.1 is 0.3 mm above that shared boundary: the lug/skin union, not the skin
+alone, backs its complete thread. Lug-bottom and top-land wall checks remain
+controlling; the ceiling need not be above the cross-tap axis.
+
+The separate 49 MIN cross-drill callout has no upper depth limit. Its existing
+tip/past-tip proof therefore describes the nominal native drill, not a
+worst-case manufactured deep end. The finite lateral and vertical backing
+checks charge the printed bands and require a continuous 2 mm envelope through
+the retained lug/socket/wall union, with the socket bore and spotface entrance
+treated as intended openings. No fillet credit or new depth band is assumed.
+
+The per-station material map includes retained ribs, socket bosses, lugs,
+walls and pocket fillets rather than assuming every hole crosses only the
+deck skin. A maximum-radius fillet may contribute material to the nominal
+model, but that optional material cannot be counted as guaranteed full thread
+when the print permits a smaller radius. Native readbacks must prove the
+actual cut opens through every retained material segment. Existing screws,
+their top-side bearing seats and the cone knob's clamp/bare-base poses stay
+unchanged; the original pivot-screw operational-retention issue is not fixed
+merely by breaking its tap through the deck.
+
+The current live stations have the following retained material. Coordinates
+are machine X/Z; the source-owned station tuples, not these rounded labels,
+remain authoritative. `THROUGH_SEAT_MATERIAL` records every individual seat.
+
+| Seats | Count | Nominal metal on the hole axis | Complete-circumference nominal receiver |
+|---|---:|---:|---:|
+| Rocker support | 4 | 13.0 mm | 13.0 mm |
+| Cone pivot, cone lock, swing stop | 1 each | 13.0 mm | 13.0 mm |
+| Pinion blocks, `PINION_PIVOT_X − 8.5` | 2 | 13.0 mm | 13.0 mm |
+| Pinion blocks, `PINION_PIVOT_X + 8.5` (X ≈ −4.652) | 2 | 13.0 mm | 13.0 mm |
+| Spring foot | 1 | 13.0 mm | 13.0 mm |
+| Arbor pedestals, including ±2 X / ±5 Z transfer envelopes | 2 | 13.0 mm | 13.0 mm |
+| Nameplate | 4 | 13.0 mm | 13.0 mm |
+
+The owner subsequently selected moving the **whole cross rib +11.0 mm in X**,
+not local notches. Its 10.0 mm width, full Z span, 3.0 mm bench relief and
+connection to the long rib/end walls remain unchanged. Its west/east faces
+are now X6.0/X16.0. This removes the two inner block bores' former 34.8 mm
+interrupted continuation down the rib; all eighteen axes and their thread
+footprints now exit the 13.0 mm skin into pocket air.
+
+The nearest #8-32 axis is X≈−4.652206 with major radius 2.083 mm.
+The existing `.X` location band plus half the flange-length band bounds the
+rib face by ±(0.8+0.4), independently of the ±0.8 hole-position allowance:
+`6.0−(0.8+0.4)−(−4.652206+0.8+2.083) = 6.569206 mm` minimum
+bare-face clearance. The implemented all-station exit gate is more conservative:
+it subtracts three `(0.8+0.05)` location/rounding allowances and the 0.25 mm
+edge break from the 8.569206 mm nominal gap, giving **5.769206 mm** at these
+block seats, still above their 2.0 mm exit-clearance requirement.
+Existing R6 MAX vertical root/end fillets are retained:
+cross/long-rib patches lie at |Z|5–11, and cross-rib/end-wall patches at
+|Z|119.25–125.25, far from these block stations at about Z−85.589/+87.311.
+The material/clearance contracts cover every seat and pedestal transfer
+envelope against the actual finite fillet patches, not an infinite rib line.
+No unrequested horizontal root fillet is introduced.
+These bounds describe the authored geometry, not the size or clearance of an
+unmodelled foundry root; no such root allowance is qualified by this proof.
+
+All eighteen receivers use the conservative full-form interval
+**0.25–10.35 mm** below the deck at the printed limits. The current lock is
+13.53 mm inside the pocket wall, and the stop is about 5.43 mm beyond the long
+rib's edge; neither is backed by those structures. No current hole footprint
+reaches an R6 patch, socket boss or cross-tap lug.
+
+Receiver capacity is distinct from unchanged stock-screw limitations.
+The base and assemblies share one insertion window per support/pedestal
+joint rather than independently choosing stock or title-block limits.
+The support window charges the ASME B18.2.1 pointed hex-cap-screw
+[+0/−0.03 in length limit](https://www.portlandbolt.com/technical/faqs/bolt-length-tolerance/)
+exactly as 0.762 mm, the support foot's ±0.51 mm band, and the actual
+0.2778125 mm washer-bearing offset. With the harvested nominal 0.75-pitch
+tip, minimum complete overlap is
+`19.05−0.762−(6.35+0.51)−0.2778125−0.9525−0.25 = 9.9476875 mm`,
+above 1.5D=9.525 mm; it is not the entire 10.10 mm receiver capacity.
+Pedestal windows retain their existing 0.76 mm short-stock allowance and
+±0.8 mm flange band. Nominal vendor tip/runout geometry is not a published
+stock-tip tolerance; these calculations do not silently qualify unknown
+end-form limits or replace the existing installed inspections.
+
+The nameplate's existing **RV-03** ruling (`parts/fr-nameplate.yaml`) retains the
+1/4 in brass screw and the printed **3.73 MIN** external full-form projection:
+`6.35−0.508−(1.500+0.13)−0.75×0.635 = 3.73575 mm`.
+That inherited calculation omits the female entrance edge break. Charging
+the unchanged 0.25 mm maximum entrance loss gives **3.48575 mm** female
+overlap; the conversion does not shorten it, and it must not be described as
+a new 1.5D-qualified joint. The frame checks that the new receiver fully
+covers the existing screw reach and records this finite overlap separately.
+The pivot shoulder screw likewise retains its existing installed **4.83 mm
+minimum** inspection: the harvested tail's nominal full-form interval is
+`[2.3368, 9.525−0.43434]`, or **6.75386 mm**, not 9.525 mm of useful thread.
+Neither inherited stock limitation is remedied by removing casting islands.
+The existing [base thread audit #617](https://github.com/pedropaulovc/harmonic-analyzer/issues/617)
+and [engagement audit #846](https://github.com/pedropaulovc/harmonic-analyzer/issues/846)
+retain the inherited qualification questions; this geometry conversion does
+not close either audit or authorize a new shortfall.
 
 ### Blind-thread DFM rule
 

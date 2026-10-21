@@ -50,7 +50,7 @@ What it does, in order:
      when no drawing changes remain after BUILD/REV stamp normalization.
   5. Before publication, regenerate every README-generated picture from the
      versioned staged bundle into an untracked temporary directory, and validate
-     and stage the ``release.yaml`` and enrolled plans' next-revision updates.
+     and stage the ``release.yaml`` and migrated/enrolled plans' next-revision updates.
      Missing images, PDF sheets, or rendering tools fail before any tag/push.
      Requires the project's meshprobe/PDFium dependencies and Blender >= 5.2;
      no local COM is used.
@@ -265,12 +265,12 @@ class _PreparedRevisionAdvance:
 
 
 def prepare_configured_revision_advance(version: str) -> _PreparedRevisionAdvance:
-    """Stage release.yaml and enrolled plan revisions without touching sources."""
+    """Stage release.yaml and migrated/enrolled plan revisions, not enrollment."""
     require_configured_revision(version)
     next_version = f"v{int(version[1:]) + 1}"
     sources = [
         RELEASE_VERSION_FILE,
-        *(_process_plans.plan_path(stem) for stem in _process_plans.TRAVELER_STEMS),
+        *(_process_plans.plan_path(stem) for stem in _process_plans.revision_stems()),
     ]
     updates: list[tuple[Path, Path]] = []
     prepared = _PreparedRevisionAdvance(updates, next_version)
@@ -529,11 +529,16 @@ def stage_comparisons(stage: Path) -> dict[str, Any]:
 def preflight(version: str, allow_dirty: bool) -> None:
     """Fail fast on configured/plan/manifest revision drift before staging."""
     require_configured_revision(version)
-    for stem in _process_plans.TRAVELER_STEMS:
+    for stem in _process_plans.revision_stems():
         try:
-            _process_plans.check_plan_revision(stem, CAD_ROOT / "out", revision=version)
+            if stem in _process_plans.TRAVELER_STEMS:
+                _process_plans.check_plan_revision(
+                    stem, CAD_ROOT / "out", revision=version
+                )
+            else:
+                _process_plans.check_authored_plan_revision(stem, version)
         except _process_plans.PlanBindError as exc:
-            raise SystemExit(f"!!  traveler plan {stem}: {exc}") from exc
+            raise SystemExit(f"!!  process plan {stem}: {exc}") from exc
     try:
         _process_plans.require_measured_release()
     except (_process_plans.PlaceholderRelease, _process_plans.PlanBindError) as exc:
@@ -1566,7 +1571,7 @@ def main() -> int:
                     report_no_publish(version, zip_path, facts, log_path)
                     log(
                         "--no-publish: prepared all README images; tracked images, "
-                        "next_revision and enrolled plan revisions are unchanged"
+                        "next_revision and migrated/enrolled plan revisions are unchanged"
                     )
                     url = None
                 else:
@@ -1588,7 +1593,7 @@ def main() -> int:
                                 f"set {RELEASE_VERSION_FILE} to "
                                 f"next_revision: {prepared.next_version}, set "
                                 "[drawing].revision to "
-                                f"{prepared.next_version} in enrolled plans "
+                                f"{prepared.next_version} in migrated/enrolled plans "
                                 f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'}, "
                                 "and commit those revisions and generated images in one "
                                 "generated-only follow-up PR before the next release. "
@@ -1607,7 +1612,7 @@ def main() -> int:
                     _telemetry.warn(
                         "POST-RELEASE PR REQUIRED: refreshed generated README images in "
                         f"{trim_renders.DOCS_IMAGES} and advanced "
-                        f"{RELEASE_VERSION_FILE} and enrolled plans "
+                        f"{RELEASE_VERSION_FILE} and migrated/enrolled plans "
                         f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'} "
                         f"to {next_revision}. Commit revisions and images in one "
                         "generated-only follow-up PR before cutting the next release. "

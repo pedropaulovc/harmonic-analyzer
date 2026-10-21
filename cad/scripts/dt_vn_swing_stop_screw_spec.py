@@ -1,10 +1,10 @@
-r"""Pure McMaster 90280A108 stock dimensions and swing-stop seat checks.
+r"""Pure McMaster 90280A108 stock dimensions and swing-stop inspection data.
 
-PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure. The fillister row in mm is the per-SKU vendor source
-(``_mcmaster_90280a108.py``, SolidWorks-free at import), which the native
+PURE DATA, no SolidWorks/COM calls, receiving-base geometry or ``build_*``
+module in its import closure. The fillister row in mm is the per-SKU vendor
+source (``_mcmaster_90280a108.py``, SolidWorks-free at import), which the native
 recipe and the same-SKU foot and latch-hook bracket specs also read; this
-module adds the stock limits and the seat checks.
+module adds the stock limits and installed-joint inspection constants.
 
 The stop seats fully home on the base top; the platform edge bears on its
 head only when DISENGAGED. It limits the disengage swing and plays no part
@@ -15,22 +15,18 @@ standard and corroborated for the slotted fillister form; they are not
 manufactured title-block grades. They bound head size, slot depth, length,
 the underside bearing circle and where full thread form starts near the
 head, not the supplier's complete curved head/rounded-tip profile.
-Only the manufactured platform's thickness uses its title-block allowance.
 The two-place MIN engagement callout below owns the installed-joint limit
 printed by the assembly drawing; it does not qualify supplier tail geometry.
+``fr_harmonic_base_fasteners.require_stop_seat_fit`` owns receiver validation,
+including the manufactured platform's thickness allowance.
 """
 
 from __future__ import annotations
 
 from math import ceil
-from typing import TYPE_CHECKING
 
-import _config
 from _fit_deviations import deviations
 from _mcmaster_90280a108 import FILLISTER_SIZE
-
-if TYPE_CHECKING:
-    from _hole_spec import HoleSpec
 
 SOURCE = "McMaster 90280A108 vendor-model fillister dimensions"
 THREAD_FIT_SOURCE = "https://www.mcmaster.com/90280A108/ (live product page, 2026-10-08)"
@@ -89,34 +85,11 @@ TIP_CHAMFER = 0.7 * THREAD_PITCH
 # Installed-joint acceptance, inspected on the real stock/receiver: the
 # shop's 1.5D full-thread rule rounded UP to 0.01 mm (machinist review of the
 # stack build: the old 1D floor printed 2.85 against 4.27 needed). The fully
-# seated 3/8 screw in its 9.8-deep thread already gives ~7 mm full form, so
-# no geometry changes; this is not a supplier tolerance on length or tip.
+# seated 3/8 screw in the through-threaded deck already gives ample full form;
+# this is not a supplier tolerance on length or tip.
 MIN_USEFUL_ENGAGEMENT_MM = ceil(1.5 * SHANK_DIA * 100.0) / 100.0
 MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form stop thread engagement "
     "at least 1.5D, rounded upward to 0.01 mm; head fully seated"
 )
 MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
-PLATE_THICKNESS_ALLOWANCE = 25.4 * float(_config.title_block("linear_2pl")["value_in"])
-
-
-def require_seat_fit(seat: HoleSpec, plate_thickness: float) -> None:
-    """Check the nominal seated stop; actual full-form engagement is inspected.
-
-    Passing this source-model seat check is not evidence that the installed
-    stock meets MIN_USEFUL_ENGAGEMENT_MM or that its head is fully seated.
-    """
-    if seat.kind != "tapped" or seat.size != THREAD or seat.end != "blind":
-        raise AssertionError("swing stop requires a blind #4-40 tapped seat")
-    if EMBED_LEN - TIP_CHAMFER < MIN_USEFUL_ENGAGEMENT_MM:
-        raise AssertionError(
-            "swing stop has less than the minimum useful thread engagement"
-        )
-    thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
-    if thread_depth - EMBED_LEN < 0.25 - 1e-9:
-        raise AssertionError("swing stop bottoms in its threaded seat")
-    if seat.depth_mm - thread_depth < 5.0 * THREAD_PITCH - 1e-9:
-        raise AssertionError("swing-stop drill lacks five-pitch plug-tap lead")
-    # The whole head must bear on the edge of a tolerance-low platform.
-    if PROUD_LEN + HEAD_H > plate_thickness - PLATE_THICKNESS_ALLOWANCE + 1e-9:
-        raise AssertionError("swing-stop head stands above the tolerance-low platform")

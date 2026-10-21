@@ -438,13 +438,14 @@ def test_unmatched_ink_has_an_inclusive_intensity_bound(
     marked[3, 3] = 255 - contrast
     before, after = (marked, blank) if removed else (blank, marked)
 
-    png, text_changed = diff._overlay(
+    png, text_changed, changed = diff._overlay(
         diff._Raster(before, (3.5, 3.5), [], ()),
         diff._Raster(after, (3.5, 3.5), [], ()),
     )
 
     assert (png is not None) is (contrast > 68)
     assert text_changed is False
+    assert changed is (contrast > 68)
 
 
 def test_neighborhood_does_not_wrap_between_opposite_page_edges() -> None:
@@ -453,12 +454,13 @@ def test_neighborhood_does_not_wrap_between_opposite_page_edges() -> None:
     before[3, 0] = 0
     after[3, -1] = 0
 
-    png, _ = diff._overlay(
+    png, _, changed = diff._overlay(
         diff._Raster(before, (3.5, 3.5), [], ()),
         diff._Raster(after, (3.5, 3.5), [], ()),
     )
 
     assert png is not None
+    assert changed is True
 
 
 def test_faint_printed_character_edit_bypasses_both_tolerances(tmp_path: Path) -> None:

@@ -57,7 +57,7 @@ Z = wall thickness):
   5/16 in clearance drills through the 6.35 mm foot from its top seat
   (Y=-82.55) at ``(X ±60.32, Z ±17.46)``. One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
-  into blind tapped seats in the harmonic base.
+  into through-tapped seats in the harmonic base.
 * **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges, the +X
   end face's foot and top edges, the two slant faces, the -X end face, and one
   fillet face, with tangent propagation -- i.e. the whole window rim and all

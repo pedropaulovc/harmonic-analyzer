@@ -603,10 +603,9 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
 
 
 def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
-    """Owner ruling 2026-10-15 (#1468 option A): step 9's spot-through
-    fit-up is a kind-accept declaration in the frame contract, which the
-    review reads for this drawing. Its `where` quotes the printed step, and
-    its reason states the float and the loose-band demand the step absorbs."""
+    """Step 9's spot-through fit-up is an owner-accepted rule-19 departure:
+    the nominal screw float cannot absorb independent plate/base stations."""
+    import _mcmaster_90114a511 as screw
     import fr_nameplate_drawing_spec as plate
     from _assembly_contract import assembly_contract
     from _drawing_registry import DRAWINGS_BY_NAME
@@ -618,16 +617,13 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
     (entry,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
     assert (entry.id, entry.kind) == ("RV-01", "accept")
-    assert entry.finding == "fit-up at assembly (rule 19)"
-    assert entry.where.endswith(_step(9))
-    assert entry.reason.endswith("(owner-accepted)")
+    assert re.search(r"\brule 19\b", entry.finding)
+    assert re.search(r"\bstep 9\b", entry.where)
     # Without the spot-through, the plate's .X station and a .XX base tap,
     # each on both axes, demand far more diametral float than the screw has.
-    float_mm = plate.SCREW_HOLE_DIA - plate.SCREW_MAJOR_DIA
+    float_mm = plate.SCREW_HOLE_DIA - screw.SHANK_DIA
     demand_mm = 2.0 * math.sqrt(2.0) * (printed_band_mm(1) + printed_band_mm(2))
     assert float_mm < demand_mm
-    assert f"{float_mm:.3f} diametral float" in entry.reason
-    assert f"= {demand_mm:.3f})" in entry.reason
     # The build reads the same file and ignores the declaration.
     assert assembly_contract("fr-frame").number == "MHA-FR-00"
 

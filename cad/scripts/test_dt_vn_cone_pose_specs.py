@@ -376,31 +376,27 @@ def test_stop_standard_envelopes_are_sourced_without_changing_native_nominals() 
             fit.deviations(tuple(reversed(band)))
 
 
-def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check() -> None:
     stop = _pure_spec("dt_vn_swing_stop_screw_spec")
     holes = _pure_spec("_hole_spec")
     assert stop.MIN_USEFUL_ENGAGEMENT_MM == 4.27
     assert "Functional installation inspection" in stop.MIN_USEFUL_ENGAGEMENT_SOURCE
     assert "full-form" in stop.MIN_USEFUL_ENGAGEMENT_SOURCE
-    seat = holes.HoleSpec(
-        "tapped",
-        stop.THREAD,
-        end="blind",
-        depth_mm=14.0,
-        overrides_mm={"ThreadDepth": 10.0},
-    )
-    stop.require_seat_fit(seat, 5.0)
-    # Between the unrounded old 1D floor and the real inspected minimum:
-    # the nominal guard must use the same rounded-up acceptance.
-    monkeypatch.setattr(
-        stop,
-        "EMBED_LEN",
-        stop.TIP_CHAMFER + (stop.SHANK_DIA + stop.MIN_USEFUL_ENGAGEMENT_MM) / 2.0,
-    )
+    fasteners = _pure_spec("fr_harmonic_base_fasteners")
+    seat = holes.HoleSpec("tapped", stop.THREAD, thread_class="2B")
+    material = fasteners.through_seat_material(seat, (100.0, 50.0))
+    fasteners.require_stop_seat_fit(seat, 5.0, material=material)
+    # Retain the distinction between a true1.5D minimum and the upward-rounded
+    # existing installation acceptance. The nominal stock window is ample;
+    # this boundary control makes only the female overlap fall between them.
+    from dataclasses import replace
+
+    raw_minimum = 1.5 * holes.THREAD_MAJOR_MM[stop.THREAD]
+    between = (raw_minimum + stop.MIN_USEFUL_ENGAGEMENT_MM) / 2.0
+    start = stop.FULL_THREAD_START_MAX_MM
+    limited = replace(material, guaranteed_segments_mm=((start, start + between),))
     with pytest.raises(AssertionError, match="minimum useful thread engagement"):
-        stop.require_seat_fit(seat, 5.0)
+        fasteners.require_stop_seat_fit(seat, 5.0, material=limited)
 
 
 def test_pivot_thread_limits_and_installed_inspection_are_separately_qualified() -> None:

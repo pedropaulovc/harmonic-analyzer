@@ -70,9 +70,13 @@ cannot ask for what the authors were told to leave out.
   case. A stated fit-up adjustment is the escape hatch when the stack cannot
   be held otherwise — never the design default.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
-  and stack asserts (for example `require_blind_seat_fit`) enforce it. Today
-  they check only ≥ 1D; raising them to 1.5D at the worst case is follow-up
-  work. The 1.5D engagement minimum and the rule-17 wall targets (2.0 mm
+  and stack asserts enforce it. Through-tapped receivers use actual retained
+  material and external full-form overlap, not blind drilling depths or raw
+  screw insertion (for example `require_through_seat_fit` in the harmonic
+  base's pure fastener contract). Receiver capacity does not by itself prove
+  a purchased screw's installed engagement; existing inspected minima and
+  owner-declared shortfalls remain explicit. The 1.5D engagement minimum and
+  the rule-17 wall targets (2.0 mm
   target, 1.5 mm floor) exist to be forgiving to a first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.
@@ -118,15 +122,57 @@ minor. Whoever runs the gate matches each one to the part's declared entry
 matching declaration gates the package like a blocker. An emitter of an
 approved declaration carries a comment naming it.
 
+The owner's **2026-10-20** ruling for **MHA-FR-01 `fr-harmonic-base` RV-02**
+accepts one nonnumeric departure from rule 2: redundant default **2B** in that
+package's generated native hole-table **SIZE cells only**. The package-local
+declaration in [`fr-harmonic-base.yaml`](../config/parts/fr-harmonic-base.yaml)
+is the reviewer-consumed register. Physical model threads remain class 2B,
+and the five separate native tap callouts still omit the duplicate class.
+The generated cells are not rewritten. This is not a general native-table
+exemption and accepts no other specification, geometry or numeric shortfall.
+
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) runs three
-independent blind senior-machinist reviews per package (`--runs N` changes the
-count). Each run receives `drawing-guidelines.md` followed by the reviewer
+`uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`
+compares baseline PDFs with the current registered PDFs (`--pdf-dir <after>`
+selects another output directory). For an explicit package, use `--name <stem>`
+with `--before-pdf` and `--pdf`; repeat each PDF option in matching
+sheet-document order. PNG CLI input is not supported. Both PDF versions are
+required unless `--force` requests an
+unconditional review of the after PDFs.
+
+Before starting independent reviews, the findings judge inspects the repository
+PDF diff tool's **overlaid** before/after pictures: shared ink is gray, removed
+ink red, and added ink blue. It may skip a package only when the differences are
+rendering noise, or an assembly drawing changes only one part's geometry without
+affecting mating shown on the drawings. SolidWorks balloon placement is unstable:
+movement of a balloon or leader is noise when both its number and referenced
+part/region remain unchanged. That noise may coexist with a skippable single-part
+geometry change. A different number or target requires review, as does uncertainty
+about either. This allowance does not extend to dimension changes or other
+annotation edits. Proximity of a changed feature to a joint alone does not prove
+a mating effect; the judge compares the depicted connections and relative
+placement. A hypothetical hidden effect of a small local feature is not a
+depicted mating change. Uncertainty grounded in the visible assembly evidence
+still requires a full review.
+An unchanged overlay is inspected too; an image-generation or precheck failure
+is not permission to skip. The report retains the before/after identities,
+overlay evidence and decision. A skip returns `SHIP` with an explicit warning
+that the machinist review was skipped due to minimal changes, not a claim that
+a full review ran. The precheck does not establish that the baseline was
+approved, and PDF overlays cannot reveal changes to review rules or owner
+exceptions. Use `--force` when those require reassessment. It bypasses the
+precheck; build gates and prompt benchmarks use it for unconditional reviews.
+
+Packages selected for review run three independent blind senior-machinist
+reviews (`--runs N` changes the count). The same judge session that inspected
+the overlays later merges their findings; independent reviewers do not receive
+the baseline or precheck context. Each run receives `drawing-guidelines.md`
+followed by the reviewer
 instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
 or `machinist_review_assembly.md`), with its classification slot expanded from
-the matching `machinist_review_<kind>_severity.md` contract. A separate isolated
-judge inspects the sheets and receives that same kind-specific classification
+the matching `machinist_review_<kind>_severity.md` contract. The isolated
+judge inspects the after sheets and receives that same kind-specific classification
 and evidence contract, not the reviewer's detection or report instructions.
 It vets every finding against the guidelines, text layer and owner exceptions,
 and clusters duplicate claims. Categories follow the contract's defect-type
@@ -177,8 +223,9 @@ both verdicts and the finding diff.
   **confirmed** blocker, over-specification or clarity finding raised by two or
   more runs. Confirmed minor findings, single-run confirmations and rejected
   clusters remain in the report but do not gate. `SHIP`
-  means no confirmed gating findings and no aggregate error. If valid runs return
-  zero findings, the judge is skipped. If all runs fail, or the judge fails after
+  means no confirmed gating findings and no aggregate error, or an explicitly
+  warned minimal-change skip. If valid runs return zero findings, findings
+  adjudication is skipped. If all runs fail, or the judge fails after
   retries (including incomplete/duplicate finding coverage), the result is
   `ERROR` and exits nonzero. Partial run failures remain visible alongside valid
   evidence; run reports and isolated judge transcripts are retained separately.
