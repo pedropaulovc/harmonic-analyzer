@@ -261,6 +261,23 @@ def _installation_flag(
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
 
+    def edge_observation(raw: Any) -> dict[str, Any]:
+        observed: dict[str, Any] = {}
+        try:
+            candidate = _early_bound(raw, "IEdge")
+            observed["same_expected"] = int(adapter.swApp.IsSame(candidate, edge))
+            observed["same_self"] = int(adapter.swApp.IsSame(candidate, candidate))
+            curve = _early_bound(candidate.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                observed["circle_m"] = tuple(
+                    float(value) for value in _read_member(curve, "CircleParams")
+                )[:7]
+            else:
+                observed["kind"] = "line" if curve.IsLine() else "other curve"
+        except Exception as error:
+            observed["unreadable"] = repr(error)[:160]
+        return observed
+
     def anchor() -> tuple[Any, tuple[float, float]]:
         view.UpdateViewDisplayGeometry()
         scan = scan_view_edges(view, label=label)
@@ -391,13 +408,14 @@ def _installation_flag(
     )
     sheet_name = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
     primary_error = None
+    note = None
     try:
         note = _early_bound(
             add_attached_note(
                 adapter,
                 view,
                 text=key,
-                entity_xy=pick,
+                entity=edge,
                 note_xy=(left, center_y),
                 attached_to=edge,
                 label=label,
@@ -405,6 +423,19 @@ def _installation_flag(
             "INote",
         )
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        if (
+            annotation.SetLeaderAttachmentPointAtIndex(0, pick[0], pick[1], 0.0)
+            is not True
+        ):
+            raise RuntimeError(f"{label}: native installation landing refused")
+        _assert_attached_to(
+            adapter,
+            annotation,
+            edge,
+            entity_type="EDGE",
+            what="installation flag after native landing",
+            label=label,
+        )
         bounds = _note_text_box(annotation, label=label)
         position = tuple(
             float(value) for value in _read_member(annotation, "GetPosition")
@@ -419,6 +450,49 @@ def _installation_flag(
         if annotation.SetPosition2(*target) is not True:
             raise RuntimeError(f"{label}: native key relocation refused")
     except BaseException as error:
+        observed = {"expected": edge_observation(edge)}
+        try:
+            selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            count = int(selection.GetSelectedObjectCount2(-1))
+            observed["selected_count"] = count
+            observed["selected"] = tuple(
+                edge_observation(selection.GetSelectedObject6(index, -1))
+                for index in range(1, min(count, 3) + 1)
+            )
+        except Exception as diagnostic_error:
+            observed["selection_error"] = repr(diagnostic_error)[:160]
+        try:
+            notes = (
+                [note]
+                if note is not None
+                else [
+                    _early_bound(raw, "INote")
+                    for raw in view.GetNotes() or ()
+                    if _early_bound(raw, "INote").GetText() == key
+                ]
+            )
+            observed["available_key_notes"] = len(notes)
+            attached = []
+            for current in notes[:2]:
+                current_annotation = _early_bound(
+                    current.GetAnnotation(), "IAnnotation"
+                )
+                entities = tuple(current_annotation.GetAttachedEntities3() or ())
+                attached.append(
+                    {
+                        "count": int(current_annotation.GetAttachedEntityCount3()),
+                        "types": tuple(
+                            current_annotation.GetAttachedEntityTypes() or ()
+                        )[:3],
+                        "entities": tuple(
+                            edge_observation(raw) for raw in entities[:3]
+                        ),
+                    }
+                )
+            observed["attached"] = tuple(attached)
+        except Exception as diagnostic_error:
+            observed["attachment_error"] = repr(diagnostic_error)[:160]
+        error.add_note(f"{label}: native selection/attachment observation {observed!r}")
         primary_error = error
         raise
     finally:

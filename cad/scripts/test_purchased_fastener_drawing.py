@@ -3369,6 +3369,11 @@ class _KitFlagNativeAnnotation:
         self.moves = []
         self.ignore_movement = False
         self.refuse_movement = False
+        self.leader_set_calls = []
+        self.leader_set_result = True
+        self.ignore_leader_set = False
+        self.leader_set_offset = (0.0, 0.0, 0.0)
+        self.on_leader_set = lambda _note: None
 
     def GetType(self):
         return 6
@@ -3401,6 +3406,19 @@ class _KitFlagNativeAnnotation:
 
     def GetLeaderCount(self):
         return self.leader_count
+
+    def SetLeaderAttachmentPointAtIndex(self, index, x, y, z):
+        assert index == 0
+        self.leader_set_calls.append((index, x, y, z))
+        if self.leader_set_result is not True:
+            return self.leader_set_result
+        if not self.ignore_leader_set:
+            self.landing = tuple(
+                value + offset
+                for value, offset in zip((x, y, z), self.leader_set_offset, strict=True)
+            )
+        self.on_leader_set(self.note)
+        return True
 
     def GetLeaderPointsAtIndex(self, index):
         assert index == 0
@@ -3499,6 +3517,7 @@ def kit_installation_native(monkeypatch):
             projection_defect=None,
             repeat_note_wrappers=False,
             on_author=lambda _note: None,
+            on_leader_set=lambda _note: None,
             note=None,
             legend=None,
             error=RuntimeError("native flag authoring failed"),
@@ -3743,18 +3762,33 @@ def kit_installation_native(monkeypatch):
                 result[0] = (result[0][0], float("nan"))
             return result
 
-        def author(_adapter, view, **kwargs):
+        def author(_adapter, view, *, text, entity, attached_to, note_xy, label):
             assert view is state.view
-            state.calls.append(kwargs)
+            assert entity is attached_to
+            assert isinstance(entity, _KitFlagNativeWrapper)
+            assert entity.native_identity is state.target.native_identity
+            state.calls.append(
+                {
+                    "text": text,
+                    "entity": entity,
+                    "attached_to": attached_to,
+                    "note_xy": note_xy,
+                    "label": label,
+                }
+            )
             state.events.append(("author",))
             state.active = view.GetName2()
-            state.selected = kwargs["attached_to"]
+            state.selected = entity
             if state.author_defect == "raises":
                 raise state.error
-            note = _KitFlagNativeNote(
-                kwargs["text"], view, kwargs["attached_to"], kwargs["entity_xy"]
-            )
-            note.annotation.position = (*kwargs["note_xy"], 0.0)
+            # Direct entity insertion proves ownership but does not choose the
+            # approved physical landing. The native setter must move this
+            # deliberately different, in-cell initial leader endpoint.
+            cx, cy = view.center
+            initial_landing = (cx - 0.006, cy + 0.003)
+            note = _KitFlagNativeNote(text, view, entity, initial_landing)
+            note.annotation.position = (*note_xy, 0.0)
+            note.annotation.on_leader_set = lambda current: state.on_leader_set(current)
             state.note = note
             view.notes.append(note)
             state.on_author(note)
@@ -3954,7 +3988,15 @@ def test_kit_installation_flag_checks_native_authoring_readback(
     kit_installation_native, configuration, drift
 ):
     state = kit_installation_native(configuration)
-    state.on_author = lambda _note: _kit_flag_apply_native_drift(state, drift)
+    if drift in {
+        "ignored-movement",
+        "movement-refused",
+        "extent-outside",
+        "nan-extent",
+    }:
+        state.on_author = lambda _note: _kit_flag_apply_native_drift(state, drift)
+    else:
+        state.on_leader_set = lambda _note: _kit_flag_apply_native_drift(state, drift)
     with pytest.raises(RuntimeError):
         state.kit._installation_flag(
             state.adapter, configuration, state.cells, state.views
@@ -4043,7 +4085,15 @@ def test_kit_installation_keys_attach_to_unique_native_features_and_settle(
     assert call["text"] == state.key
     assert state.same(call["attached_to"], state.target) == 1
     assert call["attached_to"] is not state.target
-    assert call["entity_xy"] == pytest.approx(state.project_point(state.model_point))
+    assert call["entity"] is call["attached_to"]
+    assert "entity_xy" not in call
+    assert len(state.note.annotation.leader_set_calls) == 1
+    assert state.note.annotation.leader_set_calls[0] == pytest.approx(
+        (0, *state.project_point(state.model_point), 0.0)
+    )
+    assert state.note.annotation.landing == pytest.approx(
+        (*state.project_point(state.model_point), 0.0)
+    )
     assert state.target.closest_queries
     assert state.target.closest_queries[0] == pytest.approx(state.model_point)
     assert len(state.projections[-1]) == 1
@@ -4055,7 +4105,7 @@ def test_kit_installation_keys_attach_to_unique_native_features_and_settle(
         }
         assert len(state.projections[0]) == 2
         assert state.model_point[2] < 0
-        assert call["entity_xy"][0] == pytest.approx(
+        assert state.note.annotation.landing[0] == pytest.approx(
             max(state.project_point(point)[0] for point in state.projections[0])
         )
     elif configuration == "FlangeNut":
@@ -4492,3 +4542,199 @@ def test_kit_installation_legend_normalizes_crlf_without_rewriting_requirements(
     state.legend._resolved_text += " "
     with pytest.raises(RuntimeError):
         settled()
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "setter_defect",
+    (
+        "refused",
+        "ignored",
+        "wrong-point",
+        "rebind-neighbor",
+        "rebind-same-geometry",
+        "attachment-lost",
+        "wrong-attachment-type",
+    ),
+)
+def test_kit_installation_native_landing_setter_cannot_detach_or_misland(
+    kit_installation_native, configuration, setter_defect
+):
+    state = kit_installation_native(configuration)
+
+    def configure_setter(note):
+        if setter_defect == "refused":
+            note.annotation.leader_set_result = False
+        elif setter_defect == "ignored":
+            note.annotation.ignore_leader_set = True
+        elif setter_defect == "wrong-point":
+            note.annotation.leader_set_offset = (0.002, 0.0, 0.0)
+
+    def mutate_after_setter(note):
+        if setter_defect == "rebind-neighbor":
+            _kit_flag_apply_native_drift(state, "wrong-entity")
+        elif setter_defect == "rebind-same-geometry":
+            replacement = _KitFlagNativeEdge(
+                circle=state.target.CircleParams, endpoints=state.target.endpoints
+            )
+            note.annotation.entities = (_KitFlagNativeWrapper(replacement),)
+        elif setter_defect in {"attachment-lost", "wrong-attachment-type"}:
+            _kit_flag_apply_native_drift(state, setter_defect)
+
+    state.on_author = configure_setter
+    state.on_leader_set = mutate_after_setter
+    message = (
+        "native installation landing refused" if setter_defect == "refused" else None
+    )
+    with pytest.raises(RuntimeError, match=message):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert len(state.calls) == 1
+    call = state.calls[0]
+    assert call["entity"] is call["attached_to"]
+    assert "entity_xy" not in call
+    annotation = state.note.annotation
+    assert len(annotation.leader_set_calls) == 1
+    assert annotation.leader_set_calls[0] == pytest.approx(
+        (0, *state.project_point(state.model_point), 0.0)
+    )
+    if setter_defect in {
+        "refused",
+        "rebind-neighbor",
+        "rebind-same-geometry",
+        "attachment-lost",
+        "wrong-attachment-type",
+    }:
+        # The immediate post-setter attachment proof must precede any text
+        # relocation; a later successful move cannot repair a native rebind.
+        assert not annotation.moves
+    assert state.active == state.prior_view
+    assert state.sheet == "KitSheet"
+    assert state.selected is None
+    assert state.legend is None
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("selection_succeeds", (True, False))
+def test_kit_installation_real_note_author_selects_visible_entity_in_its_view(
+    kit_installation_native, monkeypatch, configuration, selection_succeeds
+):
+    import _drawing_leader_notes as native_notes
+    import _drawing_selection as native_selection
+
+    state = kit_installation_native(configuration)
+    draw = state.adapter.currentModel
+    selection_data = []
+    select_calls = []
+    inserted = []
+    leader_modes = []
+    rebuilds = []
+
+    def create_select_data():
+        data = SimpleNamespace(View=None)
+        selection_data.append(data)
+        return data
+
+    def select_entity(append, data):
+        assert append is False
+        assert data.View is state.view
+        assert state.active == state.view.GetName2()
+        assert state.selected is None
+        select_calls.append((append, data))
+        if selection_succeeds:
+            state.selected = state.target
+        return selection_succeeds
+
+    def selected_count(mark):
+        assert mark == -1
+        return int(state.selected is not None)
+
+    def selected_entity(index, mark):
+        assert index == 1 and mark == -1
+        assert state.selected is state.target
+        # Selection readback may use a different dispatch wrapper from the
+        # visible-edge inventory while identifying the same native IEdge.
+        return _KitFlagNativeWrapper(state.selected)
+
+    def forbid_coordinate_pick(*_args, **_kwargs):
+        pytest.fail("installation entity selection must never use coordinate picking")
+
+    def insert_note(text):
+        assert state.selected is state.target
+        assert state.active == state.view.GetName2()
+        cx, cy = state.view.center
+        note = _KitFlagNativeNote(
+            text,
+            state.view,
+            _KitFlagNativeWrapper(state.selected),
+            (cx - 0.006, cy + 0.003),
+        )
+
+        def set_leader(*arguments):
+            leader_modes.append(arguments)
+            note.annotation.leader_count = 1
+            return 0
+
+        def forbid_reattachment(*_args):
+            pytest.fail("the inserted note must retain its selected native edge")
+
+        note.annotation.SetLeader3 = set_leader
+        note.annotation.SetAttachedEntities = forbid_reattachment
+        state.note = note
+        state.view.notes.append(note)
+        inserted.append(note)
+        return note
+
+    def rebuild():
+        rebuilds.append(state.note)
+        return True
+
+    draw.SelectionManager = SimpleNamespace(
+        CreateSelectData=create_select_data,
+        GetSelectedObjectCount2=selected_count,
+        GetSelectedObject6=selected_entity,
+    )
+    draw.Extension = SimpleNamespace(SelectByID2=forbid_coordinate_pick)
+    draw.InsertNote = insert_note
+    draw.EditRebuild3 = rebuild
+    state.target.Select4 = select_entity
+    state.adapter._get_attr_or_call = lambda target, name: getattr(target, name)()
+    monkeypatch.setattr(native_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        native_selection._seat_forensics, "capture_pick_miss", forbid_coordinate_pick
+    )
+    # Neither production authoring nor production selection is stubbed. Only
+    # their COM objects, binding and native readbacks are supplied by the test.
+    monkeypatch.setattr(state.kit, "add_attached_note", native_notes.add_attached_note)
+    if not selection_succeeds:
+        with pytest.raises(RuntimeError, match="by entity"):
+            state.kit._installation_flag(
+                state.adapter, configuration, state.cells, state.views
+            )
+        assert not inserted
+        assert not leader_modes
+        assert not rebuilds
+    else:
+        settled = state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+        assert inserted == [state.note]
+        assert len(leader_modes) == 1
+        assert rebuilds == [state.note]
+        assert (
+            state.note.annotation.entities[0].native_identity
+            is state.target.native_identity
+        )
+        assert state.note.annotation.leader_set_calls == [
+            pytest.approx((0, *state.project_point(state.model_point), 0.0))
+        ]
+        _kit_flag_finish_builder_notes(state)
+        settled()
+    assert len(selection_data) == 1
+    assert selection_data[0].View is state.view
+    assert select_calls == [(False, selection_data[0])]
+    assert not state.calls
+    assert state.active == state.prior_view
+    assert state.sheet == "KitSheet"
+    assert state.selected is None
