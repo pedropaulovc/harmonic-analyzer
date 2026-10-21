@@ -1994,13 +1994,12 @@ def _cad_identity_deps() -> list[str]:
 
 
 def _soundness_file_deps(stem: str) -> list[str]:
-    """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
-    outside every build closure (_assembly_postbuild, the interference contract),
-    the assembly's OWN contract (its free-DOF sets decide the verdict, and
-    verify.py is not run through ``_config_deps``), and the assembly itself with
-    its execution token."""
+    """One assembly's soundness-gate inputs: the executed Python/config closure,
+    explicit gate logic outside every build closure, the assembly's OWN contract
+    (its free-DOF sets decide the verdict), and the assembly itself with its
+    execution token."""
     deps = [
-        str(VERIFY_PY),
+        *sorted(_executed_closure([str(VERIFY_PY)])),
         str(POSTBUILD_PY),
         str(INTERFERENCE_CONTRACTS_PY),
         assembly_contract_file(stem),
@@ -2018,6 +2017,10 @@ def _soundness_file_deps(stem: str) -> list[str]:
         # structured evidence as additional outputs of this EXISTING leaf.
         deps += sorted(_executed_closure([str(SCRIPTS_DIR / "_jig_dirty_edit.py")]))
         deps.append(_submodule_dep())
+        deps += [
+            str((REPO_ROOT / filename).resolve())
+            for filename in ("dodo.py", "pyproject.toml", "uv.lock")
+        ]
         deps += [
             path
             for ref in references_of(stem)
@@ -2038,9 +2041,8 @@ def _kinematics_file_deps() -> list[str]:
     deliberately OUTSIDE every assembly recipe (it is on NO build script's
     closure), so a change to the replay logic does NOT bump any .SLDASM digest --
     and the .SLDASM deps below would then leave a fresh verify-kinematics.ok stamp
-    valid, SKIPPING the gate (codex PR #193). Depend on it directly. The build_*
-    helpers verify imports for constants need no such dep: they ride their
-    .SLDPRT -> .SLDASM digest.
+    valid, SKIPPING the gate (codex PR #193). Track the executed entry point's
+    transitive source/config closure alongside the explicit native inputs below.
 
     The magnifier live-chain sweep (verify._verify_live_chain_one) opens
     mg-magnifier.SLDASM and authors its recorded lever drive spec transiently; the
@@ -2055,7 +2057,7 @@ def _kinematics_file_deps() -> list[str]:
     recipes, so a new config read is picked up automatically.
     """
     return [
-        str(VERIFY_PY),
+        *sorted(_executed_closure([str(VERIFY_PY)])),
         str(POSTBUILD_PY),
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
@@ -2074,9 +2076,10 @@ def _kinematics_file_deps() -> list[str]:
 
 def _preflight_file_deps() -> list[str]:
     """Release-preflight inputs: the gear-ratios proof reopens drive-train +
-    channel (the only assemblies carrying real gear meshes)."""
+    channel (the only assemblies carrying real gear meshes). Its executed closure
+    includes verify.py and that module's transitive imports."""
     return [
-        str(PREFLIGHT_PY),
+        *sorted(_executed_closure([str(PREFLIGHT_PY)])),
         str(VERIFY_PY),
         str((SCRIPTS_DIR / "_assembly.py").resolve()),
         str(POSTBUILD_PY),
@@ -3191,7 +3194,8 @@ def task_verify():
         # refused as "not in the packaged graph".
         "task_dep": [f"verify_soundness:{stem}" for stem in ASSEMBLY_ORDER],
         "file_dep": [
-            str(VERIFY_PY),
+            # Child gates execute verify.py and its transitive source/config inputs.
+            *sorted(_executed_closure([str(VERIFY_PY)])),
             str(POSTBUILD_PY),
             *child_stamps,
         ],
