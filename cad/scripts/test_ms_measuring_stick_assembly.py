@@ -719,7 +719,6 @@ def test_reference_dimensions_follow_the_spec() -> None:
     values = {label: value for label, value, _callout in drawing.ASSEMBLY_DIMENSIONS}
     assert values["overall length"] == sheet.REFERENCE_OVERALL_LENGTH
     assert values["stop position"] == spec.SETTING_NEAR_FACE_MM
-    assert f"{stop.STOP_MARK:.1f}" in sheet.STOP_POSITION_CALLOUT
     assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
     assert sheet.DRAWING_REFERENCE_PRECISION >= 1
     # The underside projects below Front; both dimension rows stay above Front.
@@ -855,9 +854,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
         assert changed.SETTING_CRITERION in text
         assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
         assert "FROM LEFT STICK END" in text
-    assert changed.STOP_POSITION_CALLOUT.replace("\n", " ") == (
-        f"{mark:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
-    )
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]

@@ -5,11 +5,15 @@ builder imports this module (``test_assembly_sheet_isolation`` pins it) and a
 wording edit rebuilds the drawing alone. Every printed number interpolates a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; none is
 restated here.
+
+The near-face setting remains a controlled native model dimension. Its
+attached callout identifies the clamped setting without a graduation/REF
+qualifier: STOP_MARK still locates the assembly, not a second acceptance
+criterion on the print.
 """
 
 from __future__ import annotations
 
-import textwrap
 from fractions import Fraction
 
 import ms_measuring_stick_assembly_spec as spec
@@ -52,9 +56,6 @@ SETTING_CRITERION = (
     f"NEAR BLOCK FACE {spec.SETTING_NEAR_FACE_MM:.1f} "
     f"±{spec.SETTING_TOLERANCE_MM:.2f} mm FROM LEFT STICK END"
 )
-SETTING_REFERENCE_DESCRIPTION = (
-    f"{stop.STOP_MARK:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
-)
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode (ms_measuring_stick_explode_spec) runs steps
 # 2-5 backwards. Each line names the parts as the BOM's DESCRIPTION column
@@ -89,13 +90,9 @@ CLAMPED_SETUP_NOTE = (
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# The dimension itself states the near-face criterion and the setup note
-# repeats it in words; the callout carries only the graduation reference,
-# wrapped narrow enough to sit between the dimension's extension lines.
-STOP_POSITION_CALLOUT_WIDTH = 21  # characters
-STOP_POSITION_CALLOUT = "\n".join(
-    textwrap.wrap(SETTING_REFERENCE_DESCRIPTION, width=STOP_POSITION_CALLOUT_WIDTH)
-)
+# Label the controlled native setting, not the reference graduation: a REF
+# qualifier on this callout could be read as waiving the assembly setting band.
+STOP_POSITION_CALLOUT = "CLAMPED SETTING"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)
