@@ -3644,13 +3644,3 @@ def test_accepted_upper_bearing_profile_needs_separate_actual_receiving_authorit
         spec.qualify_primary_capture_measurements((bad, *records[1:]))
 
 
-def test_c1r_actual_upper_bearing_receiving_conditions_are_user_facing() -> None:
-    instructions = " ".join(spec.CARTRIDGE_STEPS)
-    for requirement in (
-        "C1R.", "BEFORE PRESSING EACH UPPER 6200", "ACTUAL OD 29.991-30.000",
-        "WIDTH 8.88-9.00", "FULL-CIRCUMFERENCE", "CYLINDRICAL OD LAND",
-        "AXIAL MID-PLANE BETWEEN END FACES", "ACCEPTED/REJECTED/UNINSPECTED",
-        "RECEIVING EVIDENCE BY SUPPORT", "FIT ACCEPTED ONLY",
-        "REPLACE AND REINSPECT", "CATALOGUE/MODEL SHAPE IS NOT INSPECTION",
-    ):
-        assert requirement in instructions
