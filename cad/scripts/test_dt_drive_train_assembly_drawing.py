@@ -659,6 +659,32 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert rig_anchors["dt-vn-slotted-screw"].instance == "dt-vn-slotted-screw-3"
 
 
+def test_bank_spring_explode_clears_arbor_and_pedestal_in_isometric() -> None:
+    import dt_arbor_pedestal_spec as pedestal
+    import dt_cylinder_gear_shaft_spec as shaft
+    import dt_vn_cylinder_bank_spring_spec as spring
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    spring_step, pedestal_step = steps["bank spring"], steps["north pedestal"]
+    assert spring_step.axis == pedestal_step.axis == "z"
+    # Conservative ink envelopes along projected +Z in the standard isometric:
+    # an axial millimetre projects sqrt(2/3), a radial one at most 1/sqrt(3).
+    # R11's 15 mm spring step overlaps the arbor's envelope.
+    axial, radial = math.sqrt(2.0 / 3.0), 1.0 / math.sqrt(3.0)
+    spring_south = bank_layout.BANK_SPRING_Z[0] + spring_step.distance_mm
+    spring_north = bank_layout.BANK_SPRING_Z[1] + spring_step.distance_mm
+    arbor_tip = (
+        bank_layout.BACK_STRAP_INNER_Z + pedestal.STRAP_T + bank_layout.ARBOR_DOME_HEIGHT
+    )
+    pedestal_inner = bank_layout.BACK_STRAP_INNER_Z + pedestal_step.distance_mm
+    assert (spring_south - arbor_tip) * axial > (
+        spring.OD / 2.0 + shaft.SHAFT_RADIUS
+    ) * radial
+    assert (pedestal_inner - spring_north) * axial > (
+        spring.OD / 2.0 + pedestal.TOP_RADIUS
+    ) * radial
+
+
 def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
     with pytest.raises(ValueError, match="does not classify"):
         spec.plan_explode([*_instances(), spec.Instance("widget-1", "widget", (0, 0, 0))])

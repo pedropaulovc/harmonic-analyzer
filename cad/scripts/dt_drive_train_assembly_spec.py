@@ -144,8 +144,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         ("north",),
     ),
     ExplodeStep("south end disc", ("dt-cylinder-end-disc",), "z", -15.0),
-    # The only north retention part sits between gear 19 and its pedestal.
-    ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", 15.0),
+    # R11 sheet 3: 15 left the spring over the arbor dome, so balloons 1 and 4
+    # read as one ring. Separate their ink without reaching the north pedestal.
+    ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", 22.0),
     ExplodeStep("pedestal screws lift", ("dt-vn-pedestal-hold-down-screw",), "y", 30.0),
     ExplodeStep("apex set screws lift", ("dt-vn-arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,

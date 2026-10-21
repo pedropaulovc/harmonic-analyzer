@@ -86,6 +86,11 @@ Reduced `active_count` debug banks retain applicable readbacks but report
 between a missing final gear and the north spring. Production retention evidence
 requires `coverage=full-bank`.
 
+Drive-train drawing acceptance also inspects sheet 3 for separate arbor/spring
+balloon landings, and sheet 8 step 9C against sheet 13 Detail A for the same
+back MHA-DT-02 (north pedestal) blade-setting face. Explode offsets affect
+presentation only; the installed retention geometry above is unchanged.
+
 ```powershell
 # The one fully-safe build: every part + assembly + every gate (= default task)
 uv run python -m doit
