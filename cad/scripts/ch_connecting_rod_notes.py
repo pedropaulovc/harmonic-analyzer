@@ -24,7 +24,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"RingOuterDia", "ShankWidthDim"},
     "Plate": {"RingThick"},
     "StrapBoreProfile": {"StrapBoreDia"},
-    "CamRootRelief": {"RootReliefSize", "RootReliefAngle"},
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {
@@ -42,8 +41,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # gap and the ring's float in its cam slot: three places, as their model
 # bands are written. The fork over the tines is their reference sum, at the
 # same places. The reamed press hole's band is written at three places too;
-# the inside corners' single-limit radius at one. The relief's separate native
-# width uses one place; its angle uses whole degrees and the title-block band.
+# the inside corners' single-limit radius at one.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Plate": {"RingThick": 3},
     "ForkBoss": {"ForkThick": 3},
@@ -54,7 +52,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "InsideCorners": {"InsideCornerR": 1},
     "PinHoleProfile": {"PinHoleDia": 3},
-    "CamRootRelief": {"RootReliefSize": 1, "RootReliefAngle": 0},
 }
 
 DRAWING_NOTES = f"1. TINE WALL {TINE_MIN:.2f} MIN."

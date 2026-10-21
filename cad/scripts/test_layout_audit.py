@@ -1131,6 +1131,30 @@ def test_heavy_section_ink_is_not_model_geometry_but_nearby_and_crossing_edges_r
     ]
 
 
+@pytest.mark.parametrize("offset", [0.0, 0.00005], ids=["collinear", "nearby"])
+def test_legacy_model_edge_survives_heavy_section_attribution_in_pdf(tmp_path, offset):
+    from _pdf_ink import POINT_M, page_ink, read_pdf_ink
+
+    legacy_edge = (0.072 + offset, 0.210, 0.072 + offset, 0.240)
+    section_edge = (0.072, 0.209, 0.072, 0.241)
+    paths = ""
+    for width, (x0, y0, x1, y1) in [(0.00035, section_edge), (0.00025, legacy_edge)]:
+        paths += (
+            f"{width / POINT_M} w {x0 / POINT_M} {y0 / POINT_M} m "
+            f"{x1 / POINT_M} {y1 / POINT_M} l S\n"
+        )
+    pdf = _weight_contrast_pdf(tmp_path / "mixed-section.pdf", 0.00035, 0.00013, extra_paths=paths)
+    ink = page_ink(read_pdf_ink(pdf)[0])
+    strokes = [stroke for stroke in ink["strokes"] if 0.068 <= stroke[0] <= 0.076]
+    assert sorted(stroke[4] for stroke in strokes) == pytest.approx([0.00025, 0.00035], abs=1e-7)
+    view = _view("Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), sections=[CTB_SECTION_A])
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS, strokes=strokes))
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    [edge] = geometry.segments
+    assert (edge.x0, edge.y0, edge.x1, edge.y1) == pytest.approx(legacy_edge, abs=1e-7)
+    assert model.edgeless == ()
+
+
 def test_removing_heavy_section_ink_from_model_edges_keeps_its_text_collision_gating():
     dimension = _dim("OverCut", "12.0", 0.070, 0.223)
     view = _view(

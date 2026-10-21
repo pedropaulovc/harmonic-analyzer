@@ -11,11 +11,6 @@ and the plate's near face located from one fork face) prints in a 3:1 detail
 of the side view, and the side view carries the plate's thickness at the ring
 and the overall length as a reference.
 
-The strap-mouth relief prints as two separate, model-owned scalar dimensions:
-width with its explicit band and angle under the title-block angular tolerance.
-Their native text footprints share the removed section's open band, with each
-kept clear of the other dimension's text and linework without reducing fonts.
-
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_ch_connecting_rod.py ch-connecting-rod
@@ -48,7 +43,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_dimensions import (
     assert_imported_precision,
     set_basic_dimension,
@@ -62,15 +56,9 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
-from _drawing_sections import create_section_view
-from _drawing_sheet_region import sheet_drawable_region
+from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
-from _layout_audit import annotation_geometry, calibrate_sheet_advance
-from _layout_geometry import (
-    Box, Segment, point_segment_distance, segment_box_distance, union_boxes,
-)
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -88,10 +76,6 @@ from ch_connecting_rod_spec import (
     RING_BORE_DIA,
     RING_BOTTOM_Y,
     RING_OUTER_RADIUS,
-    RING_THICKNESS,
-    ROOT_RELIEF_ANGLE_DEG,
-    ROOT_RELIEF_BAND,
-    ROOT_RELIEF_SIZE,
     SHANK_WIDTH,
     STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
@@ -217,7 +201,6 @@ OVERALL_FACES = {
 }
 OVERALL_TEXT_XY = (0.100, 0.175)
 
-
 # DETAIL C: the fork's side profile at 3:1. At 1:1 the tines, slot and ring
 # faces are 1.7-2.7 mm features and their dimensions crowded the side view
 # (baseline review). The fence centres on the rod axis midway between the
@@ -280,39 +263,6 @@ DETAIL_CALLOUTS = {
     "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
     "RingFaceNear": f"PLATE FACE; RING IN\nCAM SLOT OF {CAM_NUMBER}",
 }
-# Removed section D-D and its native scalar dimensions occupy the open band BELOW the
-# fork-detail fence and ABOVE the title block. Three-to-one preserves the
-# ordinary text size while leaving room for the native section caption.
-_ROOT_LAYOUT_GAP = 0.003
-_ROOT_TEMPLATE = DRAWING_TEMPLATES[SPEC.layout]
-_ROOT_BAND_BOTTOM = _ROOT_TEMPLATE.title_block_top_m + _ROOT_LAYOUT_GAP
-_ROOT_BAND_TOP = DETAIL_CENTER[1] - _DETAIL_FENCE_R - _ROOT_LAYOUT_GAP
-ROOT_SECTION_CENTER = (
-    _ROOT_TEMPLATE.width_m - 0.035,
-    (_ROOT_BAND_BOTTOM + _ROOT_BAND_TOP) / 2.0,
-)
-ROOT_SECTION_SCALE = (3, 1)
-ROOT_SECTION_KEEP = {
-    "RootReliefSize": (
-        (_ROOT_TEMPLATE.title_block_left_m + ROOT_SECTION_CENTER[0]) / 2.0,
-        _ROOT_BAND_BOTTOM + 0.010,
-    ),
-    # Only an import seed: native text/line readbacks seat both dimensions.
-    "RootReliefAngle": (
-        _ROOT_TEMPLATE.title_block_left_m + _ROOT_LAYOUT_GAP,
-        (_ROOT_BAND_BOTTOM + _ROOT_BAND_TOP) / 2.0,
-    ),
-}
-ROOT_SECTION_CALLOUTS = {
-    "RootReliefSize": f"ONE SIDE ONLY;\n{CAM_NUMBER} WEB SIDE",
-}
-# A horizontal cut in LEFT spans the plate thickness at Y=0, giving a true
-# XZ radial/axial section in the native chamfer dimensions' model plane.
-_ROOT_CUT_MODEL_POINTS = (
-    (0.0, 0.0, -(RING_THICKNESS / 2.0 + 1.0) / 1000.0),
-    (0.0, 0.0, (RING_THICKNESS / 2.0 + 1.0) / 1000.0),
-)
-
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 # At the plate's 2.5 mm character height (the default printed 5 mm and its
@@ -340,12 +290,13 @@ DATUM_A_SYMBOL = _sheet_xy(
 # above the shank width's dimension line (its text stands right of the shank).
 DATUM_B_EDGE = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
-# Seed the half-shank BASIC in the open band between the datum/shank
-# annotation and the pin callout. Native display-ink readbacks below seat
-# its actual dimension line there, preserving both native endpoints.
-PIN_OFFSET_TEXT_XY = (
-    0.150, (DATUM_B_SYMBOL[1] + FRONT_KEEP["PinHoleDia"][1]) / 2.0,
-)
+# The 4.00 BASIC (datum B to the pin axis) runs on the shank below the fork
+# root, its text out to the left: over the pin its line lay on the position
+# FCF's level leader and under the ream leader (baseline review); inside the
+# head it crowded the hole and the ream callout's leader crossed it (#982
+# review r3). On the shank its arrow lands on the flank itself, datum B's
+# visible edge, left of the ream leader's run down-right from the hole.
+PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, FORK_BASE_Y - 6.0)[1])
 
 
 def _fork_detail(adapter: Any, left: Any) -> Any:
@@ -427,694 +378,6 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     return detail
 
 
-def _root_section_frame(adapter: Any, view: Any) -> tuple[tuple[float, float], ...]:
-    origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="strap origin")
-    points = [
-        model_point_in_view(adapter, view, point, label="strap section axis")
-        for point in ((0.001, 0.0, 0.0), (0.0, 0.0, 0.001))
-    ]
-    return tuple(tuple(point[i] - origin[i] for i in (0, 1)) for point in points)
-
-
-def _pin_offset_layout(
-    adapter: Any, display: Any, front_annotations: list[Any], datum_b: Any,
-    *, seat: bool = False,
-) -> None:
-    """Keep the BASIC's dimension line BELOW the whole native pin callout.
-
-    Its vertical extension lines may cross the press-fit leader; the BASIC
-    dimension line itself may not. Moving only its annotation preserves both
-    originally selected native endpoints.
-    """
-    pin = [item for item in front_annotations if dimension_name(adapter, item) == "PinHoleDia"]
-    shank = [item for item in front_annotations if dimension_name(adapter, item) == "ShankWidthDim"]
-    if len(pin) != 1 or len(shank) != 1:
-        raise RuntimeError("pin-offset layout needs the native pin and shank dimensions")
-    display = _early_bound(display, "IDisplayDimension")
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if (
-        annotation.IsDangling()
-        or not any(entity is not None for entity in (annotation.GetAttachedEntities3() or ()))
-        or not math.isclose(
-            float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0,
-            SHANK_WIDTH / 2.0, abs_tol=1e-6,
-        )
-    ):
-        raise RuntimeError("pin-offset BASIC lost its associated native half-shank dimension")
-    reader = _Reader(adapter)
-    records = [
-        _dump_annotation(reader, raw)
-        for raw in [
-            pin[0], shank[0],
-            _early_bound(datum_b, "IDatumTag").GetAnnotation(), annotation,
-        ]
-    ]
-    errors = reader.take_errors()
-    if errors or any(record is None for record in records):
-        raise RuntimeError(f"pin-offset native layout reads refused: {errors}")
-    advance = calibrate_sheet_advance(records)
-    geometries = [
-        annotation_geometry(record, owner="pin-offset layout", advance=advance)
-        for record in records
-    ]
-    if any(geometry is None for geometry in geometries):
-        raise RuntimeError("pin-offset layout has unreadable native ink")
-    pin_ink = union_boxes([
-        *geometries[0].text_boxes,
-        *(segment.box() for segment in geometries[0].segments),
-    ])
-    lower_ink = union_boxes([
-        box for geometry in geometries[1:3]
-        for box in (
-            *geometry.text_boxes,
-            *(segment.box() for segment in geometry.segments if segment.role != "ext-line"),
-        )
-    ])
-    basic_ink = union_boxes([
-        *geometries[3].text_boxes,
-        *(segment.box() for segment in geometries[3].segments if segment.role != "ext-line"),
-    ])
-    if pin_ink is None or lower_ink is None or basic_ink is None:
-        raise RuntimeError("pin-offset layout has missing native text or dimension line")
-    floor, ceiling = lower_ink.ymax + _ROOT_LAYOUT_GAP, pin_ink.ymin - _ROOT_LAYOUT_GAP
-    if basic_ink.height > ceiling - floor:
-        raise RuntimeError(
-            f"pin-offset BASIC cannot fit between native datum/shank and pin callout: "
-            f"basic={basic_ink}; floor={floor}; ceiling={ceiling}"
-        )
-    if seat:
-        position = tuple(float(value) for value in annotation.GetPosition())
-        shift = (floor + ceiling - basic_ink.height) / 2.0 - basic_ink.ymin
-        if not annotation.SetPosition2(position[0], position[1] + shift, position[2]):
-            raise RuntimeError("pin-offset BASIC native annotation placement refused")
-        rebuild_drawing(adapter, label="pin-offset BASIC below press-fit callout")
-        _pin_offset_layout(adapter, display, front_annotations, datum_b)
-    elif basic_ink.ymin < floor - 1e-8 or basic_ink.ymax > ceiling + 1e-8:
-        raise RuntimeError(
-            f"pin-offset BASIC dimension line/text leaves its native clear lane: "
-            f"basic={basic_ink}; floor={floor}; ceiling={ceiling}"
-        )
-    else:
-        _telemetry.info(
-            f"pin-offset BASIC native ink={basic_ink}; datum/shank ink={lower_ink}; "
-            f"pin-callout ink={pin_ink}; required air={_ROOT_LAYOUT_GAP}"
-        )
-
-
-def _root_section_band(adapter: Any, sheet: Any) -> Box:
-    region = sheet_drawable_region(
-        adapter, sheet, width=_ROOT_TEMPLATE.width_m, height=_ROOT_TEMPLATE.height_m,
-    )
-    return Box(
-        max(region.xmin, _ROOT_TEMPLATE.title_block_left_m) + _ROOT_LAYOUT_GAP,
-        _ROOT_BAND_BOTTOM,
-        region.xmax - _ROOT_LAYOUT_GAP,
-        _ROOT_BAND_TOP,
-    )
-
-
-def _root_section_boxes(view: Any) -> tuple[Box, ...]:
-    """Refreshed native view outline and native caption extent, in sheet metres."""
-    view = _early_bound(view, "IView")
-    # A rebuild does not return control to the window's repaint loop.
-    # UpdateViewDisplayGeometry is VT_VOID and exposes the changed geometry now.
-    view.UpdateViewDisplayGeometry()
-    outline = tuple(float(value) for value in view.GetOutline())
-    if (
-        len(outline) != 4 or not all(math.isfinite(value) for value in outline)
-        or outline[2] <= outline[0] or outline[3] <= outline[1]
-    ):
-        raise RuntimeError(f"strap section has invalid native outline {outline}")
-    boxes = [Box(*outline)]
-    notes = tuple(view.GetNotes() or ())
-    if len(notes) != 1:
-        raise RuntimeError("strap section must retain its one native section caption")
-    extent = tuple(float(value) for value in _early_bound(notes[0], "INote").GetExtent())
-    if (
-        len(extent) != 6 or not all(math.isfinite(value) for value in extent)
-        or extent[3] <= extent[0] or extent[4] <= extent[1]
-    ):
-        raise RuntimeError(f"strap section has invalid native caption extent {extent}")
-    boxes.append(Box(extent[0], extent[1], extent[3], extent[4]))
-    return tuple(boxes)
-
-
-def _root_section_shift(boxes: tuple[Box, ...], band: Box) -> tuple[float, float]:
-    """Seat the measured section/caption group without discarding native extents."""
-    whole = union_boxes(list(boxes))
-    # INote.GetExtent is screen-quantized. Leave air at the band's right edge
-    # rather than seating its caption exactly on a fatal containment boundary.
-    right = band.xmax - _ROOT_LAYOUT_GAP
-    if whole.width > right - band.xmin or whole.height > band.height:
-        raise RuntimeError(
-            f"strap section and native caption do not fit their open band: "
-            f"outline={boxes[0]}; caption={boxes[1]}; union={whole}; band={band}"
-        )
-    return right - whole.xmax, band.center()[1] - whole.center()[1]
-
-
-def _root_layout_geometry(
-    adapter: Any, view: Any, annotations: list[Any], detail_annotations: list[Any],
-) -> tuple[dict[str, tuple[Box, tuple[Segment, ...]]], tuple[Box, ...]]:
-    """Use the shared audit's native positions and calibrated dimension widths.
-
-    Dimension widths remain estimates until the exported PDF audit; their
-    baselines/heights and all linework come from actual native display data.
-    """
-    names = [dimension_name(adapter, annotation) for annotation in annotations]
-    if sorted(names) != ["RootReliefAngle", "RootReliefSize"]:
-        raise RuntimeError("strap section layout requires one native width and one angle")
-    reader = _Reader(adapter)
-    caption = _early_bound(tuple(view.GetNotes())[0], "INote").GetAnnotation()
-    records = [
-        _dump_annotation(reader, annotation)
-        for annotation in [*annotations, *detail_annotations, caption]
-    ]
-    errors = reader.take_errors()
-    if errors or any(record is None for record in records):
-        raise RuntimeError(f"strap section native layout reads refused: {errors}")
-    advance = calibrate_sheet_advance(records)
-    geometries = [
-        annotation_geometry(record, owner="strap section layout", advance=advance)
-        for record in records
-    ]
-    if any(geometry is None for geometry in geometries):
-        raise RuntimeError("strap section layout contains unreadable native annotation ink")
-    dimensions = {}
-    for name, geometry in zip(names, geometries[:2], strict=True):
-        text = union_boxes(list(geometry.text_boxes))
-        if text is None:
-            raise RuntimeError(f"strap section {name} has no native rendered text")
-        dimensions[name] = (
-            text, tuple(segment for segment in geometry.segments if segment.length > 0.0),
-        )
-    obstacles = tuple(
-        box for geometry in geometries[2:-1]
-        for box in (
-            *geometry.text_boxes,
-            *(segment.box() for segment in geometry.segments if segment.length > 0.0),
-        )
-    )
-    return dimensions, obstacles
-
-
-def _root_text_target(
-    text: Box, band: Box, obstacles: tuple[Box, ...], lines: tuple[Segment, ...] = (),
-) -> Box:
-    """Choose an empty lane from native obstacle edges, not a text-centre guess."""
-    gap = _ROOT_LAYOUT_GAP
-    xs = {band.xmin, band.xmax - text.width}
-    ys = {band.ymin, band.ymax - text.height}
-    for obstacle in (*obstacles, *(segment.box() for segment in lines)):
-        xs.update((obstacle.xmin - gap - text.width, obstacle.xmax + gap))
-        ys.update((obstacle.ymin - gap - text.height, obstacle.ymax + gap))
-    for y in sorted(ys):
-        for x in sorted(xs, reverse=True):
-            candidate = Box(x, y, x + text.width, y + text.height)
-            if (
-                candidate.xmin < band.xmin - 1e-9
-                or candidate.ymin < band.ymin - 1e-9
-                or candidate.xmax > band.xmax + 1e-9
-                or candidate.ymax > band.ymax + 1e-9
-            ):
-                continue
-            if (
-                all(candidate.gap(obstacle) >= gap - 1e-9 for obstacle in obstacles)
-                and all(segment_box_distance(line, candidate) >= gap - 1e-9 for line in lines)
-            ):
-                return candidate
-    raise RuntimeError(
-        "strap section callout cannot fit below Detail C without shrinking text: "
-        f"text={text}, band={band}, obstacles={obstacles}, other dimension lines={lines}"
-    )
-
-
-def _assert_root_section_layout(
-    adapter: Any, view: Any, annotations: list[Any],
-    detail_annotations: list[Any], band: Box,
-) -> None:
-    boxes = _root_section_boxes(view)
-    dimensions, detail_ink = _root_layout_geometry(adapter, view, annotations, detail_annotations)
-    texts = tuple(text for text, _lines in dimensions.values())
-    for box in (*boxes, *texts):
-        if (
-            box.xmin < band.xmin - 1e-8 or box.ymin < band.ymin - 1e-8
-            or box.xmax > band.xmax + 1e-8 or box.ymax > band.ymax + 1e-8
-        ):
-            raise RuntimeError(f"strap section/caption/callout leaves its open band: {box}; {band}")
-    if any(
-        box.gap(other) < _ROOT_LAYOUT_GAP - 1e-8
-        for box in (*boxes, *texts) for other in detail_ink
-    ):
-        raise RuntimeError("strap section/caption/callout crowds actual Detail C text or lines")
-    for name, (text, _lines) in dimensions.items():
-        if any(text.gap(box) < _ROOT_LAYOUT_GAP - 1e-8 for box in boxes):
-            raise RuntimeError(f"strap section {name} crowds its native section or caption")
-        for other_name, (other_text, other_lines) in dimensions.items():
-            if other_name == name:
-                continue
-            if (
-                text.gap(other_text) < _ROOT_LAYOUT_GAP - 1e-8
-                or any(
-                    segment_box_distance(line, text) < _ROOT_LAYOUT_GAP - 1e-8
-                    for line in other_lines
-                )
-            ):
-                raise RuntimeError(f"strap section {name} crowds {other_name} text or lines")
-    _telemetry.info(
-        f"strap section layout: native view/caption boxes={boxes}; "
-        f"native-position/calibrated-width scalar text boxes={texts}; open band={band}"
-    )
-
-
-def _seat_root_callout(
-    adapter: Any, view: Any, annotations: list[Any],
-    detail_annotations: list[Any], band: Box, view_boxes: tuple[Box, ...],
-) -> None:
-    rebuild_drawing(adapter, label="strap section native callout rows")
-    # Seat the wider width/callout stack first, then the separate angle. Read
-    # native ink again after each move: an angular arc is not a translated box.
-    for name in ("RootReliefSize", "RootReliefAngle"):
-        dimensions, detail_ink = _root_layout_geometry(
-            adapter, view, annotations, detail_annotations,
-        )
-        text, _lines = dimensions[name]
-        others = [geometry for other_name, geometry in dimensions.items() if other_name != name]
-        target = _root_text_target(
-            text, band,
-            (*view_boxes, *detail_ink, *(other_text for other_text, _ in others)),
-            tuple(line for _other_text, other_lines in others for line in other_lines),
-        )
-        annotation = _early_bound(
-            next(item for item in annotations if dimension_name(adapter, item) == name),
-            "IAnnotation",
-        )
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(
-            position[0] + target.xmin - text.xmin,
-            position[1] + target.ymin - text.ymin,
-            position[2],
-        ):
-            raise RuntimeError(f"strap section native {name} placement refused")
-        rebuild_drawing(adapter, label=f"strap section native {name} seated")
-    _assert_root_section_layout(adapter, view, annotations, detail_annotations, band)
-
-
-def _root_cut_profile_points() -> tuple[tuple[float, float, float], ...]:
-    """The complete +X wall in the Y=0 section, including the -Z chamfer."""
-    bore, outer, half = RING_BORE_DIA / 2.0, RING_OUTER_RADIUS, RING_THICKNESS / 2.0
-    return tuple(
-        (x / 1000.0, 0.0, z / 1000.0)
-        for x, z in (
-            (bore, half), (outer, half), (outer, -half),
-            (bore + ROOT_RELIEF_SIZE, -half), (bore, -half + ROOT_RELIEF_SIZE),
-        )
-    )
-
-
-def _root_polyline_segments(raw: Any) -> tuple[Segment, ...]:
-    """Decode the documented GetPolylines7 buffer for this straight cut profile."""
-    values = tuple(float(value) for value in (raw or ()))
-    if not values or not all(math.isfinite(value) for value in values):
-        raise RuntimeError(f"strap cut has empty/nonfinite native polylines: {values!r}")
-    index, segments = 0, []
-    while index < len(values):
-        # Type, GeomDataSize, six line/layer fields, NumPolyPoints, then XYZs.
-        if len(values) - index < 9 or values[index:index + 2] != (0.0, 0.0):
-            raise RuntimeError(f"strap cut has an incomplete/nonlinear polyline at {index}: {values!r}")
-        count = values[index + 8]
-        if not count.is_integer() or count < 2:
-            raise RuntimeError(f"strap cut has invalid native polyline point count {count!r}")
-        end = index + 9 + 3 * int(count)
-        if end > len(values):
-            raise RuntimeError(f"strap cut has truncated native polyline at {index}: {values!r}")
-        points = tuple(
-            (values[offset], values[offset + 1])
-            for offset in range(index + 9, end, 3)
-        )
-        segments.extend(
-            segment for first, second in zip(points, points[1:])
-            if (segment := Segment(*first, *second)).length > 1e-12
-        )
-        index = end
-    return tuple(segments)
-
-
-def _assert_root_profile_lines(lines: tuple[Segment, ...], corners: Any) -> None:
-    """The displayed cut must retain every true wall/chamfer edge and no other wall."""
-    tolerance = 1e-7  # sheet m; 0.1 um numerical readback tolerance, not a size allowance
-    expected = tuple(
-        Segment(*first, *second)
-        for first, second in zip(corners, (*corners[1:], corners[0]))
-    )
-    if not lines or any(
-        not any(
-            point_segment_distance((line.x0, line.y0), edge) <= tolerance
-            and point_segment_distance((line.x1, line.y1), edge) <= tolerance
-            for edge in expected
-        )
-        for line in lines
-    ):
-        raise RuntimeError(f"strap cut contains off-profile/other-wall native edges: {lines!r}")
-    for edge in expected:
-        length = edge.length
-        direction = ((edge.x1 - edge.x0) / length, (edge.y1 - edge.y0) / length)
-        intervals = []
-        for line in lines:
-            endpoints = ((line.x0, line.y0), (line.x1, line.y1))
-            if all(point_segment_distance(point, edge) <= tolerance for point in endpoints):
-                projected = [
-                    (point[0] - edge.x0) * direction[0] + (point[1] - edge.y0) * direction[1]
-                    for point in endpoints
-                ]
-                intervals.append((max(0.0, min(projected)), min(length, max(projected))))
-        covered = 0.0
-        for start, end in sorted(intervals):
-            if start > covered + tolerance:
-                raise RuntimeError(f"strap cut omits a wall/chamfer interval on {edge}: {intervals!r}")
-            covered = max(covered, end)
-        if covered < length - tolerance:
-            raise RuntimeError(f"strap cut clips a wall/chamfer edge {edge}: {intervals!r}")
-
-
-def _assert_root_cut_profile(adapter: Any, view: Any) -> None:
-    native = _early_bound(view, "IView")
-    native.UpdateViewDisplayGeometry()  # VT_VOID
-    result = native.GetPolylines7(1)  # exclude hatch; makepy returns (edges, polylines)
-    if not isinstance(result, tuple) or len(result) != 2:
-        raise RuntimeError(f"strap cut has invalid native edge/polyline pair: {result!r}")
-    lines = _root_polyline_segments(result[1])
-    corners = model_points_in_view(
-        adapter, native, _root_cut_profile_points(), label="complete strap cut wall",
-    )
-    _assert_root_profile_lines(lines, corners)
-    _telemetry.info(
-        f"strap cut +X wall/chamfer retained: native lines={len(lines)}; "
-        f"projected physical corners={corners!r}; cropped={bool(native.IsCropped())}"
-    )
-
-
-def _crop_root_section(adapter: Any, view: Any) -> None:
-    """Existing native cropped-section pattern, retaining 1 mm air around +X wall."""
-    from _com import _bind
-
-    draw = adapter.currentModel
-    document = _early_bound(draw, "IDrawingDoc")
-    view = _early_bound(view, "IView")
-    margin = 1.0
-    points = model_points_in_view(
-        adapter, view,
-        [
-            (x / 1000.0, 0.0, z / 1000.0)
-            for x in (RING_BORE_DIA / 2.0 - margin, RING_OUTER_RADIUS + margin)
-            for z in (-RING_THICKNESS / 2.0 - margin, RING_THICKNESS / 2.0 + margin)
-        ],
-        label="strap section complete wall crop fence",
-    )
-    fence = Box.from_points(points)
-    if fence is None or not document.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("strap section crop has no projected fence/active view")
-    draw.ClearSelection2(True)
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    corners = []
-    for x, y in ((fence.xmin, fence.ymax), (fence.xmax, fence.ymin)):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        if point is None:
-            raise RuntimeError("strap crop fence point is missing")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        if projected is None:
-            raise RuntimeError("strap crop fence sketch projection is missing")
-        corners.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        segments = tuple(manager.CreateCornerRectangle(*corners[0], *corners[1]) or ())
-    finally:
-        manager.AddToDB = previous
-    if len(segments) != 4:
-        raise RuntimeError(f"strap crop fence has {len(segments)} sketch segments, expected 4")
-    for segment in segments:
-        if not _early_bound(_bind(segment, "ISketchSegment"), "ISketchSegment").Select4(True, None):
-            raise RuntimeError("strap crop fence segment selection refused")
-    status = int(view.Crop2(False, True, 0))  # swCropViewErrors_NoError == 1
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="strap XZ section cropped to complete +X wall")
-    view.UpdateViewDisplayGeometry()
-    if status != 1 or not bool(view.IsCropped()) or not bool(view.CropViewNoOutline):
-        raise RuntimeError(f"strap section native crop refused: status={status}, fence={fence}")
-    draw.ViewZoomtofit2()  # documented prerequisite for all native polylines
-    _assert_root_cut_profile(adapter, view)
-
-
-def _root_dimensions(adapter: Any, view: Any) -> list[Any]:
-    """Import this feature directly; a native refusal retains source/selection evidence."""
-    from types import SimpleNamespace
-
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-    from solidworks_mcp.adapters.solidworks.drawing import curate_dimensions
-
-    from _com import _bind
-    from _drawing_dimension_import import _model_item_paths, _select_model_feature
-    from _drawing_precision import _named_dimensions
-
-    draw = adapter.currentModel
-    document = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not document.ActivateView(name):
-        raise RuntimeError("strap dimensions cannot activate their native section")
-    draw.ClearSelection2(True)
-    try:
-        if not draw.Extension.SelectByID2(
-            name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0,
-        ):
-            raise RuntimeError("strap dimensions cannot select their native section")
-        paths = _model_item_paths(adapter, view)
-        selected = _select_model_feature(adapter, "CamRootRelief", paths=paths)
-        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        count = int(selection.GetSelectedObjectCount2(-1))
-        _telemetry.info(
-            f"strap native model-item selection: view={name!r}; paths={paths!r}; "
-            f"feature={selected!r}; types="
-            f"{tuple(int(selection.GetSelectedObjectType3(i, -1)) for i in range(1, count + 1))!r}"
-        )
-        result = document.InsertModelAnnotations3(1, 0x28000, False, True, True, False)
-        annotations = [
-            _early_bound(_bind(item, "IAnnotation"), "IAnnotation")
-            for item in (result or ())
-        ]
-        names = [dimension_name(adapter, annotation) for annotation in annotations]
-        if sorted(names) != sorted(ROOT_SECTION_KEEP):
-            raise RuntimeError(f"strap native section import missing/extra dimensions: {names!r}")
-        return curate_dimensions(adapter, annotations, reposition=dict(ROOT_SECTION_KEEP))
-    except Exception:
-        try:
-            source = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-            dimensions = _named_dimensions(
-                SimpleNamespace(currentModel=source), "CamRootRelief", set(ROOT_SECTION_KEEP),
-            )
-            _telemetry.info(
-                "strap native import refusal source census: "
-                + repr([
-                    {
-                        "identity": str(dimension.FullName), "type": int(display.Type2),
-                        "value": float(dimension.SystemValue), "marked": bool(display.MarkedForDrawing),
-                        "plane": tuple(_early_bound(display.GetAnnotation(), "IAnnotation").GetPlane() or ()),
-                    }
-                    for display, dimension in dimensions.values()
-                ])
-            )
-        except Exception as census_error:
-            _telemetry.info(f"strap source census refused: {census_error!r}")
-        raise
-    finally:
-        draw.ClearSelection2(True)
-
-
-def _assert_root_parent_clearance(adapter: Any, view: Any, annotations: list[Any]) -> None:
-    """The native LEFT cutting line/arrows/letters must clear its plate dimension."""
-    from _layout_audit import _section_geometry
-
-    reader = _Reader(adapter)
-    records = [_dump_annotation(reader, annotation) for annotation in annotations]
-    errors = reader.take_errors()
-    if errors or any(record is None for record in records):
-        raise RuntimeError(f"strap parent dimension ink is unreadable: {errors}")
-    advance = calibrate_sheet_advance(records)
-    cut = _early_bound(_early_bound(view, "IView").GetSection(), "IDrSection")
-    height = float(_early_bound(cut.GetTextFormat(), "ITextFormat").CharHeight)
-    arrows, texts = tuple(cut.GetArrowInfo() or ()), tuple(cut.GetTextInfo() or ())
-    if len(arrows) != 12 or len(texts) != 6 or not math.isfinite(height) or height <= 0.0:
-        raise RuntimeError("strap parent cutting line has unreadable native arrows/letters")
-    section = _section_geometry(
-        {"label": str(cut.GetLabel()), "arrows": arrows, "texts": texts, "text_height": height},
-        owner="strap section parent", advance=advance,
-    )
-    parents = [
-        annotation_geometry(record, owner="strap section parent", advance=advance)
-        for record in records
-    ]
-    if section is None or any(parent is None for parent in parents):
-        raise RuntimeError("strap parent cutting line/dimension ink is missing")
-    section_boxes = (
-        *section.text_boxes, *(line.box() for line in section.segments if line.length > 0.0),
-    )
-    parent_boxes = tuple(
-        box for parent in parents
-        for box in (*parent.text_boxes, *(line.box() for line in parent.segments if line.length > 0.0))
-    )
-    if any(box.gap(other) < _ROOT_LAYOUT_GAP - 1e-8 for box in section_boxes for other in parent_boxes):
-        raise RuntimeError("strap native cutting line/arrows/letters crowd the LEFT plate dimension")
-    _telemetry.info(f"strap parent cutting-line ink={section_boxes!r}; plate dimension ink={parent_boxes!r}")
-
-
-def _root_section(adapter: Any, left: Any, band: Box) -> tuple[Any, list[Any]]:
-    start, end = model_points_in_view(
-        adapter, left, _ROOT_CUT_MODEL_POINTS, label="strap XZ section in left parent",
-    )
-    view = create_section_view(
-        adapter, left,
-        line_start=start, line_end=end,
-        view_xy=ROOT_SECTION_CENTER, section_label="D", scale=ROOT_SECTION_SCALE,
-        partial=False, label="one web-facing strap-mouth relief",
-    )
-    view = _early_bound(view, "IView")
-    cut = _early_bound(view.GetSection(), "IDrSection")
-    cut.SetDisplayOnlySurfaceCut(True)  # native void setter; dedicated readback below
-    horizontal, vertical = _root_section_frame(adapter, view)
-    if horizontal[0] * vertical[1] - horizontal[1] * vertical[0] < 0.0:
-        reversed_cut = not bool(cut.GetReversedCutDirection())
-        cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="strap section cut reversed")
-        if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("strap section cutting direction did not persist")
-        horizontal, _vertical = _root_section_frame(adapter, view)
-    view.Angle = float(view.Angle) - math.atan2(horizontal[1], horizontal[0])
-    rebuild_drawing(adapter, label="strap section +X right, +Z up")
-    set_hidden_lines_removed(adapter, view)
-    # Oblique-carrier's native positive control: full sections import model
-    # dimensions that partial sections refuse; crop only AFTER importing.
-    # A crop can otherwise exclude the model display's annotation origin.
-    annotations = _root_dimensions(adapter, view)
-    _crop_root_section(adapter, view)
-    # Put the native caption BESIDE the small section, not below it. This
-    # saves the narrow band's height without changing any character height.
-    outline, caption_box = _root_section_boxes(view)
-    caption = _early_bound(tuple(view.GetNotes())[0], "INote")
-    annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
-    at = tuple(float(value) for value in annotation.GetPosition())
-    if not annotation.SetPosition2(
-        at[0] + outline.xmax + _ROOT_LAYOUT_GAP - caption_box.xmin,
-        at[1] + outline.center()[1] - caption_box.center()[1],
-        at[2],
-    ):
-        raise RuntimeError("strap section native caption could not be placed beside its view")
-    rebuild_drawing(adapter, label="strap section native caption beside view")
-    boxes = _root_section_boxes(view)
-    _telemetry.info(
-        f"strap section before placement: native outline={boxes[0]}; "
-        f"native caption={boxes[1]}; band={band}"
-    )
-    shift = _root_section_shift(boxes, band)
-    position = tuple(float(value) for value in view.Position)
-    target = [position[index] + shift[index] for index in (0, 1)]
-    if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("strap section could not be seated in its open band")
-    set_hidden_lines_removed(adapter, view)
-    rebuild_drawing(adapter, label="strap section below Detail C fence")
-    boxes = _root_section_boxes(view)
-    for box in boxes:
-        if (
-            box.xmin < band.xmin - 1e-8 or box.ymin < band.ymin - 1e-8
-            or box.xmax > band.xmax + 1e-8 or box.ymax > band.ymax + 1e-8
-        ):
-            raise RuntimeError(
-                f"strap section/caption leaves its open band after placement: {box}; {band}"
-            )
-    _telemetry.info(
-        f"strap section positioned and regenerated: native outline={boxes[0]}; "
-        f"native caption={boxes[1]}; band={band}"
-    )
-    return view, annotations
-
-
-def _assert_root_section(adapter: Any, view: Any, annotations: list[Any]) -> None:
-    """Settled native section and both separately owned scalar dimensions."""
-    view = _early_bound(view, "IView")
-    cut = _early_bound(view.GetSection(), "IDrSection")
-    horizontal, vertical = _root_section_frame(adapter, view)
-    if (
-        int(view.GetDisplayMode2()) != 2  # swHIDDEN (hidden lines removed)
-        or bool(view.GetUseParentDisplayMode())
-        or bool(cut.GetPartialSection())
-        or not bool(cut.GetDisplayOnlySurfaceCut())
-        or not bool(view.IsCropped())
-        or horizontal[0] <= 0.0
-        or abs(horizontal[1]) > 1e-8
-        or vertical[1] <= 0.0
-        or abs(vertical[0]) > 1e-8
-        or tuple(float(value) for value in view.ScaleRatio) != ROOT_SECTION_SCALE
-    ):
-        raise RuntimeError("strap section lost cut-only/cropped/full/scale/+X-right/+Z-up frame")
-    names = [dimension_name(adapter, annotation) for annotation in annotations]
-    if sorted(names) != ["RootReliefAngle", "RootReliefSize"]:
-        raise RuntimeError("strap section must carry exactly one native width and one angle")
-    # Imported feature display dimensions have no generic attached-edge array
-    # (native source and LEFT positive control both read zero). Their model
-    # parameter identity plus actual destination-view membership is authoritative.
-    owned = [
-        _early_bound(item, "IAnnotation") for item in (view.GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) in ROOT_SECTION_KEEP
-    ]
-    owned_identities = [
-        str(_early_bound(
-            _early_bound(item.GetSpecificAnnotation(), "IDisplayDimension").GetDimension2(0),
-            "IDimension",
-        ).FullName)
-        for item in owned
-    ]
-    if sorted(dimension_name(adapter, item) for item in owned) != sorted(names):
-        raise RuntimeError("strap section native dimensions are not owned exactly once by its view")
-    for name, item in zip(names, annotations, strict=True):
-        annotation = _early_bound(item, "IAnnotation")
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        is_width = name == "RootReliefSize"
-        expected_type = 2 if is_width else 3  # swLinearDimension / swAngularDimension
-        expected_value = ROOT_RELIEF_SIZE / 1000.0 if is_width else math.radians(ROOT_RELIEF_ANGLE_DEG)
-        if (
-            bool(annotation.IsDangling())
-            or int(annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
-            or owned_identities.count(str(dimension.FullName)) != 1
-            or int(display.Type2) != expected_type
-            or str(dimension.FullName).split("@")[:2] != [name, "CamRootRelief"]
-            or not math.isclose(
-                float(dimension.SystemValue), expected_value, rel_tol=0.0,
-                abs_tol=1e-9 if is_width else 1e-10,
-            )
-            or int(tolerance.Type) != (4 if is_width else 0)  # symmetric / title block
-        ):
-            raise RuntimeError(
-                f"strap section {name} lost its associative native source/type/value/view owner/band"
-            )
-        if is_width and (
-            not math.isclose(
-                float(tolerance.GetMinValue()) * 1000.0, ROOT_RELIEF_BAND[1], abs_tol=1e-9
-            )
-            or not math.isclose(
-                float(tolerance.GetMaxValue()) * 1000.0, ROOT_RELIEF_BAND[0], abs_tol=1e-9
-            )
-        ):
-            raise RuntimeError("strap section width lost its native symmetric band")
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION["CamRootRelief"])
-    _telemetry.success(
-        "strap section D-D: ONE local -Z relief, separate native width/band and angle"
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1190,9 +453,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="fork detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    root_band = _root_section_band(adapter, _sheet)
-    root_section, root_annotations = _root_section(adapter, left, root_band)
-    root_view_boxes = _root_section_boxes(root_section)
     # The bands import with their named model dimensions, at the part's
     # places; the drawing owns only the callout text beneath them.
     assert_imported_precision(
@@ -1209,11 +469,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, left_annotations, LEFT_CALLOUTS)
     set_dimension_callouts(adapter, detail_annotations, DETAIL_CALLOUTS)
-    set_dimension_callouts(adapter, root_annotations, ROOT_SECTION_CALLOUTS)
-    _seat_root_callout(
-        adapter, root_section, root_annotations, detail_annotations, root_band,
-        root_view_boxes,
-    )
     # Native, both ring diameters ran rim to rim through the bore's centre and
     # crossed there, under datum A's leader (#982 review r2): one arrow each on
     # the rim nearest its text keeps the bore clear.
@@ -1317,7 +572,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # axis unconstrained, so the pin-hole position (and the 147.67 direction)
     # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
     # the pin to the shank centreline.
-    datum_b = add_datum_feature(
+    add_datum_feature(
         adapter,
         front,
         edge_xy=DATUM_B_EDGE,
@@ -1335,7 +590,6 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="horizontal",
     )
     set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
-    _pin_offset_layout(adapter, pin_offset, front_annotations, datum_b, seat=True)
     add_surface_finish(
         adapter,
         front,
@@ -1369,15 +623,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Connecting Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(
-            lambda: _assert_root_section(adapter, root_section, root_annotations),
-            lambda: _assert_root_cut_profile(adapter, root_section),
-            lambda: _assert_root_parent_clearance(adapter, root_section, left_annotations),
-            lambda: _assert_root_section_layout(
-                adapter, root_section, root_annotations, detail_annotations, root_band,
-            ),
-            lambda: _pin_offset_layout(adapter, pin_offset, front_annotations, datum_b),
-        ),
     )
 
 

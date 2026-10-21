@@ -699,38 +699,3 @@ def test_fork_stays_clear_of_the_amplitude_bar_foot() -> None:
     # The crown also stays under the foot cheeks' hang below the top edge.
     top_edge_above_pin = rocker_interface.ARM_DEPTH - rocker_interface.ROD_HOLE_ABOVE_BOTTOM
     assert top_edge_above_pin - rod.FORK_CROWN_RADIUS > bar.BOTTOM_NOTCH_HEIGHT
-
-
-def test_every_authored_or_copied_rod_relief_faces_its_gear_web(monkeypatch) -> None:
-    import build_ch_channel_assembly as channel
-    from _transforms import ROT_Y_180, compose_rows
-
-    inspected = []
-
-    def actual_pose(adapter, name):
-        inspected.append(name)
-        index = int(name.rsplit("-", 1)[1]) - 1
-        rows = compose_rows(channel.rot_z_rows(index * 17.0 - 160.0), ROT_Y_180)
-        return [value for row in rows for value in row] + [0.1, 0.2, index * 0.007, 1.0]
-
-    monkeypatch.setattr(channel, "component_transform", actual_pose)
-    channel._assert_rod_web_orientation(object())
-    assert inspected == [f"ch-connecting-rod-{j + 1}" for j in range(channel.CHANNELS)]
-
-
-@pytest.mark.parametrize(
-    "direction",
-    [(0.0, 0.0, 1.0), (0.1, 0.0, -1.0), (0.0, 0.0, math.nan)],
-)
-def test_saved_rod_orientation_rejects_a_flipped_or_oblique_copy(monkeypatch, direction):
-    import build_ch_channel_assembly as channel
-
-    last = f"ch-connecting-rod-{channel.CHANNELS}"
-
-    def actual_pose(adapter, name):
-        z_row = direction if name == last else (0.0, 0.0, -1.0)
-        return [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, *z_row, 0.0, 0.0, 0.0, 1.0]
-
-    monkeypatch.setattr(channel, "component_transform", actual_pose)
-    with pytest.raises(RuntimeError, match=last):
-        channel._assert_rod_web_orientation(object())

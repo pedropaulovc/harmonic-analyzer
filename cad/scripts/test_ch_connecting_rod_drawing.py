@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -15,7 +14,6 @@ import draw_ch_connecting_rod as drawing
 import build_ch_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _layout_geometry import Box, Segment, segment_box_distance
 
 
 def test_required_drawing_paths() -> None:
@@ -28,10 +26,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert rod.DRAWING_DIMENSIONS is ch_connecting_rod_notes.DRAWING_DIMENSIONS
     marked = set().union(*ch_connecting_rod_notes.DRAWING_DIMENSIONS.values())
-    views = (
-        drawing.FRONT_KEEP, drawing.LEFT_KEEP, drawing.DETAIL_KEEP,
-        drawing.ROOT_SECTION_KEEP,
-    )
+    views = (drawing.FRONT_KEEP, drawing.LEFT_KEEP, drawing.DETAIL_KEEP)
     kept = set().union(*views)
     assert kept == marked
     assert sum(len(view) for view in views) == len(kept)
@@ -123,7 +118,6 @@ def test_analytic_volumes_follow_the_fork_geometry() -> None:
         - rod.slot_volume()
         + rod.inside_corner_volume()
         - rod.strap_bore_volume()
-        - rod.root_relief_volume()
         - rod.pin_hole_volume()
     )
     assert 0.0 < rod.finished_volume() < rod.boss_volume()
@@ -179,6 +173,12 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
     sunk into a tine face), so the pin's land in each tine is the thinnest
     tine the tine's own band leaves (#982)."""
     spec = ch_connecting_rod_spec
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    assert "add_chamfer(" not in source
+    assert "wizard_holes(" not in source
+    assert source.count("create_cut_extrude(") == 3  # slot, strap bore, pin hole
+    assert not [name for name in dir(rod) if "countersink" in name.lower()]
+    assert not [name for name in dir(spec) if "CSK" in name]
     thinnest_tine = spec.TINE_THICKNESS + spec.TINE_BAND[1]
     assert thinnest_tine == pytest.approx(1.65)
     assert thinnest_tine == spec.TINE_MIN
@@ -269,7 +269,6 @@ def test_every_tight_band_names_its_mate() -> None:
         *drawing.FRONT_CALLOUTS.values(),
         *drawing.LEFT_CALLOUTS.values(),
         *drawing.DETAIL_CALLOUTS.values(),
-        *drawing.ROOT_SECTION_CALLOUTS.values(),
     ):
         assert max(len(line) for line in text.splitlines()) <= 26, text
 
@@ -436,138 +435,21 @@ def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
     assert symbol_x + half_box < 0.216
 
 
-def _native_pin_offset(monkeypatch):
-    """The front view's native records round the 4.00 BASIC, as the shared
-    collector dumps them (sheet metres): the press-fit callout parked up-right
-    of the pin, the BASIC between the pin axis and the flank, datum B's tag on
-    the flank below the fork root, and the shank width far down the shank.
-    Only the COM reads are replaced; the shared geometry decoder is real."""
-
-    def line(x0, y0, x1, y1):
-        return [0, 0, 0, 0, x0, y0, 0.0, x1, y1, 0.0]
-
-    def arrow(x, y, dx, dy):
-        return [x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
-
-    def text(t, x, y):
-        return {"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1}
-
-    def dimension(name, lines, arrows, texts):
-        return {
-            "type": 4, "name": name, "visible": 1,
-            "display": {"lines": lines, "arrows": arrows, "texts": texts},
-            "dim": {"hole_callout": False},
-        }
-
-    def pin_callout(dy=0.0):
-        # From the rim down-right to a shoulder under the parked text.
-        return dimension(
-            "PinHoleDia",
-            [
-                line(0.1507, 0.1993 + dy, 0.1582, 0.1893 + dy),
-                line(0.1582, 0.1893 + dy, 0.1702, 0.1893 + dy),
-            ],
-            [arrow(0.1507, 0.1993 + dy, 0.6, -0.8)],
-            [text("<MOD-DIAM>1.968 +0.010/0", 0.1592, 0.1896 + dy)],
-        )
-
-    def basic(dy=0.0):
-        # Outside arrows on the flank and the pin axis; the extension lines
-        # run up past the whole pin callout.
-        y = 0.1790 + dy
-        return dimension(
-            "PinOffset",
-            [
-                line(0.146, 0.1770, 0.146, 0.2000),
-                line(0.150, 0.1770, 0.150, 0.2000),
-                line(0.13965, y, 0.146, y),
-                line(0.146, y, 0.150, y),
-                line(0.150, y, 0.15635, y),
-            ],
-            [arrow(0.146, y, -1.0, 0.0), arrow(0.150, y, 1.0, 0.0)],
-            [text(" 4.00 ", 0.1575, y - 0.0015)],
-        )
-
-    def shank(line_y=0.1000):
-        # Its extension lines run the flanks up through the BASIC's lane.
-        return dimension(
-            "ShankWidthDim",
-            [
-                line(0.146, 0.0990, 0.146, 0.1950),
-                line(0.154, 0.0990, 0.154, 0.1950),
-                line(0.146, line_y, 0.154, line_y),
-            ],
-            [arrow(0.146, line_y, 1.0, 0.0), arrow(0.154, line_y, -1.0, 0.0)],
-            [text(" 8.00 ", 0.1475, line_y + 0.0008)],
-        )
-
-    datum = {
-        "type": 2, "name": "B", "visible": 1,
-        "display": {
-            "lines": [
-                line(0.138, 0.164, 0.144, 0.164), line(0.144, 0.164, 0.144, 0.170),
-                line(0.144, 0.170, 0.138, 0.170), line(0.138, 0.170, 0.138, 0.164),
-            ],
-            "triangles": [
-                [0.146, 0.167, 0.0, 0.144, 0.1685, 0.0, 0.144, 0.1655, 0.0, 1, 0]
-            ],
-            "texts": [text("B", 0.1395, 0.1655)],
-        },
-    }
-    pin = SimpleNamespace(name="PinHoleDia", record=pin_callout())
-    shank_item = SimpleNamespace(name="ShankWidthDim", record=shank())
-    datum_b = SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(record=datum))
-    annotation = SimpleNamespace(
-        record=basic(), IsDangling=lambda: False,
-        GetAttachedEntities3=lambda: [object()],
-    )
-    display = SimpleNamespace(
-        GetAnnotation=lambda: annotation,
-        GetDimension2=lambda index: SimpleNamespace(SystemValue=0.004),
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, name: value)
-    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, item: item.name)
-    monkeypatch.setattr(
-        drawing, "_Reader", lambda adapter: SimpleNamespace(take_errors=lambda: [])
-    )
-    monkeypatch.setattr(drawing, "_dump_annotation", lambda reader, raw: raw.record)
-    return SimpleNamespace(
-        adapter=object(), display=display, front=[pin, shank_item], datum_b=datum_b,
-        pin=pin, shank=shank_item, annotation=annotation,
-        pin_callout=pin_callout, basic=basic, shank_record=shank,
-    )
-
-
-def test_pin_offset_basic_sits_below_the_whole_pin_callout(monkeypatch) -> None:
-    """#982 review r3 / baseline PNG: the BASIC's dimension line may not
-    cross the press-fit callout. Its own and the shank's tall extension
-    lines, which run through the callout and the lane, are allowed."""
-    native = _native_pin_offset(monkeypatch)
-    drawing._pin_offset_layout(native.adapter, native.display, native.front, native.datum_b)
-
-
-@pytest.mark.parametrize("defect", ["basic-through-callout", "shank-line-in-lane"])
-def test_pin_offset_basic_rejects_a_dimension_line_crossing(monkeypatch, defect) -> None:
-    native = _native_pin_offset(monkeypatch)
-    if defect == "basic-through-callout":
-        native.annotation.record = native.basic(dy=0.012)
-    else:
-        # The shank's dimension line and text now reach into the BASIC's ink,
-        # while its tall extension lines were already crossing the lane.
-        native.shank.record = native.shank_record(line_y=0.1740)
-    with pytest.raises(RuntimeError, match="leaves its native clear lane"):
-        drawing._pin_offset_layout(
-            native.adapter, native.display, native.front, native.datum_b
-        )
-
-
-def test_pin_offset_basic_refuses_a_lane_too_short_for_its_text(monkeypatch) -> None:
-    native = _native_pin_offset(monkeypatch)
-    native.pin.record = native.pin_callout(dy=-0.012)
-    with pytest.raises(RuntimeError, match="cannot fit"):
-        drawing._pin_offset_layout(
-            native.adapter, native.display, native.front, native.datum_b
-        )
+def test_pin_offset_basic_runs_on_the_shank_below_the_fork_head() -> None:
+    """#982 review r3: inside the head the 4.00 BASIC crowded the hole and
+    the ream callout's leader crossed it. Below the root its line meets the
+    flank (datum B) inside the flank's run, left of the pin axis, where the
+    leader (pin rim to the callout, down-right) has already moved right."""
+    spec = ch_connecting_rod_spec
+    text_x, text_y = drawing.PIN_OFFSET_TEXT_XY
+    root_y = drawing._sheet_xy(0.0, spec.FORK_BASE_Y)[1]
+    assert root_y - 0.010 < text_y < root_y - 0.003
+    assert text_y > drawing.DATUM_B_EDGE[1]
+    assert text_y > drawing.FRONT_KEEP["ShankWidthDim"][1] + 0.040
+    pin_x, pin_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
+    callout_x, callout_y = drawing.FRONT_KEEP["PinHoleDia"]
+    assert callout_x > pin_x and callout_y < text_y < pin_y
+    assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
 
 
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
@@ -578,6 +460,43 @@ def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
     assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_near_side_diameter(matches[0], f"ring {name}")' in source
+
+
+def test_fork_print_is_three_place_and_model_owned() -> None:
+    marked = ch_connecting_rod_notes.DRAWING_DIMENSIONS
+    assert marked["ForkBoss"] == {"ForkThick"}
+    assert marked["ForkSlotProfile"] == {
+        "TineNear",
+        "SlotWidth",
+        "RingFaceNear",
+        "SlotDepth",
+        "ForkBossLength",
+    }
+    assert marked["Plate"] == {"RingThick"}
+    assert marked["PlateProfile"] == {"RingOuterDia", "ShankWidthDim"}
+    assert marked["ForkProfile"] == {"ForkWidthDim"}
+    assert rod.DRAWING_PRECISION is ch_connecting_rod_notes.DRAWING_PRECISION
+    assert ch_connecting_rod_notes.DRAWING_PRECISION == {
+        "Plate": {"RingThick": 3},
+        "ForkBoss": {"ForkThick": 3},
+        "ForkSlotProfile": {
+            "TineNear": 3,
+            "SlotWidth": 3,
+            "RingFaceNear": 3,
+        },
+        "InsideCorners": {"InsideCornerR": 1},
+        "PinHoleProfile": {"PinHoleDia": 3},
+    }
+    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
+    assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
+    assert "(fork_thickness_dim[0],'\"ForkThickness\"')" in build
+    assert "apply_drawing_precision(adapter,DRAWING_PRECISION)" in build
+    # The fork over the tines is a reference: two tines and the slot set it.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'set_reference_dimension(adapter, fork_thick[0], label="fork over the tines")'
+        in source
+    )
 
 
 def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
@@ -730,6 +649,24 @@ def test_detail_texts_stand_outside_their_witness_lines() -> None:
     assert keep["SlotDepth"][0] < keep["ForkBossLength"][0]
 
 
+def test_model_bands_are_owned_by_named_model_dimensions() -> None:
+    spec = ch_connecting_rod_spec
+    assert spec.RING_BORE_DIA_BAND == (0.10, 0.00)
+    assert spec.TINE_BAND == (0.05, -0.05)
+    assert spec.FORK_SLOT_BAND == (0.05, -0.05)
+    assert spec.RING_FACE_BAND == (0.05, -0.05)
+    assert spec.RING_THICKNESS_BAND == (0.05, -0.05)
+    assert spec.FORK_THICKNESS_BAND == pytest.approx((0.15, -0.15))
+    assert model_toleranced_dimensions(rod) == {
+        ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
+        ("ForkSlotProfile", "TineNear"): "tine_upper",
+        ("ForkSlotProfile", "SlotWidth"): "slot_upper",
+        ("ForkSlotProfile", "RingFaceNear"): "face_upper",
+        ("Plate", "RingThick"): "thick_upper",
+        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
+    }
+
+
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     edge_x, edge_y = drawing.BORE_FINISH_EDGE
     symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
@@ -762,770 +699,3 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
         "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
-
-
-def test_root_relief_includes_angle_and_opposite_edge_in_its_land() -> None:
-    spec = ch_connecting_rod_spec
-    envelope = spec.ROOT_RELIEF_ENVELOPE
-    assert envelope["leg_min"] == pytest.approx(1.1 * math.tan(math.radians(44.0)))
-    assert envelope["leg_max"] == pytest.approx(1.3 * math.tan(math.radians(46.0)))
-    assert envelope["straight_land_min"] == pytest.approx(0.5288105921)
-    assert envelope["straight_land_min"] < 0.575  # exact 45° missed angle scatter
-    assert spec.OPPOSITE_EDGE_BREAK_MAX == 0.25
-    assert spec.RING_THICKNESS == 2.175
-    assert spec.RING_THICKNESS_BAND == (0.05, -0.05)
-    assert spec.RING_BORE_DIA == 30.8
-    assert spec.RING_BORE_DIA_BAND == (0.10, 0.00)
-    assert spec.STRAP_DIAMETRAL_CLEARANCE == pytest.approx((0.20, 0.35))
-
-
-@pytest.mark.parametrize("width", [1.1, 1.3])
-@pytest.mark.parametrize("angle", [44.0, 46.0])
-def test_root_relief_clears_the_whole_R1_corner_at_contact(width, angle) -> None:
-    # Local radial contact deliberately spends ALL bore clearance, and the
-    # strap face has ZERO axial gap to the web. Neither clearance is credited.
-    r = ch_connecting_rod_spec.CAM_ROOT_RADIUS_MAX
-    first, second = width, width * math.tan(math.radians(angle))
-    for radial, axial in ((first, second), (second, first)):
-        for step in range(101):
-            phase = math.pi / 2.0 * step / 100.0
-            root_x = r * (1.0 - math.cos(phase))
-            root_z = r * (1.0 - math.sin(phase))
-            assert root_x / radial + root_z / axial < 1.0
-    assert min(first, second) > r
-
-
-def test_root_relief_rejects_root_overlap_and_only_nonpositive_land() -> None:
-    spec = ch_connecting_rod_spec
-    with pytest.raises(ValueError, match="cam root"):
-        spec.root_relief_envelope(size=1.0)
-    consumed = spec.ROOT_RELIEF_ENVELOPE["leg_max"] + spec.OPPOSITE_EDGE_BREAK_MAX
-    with pytest.raises(ValueError, match="consume"):
-        spec.root_relief_envelope(thickness_min=consumed)
-    assert spec.root_relief_envelope(thickness_min=consumed + 1e-8)[
-        "straight_land_min"
-    ] == pytest.approx(1e-8)
-
-
-def test_one_root_relief_has_the_annular_frustum_volume() -> None:
-    spec = ch_connecting_rod_spec
-    bore = spec.RING_BORE_DIA / 2.0
-    mouth = bore + spec.ROOT_RELIEF_SIZE
-    depth = spec.ROOT_RELIEF_SIZE
-    frustum = math.pi * depth / 3.0 * (bore**2 + bore * mouth + mouth**2)
-    original_bore = math.pi * bore**2 * depth
-    assert rod.root_relief_volume() == pytest.approx(frustum - original_bore)
-    assert rod.root_relief_volume() == pytest.approx(71.4775160533)
-
-
-def _native_relief_boundary(monkeypatch):
-    spec = ch_connecting_rod_spec
-    radius, face_z = spec.RING_BORE_DIA / 2.0, -spec.RING_THICKNESS / 2.0
-
-    def circle(r, z):
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            CircleParams=(0.0, 0.0, z / 1000.0, 0.0, 0.0, 1.0, r / 1000.0),
-        )
-        return SimpleNamespace(
-            GetCurve=lambda: curve,
-            GetCurveParams2=lambda: (
-                r / 1000.0, 0.0, z / 1000.0, r / 1000.0, 0.0, z / 1000.0,
-                0.0, math.tau, 0.0, 0.0, 0.0,
-            ),
-        )
-
-    tolerance = SimpleNamespace(
-        Type=4, GetMinValue=lambda: -0.0001, GetMaxValue=lambda: 0.0001
-    )
-    size = SimpleNamespace(
-        Name="RootReliefSize", SystemValue=0.0012, Tolerance=tolerance,
-        FullName="RootReliefSize@CamRootRelief@ch-connecting-rod",
-    )
-    angle = SimpleNamespace(
-        Name="RootReliefAngle", SystemValue=math.pi / 4.0, Tolerance=SimpleNamespace(Type=0),
-        FullName="RootReliefAngle@CamRootRelief@ch-connecting-rod",
-    )
-    display = SimpleNamespace(
-        Type2=2, MarkedForDrawing=True, GetDimension2=lambda index: size,
-        GetPrimaryPrecision2=lambda: 1, GetPrimaryTolPrecision2=lambda: 1,
-    )
-    angle_display = SimpleNamespace(
-        Type2=3, MarkedForDrawing=True, GetDimension2=lambda index: angle,
-        GetPrimaryPrecision2=lambda: 0,
-    )
-    displays = [display, angle_display]
-    released = []
-    definition = SimpleNamespace(
-        Type=1, TangentPropagation=False, EdgeChamferAngle=math.pi / 4.0,
-        GetEdgeChamferDistance=lambda side: 0.0012 if side == 0 else float("nan"),
-        AccessSelections=lambda model, component: True,
-        ReleaseSelectionAccess=lambda: released.append(True),
-        Edges=[circle(radius, face_z)],
-    )
-    definition.GetEdgeCount = lambda: len(definition.Edges)
-    definition.GetFaceCount = lambda: 0
-    cone_edges = [
-        circle(radius + spec.ROOT_RELIEF_SIZE, face_z),
-        circle(radius, face_z + spec.ROOT_RELIEF_SIZE),
-    ]
-    land_edges = [
-        circle(radius, face_z + spec.ROOT_RELIEF_SIZE),
-        circle(radius, -face_z),
-    ]
-    cone = SimpleNamespace(
-        GetEdges=lambda: cone_edges,
-        GetSurface=lambda: SimpleNamespace(IsCone=lambda: True),
-    )
-    bore = SimpleNamespace(
-        GetEdges=lambda: land_edges,
-        GetSurface=lambda: SimpleNamespace(
-            IsCylinder=lambda: True,
-            CylinderParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius / 1000.0),
-        ),
-    )
-    features = {
-        "CamRootRelief": SimpleNamespace(
-            GetDefinition=lambda: definition, GetFaces=lambda: [cone],
-            displays=displays,
-        ),
-        "StrapBore": SimpleNamespace(GetFaces=lambda: [bore]),
-    }
-    monkeypatch.setattr(rod, "_early_bound", lambda value, name: value)
-    monkeypatch.setattr(rod, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(rod, "_feature_display_dimensions", lambda feature: iter(feature.displays))
-    return SimpleNamespace(
-        adapter=SimpleNamespace(currentModel=object()), circle=circle,
-        definition=definition, display=display, size=size, angle=angle,
-        angle_display=angle_display, displays=displays,
-        cone_edges=cone_edges, land_edges=land_edges, released=released,
-        radius=radius, face_z=face_z,
-    )
-
-
-@pytest.mark.parametrize("reversed_order", [False, True])
-def test_relief_model_resolves_owned_scalar_drivers_independently_of_order(
-    monkeypatch, reversed_order,
-):
-    native = _native_relief_boundary(monkeypatch)
-    if reversed_order:
-        native.displays.reverse()
-    foreign = SimpleNamespace(
-        Type2=3,
-        GetDimension2=lambda index: SimpleNamespace(
-            FullName="OtherAngle@UnrelatedFeature@ch-connecting-rod",
-            SystemValue=math.pi / 4.0,
-        ),
-    )
-    native.displays.append(foreign)
-    width_display, size, angle_display, angle = rod._root_relief_dimensions(native.adapter)
-    assert width_display is native.display
-    assert size is native.size
-    assert angle_display is native.angle_display
-    assert angle is native.angle
-    # A scalar display ignores Index=1; it must never become the other driver.
-    assert native.display.GetDimension2(1) is size
-    assert native.angle_display.GetDimension2(1) is angle
-
-
-@pytest.mark.parametrize(
-    "defect", ["missing-angle", "wrong-angle-type", "wrong-owner", "duplicate-angle", "wrong-width"],
-)
-def test_relief_model_refuses_unproved_or_ambiguous_angular_driver(monkeypatch, defect):
-    native = _native_relief_boundary(monkeypatch)
-    if defect == "missing-angle":
-        native.displays.remove(native.angle_display)
-    elif defect == "wrong-angle-type":
-        native.angle_display.Type2 = 2
-    elif defect == "wrong-owner":
-        native.angle.FullName = "RootReliefAngle@OtherFeature@ch-connecting-rod"
-    elif defect == "duplicate-angle":
-        native.displays.append(native.angle_display)
-    elif defect == "wrong-width":
-        native.size.SystemValue = 0.0011
-    with pytest.raises(RuntimeError, match="cam-root relief"):
-        rod._root_relief_dimensions(native.adapter)
-
-
-def test_native_relief_reads_one_mouth_both_legs_and_untouched_opposite_edge(monkeypatch):
-    native = _native_relief_boundary(monkeypatch)
-    rod._assert_cam_root_relief(native.adapter, marked=True)
-    assert native.released == [True]
-
-
-@pytest.mark.parametrize(
-    "defect",
-    [
-        "wrong-mouth", "both-mouths", "cone-leg", "opposite-edge", "width",
-        "angle", "band", "precision", "angle-precision", "unmarked",
-    ],
-)
-def test_native_relief_refuses_wrong_geometry_or_lost_controls(monkeypatch, defect):
-    native = _native_relief_boundary(monkeypatch)
-    if defect == "wrong-mouth":
-        native.definition.Edges = [native.circle(native.radius, -native.face_z)]
-    elif defect == "both-mouths":
-        native.definition.Edges.append(native.circle(native.radius, -native.face_z))
-    elif defect == "cone-leg":
-        native.cone_edges[1] = native.circle(native.radius, native.face_z + 1.19)
-    elif defect == "opposite-edge":
-        native.land_edges[1] = native.circle(native.radius, -native.face_z - 0.25)
-    elif defect == "width":
-        native.definition.GetEdgeChamferDistance = lambda side: 0.0011
-    elif defect == "angle":
-        native.angle.SystemValue = math.radians(44.0)
-    elif defect == "band":
-        native.size.Tolerance.GetMinValue = lambda: -0.0002
-    elif defect == "precision":
-        native.display.GetPrimaryPrecision2 = lambda: 2
-    elif defect == "angle-precision":
-        native.angle_display.GetPrimaryPrecision2 = lambda: 1
-    elif defect == "unmarked":
-        native.display.MarkedForDrawing = False
-    with pytest.raises(RuntimeError, match="cam-root relief"):
-        rod._assert_cam_root_relief(native.adapter, marked=True)
-    if defect in {"wrong-mouth", "both-mouths"}:
-        assert native.released == [True]  # a failed rollback inspection restores it
-
-
-@pytest.mark.parametrize(
-    "defect",
-    [
-        None, "native-width-residual", "view-wrapper", "dangling", "wrong-owner",
-        "wrong-feature", "view-wrong-source",
-        "angle-dangling", "angle-wrong-owner", "angle-wrong-feature",
-        "wrong-width-type", "wrong-angle-type", "wrong-width", "wrong-angle",
-        "width-band", "angle-band", "width-precision", "angle-precision",
-        "missing-view-width", "missing-view-angle", "duplicate-width", "duplicate-angle",
-        "uncropped",
-    ],
-)
-def test_relief_print_requires_unique_view_owned_native_scalar_drivers(
-    monkeypatch, defect,
-):
-    import _drawing_dimensions
-
-    native = _native_relief_boundary(monkeypatch)
-    native.adapter._attempt = lambda operation: operation()
-    annotations = [
-        SimpleNamespace(
-            GetSpecificAnnotation=lambda: native.display,
-            IsDangling=lambda: defect == "dangling",
-            OwnerType=1 if defect == "wrong-owner" else 0,
-            GetAttachedEntities3=lambda: [],
-        ),
-        SimpleNamespace(
-            GetSpecificAnnotation=lambda: native.angle_display,
-            IsDangling=lambda: defect == "angle-dangling",
-            OwnerType=1 if defect == "angle-wrong-owner" else 0,
-            GetAttachedEntities3=lambda: [],
-        ),
-    ]
-    if defect == "wrong-feature":
-        native.size.FullName = "RootReliefSize@OtherChamfer@ch-connecting-rod"
-    elif defect == "native-width-residual":
-        native.size.SystemValue = 1.199999886 / 1000.0
-    elif defect == "angle-wrong-feature":
-        native.angle.FullName = "RootReliefAngle@OtherChamfer@ch-connecting-rod"
-    elif defect == "wrong-width-type":
-        native.display.Type2 = 3
-    elif defect == "wrong-angle-type":
-        native.angle_display.Type2 = 2
-    elif defect == "wrong-width":
-        native.size.SystemValue = 0.0011
-    elif defect == "wrong-angle":
-        native.angle.SystemValue = math.radians(44.0)
-    elif defect == "width-band":
-        native.size.Tolerance.GetMinValue = lambda: -0.0002
-    elif defect == "angle-band":
-        native.angle.Tolerance.Type = 4
-    elif defect == "width-precision":
-        native.display.GetPrimaryPrecision2 = lambda: 2
-    elif defect == "angle-precision":
-        native.angle_display.GetPrimaryPrecision2 = lambda: 1
-    view_annotations = list(annotations)
-    if defect == "missing-view-width":
-        view_annotations.pop(0)
-    elif defect == "missing-view-angle":
-        view_annotations.pop(1)
-    elif defect == "duplicate-width":
-        view_annotations.append(annotations[0])
-    elif defect == "duplicate-angle":
-        view_annotations.append(annotations[1])
-    elif defect in {"view-wrapper", "view-wrong-source"}:
-        view_size = SimpleNamespace(**vars(native.size))
-        if defect == "view-wrong-source":
-            view_size.FullName = "RootReliefSize@CamRootRelief@other-part"
-        view_display = SimpleNamespace(
-            **{**vars(native.display), "GetDimension2": lambda index: view_size},
-        )
-        view_annotations[0] = SimpleNamespace(
-            **{**vars(annotations[0]), "GetSpecificAnnotation": lambda: view_display},
-        )
-    cut = SimpleNamespace(
-        GetPartialSection=lambda: False, GetDisplayOnlySurfaceCut=lambda: True,
-    )
-    view = SimpleNamespace(
-        GetSection=lambda: cut, GetDisplayMode2=lambda: 2,
-        GetUseParentDisplayMode=lambda: False, ScaleRatio=(3.0, 1.0),
-        IsCropped=lambda: defect != "uncropped",
-        GetAnnotations=lambda: view_annotations,
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, name: value)
-    monkeypatch.setattr(
-        drawing, "model_point_in_view",
-        lambda adapter, view, point, **kwargs: (
-            0.250 + 3.0 * point[0], 0.080 + 3.0 * point[2],
-        ),
-    )
-    def dimension_name(adapter, annotation):
-        return annotation.GetSpecificAnnotation().GetDimension2(0).Name
-
-    monkeypatch.setattr(drawing, "dimension_name", dimension_name)
-    monkeypatch.setattr(_drawing_dimensions, "dimension_name", dimension_name)
-    monkeypatch.setattr(
-        _drawing_dimensions._sw_type_info, "early_bound_or_flag",
-        lambda value, *args: value,
-    )
-    if defect in {None, "native-width-residual", "view-wrapper"}:
-        # Native SOLIDWORKS v15 supplies no attached-entity array for either
-        # valid scalar. View membership and complete model identity prove it.
-        drawing._assert_root_section(native.adapter, view, annotations)
-    else:
-        with pytest.raises(RuntimeError):
-            drawing._assert_root_section(native.adapter, view, annotations)
-
-
-def test_relief_authoring_selects_only_the_negative_Z_strap_mouth(monkeypatch):
-    import asyncio
-
-    from solidworks_mcp.adapters.solidworks import features
-
-    calls = []
-
-    async def add_chamfer(distance, points, *, tangent_propagation):
-        calls.append((distance, points, tangent_propagation))
-        return object()
-
-    native = _native_relief_boundary(monkeypatch)
-    native.adapter.add_chamfer = add_chamfer
-    monkeypatch.setattr(features, "_select_edges_geometric", lambda *args, **kwargs: True)
-    monkeypatch.setattr(rod, "check", lambda label, result: result)
-    monkeypatch.setattr(rod, "name_last_feature", lambda *args: None)
-    monkeypatch.setattr(rod, "name_dimensions", lambda *args: [])
-    asyncio.run(rod._cam_root_relief(native.adapter))
-    assert calls == [(1.2, [[15.4, 0.0, -1.0875]], False)]
-
-
-def _shift(box: Box, dx: float, dy: float) -> Box:
-    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
-
-
-def _measured_root_section_boxes() -> tuple[Box, ...]:
-    # Farm v13: distinguish the native view allocation from its smaller solid
-    # profile. These actual extents must not be replaced by nominal geometry.
-    return (
-        Box(0.387949500048, 0.066411999952115, 0.4056504999520001, 0.101588000047885),
-        Box(0.4089102675585283, 0.0758398127090302, 0.4541842809364547, 0.0920431438127091),
-    )
-
-
-def test_measured_section_and_caption_translate_together_without_shrinking() -> None:
-    boxes = _measured_root_section_boxes()
-    band = Box(0.219, 0.069, 0.4161, 0.109)
-    dx, dy = drawing._root_section_shift(boxes, band)
-    moved = tuple(_shift(box, dx, dy) for box in boxes)
-    assert dx < 0.0  # The caption initially extends beyond the right border.
-    for before, after in zip(boxes, moved, strict=True):
-        assert (after.width, after.height) == pytest.approx((before.width, before.height))
-        assert band.xmin <= after.xmin <= after.xmax <= band.xmax
-        assert band.ymin <= after.ymin <= after.ymax <= band.ymax
-    assert moved[1].xmin - moved[0].xmax == pytest.approx(boxes[1].xmin - boxes[0].xmax)
-    assert moved[0].union(moved[1]).center()[1] == pytest.approx(band.center()[1])
-    # Placement is sheet-frame independent, rather than tied to an import seed.
-    offset = (0.123, -0.040)
-    assert drawing._root_section_shift(
-        tuple(_shift(box, *offset) for box in boxes), _shift(band, *offset),
-    ) == pytest.approx((dx, dy))
-
-
-@pytest.mark.parametrize(
-    "band",
-    [
-        Box(0.219, 0.069, 0.4161, 0.099),  # v13's actual 35.176 mm allocation > 30 mm
-        Box(0.219, 0.069, 0.280, 0.109),  # enough height, insufficient width
-    ],
-)
-def test_measured_section_refuses_a_band_that_requires_clipping_or_shrinking(band) -> None:
-    with pytest.raises(RuntimeError, match="do not fit"):
-        drawing._root_section_shift(_measured_root_section_boxes(), band)
-
-
-def test_full_strap_section_spans_the_whole_plate_and_one_chamfer() -> None:
-    spec = ch_connecting_rod_spec
-    start, end = drawing._ROOT_CUT_MODEL_POINTS
-    half = spec.RING_THICKNESS / 2000.0
-    assert start[:2] == end[:2] == (0.0, 0.0)
-    assert sorted((start[2], end[2])) == pytest.approx((-half - 0.001, half + 0.001))
-    corners = drawing._root_cut_profile_points()
-    inner = spec.RING_BORE_DIA / 2000.0
-    outer = spec.RING_OUTER_RADIUS / 1000.0
-    relief = spec.ROOT_RELIEF_SIZE / 1000.0
-    expected = (
-        (inner, 0.0, half), (outer, 0.0, half), (outer, 0.0, -half),
-        (inner + relief, 0.0, -half), (inner, 0.0, -half + relief),
-    )
-    assert len(corners) == len(expected)
-    for actual, target in zip(corners, expected, strict=True):
-        assert actual == pytest.approx(target)
-        assert actual[0] > 0.0  # Crop only the positive-X wall, never both walls.
-        assert min(start[2], end[2]) < actual[2] < max(start[2], end[2])
-
-
-def _root_sheet_profile(xshift: float, zshift: float) -> tuple[tuple[float, float], ...]:
-    """Independent physical XZ wall, in millimetres, projected at paper scale 3:1."""
-    spec = ch_connecting_rod_spec
-    inner = spec.RING_BORE_DIA / 2.0
-    outer = inner + spec.RING_WALL
-    half = spec.RING_THICKNESS / 2.0
-    relief = spec.ROOT_RELIEF_SIZE
-    return tuple(
-        (xshift + 0.003 * x, zshift + 0.003 * z)
-        for x, z in (
-            (inner, half), (outer, half), (outer, -half),
-            (inner + relief, -half), (inner, -half + relief),
-        )
-    )
-
-
-def _closed_profile_lines(corners) -> tuple[Segment, ...]:
-    return tuple(
-        Segment(*start, *end)
-        for start, end in zip(corners, (*corners[1:], corners[0]), strict=True)
-    )
-
-
-@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
-def test_root_frame_projects_positive_X_right_and_positive_Z_up(monkeypatch, shift):
-    monkeypatch.setattr(
-        drawing, "model_point_in_view",
-        lambda adapter, view, point, **kwargs: (
-            shift[0] + 3.0 * point[0], shift[1] + 3.0 * point[2],
-        ),
-    )
-    horizontal, vertical = drawing._root_section_frame(object(), object())
-    assert horizontal == pytest.approx((0.003, 0.0))
-    assert vertical == pytest.approx((0.0, 0.003))
-
-
-@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
-@pytest.mark.parametrize("subdivided", [False, True])
-def test_root_crop_accepts_the_whole_positive_X_wall_at_paper_scale(shift, subdivided):
-    corners = _root_sheet_profile(*shift)
-    lines = _closed_profile_lines(corners)
-    if subdivided:
-        samples = []
-        for start, end in zip(corners, (*corners[1:], corners[0]), strict=True):
-            # The tessellator may split a real edge at arbitrary locations.
-            points = [
-                tuple(a + fraction * (b - a) for a, b in zip(start, end, strict=True))
-                for fraction in (0.0, 0.2, 0.65, 1.0)
-            ]
-            samples.extend(Segment(*a, *b) for a, b in zip(points, points[1:]))
-        lines = tuple(samples)
-    drawing._assert_root_profile_lines(lines, corners)
-
-
-@pytest.mark.parametrize(
-    "defect",
-    ["clipped-chamfer", "missing-edge", "missing-midpoint", "off-midpoint-gaps",
-     "wrong-wall", "off-profile", "shifted-mouth"],
-)
-@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
-def test_root_crop_refuses_incomplete_or_wrong_native_cut_edges(defect, shift):
-    corners = _root_sheet_profile(*shift)
-    actual = list(corners)
-    if defect == "clipped-chamfer":
-        a, b = corners[3:]
-        actual[3] = tuple(x + 0.2 * (y - x) for x, y in zip(a, b, strict=True))
-        actual[4] = tuple(x + 0.8 * (y - x) for x, y in zip(a, b, strict=True))
-    elif defect == "wrong-wall":
-        actual = [(2.0 * shift[0] - x, z) for x, z in corners]
-    elif defect == "shifted-mouth":
-        # Same relief size and wall envelope, but cut into the opposite face.
-        actual = [(x, 2.0 * shift[1] - z) for x, z in corners]
-    lines = list(_closed_profile_lines(actual))
-    if defect == "missing-edge":
-        lines.pop()
-    elif defect == "missing-midpoint":
-        start, end = corners[:2]
-        left = tuple(a + 0.4 * (b - a) for a, b in zip(start, end, strict=True))
-        right = tuple(a + 0.6 * (b - a) for a, b in zip(start, end, strict=True))
-        lines[:1] = [Segment(*start, *left), Segment(*right, *end)]
-    elif defect == "off-midpoint-gaps":
-        # Endpoints and midpoint all survive, but most of the edge is absent.
-        start, end = corners[:2]
-        points = [
-            tuple(a + fraction * (b - a) for a, b in zip(start, end, strict=True))
-            for fraction in (0.0, 0.1, 0.45, 0.55, 0.9, 1.0)
-        ]
-        lines[:1] = [
-            Segment(*points[index], *points[index + 1]) for index in (0, 2, 4)
-        ]
-    elif defect == "off-profile":
-        # All required corners/edges still exist; the extra chord is not a cut edge.
-        lines.append(Segment(*corners[0], *corners[2]))
-    with pytest.raises(RuntimeError):
-        drawing._assert_root_profile_lines(tuple(lines), corners)
-
-
-def _root_polyline_buffer(points) -> list[float]:
-    # Official GetPolylines7 record: Type, GeomDataSize, six display/layer
-    # fields, NumPolyPoints at index 8, then complete XYZ triples.
-    return [
-        0, 0, 0x102030, -1, 2, 1, 7, 3, len(points),
-        *(coordinate for point in points for coordinate in point),
-    ]
-
-
-def test_root_polyline_parser_reads_multiple_native_XYZ_records_and_skips_zero_length():
-    raw = _root_polyline_buffer(
-        [(0.250, 0.080, 0.0), (0.251, 0.082, 0.0), (0.251, 0.082, 0.0)],
-    )
-    raw += _root_polyline_buffer([(0.260, 0.090, 0.0), (0.263, 0.094, 0.0)])
-    assert drawing._root_polyline_segments(raw) == (
-        Segment(0.250, 0.080, 0.251, 0.082),
-        Segment(0.260, 0.090, 0.263, 0.094),
-    )
-
-
-def test_root_native_polybuffer_preserves_every_true_crop_edge():
-    corners = _root_sheet_profile(0.250, 0.080)
-    raw = _root_polyline_buffer(
-        [(x, z, 0.0) for x, z in (*corners, corners[0])],
-    )
-    drawing._assert_root_profile_lines(drawing._root_polyline_segments(raw), corners)
-
-
-@pytest.mark.parametrize("length", [1, 8, 9, 10, 14])
-def test_root_polyline_parser_refuses_truncated_header_or_XYZ_strip(length):
-    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
-    with pytest.raises(RuntimeError):
-        drawing._root_polyline_segments(raw[:length])
-
-
-@pytest.mark.parametrize("index", [9, 10, 11, 12, 13, 14])
-@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
-def test_root_polyline_parser_refuses_nonfinite_coordinates_including_depth(index, value):
-    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
-    raw[index] = value
-    with pytest.raises(RuntimeError):
-        drawing._root_polyline_segments(raw)
-
-
-@pytest.mark.parametrize("index", [1, 8])
-@pytest.mark.parametrize("value", [-1, 0.5, float("nan"), float("inf")])
-def test_root_polyline_parser_refuses_invalid_geometry_or_point_counts(index, value):
-    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
-    raw[index] = value
-    with pytest.raises(RuntimeError):
-        drawing._root_polyline_segments(raw)
-
-
-@pytest.mark.parametrize("index,value", [(0, 1), (0, 0.5), (1, 1)])
-def test_root_polyline_parser_refuses_nonpolyline_or_nonempty_geometry(index, value):
-    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
-    raw[index] = value
-    with pytest.raises(RuntimeError):
-        drawing._root_polyline_segments(raw)
-
-
-def test_scalar_dimension_lane_clears_the_other_dimensions_native_line() -> None:
-    band = Box(0.300, 0.040, 0.420, 0.059)
-    text = Box(0.0, 0.0, 0.030, 0.008)
-    line = Segment(0.300, 0.051, 0.420, 0.051)
-    target = drawing._root_text_target(text, band, (), (line,))
-    assert target.ymin == pytest.approx(band.ymin)
-    assert segment_box_distance(line, target) == pytest.approx(0.003)
-    assert (target.width, target.height) == pytest.approx((text.width, text.height))
-    with pytest.raises(RuntimeError, match="cannot fit"):
-        drawing._root_text_target(
-            text, band, (), (Segment(0.300, 0.0509, 0.420, 0.0509),),
-        )
-
-
-def _assert_clear_lane(target: Box, text: Box, band: Box, obstacles: tuple[Box, ...]) -> None:
-    assert (target.width, target.height) == pytest.approx((text.width, text.height))
-    assert band.xmin - 1e-9 <= target.xmin and target.xmax <= band.xmax + 1e-9
-    assert band.ymin - 1e-9 <= target.ymin and target.ymax <= band.ymax + 1e-9
-    for obstacle in obstacles:
-        assert target.overlaps(obstacle, tol=0.0) is None
-        assert target.gap(obstacle) >= 0.003 - 1e-9
-
-
-def test_root_callout_lane_clears_every_obstacle_anywhere_on_the_sheet() -> None:
-    band = Box(0.300, 0.040, 0.420, 0.100)
-    text = Box(0.355, 0.070, 0.385, 0.078)  # 30 x 8 mm, seated inside the view
-    obstacles = (
-        Box(0.330, 0.058, 0.390, 0.095),  # the section view
-        Box(0.350, 0.046, 0.370, 0.052),  # its caption
-        Box(0.378, 0.040, 0.420, 0.050),  # a note in the band's lower right
-    )
-    target = drawing._root_text_target(text, band, obstacles)
-    _assert_clear_lane(target, text, band, obstacles)
-    assert target.gap(text) > 0.0  # moved out of the view, not seated in place
-    dx, dy = 0.1234, 0.0567
-    moved = drawing._root_text_target(
-        _shift(text, dx, dy), _shift(band, dx, dy),
-        tuple(_shift(box, dx, dy) for box in obstacles),
-    )
-    expected = _shift(target, dx, dy)
-    assert (moved.xmin, moved.ymin, moved.xmax, moved.ymax) == pytest.approx(
-        (expected.xmin, expected.ymin, expected.xmax, expected.ymax)
-    )
-
-
-def test_root_callout_lane_takes_an_exactly_clear_strip_or_refuses() -> None:
-    band = Box(0.300, 0.040, 0.420, 0.100)
-    text = Box(0.0, 0.0, 0.030, 0.008)
-    # The view leaves exactly 3 mm plus the text's 8 mm under it, and the
-    # strip above it is too short for the text.
-    fits = (Box(0.300, 0.051, 0.420, 0.095),)
-    target = drawing._root_text_target(text, band, fits)
-    _assert_clear_lane(target, text, band, fits)
-    assert target.ymax == pytest.approx(fits[0].ymin - 0.003)
-    with pytest.raises(RuntimeError, match="cannot fit"):
-        drawing._root_text_target(text, band, (Box(0.300, 0.0509, 0.420, 0.095),))
-    with pytest.raises(RuntimeError, match="cannot fit"):
-        drawing._root_text_target(Box(0.0, 0.0, 0.130, 0.008), band, ())
-
-
-def _native_pin_hole(monkeypatch, *, seams=True):
-    """Native PinHole faces as SolidWorks reports them: one cylinder per tine,
-    each bounded by its two full mouths (and, when the kernel keeps one, a
-    straight seam joining them)."""
-    spec = ch_connecting_rod_spec
-    radius, cy = spec.PIN_HOLE_DIA / 2.0, spec.CENTER_DISTANCE
-    wall, outer = spec.FORK_SLOT_WIDTH / 2.0, spec.FORK_THICKNESS / 2.0
-
-    def circle(r, z, *, cx=0.0, cy=cy, sweep=math.tau, sense=1.0):
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            IsLine=lambda: False,
-            CircleParams=(
-                cx / 1000.0, cy / 1000.0, z / 1000.0, 0.0, 0.0, sense, r / 1000.0
-            ),
-        )
-        start, end = (0.0, sweep) if sense > 0 else (-sweep, 0.0)
-        return SimpleNamespace(
-            GetCurve=lambda: curve,
-            GetCurveParams2=lambda: (
-                (cx + r) / 1000.0, cy / 1000.0, z / 1000.0,
-                (cx + r) / 1000.0, cy / 1000.0, z / 1000.0,
-                start, end, 0.0, 0.0, 0.0,
-            ),
-        )
-
-    def seam(z0, z1, *, r=radius, cx=0.0):
-        curve = SimpleNamespace(IsCircle=lambda: False, IsLine=lambda: True)
-        return SimpleNamespace(
-            GetCurve=lambda: curve,
-            GetCurveParams2=lambda: (
-                (cx + r) / 1000.0, cy / 1000.0, z0 / 1000.0,
-                (cx + r) / 1000.0, cy / 1000.0, z1 / 1000.0,
-                0.0, abs(z1 - z0) / 1000.0, 0.0, 0.0, 0.0,
-            ),
-        )
-
-    def cylinder(edges, *, r=radius, cx=0.0, axis=(0.0, 0.0, 1.0)):
-        return SimpleNamespace(
-            GetEdges=lambda: edges,
-            GetSurface=lambda: SimpleNamespace(
-                IsCylinder=lambda: True,
-                CylinderParams=(cx / 1000.0, cy / 1000.0, 0.0, *axis, r / 1000.0),
-            ),
-        )
-
-    near = [circle(radius, -outer), circle(radius, -wall)]
-    far = [circle(radius, wall), circle(radius, outer)]
-    if seams:
-        near.append(seam(-outer, -wall))
-        far.append(seam(wall, outer))
-    faces = [cylinder(near), cylinder(far)]
-    features = {"PinHole": SimpleNamespace(GetFaces=lambda: faces)}
-    monkeypatch.setattr(rod, "_early_bound", lambda value, name: value)
-    monkeypatch.setattr(rod, "_feature_by_name", lambda adapter, name: features[name])
-    return SimpleNamespace(
-        adapter=object(), circle=circle, seam=seam, cylinder=cylinder,
-        faces=faces, near=near, far=far, radius=radius, wall=wall, outer=outer,
-    )
-
-
-@pytest.mark.parametrize("topology", ["seams", "seamless", "reversed", "trimmed-face"])
-def test_native_pin_hole_reads_two_full_tine_lands(monkeypatch, topology):
-    native = _native_pin_hole(monkeypatch, seams=topology != "seamless")
-    if topology == "reversed":
-        # The kernel may run a mouth's curve against its edge (-Z axis, the
-        # parameter span on the negative side) and a seam top-down.
-        native.far[0] = native.circle(native.radius, native.wall, sense=-1.0)
-        native.far[2] = native.seam(native.outer, native.wall)
-        native.faces[1] = native.cylinder(native.far, axis=(0.0, 0.0, -1.0))
-    elif topology == "trimmed-face":
-        # A tine face the cut trimmed may be credited to the cut as well; the
-        # two lands alone carry the proof.
-        native.faces.append(
-            SimpleNamespace(GetSurface=lambda: SimpleNamespace(IsCylinder=lambda: False))
-        )
-    rod._assert_pin_hole_lands(native.adapter)
-
-
-@pytest.mark.parametrize(
-    "defect",
-    [
-        "cylinder-radius", "mouth-radius", "shifted-axis", "tilted-axis",
-        "shifted-mouth", "partial-mouth", "outer-break", "wall-relief",
-        "one-tine", "duplicated-tine", "unsplit", "three-mouths",
-        "crossing-boundary", "seam-off-surface", "seam-past-mouth",
-    ],
-)
-def test_native_pin_hole_refuses_any_land_short_of_a_full_tine(monkeypatch, defect):
-    spec = ch_connecting_rod_spec
-    native = _native_pin_hole(monkeypatch)
-    radius, wall, outer = native.radius, native.wall, native.outer
-    if defect == "cylinder-radius":
-        native.faces[1] = native.cylinder(native.far, r=radius + 0.005)
-    elif defect == "mouth-radius":
-        native.far[1] = native.circle(radius + 0.005, outer)
-    elif defect == "shifted-axis":
-        native.faces[0] = native.cylinder(native.near, cx=0.001)
-    elif defect == "tilted-axis":
-        native.faces[0] = native.cylinder(native.near, axis=(1e-6, 0.0, 1.0))
-    elif defect == "shifted-mouth":
-        native.near[0] = native.circle(radius, -outer, cx=0.001)
-    elif defect == "partial-mouth":
-        native.near[1] = native.circle(radius, -wall, sweep=math.pi)
-    elif defect == "outer-break":
-        # A finite mouth break moves the outer mouth inward: the land is no
-        # longer the whole tine, however small the break.
-        native.near[0] = native.circle(radius, -outer + spec.OPPOSITE_EDGE_BREAK_MAX)
-    elif defect == "wall-relief":
-        native.far[0] = native.circle(radius, wall + spec.ROOT_RELIEF_SIZE)
-    elif defect == "one-tine":
-        del native.faces[1]
-    elif defect == "duplicated-tine":
-        native.faces[1] = native.faces[0]
-    elif defect == "unsplit":
-        native.faces[:] = [
-            native.cylinder([native.circle(radius, -outer), native.circle(radius, outer)])
-        ]
-    elif defect == "three-mouths":
-        native.far.append(native.circle(radius, outer))
-    elif defect == "crossing-boundary":
-        curve = SimpleNamespace(IsCircle=lambda: False, IsLine=lambda: False)
-        native.far.append(SimpleNamespace(GetCurve=lambda: curve))
-    elif defect == "seam-off-surface":
-        native.near[2] = native.seam(-outer, -wall, r=radius + 0.005)
-    elif defect == "seam-past-mouth":
-        native.near[2] = native.seam(-outer - 0.5, -wall)
-    with pytest.raises(RuntimeError, match="pin hole"):
-        rod._assert_pin_hole_lands(native.adapter)

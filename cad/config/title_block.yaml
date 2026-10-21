@@ -47,8 +47,7 @@ edge_break: { radius_mm: 0.25, chamfer_max_mm: 0.25, display_r: "R0.25", display
 
 # Inside-corner ceiling: the first line of the title block's general-note
 # block, "INSIDE CORNERS <R>", reads $PRPSHEET:{TOL_INSIDE_CORNER}, which
-# _part_properties derives from ``radius_mm`` as "R1.0 MAX". Geometry checks
-# read the same number, so the printed and modelled ceilings cannot drift.
+# _part_properties derives from ``radius_mm`` as "R1.0 MAX".
 # The title-block convention already scopes it as the default, so
 # feature-specific smaller limits remain native model dimensions (#1625, #1636).
 inside_corner: { radius_mm: 1.0 }

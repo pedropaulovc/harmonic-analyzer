@@ -36,12 +36,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "EdgeRibFrontEndStep",
     },
     "EdgeRibFront": {"EdgeRibThickness"},
-    "MiddleRibProfile": {"MidRibLeftX"},
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
-    "StubRootFillet": {"StubRootRadius"},
-    "RibEndFillet": {"RibEndRadius"},
     "KnifeEnvelopeReference": {
         "HexWidth",
         "HexHeight",
@@ -61,8 +58,6 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
-    ("StubRootFillet", "StubRootRadius"): "2X R",
-    ("RibEndFillet", "RibEndRadius"): "2X R",
     ("KnifeEnvelopeReference", "HexWidth"): "2X (",
     ("KnifeEnvelopeReference", "HexHeight"): "2X ",
     ("KnifeEnvelopeReference", "RidgeFromLeft"): "2X ",
@@ -126,8 +121,7 @@ BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 # view G (stack r4: six short lines on the -X one rose over the border).
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "EdgeRibFrontEndTopX": "END RIB FACES",
-    "MidRibLeftX": "MID RIB THEORETICAL INTERSECTION",
+    "EdgeRibFrontEndTopX": "ALL RIBS",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
@@ -135,8 +129,6 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromRight": f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
-    "StubRootRadius": "STUB ROOTS\nALL AROUND",
-    "RibEndRadius": "END RIB STEP\nTO PLATE TOP",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
@@ -169,10 +161,12 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # reference dimensions in parentheses are welcome): linear, no Ø glyph.
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
-# The ordinary bounded drill depth charges the pilot cone and wander. It does
-# not establish the finished internal thread's maximum root diameter or extent.
-# A standard 2B thread and the existing full-thread MIN do not supply those
-# upper bounds; qualified tooling/process evidence and owner review remain open.
+# Leads the 2-56 receiver callout: the rib now contains the drill with an
+# ordinary bounded .XX depth band. The lower limit clears the unchanged screw
+# and two-pitch tap lead; the upper limit keeps its point inside the rib.
+# Section H-H shows the transition to thinner plate beyond the point, not a
+# bottom wall. The spring-anchor pad does not back these inboard receivers.
+# Keep both physical functions visible; this is not an accepted exception.
 BRACKET_TAP_CALLOUT_PROCESS = (
     "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
@@ -221,12 +215,3 @@ BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1 ROTATED 180°"
 # named by a letter arrow onto the +Z end.
 FRONT_VIEW_LETTER = "G"
 FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER} SCALE 1:2"
-# Sheet 2's cropped plan looks down onto the -Z stub root from VIEW F.
-# Turning the standard Top view half a turn keeps VIEW F's reversed X;
-# K is removed to the open upper-left field instead of aligned above F.
-STUB_ROOT_VIEW_LETTER = "K"
-STUB_ROOT_VIEW_NOTE = f"VIEW {STUB_ROOT_VIEW_LETTER} SCALE 5:1"
-
-# The plan on sheet 2 exists to locate the removed middle-rib section, not to
-# repeat sheet 1's dimensions or imply the end and middle outlines coincide.
-MIDDLE_RIB_PLAN_NOTE = "MIDDLE RIB\nCUT LOCATION\nPLAN SCALE 1:2"

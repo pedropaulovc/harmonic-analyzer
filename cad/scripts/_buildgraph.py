@@ -2356,8 +2356,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
-        # Angular and edge-break rows bound the connecting-rod relief geometry.
-        "ch_connecting_rod_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
         "ch_rocker_arm_tl_outline_template_spec",
         # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.

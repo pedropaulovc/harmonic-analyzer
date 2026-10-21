@@ -867,13 +867,26 @@ def _printed_leader_starts(
     return out, ambiguities
 
 
-def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
-    """Solid black model edges at current or retained calibration weights."""
-    return [
-        Segment(*_floats(raw)[:4], "geometry")
-        for raw in (dump.get("ink") or {}).get("strokes", ())
-        if not raw[5] and any(low <= float(raw[4]) <= high for low, high in MODEL_EDGE_WIDTH_BANDS_M)
-    ]
+def ink_edges(dump: Mapping[str, Any], *, sections: Sequence[AnnotationGeometry] = ()) -> list[Segment]:
+    """Solid model edges, attributing only ambiguous heavy ink to sections."""
+    if not sections:
+        return [
+            Segment(*_floats(raw)[:4], "geometry")
+            for raw in (dump.get("ink") or {}).get("strokes", ())
+            if not raw[5] and any(low <= float(raw[4]) <= high for low, high in MODEL_EDGE_WIDTH_BANDS_M)
+        ]
+    legacy: list[Segment] = []
+    heavy: list[Segment] = []
+    legacy_band, heavy_band = MODEL_EDGE_WIDTH_BANDS_M
+    for raw in (dump.get("ink") or {}).get("strokes", ()):
+        if raw[5]:
+            continue
+        width = float(raw[4])
+        if legacy_band[0] <= width <= legacy_band[1]:
+            legacy.append(Segment(*_floats(raw)[:4], "geometry"))
+        elif heavy_band[0] <= width <= heavy_band[1]:
+            heavy.append(Segment(*_floats(raw)[:4], "geometry"))
+    return legacy + _unclaimed_model_edges(heavy, sections)
 
 
 def ink_dashed_strokes(dump: Mapping[str, Any]) -> list[Segment]:
@@ -2332,10 +2345,10 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                     exact=True,
                 )
             )
-    # Only section annotations can share visible-edge weight. Thin leaders,
-    # centre marks and dimensions must never claim solid model geometry.
+    # Only the current heavy edge family shares section-line weight. Preserve
+    # legacy 0.25 mm edges even when they lie on or near section annotations.
     sections = [annotation for annotation in annotations if annotation.kind == "section-line"]
-    edges = view_edges(_unclaimed_model_edges(ink_edges(dump), sections, require_parallel=True), outlines)
+    edges = view_edges(ink_edges(dump, sections=sections), outlines)
     for name, solid in edges.items():
         annotations.append(
             AnnotationGeometry(label=f"view {name} geometry", kind="geometry", owner=name, segments=tuple(solid))

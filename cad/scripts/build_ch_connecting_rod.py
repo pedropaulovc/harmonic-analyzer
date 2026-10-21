@@ -41,16 +41,15 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
-import json
 import math
 import sys
 
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _bind, _com_invoke, _early_bound
-from _dimensions import _feature_display_dimensions, drive_dimension, name_dimensions, set_global
-from _feature_tree import _feature_by_name, name_last_feature
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -98,9 +97,6 @@ from ch_connecting_rod_spec import (
     RING_THICKNESS,
     RING_THICKNESS_BAND,
     RING_WALL,
-    ROOT_RELIEF_ANGLE_DEG,
-    ROOT_RELIEF_BAND,
-    ROOT_RELIEF_SIZE,
     SHANK_THICKNESS,
     SHANK_WIDTH,
     SURFACE_FINISHES,
@@ -178,15 +174,6 @@ def strap_bore_volume() -> float:
     return math.pi * (RING_BORE_DIA / 2.0) ** 2 * RING_THICKNESS
 
 
-def root_relief_volume() -> float:
-    """One conical bore-mouth wedge, minus its original straight bore."""
-    # At the authored 45 degrees both physical legs equal native Width;
-    # the tolerance envelope in the spec bounds either leg ordering.
-    radial = ROOT_RELIEF_SIZE
-    axial = radial * math.tan(math.radians(ROOT_RELIEF_ANGLE_DEG))
-    return math.pi * axial * (RING_BORE_DIA / 2.0 * radial + radial**2 / 3.0)
-
-
 def pin_hole_volume() -> float:
     """The reamed hole crosses the slot, so it only cuts the two tines."""
     return math.pi * (PIN_HOLE_DIA / 2.0) ** 2 * (FORK_THICKNESS - FORK_SLOT_WIDTH)
@@ -221,7 +208,6 @@ def finished_volume() -> float:
         - slot_volume()
         + inside_corner_volume()
         - strap_bore_volume()
-        - root_relief_volume()
         - pin_hole_volume()
     )
 
@@ -283,362 +269,6 @@ def tolerance_at_dimension_places(
     return places
 
 
-def _mouth_circle(
-    edge, *, centre=(0.0, 0.0), label: str = "cam-root relief"
-) -> tuple[float, float] | None:
-    """A full circle on the Z axis through ``centre`` (mm) as (radius, local
-    Z), in mm; None for a non-circular boundary (a cylinder's straight seam)."""
-    edge = _early_bound(edge, "IEdge")
-    curve = _early_bound(edge.GetCurve(), "ICurve")
-    if not curve.IsCircle():
-        return None
-    values = tuple(float(value) for value in curve.CircleParams)
-    params = tuple(float(value) for value in edge.GetCurveParams2())
-    if (
-        len(values) != 7
-        or not all(math.isfinite(value) for value in values)
-        or math.hypot(
-            values[0] - centre[0] / 1000.0, values[1] - centre[1] / 1000.0
-        ) > 1e-9
-        or math.hypot(values[3], values[4]) > 1e-9
-        or abs(abs(values[5]) - 1.0) > 1e-9
-        or len(params) != 11
-        or not math.isclose(abs(params[7] - params[6]), math.tau, abs_tol=1e-8)
-    ):
-        raise RuntimeError(f"{label}: edge is not a full coaxial circle")
-    return values[6] * 1000.0, values[2] * 1000.0
-
-
-def _assert_pin_hole_seam(edge, *, radius: float, centre, bounds) -> None:
-    """A land's only non-circular boundary is the cylinder's straight seam,
-    on the hole's surface and ending on its two mouths."""
-    edge = _early_bound(edge, "IEdge")
-    if not _early_bound(edge.GetCurve(), "ICurve").IsLine():
-        raise RuntimeError("pin hole: a land boundary is neither a mouth nor a seam")
-    params = tuple(float(value) for value in edge.GetCurveParams2())
-    if len(params) != 11 or any(
-        abs(math.hypot(x * 1000.0 - centre[0], y * 1000.0 - centre[1]) - radius) > 1e-6
-        or not (bounds[0] - 1e-6 <= abs(z) * 1000.0 <= bounds[1] + 1e-6)
-        for x, y, z in (params[0:3], params[3:6])
-    ):
-        raise RuntimeError("pin hole: seam leaves the hole's surface or its tine")
-
-
-def _assert_pin_hole_lands(adapter) -> None:
-    """Prove the reamed hole runs straight through BOTH full tines: PinHole
-    owns exactly two native cylinders of the hole's radius on the pin axis,
-    each bounded by full circles on the fork's outer face and its slot wall,
-    so each land is the whole tine -- no chamfer, countersink, breakout or
-    shortened tine. Exact radius and mouth positions already exclude a finite
-    mouth break, so no adjacent-face reads are needed."""
-    feature = _early_bound(_feature_by_name(adapter, "PinHole"), "IFeature")
-    radius, centre = PIN_HOLE_DIA / 2.0, (0.0, CENTER_DISTANCE)
-    wall, outer = FORK_SLOT_WIDTH / 2.0, FORK_THICKNESS / 2.0
-    lands = []
-    for raw_face in feature.GetFaces() or ():
-        face = _early_bound(raw_face, "IFace2")
-        surface = _early_bound(face.GetSurface(), "ISurface")
-        if not surface.IsCylinder():
-            continue  # a trimmed tine face the kernel may also credit to the cut
-        cylinder = tuple(float(value) for value in surface.CylinderParams)
-        if (
-            len(cylinder) != 7
-            or not all(math.isfinite(value) for value in cylinder)
-            or math.hypot(
-                cylinder[0] - centre[0] / 1000.0, cylinder[1] - centre[1] / 1000.0
-            ) > 1e-9
-            or math.hypot(cylinder[3], cylinder[4]) > 1e-9
-            or abs(abs(cylinder[5]) - 1.0) > 1e-9
-            or abs(cylinder[6] * 1000.0 - radius) > 1e-6
-        ):
-            raise RuntimeError(
-                f"pin hole: native cylinder {cylinder} is not the Ø{PIN_HOLE_DIA:g} "
-                "hole on the pin axis"
-            )
-        ends = []
-        for raw_edge in face.GetEdges() or ():
-            circle = _mouth_circle(raw_edge, centre=centre, label="pin hole")
-            if circle is None:
-                _assert_pin_hole_seam(
-                    raw_edge, radius=radius, centre=centre, bounds=(wall, outer)
-                )
-                continue
-            if abs(circle[0] - radius) > 1e-6:
-                raise RuntimeError(f"pin hole: mouth radius {circle[0]} != {radius}")
-            ends.append(round(circle[1], 6))
-        lands.append(tuple(sorted(ends)))
-    for land in lands:
-        if len(land) != 2 or not math.isclose(
-            land[1] - land[0], TINE_THICKNESS, abs_tol=1e-6
-        ):
-            raise RuntimeError(
-                f"pin hole: land {land} is not one straight {TINE_THICKNESS:g} tine"
-            )
-    expected = [
-        (round(-outer, 6), round(-wall, 6)),
-        (round(wall, 6), round(outer, 6)),
-    ]
-    if sorted(lands) != expected:
-        raise RuntimeError(
-            f"pin hole: tine lands {sorted(lands)} != both full tines {expected}"
-        )
-    _telemetry.success(
-        f"pin hole: Ø{PIN_HOLE_DIA:g} straight through BOTH full {TINE_THICKNESS:g} mm "
-        f"tines, mouths on the fork faces +/-{outer:g} and the slot walls +/-{wall:g}"
-    )
-
-
-def _log_root_relief_dimension_census(adapter) -> None:
-    """Record the actual model-feature shape before refusing an unknown display.
-
-    GetDimension2's index selects a second component ONLY for a native chamfer
-    display; other display types ignore it. Keep both identities and SI values
-    so a distance returned twice cannot be mistaken for an angular dimension.
-    Diagnostic read failures are recorded, never substituted into the build.
-    """
-    def failure(exc):
-        return {"error": f"{type(exc).__name__}: {exc}"}
-
-    def scalar(getter):
-        try:
-            value = getter()
-            if isinstance(value, float) and not math.isfinite(value):
-                return {"nonfinite": str(value)}
-            return value
-        except Exception as exc:
-            return failure(exc)
-
-    def dimension(raw):
-        if raw is None:
-            return None
-        item = _bind(raw, "IDimension")
-        return {
-            "full_name": scalar(lambda: str(item.FullName)),
-            "name": scalar(lambda: str(item.Name)),
-            "system_value": scalar(lambda: float(item.SystemValue)),
-        }
-
-    census = {"feature": "CamRootRelief", "display_dimensions": []}
-    try:
-        feature = _early_bound(_feature_by_name(adapter, "CamRootRelief"), "IFeature")
-        try:
-            definition = _early_bound(feature.GetDefinition(), "IChamferFeatureData2")
-            census["definition"] = {
-                "type": scalar(lambda: int(definition.Type)),
-                "angle_rad": scalar(lambda: float(definition.EdgeChamferAngle)),
-                "width_m": scalar(lambda: float(definition.GetEdgeChamferDistance(0))),
-                "tangent_propagation": scalar(lambda: bool(definition.TangentPropagation)),
-            }
-        except Exception as exc:
-            census["definition"] = failure(exc)
-        for index, raw_display in enumerate(_feature_display_dimensions(feature)):
-            # This iterator yields RAW PyIDispatch, not a wrapped display or
-            # a tuple. Match _named_dimensions: _bind converts raw dispatch;
-            # _early_bound's no-_oleobj_ test-double passthrough cannot.
-            display = _bind(raw_display, "IDisplayDimension")
-            row = {"index": index, "type2": scalar(lambda: int(display.Type2))}
-            components = []
-            for component in (0, 1):
-                try:
-                    raw_dimension = display.GetDimension2(component)
-                    row[f"dimension{component}"] = dimension(raw_dimension)
-                    components.append(raw_dimension)
-                except Exception as exc:
-                    row[f"dimension{component}"] = failure(exc)
-                    components.append(None)
-            row["same_0_1"] = (
-                scalar(lambda: int(adapter.swApp.IsSame(*components)))
-                if all(item is not None for item in components) else None
-            )
-            census["display_dimensions"].append(row)
-    except Exception as exc:
-        census["enumeration"] = failure(exc)
-    _telemetry.info(
-        "cam-root relief native dimension census: "
-        + json.dumps(census, sort_keys=True, allow_nan=False)
-    )
-
-
-def _root_relief_dimensions(adapter) -> tuple[object, object, object, object]:
-    """Resolve scalar model drivers by native type/owner, never D2/order.
-
-    InsertFeatureChamfer's farm-observed width display is linear (Type2=2),
-    not a drawing compound chamfer. The second feature display is usable as
-    the angular driver ONLY if its own native type, owner and value prove it.
-    """
-    try:
-        feature = _feature_by_name(adapter, "CamRootRelief")
-        owned = []
-        for raw_display in _feature_display_dimensions(feature):
-            raw_dimension = _com_invoke(
-                raw_display, "IDisplayDimension", "GetDimension2", 0,
-            )
-            full_name = str(_com_invoke(raw_dimension, "IDimension", "FullName"))
-            if full_name.split("@")[1:2] != ["CamRootRelief"]:
-                continue
-            owned.append((
-                _bind(raw_display, "IDisplayDimension"),
-                _bind(raw_dimension, "IDimension"),
-            ))
-        widths = [(display, dimension) for display, dimension in owned if int(display.Type2) == 2]
-        angles = [(display, dimension) for display, dimension in owned if int(display.Type2) == 3]
-        if len(owned) != 2 or len(widths) != 1 or len(angles) != 1:
-            raise RuntimeError(
-                "cam-root relief: expected exactly one owned linear width and one angular driver; "
-                f"owned display types={[int(display.Type2) for display, _dimension in owned]}"
-            )
-        width_display, size = widths[0]
-        angle_display, angle = angles[0]
-        if (
-            str(size.FullName).split("@")[:2] != ["RootReliefSize", "CamRootRelief"]
-            or not math.isclose(
-                float(size.SystemValue) * 1000.0, ROOT_RELIEF_SIZE, abs_tol=1e-6,
-            )
-            or not math.isclose(
-                float(angle.SystemValue), math.radians(ROOT_RELIEF_ANGLE_DEG), abs_tol=1e-10,
-            )
-        ):
-            raise RuntimeError("cam-root relief: native scalar width/angle drivers changed")
-        return width_display, size, angle_display, angle
-    except Exception:
-        _log_root_relief_dimension_census(adapter)
-        raise
-
-
-async def _cam_root_relief(adapter) -> list[tuple[str, str]]:
-    """Select exactly the local -Z bore mouth, never a whole annular face."""
-    from solidworks_mcp.adapters.solidworks.features import _select_edges_geometric
-
-    points = [[RING_BORE_DIA / 2.0, 0.0, -RING_THICKNESS / 2.0]]
-    if _select_edges_geometric(adapter, points, tol_mm=0.001) is not True:
-        raise RuntimeError("cam-root relief: local -Z bore edge did not resolve")
-    check(
-        "one web-facing strap-mouth chamfer",
-        await adapter.add_chamfer(ROOT_RELIEF_SIZE, points, tangent_propagation=False),
-    )
-    name_last_feature(adapter, "CamRootRelief")
-    name_dimensions(adapter, "CamRootRelief", ["RootReliefSize"])
-    _display, _size, _angle_display, angle = _root_relief_dimensions(adapter)
-    angle.Name = "RootReliefAngle"
-    if str(angle.Name) != "RootReliefAngle":
-        raise RuntimeError("cam-root relief: native angle name did not persist")
-    _telemetry.success(
-        f"cam-root relief native model drivers: {_size.FullName}, "
-        f"Type2={int(_display.Type2)}, width_m={float(_size.SystemValue)!r}; "
-        f"{angle.FullName}, Type2={int(_angle_display.Type2)}, "
-        f"angle_rad={float(angle.SystemValue)!r}"
-    )
-    return [
-        ("RootReliefSize@CamRootRelief", '"RootReliefSize"'),
-        ("RootReliefAngle@CamRootRelief", f"{ROOT_RELIEF_ANGLE_DEG}deg"),
-    ]
-
-
-def _assert_cam_root_relief(adapter, *, marked: bool = False) -> None:
-    """Prove selected edge, cone legs and unchanged opposite running mouth."""
-    feature = _early_bound(_feature_by_name(adapter, "CamRootRelief"), "IFeature")
-    definition = _early_bound(feature.GetDefinition(), "IChamferFeatureData2")
-    if (
-        int(definition.Type) != 1  # swChamferAngleDistance
-        or bool(definition.TangentPropagation)
-        or not math.isclose(
-            float(definition.GetEdgeChamferDistance(0)) * 1000.0,
-            ROOT_RELIEF_SIZE, abs_tol=1e-6,
-        )
-        or not math.isclose(
-            float(definition.EdgeChamferAngle),
-            math.radians(ROOT_RELIEF_ANGLE_DEG), abs_tol=1e-10,
-        )
-    ):
-        raise RuntimeError("cam-root relief: native angle-distance definition changed")
-    # AccessSelections rolls back; always restore before inspecting final faces.
-    if not definition.AccessSelections(adapter.currentModel, None):
-        raise RuntimeError("cam-root relief: cannot inspect selected native mouth")
-    try:
-        edges = tuple(definition.Edges or ())
-        if int(definition.GetEdgeCount()) != 1 or len(edges) != 1:
-            raise RuntimeError("cam-root relief: exactly ONE bore edge is required")
-        if int(definition.GetFaceCount()) != 0:
-            raise RuntimeError("cam-root relief: a whole face was selected")
-        selected = _mouth_circle(edges[0])
-        expected = (RING_BORE_DIA / 2.0, -RING_THICKNESS / 2.0)
-        if selected is None or math.dist(selected, expected) > 1e-6:
-            raise RuntimeError(
-                f"cam-root relief: selected {selected}, not -Z mouth {expected}"
-            )
-    finally:
-        definition.ReleaseSelectionAccess()
-    display, size, angle_display, angle = _root_relief_dimensions(adapter)
-    if (
-        int(display.GetPrimaryPrecision2()) != 1
-        or int(display.GetPrimaryTolPrecision2()) != 1
-        or int(angle_display.GetPrimaryPrecision2()) != 0
-        or (marked and not all(bool(item.MarkedForDrawing) for item in (display, angle_display)))
-        or str(angle.FullName).split("@")[:2] != ["RootReliefAngle", "CamRootRelief"]
-    ):
-        raise RuntimeError("cam-root relief: native scalar display/precision/drawing mark changed")
-    if int(angle.Tolerance.Type) != 0:
-        raise RuntimeError("cam-root relief: angle must retain title-block tolerance")
-    tolerance = _early_bound(size.Tolerance, "IDimensionTolerance")
-    if (
-        int(tolerance.Type) != 4  # swTolSYMMETRIC
-        or not math.isclose(
-            float(tolerance.GetMinValue()) * 1000.0, ROOT_RELIEF_BAND[1], abs_tol=1e-9
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()) * 1000.0, ROOT_RELIEF_BAND[0], abs_tol=1e-9
-        )
-    ):
-        raise RuntimeError("cam-root relief: native size band changed")
-    circles = set()
-    for raw_face in feature.GetFaces() or ():
-        face = _early_bound(raw_face, "IFace2")
-        if not _early_bound(face.GetSurface(), "ISurface").IsCone():
-            continue
-        for raw_edge in face.GetEdges() or ():
-            circle = _mouth_circle(raw_edge)
-            if circle is not None:
-                circles.add(tuple(round(value, 6) for value in circle))
-    radius, face_z = RING_BORE_DIA / 2.0, -RING_THICKNESS / 2.0
-    # At nominal 45 degrees, geometric readbacks prove BOTH legs; they do not
-    # establish which face native Width controls away from 45 degrees.
-    expected_circles = {
-        (round(radius + ROOT_RELIEF_SIZE, 6), round(face_z, 6)),
-        (round(radius, 6), round(face_z + ROOT_RELIEF_SIZE, 6)),
-    }
-    if circles != expected_circles:
-        raise RuntimeError(
-            f"cam-root relief: actual cone boundaries {circles} != {expected_circles}"
-        )
-    bore = _early_bound(_feature_by_name(adapter, "StrapBore"), "IFeature")
-    lands = []
-    for raw_face in bore.GetFaces() or ():
-        face = _early_bound(raw_face, "IFace2")
-        surface = _early_bound(face.GetSurface(), "ISurface")
-        if not surface.IsCylinder():
-            continue
-        cylinder = tuple(float(value) for value in surface.CylinderParams)
-        if not math.isclose(cylinder[6] * 1000.0, radius, abs_tol=1e-6):
-            continue
-        ends = [_mouth_circle(edge) for edge in face.GetEdges() or ()]
-        lands.append(
-            {tuple(round(v, 6) for v in end) for end in ends if end is not None}
-        )
-    expected_land = {
-        (round(radius, 6), round(face_z + ROOT_RELIEF_SIZE, 6)),
-        (round(radius, 6), round(RING_THICKNESS / 2.0, 6)),
-    }
-    if lands != [expected_land]:
-        raise RuntimeError(
-            f"cam-root relief: running bore/opposite mouth changed: {lands}"
-        )
-    _telemetry.success(
-        f"cam-root relief: ONE local -Z mouth; cone {sorted(circles)}; "
-        f"straight native bore land {RING_THICKNESS - ROOT_RELIEF_SIZE:g} mm; "
-        "opposite mouth unchanged (general edge break remains applicable)"
-    )
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -665,7 +295,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
     await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
     await set_global(adapter, "InsideCornerR", f"{INSIDE_CORNER_R}mm")
-    await set_global(adapter, "RootReliefSize", f"{ROOT_RELIEF_SIZE}mm")
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
     await set_global(
@@ -1021,16 +650,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "StrapBore")
     v_expected -= strap_bore_volume()
-    v_before_relief = await volume_check(
-        adapter, "strap bore", v_expected, 0.002 * v_expected
-    )
-    drive_jobs += await _cam_root_relief(adapter)
-    v_relief = root_relief_volume()
-    v_expected -= v_relief
-    await volume_check(
-        adapter, "single web-facing cam-root relief",
-        v_before_relief - v_relief, 1e-4 * v_before_relief,
-    )
+    await volume_check(adapter, "strap bore", v_expected, 0.002 * v_expected)
 
     # Pivot pin hole on the rod axis, reamed through both tines (the slot
     # between them is air). The pin RUNS in the arm's #47 hole and is PRESSED
@@ -1117,12 +737,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ForkSlotProfile", "RingFaceNear", face_upper
     )
     set_dimension_symmetric_tolerance(adapter, "Plate", "RingThick", thick_upper)
-    relief_lower, relief_upper = deviations(ROOT_RELIEF_BAND)
-    if relief_lower != -relief_upper:
-        raise AssertionError("the cam-root relief's native size band must be symmetric")
-    set_dimension_symmetric_tolerance(
-        adapter, "CamRootRelief", "RootReliefSize", relief_upper
-    )
     _inside_corner_max_limit(adapter)
     # The reamed press hole's band rides natively on its diameter, which the
     # front view imports at three places (DRAWING_PRECISION); its band prints
@@ -1132,8 +746,6 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")
-    _assert_cam_root_relief(adapter)
-    _assert_pin_hole_lands(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -1160,8 +772,6 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes", "Isometric View Note",
         ),
     )
-    _assert_cam_root_relief(adapter, marked=True)
-    _assert_pin_hole_lands(adapter)
     return artefacts
 
 

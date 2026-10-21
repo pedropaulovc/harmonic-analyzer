@@ -1953,8 +1953,7 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     layout-audit report -- which rides the remote cache with the sheet, so a
     restored leaf still carries its findings and sheet dumps."""
     spec = DRAWINGS_BY_NAME[stem]
-    outputs = [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
-    return outputs
+    return [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -3724,7 +3723,6 @@ def task_check():
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
-        SCRIPTS_DIR / "test_sm_summing_lever_receiver_native.py",
         SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
         # #1559: the MHA-MG-04 rod's threaded seat in the MHA-MG-02 hex clamp.
         SCRIPTS_DIR / "test_mg_rod_clamp_joint.py",

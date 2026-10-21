@@ -157,81 +157,31 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
-The owner-selected MHA-SM-03 repair preserves the existing rib profiles and
-extends only the **−Z receiver rib to 9.40 ±0.51 mm**. Relative to the previous
-8.20 mm receiver, this adds **1.20 mm inward**: the entry stays **−76.20 mm**,
-the inner boundary becomes **−66.80 mm**, and the opposite rib stays **5.08 mm**.
-The two axes, top-referenced **2.54 ±0.05 mm** row, 13.7 mm pitch,
-MHA-MG-VN-53 screws and 3.175 mm flange are unchanged. No tighter tolerance,
-wall waiver or drawing-orientation approval is implied.
+MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
+cylindrical tap-drill depth, explicitly symmetric in the native dimension.
+The native hole callout prints **6.50** at two places, inheriting the same
+ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
+accepted tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
+to **8.20 mm**: its entry remains **−76.20 mm**, its inner boundary is
+**−68.00 mm**, and the opposite end rib remains **5.08 mm**. The axes and
+13.7 mm pitch, MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged.
+Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**.
+At the printed limits the full-thread containment margin is **2.69 mm**,
+bottoming-tap lead exceeds two pitches by **0.082857 mm**, and the entire
+118° point plus conservative 0.3° wander stays inside the shortest rib by
+**0.076133 mm**. This last value is point containment, not a bottom-wall
+thickness or a reduced rule-17 wall floor.
 
-The cylindrical drill remains **6.50 ±0.51 mm**, printed **6.50** under the
-ordinary title-block .XX band. Charge its printed **Ø1.78 +0.10/0**, not the
-unrounded native Ø1.778, so the worst radius is **0.940 mm**. With plate
-**5.08 ±0.51 mm**, the lower-corner stack is correlated:
-`axis-to-underside = plate_min − top_row_max = 4.57 − 2.59 = 1.98 mm`.
-Do not independently charge plate half-thickness again. Entry-face translation
-also cancels from the receiver-depth minus drill-depth difference.
+A bounded depth remains necessary: an unbounded MIN drill could enter the
+**5.08 mm plate** beyond the rib, where the receiver axes are inboard of the
+spring-anchor pad and the plate alone cannot meet the unchanged **1.5 mm**
+wall floor. The ordinary ±0.51 band bounds that reach without a special
+tight drill band. `magnifying_bracket_joint_layout` owns the physical stack
+and point/wander proof; section H-H shows the rib-to-plate transition.
 
-The sharp external rib-cap/plate-underside notch is a finite surface corner,
-not an infinite underside plane inside the rib. At the adverse bands, the
-118° cone's nearest point is **0.03956345 mm past the cylindrical shoulder**;
-subtracting the full-vector **0.03966197 mm** 0.3° wander bound gives a local
-pilot-to-corner bound of **2.10745219 mm**, above the unchanged 2.0 mm target
-and 1.5 mm floor. This is a **pilot-hole** bound, not a finished-thread guarantee.
-The old 8.20 mm receiver's corresponding pilot bound was only **1.20291600 mm**;
-its **1.24257797 mm** un-wandered closest point was the shoulder, not the cone
-tip or an interior cone point. A point-containment margin is not a wall.
-
-**Finished-thread wall proof remains pending; this repair is not approved for
-release on the pilot result alone.** ASME B1.1-2003 §§5.5 and 8.3.2(a,b)
-specify the internal **minimum** major diameter but leave its **maximum**
-unspecified, determined by the unworn cutting-tool crest
-([primary standard text, PDF filename says 2008](https://fpg-co.com/Standards/ASME%20B1.1%202008.pdf)).
-The screw's basic Ø2.1844 is therefore not an upper bound on the hole root.
-The previously reported **2.03942169 mm** is only a conditional calculation:
-it assumes internal major diameter no greater than that basic diameter and
-physical thread extent no farther than the 7.01 mm maximum drill cylinder.
-Neither condition follows from the printed 2B thread or **4.95 MIN**.
-
-Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**;
-the modeled Hole Wizard pilot does not reproduce the cut thread roots. The
-unapproved, radially ambiguous `THREAD EXTENT WITHIN DRILL CYLINDER` process
-line is removed rather than treated as authority for new limits. A real
-off-the-shelf tap's maximum cutting-crest diameter and a qualified axial
-process need evidence and an owner decision; H/GH tap limits control **pitch**
-diameter and cannot substitute for root-OD evidence. No geometry increase or
-bespoke tighter finished-root limit is inferred. Existing engagement,
-screw-tip, tap-lead, head-float and other valid local guards remain independent.
-`magnifying_bracket_joint_layout` retains the actual printed-band pilot guard
-and labels the basic-major calculation conditional, with no thread-wall pass
-assertion.
-
-End-rib **35.75** dimensions name **END RIB FACES** only. The unchanged middle
-rib's **35.75** is the *theoretical intersection of its tangent slants*, buried
-inside the plate; its visible plate join is **30.36018218 mm** from the axis.
-The dedicated cut-face-only section L-L imports the actual native
-`MidRibLeftX@MiddleRibProfile` dimension and shows view-owned tangent extensions
-from the actual source sketch. It does not reprofile the rib to make a visible
-35.75 endpoint. View F retains its top-referenced row and centreline without
-the duplicate 2.54 reference.
-The imported dimension is model-associative. The tangent extensions are
-recipe-generated drawing construction sampled from the source sketch; their
-settled check proves coincidence in the current build, not automatic updating
-after a later saved-part edit. Regenerate the drawing after such an edit.
-
-These are local analytic results, not a claim that every installed clearance
-or finished-thread wall has been proved. Part-save checks require native
-trimmed pilot faces/closest-point witnesses and the original middle-rib profile.
-Those modeled pilot checks cannot certify unmodeled internal thread roots.
-The affected
-`ha-harmonic-analyzer` assembly adds a localized native new-strip check against
-configured installed neighbors, independent of allowed whole-part contacts;
-`sm-summing` and `mg-magnifier` alone do not contain all cross-subassembly pairs.
-The strip check is **static installed-state evidence**, not an operational
-swept-volume certificate. Real-seat part/assembly results, native dimension
-association, all printed ink/readability and preserved contact interfaces must
-be accepted before this geometry is called fully clear.
+View F retains the top-referenced **2.54 ±0.05 mm** receiver-row location
+and the centreline through both taps and the hex centre. The duplicate
+parenthesized 2.54 reference is omitted; it adds no independent requirement.
 
 Section C-C retains the model-owned **5.08 mm** plate-thickness dimension
 under the title-block two-place band. Both visible extension lines begin
@@ -434,26 +384,6 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 |---|---|---|---|---|---|
 | **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.44×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.575 through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed (see [Cutter plan](#cutter-plan); wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
 | **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring and shank 2.175, both faces at 1.950 / 4.125 ±0.05 from the fork's datum face, fork 6.075 REF, all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin, 18 long from the crown; tine 1.700 ±0.05 from the datum face, slot 2.675 ±0.05, 14.75 deep from the crown (#982); Ø1.968 +0.010/0 pin hole reamed through both tines (pin MHA-CH-10 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **1.700** (1.65 MIN) beside a 2.675 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.175 shank ~150 long faced from 6.35 — chatter/curl); the ream must hold +0.010/0 for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
-
-**Selected cam-root relief B.** The source authority is
-[`ch_connecting_rod_spec.py`](../scripts/ch_connecting_rod_spec.py): chamfer
-exactly **one** strap-bore mouth, on the rod's local −Z side, **1.2 ±0.1 mm
-at 45°**; the title-block general angular tolerance is **±1°**. Keep the
-opposite mouth to the general **0.25 mm maximum edge break**. The cylinder
-gear is unchanged. At bench preassembly, orient the relieved mouth **north,
-toward its cylinder-gear web**; the authored rod rotation maps local −Z to
-assembly +Z. Preserve the bore's running fit and the plate's thickness and
-face-location bands.
-
-The clearance envelope assumes **zero axial gap and local radial contact**,
-without crediting the running clearance. With the R1 maximum cam root,
-both possible chamfer legs remain greater than 1 mm over the size and
-44–46° limits. Conservatively allowing the largest possible axial leg
-(1.34619 mm), the minimum plate thickness (2.125 mm), and the opposite
-0.25 mm edge break leaves **0.52881 mm (about 0.529 mm) minimum straight
-bearing land**. This is a geometric clearance result for the selected
-topology, **not a load-capacity or wear qualification**; the reduced bearing
-land does not establish an allowable operating load.
 
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 

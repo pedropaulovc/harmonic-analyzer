@@ -143,6 +143,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import functools
 import math
 import sys
 import time
@@ -1370,36 +1371,6 @@ async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list
     return [by_amplitude[amplitude] for amplitude in amplitudes]
 
 
-def _assert_rod_web_orientation(adapter) -> None:
-    """Every saved occurrence, authored OR copied, relieves toward the web."""
-    for j in range(CHANNELS):
-        rod = f"ch-connecting-rod-{j + 1}"
-        actual = component_transform(adapter, rod)
-        # Transform2 stores local-axis rows. Rz(tilt) Ry180 maps local -Z
-        # to world +Z for every tilt; inspect the solved native pose instead
-        # of merely asserting that the construction-time rows had that form.
-        web_direction = tuple(-value for value in actual[6:9])
-        if (
-            len(web_direction) != 3
-            or not all(math.isfinite(value) for value in web_direction)
-            or math.dist(web_direction, (0.0, 0.0, 1.0)) > 1e-6
-        ):
-            raise RuntimeError(
-                f"{rod}: local -Z bore relief faces {web_direction}, "
-                "not world +Z toward its cylinder-gear web"
-            )
-        _telemetry.event(
-            "rod.cam_root_relief_orientation", channel=j, component=rod,
-            web_direction=web_direction,
-        )
-
-
-def _assert_channel_native_contacts(adapter, asm_name: str) -> None:
-    """Keep spring proof and certify every rod on the reopened saved assembly."""
-    assert_assembly_spring_contacts(adapter, asm_name, channel_count=CHANNELS)
-    _assert_rod_web_orientation(adapter)
-
-
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -2530,7 +2501,10 @@ async def build(adapter) -> dict[str, str]:
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        native_contact_check=_assert_channel_native_contacts,
+        native_contact_check=functools.partial(
+            assert_assembly_spring_contacts,
+            channel_count=CHANNELS,
+        ),
     )
 
 

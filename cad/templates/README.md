@@ -62,6 +62,9 @@ To check exported PDFs, use `_pdf_ink.read_pdf_ink` from the locked project
 environment; each stroke's `width` is in metres, so multiply by 1000 for
 millimetres. Inspect a representative part and dense assembly at print size;
 section cutting lines may legitimately have the same width as visible edges.
+The layout audit attributes section ink only within the ambiguous 0.35 mm
+edge family. Retained 0.25 mm model edges remain geometry even when collinear
+with or close to a section cutting line.
 
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.
@@ -96,19 +99,6 @@ issue #249.
 
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails before it can save blank tolerance cells.
-
-Local inside-corner limits override the title-block default. The summing lever
-models its two stub roots at R0.5 MAX and its two rib-end feet at R0.4 MAX;
-sheet 2 imports those native fillet dimensions into VIEW K and DETAIL J.
-The part build checks each intended edge pick within 1 µm and reads back each
-fillet's stored edge count and radius. Those checks do not replace inspection
-of the resulting geometry and the drawing leaders.
-After the final drawing rebuild, each imported corner-radius arrow is checked
-against its finite material arc using native display-data readback. A tip on
-the continuation of the supporting circle is rejected even when the radius
-value and MAX tolerance are correct.
-The receiver view retains its native locating dimension and axis centerline
-without repeating their distance as a reference dimension.
 
 The cone-pivot-post drawing also checks the linked Finish note's native extent
 against the landscape template's cell rules. In the exported sheet, those rules
@@ -206,9 +196,12 @@ After successful persisted readback, deliberately install the returned binaries
 into this directory, remove any temporary dispatch hook, and render portrait
 and landscape samples from the installed templates on the farm. The bootstrap
 leaf itself still renders from the checked-in templates, not from a runtime
-override. Census success is not visual approval: obtain explicit owner
-approval of both sample orientations before merging, and run the applicable
-drawing/machinist gates.
+override. Census success is not visual approval: review both samples for
+template-introduced drawing/machinist regressions and obtain explicit owner
+approval of both portrait and landscape orientations before merging.
+Record inherited findings separately; they do not require new geometry work
+as a condition of accepting this template change. This scope distinction does
+not change the project's drawing or machinist-review policies.
 
 #### Installed three-row note provenance (issue #1636)
 
