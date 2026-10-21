@@ -72,6 +72,7 @@ TOLERANCE_CLASS = "machined_block"
 LOWER_FACTORY_CHAMFER = 1.0  # ESTIMATED; as supplied and unmodified
 CUT_END_CHAMFER_MAX = 1.0
 CUT_END_CHAMFER_PLACES = 1
+CUT_END_CHAMFER_ANGLE_DEG = 45.0
 RADIUS = MAJOR_DIA / 2.0
 
 # (y, radius), finished envelope; the builder's rectangular blank receives
@@ -101,6 +102,8 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
 }
 DIMENSION_TOLERANCE_TYPES = {"FinishedLength": 0, "CutEndChamfer": 6}  # NONE / MAX
+# The drawing refreshes the angle text from the saved native chamfer definition;
+# these labels do not substitute typed values for the associated MAX driver.
 DIMENSION_CALLOUTS = {
     "FinishedLength": "FINISHED; UPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
