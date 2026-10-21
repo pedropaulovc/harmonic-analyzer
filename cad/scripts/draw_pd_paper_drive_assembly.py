@@ -2620,6 +2620,7 @@ def _place_bom_sheet(
     _shift_view(adapter, inner, shift, label=f"{inner_label} ring fit")
     iso_items, inner_items = transgear_balloon_items(items)
     iso_label = "paper-drive transgear BOM coverage"
+    bom_diagnostics: dict[str, Any] = {"table": table, "configuration": bom_configuration}
     landings = add_component_bom_balloons(
         adapter,
         view,
@@ -2627,6 +2628,7 @@ def _place_bom_sheet(
         anchors=TRANSGEAR_BALLOON_ANCHORS,
         label=iso_label,
         margin=BALLOON_MARGIN,
+        _bom_diagnostics=bom_diagnostics,
     )
     # Farm run 20261015T082822796Z: the isometric's angular ring order still
     # crossed items 14 and 16, whose attachments sit at different depths
@@ -2643,6 +2645,7 @@ def _place_bom_sheet(
         anchors=TRANSGEAR_BALLOON_ANCHORS,
         label=balloons_label,
         margin=BALLOON_MARGIN,
+        _bom_diagnostics=bom_diagnostics,
     )
     inner_landings.append(
         _balloon_collar_on_its_rear_rim(
