@@ -1732,12 +1732,36 @@ not a calibrated runtime or guaranteed fit: the remaining-work projection was
 about 515 seconds, with the final four controls still unmeasured. A failure does
 not authorize another retry, budget increase or dropped control.
 
-The actual-function inert smoke and 665 focused tests pass, including changed
-saved hints through activation, E5 export and cleanup, with identity/path/type
-drift still refusing. The obsolete saved-title-immutability-only test was removed.
-All 29 native controls, setter effects/restoration, normal drawing and the complete
-32-output package remain required. Partial native coverage is not full
-qualification. No performance gain is established.
+Historically, the actual-function inert smoke and 665 focused tests passed,
+including changed saved hints through activation, E5 export and cleanup, with
+identity/path/type drift still refusing. The obsolete saved-title-immutability-only
+test was removed. The later `fff98dc25` native run completed the original 29
+controls with 174 FULL and 15 SOURCE observations and all 32 outputs. That
+retained native/visual evidence belongs to that exact historical source; it is
+not current C29 native proof or an old/new performance comparison.
+
+The current candidate adds selection-only C29 after C25 and before C26/C27,
+preserving all original controls and their relative order. Exact marked L0 is
+B/P1 mark16 followed by B/P2 mark32. Outer suspension must expose empty L1;
+the existing inner selection guard adds exactly A/P1,P2 through the typed
+dispatch array with View A/Mark0, validates identity/type20/mark/view/count,
+then must restore exact empty L1 and context/flags. Only successful inner
+restoration permits one outer resume and exact marked L0 restoration. Unexpected
+inner restoration refuses without a guessed outer pop/retry; existing owned
+drawing disposal handles failure, not visibility rollback. No visibility command,
+rebuild, save, export, ownership query or production cutover is added.
+
+Current C29 native qualification is **PENDING**. The parent-run offline batch
+passed 927 tests across the probe and recipe tests; the actual canonical-template,
+function and cache-admission smoke passed with the unchanged 19,046-byte input
+and exact SHA-256 above. Persistent report-failure coverage verifies mandatory
+inner restoration cannot be blocked by added reporting. These inert results do
+not establish native nesting. The source-derived normal schedule is 180 FULL
+and 15 SOURCE observations for 30 controls, within unchanged 192 FULL/16 SOURCE
+caps and 32 case slots; all 32 outputs and the 900-second normal/70-second cleanup/
+970-second overall policy remain required. A future C29 pass would establish
+only this two-level, empty-intermediate fixture behavior, not arbitrary nesting
+or foreign-ownership semantics. No performance gain is established.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible
@@ -1841,7 +1865,7 @@ An outer teardown that closes every document does not turn a failed C28 receipt
 into a successful owned-cleanup/source-preservation proof.
 Offline fakes model the documented collateral behavior; they are not native proof.
 
-All 29 controls remain required, including seven separately timed checked setup
+All 30 controls remain required, including seven separately timed checked setup
 rebuilds. The cooperative time limits above cannot preempt a synchronous COM call.
 Any unsupported/failed control, unresolved cleanup or source-cleanliness failure
 blocks normal drawing. Preserve the finalized terminal report size/digest receipt

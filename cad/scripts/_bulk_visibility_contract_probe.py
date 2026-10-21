@@ -78,6 +78,7 @@ class Case(StrEnum):
     BETWEEN_ENABLED = "C26"
     BETWEEN_DISABLED = "C27"
     CLEANUP = "C28"
+    NESTED_SELECTION = "C29"
 
 
 class Export(StrEnum):
@@ -239,6 +240,7 @@ MARKED_CASES = frozenset(
         Case.EXCEPTION_DISABLED,
         Case.BETWEEN_ENABLED,
         Case.BETWEEN_DISABLED,
+        Case.NESTED_SELECTION,
     )
 )
 OVERALL_BUDGET_SECONDS = 970.0
@@ -3114,6 +3116,92 @@ class NativeProbe:
                 "marked sentinel precondition mismatch",
             )
 
+    def nested_selection_case(self) -> None:
+        """Discriminate only two levels with an empty intermediate selection."""
+        original = self.context(self.views())
+        require(
+            original["sheet"] is ViewId.B
+            and original["view"] is ViewId.B
+            and original["selection"]
+            == [
+                {"view": ViewId.B, "node": NodeId.P1, "mark": 16, "type": 20},
+                {"view": ViewId.B, "node": NodeId.P2, "mark": 32, "type": 20},
+            ],
+            Verdict.SELECTION,
+            "C29 requires the exact marked sentinel L0",
+        )
+        row = self.receipt.data["cases"][self.receipt.case]
+        nested = row["nested_selection"] = {
+            "scope": "two_levels_empty_intermediate_only",
+            "phase": "outer_suspend_entered",
+            "L0": original,
+            "outer_resume": {"attempted": False},
+        }
+        manager = self.bind(
+            self.model(Document.DRAWING).SelectionManager, "ISelectionMgr"
+        )
+        self.receipt.checkpoint()
+        raw = manager.SuspendSelectionList()
+        nested["outer_suspend"] = {"raw": repr(raw), "type": type(raw).__name__}
+        require(
+            api_int(raw, "C29 outer SuspendSelectionList", Verdict.SELECTION) == 1,
+            Verdict.SELECTION,
+            "C29 outer suspension did not report nonempty L0",
+        )
+        empty = {**original, "selection": []}
+        nested["L1"] = self.context(self.views())
+        require(
+            nested["L1"] == empty,
+            Verdict.SELECTION,
+            "C29 outer suspension did not expose exact empty L1",
+        )
+        nested["phase"] = "outer_suspended"
+        self.checkpoint("C29-outer-suspended")
+        nested["phase"] = "inner_guard_entered"
+        self.receipt.checkpoint()
+        with self.selection_guard() as inner:
+            nested["phase"] = "inner_selection_entered"
+            self.receipt.checkpoint()
+            self.model(Document.DRAWING).ClearSelection2(True)
+            view, nodes = self.views()[ViewId.A]
+            data = self.bind(inner.CreateSelectData(), "ISelectData")
+            data.View, data.Mark = view, 0
+            pins = (NodeId.P1, NodeId.P2)
+            raw = inner.AddSelectionListObjects(
+                self.dispatches(tuple(nodes[key].drawing_component for key in pins)),
+                data,
+            )
+            nested["bulk_add"] = {"raw": repr(raw), "type": type(raw).__name__}
+            added = api_int(raw, "C29 AddSelectionListObjects", Verdict.SELECTION)
+            self.receipt.counts["bulk_add"] += 1
+            require(added == 2, Verdict.SELECTION, "C29 partial bulk add")
+            row.setdefault("selections", []).append(self.verify_batch(inner, pins))
+            nested["phase"] = "inner_selected"
+            self.checkpoint("C29-inner-selected")
+            nested["phase"] = "inner_restore_entered"
+            self.receipt.checkpoint()
+        # No finally-pop: unexpected inner restoration aborts before this point.
+        require(
+            nested["inner_restored_context"] == empty,
+            Verdict.RESTORATION,
+            "C29 inner resume did not reproduce exact empty L1",
+        )
+        nested["phase"] = "outer_resume_entered"
+        nested["outer_resume"]["attempted"] = True
+        self.receipt.checkpoint()
+        raw = manager.ResumeSelectionList2(False)
+        nested["outer_resume"].update(
+            completed=True, raw=repr(raw), type=type(raw).__name__
+        )
+        nested["L0_restored"] = self.context(self.views())
+        require(
+            nested["L0_restored"] == original,
+            Verdict.RESTORATION,
+            "C29 outer resume did not reproduce exact marked L0",
+        )
+        nested["phase"] = "outer_restored"
+        self.checkpoint("C29-outer-resumed")
+
     @contextmanager
     def selection_guard(self) -> Iterator[Any]:
         original = self.context(self.views())
@@ -3122,9 +3210,31 @@ class NativeProbe:
         )
         suspended = False
         primary: BaseException | None = None
+        nested = (
+            self.receipt.data["cases"][self.receipt.case].get("nested_selection")
+            if self.receipt.case is Case.NESTED_SELECTION
+            else None
+        )
+
+        def resume_selection() -> None:
+            if suspended:
+                if nested is not None:
+                    nested["inner_resume"] = {"attempted": True}
+                raw = manager.ResumeSelectionList2(False)
+                if nested is not None:
+                    nested["inner_resume"].update(
+                        completed=True, raw=repr(raw), type=type(raw).__name__
+                    )
+
         try:
             raw_result = manager.SuspendSelectionList()
             suspended = True
+            if nested is not None:
+                nested["inner_suspend"] = {
+                    "raw": repr(raw_result),
+                    "type": type(raw_result).__name__,
+                }
+                self.receipt.checkpoint()
             result = api_int(raw_result, "SuspendSelectionList", Verdict.SELECTION)
             require(
                 result == (1 if original["selection"] else 0)
@@ -3154,15 +3264,18 @@ class NativeProbe:
                     lambda: self.activate_view(
                         original["sheet"], sheet_only=original["view"] is None
                     ),
-                    lambda: manager.ResumeSelectionList2(False) if suspended else None,
+                    resume_selection,
                 ):
                     try:
                         restore()
                     except BaseException as error:
                         restoration_errors.append(error)
                 try:
+                    restored_context = self.context(self.views())
+                    if nested is not None:
+                        nested["inner_restored_context"] = restored_context
                     require(
-                        self.context(self.views()) == original,
+                        restored_context == original,
                         Verdict.RESTORATION,
                         "original ordered selection/marks/context/flags not restored",
                     )
@@ -4155,6 +4268,9 @@ class NativeProbe:
                     flag_overrides={"A_disable": disabled},
                     expected_injection=Injection.AFTER_SELECTION,
                 )
+            self.run_case(
+                Case.NESTED_SELECTION, self.nested_selection_case, marked=True
+            )
             for case, disabled in (
                 (Case.BETWEEN_ENABLED, False),
                 (Case.BETWEEN_DISABLED, True),
@@ -4176,9 +4292,9 @@ class NativeProbe:
             expected_counts = {
                 "hide": 16,
                 "show": 14,
-                "bulk_add": 32,
+                "bulk_add": 33,
                 "single_select": 2,
-                "marked_select": 18,
+                "marked_select": 20,
                 "setup_scalar_visibility": 18,
                 "harness_setup_rebuild": 7,
                 "native_copy_save": 3,

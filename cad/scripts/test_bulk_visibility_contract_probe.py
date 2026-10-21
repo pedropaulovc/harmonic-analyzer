@@ -1836,6 +1836,397 @@ def sheet_mode_contract(sheet_scale_construction, monkeypatch):
     return fixture
 
 
+@pytest.fixture
+def nested_selection_contract(sheet_mode_contract, monkeypatch):
+    """C29-only alternative native ports, not a claim about vendor nesting."""
+    fixture = sheet_mode_contract
+    subject = fixture.subject
+    subject.create_drawing()
+    fixture.controls.nesting = "stack"
+    fixture.selection_events = []
+    fixture.dispatch_arrays = []
+    original_manager = type(fixture.drawing.SelectionManager)
+
+    class NestedSelectionManager(original_manager):
+        def __init__(self):
+            super().__init__()
+            self.saved = []
+            self.pop_count = 0
+
+        def CreateSelectData(self):
+            fixture.selection_events.append(("CreateSelectData",))
+            return SimpleNamespace(View=None, Mark=None)
+
+        def SuspendSelectionList(self):
+            fixture.selection_events.append(("suspend", tuple(self.selected)))
+            previous, self.selected = self.selected, []
+            self.saved.append(previous)
+            self.suspended = True
+            return int(bool(previous))
+
+        def ResumeSelectionList2(self, append):
+            assert append is False and self.saved
+            self.pop_count += 1
+            fixture.selection_events.append(("resume", append))
+            restored = self.saved.pop()
+            if fixture.controls.nesting == "single_slot_loss":
+                # Alternative port: inner resume unexpectedly exposes L0.
+                restored = self.saved[0]
+            elif fixture.controls.nesting == "wrong_l1":
+                restored = self.selected
+            self.selected = restored
+            self.suspended = bool(self.saved)
+            if fixture.controls.nesting == "inner_throw":
+                raise OSError("inert inner resume threw after restoring empty L1")
+
+        def AddSelectionListObjects(self, array, data):
+            assert array is fixture.dispatch_arrays[-1]
+            assert (
+                array.vt == subject.pythoncom.VT_ARRAY | subject.pythoncom.VT_DISPATCH
+            )
+            assert data.View is fixture.views[probe.ViewId.A] and data.Mark == 0
+            assert self.selected == [] and len(self.saved) == 2
+            assert array.values == tuple(
+                fixture.components[probe.ViewId.A][key]
+                for key in (probe.NodeId.P1, probe.NodeId.P2)
+            )
+            fixture.selection_events.append(("bulk_add", array.values))
+            self.selected = [
+                (component, data.View, data.Mark) for component in array.values
+            ]
+            return len(array.values)
+
+    manager = fixture.drawing.SelectionManager = NestedSelectionManager()
+    for view_id, nodes in fixture.components.items():
+        for key, component in nodes.items():
+
+            def select(append, data, component=component, view_id=view_id):
+                assert data.View is fixture.views[view_id]
+                if not append:
+                    manager.selected = []
+                manager.selected.append((component, data.View, data.Mark))
+                fixture.selection_events.append(
+                    ("select", component, data.Mark, append)
+                )
+                return True
+
+            component.Select = select
+
+    subject.pythoncom = SimpleNamespace(VT_ARRAY=0x2000, VT_DISPATCH=9)
+
+    def variant(vt, values):
+        array = SimpleNamespace(vt=vt, values=values)
+        fixture.dispatch_arrays.append(array)
+        return array
+
+    subject.variant = variant
+    monkeypatch.setattr(
+        subject, "case_checkpoint", probe.NativeProbe.case_checkpoint.__get__(subject)
+    )
+    # Observe forbidden calls directly as well as through receipt counters.
+    for name in ("HideComponent2", "ShowComponent2", "EditRebuild3", "Save3"):
+        monkeypatch.setattr(
+            fixture.drawing,
+            name,
+            lambda *args, name=name: pytest.fail(f"C29 called forbidden native {name}"),
+            raising=False,
+        )
+    fixture.mode_events.clear()
+    fixture.edit_calls.clear()
+    return fixture
+
+
+def test_c29_modeled_nested_success_retains_exact_marked_context_and_six_full_receipts(
+    nested_selection_contract,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    before = subject.receipt.counts.copy()
+    subject.run_case(
+        probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
+    )
+    row = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]
+    nested = row["nested_selection"]
+    original = nested["L0"]
+    empty = {**original, "selection": []}
+    assert original["sheet"] is original["view"] is probe.ViewId.B
+    assert original["selection"] == [
+        {"view": probe.ViewId.B, "node": probe.NodeId.P1, "mark": 16, "type": 20},
+        {"view": probe.ViewId.B, "node": probe.NodeId.P2, "mark": 32, "type": 20},
+    ]
+    assert nested["scope"] == "two_levels_empty_intermediate_only"
+    assert nested["phase"] == "outer_restored"
+    assert nested["L1"] == nested["inner_restored_context"] == empty
+    assert nested["L0_restored"] == subject.context(subject.views()) == original
+    assert nested["outer_suspend"] == {"raw": "1", "type": "int"}
+    assert nested["inner_suspend"] == {"raw": "0", "type": "int"}
+    assert nested["bulk_add"] == {"raw": "2", "type": "int"}
+    assert (
+        nested["inner_resume"]
+        == nested["outer_resume"]
+        == {
+            "attempted": True,
+            "completed": True,
+            "raw": "None",
+            "type": "NoneType",
+        }
+    )
+    manager = fixture.drawing.SelectionManager
+    assert manager.pop_count == 2 and manager.saved == [] and not manager.suspended
+    assert [event[0] for event in fixture.selection_events] == [
+        "CreateSelectData",
+        "select",
+        "CreateSelectData",
+        "select",
+        "suspend",
+        "suspend",
+        "CreateSelectData",
+        "bulk_add",
+        "resume",
+        "resume",
+    ]
+    assert len(fixture.dispatch_arrays) == 1
+    assert row["selections"] == [
+        {
+            "intended": (probe.NodeId.P1, probe.NodeId.P2),
+            "count": 2,
+            "identity_matrix": [[1, 0], [0, 1]],
+            "types": [20, 20],
+            "marks": [0, 0],
+            "own_view": [1, 1],
+            "selection_view": [1, 1],
+        }
+    ]
+    assert row["status"] is probe.Verdict.PASSED
+    assert row["candidate_operation_counts"] == {
+        "hide": 0,
+        "show": 0,
+        "bulk_add": 1,
+        "single_select": 0,
+        "selection_guard": 1,
+        "rebuild": 0,
+        "harness_setup_rebuild": 0,
+        "setup_scalar_visibility": 0,
+        "candidate_scalar_visibility": 0,
+    }
+    assert row["operation_counts"]["marked_select"] == 2
+    assert (
+        subject.receipt.counts[probe.SnapshotKind.FULL]
+        - before[probe.SnapshotKind.FULL]
+        == 6
+    )
+    assert (
+        subject.receipt.counts[probe.SnapshotKind.SOURCE]
+        == before[probe.SnapshotKind.SOURCE]
+    )
+    events = subject.receipt.data["observations"]
+    assert [event["label"] for event in events] == [
+        "case-fresh-precondition",
+        "C29-outer-suspended",
+        "C29-inner-selected",
+        "selection-guard-restored",
+        "C29-outer-resumed",
+        "case-candidate-complete",
+    ]
+    snapshots = [
+        subject.receipt.data["snapshots"][event["content"]] for event in events
+    ]
+    assert [snapshot["context"]["selection"] for snapshot in snapshots] == [
+        original["selection"],
+        [],
+        [
+            {"view": probe.ViewId.A, "node": key, "mark": 0, "type": 20}
+            for key in (probe.NodeId.P1, probe.NodeId.P2)
+        ],
+        [],
+        original["selection"],
+        original["selection"],
+    ]
+    for snapshot in snapshots:
+        assert snapshot["context"]["flags"] == original["flags"]
+        assert snapshot["visibility_mismatches"] == []
+        assert set(snapshot["views"]) == set(probe.ViewId)
+        assert (
+            snapshot["source"]["native"][probe.Document.R]["fresh_native_is_same"] == 1
+        )
+    assert fixture.saved_pdfs == fixture.rendered_exports == fixture.edit_calls == []
+    assert ("rebuild",) not in fixture.mode_events
+
+
+@pytest.mark.parametrize("nesting", ["single_slot_loss", "wrong_l1", "inner_throw"])
+def test_c29_modeled_inner_restore_failure_never_guesses_outer_pop(
+    nested_selection_contract,
+    nesting,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    fixture.controls.nesting = nesting
+    with pytest.raises(probe.ProbeFailure) as caught:
+        subject.run_case(
+            probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
+        )
+    primary = caught.value
+    row = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]
+    nested = row["nested_selection"]
+    observed = subject.context(subject.views())
+    assert primary.verdict is row["status"] is probe.Verdict.RESTORATION
+    assert subject.receipt.primary is primary
+    assert nested["phase"] == "inner_restore_entered"
+    assert nested["outer_resume"] == {"attempted": False}
+    assert "L0_restored" not in nested
+    assert nested["inner_resume"]["attempted"] is True
+    assert nested["inner_suspend"] == {"raw": "0", "type": "int"}
+    assert nested["inner_restored_context"] == observed
+    assert nested["L1"] == {**nested["L0"], "selection": []}
+    if nesting == "inner_throw":
+        assert "completed" not in nested["inner_resume"]
+        assert "inert inner resume threw" in str(primary)
+        assert observed == nested["L1"]
+    else:
+        assert nested["inner_resume"] == {
+            "attempted": True,
+            "completed": True,
+            "raw": "None",
+            "type": "NoneType",
+        }
+        assert observed != nested["L1"]
+        if nesting == "single_slot_loss":
+            assert observed == nested["L0"]
+        else:
+            assert [item["view"] for item in observed["selection"]] == [
+                probe.ViewId.A
+            ] * 2
+    assert fixture.drawing.SelectionManager.pop_count == 1
+    assert len(fixture.drawing.SelectionManager.saved) == 1
+    assert [event[0] for event in fixture.selection_events].count("resume") == 1
+    events = subject.receipt.data["observations"]
+    assert [event["label"] for event in events] == [
+        "case-fresh-precondition",
+        "C29-outer-suspended",
+        "C29-inner-selected",
+        "selection-guard-restored",
+    ]
+    post = subject.receipt.data["snapshots"][events[-1]["content"]]
+    assert post["context"]["selection"] == observed["selection"]
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(primary)
+    assert (
+        persisted["cases"]["C29"]["nested_selection"]["L0"]["selection"]
+        == nested["L0"]["selection"]
+    )
+    assert (
+        persisted["cases"]["C29"]["nested_selection"]["inner_restored_context"][
+            "selection"
+        ]
+        == observed["selection"]
+    )
+    assert persisted["handoff_allowed"] is False
+
+
+def test_c29_report_failure_before_inner_exit_still_resumes_once_without_outer_pop(
+    nested_selection_contract,
+    monkeypatch,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    original = OSError("inert report write failed before inner guard exit")
+    checkpoint = subject.receipt.checkpoint
+    injected = []
+
+    def fail_inner_restore_report_until_resume():
+        nested = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION].get(
+            "nested_selection", {}
+        )
+        if (
+            nested.get("phase") == "inner_restore_entered"
+            and fixture.drawing.SelectionManager.pop_count == 0
+        ):
+            injected.append(original)
+            assert fixture.drawing.SelectionManager.pop_count == 0
+            raise original
+        checkpoint()
+
+    monkeypatch.setattr(
+        subject.receipt, "checkpoint", fail_inner_restore_report_until_resume
+    )
+    with pytest.raises(OSError) as caught:
+        subject.run_case(
+            probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
+        )
+    assert caught.value is subject.receipt.primary is original
+    assert injected == [original]
+    row = subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]
+    nested = row["nested_selection"]
+    assert nested["phase"] == "inner_restore_entered"
+    assert nested["inner_resume"] == {
+        "attempted": True,
+        "completed": True,
+        "raw": "None",
+        "type": "NoneType",
+    }
+    assert nested["outer_resume"] == {"attempted": False}
+    assert "L0_restored" not in nested
+    assert nested["inner_restored_context"] == nested["L1"]
+    assert subject.context(subject.views()) == nested["L1"]
+    manager = fixture.drawing.SelectionManager
+    assert manager.pop_count == 1 and len(manager.saved) == 1
+    assert [event[0] for event in fixture.selection_events].count("resume") == 1
+    (restoration,) = [
+        operation for operation in row["operations"] if operation["bucket"] == "restore"
+    ]
+    assert restoration["status"] is probe.Verdict.PASSED
+    assert subject.receipt.data["secondary_errors"] == []
+    event = subject.receipt.data["observations"][-1]
+    assert event["label"] == "selection-guard-restored"
+    post = subject.receipt.data["snapshots"][event["content"]]
+    assert post["context"]["selection"] == []
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(original)
+    recorded = persisted["cases"]["C29"]["nested_selection"]
+    assert recorded["inner_resume"] == nested["inner_resume"]
+    assert recorded["outer_resume"] == {"attempted": False}
+    assert recorded["inner_restored_context"]["selection"] == []
+    assert persisted["handoff_allowed"] is False
+
+
+def test_c29_failed_case_owned_cleanup_closes_without_another_selection_pop(
+    nested_selection_contract,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    fixture.controls.nesting = "single_slot_loss"
+    primary = capture_and_cleanup_failure(
+        subject,
+        lambda: subject.run_case(
+            probe.Case.NESTED_SELECTION, subject.nested_selection_case, marked=True
+        ),
+        executed_cases=(probe.Case.NESTED_SELECTION,),
+    )
+    assert primary.verdict is probe.Verdict.RESTORATION
+    assert subject.receipt.primary is primary
+    assert fixture.drawing.SelectionManager.pop_count == 1
+    assert [event[0] for event in fixture.selection_events].count("resume") == 1
+    assert subject.app.closed == [fixture.drawing, fixture.source]
+    assert not subject.app.models and not subject.documents and not subject.acquisitions
+    assert subject.app.ActiveDoc is None
+    assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.PASSED
+    assert subject.receipt.data["cleanup"]["inventory_empty"] is True
+    assert subject.receipt.data["handoff_allowed"] is False
+    assert (
+        subject.receipt.data["cases"][probe.Case.NESTED_SELECTION]["status"]
+        is probe.Verdict.RESTORATION
+    )
+    assert (
+        subject.receipt.data["observations"][-1]["label"]
+        == "cleanup-final-empty-and-source-disk"
+    )
+    subject.receipt.checkpoint()
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(primary)
+    assert persisted["cleanup"]["remaining_owned"] == []
+    assert persisted["handoff_allowed"] is False
+
+
 def sheet_mode_record(subject):
     (record,) = [
         row
@@ -2499,7 +2890,6 @@ def test_sheet_mode_actual_c00_retains_two_full_and_no_source_observations(
         "constructed-drawing",
         "case-candidate-complete",
     ]
-    assert len(subject.receipt.data["cases"]) == 29
     assert subject.receipt.data["bounds"]["case_slots"] == 32
     assert len(fixture.edit_calls) == 1
     assert (
@@ -3692,7 +4082,7 @@ def test_template_preference_exception_preserves_primary_without_acquisition(
     assert persisted["primary_error"]["message"] == str(original)
 
 
-def capture_and_cleanup_failure(subject, action):
+def capture_and_cleanup_failure(subject, action, *, executed_cases=()):
     """Exercise actual run/case/stage and owned cleanup, retaining the first error."""
     subject.construction_action = action
     with pytest.raises(BaseException) as caught:
@@ -3712,7 +4102,7 @@ def capture_and_cleanup_failure(subject, action):
     assert all(
         row["status"] is probe.Verdict.NOT_EXECUTED
         for case, row in subject.receipt.data["cases"].items()
-        if case is not probe.Case.CONSTRUCTION
+        if case not in (probe.Case.CONSTRUCTION, *executed_cases)
     )
     return original
 
