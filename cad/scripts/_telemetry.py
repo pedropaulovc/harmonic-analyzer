@@ -54,14 +54,14 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry._logs import get_logger_provider, set_logger_provider
 from opentelemetry.propagate import extract, inject
-from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler, LogRecordProcessor
 from opentelemetry.sdk._logs.export import (
     BatchLogRecordProcessor,
     ConsoleLogRecordExporter,
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     ConsoleSpanExporter,
@@ -926,6 +926,62 @@ def _otlp_log_processor(*, pending_warnings: list[str] | None = None):
         return None
 
 
+# The worker supplies these exact resource keys for one admitted leaf execution.
+# Keep this narrow: resource routing/configuration is not record metadata, and
+# arbitrary resource attributes must not inflate every span and log.
+_FARM_IDENTITY_KEYS = (
+    "farm.workflow_id",
+    "farm.run_id",
+    "farm.attempt",
+    "farm.execution",
+    "farm.worker",
+)
+
+
+def _farm_identity(resource: Resource) -> dict[str, Any]:
+    """Snapshot resolved resource identity, preserving SDK values and types."""
+    return {
+        key: resource.attributes[key]
+        for key in _FARM_IDENTITY_KEYS
+        if key in resource.attributes
+    }
+
+
+class _FarmIdentitySpanProcessor(SpanProcessor):
+    def __init__(self, resource: Resource) -> None:
+        self._identity = _farm_identity(resource)
+
+    def on_start(self, span: Any, parent_context: Any = None) -> None:
+        for key, value in self._identity.items():
+            if key not in span.attributes:
+                span.set_attribute(key, value)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        # No buffered work; permit the provider to flush subsequent exporters.
+        return True
+
+
+class _FarmIdentityLogProcessor(LogRecordProcessor):
+    def __init__(self, resource: Resource) -> None:
+        self._identity = _farm_identity(resource)
+
+    def on_emit(self, log_record: Any) -> None:
+        record = log_record.log_record
+        if not self._identity:
+            return
+        if record.attributes is None:
+            record.attributes = dict(self._identity)
+        else:
+            for key, value in self._identity.items():
+                record.attributes.setdefault(key, value)
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
+
 def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
@@ -1023,6 +1079,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
             _span_processors.append(processor)
 
     tracer_provider = TracerProvider(resource=resource)
+    tracer_provider.add_span_processor(_FarmIdentitySpanProcessor(resource))
     for processor in _span_processors:
         tracer_provider.add_span_processor(processor)
     trace.set_tracer_provider(tracer_provider)
@@ -1051,6 +1108,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         if processor is not None:
             _log_processors.append(processor)
     logger_provider = LoggerProvider(resource=resource)
+    logger_provider.add_log_record_processor(_FarmIdentityLogProcessor(resource))
     for processor in _log_processors:
         logger_provider.add_log_record_processor(processor)
     set_logger_provider(logger_provider)
@@ -1166,13 +1224,15 @@ def _provider_for_service(service: str):
     configure()
     provider = _aux_providers.get(service)
     if provider is None:
+        resource = Resource.create(_resource_attributes(service))
         provider = TracerProvider(
             # No atexit hook: this provider does not OWN its processors (they are the
             # primary provider's), and letting it shut them down at exit would re-close
             # every exporter -- one "Exporter already shutdown" per extra resource.
             shutdown_on_exit=False,
-            resource=Resource.create(_resource_attributes(service)),
+            resource=resource,
         )
+        provider.add_span_processor(_FarmIdentitySpanProcessor(resource))
         for processor in _span_processors:
             provider.add_span_processor(processor)
         _aux_providers[service] = provider
@@ -1184,11 +1244,13 @@ def _logger_provider_for_service(service: str):
     resource naming ``service``, sharing :data:`_log_processors`, built lazily."""
     provider = _aux_logger_providers.get(service)
     if provider is None:
+        resource = Resource.create(_resource_attributes(service))
         provider = LoggerProvider(
             # Not the owner of the shared processors; see _provider_for_service.
             shutdown_on_exit=False,
-            resource=Resource.create(_resource_attributes(service)),
+            resource=resource,
         )
+        provider.add_log_record_processor(_FarmIdentityLogProcessor(resource))
         for processor in _log_processors:
             provider.add_log_record_processor(processor)
         _aux_logger_providers[service] = provider
