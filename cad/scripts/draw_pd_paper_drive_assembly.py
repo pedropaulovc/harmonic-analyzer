@@ -28,10 +28,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
-import hashlib
 import json
 import math
-from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -1759,8 +1757,8 @@ def _create_sheets(adapter: Any) -> None:
 
 def _annotate_bom_width_boundary(
     table: Any, *, configuration: str | None, stage: str,
-    outcome: dict[str, Any] | None = None, capture_cells: bool = False,
-) -> dict[str, Any] | None:
+    outcome: dict[str, Any] | None = None,
+) -> None:
     """Retain bounded raw measurements, never infer a hidden-column index map."""
     def read(call: Callable[[], Any]) -> dict[str, Any]:
         try:
@@ -1798,7 +1796,7 @@ def _annotate_bom_width_boundary(
             ],
             "caps": {"columns": declared > 8, "rows": rows > 64},
         }
-        if stage == "all_visible_after_widths" or capture_cells:
+        if stage == "all_visible_after_widths":
             try:
                 formats: list[dict[str, Any]] = []
                 format_ids: dict[str, int] = {}
@@ -1876,9 +1874,8 @@ def _annotate_bom_width_boundary(
         _telemetry.info(
             "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
         )
-        return summary
     except Exception:
-        return None  # Observational evidence cannot mask or weaken a guard.
+        pass  # Observational evidence cannot mask or weaken a guard.
 
 
 def _set_bom_column_widths(
@@ -1905,6 +1902,10 @@ def _set_bom_column_widths(
         or any(not math.isfinite(width) or width <= 0.0 for _column, width in widths)
     ):
         raise ValueError("paper-drive BOM width targets must be distinct visible columns")
+
+    # Retained native Part Number cells constrain row minima even when hidden.
+    # The controlled native width comparison preserved every cell and member.
+    targets = (*widths, (native_column, BOM_COLUMN_WIDTHS["description"]))
 
     def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
         return (
@@ -1937,7 +1938,7 @@ def _set_bom_column_widths(
         _annotate_bom_width_boundary(
             table, configuration=configuration, stage="all_visible_before_widths"
         )
-        for column, width in widths:
+        for column, width in targets:
             returned = float(table.SetColumnWidth(column, width, 0))
             if not math.isfinite(returned) or abs(returned - width) > 1e-6:
                 raise RuntimeError(f"paper-drive BOM column {column} width was refused")
@@ -1955,7 +1956,7 @@ def _set_bom_column_widths(
         prove_all_visible()
         _annotate_bom_width_boundary(
             table, configuration=configuration, stage="all_visible_after_widths",
-            outcome={"requested_widths": tuple(widths), "verified_widths": tuple(expected_widths)},
+            outcome={"requested_widths": targets, "verified_widths": tuple(expected_widths)},
         )
     except BaseException as error:
         primary_error = error
@@ -2173,12 +2174,163 @@ def bom_split_row(row_heights: Sequence[float], header_count: int) -> int:
     return min(candidates)[1]
 
 
+def _bom_piece_grid_bounds(
+    annotation: Any, *, row_heights: Sequence[float], piece: int
+) -> tuple[float, float, float, float]:
+    """Prove this fixed four-column piece from its actual displayed grid."""
+    tolerance = 1e-7
+    evidence: dict[str, Any] = {
+        "piece": piece, "expected_rows": len(row_heights),
+        "encoding": "GetLineAtIndex3: metadata[0:4], startXYZ[4:7], endXYZ[7:10]",
+        "coordinate_contract": "untransformed sheet metres; native anchor and row readback checked",
+        "lines": [],
+    }
+    try:
+        if not 2 <= len(row_heights) <= 44 or any(
+            not math.isfinite(height) or height <= 0.0 for height in row_heights
+        ):
+            raise RuntimeError("paper-drive BOM displayed grid native row heights are unreadable")
+        evidence["native_row_heights_m"] = tuple(row_heights)
+        position = tuple(float(value) for value in annotation.GetPosition())
+        evidence["native_annotation_position_m"] = tuple(
+            value if math.isfinite(value) else repr(value) for value in position
+        )
+        if (
+            len(position) != 3 or any(not math.isfinite(value) for value in position)
+            or abs(position[2]) > tolerance
+        ):
+            raise RuntimeError(f"paper-drive BOM position unreadable: {position!r}")
+        raw_display = annotation.GetDisplayData()
+        if raw_display is None:
+            raise RuntimeError("paper-drive BOM displayed grid display data is unavailable")
+        display = _early_bound(raw_display, "IDisplayData")
+        count = display.GetLineCount()
+        evidence["line_count"] = count
+        if type(count) is not int or not 1 <= count <= 1024:
+            raise RuntimeError("paper-drive BOM displayed grid line count is unsupported")
+        horizontal: list[tuple[float, float, float]] = []
+        vertical: list[tuple[float, float, float]] = []
+        zero_length = []
+        for index in range(count):
+            raw_line = display.GetLineAtIndex3(index)
+            try:
+                if len(raw_line) != 10:
+                    raise ValueError("native line record length is not ten")
+                values = tuple(float(value) for value in raw_line)
+            except (TypeError, ValueError, OverflowError) as error:
+                evidence["malformed_line"] = {"index": index, "raw": repr(raw_line)[:512]}
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid line {index} is not a ten-value record"
+                ) from error
+            evidence["lines"].append(tuple(
+                value if math.isfinite(value) else repr(value) for value in values
+            ))
+            if any(not math.isfinite(value) for value in values):
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid line {index} has non-finite values"
+                )
+            start, end = values[4:7], values[7:10]
+            if start == end:
+                zero_length.append(index)
+                continue
+            if abs(start[2]) > tolerance or abs(end[2]) > tolerance:
+                raise RuntimeError("paper-drive BOM displayed grid has non-sheet Z coordinates")
+            dx, dy = abs(start[0] - end[0]), abs(start[1] - end[1])
+            if dx <= tolerance and dy <= tolerance:
+                raise RuntimeError("paper-drive BOM displayed grid contains an ambiguous short nonzero line")
+            if dy <= tolerance:
+                horizontal.append((start[1], min(start[0], end[0]), max(start[0], end[0])))
+            elif dx <= tolerance:
+                vertical.append((start[0], min(start[1], end[1]), max(start[1], end[1])))
+            else:
+                raise RuntimeError("paper-drive BOM displayed grid has unsupported non-axis-aligned geometry")
+        evidence["zero_length_line_indices"] = zero_length
+
+        def coordinates(values: list[float]) -> tuple[float, ...]:
+            representatives: list[float] = []
+            for value in sorted(values):
+                # Each cluster stays anchored to its first observed coordinate.
+                if not representatives or value - representatives[-1] > tolerance:
+                    representatives.append(value)
+            return tuple(representatives)
+
+        xs = coordinates([coordinate for coordinate, _start, _end in vertical])
+        ys = coordinates([coordinate for coordinate, _start, _end in horizontal])
+        evidence["x_boundaries_m"], evidence["y_boundaries_m"] = xs, ys
+        if len(xs) != 5 or len(ys) != len(row_heights) + 1:
+            raise RuntimeError(
+                "paper-drive BOM displayed grid boundary counts are "
+                f"{len(xs)}x{len(ys)}; expected 5x{len(row_heights) + 1}"
+            )
+
+        def prove_coverage(
+            segments: list[tuple[float, float, float]],
+            boundaries: tuple[float, ...], lower: float, upper: float, direction: str,
+        ) -> None:
+            if any(
+                start < lower - tolerance or end > upper + tolerance
+                for _coordinate, start, end in segments
+            ):
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid has outlying {direction} boundary geometry"
+                )
+            for boundary in boundaries:
+                reached = lower
+                for start, end in sorted(
+                    (start, end) for coordinate, start, end in segments
+                    if abs(coordinate - boundary) <= tolerance
+                ):
+                    if start > reached + tolerance:
+                        break
+                    reached = max(reached, end)
+                if reached < upper - tolerance:
+                    raise RuntimeError(
+                        f"paper-drive BOM displayed grid has incomplete {direction} boundary coverage"
+                    )
+
+        prove_coverage(horizontal, ys, xs[0], xs[-1], "horizontal")
+        prove_coverage(vertical, xs, ys[0], ys[-1], "vertical")
+        widths = tuple(right - left for left, right in zip(xs, xs[1:]))
+        heights = tuple(
+            ys[index + 1] - ys[index] for index in range(len(ys) - 2, -1, -1)
+        )
+        bounds = (xs[0], ys[0], xs[-1], ys[-1])
+        evidence.update({
+            "bounds_m": bounds, "column_widths_m": widths, "row_heights_m": heights,
+        })
+        if any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(widths, BOM_COLUMN_WIDTHS.values(), strict=True)
+        ):
+            raise RuntimeError("paper-drive BOM displayed grid column widths changed")
+        if any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(heights, row_heights, strict=True)
+        ):
+            raise RuntimeError(
+                "paper-drive BOM displayed grid row heights disagree with native split rows"
+            )
+        if abs(bounds[0] - position[0]) > 1e-6 or abs(bounds[3] - position[1]) > 1e-6:
+            raise RuntimeError("paper-drive BOM displayed grid does not match its native annotation anchor")
+        return bounds
+    except Exception as error:
+        evidence["error"] = f"{type(error).__name__}: {error}"[:512]
+        raise
+    finally:
+        try:
+            _telemetry.info("drawing.pd_bom_grid " + json.dumps(evidence, separators=(",", ":")))
+        except Exception:
+            pass  # Native geometry failures must survive observational logging.
+
+
 def _assert_bom_pieces(
     pieces: Sequence[Any], *, header_count: int, total_rows: int,
     configuration: str | None = None,
     expected_snapshot: BomSnapshot | None = None,
 ) -> None:
     """Read split ranges and physical extents; every logical data row survives."""
+    if len(pieces) != 2:
+        raise RuntimeError("paper-drive BOM split needs exactly two native pieces")
     membership: Counter[int] = Counter()
     findings = []
     validated_pieces = []
@@ -2221,19 +2373,20 @@ def _assert_bom_pieces(
                     "paper-drive split BOM native membership or quantities changed"
                 )
         rows = sorted({*range(header_count), *range(start, end + 1)})
-        height = sum(float(piece.GetRowHeight(row)) for row in rows)
-        width = sum(
-            float(piece.GetColumnWidth(column))
-            for column in range(int(piece.ColumnCount))
+        row_heights = tuple(float(piece.GetRowHeight(row)) for row in rows)
+        raw_annotation = piece.GetAnnotation()
+        if raw_annotation is None:
+            raise RuntimeError("paper-drive BOM split annotation is unavailable")
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        left, bottom, right, top = _bom_piece_grid_bounds(
+            annotation, row_heights=row_heights, piece=index + 1
         )
-        annotation = _early_bound(piece.GetAnnotation(), "IAnnotation")
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if len(position) != 3:
-            raise RuntimeError(f"paper-drive BOM position unreadable: {position!r}")
-        violations = bom_extent_violations((position[0], position[1]), width, height)
+        anchor = (left, top)
+        width, height = right - left, top - bottom
+        violations = bom_extent_violations(anchor, width, height)
         expected_anchor = (BOM_ANCHOR, BOM_SECOND_ANCHOR)[index]
         if any(
-            abs(position[axis] - expected_anchor[axis]) > 1e-6
+            abs(anchor[axis] - expected_anchor[axis]) > 1e-6
             for axis in range(2)
         ):
             violations.append("table moved outside its assigned column")
@@ -2241,7 +2394,7 @@ def _assert_bom_pieces(
             violations.append("table column widths changed after splitting")
         _telemetry.event(
             "drawing.bom_piece", piece=index + 1, split_count=count, split_range=(start, end),
-            anchor_mm=(position[0] * 1000, position[1] * 1000),
+            anchor_mm=(anchor[0] * 1000, anchor[1] * 1000),
             width_mm=width * 1000, height_mm=height * 1000,
             violations=tuple(violations),
         )
@@ -2514,270 +2667,6 @@ def _balloon_collar_on_its_rear_rim(
     )
 
 
-def _probe_native201_row_minimum(
-    adapter: Any, table: Any, reference: Any, *,
-    configuration: str, expected_snapshot: BomSnapshot,
-) -> None:
-    """Temporary PD-only causal width experiment; always stop before saving."""
-    drawing = _early_bound(adapter.currentModel, "IModelDoc2")
-    if drawing.GetType() != 3 or drawing.GetPathName() != "":
-        raise RuntimeError("native201 probe requires its unsaved drawing")
-    physical = _bom_physical_columns(table, label="native201 probe")
-    if physical != ((202, False), (204, False), (204, False), (203, False), (201, True)):
-        raise RuntimeError("native201 probe requires the qualified five-column layout")
-    native_column = next(index for index, (kind, _hidden) in enumerate(physical) if kind == 201)
-    original_hidden = table.ColumnHidden(native_column)
-    if original_hidden is not True:
-        raise RuntimeError("native201 probe original hidden state is not proven")
-    rows = len(expected_snapshot) + 1
-    if rows != 44 or int(table.RowCount) != rows:
-        raise RuntimeError("native201 probe requires all 44 physical rows")
-    control_width = 0.118  # Existing Description width; not a no-wrap guarantee.
-    all_visible = tuple((kind, False) for kind, _hidden in physical)
-
-    def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
-        return (
-            table.GetColumnType3(index, include_hidden),
-            table.GetColumnTitle2(index, include_hidden),
-            table.DisplayedText2(0, index, include_hidden),
-        )
-
-    column_records = tuple(column_record(index, True) for index in range(len(physical)))
-    bom = _early_bound(table, "IBomTableAnnotation")
-
-    def prove_hidden() -> BomSnapshot:
-        if _bom_physical_columns(table, label="native201 hidden probe") != physical:
-            raise RuntimeError("native201 probe column visibility/order changed")
-        raw_feature = bom.BomFeature
-        if raw_feature is None:
-            raise RuntimeError("native201 probe native feature is unavailable")
-        feature = _early_bound(raw_feature, "IBomFeature")
-        if feature.PartConfigurationGrouping != 3 or feature.DisplayAsOneItem is not False:
-            raise RuntimeError("native201 probe native grouping changed")
-        snapshot = validate_bom_number_property(
-            table, configuration=configuration, label="native201 probe",
-            expected_rows=rows, occurrence_quantities=True,
-        )
-        if snapshot != expected_snapshot:
-            raise RuntimeError("native201 probe native membership, Number or quantity changed")
-        return snapshot
-
-    prove_hidden()
-    raw_source = reference.ReferencedDocument
-    if raw_source is None or isinstance(raw_source, str):
-        raise RuntimeError("native201 probe source assembly document is unavailable")
-    source = _early_bound(raw_source, "IModelDoc2")
-    if Path(source.GetPathName()).resolve() != SOURCE.resolve():
-        raise RuntimeError("native201 probe reference does not identify the source assembly")
-    observations = [(0, 0, source)]
-    for row, *_rest in expected_snapshot:
-        for occurrence, raw in enumerate(bom.GetComponents2(row, configuration) or (), 1):
-            component = _early_bound(raw, "IComponent2")
-            model = component.GetModelDoc2()
-            if model is None:
-                raise RuntimeError("native201 probe source document is unresolved")
-            observations.append((row, occurrence, _early_bound(model, "IModelDoc2")))
-    expected_occurrences = sum(
-        count for _row, members, _number, _quantity in expected_snapshot
-        for _path, _member, count in members
-    )
-    if len(observations) != expected_occurrences + 1:
-        raise RuntimeError("native201 probe source document observations are incomplete")
-    source_documents = []
-    for row, occurrence, model in observations:
-        path = model.GetPathName()
-        if type(path) is not str or not path or not Path(path).is_file():
-            raise RuntimeError("native201 probe source path is unavailable")
-        source_documents.append((row, occurrence, model, path))
-    paths = tuple(dict.fromkeys(Path(path) for _row, _occurrence, _model, path in source_documents))
-    path_ids = {path: index for index, path in enumerate(paths)}
-
-    def source_state() -> dict[str, Any]:
-        flags = []
-        # Retain EVERY native model-document observation, not one wrapper per
-        # path. Only disk hashing is deduplicated by physical pathname.
-        for row, occurrence, model, path in source_documents:
-            flag = model.GetSaveFlag()
-            if model.GetPathName() != path or type(flag) is not bool:
-                raise RuntimeError("native201 probe source document identity/flag is unavailable")
-            flags.append((row, occurrence, path_ids[Path(path)], flag))
-        hashes = []
-        for path in paths:
-            with path.open("rb") as stream:
-                hashes.append((str(path), hashlib.file_digest(stream, "sha256").hexdigest()))
-        return {"disk_sha256": hashes, "live_document_flags": flags}
-
-    sources_before = source_state()
-    original_widths: tuple[float, ...] | None = None
-    baseline_cells: Any = None
-    baseline_heights: tuple[float, ...] | None = None
-    width_attempted = False
-    primary_error: BaseException | None = None
-
-    def prove_visible() -> None:
-        if _bom_physical_columns(table, label="native201 visible probe") != all_visible:
-            raise RuntimeError("native201 probe all-visible column identity changed")
-        for index, expected in enumerate(column_records):
-            if column_record(index, True) != expected or column_record(index, False) != expected:
-                raise RuntimeError("native201 probe physical/legacy column identity disagrees")
-
-    def widths_equal(expected: tuple[float, ...]) -> None:
-        actual = tuple(float(table.GetColumnWidth(index)) for index in range(len(physical)))
-        if any(
-            not math.isfinite(value) or abs(value - wanted) > 1e-9
-            for value, wanted in zip(actual, expected, strict=True)
-        ):
-            raise RuntimeError("native201 probe independent width readback changed")
-
-    def observe_visible(phase: str, target: float | None, returned: float | None) -> None:
-        nonlocal baseline_cells
-        record = _annotate_bom_width_boundary(
-            table, configuration=configuration,
-            stage=f"native201_probe_{phase}_all_visible", capture_cells=True,
-            outcome={"requested_201_m": target, "setter_return_m": returned},
-        )
-        census = record.get("cell_census", {}) if record is not None else {}
-        formats = census.get("formats", [])
-        font_fields = {
-            "use_document_format", "IsHeightSpecifiedInPts", "CharHeight",
-            "CharHeightInPts", "TypeFaceName", "WidthFactor", "CharSpacingFactor",
-            "LineSpacing", "Bold", "Italic",
-        }
-        if not formats or census.get("caps") != {"rows": False, "columns": False}:
-            raise RuntimeError("native201 probe cell/font census is incomplete")
-        for font in formats:
-            if set(font) != font_fields or any(
-                not isinstance(value, dict) or "value" not in value
-                or value.get("truncated") is not False
-                for value in font.values()
-            ):
-                raise RuntimeError("native201 probe font readback is unavailable")
-        cells = []
-        if len(census.get("rows", [])) != rows:
-            raise RuntimeError("native201 probe cell census omits rows")
-        for index, row in enumerate(census["rows"]):
-            if row["row"] != index or len(row["cells"]) != len(physical):
-                raise RuntimeError("native201 probe cell census coverage changed")
-            for column, cell in enumerate(row["cells"]):
-                if cell["column"] != column or not all(
-                    isinstance(cell[field], str) for field in ("text", "displayed")
-                ):
-                    raise RuntimeError("native201 probe cell text readback is unavailable")
-                cells.append((index, column, cell["text"], cell["displayed"], formats[cell["format_id"]]))
-        state = (formats[census["table_format_id"]], cells)
-        if baseline_cells is None:
-            baseline_cells = state
-        elif state != baseline_cells:
-            raise RuntimeError("native201 probe cell text or font changed")
-
-    def settle_hidden(phase: str) -> tuple[float, ...]:
-        if _bom_physical_columns(table, label="native201 settling probe") != physical:
-            raise RuntimeError("native201 probe hidden state was not restored before row requests")
-        returned_heights = tuple(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0) for row in range(rows))
-        if drawing.EditRebuild3() is not True:
-            raise RuntimeError("native201 probe drawing rebuild failed")
-        snapshot = prove_hidden()
-        heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
-        if any(not math.isfinite(height) or height <= 0.0 for height in heights):
-            raise RuntimeError("native201 probe physical row heights are unavailable")
-        _annotate_bom_width_boundary(
-            table, configuration=configuration, stage=f"native201_probe_{phase}_settled",
-            outcome={
-                "requested_row_height_m": BOM_ROW_HEIGHT,
-                "row_height_returns": returned_heights, "native_snapshot": snapshot,
-            },
-        )
-        return heights
-
-    try:
-        table.SetColumnHidden(native_column, False)
-        prove_visible()
-        original_widths = tuple(
-            float(table.GetColumnWidth(index)) for index in range(len(physical))
-        )
-        if any(not math.isfinite(width) or width <= 0.0 for width in original_widths):
-            raise RuntimeError("native201 probe original column widths are unavailable")
-        if original_widths[native_column] >= control_width:
-            raise RuntimeError("native201 probe fixed width is not a widening control")
-        widths_equal(tuple(BOM_COLUMN_WIDTHS.values()) + (original_widths[native_column],))
-        observe_visible("baseline", None, None)
-        table.SetColumnHidden(native_column, original_hidden)
-        baseline_heights = settle_hidden("baseline")
-
-        table.SetColumnHidden(native_column, False)
-        prove_visible()
-        widths_equal(original_widths)
-        width_attempted = True
-        returned = float(table.SetColumnWidth(native_column, control_width, 0))
-        if not math.isfinite(returned) or abs(returned - control_width) > 1e-9:
-            raise RuntimeError("native201 probe control width was refused")
-        widths_equal(original_widths[:-1] + (control_width,))
-        prove_visible()
-        observe_visible("treatment", control_width, returned)
-        table.SetColumnHidden(native_column, original_hidden)
-        settle_hidden("treatment")
-    except BaseException as error:
-        primary_error = error
-        raise
-    finally:
-        cleanup_errors: list[BaseException] = []
-        try:
-            table.SetColumnHidden(native_column, False)
-        except BaseException as error:
-            cleanup_errors.append(error)
-        try:
-            # Prove state independently even if the expose call raised after
-            # taking effect. Never write a width through ambiguous indices.
-            prove_visible()
-            if original_widths is not None:
-                returned = None
-                if width_attempted:
-                    returned = float(table.SetColumnWidth(native_column, original_widths[native_column], 0))
-                    if not math.isfinite(returned) or abs(returned - original_widths[native_column]) > 1e-9:
-                        raise RuntimeError("native201 probe original width restoration was refused")
-                widths_equal(original_widths)
-                observe_visible("restored", original_widths[native_column], returned)
-        except BaseException as error:
-            cleanup_errors.append(error)
-        try:
-            # Independent attempt: a failed width restoration must not leave
-            # the retained key exposed, even though this drawing is discarded.
-            table.SetColumnHidden(native_column, original_hidden)
-        except BaseException as error:
-            cleanup_errors.append(error)
-        try:
-            restored_heights = settle_hidden("restored")
-            if baseline_heights is not None and any(
-                abs(actual - expected) > 1e-9
-                for actual, expected in zip(restored_heights, baseline_heights, strict=True)
-            ):
-                raise RuntimeError("native201 probe baseline row minima were not restored")
-        except BaseException as error:
-            cleanup_errors.append(error)
-        try:
-            sources_after = source_state()
-            try:
-                _telemetry.info("drawing.pd_native201_probe_sources " + json.dumps({
-                    "before": sources_before, "after": sources_after,
-                    "proof_scope": "disk hashes and captured live dirty flags, not whole-memory proof",
-                }, separators=(",", ":")))
-            except Exception:
-                pass
-            if sources_after != sources_before:
-                raise RuntimeError("native201 probe source disk hash or live dirty flag changed")
-        except BaseException as error:
-            cleanup_errors.append(error)
-        if cleanup_errors:
-            if primary_error is None:
-                failure = RuntimeError("native201 probe cleanup failed")
-                for error in cleanup_errors:
-                    failure.add_note(repr(error))
-                raise failure from cleanup_errors[0]
-            for error in cleanup_errors:
-                primary_error.add_note(f"native201 probe cleanup also failed: {error!r}")
-    raise RuntimeError("native201 width diagnostic completed; deliberate stop before split/save")
-
-
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
 ) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
@@ -2857,10 +2746,6 @@ def _place_bom_sheet(
         occurrence_quantities=True,
     )
     _activate_sheet(adapter, SHEET_NAMES[5])
-    _probe_native201_row_minimum(
-        adapter, table, reference,
-        configuration=bom_configuration, expected_snapshot=bom_snapshot,
-    )
     pieces = _split_bom(
         adapter, table, configuration=bom_configuration,
         expected_snapshot=bom_snapshot,

@@ -2596,12 +2596,13 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         for index, column in enumerate(columns):
             if column.kind != 201:
                 continue
-            # Model only the observed retained-long-name wrap dependency, not
-            # native font metrics: each extra line raises the content minimum.
-            # Compact authored rows at the original width are an assumption;
-            # successful native two-field layout still needs qualification.
+            # Stateful wrap model informed by native2474's width-only A/B/A:
+            # retained native text constrains row minima even while hidden.
+            # This is not a native font/height or visible-extent qualification.
             text_width = len(cells[row][index]) * 0.0016
-            original_lines = max(1, math.ceil(text_width / _PD_NATIVE_PART_WIDTH))
+            original_lines = max(
+                1, math.ceil(text_width / drawing.BOM_COLUMN_WIDTHS["description"])
+            )
             current_lines = max(1, math.ceil(text_width / max(column.width, 0.001)))
             minimum = max(
                 minimum,
@@ -2950,6 +2951,42 @@ def test_native_width_fixture_preserves_storage_and_legacy_projection(monkeypatc
         assert table.GetColumnType3(index, True) == (-1, None, 0)
 
 
+def test_retained_native_width_model_reversibly_constrains_hidden_row_minima(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    before_snapshot = _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
+
+    def heights_at(width):
+        # Only the physical retained width changes; hidden state and identical
+        # row-minimum requests are restored before observing the consumer.
+        assert table.SetColumnHidden(4, False) is None
+        assert table.SetColumnWidth(4, width, 0) == width
+        assert table.SetColumnHidden(4, True) is None
+        return tuple(
+            table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
+        )
+
+    narrow = heights_at(_PD_NATIVE_PART_WIDTH)
+    wide = heights_at(drawing.BOM_COLUMN_WIDTHS["description"])
+    restored = heights_at(_PD_NATIVE_PART_WIDTH)
+    assert any(after < before for before, after in zip(narrow, wide))
+    assert restored == narrow
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    ) == before_snapshot
+    # This deliberately models causality, not native2474's exact 30 reduced
+    # rows, 220 cell/font observations, or native extent qualification.
+
+
 def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypatch):
     configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     old = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
@@ -2992,6 +3029,10 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
         for component in scene.components
     )
     before_cells = tuple(tuple(row) for row in scene.cells)
+    narrow_heights = tuple(
+        table.SetRowHeight(row, drawing.BOM_ROW_HEIGHT, 0) for row in range(44)
+    )
+    assert max(narrow_heights) > drawing.BOM_ROW_HEIGHT
     items = dict(drawing._validate_bom(
         scene.adapter, table, drawing._source_family_counts(scene.model),
         configuration=configuration,
@@ -3001,7 +3042,9 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
         width for _index, width in widths
     )
     assert (scene.state.columns[-1].kind, scene.state.columns[-1].hidden,
-            scene.state.columns[-1].width) == (201, True, _PD_NATIVE_PART_WIDTH)
+            scene.state.columns[-1].width) == (
+                201, True, drawing.BOM_COLUMN_WIDTHS["description"]
+            )
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     assert tuple(
         (id(component), component.GetPathName(), component.ReferencedConfiguration,
@@ -3029,6 +3072,8 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
     assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
     heights = tuple(table.GetRowHeight(row) for row in range(44))
     assert heights == (drawing.BOM_ROW_HEIGHT,) * 44
+    assert sum(heights) < sum(narrow_heights)
+    assert any(after < before for before, after in zip(narrow_heights, heights))
     split_after = drawing.bom_split_row(heights, 1)
     for anchor, height in (
         (drawing.BOM_ANCHOR, sum(heights[:split_after + 1])),
@@ -3037,11 +3082,11 @@ def test_pd_all_visible_authoring_avoids_hidden_long_name_row_overflow(monkeypat
         assert not drawing.bom_extent_violations(
             anchor, sum(drawing.BOM_COLUMN_WIDTHS.values()), height
         )
-    # Logical row fit is not native extent qualification. The observed legacy
-    # getter still projects the wide 201, so the unchanged split guard must
-    # refuse this ambiguous aggregate (covered by the split-piece regression).
+    # Logical row fit is not native extent qualification. The legacy getter
+    # still projects the wide retained 201; only independent displayed-grid
+    # geometry can establish the split pieces' actual visible extent.
     assert sum(table.GetColumnWidth(index) for index in range(4)) == pytest.approx(
-        0.012 + 0.048 + 0.118 + _PD_NATIVE_PART_WIDTH
+        0.012 + 0.048 + 0.118 + 0.118
     )
 
 
@@ -3067,14 +3112,18 @@ def test_pd_width_authoring_sets_physical_columns_and_preserves_untargeted_width
     drawing._set_bom_column_widths(table, widths)
     for index, column in enumerate(scene.state.columns):
         old_width, *old_metadata = original[id(column)]
-        assert column.width == dict(widths).get(index, old_width)
+        expected = (
+            drawing.BOM_COLUMN_WIDTHS["description"]
+            if column.kind == 201 else dict(widths).get(index, old_width)
+        )
+        assert column.width == expected
         assert [column.kind, column.property_name, column.raw_property_data, column.hidden] == (
             old_metadata
         )
-    assert scene.state.columns[-1].width == _PD_NATIVE_PART_WIDTH
+    assert scene.state.columns[-1].width == drawing.BOM_COLUMN_WIDTHS["description"]
     assert scene.state.columns[-1].hidden is True
     assert scene.state.columns[quantity_column].width == 0.012
-    assert table.GetColumnWidth(quantity_column) == _PD_NATIVE_PART_WIDTH
+    assert table.GetColumnWidth(quantity_column) == drawing.BOM_COLUMN_WIDTHS["description"]
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
 
@@ -3199,7 +3248,7 @@ def test_pd_width_authoring_refuses_independent_width_readback_damage(monkeypatc
 
     def set_width(index, width, options):
         actual = native_set(index, width, options)
-        if index == 4:
+        if index == damaged_column or (fault == "untargeted-sku" and index == 4):
             columns[damaged_column].width += 0.001
         return actual
 
@@ -3209,7 +3258,7 @@ def test_pd_width_authoring_refuses_independent_width_readback_damage(monkeypatc
             table, ((0, 0.012), (1, 0.048), (2, 0.118), (4, 0.012))
         )
     assert columns[damaged_column].width == pytest.approx(
-        0.013 if fault == "quantity" else before + 0.001
+        {"quantity": 0.012, "retained-native": 0.118}.get(fault, before) + 0.001
     )
     assert columns[-1].hidden is True
 
@@ -3236,7 +3285,7 @@ def test_pd_width_authoring_refuses_failed_restoration_without_a_primary_error(m
             table, ((0, 0.012), (1, 0.048), (2, 0.118), (3, 0.012))
         )
     assert columns[3].width == 0.012
-    assert columns[-1].width == _PD_NATIVE_PART_WIDTH
+    assert columns[-1].width == drawing.BOM_COLUMN_WIDTHS["description"]
     assert columns[-1].hidden is (fault == "raises-after-effect")
     assert columns[3].hidden is (fault == "wrong-column")
 
@@ -4370,6 +4419,25 @@ def test_bom_insertion_refuses_changes_from_the_description_rebuild(
 
 
 
+def _pd_display_grid(table, rows, anchor):
+    """Model displayed physical borders, not a requested-width/readback echo."""
+    xs = [anchor[0]]
+    for column in table._pd_state.columns:
+        if not column.hidden:
+            xs.append(xs[-1] + column.width)
+    ys = [anchor[1]]
+    for row in rows:
+        ys.append(ys[-1] - table.GetRowHeight(row))
+
+    def line(x1, y1, x2, y2):
+        return (0, 0, 0, 0, x1, y1, 0.0, x2, y2, 0.0)
+
+    return (
+        [line(x, ys[-1], x, ys[0]) for x in xs]
+        + [line(xs[0], y, xs[-1], y) for y in ys]
+    )
+
+
 def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
     total_rows = len(drawing.BOM_PART_NUMBERS) + 1
     split_after = drawing.bom_split_row(
@@ -4435,16 +4503,24 @@ def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
         ))
         for column, width in enumerate(widths):
             table._pd_state.columns[column].width = width
+        table._pd_state.columns[-1].width = drawing.BOM_COLUMN_WIDTHS["description"]
         anchor = (drawing.BOM_ANCHOR, drawing.BOM_SECOND_ANCHOR)[index]
+        lines = _pd_display_grid(table, sorted(readable_rows), anchor)
+        display = SimpleNamespace(
+            GetLineCount=lambda lines=lines: len(lines),
+            GetLineAtIndex3=lambda line_index, lines=lines: lines[line_index],
+        )
+        table._pd_grid_lines = lines
         table.GetAnnotation.return_value = SimpleNamespace(
-            GetPosition=lambda anchor=anchor: (*anchor, 0.0)
+            GetPosition=lambda anchor=anchor: (*anchor, 0.0),
+            GetDisplayData=lambda display=display: display,
         )
         pieces.append(table)
         association_reads.append(reads)
     return pieces, association_reads, split_after, total_rows, expected_snapshot
 
 
-def test_split_bom_proves_global_native_numbers_before_refusing_legacy_width_ambiguity(monkeypatch):
+def test_split_bom_proves_global_native_numbers_and_physical_grid_despite_legacy_alias(monkeypatch):
     pieces, association_reads, split_after, total_rows, expected_snapshot = (
         _pd_split_bom_fixture(monkeypatch)
     )
@@ -4452,20 +4528,18 @@ def test_split_bom_proves_global_native_numbers_before_refusing_legacy_width_amb
         assert tuple(column.width for column in piece._pd_state.columns[:4]) == (
             0.012, 0.048, 0.118, 0.012
         )
-        assert piece._pd_state.columns[-1].width == _PD_NATIVE_PART_WIDTH
+        assert piece._pd_state.columns[-1].width == 0.118
         assert piece._pd_state.columns[-1].hidden is True
-        # Faithful native2437 getters produce 224.824 mm, not the intended
-        # physical 190 mm. Never replace this unqualified aggregate with the
-        # requested widths merely to make the split fixture pass.
+        # The hidden legacy getter remains 296 mm. The independent displayed
+        # physical grid, not this alias or requested widths, proves 190 mm.
         assert sum(piece.GetColumnWidth(index) for index in range(4)) == pytest.approx(
-            0.012 + 0.048 + 0.118 + _PD_NATIVE_PART_WIDTH
+            0.296
         )
-    with pytest.raises(RuntimeError, match="table column widths changed after splitting"):
-        drawing._assert_bom_pieces(
-            pieces, header_count=1, total_rows=total_rows,
-            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
-            expected_snapshot=expected_snapshot,
-        )
+    drawing._assert_bom_pieces(
+        pieces, header_count=1, total_rows=total_rows,
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        expected_snapshot=expected_snapshot,
+    )
     assert association_reads == [
         set(range(1, split_after + 1)),
         set(range(split_after + 1, total_rows)),
@@ -4477,6 +4551,138 @@ def test_split_bom_proves_global_native_numbers_before_refusing_legacy_width_amb
         pieces[1].DisplayedText2(1, 3, True)
     with pytest.raises(RuntimeError, match="outside this split piece's global rows"):
         pieces[1].RowHidden(1)
+
+
+def test_split_bom_accepts_complete_segmented_grid_and_zero_length_records(monkeypatch):
+    pieces, _reads, _split_after, total_rows, snapshot = _pd_split_bom_fixture(monkeypatch)
+    for piece in pieces:
+        lines = piece._pd_grid_lines
+        original = lines.pop(0)
+        midpoint = (original[5] + original[8]) / 2
+        lines.extend((
+            (*original[:7], original[7], midpoint, original[9]),
+            (*original[:5], midpoint, *original[6:]),
+            (0.0,) * 10,
+        ))
+    drawing._assert_bom_pieces(
+        pieces, header_count=1, total_rows=total_rows,
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        expected_snapshot=snapshot,
+    )
+
+
+@pytest.mark.parametrize("wrong_order", (False, True))
+def test_split_bom_grid_tracks_nonuniform_global_row_heights(monkeypatch, wrong_order):
+    pieces, _reads, split_after, total_rows, snapshot = _pd_split_bom_fixture(monkeypatch)
+    for index, piece in enumerate(pieces):
+        native_height = piece.GetRowHeight.side_effect
+
+        def row_height(row, native_height=native_height):
+            return native_height(row) + row * 0.00001
+
+        piece.GetRowHeight.side_effect = row_height
+        rows = (
+            list(range(split_after + 1)) if index == 0
+            else [0, *range(split_after + 1, total_rows)]
+        )
+        if wrong_order and index == 1:
+            # Render the same rows and total height in the wrong vertical order;
+            # independent native global-row heights remain unchanged.
+            rows[1], rows[2] = rows[2], rows[1]
+        piece._pd_grid_lines[:] = _pd_display_grid(
+            piece, rows, (drawing.BOM_ANCHOR, drawing.BOM_SECOND_ANCHOR)[index]
+        )
+    if wrong_order:
+        with pytest.raises(RuntimeError, match="row heights disagree with native split rows"):
+            drawing._assert_bom_pieces(
+                pieces, header_count=1, total_rows=total_rows,
+                configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+                expected_snapshot=snapshot,
+            )
+    else:
+        drawing._assert_bom_pieces(
+            pieces, header_count=1, total_rows=total_rows,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            expected_snapshot=snapshot,
+        )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ("malformed", "nonfinite", "missing-boundary", "gap", "translated",
+     "hidden-column", "whole-table", "missing-repeated-header", "wrong-column-width",
+     "diagonal", "nonplanar", "outlying-extension"),
+)
+def test_split_bom_refuses_corrupted_actual_second_piece_grid(monkeypatch, fault):
+    pieces, _reads, split_after, total_rows, snapshot = _pd_split_bom_fixture(monkeypatch)
+    second = pieces[1]
+    lines = second._pd_grid_lines
+    original_grid = tuple(lines)
+    if fault == "malformed":
+        lines[0] = lines[0][:-1]
+    elif fault == "nonfinite":
+        lines[0] = (*lines[0][:4], float("nan"), *lines[0][5:])
+    elif fault == "missing-boundary":
+        del lines[1]
+    elif fault == "gap":
+        # Keep every coordinate boundary but leave an interior horizontal gap.
+        original = lines.pop(5)
+        left, right = original[4], original[7]
+        lines.extend((
+            (*original[:7], left + (right - left) * 0.4, *original[8:]),
+            (*original[:4], left + (right - left) * 0.6, *original[5:]),
+        ))
+    elif fault == "translated":
+        lines[:] = [
+            (*line[:4], line[4] + 0.001, *line[5:7], line[7] + 0.001, *line[8:])
+            for line in lines
+        ]
+    elif fault == "hidden-column":
+        # A leaked hidden native border is not part of the four-column grid.
+        edge = lines[4]
+        lines.append((
+            *edge[:4], edge[4] + second._pd_state.columns[-1].width,
+            *edge[5:7], edge[7] + second._pd_state.columns[-1].width, *edge[8:],
+        ))
+    elif fault in ("whole-table", "missing-repeated-header"):
+        rows = (
+            [0] * total_rows if fault == "whole-table"
+            else range(split_after + 1, total_rows)
+        )
+        lines[:] = _pd_display_grid(second, rows, drawing.BOM_SECOND_ANCHOR)
+    elif fault == "wrong-column-width":
+        second._pd_state.columns[3].width = 0.013
+        lines[:] = _pd_display_grid(
+            second, [0, *range(split_after + 1, total_rows)], drawing.BOM_SECOND_ANCHOR
+        )
+    elif fault == "diagonal":
+        lines[0] = (*lines[0][:7], lines[0][7] + 0.001, *lines[0][8:])
+    elif fault == "nonplanar":
+        lines[0] = (*lines[0][:-1], 0.001)
+    elif fault == "outlying-extension":
+        horizontal = lines[5]
+        lines[5] = (*horizontal[:7], horizontal[7] + 0.001, *horizontal[8:])
+    reasons = {
+        "malformed": "line 0 is not a ten-value record",
+        "nonfinite": "line 0 has non-finite values",
+        "missing-boundary": "boundary counts are",
+        "gap": "has incomplete horizontal boundary coverage",
+        "translated": "displayed grid does not match its native annotation anchor",
+        "hidden-column": "boundary counts are",
+        "whole-table": "boundary counts are",
+        "missing-repeated-header": "boundary counts are",
+        "wrong-column-width": "column widths changed",
+        "diagonal": "unsupported non-axis-aligned geometry",
+        "nonplanar": "non-sheet Z coordinates",
+        "outlying-extension": "has outlying horizontal boundary geometry",
+    }
+    assert tuple(lines) != original_grid
+    with pytest.raises(RuntimeError, match=reasons[fault]):
+        drawing._assert_bom_pieces(
+            pieces, header_count=1, total_rows=total_rows,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            expected_snapshot=snapshot,
+        )
 
 
 @pytest.mark.parametrize("hidden_row", ("header", "first-data", "last-data"))
