@@ -65,7 +65,7 @@ from _drawing_scan import _zoomed_on
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _fastener_catalog import fastener
-from _seat_forensics import capture_com_failure
+import _seat_forensics
 import _telemetry
 
 # Project-used scales, largest first, tried against actual native outlines;
@@ -490,7 +490,7 @@ def _retain_supplier_source_failure(
     """Retain already-exported outputs only; never SaveAs a failing source graph."""
     try:
         paths = spec.outputs
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             None,
             f"{spec.artifact_stem}-source-lifecycle",
             str(error),

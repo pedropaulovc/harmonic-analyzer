@@ -7989,7 +7989,9 @@ def test_source_checkpoint_failure_capture_cannot_replace_primary(
     def failed_capture(*_args, **_kwargs):
         raise KeyboardInterrupt("secondary capture interruption")
 
-    monkeypatch.setattr(purchased, "capture_com_failure", failed_capture)
+    monkeypatch.setattr(
+        purchased._seat_forensics, "capture_com_failure", failed_capture
+    )
     spec = SimpleNamespace(
         artifact_stem="supplier",
         source=tmp_path / "supplier.SLDPRT",
