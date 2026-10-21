@@ -19,18 +19,25 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_variant_drawing import build_purchased_variant_drawing
 from _part_configuration_exports import _sha256
 from _com import _early_bound, _read_member
-from _drawing_attachment import _assert_leader_lands, _is_same_attachment
+from _drawing_attachment import (
+    _assert_attached_to,
+    _assert_leader_lands,
+    _is_same_attachment,
+)
 from _drawing_common import set_high_quality_shaded_with_edges
 from _drawing_dimensions import set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
-from _drawing_edges import visible_view_entities
+from _drawing_edges import scan_view_edges, visible_view_entities
 from _drawing_projection import model_points_in_view
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import property_link
 from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
 import sh_vn_clamping_kit_t_nut_spec as tnut
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
+from _layout_geometry import Box, Segment, segment_box_distance
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_clamping_kit_hardware"]
@@ -38,9 +45,9 @@ PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "52-PIECE CLAMPING KIT, 14 MM T-SLOT, 1/2-13 HARDWARE"
 VARIANTS = (
-    ("HoldDownStud", "HOLD-DOWN STUD"),
-    ("TNut", "T-NUT"),
-    ("FlangeNut", "FLANGE NUT"),
+    ("HoldDownStud", "[1] HOLD-DOWN STUD"),
+    ("TNut", "[2] T-NUT"),
+    ("FlangeNut", "[3] FLANGE NUT"),
 )
 PURCHASE_UNIT = "52-PIECE KIT"
 
@@ -234,6 +241,324 @@ def _note_text_box(
     if box is None:
         raise RuntimeError(f"{label}: native thread text is missing")
     return (box.xmin, box.ymin, box.xmax, box.ymax)
+
+
+def _installation_flag(
+    adapter: Any, configuration: str, cells: tuple, views: list[Any]
+) -> Callable[[], None]:
+    """Key the existing property-linked requirement to its physical feature."""
+    spec = {
+        "HoldDownStud": stud,
+        "TNut": tnut,
+        "FlangeNut": flange_nut,
+    }[configuration]
+    member_label = dict(VARIANTS)[configuration]
+    key = member_label.split(" ", 1)[0]
+    index = 2 if configuration == "TNut" else 0
+    view = _early_bound(views[index], "IView")
+    cell = cells[index][2]
+    label = f"kit {configuration} installation {key}"
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+
+    def anchor() -> tuple[Any, tuple[float, float]]:
+        view.UpdateViewDisplayGeometry()
+        scan = scan_view_edges(view, label=label)
+        if configuration == "HoldDownStud":
+            radius = stud.RADIUS - stud.END_CHAMFER
+            point_mm = (0.0, 0.0, radius)
+        else:
+            part = _early_bound(view.ReferencedDocument, "IPartDoc")
+            raw = part.FeatureByName(f"{configuration}ThreadBore")
+            if raw is None:
+                raise RuntimeError(f"{label}: native bore feature is missing")
+            feature = _early_bound(raw, "IFeature")
+            definition = feature.GetDefinition()
+            if feature.GetTypeName2() != "HoleWzd" or definition is None:
+                raise RuntimeError(f"{label}: native Hole Wizard definition is missing")
+            bore_radius = (
+                float(
+                    _early_bound(
+                        definition, "IWizardHoleFeatureData2"
+                    ).ThruTapDrillDiameter
+                )
+                * 500.0
+            )
+            radius = (
+                tnut.FOOT_WIDTH / 2
+                if configuration == "TNut"
+                else flange_nut.FLANGE_DIA / 2
+            )
+            if not math.isfinite(bore_radius) or not 0 < bore_radius < radius:
+                raise RuntimeError(
+                    f"{label}: actual through-tap diameter is unreadable"
+                )
+            inboard = (radius + bore_radius) / 2
+            if configuration == "TNut":
+                choices = (
+                    (tnut.LENGTH / 2, 0.0, inboard),
+                    (tnut.LENGTH / 2, 0.0, -inboard),
+                )
+                projected = model_points_in_view(
+                    adapter,
+                    view,
+                    tuple(tuple(value / 1000 for value in point) for point in choices),
+                    label=label,
+                )
+                if (
+                    len(projected) != 2
+                    or any(
+                        len(point) < 2
+                        or not all(math.isfinite(value) for value in point[:2])
+                        for point in projected
+                    )
+                    or projected[0][0] == projected[1][0]
+                ):
+                    raise RuntimeError(f"{label}: foot-edge projections are unreadable")
+                point_mm = choices[max(range(2), key=lambda item: projected[item][0])]
+            else:
+                point_mm = (inboard, 0.0, math.sqrt(radius**2 - inboard**2))
+        point_m = tuple(value / 1000 for value in point_mm)
+        matches = []
+        for item in scan.edges:
+            if configuration == "TNut":
+                if (
+                    item.line is None
+                    or any(len(point) != 3 for point in item.line)
+                    or not all(
+                        math.isfinite(value) for point in item.line for value in point
+                    )
+                ):
+                    continue
+                ends = (
+                    (tnut.LENGTH / 2, 0.0, -tnut.FOOT_WIDTH / 2),
+                    (tnut.LENGTH / 2, 0.0, tnut.FOOT_WIDTH / 2),
+                )
+                errors = (
+                    max(math.dist(a, b) for a, b in zip(item.line, ends, strict=True)),
+                    max(
+                        math.dist(a, b)
+                        for a, b in zip(item.line, reversed(ends), strict=True)
+                    ),
+                )
+                if min(errors) > 1e-5:
+                    continue
+            else:
+                circle = item.circle
+                if (
+                    circle is None
+                    or len(circle) != 7
+                    or not all(math.isfinite(value) for value in circle)
+                    or any(abs(value) > 1e-5 for value in circle[:3])
+                    or abs(circle[3]) > 1e-9
+                    or abs(abs(circle[4]) - 1.0) > 1e-9
+                    or abs(circle[5]) > 1e-9
+                    or abs(circle[6] - radius) > 1e-5
+                ):
+                    continue
+            # The inboard pick is on this physical trim, not merely its
+            # underlying circle. For nuts its projection is outside the actual
+            # bore but inside the outer boundary, away from coincident picks.
+            item.edge.GetCurve()
+            closest = tuple(
+                float(value) for value in item.edge.GetClosestPointOn(*point_m) or ()
+            )
+            if (
+                len(closest) >= 3
+                and all(math.isfinite(value) for value in closest[:3])
+                and math.dist(point_m, closest[:3]) <= 1e-8
+            ):
+                matches.append(item.edge)
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: expected one visible physical installation edge; "
+                f"found={len(matches)}, point_mm={point_mm!r}"
+            )
+        point = model_points_in_view(adapter, view, (point_m,), label=label)[0]
+        if len(point) < 2 or not all(math.isfinite(value) for value in point[:2]):
+            raise RuntimeError(f"{label}: native installation projection is unreadable")
+        return matches[0], point
+
+    edge, pick = anchor()
+    outline = _box(view.GetOutline(), label=label)
+    left = max(outline[2] + 0.004, (outline[0] + outline[2]) / 2 + 0.018)
+    center_y = outline[1] - 0.004
+    previous = drawing.ActiveDrawingView
+    previous_name = (
+        str(_early_bound(previous, "IView").GetName2())
+        if previous is not None
+        else None
+    )
+    sheet_name = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
+    primary_error = None
+    try:
+        note = _early_bound(
+            add_attached_note(
+                adapter,
+                view,
+                text=key,
+                entity_xy=pick,
+                note_xy=(left, center_y),
+                attached_to=edge,
+                label=label,
+            ),
+            "INote",
+        )
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        bounds = _note_text_box(annotation, label=label)
+        position = tuple(
+            float(value) for value in _read_member(annotation, "GetPosition")
+        )
+        if len(position) < 3 or not all(math.isfinite(value) for value in position):
+            raise RuntimeError(f"{label}: native key position is unreadable")
+        target = (
+            position[0] + left - bounds[0],
+            position[1] + center_y - (bounds[1] + bounds[3]) / 2,
+            0.0,
+        )
+        if annotation.SetPosition2(*target) is not True:
+            raise RuntimeError(f"{label}: native key relocation refused")
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        cleanup_errors = []
+        try:
+            draw.ClearSelection2(True)
+        except Exception as error:
+            cleanup_errors.append(f"selection clear: {error!r}")
+        try:
+            restored = (
+                drawing.ActivateView(previous_name)
+                if previous_name is not None
+                else drawing.ActivateSheet(sheet_name)
+            )
+            active = drawing.ActiveDrawingView
+            active_name = (
+                str(_early_bound(active, "IView").GetName2())
+                if active is not None
+                else None
+            )
+            active_sheet = str(
+                _early_bound(drawing.GetCurrentSheet(), "ISheet").GetName()
+            )
+            if (
+                restored is not True
+                or active_name != previous_name
+                or active_sheet != sheet_name
+            ):
+                raise RuntimeError("drawing activation did not restore")
+        except Exception as error:
+            cleanup_errors.append(f"activation restore: {error!r}")
+        if cleanup_errors:
+            message = f"{label}: drawing restoration failed: {tuple(cleanup_errors)!r}"
+            if primary_error is not None:
+                primary_error.add_note(message)
+            else:
+                raise RuntimeError(message)
+
+    def geometry() -> tuple[Box, tuple[float, ...]]:
+        current_edge, current_pick = anchor()
+        if int(adapter.swApp.IsSame(current_edge, edge)) != 1:
+            raise RuntimeError(f"{label}: installation edge lost native identity")
+        _assert_attached_to(
+            adapter,
+            annotation,
+            current_edge,
+            entity_type="EDGE",
+            what="installation flag",
+            label=label,
+        )
+        owner = _read_member(annotation, "Owner")
+        if (
+            note.GetText() != key
+            or note.PropertyLinkedText != key
+            or int(annotation.Visible) != 1
+            or int(annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
+            or owner is None
+            or int(adapter.swApp.IsSame(_early_bound(owner, "IView"), view)) != 1
+        ):
+            raise RuntimeError(f"{label}: key text, visibility or native owner changed")
+        points = tuple(
+            float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ()
+        )
+        if (
+            len(points) < 6
+            or len(points) % 3
+            or not all(math.isfinite(value) for value in points)
+        ):
+            raise RuntimeError(f"{label}: native key leader is unreadable")
+        _assert_leader_lands(
+            annotation, current_pick, what="installation flag", label=label
+        )
+        bounds = _note_text_box(annotation, label=label)
+        current_outline = _box(view.GetOutline(), label=label)
+        if (
+            not _inside(bounds, cell)
+            or not _inside(_box(note.GetExtent(), label=label, kind="note"), cell)
+            or any(
+                not _inside((points[i], points[i + 1], points[i], points[i + 1]), cell)
+                for i in range(0, len(points), 3)
+            )
+            or Box(*bounds).gap(Box(*current_outline)) < 0.002
+        ):
+            raise RuntimeError(f"{label}: key leaves its cell or crowds the view")
+        return Box(*bounds), points
+
+    geometry()
+
+    def settled() -> None:
+        bounds, points = geometry()
+        inventory = []
+        for sheet_views in drawing.GetViews() or ():
+            for raw_view in sheet_views or ():
+                for raw in _early_bound(raw_view, "IView").GetNotes() or ():
+                    current_note = _early_bound(raw, "INote")
+                    current_annotation = _early_bound(
+                        current_note.GetAnnotation(), "IAnnotation"
+                    )
+                    if not any(
+                        int(adapter.swApp.IsSame(current_annotation, prior[1])) == 1
+                        for prior in inventory
+                    ):
+                        inventory.append((current_note, current_annotation))
+        keyed = [item for item in inventory if item[0].GetText() == key]
+        linked = (
+            f"{member_label}: {property_link(f'{configuration} Manufacturing Notes')}"
+        )
+        resolved = f"{member_label}: {spec.DRAWING_NOTES}"
+        legends = [item for item in inventory if item[0].PropertyLinkedText == linked]
+        if (
+            len(keyed) != 1
+            or int(adapter.swApp.IsSame(keyed[0][1], annotation)) != 1
+            or len(legends) != 1
+            or legends[0][0].GetText().replace("\r\n", "\n") != resolved
+        ):
+            raise RuntimeError(
+                f"{label}: expected one native key and its unchanged linked legend"
+            )
+        scale = tuple(float(value) for value in view.ScaleRatio)
+        caption_text = f"{cells[index][0][1:].upper()}  {scale[0]:g}:{scale[1]:g}"
+        captions = []
+        for current_note, _ in inventory:
+            if current_note.GetText() != caption_text:
+                continue
+            box = _box(current_note.GetExtent(), label=label, kind="note")
+            if cell[0] <= (box[0] + box[2]) / 2 <= cell[2]:
+                captions.append(Box(*box))
+        if len(captions) != 1:
+            raise RuntimeError(f"{label}: expected one measured view caption")
+        caption = captions[0]
+        segments = [
+            Segment(points[i], points[i + 1], points[i + 3], points[i + 4])
+            for i in range(0, len(points) - 3, 3)
+        ]
+        if bounds.gap(caption) < 0.002 or any(
+            segment_box_distance(segment, caption) < 0.002 for segment in segments
+        ):
+            raise RuntimeError(f"{label}: native key or leader crowds its caption")
+
+    return settled
 
 
 def _member_thread_note(
@@ -1252,16 +1577,20 @@ def annotate_member(
     views: list[Any],
 ) -> tuple[Callable[[], None], ...]:
     if configuration == "HoldDownStud":
-        return (_stud_length_reference(adapter, cells, views),)
-    if configuration == "TNut":
-        return (_member_thread_note(adapter, cells, views, member="T-nut", spec=tnut),)
-    if configuration == "FlangeNut":
-        return (
+        checks = (_stud_length_reference(adapter, cells, views),)
+    elif configuration == "TNut":
+        checks = (
+            _member_thread_note(adapter, cells, views, member="T-nut", spec=tnut),
+        )
+    elif configuration == "FlangeNut":
+        checks = (
             _member_thread_note(
                 adapter, cells, views, member="flange nut", spec=flange_nut
             ),
         )
-    return ()
+    else:
+        return ()
+    return (*checks, _installation_flag(adapter, configuration, cells, views))
 
 
 async def build(adapter: Any) -> dict[str, str]:

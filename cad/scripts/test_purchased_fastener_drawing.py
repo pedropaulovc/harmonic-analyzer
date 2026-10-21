@@ -1256,6 +1256,8 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     import hashlib
     import draw_sh_vn_clamping_kit_hardware as kit
 
+    monkeypatch.setattr(kit, "_installation_flag", lambda *_args: lambda: None)
+
     spec = kit.tnut if configuration == "TNut" else kit.flange_nut
     bore_feature = f"{configuration}ThreadBore"
     other_feature = (
@@ -2954,6 +2956,8 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
     from solidworks_mcp.adapters import sw_type_info
     import _drawing_dimensions as dimension_text
 
+    monkeypatch.setattr(kit, "_installation_flag", lambda *_args: lambda: None)
+
     class Rim:
         def __init__(self, station, radius):
             self.station = station
@@ -3247,3 +3251,1244 @@ def test_kit_rotated_native_text_anchor_rotates_the_reference_offset():
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
         (0.036, 0.15, 0.04, 0.17)
     )
+
+
+class _KitFlagNativeWrapper:
+    """A fresh dispatch wrapper, not a new native annotation or edge."""
+
+    def __init__(self, native):
+        self.native = native
+
+    def __getattr__(self, name):
+        return getattr(self.native, name)
+
+
+class _KitFlagNativeEdge:
+    """Physical edge oracle independent of the recipe's candidate selection."""
+
+    def __init__(self, *, circle=None, endpoints=None, trimmed=False):
+        self.native_identity = object()
+        self.CircleParams = circle
+        self.endpoints = endpoints
+        self.trimmed = trimmed
+        self.closest_queries = []
+        self.closest_defect = None
+
+    def GetCurve(self):
+        return self
+
+    def IsCircle(self):
+        return self.CircleParams is not None
+
+    def IsLine(self):
+        return self.endpoints is not None
+
+    def GetStartVertex(self):
+        return self._vertex(0)
+
+    def GetEndVertex(self):
+        return self._vertex(1)
+
+    def _vertex(self, index):
+        if self.endpoints is None:
+            return None
+        return SimpleNamespace(GetPoint=lambda: self.endpoints[index])
+
+    def GetCurveParams3(self):
+        return SimpleNamespace(
+            StartPoint=None if self.endpoints is None else self.endpoints[0],
+            EndPoint=None if self.endpoints is None else self.endpoints[1],
+            UMinValue=0.0,
+            UMaxValue=1.0,
+        )
+
+    def GetClosestPointOn(self, x, y, z):
+        import math
+
+        self.closest_queries.append((x, y, z))
+        if self.endpoints is not None:
+            start, end = self.endpoints
+            delta = tuple(b - a for a, b in zip(start, end))
+            length_squared = sum(value * value for value in delta)
+            fraction = (
+                sum(
+                    (value - origin) * direction
+                    for value, origin, direction in zip((x, y, z), start, delta)
+                )
+                / length_squared
+            )
+            fraction = min(1.0, max(0.0, fraction))
+            point = tuple(
+                origin + fraction * direction for origin, direction in zip(start, delta)
+            )
+        else:
+            cx, cy, cz, ax, ay, az, radius = self.CircleParams
+            axis_length = math.sqrt(ax * ax + ay * ay + az * az)
+            axis = (ax / axis_length, ay / axis_length, az / axis_length)
+            delta = (x - cx, y - cy, z - cz)
+            normal = sum(a * b for a, b in zip(delta, axis))
+            radial = tuple(a - normal * b for a, b in zip(delta, axis))
+            radial_length = math.sqrt(sum(value * value for value in radial))
+            if radial_length == 0.0:
+                radial, radial_length = (0.0, 0.0, 1.0), 1.0
+            point = tuple(
+                center + radius * direction / radial_length
+                for center, direction in zip((cx, cy, cz), radial)
+            )
+            if self.trimmed:
+                # Same untrimmed circle, but its physical arc omits +Z.
+                point = (cx, cy, cz - radius)
+            fraction = 0.5
+        # IEdge.GetClosestPointOn's fifth field is explicitly unused by the
+        # SDK. Spatial proof must not reject an otherwise valid native edge.
+        result = (*point, fraction, float("nan"))
+        if self.closest_defect == "nan":
+            return (float("nan"), *result[1:])
+        if self.closest_defect == "short":
+            return result[:2]
+        return result
+
+
+class _KitFlagNativeAnnotation:
+    """Separate IAnnotation readback for a real-looking native INote graph."""
+
+    def __init__(self, note, view, edge, landing):
+        self.native_identity = object()
+        self.note = note
+        self.Owner = view
+        self.OwnerType = 0
+        self.Visible = 1
+        self.entities = (edge,)
+        self.entity_types = (1,)
+        self.entity_count = 1
+        self.dangling = False
+        self.leader_count = 1
+        self.landing = (*landing, 0.0)
+        self.leader_override = None
+        self.position = (0.0, 0.0, 0.0)
+        self.moves = []
+        self.ignore_movement = False
+        self.refuse_movement = False
+
+    def GetType(self):
+        return 6
+
+    def GetSpecificAnnotation(self):
+        return self.note
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition(self, x, y, z):
+        return self.SetPosition2(x, y, z)
+
+    def SetPosition2(self, x, y, z):
+        self.moves.append((x, y, z))
+        if self.refuse_movement:
+            return False
+        if not self.ignore_movement:
+            self.position = (x, y, z)
+        return True
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetAttachedEntityTypes(self):
+        return self.entity_types
+
+    def GetAttachedEntityCount3(self):
+        return self.entity_count
+
+    def GetLeaderCount(self):
+        return self.leader_count
+
+    def GetLeaderPointsAtIndex(self, index):
+        assert index == 0
+        return (
+            self.leader_override
+            if self.leader_override is not None
+            else (*self.position, *self.landing)
+        )
+
+    def IsDangling(self):
+        return self.dangling
+
+    def GetDisplayData(self):
+        return self.note.GetDisplayData()
+
+
+class _KitFlagNativeNote:
+    def __init__(self, text, view, edge, landing):
+        self.native_identity = object()
+        self.PropertyLinkedText = text
+        self.resolved_text = text
+        self.width = 0.0042
+        self.height = 0.003
+        # Deliberately not equal to the annotation insertion point: placement
+        # must measure native ink rather than trusting requested coordinates.
+        self.ink_offset = (-0.0013, -0.0008)
+        self.extent_override = None
+        self.annotation = _KitFlagNativeAnnotation(self, view, edge, landing)
+
+    def GetAnnotation(self):
+        return _KitFlagNativeWrapper(self.annotation)
+
+    def GetText(self):
+        return self.resolved_text
+
+    def GetExtent(self):
+        if self.extent_override is not None:
+            return self.extent_override
+        x, y, _z = self.annotation.position
+        left = x + self.ink_offset[0]
+        bottom = y + self.ink_offset[1]
+        return (left, bottom, 0.0, left + self.width, bottom + self.height, 0.0)
+
+    def GetDisplayData(self):
+        x0, y0, _z0, _x1, _y1, _z1 = self.GetExtent()
+        return SimpleNamespace(
+            GetTextCount=lambda: 1,
+            GetTextAtIndex=lambda _index: self.resolved_text,
+            GetTextInBoxWidthAtIndex=lambda _index: self.width,
+            GetTextHeightAtIndex=lambda _index: self.height,
+            GetTextPositionAtIndex=lambda _index: (x0, y0, 0.0),
+            GetTextRefPositionAtIndex=lambda _index: 1,
+            GetTextAngleAtIndex=lambda _index: 0.0,
+        )
+
+
+@pytest.fixture
+def kit_installation_native(monkeypatch):
+    """Keep recipe validation real; replace only the native COM boundary."""
+    import draw_sh_vn_clamping_kit_hardware as kit
+    import _drawing_attachment as attachment
+    from _drawing_edges import ViewEdge, ViewEdges
+    from solidworks_mcp.adapters import sw_type_info
+
+    monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
+
+    def make(configuration, *, prior_view="previous-view"):
+        index, key, title, spec = {
+            "HoldDownStud": (0, "[1]", "HOLD-DOWN STUD", kit.stud),
+            "TNut": (1, "[2]", "T-NUT", kit.tnut),
+            "FlangeNut": (2, "[3]", "FLANGE NUT", kit.flange_nut),
+        }[configuration]
+        cells = configured.configuration_view_cells(index, 3)
+        state = SimpleNamespace(
+            kit=kit,
+            configuration=configuration,
+            key=key,
+            title=title,
+            spec=spec,
+            cells=cells,
+            active=prior_view,
+            sheet="KitSheet",
+            prior_view=prior_view,
+            selected=object(),
+            events=[],
+            calls=[],
+            comparisons=[],
+            projections=[],
+            author_defect=None,
+            restore_defect=None,
+            clear_error=None,
+            projection_defect=None,
+            repeat_note_wrappers=False,
+            on_author=lambda _note: None,
+            note=None,
+            legend=None,
+            error=RuntimeError("native flag authoring failed"),
+        )
+        state.bore_radius = 0.00535813
+        state.bore_definition = SimpleNamespace(
+            ThruTapDrillDiameter=2 * state.bore_radius
+        )
+        state.bore_kind = "HoleWzd"
+        state.bore_feature_missing = False
+        state.bore_definition_missing = False
+
+        def source_feature(name):
+            assert name == f"{configuration}ThreadBore"
+            state.events.append(("native-bore", name))
+            if state.bore_feature_missing:
+                return None
+            return SimpleNamespace(
+                GetTypeName2=lambda: state.bore_kind,
+                GetDefinition=lambda: (
+                    None if state.bore_definition_missing else state.bore_definition
+                ),
+            )
+
+        state.source = SimpleNamespace(
+            FeatureByName=source_feature,
+            ShowConfiguration2=lambda *_args: pytest.fail(
+                "flag presentation must not mutate source configuration"
+            ),
+        )
+
+        class NativeView:
+            def __init__(self, name, center, box):
+                self.name = name
+                self.center = center
+                self.cell = box
+                self.native_identity = object()
+                self.notes = []
+                self.refreshes = 0
+                self.scans = 0
+                self.ScaleRatio = (1.0, 2.0)
+                self.ReferencedDocument = state.source
+
+            def GetName2(self):
+                return self.name
+
+            def GetOutline(self):
+                x, y = self.center
+                return (x - 0.008, y - 0.006, x + 0.008, y + 0.006)
+
+            def UpdateViewDisplayGeometry(self):
+                self.refreshes += 1
+                state.events.append(("refresh", self.name))
+
+            def GetNotes(self):
+                state.events.append(("notes", self.name))
+                wrappers = [_KitFlagNativeWrapper(note) for note in self.notes]
+                return wrappers * (2 if state.repeat_note_wrappers else 1)
+
+        views = [
+            NativeView(f"{configuration}-{name}", center, box)
+            for name, center, box in cells
+        ]
+        state.views = views
+        state.view_index = 2 if configuration == "TNut" else 0
+        state.view = views[state.view_index]
+        state.sheet_view = NativeView("KitSheet", (0.0, 0.0), (0, 0, 1, 1))
+        state.other_sheet = NativeView("OtherSheet", (0.0, 0.0), (0, 0, 1, 1))
+        state.other_view = NativeView("OtherView", (0.0, 0.0), (0, 0, 1, 1))
+
+        if configuration == "TNut":
+            half_length = spec.LENGTH / 2000
+            half_width = spec.FOOT_WIDTH / 2000
+            endpoints = (
+                (half_length, 0.0, half_width),
+                (half_length, 0.0, -half_width),
+            )
+            target = _KitFlagNativeEdge(endpoints=endpoints)
+            inboard = (half_width + state.bore_radius) / 2
+            # This fixture's oblique projection puts -Z on screen-right.
+            state.model_point = (half_length, 0.0, -inboard)
+            state.decoys = [
+                _KitFlagNativeEdge(
+                    endpoints=tuple((-x, y, z) for x, y, z in endpoints)
+                ),
+                _KitFlagNativeEdge(
+                    endpoints=tuple((x, y + 0.001, z) for x, y, z in endpoints)
+                ),
+                _KitFlagNativeEdge(
+                    endpoints=tuple((x, y, z * 0.8) for x, y, z in endpoints)
+                ),
+                _KitFlagNativeEdge(
+                    endpoints=(endpoints[0], (half_length, 0.0, -half_width / 2))
+                ),
+            ]
+        else:
+            radius = (
+                (spec.RADIUS - spec.END_CHAMFER) / 1000
+                if configuration == "HoldDownStud"
+                else spec.FLANGE_DIA / 2000
+            )
+            circle = (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, radius)
+            target = _KitFlagNativeEdge(circle=circle)
+            if configuration == "HoldDownStud":
+                state.model_point = (0.0, 0.0, radius)
+            else:
+                import math
+
+                inboard = (radius + state.bore_radius) / 2
+                state.model_point = (
+                    inboard,
+                    0.0,
+                    math.sqrt(radius * radius - inboard * inboard),
+                )
+            upper_y = (
+                spec.LENGTH / 1000
+                if configuration == "HoldDownStud"
+                else spec.HEIGHT / 1000
+            )
+            chamfer_y = (
+                spec.END_CHAMFER / 1000 if configuration == "HoldDownStud" else 0.0005
+            )
+            chamfer_radius = (
+                spec.RADIUS / 1000
+                if configuration == "HoldDownStud"
+                else radius + 0.0005
+            )
+            inner_radius = (
+                state.bore_radius if configuration == "FlangeNut" else radius * 0.6
+            )
+            state.decoys = [
+                _KitFlagNativeEdge(circle=(0.0, upper_y, 0.0, 0.0, 1.0, 0.0, radius)),
+                _KitFlagNativeEdge(circle=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, inner_radius)),
+                _KitFlagNativeEdge(
+                    circle=(0.0, chamfer_y, 0.0, 0.0, 1.0, 0.0, chamfer_radius)
+                ),
+                _KitFlagNativeEdge(circle=(0.0005, 0.0, 0.0, 0.0, 1.0, 0.0, radius)),
+                _KitFlagNativeEdge(circle=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius)),
+            ]
+        state.target = target
+        state.edges = [*state.decoys, target]
+
+        def same(first, second):
+            state.comparisons.append((first, second))
+            first_identity = getattr(first, "native_identity", first)
+            second_identity = getattr(second, "native_identity", second)
+            if state.author_defect == "owner-identity-unknown" and (
+                first_identity is state.view.native_identity
+                and second_identity is state.view.native_identity
+            ):
+                return -1
+            return int(first_identity is second_identity)
+
+        class NativeDrawing:
+            @property
+            def ActiveDrawingView(self):
+                if state.active is None:
+                    return None
+                return SimpleNamespace(GetName2=lambda: state.active)
+
+            def GetCurrentSheet(self):
+                return SimpleNamespace(GetName=lambda: state.sheet)
+
+            def ActivateView(self, name):
+                state.events.append(("activate-view", name))
+                if name == state.prior_view and state.restore_defect == "throws":
+                    raise RuntimeError("native flag view restore failed")
+                if name == state.prior_view and state.restore_defect == "ignored":
+                    return True
+                state.active = name
+                return True
+
+            def ActivateSheet(self, name):
+                state.events.append(("activate-sheet", name))
+                if state.restore_defect == "throws":
+                    raise RuntimeError("native flag sheet restore failed")
+                if state.restore_defect != "ignored":
+                    state.active = None
+                    state.sheet = name
+                return True
+
+            def ClearSelection2(self, all_selected):
+                assert all_selected is True
+                state.selected = None
+                state.events.append(("clear-selection",))
+                if state.clear_error is not None:
+                    raise state.clear_error
+
+            def GetViews(self):
+                state.events.append(("all-views",))
+                return (
+                    (state.other_sheet, state.other_view),
+                    (state.sheet_view, *views),
+                )
+
+        def scan(view, *, label):
+            assert view is state.view
+            assert view.refreshes > view.scans, "scan requires fresh native geometry"
+            view.scans += 1
+            state.events.append(("scan", label))
+            edges = state.edges
+            rows = []
+            for edge in edges:
+                wrapped = _KitFlagNativeWrapper(edge)
+                line = (
+                    None
+                    if edge.endpoints is None
+                    else tuple(
+                        tuple(value * 1000 for value in point)
+                        for point in edge.endpoints
+                    )
+                )
+                circle = (
+                    None
+                    if edge.CircleParams is None
+                    else (
+                        *(value * 1000 for value in edge.CircleParams[:3]),
+                        *edge.CircleParams[3:6],
+                        edge.CircleParams[6] * 1000,
+                    )
+                )
+                rows.append(ViewEdge(wrapped, line, circle, None))
+            return ViewEdges(label, tuple(rows))
+
+        def project_point(point):
+            x, y, z = point
+            cx, cy = state.view.center
+            return (
+                cx + 0.31 * x + 0.11 * y - 0.23 * z,
+                cy + 0.13 * x + 0.37 * y + 0.29 * z,
+            )
+
+        def project(_adapter, view, points, **_kwargs):
+            assert view is state.view
+            state.projections.append(tuple(points))
+            result = [project_point(point) for point in points]
+            if state.projection_defect == "choice-nan" and len(points) == 2:
+                result[0] = (float("nan"), result[0][1])
+            elif state.projection_defect == "choice-tie" and len(points) == 2:
+                result[1] = (result[0][0], result[1][1])
+            elif state.projection_defect == "anchor-nan" and len(points) == 1:
+                result[0] = (result[0][0], float("nan"))
+            return result
+
+        def author(_adapter, view, **kwargs):
+            assert view is state.view
+            state.calls.append(kwargs)
+            state.events.append(("author",))
+            state.active = view.GetName2()
+            state.selected = kwargs["attached_to"]
+            if state.author_defect == "raises":
+                raise state.error
+            note = _KitFlagNativeNote(
+                kwargs["text"], view, kwargs["attached_to"], kwargs["entity_xy"]
+            )
+            note.annotation.position = (*kwargs["note_xy"], 0.0)
+            state.note = note
+            view.notes.append(note)
+            state.on_author(note)
+            return note
+
+        state.adapter = SimpleNamespace(
+            currentModel=NativeDrawing(),
+            swApp=SimpleNamespace(IsSame=same),
+            _attempt=lambda operation: operation(),
+        )
+        state.same = same
+        state.project_point = project_point
+        monkeypatch.setattr(kit, "scan_view_edges", scan)
+        monkeypatch.setattr(kit, "model_points_in_view", project)
+        monkeypatch.setattr(kit, "add_attached_note", author)
+        return state
+
+    return make
+
+
+def _kit_flag_apply_native_drift(state, drift):
+    note = state.note
+    annotation = note.annotation
+    if drift == "attachment-lost":
+        annotation.entities = ()
+        annotation.entity_count = 0
+    elif drift == "wrong-entity":
+        annotation.entities = (_KitFlagNativeWrapper(state.decoys[0]),)
+    elif drift == "wrong-attachment-type":
+        annotation.entity_types = (2,)
+    elif drift == "wrong-attachment-count":
+        annotation.entity_count = 2
+    elif drift == "wrong-key":
+        note.resolved_text = "[9]"
+    elif drift == "wrong-key-link":
+        note.PropertyLinkedText = "installation " + state.key
+    elif drift == "wrong-owner":
+        annotation.Owner = state.views[3]
+    elif drift == "wrong-owner-type":
+        annotation.OwnerType = 1
+    elif drift == "owner-identity-unknown":
+        state.author_defect = drift
+    elif drift == "dangling":
+        annotation.dangling = True
+    elif drift == "hidden":
+        annotation.Visible = 3
+    elif drift == "nan-leader":
+        annotation.leader_override = (
+            *annotation.position,
+            float("nan"),
+            annotation.landing[1],
+            0.0,
+        )
+    elif drift == "inf-leader":
+        annotation.leader_override = (
+            *annotation.position,
+            annotation.landing[0],
+            float("inf"),
+            0.0,
+        )
+    elif drift == "short-leader":
+        annotation.leader_override = annotation.position
+    elif drift == "elbow-outside":
+        left, bottom, _right, _top = state.view.cell
+        annotation.leader_override = (
+            *annotation.position,
+            left - 0.003,
+            bottom + 0.005,
+            0.0,
+            *annotation.landing,
+        )
+    elif drift == "wrong-landing":
+        annotation.landing = (
+            annotation.landing[0] + 0.002,
+            annotation.landing[1],
+            0.0,
+        )
+    elif drift == "no-leader":
+        annotation.leader_count = 0
+    elif drift == "extra-leader":
+        annotation.leader_count = 2
+    elif drift == "extent-outside":
+        left, bottom, right, top = state.cells[state.view_index][2]
+        note.extent_override = (left - 0.004, bottom, 0.0, right, top, 0.0)
+    elif drift == "nan-extent":
+        note.extent_override = (float("nan"), 0.14, 0.0, 0.2, 0.15, 0.0)
+    elif drift == "ignored-movement":
+        annotation.position = (*state.view.center, 0.0)
+        annotation.ignore_movement = True
+    elif drift == "movement-refused":
+        annotation.refuse_movement = True
+    else:
+        raise AssertionError(f"unowned kit installation flag drift: {drift}")
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("geometry", ("missing", "duplicate", "nonfinite"))
+def test_kit_installation_flag_refuses_no_unique_physical_edge(
+    kit_installation_native, configuration, geometry
+):
+    state = kit_installation_native(configuration)
+    if geometry == "missing":
+        state.edges.remove(state.target)
+    elif geometry == "duplicate":
+        duplicate = _KitFlagNativeEdge(
+            circle=state.target.CircleParams, endpoints=state.target.endpoints
+        )
+        state.edges.append(duplicate)
+    elif configuration == "TNut":
+        start, end = state.target.endpoints
+        state.target.endpoints = ((float("nan"), *start[1:]), end)
+    else:
+        state.target.CircleParams = (float("nan"), *state.target.CircleParams[1:])
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert not state.calls
+    assert state.view.refreshes >= 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "FlangeNut"))
+@pytest.mark.parametrize("geometry", ("wrong-trim", "closest-nan", "closest-short"))
+def test_kit_installation_circle_requires_the_point_on_the_physical_edge(
+    kit_installation_native, configuration, geometry
+):
+    state = kit_installation_native(configuration)
+    if geometry == "wrong-trim":
+        state.target.trimmed = True
+    else:
+        state.target.closest_defect = {
+            "closest-nan": "nan",
+            "closest-short": "short",
+        }[geometry]
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert not state.calls
+    assert state.target.closest_queries
+    assert state.target.closest_queries[0] == pytest.approx(state.model_point)
+
+
+@pytest.mark.parametrize(
+    "defect", ("wrong-x", "wrong-height", "wrong-profile", "wrong-endpoint")
+)
+def test_kit_tnut_installation_requires_exact_positive_x_foot_profile(
+    kit_installation_native, defect
+):
+    state = kit_installation_native("TNut")
+    start, end = state.target.endpoints
+    if defect == "wrong-x":
+        state.target.endpoints = tuple((-x, y, z) for x, y, z in (start, end))
+    elif defect == "wrong-height":
+        state.target.endpoints = tuple((x, y + 0.0005, z) for x, y, z in (start, end))
+    elif defect == "wrong-profile":
+        # Same midpoint and infinite line, wrong actual profile width.
+        state.target.endpoints = tuple((x, y, z * 1.2) for x, y, z in (start, end))
+    else:
+        state.target.endpoints = (start, (end[0], end[1], end[2] + 0.001))
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, state.configuration, state.cells, state.views
+        )
+    assert not state.calls
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "attachment-lost",
+        "wrong-entity",
+        "wrong-attachment-type",
+        "wrong-attachment-count",
+        "wrong-key",
+        "wrong-key-link",
+        "wrong-owner",
+        "wrong-owner-type",
+        "owner-identity-unknown",
+        "dangling",
+        "hidden",
+        "nan-leader",
+        "inf-leader",
+        "short-leader",
+        "elbow-outside",
+        "wrong-landing",
+        "no-leader",
+        "extra-leader",
+        "extent-outside",
+        "nan-extent",
+        "ignored-movement",
+        "movement-refused",
+    ),
+)
+def test_kit_installation_flag_checks_native_authoring_readback(
+    kit_installation_native, configuration, drift
+):
+    state = kit_installation_native(configuration)
+    state.on_author = lambda _note: _kit_flag_apply_native_drift(state, drift)
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert len(state.calls) == 1
+    assert state.active == state.prior_view
+    assert state.sheet == "KitSheet"
+    assert state.selected is None
+    assert state.legend is None
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("prior_view", ("previous-view", None))
+@pytest.mark.parametrize("restore_defect", (None, "throws"))
+def test_kit_installation_authoring_error_restores_context_without_masking(
+    kit_installation_native, configuration, prior_view, restore_defect
+):
+    state = kit_installation_native(configuration, prior_view=prior_view)
+    state.author_defect = "raises"
+    state.restore_defect = restore_defect
+    with pytest.raises(RuntimeError) as refused:
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert refused.value is state.error
+    assert len(state.calls) == 1
+    assert state.selected is None
+    if restore_defect is None:
+        assert state.active == prior_view
+        assert state.sheet == "KitSheet"
+    else:
+        assert "restore failed" in "\n".join(refused.value.__notes__)
+    restoration = (
+        ("activate-view", prior_view)
+        if prior_view is not None
+        else ("activate-sheet", "KitSheet")
+    )
+    assert restoration in state.events
+
+
+def _kit_flag_finish_builder_notes(state):
+    """The builder does not author its footer or captions until after the hook."""
+    assert state.note is not None
+    assert state.legend is None
+    member = f"{state.key} {state.title}"
+    state.legend = _Note(
+        f"{member}: {state.kit.property_link(f'{state.configuration} Manufacturing Notes')}",
+        f"{member}: {state.spec.DRAWING_NOTES}",
+        state.cells[0][2][0],
+        0.105,
+    )
+    state.legend.native_identity = object()
+    state.sheet_view.notes.append(state.legend)
+    orientation = state.cells[state.view_index][0][1:].upper()
+    numerator, denominator = state.view.ScaleRatio
+    caption_text = f"{orientation}  {numerator:g}:{denominator:g}"
+    cx, _cy = state.view.center
+    caption_y = state.view.cell[1] - 0.004
+    state.caption = _Note(caption_text, caption_text, cx, caption_y)
+    state.caption.native_identity = object()
+    state.caption._extent = (
+        cx - 0.008,
+        caption_y - 0.0015,
+        0.0,
+        cx + 0.008,
+        caption_y + 0.0015,
+        0.0,
+    )
+    state.sheet_view.notes.append(state.caption)
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("prior_view", ("previous-view", None))
+def test_kit_installation_keys_attach_to_unique_native_features_and_settle(
+    kit_installation_native, configuration, prior_view
+):
+    state = kit_installation_native(configuration, prior_view=prior_view)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    assert callable(settled)
+    assert state.legend is None
+    assert ("all-views",) not in state.events
+    assert len(state.calls) == 1
+    call = state.calls[0]
+    assert call["text"] == state.key
+    assert state.same(call["attached_to"], state.target) == 1
+    assert call["attached_to"] is not state.target
+    assert call["entity_xy"] == pytest.approx(state.project_point(state.model_point))
+    assert state.target.closest_queries
+    assert state.target.closest_queries[0] == pytest.approx(state.model_point)
+    assert len(state.projections[-1]) == 1
+    assert state.projections[-1][0] == pytest.approx(state.model_point)
+    if configuration == "TNut":
+        assert set(state.target.endpoints) == {
+            (state.spec.LENGTH / 2000, y / 1000, z / 1000)
+            for z, y in state.spec.PROFILE[:2]
+        }
+        assert len(state.projections[0]) == 2
+        assert state.model_point[2] < 0
+        assert call["entity_xy"][0] == pytest.approx(
+            max(state.project_point(point)[0] for point in state.projections[0])
+        )
+    elif configuration == "FlangeNut":
+        assert state.model_point[0] > state.bore_radius
+        assert state.model_point[2] > 0
+    outline = state.view.GetOutline()
+    left = max(outline[2] + 0.004, (outline[0] + outline[2]) / 2 + 0.018)
+    center_y = outline[1] - 0.004
+    x0, y0, _z0, x1, y1, _z1 = state.note.GetExtent()
+    assert x0 == pytest.approx(left)
+    assert (y0 + y1) / 2 == pytest.approx(center_y)
+    assert state.note.annotation.moves
+    assert state.note.annotation.position[:2] != call["note_xy"]
+    cell = state.view.cell
+    assert cell[0] <= x0 < x1 <= cell[2]
+    assert cell[1] <= y0 < y1 <= cell[3]
+    assert state.active == prior_view
+    assert state.sheet == "KitSheet"
+    assert state.selected is None
+
+    _kit_flag_finish_builder_notes(state)
+    # GetViews/GetNotes may return several wrappers for one native annotation,
+    # even through another sheet. They must not count as extra key/legend notes.
+    state.repeat_note_wrappers = True
+    state.other_view.notes.extend((state.note, state.legend, state.caption))
+    state.note.annotation.Owner = _KitFlagNativeWrapper(state.view)
+    state.note.annotation.entities = (_KitFlagNativeWrapper(state.target),)
+    comparisons_before = len(state.comparisons)
+    scans_before = state.view.scans
+    settled()
+    assert len(state.calls) == 1
+    assert state.view.scans > scans_before
+    assert any(
+        first is not second
+        and getattr(first, "native_identity", first)
+        is getattr(second, "native_identity", second)
+        for first, second in state.comparisons[comparisons_before:]
+    )
+
+
+@pytest.mark.parametrize(
+    ("configuration", "requirement"),
+    (
+        (
+            "HoldDownStud",
+            "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT.",
+        ),
+        (
+            "TNut",
+            "FOOT UNDER THE SLOT UNDERCUT; VERIFY THE FIT IN THE TABLE SLOT ON RECEIPT.",
+        ),
+        ("FlangeNut", "FLANGE FACE DOWN ON THE BASE BAR."),
+    ),
+)
+def test_kit_installation_labels_preserve_the_exact_existing_requirement(
+    kit_installation_native, configuration, requirement
+):
+    state = kit_installation_native(configuration)
+    assert state.kit.VARIANTS == (
+        ("HoldDownStud", "[1] HOLD-DOWN STUD"),
+        ("TNut", "[2] T-NUT"),
+        ("FlangeNut", "[3] FLANGE NUT"),
+    )
+    assert state.spec.DRAWING_NOTES == requirement
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    assert state.legend.GetText() == f"{state.key} {state.title}: {requirement}"
+    settled()
+    assert state.spec.DRAWING_NOTES == requirement
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "attachment-lost",
+        "wrong-entity",
+        "wrong-attachment-type",
+        "wrong-attachment-count",
+        "wrong-key",
+        "wrong-key-link",
+        "wrong-owner",
+        "wrong-owner-type",
+        "owner-identity-unknown",
+        "dangling",
+        "hidden",
+        "nan-leader",
+        "inf-leader",
+        "short-leader",
+        "elbow-outside",
+        "wrong-landing",
+        "no-leader",
+        "extra-leader",
+        "extent-outside",
+        "nan-extent",
+    ),
+)
+def test_kit_installation_flag_rechecks_native_state_after_final_rebuild(
+    kit_installation_native, configuration, drift
+):
+    state = kit_installation_native(configuration)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    _kit_flag_apply_native_drift(state, drift)
+    with pytest.raises(RuntimeError):
+        settled()
+    assert len(state.calls) == 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "missing-key",
+        "duplicate-key",
+        "replaced-key-annotation",
+        "missing-legend",
+        "duplicate-legend",
+        "wrong-legend-key",
+        "wrong-property-link",
+        "literal-instead-of-property-link",
+        "wrong-resolved-requirement",
+        "duplicate-on-other-sheet",
+    ),
+)
+def test_kit_installation_settled_requires_one_key_and_exact_linked_legend(
+    kit_installation_native, configuration, defect
+):
+    state = kit_installation_native(configuration)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    if defect == "missing-legend":
+        # A valid native key is not enough: the later builder footer is required.
+        with pytest.raises(RuntimeError):
+            settled()
+        assert state.legend is None
+        return
+    _kit_flag_finish_builder_notes(state)
+    if defect == "missing-key":
+        state.view.notes.remove(state.note)
+    elif defect == "duplicate-key":
+        extra = _KitFlagNativeNote(
+            state.key, state.view, state.target, state.project_point(state.model_point)
+        )
+        state.views[3].notes.append(extra)
+    elif defect == "replaced-key-annotation":
+        replacement = copy.copy(state.note.annotation)
+        replacement.native_identity = object()
+        state.note.annotation = replacement
+    elif defect == "duplicate-legend":
+        duplicate = copy.copy(state.legend)
+        duplicate.native_identity = object()
+        state.sheet_view.notes.append(duplicate)
+    elif defect == "wrong-legend-key":
+        state.legend.PropertyLinkedText = state.legend.PropertyLinkedText.replace(
+            state.key, "[9]", 1
+        )
+        state.legend._resolved_text = state.legend.GetText().replace(
+            state.key, "[9]", 1
+        )
+    elif defect == "wrong-property-link":
+        state.legend.PropertyLinkedText = (
+            f"{state.key} {state.title}: "
+            f"{state.kit.property_link('Unrelated Manufacturing Notes')}"
+        )
+    elif defect == "literal-instead-of-property-link":
+        state.legend.PropertyLinkedText = state.legend.GetText()
+    elif defect == "wrong-resolved-requirement":
+        state.legend._resolved_text = (
+            f"{state.key} {state.title}: USE A DIFFERENT INSTALLATION."
+        )
+    elif defect == "duplicate-on-other-sheet":
+        duplicate = copy.copy(state.legend)
+        duplicate.native_identity = object()
+        state.other_sheet.notes.append(duplicate)
+    with pytest.raises(RuntimeError):
+        settled()
+    assert len(state.calls) == 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("edge_drift", ("missing", "same-geometry-new-identity"))
+def test_kit_installation_settled_rescans_edge_identity_after_final_rebuild(
+    kit_installation_native, configuration, edge_drift
+):
+    state = kit_installation_native(configuration)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    state.edges.remove(state.target)
+    if edge_drift == "same-geometry-new-identity":
+        state.edges.append(
+            _KitFlagNativeEdge(
+                circle=state.target.CircleParams, endpoints=state.target.endpoints
+            )
+        )
+    scans_before = state.view.scans
+    with pytest.raises(RuntimeError):
+        settled()
+    assert state.view.scans > scans_before
+    assert len(state.calls) == 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+def test_kit_installation_refuses_nonfinite_projected_anchor_before_authoring(
+    kit_installation_native, configuration
+):
+    state = kit_installation_native(configuration)
+    state.projection_defect = "anchor-nan"
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert not state.calls
+
+
+def test_kit_tnut_installation_refuses_nonfinite_projected_choice(
+    kit_installation_native,
+):
+    state = kit_installation_native("TNut")
+    state.projection_defect = "choice-nan"
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, state.configuration, state.cells, state.views
+        )
+    assert not state.calls
+
+
+@pytest.mark.parametrize("configuration", ("TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "bore_defect",
+    ("missing", "wrong-feature-type", "no-definition", "nan", "zero", "outside"),
+)
+def test_kit_installation_nut_pick_requires_actual_native_through_bore(
+    kit_installation_native, configuration, bore_defect
+):
+    state = kit_installation_native(configuration)
+    if bore_defect == "missing":
+        state.bore_feature_missing = True
+    elif bore_defect == "wrong-feature-type":
+        state.bore_kind = "Cut"
+    elif bore_defect == "no-definition":
+        state.bore_definition_missing = True
+    else:
+        diameter = {
+            "nan": float("nan"),
+            "zero": 0.0,
+            "outside": 0.100,
+        }[bore_defect]
+        state.bore_definition.ThruTapDrillDiameter = diameter
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert not state.calls
+    assert ("native-bore", f"{configuration}ThreadBore") in state.events
+
+
+@pytest.mark.parametrize("prior_view", ("previous-view", None))
+@pytest.mark.parametrize("restore_defect", (None, "throws"))
+def test_kit_installation_clear_failure_cannot_skip_restore_or_mask_primary(
+    kit_installation_native, prior_view, restore_defect
+):
+    state = kit_installation_native("HoldDownStud", prior_view=prior_view)
+    state.author_defect = "raises"
+    state.restore_defect = restore_defect
+    state.clear_error = RuntimeError("native flag selection clear failed")
+    with pytest.raises(RuntimeError) as refused:
+        state.kit._installation_flag(
+            state.adapter, state.configuration, state.cells, state.views
+        )
+    assert refused.value is state.error
+    cleanup_notes = "\n".join(refused.value.__notes__)
+    assert "selection clear failed" in cleanup_notes
+    restoration = (
+        ("activate-view", prior_view)
+        if prior_view is not None
+        else ("activate-sheet", "KitSheet")
+    )
+    assert restoration in state.events
+    if restore_defect is None:
+        assert state.active == prior_view
+        assert state.sheet == "KitSheet"
+    else:
+        assert "restore failed" in cleanup_notes
+
+
+@pytest.mark.parametrize(
+    ("configuration", "variation"),
+    (
+        ("TNut", "reversed-endpoints"),
+        ("HoldDownStud", "negative-axis"),
+        ("FlangeNut", "negative-axis"),
+        ("HoldDownStud", "wrong-trim-decoy"),
+        ("FlangeNut", "wrong-trim-decoy"),
+    ),
+)
+def test_kit_installation_accepts_native_equivalents_not_physical_decoys(
+    kit_installation_native, configuration, variation
+):
+    state = kit_installation_native(configuration)
+    if variation == "reversed-endpoints":
+        state.target.endpoints = tuple(reversed(state.target.endpoints))
+    elif variation == "negative-axis":
+        circle = state.target.CircleParams
+        state.target.CircleParams = (*circle[:3], 0.0, -1.0, 0.0, circle[6])
+    else:
+        # Two identical underlying circles, only one physical edge contains
+        # the intended point. Counting curves rather than trims refuses this.
+        state.edges.append(
+            _KitFlagNativeEdge(circle=state.target.CircleParams, trimmed=True)
+        )
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    settled()
+    assert state.same(state.calls[0]["attached_to"], state.target) == 1
+    assert len(state.calls) == 1
+
+
+@pytest.mark.parametrize("closest_defect", ("nan", "short"))
+def test_kit_tnut_installation_requires_a_readable_physical_line_pick(
+    kit_installation_native, closest_defect
+):
+    state = kit_installation_native("TNut")
+    state.target.closest_defect = closest_defect
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, state.configuration, state.cells, state.views
+        )
+    assert not state.calls
+    assert state.target.closest_queries
+
+
+def test_kit_tnut_installation_refuses_ambiguous_projected_side(
+    kit_installation_native,
+):
+    state = kit_installation_native("TNut")
+    state.projection_defect = "choice-tie"
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, state.configuration, state.cells, state.views
+        )
+    assert not state.calls
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize(
+    "caption_defect",
+    ("missing", "duplicate", "wrong-scale", "key-overlap", "leader-overlap"),
+)
+def test_kit_installation_settled_protects_measured_caption_ink(
+    kit_installation_native, configuration, caption_defect
+):
+    state = kit_installation_native(configuration)
+    settled = state.kit._installation_flag(
+        state.adapter, configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    if caption_defect == "missing":
+        state.sheet_view.notes.remove(state.caption)
+    elif caption_defect == "duplicate":
+        duplicate = copy.copy(state.caption)
+        duplicate.native_identity = object()
+        state.other_sheet.notes.append(duplicate)
+    elif caption_defect == "wrong-scale":
+        state.caption._resolved_text = state.caption.GetText().replace("1:2", "9:9")
+    elif caption_defect == "key-overlap":
+        state.caption._extent = state.note.GetExtent()
+    else:
+        start = state.note.annotation.position
+        end = state.note.annotation.landing
+        x, y = ((start[i] + end[i]) / 2 for i in range(2))
+        # The vertices stay inside the cell, and the key box is clear; only
+        # the native leader segment intersects this measured caption ink.
+        state.caption._extent = (
+            x - 0.0004,
+            y - 0.0004,
+            0.0,
+            x + 0.0004,
+            y + 0.0004,
+            0.0,
+        )
+    with pytest.raises(RuntimeError):
+        settled()
+    assert len(state.calls) == 1
+
+
+@pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
+@pytest.mark.parametrize("prior_view", ("previous-view", None))
+def test_kit_installation_refuses_a_silent_context_restore_failure(
+    kit_installation_native, configuration, prior_view
+):
+    state = kit_installation_native(configuration, prior_view=prior_view)
+    state.restore_defect = "ignored"
+    with pytest.raises(RuntimeError):
+        state.kit._installation_flag(
+            state.adapter, configuration, state.cells, state.views
+        )
+    assert len(state.calls) == 1
+    assert state.selected is None
+
+
+def test_kit_installation_legend_normalizes_crlf_without_rewriting_requirements(
+    kit_installation_native, monkeypatch
+):
+    state = kit_installation_native("HoldDownStud")
+    original_requirement = state.spec.DRAWING_NOTES
+    # A separate source contract exercises native Windows line endings without
+    # changing the real kit requirement or teaching the checker to strip text.
+    wrapped_requirement = original_requirement.replace("; ", ";\n", 1)
+    source_contract = SimpleNamespace(
+        RADIUS=state.spec.RADIUS,
+        END_CHAMFER=state.spec.END_CHAMFER,
+        LENGTH=state.spec.LENGTH,
+        DRAWING_NOTES=wrapped_requirement,
+    )
+    monkeypatch.setattr(state.kit, "stud", source_contract)
+    state.spec = source_contract
+    settled = state.kit._installation_flag(
+        state.adapter, state.configuration, state.cells, state.views
+    )
+    _kit_flag_finish_builder_notes(state)
+    state.legend._resolved_text = state.legend.GetText().replace("\n", "\r\n")
+    settled()
+    assert source_contract.DRAWING_NOTES == wrapped_requirement
+    state.legend._resolved_text += " "
+    with pytest.raises(RuntimeError):
+        settled()
