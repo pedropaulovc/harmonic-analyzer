@@ -495,18 +495,42 @@ def _native_same(left, right):
     return int(left is right)
 
 
-def _native_type_info(interface):
-    def documentation(member_id):
-        assert member_id == -1
-        return interface, "", 0, ""
+class _WitnessComError(Exception):
+    def __init__(self, hresult):
+        super().__init__(f"native HRESULT {hresult}")
+        self.hresult = hresult
 
-    return SimpleNamespace(GetTypeInfo=lambda: SimpleNamespace(GetDocumentation=documentation))
+
+class _WitnessDispatch:
+    point_iid = "fixture-point-IID"
+    segment_iid = "fixture-segment-IID"
+
+    def __init__(self, interface):
+        self.calls = []
+        self.capabilities = {
+            self.point_iid: interface == "ISketchPoint",
+            self.segment_iid: interface == "ISketchSegment",
+        }
+
+    def QueryInterface(self, iid, use_iid):
+        self.calls.append((iid, use_iid))
+        assert use_iid == "fixture-IUnknown"
+        outcome = self.capabilities[iid]
+        if isinstance(outcome, Exception):
+            raise outcome
+        if outcome is False:
+            raise _WitnessComError(-2147467262)
+        if outcome is None:
+            return None
+        assert outcome is True
+        # Capability-only pointer: it deliberately exposes no sketch methods.
+        return object()
 
 
 def _native_sketch_segment(*, owner="ActualLocationProfile", kind=0, identifiers=(1, 2)):
     sketch = _NativeSketch(owner, owner)
     return SimpleNamespace(
-        _oleobj_=_native_type_info("ISketchSegment"),
+        _oleobj_=_WitnessDispatch("ISketchSegment"),
         owner_sketch=sketch,
         GetSketch=lambda: sketch,
         GetType=lambda: kind,
@@ -743,7 +767,7 @@ class _WitnessPoint:
     def __init__(self, owner, x, y, z=0.0):
         self.owner, self.X, self.Y, self.Z = owner, x, y, z
         self.relations = []
-        self._oleobj_ = _native_type_info("ISketchPoint")
+        self._oleobj_ = _WitnessDispatch("ISketchPoint")
 
     def GetID(self):
         return id(self), 0
@@ -781,6 +805,15 @@ class _RelativeWitnessFixture:
     def __init__(self, monkeypatch, *, mode="retained"):
         from solidworks_mcp.adapters import com_variant
         import _telemetry
+        import sys
+
+        monkeypatch.setitem(sys.modules, "pythoncom", SimpleNamespace(
+            IID_IUnknown="fixture-IUnknown", com_error=_WitnessComError,
+        ))
+        monkeypatch.setitem(sys.modules, "solidworks_mcp.adapters._generated.sldworks_2026", SimpleNamespace(
+            ISketchPoint=SimpleNamespace(CLSID=_WitnessDispatch.point_iid),
+            ISketchSegment=SimpleNamespace(CLSID=_WitnessDispatch.segment_iid),
+        ))
 
         self.mode = mode
         self.events, self.selections, self.lines, self.relations, self.displays = [], [], [], [], []
@@ -1481,34 +1514,105 @@ def test_internal_entity_type_array_is_not_applied_to_actual_definition_array(mo
     assert row["identity_matches"] is True
 
 
-@pytest.mark.parametrize("mode", ("unknown-interface", "unavailable-typeinfo", "unavailable-definitions"))
-def test_unknown_definition_classification_is_logged_and_never_cast_or_accepted(monkeypatch, mode) -> None:
+@pytest.mark.parametrize("mode", (
+    "neither-interface", "both-interfaces", "point-qi-unavailable",
+    "segment-qi-unavailable", "non-com-failure", "null-pointer",
+    "unavailable-definitions",
+))
+def test_unknown_definition_capability_is_logged_and_never_cast_or_accepted(monkeypatch, mode) -> None:
     import ast
 
     fixture = _RelativeWitnessFixture(monkeypatch)
     line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
     relation = fixture.relations[1]
-
-    def unavailable():
-        raise RuntimeError("native metadata unavailable")
-
-    if mode == "unknown-interface":
-        fixture.tap._oleobj_ = _native_type_info("IUnexpectedNativeEntity")
-    elif mode == "unavailable-typeinfo":
-        fixture.tap._oleobj_ = SimpleNamespace(GetTypeInfo=unavailable)
+    dispatch = fixture.tap._oleobj_
+    dispatch.calls.clear()
+    if mode == "neither-interface":
+        dispatch.capabilities[dispatch.point_iid] = False
+    elif mode == "both-interfaces":
+        dispatch.capabilities[dispatch.segment_iid] = True
+    elif mode == "point-qi-unavailable":
+        dispatch.capabilities[dispatch.point_iid] = _WitnessComError(-2147352565)
+    elif mode == "segment-qi-unavailable":
+        dispatch.capabilities[dispatch.segment_iid] = _WitnessComError(-2147467259)
+    elif mode == "non-com-failure":
+        dispatch.capabilities[dispatch.point_iid] = RuntimeError("disconnected native dispatch")
+    elif mode == "null-pointer":
+        dispatch.capabilities[dispatch.point_iid] = None
     else:
+        def unavailable():
+            raise RuntimeError("native definitions unavailable")
         relation.GetDefinitionEntities2 = unavailable
+
+    original_bind = part._early_bound
+
+    def bind(entity, interface):
+        if entity is fixture.tap:
+            pytest.fail("unclassified native definition must never be speculatively bound")
+        return original_bind(entity, interface)
+
+    monkeypatch.setattr(part, "_early_bound", bind)
     with pytest.raises(RuntimeError):
-        part._require_witness_relation(fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap), stage="metadata-unavailable")
+        part._require_witness_relation(fixture.adapter, (relation,), 26, (line.GetStartPoint2(), fixture.tap), stage="capability-unavailable")
     fields = fixture.events[-1][1]
     assert fields["actual_relation_kinds"] == (26,)
     row, = ast.literal_eval(fields["relation_definitions"])
     assert row["identity_matches"] is False
-    if mode == "unknown-interface":
-        assert "IUnexpectedNativeEntity" in row["definition_interfaces"]
+    assert row["readback_errors"]
+    assert row["mandatory_readback_errors"]
+    if mode == "unavailable-definitions":
+        assert dispatch.calls == []
     else:
-        assert row["readback_errors"]
-        assert row["mandatory_readback_errors"]
+        assert dispatch.calls == [
+            (dispatch.point_iid, "fixture-IUnknown"),
+            (dispatch.segment_iid, "fixture-IUnknown"),
+        ]
+        definition = row["definition_fields"][0]  # Fixture returns definitions reversed.
+        assert definition["interface"] is None
+        queries = definition["query_interfaces"]
+        assert [query["iid"] for query in queries] == [dispatch.point_iid, dispatch.segment_iid]
+        if mode == "neither-interface":
+            assert [query["supported"] for query in queries] == [False, False]
+            assert [query["hresult"] for query in queries] == [-2147467262, -2147467262]
+        elif mode == "both-interfaces":
+            assert [query["supported"] for query in queries] == [True, True]
+            assert [query["hresult"] for query in queries] == [0, 0]
+        elif mode == "point-qi-unavailable":
+            assert [query["supported"] for query in queries] == [None, False]
+            assert [query["hresult"] for query in queries] == [-2147352565, -2147467262]
+        elif mode == "segment-qi-unavailable":
+            assert [query["supported"] for query in queries] == [True, None]
+            assert [query["hresult"] for query in queries] == [0, -2147467259]
+        else:
+            assert [query["supported"] for query in queries] == [None, False]
+            assert [query["hresult"] for query in queries] == [None, -2147467262]
+
+
+def test_horizontal_definition_uses_native_qi_without_dispatch_type_metadata(monkeypatch) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch, mode="segment-dispatch-proxy")
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    relation = fixture.relations[0]
+    actual, = relation.GetDefinitionEntities2()
+    assert actual is not line
+    assert fixture.adapter.swApp.IsSame(actual, line) == 0
+    actual._oleobj_.calls.clear()
+    part._require_witness_relation(fixture.adapter, (relation,), 4, (), line, stage="horizontal-positive-control")
+    assert actual._oleobj_.calls == [
+        (_WitnessDispatch.point_iid, "fixture-IUnknown"),
+        (_WitnessDispatch.segment_iid, "fixture-IUnknown"),
+    ]
+    fields = fixture.events[-1][1]
+    assert fields["actual_relation_kinds"] == (4,)
+    row, = ast.literal_eval(fields["relation_definitions"])
+    assert row["identity_matches"] is True
+    assert row["segment_key"] == ("LeverBoreLocationProfile", 0, 2, 1)
+    assert row["mandatory_readback_errors"] == []
+    definition, = row["definition_fields"]
+    assert definition["interface"] == "ISketchSegment"
+    assert [query["hresult"] for query in definition["query_interfaces"]] == [-2147467262, 0]
+    assert [query["supported"] for query in definition["query_interfaces"]] == [False, True]
 
 
 @pytest.mark.parametrize("unavailable_field", ("GetEntities", "GetEntitiesType"))

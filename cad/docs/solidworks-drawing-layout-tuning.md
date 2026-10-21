@@ -1582,13 +1582,17 @@ The official references name `swConstraintType_e` for both APIs: do not invent
 a25/26-to4/5 mapping from the unrecorded value. Classify actual definition
 entities before point identity or segment-key comparisons; an unrelated
 GetEntities/GetEntitiesType inventory is not the definition-entity inventory.
-Classify each definition dispatch using native
-[`IDispatch.GetTypeInfo`](https://learn.microsoft.com/en-us/windows/win32/api/oaidl/nf-oaidl-idispatch-gettypeinfo)
-and `ITypeInfo.GetDocumentation(-1)`, not the Python wrapper class or a
-speculative cast. Unknown interface/type information remains unavailable.
+R11 regressed the already-passed HORIZONTAL4 check because mandatory runtime
+type information returned `Invalid index`; that optional metadata is not an
+interface-capability contract. Classify each actual definition with native
+[`QueryInterface`](https://learn.microsoft.com/en-us/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface(refiid_void))
+and the pinned SDK interface IID. Only `E_NOINTERFACE` means that interface is
+unsupported; other failures remain unavailable. Reject ambiguous or unsupported
+classification. A generated `_early_bound` wrapper's fallback is not capability
+proof, and capability does not replace the native sketch-entity identity keys.
 Keep optional internal inventories and point-ID diagnostics separate from
-mandatory definition/type/identity evidence; telemetry failure must not create
-an unrelated constraint-acceptance requirement.
+mandatory definition/interface/identity evidence; telemetry failure must not
+create an unrelated constraint-acceptance requirement.
 
 The r5 attempt failed earlier, at the combined selected-count/circle-identity
 guard, before setting or reading a native pick. The r6 positive control then
