@@ -1735,8 +1735,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _activate_sheet(adapter, sheet_name)
         scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
-        # TODO(#1667): Restore after deterministic farm balloon placement;
-        # exploded wheel/lever balloons intentionally omitted meanwhile.
+        # TODO(#1667): Restore disabled wheel/lever groups only after the linked
+        # fix is validated; remove MB-1667-MG and this TODO with restoration.
         # landings += add_component_bom_balloons(
         #     adapter,
         #     view,
