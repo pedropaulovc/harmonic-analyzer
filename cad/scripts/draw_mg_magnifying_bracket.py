@@ -129,6 +129,8 @@ def _mouth_section(adapter: Any, side: Any) -> Any:
 
 def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
     """Keep the native tap/mate, omit its default printed class and duplicate name."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
     display = _early_bound(callout, "IDisplayDimension")
     definition = str(display.GetText(5) or "")
     if not all(token in definition for token in ("<hw-threaddesc>", "<hw-threadclass>", "<hw-thru>")):
@@ -136,11 +138,17 @@ def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
     resolved = str(display.GetText(1) or "")
     if THREAD not in resolved:
         raise RuntimeError("through-tap callout has no resolved native thread size")
-    classes = [
-        raw for raw in (display.GetHoleCalloutVariables() or ())
-        if str(_early_bound(raw, "ICalloutVariable").VariableName) == "hw-threadclass"
-    ]
-    if len(classes) != 1 or int(_early_bound(classes[0], "ICalloutVariable").Type) != 3:
+    # As in set_hole_callout_precision, resolve metadata against the returned
+    # dispatch, not ICalloutVariable's DISPIDs on a concrete variable pointer.
+    # The makepy constructor can retain that pointer after E_NOINTERFACE.
+    classes = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        metadata = dynamic_dispatch(raw._oleobj_)
+        if str(metadata.VariableName) == "hw-threadclass":
+            if int(metadata.Type) != 3:
+                raise RuntimeError("through-tap callout lacks one native string thread-class variable")
+            classes.append(raw)
+    if len(classes) != 1:
         raise RuntimeError("through-tap callout lacks one native string thread-class variable")
     thread_class = _early_bound(classes[0], "ICalloutStringVariable")
     original_class = str(thread_class.String or "")
