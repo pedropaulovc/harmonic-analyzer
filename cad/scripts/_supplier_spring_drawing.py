@@ -19,6 +19,7 @@ from solidworks_mcp.adapters.solidworks.drawing import iter_views, place_view, v
 from _check import check
 from _com import _early_bound
 import _config
+import _telemetry
 from _drawing_common import (
     DrawingOutputs, assert_asme_b_sheet, finalize_drawing, new_project_drawing,
     read_required_properties, stamp_drawing_summary,
@@ -28,7 +29,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
-    _PROPERTIES, _box, _cell, _center_marks_without_lines, _fit_group, _inside,
+    _PROPERTIES, _SCALES, _box, _cell, _center_marks_without_lines, _fit_group, _inside,
     _literal_note, _purchased_title_block, _rebuild, add_purchased_footer,
     assert_supplier_view_fits, check_item, supplier_fit_cells, view_band_bottom,
 )
@@ -106,6 +107,50 @@ def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
         _cell("installed_iso", 0.325, 0.142, 0.406, 0.175),
         _cell("max_front", 0.028, caption_y + 0.020, 0.403, 0.122),
     )
+
+
+def _record_supplier_fit_candidates(adapter: Any, draw: Any, members: list[tuple[Any, tuple]]) -> None:
+    """Record actual native extents after a failed fit; never select a fallback."""
+    previous = [(view, tuple(view.ScaleRatio), view.UseSheetScale) for view, _ in members]
+    try:
+        for scale in _SCALES:
+            for view, _ in members:
+                view.UseSheetScale = 0
+                view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+            _rebuild(draw, phase="diagnose supplier view scale")
+            for view, (key, center, cell) in members:
+                raw_outline = view.GetOutline()
+                try:
+                    outline = tuple(float(value) for value in raw_outline) if raw_outline is not None else ()
+                except (TypeError, ValueError, OverflowError):
+                    outline = ()
+                size = ((outline[2] - outline[0], outline[3] - outline[1])
+                        if len(outline) == 4 else None)
+                if len(outline) != 4:
+                    outline_status = "missing-or-malformed"
+                elif not all(map(isfinite, outline)):
+                    outline_status = "nonfinite"
+                elif size[0] <= 0.0 or size[1] <= 0.0:
+                    outline_status = "nonpositive"
+                else:
+                    outline_status = "finite-positive"
+                cell_size = (cell[2] - cell[0], cell[3] - cell[1])
+                excess = tuple(size[index] - cell_size[index] for index in range(2)) if size else None
+                _telemetry.info(
+                    f"supplier fit diagnostic: key={key!r}; view={view_name(adapter, view)!r}; "
+                    f"configuration={str(view.ReferencedConfiguration)!r}; "
+                    f"orientation={str(view.GetOrientationName())!r}; "
+                    f"requested_scale={scale!r}; actual_scale={tuple(view.ScaleRatio)!r}; "
+                    f"use_sheet_scale={view.UseSheetScale!r}; position_m={tuple(view.Position)!r}; "
+                    f"raw_outline_m={raw_outline!r}; outline_status={outline_status!r}; "
+                    f"outline_m={outline!r}; size_m={size!r}; cell_m={cell!r}; "
+                    f"cell_center_m={center!r}; size_excess_m={excess!r}"
+                )
+    finally:
+        for view, ratio, use_sheet_scale in previous:
+            view.ScaleRatio = double_array([float(value) for value in ratio])
+            view.UseSheetScale = use_sheet_scale
+        _rebuild(draw, phase="restore failed supplier view scale")
 
 
 async def build_supplier_spring_drawing(
@@ -235,7 +280,20 @@ async def build_supplier_spring_drawing(
     for keys in (("free_front", "free_top"), ("free_right",), ("installed_iso",), ("installed_second_iso",), ("max_front",)):
         members = [(views[key], cell) for cell in fit_cells if (key := cell[0]) in keys]
         if members:
-            scale = _fit_group(draw, members)
+            try:
+                scale = _fit_group(draw, members)
+            except RuntimeError as error:
+                try:
+                    _record_supplier_fit_candidates(adapter, draw, members)
+                except Exception as diagnostic_error:
+                    error.add_note(f"supplier fit diagnostics also failed: {diagnostic_error}")
+                import _seat_forensics
+
+                _seat_forensics.capture_com_failure(
+                    adapter, f"supplier-fit-{spec.artifact_stem}", str(error),
+                    exception=error, sheet_png=True,
+                    view_keys=tuple(cell[0] for _, cell in members),
+                )
             scales.update({cell[0]: scale for _, cell in members})
     _center_marks_without_lines(list(views.values()), cells)
     scale = scales["free_front"]

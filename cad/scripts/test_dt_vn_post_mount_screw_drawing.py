@@ -1239,6 +1239,9 @@ def _supplier_seat(monkeypatch, center, scale, *, source_angle=math.pi / 2.0):
         assert adapter is seat and display.name == contract["label"]
         seat.log.append(("reference", display.name))
 
+    # Existing frame-contract tests count projection calls independently of
+    # observational diagnostics; the diagnostic readbacks have their own test.
+    monkeypatch.setattr(drawing, "_log_supplier_view_state", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
     monkeypatch.setattr(projection, "double_array", lambda values: _DoubleArray(values))
@@ -1448,6 +1451,7 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
     monkeypatch, newline,
 ):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_log_supplier_view_state", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     monkeypatch.setattr(drawing, "assert_supplier_view_fits", lambda *_args, **_kwargs: None)
@@ -1508,9 +1512,12 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
             GetAnnotations=lambda annotations=annotations: annotations,
         ))
     monkeypatch.setattr(drawing, "iter_views", lambda _adapter: views)
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(
-        ActivateSheet=lambda _name: True, GetCurrentSheet=lambda: object(),
-    ))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            ActivateSheet=lambda _name: True, GetCurrentSheet=lambda: object(),
+        ),
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
     text = drawing.SUPPLIER_STOCK_TITLE
     assert "\n" in text
     state = SimpleNamespace(text=text.replace("\n", newline))
@@ -1520,11 +1527,138 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
         GetExtent=lambda: (0.03, 0.22, 0.0, 0.15, 0.24, 0.0),
     )
     notes = [(note, text, (0.02, 0.20, 0.18, 0.25))]
-    drawing._verify_supplier_stock(adapter, "stock", "head", notes)
+    drawing._check_supplier_stock(adapter, *views, notes)
     assert frames == [
         ("stock", drawing.STOCK_CENTER, drawing.STOCK_SCALE, False),
         ("head", drawing.STOCK_HEAD_CENTER, drawing.STOCK_HEAD_SCALE, True),
     ]
     state.text = state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
     with pytest.raises(RuntimeError, match="source label changed"):
-        drawing._verify_supplier_stock(adapter, "stock", "head", notes)
+        drawing._check_supplier_stock(adapter, *views, notes)
+
+
+def test_supplier_diagnostics_read_native_vertices_not_expected_profile(monkeypatch):
+    import ast
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "visible_reference_geometry", lambda *_args: [("OtherSketch", "sketch")])
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    native_points = [_SketchPoint((0.004, 0.008, 0.0)), _SketchPoint((0.007, 0.012, 0.0))]
+    source_transform = SimpleNamespace(
+        ArrayData=tuple(range(16)),
+        Inverse=lambda: lambda xyz: (xyz[0] + 0.020, xyz[1] - 0.030, xyz[2]),
+    )
+    segment = SimpleNamespace(
+        GetType=lambda: 0, ConstructionGeometry=True,
+        GetStartPoint2=lambda: native_points[0], GetEndPoint2=lambda: native_points[1],
+    )
+    sketch = SimpleNamespace(
+        ModelToSketchTransform=source_transform,
+        GetSketchPoints2=lambda: native_points, GetSketchSegments=lambda: [segment],
+    )
+    feature = SimpleNamespace(Visible=1, GetSpecificFeature2=lambda: sketch)
+    source = SimpleNamespace(
+        FeatureByName=lambda _name: feature, GetPathName=lambda: "source.SLDPRT",
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
+    )
+    bad_outline = (0.1233162, -0.08746936549327414, 0.1555234, 0.1275858660249454)
+    view = SimpleNamespace(
+        Name="Drawing View4", ReferencedDocument=source,
+        ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+        UseSheetScale=0, ScaleRatio=drawing.STOCK_SCALE, Angle=0.41,
+        Position=(0.2, 0.1), GetOutline=lambda: bad_outline, IsCropped=lambda: False,
+        ModelToViewTransform=SimpleNamespace(ArrayData=tuple(range(16, 32))),
+        GetSketch=lambda: SimpleNamespace(
+            ModelToSketchTransform=SimpleNamespace(ArrayData=tuple(range(32, 48))),
+        ),
+    )
+    adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda: _Utility()))
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, *, label: [(2 * x + 0.2, 2 * y + 0.1) for x, y, _z in points],
+    )
+    drawing._log_supplier_view_state(adapter, view, stage="control", geometry=True)
+    fields = {
+        line.split(" ", 3)[3].split("=", 1)[0]: ast.literal_eval(line.split("=", 1)[1])
+        for line in messages
+    }
+    assert fields["pose"]["outline_m"] == bad_outline
+    assert fields["pose"]["angle_rad"] == 0.41
+    assert fields["source_geometry"]["source_active_configuration"] == "Default"
+    assert fields["source_geometry"]["source_points_m"] == [(0.004, 0.008, 0.0), (0.007, 0.012, 0.0)]
+    assert fields["source_geometry"]["sheet_vertex_bounds_m"] == pytest.approx((0.248, 0.056, 0.254, 0.064))
+    assert fields["source_geometry"]["segments"] == [{
+        "type": 0, "construction": True,
+        "endpoints_m": [(0.004, 0.008, 0.0), (0.007, 0.012, 0.0)],
+    }]
+    assert fields["model_to_view"] == tuple(range(16, 32))
+    assert fields["sheet_to_view_sketch"] == tuple(range(32, 48))
+    assert fields["source_shown_references"] == [("OtherSketch", "sketch")]
+    # Missing diagnostic data must be reported, not fabricated or fatal.
+    view.ModelToViewTransform = None
+    messages.clear()
+    drawing._log_supplier_view_state(adapter, view, stage="missing transform")
+    assert "read_error" in messages[-1] and "AttributeError" in messages[-1]
+
+
+@pytest.mark.parametrize("identity", [0, 1])
+def test_supplier_failure_captures_sheet_and_checks_final_frame_before_outline(monkeypatch, identity):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    views = [
+        SimpleNamespace(
+            Name=name, ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+            UseSheetScale=0, ScaleRatio=scale, IsCropped=lambda cropped=cropped: cropped,
+            UpdateViewDisplayGeometry=lambda: None,
+        )
+        for name, scale, cropped in (
+            ("Drawing View4", drawing.STOCK_SCALE, False),
+            ("Drawing View5", drawing.STOCK_HEAD_SCALE, True),
+        )
+    ]
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(ActivateSheet=lambda _name: True, GetCurrentSheet=lambda: object()),
+        swApp=SimpleNamespace(IsSame=lambda _first, _second: identity),
+    )
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: views)
+    monkeypatch.setattr(drawing, "sheet_drawable_region", lambda *_args, **_kwargs: SimpleNamespace(
+        xmin=0.0, ymin=0.0, xmax=0.5, ymax=0.5,
+    ))
+    calls = []
+    monkeypatch.setattr(drawing, "_log_supplier_view_state", lambda _adapter, view, **kwargs: calls.append(
+        ("snapshot", view.Name, kwargs["stage"]),
+    ))
+    monkeypatch.setattr(drawing, "_assert_supplier_profile_frame", lambda _adapter, view, *_args, **_kwargs: calls.append(
+        ("frame", view.Name),
+    ))
+    refusal = RuntimeError("native outline is still vertical")
+
+    def cell(*_args, **_kwargs):
+        calls.append(("cell",))
+        raise refusal
+
+    def capture(actual_adapter, label, message, **kwargs):
+        assert actual_adapter is adapter
+        assert label == f"{drawing.PART_STEM}-supplier-envelope"
+        assert kwargs["sheet_png"] is True
+        calls.append(("capture", kwargs["exception"]))
+        raise kwargs["exception"]
+
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", cell)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._verify_supplier_stock(adapter, *views, [])
+    assert calls[-1] == ("capture", caught.value)
+    if identity:
+        assert caught.value is refusal
+        assert calls[:4] == [
+            ("snapshot", view.Name, f"{view.Name}: settled {phase} refresh")
+            for view in views for phase in ("before", "after")
+        ]
+        assert calls[4:6] == [("frame", "Drawing View4"), ("cell",)]
+    else:
+        assert "identity changed" in str(caught.value)
+        assert len(calls) == 1
