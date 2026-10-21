@@ -394,15 +394,14 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Notes name the locating mate, the shop's inside-corner ceiling and the one
-# known wall shortfall (rule 20); every size, band and finish remains on a
-# dimension or native symbol (drawing-guidelines.md rule 2 (the title block is
-# the general specification) and rule 7 (notes: few, flagged, never a method)).
-# TODO(#1625): drop the corner line when the title block carries the default.
+# Notes name the locating mate and the one known wall shortfall (rule 20);
+# the inside-corner ceiling remains solely in the title block. Every size,
+# band and finish remains on a dimension or native symbol (drawing-guidelines.md
+# rule 2 (the title block is the general specification) and rule 7 (notes: few,
+# flagged, never a method)).
 DRAWING_NOTES = "\n".join(
     (
         "FOOT SEATS ON MHA-DT-20.",
-        "INSIDE CORNERS R1.0 MAX.",
         f"WALL {MOUNT_HEAD_WEB_WORST:.2f} MIN, COUNTERBORE TO HEAD OD.",
     )
 )
