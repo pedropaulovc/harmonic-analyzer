@@ -495,7 +495,7 @@ def action(inputs, monkeypatch):
 
 @pytest.fixture
 def review_sessions(monkeypatch):
-    """Replace only the model-session boundary, not CLI/aggregate consumers."""
+    """Replace provider execution, retaining canonical session report publication."""
     import machinist_review as mr
 
     seen = []
@@ -518,7 +518,7 @@ def review_sessions(monkeypatch):
                 "member_ids": [finding["id"] for finding in findings],
                 "reason": "The hermetic judge rejects this synthetic claim.",
             }]}
-        return replace(
+        review = replace(
             mr._failed_review(
                 package, kwargs["reviewer"], kwargs["model"], kwargs["effort"],
                 [mr._sha256(source) for source in package.sources], "unused",
@@ -526,6 +526,8 @@ def review_sessions(monkeypatch):
             verdict=verdict, error=None, passed=findings is not None, sheet_count=1,
             prompt_sha256="hermetic-session", extra={"inspection_proven": True},
         )
+        mr.write_review(review, kwargs["report_dir"])
+        return review
 
     monkeypatch.setattr(mr, "_review_session", session)
     return SimpleNamespace(module=mr, seen=seen)
