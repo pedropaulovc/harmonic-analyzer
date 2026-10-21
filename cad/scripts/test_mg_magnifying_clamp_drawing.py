@@ -6,6 +6,7 @@ import itertools
 import json
 import math
 from fractions import Fraction
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,8 +18,12 @@ import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
 import _gtol_face_resolve
 import _drawing_leader_notes as leader_notes
+import _drawing_notes as drawing_notes
+from _drawing_layout_check import DrawableRegion
+from _layout_audit import find_leader_through_text
+from _layout_geometry import AnnotationGeometry, Box, Segment, SheetGeometry, find_border_breaches
 from _gtol_face import FaceGeometry, SURFACE_PLANE
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 
 
 def test_no_surface_finish_on_the_clamped_bore() -> None:
@@ -560,6 +565,63 @@ def test_stock_note_uses_the_exact_view_face_and_native_source_correspondence(mo
     audit = json.loads(state.records[-1][1]["auditJSON"])
     assert audit["source_self"] == audit["view_self"] == audit["canonical_self"] == audit["source_same"] == 1
     assert audit["raw_source_vs_view"] == cross_context_code and audit["stage"] == "stock.complete"
+
+
+def test_stock_flat_leader_clears_linked_scale_caption_with_r17_actual_ink(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch)
+    drawing._add_stock_note(state.adapter, state.view)
+    stock = state.document.notes[0]
+    assert stock.GetText() == spec.STOCK_NOTE
+    assert stock.GetAnnotation().GetAttachedEntities3() == (state.alias,)
+
+    def insert_linked(adapter, text, x, y):
+        assert adapter is state.adapter
+        assert text == drawing.property_link("Isometric View Note")
+        return SimpleNamespace(position=(x, y), GetText=lambda: spec.ISOMETRIC_VIEW_NOTE)
+
+    monkeypatch.setattr(drawing_notes, "add_note", insert_linked)
+    caption = drawing.add_property_linked_note(
+        state.adapter, "Isometric View Note", *drawing.ISO_NOTE_XY
+    )
+    assert caption.GetText() == spec.ISOMETRIC_VIEW_NOTE
+
+    # R17's measured native segment and caption ink, rounded to 0.1 mm by
+    # the audit. Keep the actual flat attachment/stock lane, move only caption ink.
+    original_anchor = (0.335, 0.150)
+    original_box = Box(0.3354, 0.1464, 0.3937, 0.1500)
+    stock_ink = AnnotationGeometry(
+        label=stock.GetText(), kind="note", owner="stock iso",
+        segments=(Segment(0.3891, 0.1384, 0.3508, 0.1637, "leader"),),
+    )
+    caption_ink = AnnotationGeometry(
+        label=caption.GetText(), kind="note", owner="sheet",
+        text_boxes=(original_box,), position=original_anchor, exact=True,
+    )
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    sheet = SheetGeometry(
+        name="Sheet1", width=template.width_m, height=template.height_m,
+        region=DrawableRegion.whole_sheet(template.width_m, template.height_m),
+        keep_outs=(("title block", Box(
+            template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m
+        )),),
+        annotations=(stock_ink, caption_ink),
+    )
+    before = find_leader_through_text(sheet)
+    assert len(before) == 1 and before[0].kind == "leader-through-text"
+    assert before[0].extra["overlap_mm"] == pytest.approx(6.47, abs=0.15)
+
+    dx, dy = (value - old for value, old in zip(caption.position, original_anchor, strict=True))
+    moved_box = Box(
+        original_box.xmin + dx, original_box.ymin + dy,
+        original_box.xmax + dx, original_box.ymax + dy,
+    )
+    after = replace(sheet, annotations=(stock_ink, replace(
+        caption_ink, text_boxes=(moved_box,), position=caption.position
+    )))
+    assert find_leader_through_text(after) == []
+    # These are the registry's paper/title bounds, not invented native view
+    # or zone extents: the unchanged final live audit must still prove those.
+    assert find_border_breaches(after) == []
 
 
 @pytest.mark.parametrize("fault, message", (

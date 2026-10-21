@@ -1212,7 +1212,11 @@ flat. Require positive native self controls, exact source correspondence and
 one matching face, then use that same view face for selection and attachment.
 Do not substitute FaceID or plane/box similarity for native source association.
 R16 imported all five ordinary location dimensions but its stock flag failed
-the strict FACE attachment check; the corrected context still needs native proof.
+the strict FACE attachment check. R17 proved the feature/view/source mapping
+and strict attachment, including distinct source/view handles, then failed
+the final audit because that leader crossed the isometric scale caption.
+Route the actual attached leader clear of the caption; identity closure is
+not sheet-layout acceptance, and neither guard should be weakened.
 
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
