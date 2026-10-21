@@ -1734,6 +1734,15 @@ before the existing gate records the failure. Magnifier cleanup remains
 normal-path-only; the outer build session still owns teardown after an exception.
 These timings do not establish a speedup.
 
+The jig walk also publishes eight aggregate attributes: attempt count and elapsed
+nanoseconds for `jig.drive_write`, `jig.force_rebuild`, `jig.edit_rebuild` and
+`jig.transform_readback` (suffixes `_attempts` and `_elapsed_ns`). These disjoint
+envelopes measure the existing operations, not certified successful native calls
+or pure solver CPU. Totals are recorded once on the walk span, including partial
+work on an early return or exception; setup, interference and mate phases remain
+separate. No poses, rebuilds, validation or cleanup are skipped. Other `_rebuild`
+callers do not read the timing clock.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on
