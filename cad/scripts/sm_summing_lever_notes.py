@@ -12,7 +12,11 @@ offline drawing test.
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import LINEAR_BAND, SCREW_THREAD
+from magnifying_bracket_joint_layout import (
+    LINEAR_BAND,
+    SCREW_THREAD,
+    THREAD_EXTENT_REQUIREMENT,
+)
 from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
@@ -36,6 +40,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "EdgeRibFrontEndStep",
     },
     "EdgeRibFront": {"EdgeRibThickness"},
+    "MiddleRibProfile": {"MidRibLeftX"},
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
@@ -125,7 +130,8 @@ BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 # view G (stack r4: six short lines on the -X one rose over the border).
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "EdgeRibFrontEndTopX": "ALL RIBS",
+    "EdgeRibFrontEndTopX": "END RIB FACES",
+    "MidRibLeftX": "MID RIB THEORETICAL INTERSECTION",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
@@ -167,15 +173,15 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # reference dimensions in parentheses are welcome): linear, no Ø glyph.
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
-# Leads the 2-56 receiver callout: the rib now contains the drill with an
-# ordinary bounded .XX depth band. The lower limit clears the unchanged screw
-# and two-pitch tap lead; the upper limit keeps its point inside the rib.
-# Section H-H shows the transition to thinner plate beyond the point, not a
-# bottom wall. The spring-anchor pad does not back these inboard receivers.
-# Keep both physical functions visible; this is not an accepted exception.
+# The bounded cylindrical drill contains both its cone and all actual thread.
+# The native 4.95 MIN controls usable thread, not an unlimited physical thread
+# extent. The explicit process line bounds that extent by the existing drill
+# cylinder; the pure wall contract conservatively charges the major envelope
+# over that whole cylinder. No screw, thread engagement or hole axis changes.
 BRACKET_TAP_CALLOUT_PROCESS = (
     "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
+    f"{THREAD_EXTENT_REQUIREMENT}\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
@@ -226,3 +232,7 @@ FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER} SCALE 1:2"
 # K is removed to the open upper-left field instead of aligned above F.
 STUB_ROOT_VIEW_LETTER = "K"
 STUB_ROOT_VIEW_NOTE = f"VIEW {STUB_ROOT_VIEW_LETTER} SCALE 5:1"
+
+# The plan on sheet 2 exists to locate the removed middle-rib section, not to
+# repeat sheet 1's dimensions or imply the end and middle outlines coincide.
+MIDDLE_RIB_PLAN_NOTE = "MIDDLE RIB\nCUT LOCATION\nPLAN SCALE 1:2"

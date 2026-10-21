@@ -174,6 +174,8 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     # The process line leads the callout; the native size starts the next row.
     assert notes.BRACKET_TAP_CALLOUT_PROCESS.endswith("\n")
     assert notes.BRACKET_SCREW_NUMBER in notes.BRACKET_TAP_CALLOUT_PROCESS
+    assert notes.BRACKET_TAP_CALLOUT_PROCESS.splitlines()[-1] == joint.THREAD_EXTENT_REQUIREMENT
+    assert joint.THREAD_EXTENT_REQUIREMENT == "THREAD EXTENT WITHIN DRILL CYLINDER"
     assert '"hw-threaddepth": THREAD_DEPTH' in drawing_source
     assert '"hw-tapdrldepth": DRILL_DEPTH' in drawing_source
     assert "bracket tap callout omits native depths" in drawing_source
@@ -205,7 +207,7 @@ def test_receiver_upper_stop_keeps_drill_out_of_unbacked_plate() -> None:
 
     # Both longitudinal receivers sit outside the pivot cylinder and inboard
     # of the pad. After the end rib, only the plate backs their bore walls.
-    drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
+    drill_radius_max = joint.TAP_DRILL_RADIUS_MAX
     pad_inner_x = sm_summing_lever_spec.PLATE_W - sm_summing_lever_spec.SPRING_PAD_W
     for x, _y, _z in joint.LEVER_HOLE_POINTS:
         assert x - joint.POSITION_BAND - drill_radius_max > sm_summing_lever_spec.CYL_R
@@ -214,8 +216,7 @@ def test_receiver_upper_stop_keeps_drill_out_of_unbacked_plate() -> None:
     # A MIN-only depth would allow the full drill diameter into this thinner
     # section. Its worst wall would not meet the unchanged 1.5 mm floor.
     bare_plate_wall = (
-        sm_summing_lever_spec.PLATE_T - joint.LINEAR_BAND
-        - (sm_summing_lever_spec.PLATE_T / 2.0 + joint.POSITION_BAND)
+        joint.RECEIVER_LOWER_NOTCH_HEIGHT_MIN
         - drill_radius_max - joint.DRILL_WANDER_MAX
     )
     assert bare_plate_wall < 1.5
@@ -324,6 +325,17 @@ def test_dimension_metadata_names_resolve_to_their_model_owners() -> None:
     assert above | below <= set(names)
     for (feature, name), _prefix in notes.DIMENSION_PREFIXES.items():
         assert name in notes.DRAWING_DIMENSIONS[feature]
+
+
+def test_middle_theoretical_reach_and_end_rib_faces_have_distinct_native_owners() -> None:
+    assert notes.DRAWING_DIMENSIONS["MiddleRibProfile"] == {"MidRibLeftX"}
+    assert drawing.DIMENSIONS_BY_FEATURE["MiddleRibProfile"] == {"MidRibLeftX"}
+    assert "MidRibLeftX" not in notes.DRAWING_DIMENSIONS["EdgeRibFrontProfile"]
+    assert "EdgeRibFrontEndTopX" in notes.DRAWING_DIMENSIONS["EdgeRibFrontProfile"]
+    assert notes.DIMENSION_CALLOUTS_ABOVE["EdgeRibFrontEndTopX"] == "END RIB FACES"
+    assert notes.DIMENSION_CALLOUTS_ABOVE["MidRibLeftX"] == "MID RIB THEORETICAL INTERSECTION"
+    assert "MidRibLeftX" not in notes.REFERENCE_DIMENSIONS
+    assert "MidRibLeftX" not in drawing.TOP_KEEP
 
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
@@ -909,6 +921,12 @@ def bracket_depth_callout(monkeypatch):
     drill = native("hw-tapdrldepth", 6.50)
     unrelated = native("hw-threaddia", 2.1844)
     variables = [unrelated.raw, thread.raw, drill.raw]
+    definitions = {
+        5: f"{notes.BRACKET_TAP_CALLOUT_PROCESS}#2-56 <hw-threadsize>",
+        6: "<hw-threaddepth> MIN",
+        7: "<hw-tapdrldepth>",
+        8: "",
+    }
     dispatched = []
     bound = []
 
@@ -927,11 +945,14 @@ def bracket_depth_callout(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "win32com.client.dynamic", SimpleNamespace(Dispatch=dispatch))
     monkeypatch.setattr(drawing, "_early_bound", early_bound)
-    callout = SimpleNamespace(GetHoleCalloutVariables=lambda: variables)
+    callout = SimpleNamespace(
+        GetHoleCalloutVariables=lambda: variables,
+        GetText=lambda part: definitions[part],
+    )
     return SimpleNamespace(
         dress=lambda: drawing._dress_bracket_depth_callout(callout),
         thread=thread, drill=drill, unrelated=unrelated, variables=variables,
-        dispatched=dispatched, bound=bound,
+        dispatched=dispatched, bound=bound, definitions=definitions,
     )
 
 
@@ -968,6 +989,18 @@ def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_cal
     assert effective_limits == pytest.approx((5.99, 7.01))
     physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
     assert effective_limits == pytest.approx(physical_limits)
+
+
+@pytest.mark.parametrize("replacement", ["", "THREAD EXTENT UNBOUNDED"])
+def test_bracket_depth_callout_requires_the_printed_thread_extent_process(
+    bracket_depth_callout, replacement,
+) -> None:
+    case = bracket_depth_callout
+    required = "THREAD EXTENT WITHIN DRILL CYLINDER"
+    assert required in case.definitions[5]
+    case.definitions[5] = case.definitions[5].replace(required, replacement)
+    with pytest.raises(RuntimeError, match="omits bounded physical thread extent"):
+        case.dress()
 
 
 @pytest.mark.parametrize(("member", "wrong_mm"), [("thread", 4.90), ("drill", 6.00)])
@@ -1052,7 +1085,7 @@ def test_rib_added_area_matches_independent_cross_section_integration() -> None:
 
 
 @pytest.mark.asyncio
-async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch) -> None:
+async def test_only_receiver_rib_extrudes_inward_to_nine_point_four(monkeypatch) -> None:
     from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
 
     part = lever_build
@@ -1107,16 +1140,16 @@ async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch)
     await part._edge_rib(adapter, True, "receiver", "EdgeRibBack", jobs)
     await part._edge_rib(adapter, False, "opposite", "EdgeRibFront", jobs)
     assert len(calls) == 2
-    for (depth, offset, _), expected in zip(calls, ((8.2, 68.0), (5.08, 71.12)), strict=True):
+    for (depth, offset, _), expected in zip(calls, ((9.4, 66.8), (5.08, 71.12)), strict=True):
         assert (depth, offset) == pytest.approx(expected)
     assert [kwargs for _, _, kwargs in calls] == [{"flip": True}, {}]
     assert -calls[0][1] - calls[0][0] == pytest.approx(-76.2)
     assert calls[1][1] + calls[1][0] == pytest.approx(76.2)
     area = part.edge_rib_added_area_mm2()
     assert area > 0
-    baselines = [1000.0, 1000.0 + 17.0 * 8.2]
+    baselines = [1000.0, 1000.0 + 17.0 * 9.4]
     assert [value - baseline for (_, value, _), baseline in zip(volumes, baselines, strict=True)] == pytest.approx(
-        [area * 8.2, area * 5.08]
+        [area * 9.4, area * 5.08]
     )
     assert events == ["measure", "extrude", "check", "measure", "extrude", "check"]
     assert jobs == [("front thickness", '"RibT"')]
@@ -1137,20 +1170,20 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
         )
         return SimpleNamespace(GetSurface=lambda: surface)
 
-    planes = {"EdgeRibBack": [-76.2, -68.0], "EdgeRibFront": [71.12, 76.2]}
-    depths = {"EdgeRibBack": 8.2, "EdgeRibFront": 5.08}
+    planes = {"EdgeRibBack": [-76.2, -66.8], "EdgeRibFront": [71.12, 76.2]}
+    depths = {"EdgeRibBack": 9.4, "EdgeRibFront": 5.08}
     if damage == "outer-caps-absent":
-        planes = {"EdgeRibBack": [-68.0], "EdgeRibFront": [71.12]}
+        planes = {"EdgeRibBack": [-66.8], "EdgeRibFront": [71.12]}
     elif damage == "receiver-depth":
         depths["EdgeRibBack"] = 7.3
     elif damage == "opposite-depth":
-        depths["EdgeRibFront"] = 8.2
+        depths["EdgeRibFront"] = 9.4
     elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
-        planes["EdgeRibBack"][1] = -68.9
+        planes["EdgeRibBack"][1] = -67.7
     elif damage == "opposite-inner":
-        planes["EdgeRibFront"][0] = 68.0
+        planes["EdgeRibFront"][0] = 66.8
     elif damage == "extra":
         planes["EdgeRibBack"].append(-70.0)
     elif damage == "empty":
@@ -1189,7 +1222,7 @@ def test_receiver_row_sits_inside_the_end_rib_height() -> None:
     upper and lower faces, not the plate's."""
     import magnifying_bracket_joint_layout as joint
 
-    drill_radius_max = (joint.TAP_DRILL_DIA + 0.10) / 2.0
+    drill_radius_max = joint.TAP_DRILL_RADIUS_MAX
     outer_x = max(point[0] for point in joint.LEVER_HOLE_POINTS)
     assert outer_x + drill_radius_max + joint.POSITION_BAND < lever_build.RIB_PLATE_REACH
     row_offset_max = joint.POSITION_BAND + joint.LINEAR_BAND / 2.0
@@ -1198,7 +1231,7 @@ def test_receiver_row_sits_inside_the_end_rib_height() -> None:
         - joint.LINEAR_BAND / 2.0
     )
     wall = rib_half_min - row_offset_max - drill_radius_max - joint.DRILL_WANDER_MAX
-    assert wall == pytest.approx(3.17940, abs=1e-5)
+    assert wall == pytest.approx(3.17805, abs=1e-5)
     assert wall >= 2.0
 
 
@@ -1298,7 +1331,7 @@ def _thread_annotation_drawing(monkeypatch, note_count: int = 7):
     ):
         # Native definitions retain associative fields, including the blind depths.
         definitions = {
-            5: f"{prefix} <hw-threadsize>",
+            5: f"{notes.BRACKET_TAP_CALLOUT_PROCESS if owner is back else ''}{prefix} <hw-threadsize>",
             6: "<hw-threaddepth> MIN" if owner is back else "THRU",
             7: "<hw-tapdrldepth>" if owner is back else "",
             8: "",
@@ -1414,6 +1447,22 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
     case.callouts[0][2].hole_callout = False
     with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
         drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+
+
+@pytest.mark.parametrize("replacement", ["", "THREAD EXTENT UNBOUNDED"])
+def test_finished_bracket_callout_preserves_the_printed_thread_extent_process(
+    monkeypatch, replacement,
+) -> None:
+    case = _thread_annotation_drawing(monkeypatch)
+    bracket_callout = case.callouts[-1][2]
+    required = "THREAD EXTENT WITHIN DRILL CYLINDER"
+    assert required in bracket_callout.definitions[5]
+    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+    drawing._remove_redundant_thread_notes(case.adapter)
+    check()
+    bracket_callout.definitions[5] = bracket_callout.definitions[5].replace(required, replacement)
+    with pytest.raises(RuntimeError, match="authored native hole callout changed"):
+        check()
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
@@ -1905,3 +1954,296 @@ def test_radius_arrow_landing_rejects_invisible_extension_and_air(
     state.dangling = True
     with pytest.raises(RuntimeError, match="native radius is dangling"):
         drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
+
+
+def _native_middle_rib_profile(monkeypatch, *, reverse=False, alternate=False):
+    """Expose native sketch points through the view's referenced part, in metres."""
+    vertex_mm = (lever_build.RIB_PLATE_REACH, 0.0, 0.0)
+    upper_mm = (6.496716083916082, 13.785872483270184, 0.0)
+    lower_mm = (6.496716083916082, -13.785872483270184, 0.0)
+    if alternate:
+        # A source-reading seam must interpolate what is actually in the native
+        # sketch, not silently regenerate the nominal tangent from constants.
+        upper_mm, lower_mm = (8.0, 14.5, 0.0), (7.2, -13.5, 0.0)
+
+    def point(mm):
+        return SimpleNamespace(**dict(zip("XYZ", (value / 1000.0 for value in mm), strict=True)))
+
+    def line(start, end):
+        segment = SimpleNamespace(start=point(start), end=point(end), GetType=lambda: 0)
+        segment.GetStartPoint2 = lambda: segment.start
+        segment.GetEndPoint2 = lambda: segment.end
+        return segment
+
+    upper = line(upper_mm, vertex_mm) if reverse else line(vertex_mm, upper_mm)
+    lower = line(vertex_mm, lower_mm) if reverse else line(lower_mm, vertex_mm)
+    state = SimpleNamespace(
+        segments=[
+            line((-76.2, 0.0, 0.0), (-3.048, 14.9, 0.0)),
+            lower, SimpleNamespace(GetType=lambda: 1), upper,
+        ],
+        feature_present=True, sketch_present=True, lookups=[],
+    )
+    sketch = SimpleNamespace(GetSketchSegments=lambda: state.segments)
+    feature = SimpleNamespace(
+        GetSpecificFeature2=lambda: sketch if state.sketch_present else None,
+    )
+
+    def feature_by_name(name):
+        state.lookups.append(name)
+        assert name == "MiddleRibProfile"
+        return feature if state.feature_present else None
+
+    part = SimpleNamespace(FeatureByName=feature_by_name)
+    view = SimpleNamespace(ReferencedDocument=part)
+
+    def drawing_feature_lookup(_name):
+        raise AssertionError("native profile must come from the referenced part, not the drawing")
+
+    def attr_or_call(value, name):
+        member = getattr(value, name)
+        return member() if callable(member) else member
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureByName=drawing_feature_lookup),
+        _get_attr_or_call=attr_or_call,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    return SimpleNamespace(
+        adapter=adapter, view=view, state=state, upper=upper, lower=lower,
+        upper_mm=upper_mm, lower_mm=lower_mm, vertex_mm=vertex_mm,
+    )
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("alternate", [False, True])
+def test_middle_rib_extensions_interpolate_the_actual_referenced_native_tangents(
+    monkeypatch, reverse, alternate,
+) -> None:
+    case = _native_middle_rib_profile(monkeypatch, reverse=reverse, alternate=alternate)
+    extensions = drawing._middle_rib_source_tangents(case.adapter, case.view)
+    assert len(extensions) == 2
+    assert case.state.lookups == ["MiddleRibProfile"]
+    by_height = sorted(extensions, key=lambda endpoints: endpoints[0][1])
+    for (join, vertex), tangent in zip(
+        by_height, (case.lower_mm, case.upper_mm), strict=True,
+    ):
+        tx, ty, _tz = tangent
+        plate_y = math.copysign(lever_build.PLATE_T / 2.0, ty)
+        expected_x = case.vertex_mm[0] + (
+            tx - case.vertex_mm[0]
+        ) * abs(plate_y / ty)
+        assert join == pytest.approx((expected_x, plate_y, 0.0))
+        assert vertex == pytest.approx(case.vertex_mm)
+        assert tx < join[0] < vertex[0]
+    if not alternate:
+        assert by_height[0][0][0] == pytest.approx(30.360182182011)
+        assert by_height[1][0][0] == pytest.approx(30.360182182011)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "missing-part", "missing-feature", "missing-sketch", "missing-segments",
+        "missing-lower", "duplicate-upper", "missing-vertex", "off-plane-vertex",
+        "endpoint-inside-plate", "endpoint-negative-x", "off-plane-endpoint",
+        "nonfinite-endpoint",
+    ],
+)
+def test_middle_rib_extensions_refuse_incomplete_or_ambiguous_native_profiles(
+    monkeypatch, damage,
+) -> None:
+    case = _native_middle_rib_profile(monkeypatch)
+    if damage == "missing-part":
+        case.view.ReferencedDocument = None
+    elif damage == "missing-feature":
+        case.state.feature_present = False
+    elif damage == "missing-sketch":
+        case.state.sketch_present = False
+    elif damage == "missing-segments":
+        case.state.segments = None
+    elif damage == "missing-lower":
+        case.state.segments.remove(case.lower)
+    elif damage == "duplicate-upper":
+        case.state.segments.append(case.upper)
+    elif damage == "missing-vertex":
+        case.upper.start.X += 0.00001
+    elif damage == "off-plane-vertex":
+        case.upper.start.Z = 0.00001
+    elif damage == "endpoint-inside-plate":
+        case.upper.end.Y = lever_build.PLATE_T / 2000.0
+    elif damage == "off-plane-endpoint":
+        case.upper.end.Z = 0.00001
+    elif damage == "nonfinite-endpoint":
+        case.upper.end.X = math.nan
+    else:
+        case.upper.end.X = -case.upper.end.X
+    with pytest.raises(RuntimeError, match="paired native middle-rib tangents"):
+        drawing._middle_rib_source_tangents(case.adapter, case.view)
+
+
+def test_middle_rib_layout_accepts_actual_finite_ink_inside_its_allocated_regions() -> None:
+    drawing._require_middle_rib_layout(
+        {
+            "section": ((0.120, 0.210, 0.150, 0.240), (0.110, 0.200, 0.160, 0.250)),
+            "plan": ((0.200, 0.020, 0.230, 0.060), (0.190, 0.010, 0.240, 0.070)),
+        },
+        {"foreign-view": (0.280, 0.100, 0.320, 0.180)},
+    )
+
+
+@pytest.mark.parametrize("side", range(4))
+def test_middle_rib_layout_rejects_actual_ink_outside_each_region_edge(side) -> None:
+    region = (0.110, 0.200, 0.160, 0.250)
+    inside = list(region)
+    outside = list(region)
+    direction = -1 if side < 2 else 1
+    inside[side] -= direction * 1e-6
+    outside[side] += direction * 1e-6
+    drawing._require_middle_rib_layout({"section": (tuple(inside), region)}, {})
+    with pytest.raises(RuntimeError, match="outside allocated"):
+        drawing._require_middle_rib_layout({"section": (tuple(outside), region)}, {})
+
+
+@pytest.mark.parametrize("side", ["left", "right", "below", "above"])
+def test_middle_rib_layout_discriminates_two_mm_foreign_ink_clearance(side) -> None:
+    section = (0.120, 0.210, 0.150, 0.240)
+    region = (0.110, 0.200, 0.160, 0.250)
+
+    def neighbor(gap):
+        if side == "left":
+            return (0.100, 0.210, section[0] - gap, 0.240)
+        if side == "right":
+            return (section[2] + gap, 0.210, 0.170, 0.240)
+        if side == "below":
+            return (0.120, 0.190, 0.150, section[1] - gap)
+        return (0.120, section[3] + gap, 0.150, 0.260)
+
+    drawing._require_middle_rib_layout(
+        {"section": (section, region)}, {"foreign-ink": neighbor(0.002 + 1e-6)},
+    )
+    with pytest.raises(RuntimeError, match="crowds"):
+        drawing._require_middle_rib_layout(
+            {"section": (section, region)}, {"foreign-ink": neighbor(0.002 - 1e-6)},
+        )
+
+
+@pytest.mark.parametrize("coordinate", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize("owner", ["section", "foreign"])
+def test_middle_rib_layout_refuses_nonfinite_actual_ink(coordinate, owner) -> None:
+    section = (0.120, 0.210, 0.150, 0.240)
+    region = (0.110, 0.200, 0.160, 0.250)
+    foreign = (0.280, 0.100, 0.320, 0.180)
+    if owner == "section":
+        section = (coordinate, *section[1:])
+    else:
+        foreign = (coordinate, *foreign[1:])
+    with pytest.raises(RuntimeError):
+        drawing._require_middle_rib_layout(
+            {"section": (section, region)}, {"foreign-ink": foreign},
+        )
+
+
+def _native_middle_rib_cut_ink(monkeypatch):
+    """Native GetSectionLineInfo2 payload: segments, two arrows, two letter positions."""
+    state = SimpleNamespace(
+        label="L",
+        values=[
+            1.0, 0.0, 2.0,
+            0.0, 0.120, 0.040, 0.0, 0.160, 0.040, 0.0,
+            0.0, 0.160, 0.040, 0.0, 0.200, 0.040, 0.0,
+            0.120, 0.040, 0.0, 0.115, 0.040, 0.0, 0.001, 0.002, 0.0,
+            0.200, 0.040, 0.0, 0.205, 0.040, 0.0, 0.001, 0.003, 0.0,
+            0.110, 0.045, 0.0, 0.207, 0.045, 0.0, 0.003,
+        ],
+    )
+    section = SimpleNamespace(GetLabel=lambda: state.label)
+    state.sections = [section]
+    plan = SimpleNamespace(
+        GetSectionLines=lambda: state.sections,
+        GetSectionLineInfo2=lambda: state.values,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    return SimpleNamespace(state=state, plan=plan)
+
+
+def test_middle_rib_cut_ink_bounds_each_native_line_arrow_and_letter(monkeypatch) -> None:
+    case = _native_middle_rib_cut_ink(monkeypatch)
+    ink = drawing._middle_rib_cut_ink(case.plan)
+    expected = {
+        "L-L cut segment 0": (0.120, 0.040, 0.160, 0.040),
+        "L-L cut segment 1": (0.160, 0.040, 0.200, 0.040),
+        "L-L cut arrow 0": (0.113, 0.038, 0.122, 0.042),
+        "L-L cut arrow 1": (0.197, 0.037, 0.208, 0.043),
+        "L-L cut letter 0": (0.110, 0.042, 0.113, 0.045),
+        "L-L cut letter 1": (0.207, 0.042, 0.210, 0.045),
+    }
+    assert ink.keys() == expected.keys()
+    for name, box in expected.items():
+        assert ink[name] == pytest.approx(box)
+    region = (0.100, 0.030, 0.220, 0.050)
+    drawing._require_middle_rib_layout(
+        {name: (box, region) for name, box in ink.items()},
+        {"foreign-view": (0.240, 0.030, 0.260, 0.050)},
+    )
+
+
+@pytest.mark.parametrize(
+    ("primitive", "coordinate_index"),
+    [("segment", 7), ("arrow", 20), ("letter", 35)],
+)
+def test_middle_rib_native_cut_ink_cannot_escape_via_line_arrow_or_letter(
+    monkeypatch, primitive, coordinate_index,
+) -> None:
+    case = _native_middle_rib_cut_ink(monkeypatch)
+    case.state.values[coordinate_index] = 0.240
+    ink = drawing._middle_rib_cut_ink(case.plan)
+    region = (0.100, 0.030, 0.220, 0.050)
+    with pytest.raises(RuntimeError, match=f"{primitive}.*outside allocated"):
+        drawing._require_middle_rib_layout(
+            {name: (box, region) for name, box in ink.items()}, {},
+        )
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "missing-section", "duplicate-section", "wrong-label", "missing-payload",
+        "wrong-section-count", "zero-segments", "fractional-segments",
+        "truncated", "extra-values", "nonfinite-segment", "nonfinite-arrow",
+        "nonfinite-letter", "zero-arrow-size", "zero-letter-height",
+    ],
+)
+def test_middle_rib_cut_ink_refuses_malformed_native_arrays(monkeypatch, damage) -> None:
+    case = _native_middle_rib_cut_ink(monkeypatch)
+    state = case.state
+    if damage == "missing-section":
+        state.sections.clear()
+    elif damage == "duplicate-section":
+        state.sections *= 2
+    elif damage == "wrong-label":
+        state.label = "Q"
+    elif damage == "missing-payload":
+        state.values = None
+    elif damage == "wrong-section-count":
+        state.values[0] = 2.0
+    elif damage == "zero-segments":
+        state.values[2] = 0.0
+    elif damage == "fractional-segments":
+        state.values[2] = 2.5
+    elif damage == "truncated":
+        state.values.pop()
+    elif damage == "extra-values":
+        state.values.append(0.0)
+    elif damage == "nonfinite-segment":
+        state.values[4] = math.nan
+    elif damage == "nonfinite-arrow":
+        state.values[20] = math.inf
+    elif damage == "nonfinite-letter":
+        state.values[35] = -math.inf
+    elif damage == "zero-arrow-size":
+        state.values[23:25] = [0.0, 0.0]
+    else:
+        state.values[-1] = 0.0
+    with pytest.raises(RuntimeError, match="middle-rib"):
+        drawing._middle_rib_cut_ink(case.plan)

@@ -92,6 +92,7 @@ from _assembly import (
 from _transforms import IDENTITY, euler_from_rows, rows_from_euler
 from _interference_contracts import allowed_interference_pairs
 from _chain_mounts import mounted_wheels
+from _native_receiver_clearance import assert_receiver_added_strip
 
 import _telemetry
 
@@ -226,6 +227,16 @@ async def _author_integration_settings(adapter: Any) -> None:
     )
     blank_sketch(adapter, spec.SETTING_FEATURE)
 
+def _assert_receiver_added_strip(adapter: Any, asm_name: str = ASM_NAME) -> None:
+    """Certify the installed addition, not existing intended lever contacts.
+
+    The native helper logs exact nested occurrence pairs, overlap, closest
+    points and static air. The same callback runs again on the reconciled
+    saved artifact and on every parts refresh, including no-op fingerprints.
+    """
+    assert_receiver_added_strip(adapter, asm_name)
+
+
 
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
@@ -312,7 +323,12 @@ async def build(adapter) -> dict[str, str]:
         ASM_NAME,
         lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
     )
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        native_contact_check=_assert_receiver_added_strip,
+        solved_gates=_assert_receiver_added_strip,
+    )
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
     # those exports dirty the reopened document, so discard it again without

@@ -11,8 +11,8 @@ taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore.  Sheet 1
-shows a 1:2 front profile (the boss, web and the rib outline every rib
-shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
+shows a 1:2 front profile (the boss, web and the end-rib outline), a
+4:1 detail of the trunnion envelope and its knife-edge round, a
 1:2 top plan (plate, ribs, cylinder, summation web, trunnion length, the
 anchor taps and their pattern control, and the VIEW F arrow onto the -Z
 end), a 1:1 partial section C-C of the plate's thickness, a 4:1 section H-H
@@ -58,6 +58,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_annotation_extent import boxes_clear
+from _drawing_layout_audit import annotation_display
+from _layout_audit import display_box, estimated_text_runs
 from _drawing_dimensions import (
     set_basic_dimension,
     set_dimension_callouts,
@@ -94,6 +97,7 @@ from magnifying_bracket_joint_layout import (
     RIB_DEPTH,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
+    THREAD_EXTENT_REQUIREMENT,
 )
 from sm_summing_lever_notes import (
     BACK_VIEW_LETTER,
@@ -104,6 +108,7 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
+    MIDDLE_RIB_PLAN_NOTE,
     REFERENCE_DIMENSIONS,
     SPRING_TAP_CALLOUT_PROCESS,
     STUB_ROOT_VIEW_LETTER,
@@ -174,6 +179,17 @@ ISO_CENTER = (0.350, 0.225)
 # bunched along the top edge over an empty lower two-thirds).
 BACK_CENTER = (0.225, 0.150)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
+# Separate cut-face-only middle profile: its 35.75 is a buried theoretical
+# intersection, not the end ribs' visible plate-side face. Keep the existing
+# two sheets and full-size text. Native settled checks, not these allocations,
+# decide whether the added plan/section fit beside K, VIEW F and the isometric.
+MIDDLE_RIB_PLAN_CENTER = (0.160, 0.061)
+MIDDLE_RIB_PLAN_NOTE_XY = (0.077, 0.030)
+MIDDLE_RIB_SECTION_ORIGIN = (0.205, 0.235)
+MIDDLE_RIB_CAPTION_XY = (0.160, 0.216)
+MIDDLE_RIB_DIMENSION_XY = (0.223, 0.259)
+MIDDLE_RIB_SECTION_REGION = (0.117, 0.205, 0.270, 0.270)
+MIDDLE_RIB_PLAN_REGION = (0.075, 0.010, 0.208, 0.118)
 
 # Detail D: the trunnion envelope at 4:1, in the open field left of the front
 # profile.  The fence (6 model mm) holds the hexagon (5.13 half-height, 3.5
@@ -1012,6 +1028,338 @@ def _plate_section(adapter: Any, top: Any) -> Callable[[], None]:
     return _style_plate_thickness_witnesses(adapter, native, annotations)
 
 
+def _middle_rib_source_tangents(
+    adapter: Any, view: Any,
+) -> tuple[tuple[tuple[float, float, float], tuple[float, float, float]], ...]:
+    """Visible plate joins and buried vertex, read from the actual native sketch.
+
+    The construction ink extends the real slants; it does not redraw a different
+    rib or manufacture a dimension to the visible join. All returned points are
+    part millimetres in the untransformed Front-plane sketch.
+    """
+    if view.ReferencedDocument is None:
+        raise RuntimeError("missing paired native middle-rib tangents: no source part")
+    part = _early_bound(view.ReferencedDocument, "IPartDoc")
+    raw = part.FeatureByName("MiddleRibProfile")
+    if raw is None:
+        raise RuntimeError("missing paired native middle-rib tangents: no profile")
+    raw_sketch = _early_bound(raw, "IFeature").GetSpecificFeature2()
+    if raw_sketch is None:
+        raise RuntimeError("missing paired native middle-rib tangents: no native sketch")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    expected = (RIB_PLATE_REACH / 1000.0, 0.0, 0.0)
+    tangents = []
+    for raw_segment in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw_segment, "ISketchSegment")
+        if int(segment.GetType()) != 0:  # swSketchLINE
+            continue
+        line = _early_bound(segment, "ISketchLine")
+        points = []
+        for accessor in ("GetStartPoint2", "GetEndPoint2"):
+            point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+            xyz = tuple(float(adapter._get_attr_or_call(point, axis)) for axis in "XYZ")
+            if not all(math.isfinite(value) for value in xyz):
+                raise RuntimeError("invalid paired native middle-rib tangents")
+            points.append(xyz)
+        for vertex, other in (points, reversed(points)):
+            if math.dist(vertex, expected) > 1e-9:
+                continue
+            if (
+                not 0.0 < other[0] < vertex[0]
+                or abs(other[1]) <= PLATE_T / 2000.0
+                or abs(other[2]) > 1e-9
+            ):
+                raise RuntimeError("invalid paired native middle-rib tangents")
+            fraction = (PLATE_T / 2000.0) / abs(other[1])
+            join = tuple(
+                (vertex[axis] + fraction * (other[axis] - vertex[axis])) * 1000.0
+                for axis in range(3)
+            )
+            tangents.append((join, tuple(value * 1000.0 for value in vertex)))
+    if len(tangents) != 2 or sorted(math.copysign(1.0, pair[0][1]) for pair in tangents) != [-1.0, 1.0]:
+        raise RuntimeError("missing paired native middle-rib tangents")
+    return tuple(sorted(tangents, key=lambda pair: -pair[0][1]))
+
+
+def _require_middle_rib_layout(
+    new_ink: dict[str, tuple[tuple[float, ...], tuple[float, ...]]],
+    neighbor_ink: dict[str, tuple[float, ...]],
+) -> None:
+    """Contain every read-back primitive and keep foreign ink 2 mm away."""
+    for label, box in neighbor_ink.items():
+        if (
+            len(box) != 4 or not all(math.isfinite(value) for value in box)
+            or box[0] > box[2] or box[1] > box[3]
+        ):
+            raise RuntimeError(f"{label}: invalid foreign middle-rib ink: {box}")
+    for label, (box, region) in new_ink.items():
+        if (
+            len(box) != 4 or len(region) != 4
+            or not all(math.isfinite(value) for value in (*box, *region))
+            or box[0] > box[2] or box[1] > box[3]
+            or box[0] < region[0] or box[1] < region[1]
+            or box[2] > region[2] or box[3] > region[3]
+        ):
+            raise RuntimeError(f"{label}: outside allocated middle-rib region: {box}")
+        for other, other_box in neighbor_ink.items():
+            if not boxes_clear(box, other_box, gap=0.002):
+                raise RuntimeError(f"{label} crowds {other}: {box}, {other_box}")
+
+
+def _middle_rib_annotation_box(
+    adapter: Any, annotation: Any, *, label: str, text_only: bool = False,
+) -> tuple[float, ...] | None:
+    """Native note extents or complete display geometry, never an anchor square."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    if int(annotation.Visible) in (2, 3):
+        return None
+    if int(annotation.GetType()) == 6:
+        extent = tuple(float(value) for value in _early_bound(
+            annotation.GetSpecificAnnotation(), "INote"
+        ).GetExtent())
+        if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
+            raise RuntimeError(f"{label}: invalid native note extent {extent}")
+        return extent[0], extent[1], extent[3], extent[4]
+    display, errors = annotation_display(adapter, annotation)
+    if errors:
+        raise RuntimeError(f"{label}: native ink read refused: {errors}")
+    if text_only:
+        display = {"texts": display.get("texts", ())}
+    box = display_box(display, advance=0.8)
+    estimates = estimated_text_runs(display)
+    if estimates:
+        _telemetry.info(
+            f"{label}: {estimates} unreported glyph widths conservatively estimated; "
+            "native strokes/positions/heights measured; PDF ink review still required"
+        )
+    return None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
+
+
+def _middle_rib_cut_ink(plan: Any) -> dict[str, tuple[float, ...]]:
+    """The actual L-L line, both arrow envelopes and both letter envelopes."""
+    sections = tuple(plan.GetSectionLines() or ())
+    if len(sections) != 1 or str(_early_bound(sections[0], "IDrSection").GetLabel()) != "L":
+        raise RuntimeError("middle-rib plan does not own its single L-L cutting line")
+    values = tuple(float(value) for value in plan.GetSectionLineInfo2() or ())
+    if len(values) < 3 or not all(math.isfinite(value) for value in values) or values[0] != 1:
+        raise RuntimeError("invalid native middle-rib section-line ink")
+    count, offset = int(values[2]), 3
+    if count < 1 or values[2] != count or len(values) != 3 + count * 7 + 25:
+        raise RuntimeError("invalid native middle-rib section-line ink length")
+    boxes = {}
+    for index in range(count):
+        segment = values[offset:offset + 7]
+        boxes[f"L-L cut segment {index}"] = (
+            min(segment[1], segment[4]), min(segment[2], segment[5]),
+            max(segment[1], segment[4]), max(segment[2], segment[5]),
+        )
+        offset += 7
+    for index in range(2):
+        arrow = values[offset:offset + 9]
+        padding = max(arrow[6], arrow[7])
+        if padding <= 0.0:
+            raise RuntimeError("middle-rib cutting arrow has no native width/height")
+        boxes[f"L-L cut arrow {index}"] = (
+            min(arrow[0], arrow[3]) - padding, min(arrow[1], arrow[4]) - padding,
+            max(arrow[0], arrow[3]) + padding, max(arrow[1], arrow[4]) + padding,
+        )
+        offset += 9
+    height = values[offset + 6]
+    if height <= 0.0:
+        raise RuntimeError("middle-rib cutting letter has no native height")
+    for index in range(2):
+        x, y = values[offset + index * 3:offset + index * 3 + 2]
+        # GetTextInfo's point is upper-left; one full height bounds a single L.
+        boxes[f"L-L cut letter {index}"] = (x, y - height, x + height, y)
+    return boxes
+
+
+def _middle_rib_section(
+    adapter: Any, *, neighboring_views: tuple[Any, ...],
+) -> tuple[Any, Any, Callable[[], None]]:
+    """Native cut-only L-L and its small associated plan, on receiver sheet 2."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    plan = _early_bound(place_view(
+        adapter, str(SOURCE), "*Top", *MIDDLE_RIB_PLAN_CENTER, scale=(1, 2)
+    ), "IView")
+    set_hidden_lines_removed(adapter, plan)
+    _set_tangent_edges(plan, visible=False)
+    line = model_points_in_view(
+        adapter, plan,
+        [_metres((x, 0.0, 0.0)) for x in (TIP_X - ANCHOR_R - 8.0, PLATE_W + 8.0)],
+        label="middle-rib L-L cutting line", names=("boss end", "plate end"),
+    )
+    section = _early_bound(create_section_view(
+        adapter, plan, line_start=line[0], line_end=line[1],
+        view_xy=MIDDLE_RIB_SECTION_ORIGIN, section_label="L", scale=(1, 1),
+        partial=True, label="middle-rib theoretical intersection",
+    ), "IView")
+    cut = _early_bound(section.GetSection(), "IDrSection")
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="middle-rib cut face only")
+    if not cut.GetDisplayOnlySurfaceCut():
+        raise RuntimeError("middle-rib L-L includes end ribs beyond its cutting plane")
+    _hidden_lines_removed_without_greyed_pass(section)
+    origin_mm = (0.0, 0.0, 0.0)
+    for attempt in range(3):
+        origin, up = model_points_in_view(
+            adapter, section, [_metres(origin_mm), _metres((0.0, 1.0, 0.0))],
+            label="middle-rib orientation", names=("origin", "+Y"),
+        )
+        dx, dy = up[0] - origin[0], up[1] - origin[1]
+        if dy > 0.0 and abs(dx) <= 1e-7:
+            break
+        section.Angle = float(section.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+        rebuild_drawing(adapter, label=f"middle-rib turned +Y up, pass {attempt}")
+    else:
+        raise RuntimeError("middle-rib L-L does not run +Y up")
+    origin, right = model_points_in_view(
+        adapter, section, [_metres(origin_mm), _metres((1.0, 0.0, 0.0))],
+        label="middle-rib handedness", names=("origin", "+X"),
+    )
+    if right[0] <= origin[0]:
+        cut.SetReversedCutDirection(not bool(cut.GetReversedCutDirection()))
+        rebuild_drawing(adapter, label="middle-rib looks toward +Z")
+        # Reversed section flips its handedness, not the model's +Y direction.
+        origin, right, up = model_points_in_view(
+            adapter, section, [_metres(origin_mm), _metres((1.0, 0.0, 0.0)), _metres((0.0, 1.0, 0.0))],
+            label="middle-rib final handedness", names=("origin", "+X", "+Y"),
+        )
+        if right[0] <= origin[0] or up[1] <= origin[1] or abs(up[0] - origin[0]) > 1e-7:
+            raise RuntimeError("middle-rib L-L has wrong native handedness")
+    for attempt in range(4):
+        section.UpdateViewDisplayGeometry()
+        origin = model_point_in_view(adapter, section, _metres(origin_mm), label="L-L axis")
+        if math.dist(origin, MIDDLE_RIB_SECTION_ORIGIN) <= 1e-4:
+            break
+        position = tuple(float(value) for value in section.Position)
+        if not section.SetViewPosition(double_array([
+            position[index] + MIDDLE_RIB_SECTION_ORIGIN[index] - origin[index]
+            for index in (0, 1)
+        ]), False):
+            raise RuntimeError("failed to centre middle-rib L-L on its native axis")
+        rebuild_drawing(adapter, label=f"middle-rib centred, pass {attempt}")
+    else:
+        raise RuntimeError("middle-rib L-L native axis did not settle")
+    tangents = _middle_rib_source_tangents(adapter, section)
+    extensions = [
+        _owned_centerline(adapter, section, ends, label=f"middle-rib tangent extension {index}")
+        for index, ends in enumerate(tangents)
+    ]
+    annotations = curate_view_dimensions(
+        adapter, section, keep={"MidRibLeftX": MIDDLE_RIB_DIMENSION_XY},
+        view_label="middle-rib L-L", dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    if len(annotations) != 1:
+        raise RuntimeError("middle-rib L-L did not import its one native model dimension")
+    reach_annotation = _early_bound(annotations[0], "IAnnotation")
+    _apply_callouts(adapter, annotations, label="middle-rib L-L")
+    position_section_caption(adapter, section, MIDDLE_RIB_CAPTION_XY, label="middle-rib L-L")
+    if drawing.ActivateView(view_name(adapter, plan)) is not True:
+        raise RuntimeError("failed to activate the middle-rib cut-location plan")
+    plan_note = _early_bound(add_property_linked_note(
+        adapter, "Middle Rib Plan Note", *MIDDLE_RIB_PLAN_NOTE_XY
+    ), "INote")
+    plan_note_annotation = _early_bound(plan_note.GetAnnotation(), "IAnnotation")
+
+    def check() -> None:
+        if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
+            raise RuntimeError("could not activate receiver sheet for middle-rib proof")
+        if not cut.GetDisplayOnlySurfaceCut() or _middle_rib_source_tangents(adapter, section) != tangents:
+            raise RuntimeError("middle-rib native section/profile association changed")
+        sketch = _early_bound(section.GetSketch(), "ISketch")
+        transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+        for index, (segment, ends) in enumerate(zip(extensions, tangents, strict=True)):
+            if int(segment.Color) != 0 or sum(
+                adapter.swApp.IsSame(raw, segment) == 1
+                for raw in (sketch.GetSketchSegments() or ())
+            ) != 1:
+                raise RuntimeError(f"middle-rib tangent extension {index} left its owning view")
+            projected = model_points_in_view(
+                adapter, section, [_metres(point) for point in ends],
+                label=f"middle-rib tangent extension {index}", names=("join", "vertex"),
+            )
+            line = _early_bound(segment, "ISketchLine")
+            for accessor, (x, y) in zip(("GetStartPoint2", "GetEndPoint2"), projected, strict=True):
+                expected_point = _early_bound(utility.CreatePoint(
+                    double_array([x, y, 0.0])
+                ), "IMathPoint")
+                expected = tuple(float(value) for value in _early_bound(
+                    expected_point.MultiplyTransform(transform), "IMathPoint"
+                ).ArrayData)
+                point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+                actual = tuple(float(adapter._get_attr_or_call(point, axis)) for axis in "XYZ")
+                if (
+                    not all(math.isfinite(value) for value in (*actual, *expected))
+                    or math.dist(actual, expected) > 1e-9
+                ):
+                    raise RuntimeError(f"middle-rib tangent extension {index} no longer meets its native profile")
+        display = _early_bound(reach_annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        full_name = str(dimension.FullName)
+        reach_mm = float(dimension.SystemValue) * 1000.0
+        if (
+            full_name.split("@")[:2] != ["MidRibLeftX", "MiddleRibProfile"]
+            or not math.isfinite(reach_mm) or abs(reach_mm - RIB_PLATE_REACH) > 1e-7
+            or reach_annotation.IsDangling()
+            or int(reach_annotation.OwnerType) != 0
+            or sum(adapter.swApp.IsSame(raw, reach_annotation) == 1 for raw in (section.GetAnnotations() or ())) != 1
+            or str(display.GetText(3) or "") != DIMENSION_CALLOUTS_ABOVE["MidRibLeftX"]
+            or str(plan_note.GetText() or "") != MIDDLE_RIB_PLAN_NOTE
+            or int(plan_note_annotation.OwnerType) != 0
+            or sum(adapter.swApp.IsSame(raw, plan_note_annotation) == 1 for raw in (plan.GetAnnotations() or ())) != 1
+        ):
+            raise RuntimeError("middle-rib L-L lost its native theoretical-reach dimension")
+        _telemetry.info(f"middle-rib imported source {full_name}: {dimension.SystemValue} m")
+        new_ink = {}
+        for name, view, region in (
+            ("middle-rib L-L", section, MIDDLE_RIB_SECTION_REGION),
+            ("middle-rib cut plan", plan, MIDDLE_RIB_PLAN_REGION),
+        ):
+            view.UpdateViewDisplayGeometry()
+            outline = tuple(float(value) for value in view.GetOutline())
+            new_ink[f"{name} outline"] = (outline, region)
+            for index, raw_annotation in enumerate(view.GetAnnotations() or ()):
+                if adapter.swApp.IsSame(raw_annotation, plan_note_annotation) == 1:
+                    continue
+                box = _middle_rib_annotation_box(adapter, raw_annotation, label=f"{name} annotation {index}")
+                if box is not None:
+                    new_ink[f"{name} annotation {index}"] = (box, region)
+                text_box = _middle_rib_annotation_box(
+                    adapter, raw_annotation, label=f"{name} text {index}", text_only=True,
+                )
+                if text_box is not None and not boxes_clear(text_box, outline, gap=0.002):
+                    raise RuntimeError(f"{name} text {index} crowds its own cut: {text_box}, {outline}")
+        note_box = _middle_rib_annotation_box(adapter, plan_note_annotation, label="middle-rib plan label")
+        if note_box is None:
+            raise RuntimeError("middle-rib cut plan lost its readable label")
+        new_ink["middle-rib plan label"] = (note_box, MIDDLE_RIB_PLAN_REGION)
+        if not boxes_clear(note_box, new_ink["middle-rib cut plan outline"][0], gap=0.002):
+            raise RuntimeError("middle-rib plan label crowds its own cut-location view")
+        for name, box in _middle_rib_cut_ink(plan).items():
+            new_ink[name] = (box, MIDDLE_RIB_PLAN_REGION)
+        neighbors = {}
+        # Include sheet-owned labels, not just the four neighboring view boxes.
+        for index, raw_view in enumerate((*neighboring_views, drawing.GetFirstView())):
+            view = _early_bound(raw_view, "IView")
+            name = f"existing receiver view {index}"
+            if index < len(neighboring_views):
+                neighbors[f"{name} outline"] = tuple(float(value) for value in view.GetOutline())
+            for annotation_index, raw_annotation in enumerate(view.GetAnnotations() or ()):
+                annotation = _early_bound(raw_annotation, "IAnnotation")
+                if int(annotation.OwnerType) == 2 or adapter.swApp.IsSame(annotation, plan_note_annotation) == 1:
+                    continue
+                box = _middle_rib_annotation_box(adapter, annotation, label=name)
+                if box is not None:
+                    neighbors[f"{name} annotation {annotation_index}"] = box
+        _require_middle_rib_layout(new_ink, neighbors)
+        _telemetry.success(f"middle-rib native allocated ink: {new_ink}; foreign ink: {neighbors}")
+
+    check()
+    return section, plan, check
+
+
 def _style_plate_thickness_witnesses(
     adapter: Any, view: Any, annotations: list[Any],
 ) -> Callable[[], None]:
@@ -1751,9 +2099,9 @@ def _receiver_row_centerline(adapter: Any, back: Any) -> Any:
 # Front profile at 1:2 (2026-10-15 baseline render): the pivot axis prints at
 # (0.2352, 0.2352), the boss spans x 0.1925..0.2021, the end rib's R15.24 arc
 # 7.6 mm round the axis, the web bar y 0.2338..0.2363 from the boss to that
-# arc, the plate tip x 0.2535..0.2575.  Every rib shares the +Z end rib's
-# outline, so its dimensions sit here once: the 35.75 reach above the view,
-# the rib end's step over the plate top right of the plate tip, the rib arc
+# arc, the plate tip x 0.2535..0.2575. The END ribs share this clipped
+# outline; the middle rib's tangent reaches a buried theoretical vertex
+# instead (section L-L). The end-face 35.75 sits above this view,
 # taking a leader from below left of the detail letter, the boss height left
 # of the boss, and the web thickness standing above the web.  The cylinder
 # is sized in the plan (TOP_KEEP): here the rib outline hides it.
@@ -1906,7 +2254,7 @@ TOP_KEEP = {
 # audit's 3.48 text separation).
 BACK_KEEP = {
     "SpringSeatThickness": (0.153, 0.133),
-    "SpringPadWidth": (0.130, 0.116),
+    "SpringPadWidth": (0.095, 0.116),
     # Leave the K viewing letter and its downward arrow clear below this block.
     "ReceiverX0": (0.220, 0.1955),
     # Each tight station names the bracket (machinist review r5): the 14.75's
@@ -1915,7 +2263,7 @@ BACK_KEEP = {
     "ReceiverY0": (0.143, 0.1585),
 }
 # The back view's label, under the pad's width.  The point is its top left.
-BACK_VIEW_NOTE_XY = (0.110, 0.100)
+BACK_VIEW_NOTE_XY = (0.045, 0.130)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
@@ -2009,6 +2357,8 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
+    if THREAD_EXTENT_REQUIREMENT not in str(callout.GetText(5) or ""):
+        raise RuntimeError("bracket tap callout omits bounded physical thread extent")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -2030,6 +2380,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Back View Note",
             "Front View Note",
             "Stub Root View Note",
+            "Middle Rib Plan Note",
         ),
         required=(
             "Number",
@@ -2040,6 +2391,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Back View Note",
             "Front View Note",
             "Stub Root View Note",
+            "Middle Rib Plan Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2577,6 +2929,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # The repeated isometric's label, where sheet 1 puts its own (machinist
     # review r12: unlabelled on this sheet).
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
+    _, _, check_middle_rib = _middle_rib_section(
+        adapter, neighboring_views=(back, receiver_iso, stub_root, rib_end)
+    )
     check_thread_annotations = _finished_thread_annotation_check(
         adapter,
         (
@@ -2611,6 +2966,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Recheck after the final rebuild, before either drawing or PDF is saved.
         settled_checks=(
             check_thread_annotations, check_plate_thickness, check_corner_radius_landings,
+            check_middle_rib,
         ),
     )
 

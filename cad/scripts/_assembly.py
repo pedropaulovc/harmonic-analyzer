@@ -2553,8 +2553,12 @@ async def save_assembly_and_images(
     assembly it describes is saved and fingerprinted; the previous manifest is
     retired with the previous mass-property proof, so a failed build never
     leaves a manifest beside an assembly it does not describe."""
-    if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
+    if asm_name in ("ch-channel", "sm-summing", "ha-harmonic-analyzer") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    if asm_name == "ha-harmonic-analyzer":
+        # Its strip gate also runs before SaveAsCopy. A changed referenced
+        # lever must not retain the previous proof when that early gate fails.
+        _invalidate_massprops_proof(_massprops_sidecar(asm_name))
     # The drawings' views at 1:2 and smaller print this derived configuration
     # (gear teeth and screw threads suppressed); Default stays the solved,
     # gated, rendered and saved-active pose.
@@ -2610,9 +2614,7 @@ async def save_assembly_and_images(
     # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
     # the copy source is discarded so the reopen loads clean children from disk.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    if asm_name in ("ch-channel", "sm-summing"):
-        if native_contact_check is None:
-            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    if native_contact_check is not None:
         native_contact_check(adapter, asm_name)
     # Fingerprint the actual reconciled persisted model and publish its proof
     # only after every strict native contact has succeeded.
@@ -3418,13 +3420,14 @@ async def refresh_assembly(
     (free DOF), ``check_no_interference`` (overlaps), ``assert_model_healthy``
     (deep mate health). Any gate raises a ``RuntimeError`` naming the culprit.
     Channel and summing assemblies additionally run strict static native spring
-    contact after their final reconciliation on every refresh, even when the
-    0.1-mm-rounded geometry fingerprint is unchanged. A failure leaves the
-    relevant proof marker invalid and never rewrites a no-op ``.SLDASM``. The
+    contact after their final reconciliation on every refresh. The complete
+    machine checks its receiver addition before save and after reconciliation.
+    These checks also run when the 0.1-mm-rounded fingerprint is unchanged.
+    A failure leaves the proof marker invalid and never rewrites a no-op file. The
     caller escalates to a full from-scratch rebuild via the ``full`` escape
     (delete the target + ``doit assembly:<stem>``).
     """
-    if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
+    if asm_name in ("ch-channel", "sm-summing", "ha-harmonic-analyzer") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
@@ -3517,7 +3520,7 @@ async def refresh_assembly(
             f"refresh {asm_name}: saved artifact opened with "
             f"NeedsRebuild2={opened_rebuild_status}; forcing gates + clean re-save"
         )
-    if asm_name in ("ch-channel", "sm-summing"):
+    if asm_name in ("ch-channel", "sm-summing", "ha-harmonic-analyzer"):
         # Revoke the previous certificate before either the changed-save path or
         # the byte-stable no-op path attempts strict native certification.
         # Failure to remove it aborts before any save or reconciliation.
@@ -3547,6 +3550,14 @@ async def refresh_assembly(
             f"refresh {asm_name}: fingerprint unchanged, no repairs -- broad "
             "DOF/interference/health gates reused"
         )
+    if asm_name == "ha-harmonic-analyzer":
+        # Refuse a colliding addition BEFORE replacing the assembly, then
+        # independently certify the actual saved/reconciled occurrences below.
+        # This must also run on the byte-stable no-op fingerprint path.
+        _run_solved_gates(
+            adapter, asm_name, lambda value: native_contact_check(value, asm_name)
+        )
+
 
     with _telemetry.span("save", asm=asm_name, changed=geometry_changed):
         if geometry_changed:
@@ -3562,9 +3573,7 @@ async def refresh_assembly(
     if saved:
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
 
-    if asm_name in ("ch-channel", "sm-summing"):
-        if native_contact_check is None:
-            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    if native_contact_check is not None:
         native_contact_check(adapter, asm_name)
 
     # Publish proof only after every persisted native check has succeeded.

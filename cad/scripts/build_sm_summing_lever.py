@@ -123,6 +123,7 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    MIDDLE_RIB_PLAN_NOTE,
     STUB_ROOT_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
@@ -217,14 +218,14 @@ RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 # Only the -Z edge rib is the magnifier bracket's receiver: its inward
 # extension gives the #2-56 drill an ordinary depth band without moving the
 # entry face. The independent +Z rib retains RIB_T.
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.00
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 66.80
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
 # hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
 # rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
 # channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
-# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-68.00),
+# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-66.80),
 # so that rib would refill it. Every rib's +X end therefore stops inboard of the
 # hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
@@ -968,6 +969,239 @@ def _assert_edge_rib_end_planes(adapter) -> None:
             f"{name}: native depth {depth_mm} mm; end planes {sorted(planes)} mm; "
             f"outer boundary {outer} mm"
         )
+
+
+def _native_values(values, count: int, label: str) -> tuple[float, ...]:
+    result = tuple(float(value) for value in values)
+    if len(result) != count or not all(math.isfinite(value) for value in result):
+        raise RuntimeError(f"{label}: invalid native values {result}")
+    return result
+
+
+def _assert_receiver_trimmed_wall(adapter) -> None:
+    """Certify nominal, finite BREP walls, not the print's worst-case bands.
+
+    ClosestDistance receives IFace2 objects, never their infinite ISurfaces.
+    Only the intentional entry plane and this receiver's bore faces are
+    omitted. Every other body face is tested (including other internal faces,
+    conservatively). The rear cap and plate underside must independently
+    return the actual notch corner, not an infinite-plane projection.
+    """
+    from magnifying_bracket_joint_layout import cone_notch_closest_advance
+
+    tol = 1e-5  # mm; native geometry, not a manufacturing allowance
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    if len(bodies) != 1:
+        raise RuntimeError("receiver certificate: expected exactly one solid body")
+    feature = part.FeatureByName("BracketMountingTaps")
+    if feature is None:
+        raise RuntimeError("receiver certificate: missing BracketMountingTaps")
+    feature = _early_bound(feature, "IFeature")
+    radius = TAP_DRILL_DIA / 2.0
+    entry = LEVER_HOLE_POINTS[0][2]
+    shoulder = entry + DRILL_DEPTH
+    rear = entry + RECEIVER_RIB_T
+    half_plate = PLATE_T / 2.0
+    holes = {(x, y): {} for x, y, _z in LEVER_HOLE_POINTS}
+    for raw in feature.GetFaces() or ():
+        face = _early_bound(raw, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        cylinder, cone = bool(surface.IsCylinder()), bool(surface.IsCone())
+        if not cylinder and not cone:
+            raise RuntimeError("receiver certificate: unexpected hole feature face")
+        kind = "cylinder" if cylinder else "cone"
+        params = _native_values(
+            surface.CylinderParams if cylinder else surface.ConeParams2,
+            7 if cylinder else 11, f"receiver {kind}",
+        )
+        if abs(params[3]) > 1e-8 or abs(params[4]) > 1e-8 or abs(abs(params[5]) - 1) > 1e-8:
+            raise RuntimeError(f"receiver {kind}: wrong native axis {params[3:6]}")
+        station = [
+            point for point in holes
+            if math.hypot(params[0] * 1000 - point[0], params[1] * 1000 - point[1]) <= tol
+        ]
+        if len(station) != 1 or kind in holes[station[0]]:
+            raise RuntimeError(f"receiver {kind}: wrong or duplicate native station")
+        if cylinder and abs(params[6] * 1000 - radius) > tol:
+            raise RuntimeError("receiver cylinder: wrong native minor radius")
+        if cone and abs(abs(params[7]) - math.atan(radius / DRILL_POINT_DEPTH)) > 1e-8:
+            raise RuntimeError("receiver cone: wrong native drill-point angle")
+        # Circular trim edges, unlike GetBox, give exact shoulder/end stations.
+        rings = []
+        vertices = []
+        for raw_edge in face.GetEdges() or ():
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                ring = _native_values(curve.CircleParams, 7, "receiver circular trim")
+                if (
+                    abs(ring[0] * 1000 - station[0][0]) > tol
+                    or abs(ring[1] * 1000 - station[0][1]) > tol
+                    or abs(ring[3]) > 1e-8 or abs(ring[4]) > 1e-8
+                    or abs(abs(ring[5]) - 1) > 1e-8
+                    or abs(ring[6] * 1000 - radius) > tol
+                ):
+                    raise RuntimeError("receiver: wrong native circular trim")
+                rings.append(ring[2] * 1000)
+                _telemetry.info(
+                    f"receiver native x={station[0][0]:g} {kind}: "
+                    f"trim centre={tuple(value * 1000 for value in ring[:3])}; "
+                    f"axis={params[3:6]}; trim radius={ring[6] * 1000:.9f} mm"
+                )
+            for vertex in (edge.GetStartVertex(), edge.GetEndVertex()):
+                if vertex is not None:
+                    vertices.append(tuple(
+                        value * 1000 for value in _native_values(
+                            _early_bound(vertex, "IVertex").GetPoint(), 3, "receiver vertex"
+                        )
+                    ))
+        expected = (entry, shoulder) if cylinder else (shoulder,)
+        if not rings or any(min(abs(z - wanted) for wanted in expected) > tol for z in rings) or any(
+            not any(abs(z - wanted) <= tol for z in rings) for wanted in expected
+        ):
+            raise RuntimeError(f"receiver {kind}: wrong native shoulder/depth {rings}")
+        if cone and not any(
+            math.dist(point, (*station[0], shoulder + DRILL_POINT_DEPTH)) <= tol
+            for point in vertices
+        ):
+            raise RuntimeError("receiver cone: native blind tip missing or wrong depth")
+        holes[station[0]][kind] = face
+    if any(set(faces) != {"cylinder", "cone"} for faces in holes.values()):
+        raise RuntimeError("receiver certificate: both holes need cylinder and cone")
+
+    external = []
+    entry_count = 0
+    for raw in _early_bound(bodies[0], "IBody2").GetFaces() or ():
+        face = _early_bound(raw, "IFace2")
+        owner = _early_bound(face.GetFeature(), "IFeature")
+        if owner is None:
+            raise RuntimeError("receiver certificate: native face has no owner")
+        if str(owner.Name) == "BracketMountingTaps":
+            continue
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        label = "external"
+        if surface.IsPlane():
+            plane = _native_values(surface.PlaneParams, 6, "receiver external plane")
+            nx, ny, nz = plane[:3]
+            if abs(nx) < 1e-8 and abs(ny) < 1e-8 and abs(abs(nz) - 1) < 1e-8:
+                z = plane[5] * 1000
+                if abs(z - entry) <= tol:
+                    entry_count += 1
+                    continue
+                if abs(z - rear) <= tol:
+                    label = "rear cap"
+            if abs(nx) < 1e-8 and abs(nz) < 1e-8 and abs(abs(ny) - 1) < 1e-8:
+                if abs(plane[4] * 1000 + half_plate) <= tol:
+                    label = "plate underside"
+        external.append((face, label))
+    if entry_count == 0 or not external:
+        raise RuntimeError("receiver certificate: missing native entry/external faces")
+    for (x, y), faces in holes.items():
+        for kind, hole in faces.items():
+            advance = 0.0 if kind == "cylinder" else cone_notch_closest_advance(
+                RECEIVER_RIB_T - DRILL_DEPTH, half_plate, radius,
+            )
+            radial = radius * (1.0 - advance / DRILL_POINT_DEPTH)
+            expected_gap = math.hypot(rear - shoulder - advance, half_plate - radial)
+            witnessed = set()
+            nearest = math.inf
+            for face, label in external:
+                distance, raw_a, raw_b = model.ClosestDistance(hole, face)
+                distance = float(distance) * 1000
+                a = tuple(value * 1000 for value in _native_values(raw_a, 3, "hole witness"))
+                b = tuple(value * 1000 for value in _native_values(raw_b, 3, "wall witness"))
+                if not math.isfinite(distance) or distance < 0 or abs(math.dist(a, b) - distance) > tol:
+                    raise RuntimeError("receiver certificate: native ClosestDistance failed")
+                if distance < expected_gap - tol:
+                    raise RuntimeError(
+                        f"receiver {x:g} {kind}: {label} gap {distance:g} < nominal {expected_gap:g} mm; {a}, {b}"
+                    )
+                nearest = min(nearest, distance)
+                if label in ("rear cap", "plate underside") and abs(distance - expected_gap) <= tol:
+                    # The cap may choose either equally close notch corner;
+                    # the underside must choose the lower corner.
+                    signs = (-1, 1) if label == "rear cap" else (-1,)
+                    if any(
+                        math.dist(b, (x, sign * half_plate, rear)) <= tol
+                        and math.dist(a, (x, sign * radial, shoulder + advance)) <= tol
+                        for sign in signs
+                    ):
+                        witnessed.add(label)
+                        _telemetry.info(
+                            f"receiver native x={x:g} {kind} -> {label}: "
+                            f"{distance:.9f} mm; hole={a}; wall={b}"
+                        )
+                    elif label == "plate underside":
+                        raise RuntimeError("receiver certificate: wrong trimmed underside witness")
+            if witnessed != {"rear cap", "plate underside"} or abs(nearest - expected_gap) > tol:
+                raise RuntimeError(
+                    f"receiver {x:g} {kind}: missing trimmed corner proof {witnessed}; "
+                    f"minimum {nearest:g}, nominal {expected_gap:g} mm"
+                )
+    _telemetry.success("receiver: both native cylinders/cones retain nominal finite-surface walls")
+
+
+def _assert_middle_rib_profile(adapter) -> None:
+    """Read original tangent endpoints and the actual imported dimension refs."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    raw = part.FeatureByName("MiddleRibProfile")
+    if raw is None:
+        raise RuntimeError("MiddleRibProfile: missing native sketch")
+    feature = _early_bound(raw, "IFeature")
+    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    lines = []
+    segments = tuple(sketch.GetSketchSegments() or ())
+    for raw_segment in segments:
+        segment = _early_bound(raw_segment, "ISketchSegment")
+        if int(segment.GetType()) != 0:  # swSketchLINE
+            continue
+        line = _early_bound(raw_segment, "ISketchLine")
+        points = []
+        for raw_point in (line.GetStartPoint2(), line.GetEndPoint2()):
+            point = _early_bound(raw_point, "ISketchPoint")
+            points.append(tuple(value * 1000 for value in (point.X, point.Y, point.Z)))
+        lines.append(points)
+    if len(segments) != 6 or len(lines) != 4:
+        raise RuntimeError("MiddleRibProfile: wrong native profile stack")
+    for vertex_x in (RIB_PLATE_REACH, TIP_X):
+        tx = ARC_R**2 / vertex_x
+        ty = ARC_R * math.sqrt(1 - ARC_R**2 / vertex_x**2)
+        for sign in (-1, 1):
+            expected = ((vertex_x, 0.0, 0.0), (tx, sign * ty, 0.0))
+            if sum(
+                any(math.dist(a, expected[0]) < 1e-5 and math.dist(b, expected[1]) < 1e-5
+                    for a, b in (points, points[::-1]))
+                for points in lines
+            ) != 1:
+                raise RuntimeError("MiddleRibProfile: original native tangent endpoints changed")
+    dimension = feature.Parameter("MidRibLeftX")
+    if dimension is None:
+        raise RuntimeError("MiddleRibProfile: missing MidRibLeftX")
+    dimension = _early_bound(dimension, "IDimension")
+    if abs(float(dimension.SystemValue) * 1000 - RIB_PLATE_REACH) > 1e-5:
+        raise RuntimeError("MiddleRibProfile: wrong theoretical vertex dimension")
+    refs = tuple(dimension.ReferencePoints or ())
+    if len(refs) != 3:
+        raise RuntimeError("MiddleRibProfile: missing native dimension reference points")
+    points = [
+        tuple(value * 1000 for value in _native_values(
+            _early_bound(point, "IMathPoint").ArrayData, 3, "middle rib dimension reference"
+        )) for point in refs[:2]
+    ]
+    if not (
+        any(math.dist(point, (RIB_PLATE_REACH, 0, 0)) < 1e-5 for point in points)
+        and any(math.dist(point, (0, 0, 0)) < 1e-5 for point in points)
+    ):
+        raise RuntimeError("MiddleRibProfile: dimension does not reference origin and theoretical vertex")
+    tx = ARC_R**2 / RIB_PLATE_REACH
+    ty = ARC_R * math.sqrt(1 - ARC_R**2 / RIB_PLATE_REACH**2)
+    join = RIB_PLATE_REACH + (tx - RIB_PLATE_REACH) * (PLATE_T / 2) / ty
+    _telemetry.success(
+        f"MiddleRibProfile: original native tangents; theoretical vertex "
+        f"({RIB_PLATE_REACH:g}, 0); visible plate join x={join:.9f} mm"
+    )
 
 
 async def _edge_rib(
@@ -1738,6 +1972,7 @@ def _drawing_dimension_contract(adapter) -> None:
     for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
         set_dimension_display_precision(adapter, "KnifeEnvelopeReference", name, 3)
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
+    set_dimension_display_precision(adapter, "MiddleRibProfile", "MidRibLeftX", 2)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
         set_dimension_symmetric_tolerance(
             adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL
@@ -2043,6 +2278,7 @@ async def build(adapter) -> dict[str, str]:
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
             "Stub Root View Note": STUB_ROOT_VIEW_NOTE,
+            "Middle Rib Plan Note": MIDDLE_RIB_PLAN_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -2051,6 +2287,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     _assert_edge_rib_end_planes(adapter)
+    _assert_receiver_trimmed_wall(adapter)
+    _assert_middle_rib_profile(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -2063,6 +2301,7 @@ async def build(adapter) -> dict[str, str]:
             "Back View Note",
             "Front View Note",
             "Stub Root View Note",
+            "Middle Rib Plan Note",
         ),
     )
     return artefacts

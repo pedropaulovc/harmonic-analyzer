@@ -3724,6 +3724,7 @@ def task_check():
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
+        SCRIPTS_DIR / "test_sm_summing_lever_receiver_native.py",
         SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
         # #1559: the MHA-MG-04 rod's threaded seat in the MHA-MG-02 hex clamp.
         SCRIPTS_DIR / "test_mg_rod_clamp_joint.py",

@@ -157,31 +157,59 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
-MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
-cylindrical tap-drill depth, explicitly symmetric in the native dimension.
-The native hole callout prints **6.50** at two places, inheriting the same
-ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
-accepted tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
-to **8.20 mm**: its entry remains **−76.20 mm**, its inner boundary is
-**−68.00 mm**, and the opposite end rib remains **5.08 mm**. The axes and
-13.7 mm pitch, MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged.
+The owner-selected MHA-SM-03 repair preserves the existing rib profiles and
+extends only the **−Z receiver rib to 9.40 ±0.51 mm**. Relative to the previous
+8.20 mm receiver, this adds **1.20 mm inward**: the entry stays **−76.20 mm**,
+the inner boundary becomes **−66.80 mm**, and the opposite rib stays **5.08 mm**.
+The two axes, top-referenced **2.54 ±0.05 mm** row, 13.7 mm pitch,
+MHA-MG-VN-53 screws and 3.175 mm flange are unchanged. No tighter tolerance,
+wall waiver or drawing-orientation approval is implied.
+
+The cylindrical drill remains **6.50 ±0.51 mm**, printed **6.50** under the
+ordinary title-block .XX band. Charge its printed **Ø1.78 +0.10/0**, not the
+unrounded native Ø1.778, so the worst radius is **0.940 mm**. With plate
+**5.08 ±0.51 mm**, the lower-corner stack is correlated:
+`axis-to-underside = plate_min − top_row_max = 4.57 − 2.59 = 1.98 mm`.
+Do not independently charge plate half-thickness again. Entry-face translation
+also cancels from the receiver-depth minus drill-depth difference.
+
+The sharp external rib-cap/plate-underside notch is a finite surface corner,
+not an infinite underside plane inside the rib. At the adverse bands, the
+118° cone's nearest point is **0.03956345 mm past the cylindrical shoulder**;
+subtracting the full-vector **0.03966197 mm** 0.3° wander bound gives a local
+pilot-to-corner bound of **2.10745219 mm**. Conservatively extending the screw
+major-radius envelope over the *entire bounded drill cylinder* gives
+**2.03942169 mm**. Both exceed the unchanged 2.0 mm target and 1.5 mm floor.
+The old 8.20 mm receiver's corresponding pilot bound was only **1.20291600 mm**;
+its **1.24257797 mm** un-wandered closest point was the shoulder, not the cone
+tip or an interior cone point. A point-containment margin is not a wall.
+
 Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**.
-At the printed limits the full-thread containment margin is **2.69 mm**,
-bottoming-tap lead exceeds two pitches by **0.082857 mm**, and the entire
-118° point plus conservative 0.3° wander stays inside the shortest rib by
-**0.076133 mm**. This last value is point containment, not a bottom-wall
-thickness or a reduced rule-17 wall floor.
+The feature callout additionally requires **THREAD EXTENT WITHIN DRILL CYLINDER**:
+MIN is not permission for unlimited thread beyond the finite volume charged by
+the wall proof. Existing engagement, screw-tip, tap-lead, head-float and other
+local-wall guards remain independent. `magnifying_bracket_joint_layout` owns
+the printed-band, cone and wander calculations.
 
-A bounded depth remains necessary: an unbounded MIN drill could enter the
-**5.08 mm plate** beyond the rib, where the receiver axes are inboard of the
-spring-anchor pad and the plate alone cannot meet the unchanged **1.5 mm**
-wall floor. The ordinary ±0.51 band bounds that reach without a special
-tight drill band. `magnifying_bracket_joint_layout` owns the physical stack
-and point/wander proof; section H-H shows the rib-to-plate transition.
+End-rib **35.75** dimensions name **END RIB FACES** only. The unchanged middle
+rib's **35.75** is the *theoretical intersection of its tangent slants*, buried
+inside the plate; its visible plate join is **30.36018218 mm** from the axis.
+The dedicated cut-face-only section L-L imports the actual native
+`MidRibLeftX@MiddleRibProfile` dimension and shows view-owned tangent extensions
+from the actual source sketch. It does not reprofile the rib to make a visible
+35.75 endpoint. View F retains its top-referenced row and centreline without
+the duplicate 2.54 reference.
 
-View F retains the top-referenced **2.54 ±0.05 mm** receiver-row location
-and the centreline through both taps and the hex centre. The duplicate
-parenthesized 2.54 reference is omitted; it adds no independent requirement.
+These are local analytic bounds, not a claim that every installed clearance
+has been measured. Part-save checks require native trimmed faces/closest-point
+witnesses for both drills and the original middle-rib profile. The affected
+`ha-harmonic-analyzer` assembly adds a localized native new-strip check against
+configured installed neighbors, independent of allowed whole-part contacts;
+`sm-summing` and `mg-magnifier` alone do not contain all cross-subassembly pairs.
+The strip check is **static installed-state evidence**, not an operational
+swept-volume certificate. Real-seat part/assembly results, native dimension
+association, all printed ink/readability and preserved contact interfaces must
+be accepted before this geometry is called fully clear.
 
 Section C-C retains the model-owned **5.08 mm** plate-thickness dimension
 under the title-block two-place band. Both visible extension lines begin

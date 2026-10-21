@@ -58,6 +58,10 @@ async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
         from _native_spring_contact import assert_assembly_spring_contacts
 
         native_contact_check = assert_assembly_spring_contacts
+    elif asm_name == "ha-harmonic-analyzer":
+        from build_ha_harmonic_analyzer_assembly import _assert_receiver_added_strip
+
+        native_contact_check = _assert_receiver_added_strip
 
     artefacts = await refresh_assembly(
         adapter,
