@@ -2966,12 +2966,23 @@ def test_a_pick_miss_writes_its_capture_under_failures(
 
 
 @pytest.mark.parametrize(
-    ("filters", "bad_transform"),
-    [(tuple(range(64)), False), (None, False), (tuple(range(65)), False),
-     (tuple(range(64)), True)],
+    ("filters", "transform_failure"),
+    [
+        (tuple(range(64)), None),
+        (None, None),
+        (tuple(range(65)), None),
+        (tuple(range(64)), "nonfinite"),
+        (tuple(range(64)), "wrong_length"),
+        (tuple(range(64)), "unreadable"),
+    ],
 )
 def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
-    tmp_path, capture_telemetry, monkeypatch, strict_forensic_owners, filters, bad_transform
+    tmp_path,
+    capture_telemetry,
+    monkeypatch,
+    strict_forensic_owners,
+    filters,
+    transform_failure,
 ):
     """Offline API-shaped doubles prove raw evidence survives before exports.
 
@@ -2982,8 +2993,10 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
     model = _FailureDrawing(tmp_path, unsaved=True)
     reads = []
     transform_data = tuple(float(n) for n in range(16))
-    if bad_transform:
+    if transform_failure == "nonfinite":
         transform_data = (float("nan"), *transform_data[1:])
+    elif transform_failure == "wrong_length":
+        transform_data = transform_data[:15]
 
     class Transform:
         _native_interfaces = ("IMathTransform",)
@@ -2992,6 +3005,8 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
         def ArrayData(self):
             reads.append("transform")
             assert _fake_grab_screen.windows == [None, 77]
+            if transform_failure == "unreadable":
+                raise RuntimeError("transform RPC refused")
             return transform_data
 
         def __bool__(self):
@@ -3060,7 +3075,7 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
     def before_export():
         assert _fake_grab_screen.windows == [None, 77]
         assert reads.count("transform") == 1
-        assert reads.count("point") == 1
+        assert reads.count("point") == (0 if transform_failure else 1)
 
     def save_bmp(*args):
         before_export()
@@ -3086,14 +3101,20 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
     assert state["view_visible_box_px"] == [300, 40, 2000, 1200]
     assert state["view_has_perspective"] is False
     assert state["sheet_xy"] == [0.15356, 0.14845]
-    assert state["sheet_point_view_px"] == [123.25, 456.5, 0.0]
-    if bad_transform:
-        assert "finite" in state["view_transform_error"]
+    if transform_failure:
+        expected_error = {
+            "nonfinite": "finite",
+            "wrong_length": "array of 16",
+            "unreadable": "transform RPC refused",
+        }[transform_failure]
+        assert expected_error in state["view_transform_error"]
         assert "view_transform" not in state
-        # The native transform object remains usable even when its raw array
-        # cannot be captured; projection must not fall back to Python math.
+        assert "sheet_point_view_px" not in state
+        assert "finite 16-value view_transform" in state["sheet_point_view_px_error"]
+        assert not {"math", "create_point", "multiply", "point"} & set(reads)
     else:
         assert state["view_transform"] == list(transform_data)
+        assert state["sheet_point_view_px"] == [123.25, 456.5, 0.0]
     if filters is None:
         assert state["selection_filters"] is None
         assert "selection_filters_error" in state

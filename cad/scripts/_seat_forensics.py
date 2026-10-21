@@ -1636,18 +1636,23 @@ def _zoomed_pick_state(adapter: Any, sheet_xy: Sequence[float]) -> dict[str, Any
     read("view_hwnd", hwnd)
     read("view_visible_box_px", lambda: numbers(view.GetVisibleBox(), 4, integers=True))
     perspective = read("view_has_perspective", lambda: boolean(view.HasPerspective()))
+    transform_values = None
     try:
         raw_transform = view.Transform
         if raw_transform is None:
             raise RuntimeError("IModelView.Transform returned None")
         transform = _com._early_bound(raw_transform, "IMathTransform")
-        read("view_transform", lambda: numbers(transform.ArrayData, 16))
+        transform_values = read("view_transform", lambda: numbers(transform.ArrayData, 16))
     except Exception as exc:  # noqa: BLE001 - raw fields survive a missing transform
         state["view_transform_error"] = f"{type(exc).__name__}: {exc}"
     try:
         if app is None or transform is None or xy is None:
             raise RuntimeError(
                 "projection unavailable: application, transform or sheet_xy unreadable"
+            )
+        if transform_values is None:
+            raise RuntimeError(
+                "projection unavailable: finite 16-value view_transform unreadable"
             )
         if perspective is not False:
             raise RuntimeError(

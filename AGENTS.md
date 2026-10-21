@@ -1210,9 +1210,11 @@ enforces it, and derives its scope from that one constant:
    new probing. The snapshot contains at most 64 raw selection-filter IDs,
    the filter-enable flag, active-view scale, 64-bit HWND, four visible-box
    pixel coordinates, perspective flag, 16 raw finite transform entries and
-   the two sheet coordinates. A nonperspective view may also supply three
-   finite coordinates from native MathPoint transformation; these are view
-   coordinates, not a guessed desktop position or selection aperture.
+   the two sheet coordinates. Only a confirmed nonperspective view with a
+   successfully read finite 16-entry transform may supply three finite
+   coordinates from native MathPoint transformation; otherwise projection is
+   unavailable with an explicit dependent error and no math allocation. These
+   are view coordinates, not a guessed desktop position or selection aperture.
    Unreadable/malformed probes carry explicit `<key>_error` causes; dependent
    failures name the unavailable prerequisite. A null filter array remains
    raw `None` with an error, not proof that no filters are active.
@@ -1238,8 +1240,10 @@ enforces it, and derives its scope from that one constant:
    `drawing_pick_state`, `_zoomed_pick_state`) reaches any of them.
    `_zoomed_pick_state` alone may call `IMathUtility.CreatePoint` to allocate
    a local math point: it does not create document geometry. The inert gate
-   pins that function/member pair, not a general `Create*` exemption; all
-   document/seat mutator prohibitions remain.
+   pins the exact typed math-utility producer, receiver and one-array call
+   shape, rejects receiver reassignment and sketch allocation even in that
+   function, and is not a general `Create*` exemption; all document/seat
+   mutator prohibitions remain.
    The one PRE-save root that may reach the export writers
    is `capture_pick_screens` (`PRE_SAVE_EXPORTS`), a pick-miss screenshot
    taken before a retry: it reaches only `SaveBMP` and `SaveAs3`, and every
