@@ -13,9 +13,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, dimension_name, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, stamp_drawing_summary
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
@@ -217,6 +218,22 @@ for _index, (_x, _y) in enumerate(part_spec.REGISTER_POINTS, 1):
     )
 
 
+def _assert_pocket_corner_callout(adapter: Any, annotations: list[Any]) -> None:
+    """Read the local manufacturing MAX on the real chamber size dimension."""
+    pocket = [annotation for annotation in annotations
+              if dimension_name(adapter, annotation) == "PocketDia"]
+    if len(pocket) != 1:
+        raise RuntimeError(f"expected one native chamber size dimension, found {len(pocket)}")
+    annotation = _early_bound(pocket[0], "IAnnotation")
+    display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if display is None:
+        raise RuntimeError("native chamber size dimension has no display annotation")
+    display = _early_bound(display, "IDisplayDimension")
+    actual = str(adapter._attempt(lambda: display.GetText(4)) or "").replace("\r", "")
+    if actual != part_spec.DIMENSION_CALLOUTS["PocketDia"]:
+        raise RuntimeError("native chamber floor/wall corner instruction did not persist")
+
+
 def _project(adapter, view, point, label):
     return model_point_in_view(adapter, view, tuple(value / 1000.0 for value in point), label=label)
 
@@ -244,6 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations.extend(curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=part_spec.DRAWING_DIMENSIONS))
     assert_imported_precision(adapter, annotations, part_spec.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part_spec.DIMENSION_CALLOUTS, location="below")
+    _assert_pocket_corner_callout(adapter, annotations)
     for view in (top, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError("failed to mark cap bore/pattern centres")

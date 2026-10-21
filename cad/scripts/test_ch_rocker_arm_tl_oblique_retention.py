@@ -61,6 +61,7 @@ def test_capture_uses_actual_component_patterns_and_unchanged_functional_fits(mo
         flange_thickness_max=pin.FLANGE_THICK + printed_band_mm(pin.FLANGE_THICK_PLACES),
         pocket_diameter_min=cap.POCKET_DIA + cap.POCKET_BAND[1],
         pocket_diameter_max=cap.POCKET_DIA + cap.POCKET_BAND[0],
+        pocket_corner_radius_max=cap.POCKET_CORNER_RADIUS_MAX,
         bearing_bore_diameter_max=block.BORE_DIA_MAX,
         carriage_counterbore_diameter_max=block.CBORE_DIA + printed_band_mm(2),
         carrier_clearance=carrier.PIN_CLEARANCE_MAX,
@@ -140,7 +141,7 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
     )
     assert bounds.cap_pocket_margin == pytest.approx(
         (cap.POCKET_DIA + cap.POCKET_BAND[1]) / 2.0 * math.cos(bounds.cap_tilt)
-        - bounds.cap_lateral_shift - roof_shift - stop_radius
+        - bounds.cap_lateral_shift - roof_shift - stop_radius - cap.POCKET_CORNER_RADIUS_MAX
     )
     center_band = printed_band_mm(cap.CENTER_LOCATION_PLACES)
     center_offset = max(
@@ -156,6 +157,40 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
     assert retention.STOP_CONTACT_DIAMETER * math.tan(theta) == pytest.approx(
         retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
     )
+
+
+@pytest.mark.parametrize("fraction", (0.999999, 1.000001))
+def test_chamber_corner_normal_quarter_circle_boundary(fraction: float) -> None:
+    # Zero guaranteed flange chamfer. Face variation is already included in
+    # the accepted chamber and lower-gap intervals, not spent a second time.
+    radial = ((cap.POCKET_DIA + cap.POCKET_BAND[1])
+              - (pin.FLANGE_DIA + pin.FLANGE_DIA_BAND[0])) / 2.0
+    roof = retention.CAP_CHAMBER_EXCESS[0] - retention.PIN_LOWER_GAP[1]
+    limit = radial + roof + math.sqrt(2.0 * radial * roof)
+    radius = fraction * limit
+    residual = (radius - radial) ** 2 + (radius - roof) ** 2 - radius ** 2
+    if fraction < 1.0:
+        assert residual < 0.0
+        assert retention.capture_bounds(pocket_corner_radius_max=radius).cap_pocket_margin > 0.0
+    else:
+        assert residual > 0.0
+        with pytest.raises(ValueError):
+            retention.capture_bounds(pocket_corner_radius_max=radius)
+
+
+def test_chamber_corner_reserves_the_full_fixed_stop_circle_through_upset() -> None:
+    sharp = retention.capture_bounds(pocket_corner_radius_max=0.0)
+    actual = retention.capture_bounds(pocket_corner_radius_max=cap.POCKET_CORNER_RADIUS_MAX)
+    assert actual.cap_pocket_margin == pytest.approx(
+        sharp.cap_pocket_margin - cap.POCKET_CORNER_RADIUS_MAX
+    )
+    assert actual.cap_pocket_margin > 0.0
+    # The normal corner bound is stricter, but consuming the complete actual
+    # flat-roof margin must never leave an accepted capture enclosure either.
+    beyond_flat_roof = math.nextafter(sharp.cap_pocket_margin, math.inf)
+    assert sharp.cap_pocket_margin - beyond_flat_roof < 0.0
+    with pytest.raises(ValueError):
+        retention.capture_bounds(pocket_corner_radius_max=beyond_flat_roof)
 
 
 def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> None:

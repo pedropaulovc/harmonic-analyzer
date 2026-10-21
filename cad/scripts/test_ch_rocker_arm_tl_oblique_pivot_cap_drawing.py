@@ -66,6 +66,38 @@ def test_integral_register_geometry_has_one_shared_owner() -> None:
     assert spec.REGISTER_END_CHAMFER_MAX == retention.CAP_REGISTER_END_CHAMFER_MAX == 0.20
 
 
+@pytest.mark.parametrize("persisted", (True, False))
+def test_local_corner_limit_is_read_back_on_the_native_chamber_size(
+    monkeypatch: pytest.MonkeyPatch, persisted: bool,
+) -> None:
+    expected = spec.DIMENSION_CALLOUTS["PocketDia"]
+    read_parts = []
+
+    def get_text(part):
+        read_parts.append(part)
+        return expected.replace("\n", "\r\n") if persisted else "GENERAL CORNER LIMIT ONLY"
+
+    display = SimpleNamespace(GetText=get_text)
+    pocket = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    unrelated = object()
+    adapter = SimpleNamespace(_attempt=lambda call: call())
+    monkeypatch.setattr(drawing, "dimension_name",
+                        lambda _adapter, annotation: "PocketDia" if annotation is pocket else "ApertureDia")
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    if persisted:
+        drawing._assert_pocket_corner_callout(adapter, [unrelated, pocket])
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_pocket_corner_callout(adapter, [unrelated, pocket])
+    assert read_parts == [4]  # swDimensionTextCalloutBelow, not a free note or primary value
+
+
+def test_local_corner_readback_requires_a_chamber_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, _annotation: "ApertureDia")
+    with pytest.raises(RuntimeError):
+        drawing._assert_pocket_corner_callout(object(), [object()])
+
+
 def test_all_real_material_margins_survive_the_printed_limits() -> None:
     margins = spec.require_clearance_geometry()
     assert margins == spec.GEOMETRY_MARGINS

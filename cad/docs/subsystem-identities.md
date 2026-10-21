@@ -123,6 +123,16 @@ and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) from operation, pass changes and ma
 acceptance (C4–C7, **CAPTUREANDOPERATION**). The operation sheet retains the finished
 isometric at 1:15 without competing with the cartridge assembly instructions.
 
+The cap chamber's existing associative pocket-size callout limits only its
+floor/wall inside corner to **R0.20 MAX**; the shared template's R1.0 general
+ceiling remains unchanged elsewhere. The analytical roof-land allowance
+reserves that complete local radius throughout the intact-rigid upset.
+Earlier peripheral corner contact is permitted, but the full fixed stop
+circle must still lie on a flat roof. Centered size clearance proves normal
+assembly is feasible, not that every register-slop pose runs clear: the fitter
+must inspect both actual gaps over the complete flange faces/rims and verify
+a full free pin turn before fitting the carrier.
+
 Source B supplies direct functional inspections, not new GD&T controls:
 inspect the pivot-pin functional face variation ≤0.05 mm over Ø35 mm and
 each of the four carrier bores' axis variation ≤0.05 mm over 10.5 mm.

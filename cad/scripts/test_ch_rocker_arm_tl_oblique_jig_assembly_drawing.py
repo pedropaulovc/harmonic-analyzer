@@ -20,6 +20,7 @@ import _component_references
 import _drawing_tables
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 
@@ -870,10 +871,13 @@ def test_bom_identity_is_the_registry() -> None:
 
 def test_steps_cite_every_screw_by_item_number() -> None:
     screws = [stem for stem in spec.BOM_ORDER if stem.endswith("-screw")]
-    steps = "\n".join((
-        drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED,
-        drawing.CAPTURE_LAYOUT.steps, drawing.CAPTURE_LAYOUT.continued,
-    ))
+    steps = "\n".join(
+        text
+        for layout in (
+            drawing.STEPS_LAYOUT, drawing.CARTRIDGE_LAYOUT, drawing.CAPTURE_LAYOUT
+        )
+        for text in (layout.steps, layout.continued)
+    )
     for stem in screws:
         assert f"(ITEM {drawing.BOM_ITEM_NUMBERS[stem]})" in steps
     # A citation never breaks across a line.
@@ -961,6 +965,13 @@ def test_source_census_proves_all_twelve_native_kit_references(native_bom_bindin
     first_stud.ComponentReference = ""
     with pytest.raises(RuntimeError, match="missing native component references"):
         drawing._validate_source(source)
+
+
+def test_cartridge_steps_cite_the_sourced_cap_screw_sku() -> None:
+    steps = "\n".join(
+        (drawing.CARTRIDGE_LAYOUT.steps, drawing.CARTRIDGE_LAYOUT.continued)
+    )
+    assert hardware.SCREW_SKU in steps
 
 
 class _Table:

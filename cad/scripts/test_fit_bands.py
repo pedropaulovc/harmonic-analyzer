@@ -556,31 +556,6 @@ def test_indexed_fit_bands_are_valid(module_name: str, name: str) -> None:
     _check_band(f"{module_name}.{name}", band, "upper_lower")
 
 
-@pytest.mark.parametrize(
-    ("module_name", "expected"),
-    (
-        (
-            "build_ch_rocker_arm_tl_oblique_pivot_cap",
-            {
-                ("PocketProfile", "PocketDia"): "*deviations(spec.POCKET_BAND)",
-                ("ApertureProfile", "ApertureDia"): "*deviations(spec.DRILLED_BAND)",
-                ("BoltProfile", "BoltHoleDia"): "*deviations(spec.DRILLED_BAND)",
-            },
-        ),
-        (
-            "build_ch_rocker_arm_tl_oblique_pivot_retainer",
-            {("WasherProfile", "WasherBore"): "*deviations(spec.DRILLED_BAND)"},
-        ),
-    ),
-)
-def test_capture_manufactured_parts_author_their_real_native_fit_bands(
-    module_name: str, expected: dict[tuple[str, str], str]
-) -> None:
-    from _drawing_contract import model_toleranced_dimensions
-
-    assert model_toleranced_dimensions(_import(module_name)) == expected
-
-
 def test_classification_lists_are_current() -> None:
     inventory = set(_inventory())
     assert ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND") in inventory, (

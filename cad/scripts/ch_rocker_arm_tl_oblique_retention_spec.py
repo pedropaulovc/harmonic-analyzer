@@ -65,6 +65,7 @@ CAP_OUTLINE_PLACES = 1
 CAP_CENTER_LOCATION_PLACES = 2
 CAP_POCKET_DIAMETER = 36.60
 CAP_POCKET_DIAMETER_BAND = (0.10, -0.10)
+CAP_POCKET_CORNER_RADIUS_MAX = 0.20  # local floor/wall finish limit; not a modeled fillet
 CAP_POCKET_DEPTH = 3.30  # REF; face to actual flange and chamber-excess requirement
 CAP_CHAMBER_EXCESS = (0.20, 0.30)
 CAP_APERTURE_DIAMETER = 19.0
@@ -341,6 +342,7 @@ def capture_bounds(
     flange_thickness_max: float = PIN_FLANGE_THICK + printed_band_mm(PIN_FLANGE_THICK_PLACES),
     pocket_diameter_max: float = CAP_POCKET_DIAMETER + CAP_POCKET_DIAMETER_BAND[0],
     pocket_diameter_min: float = CAP_POCKET_DIAMETER + CAP_POCKET_DIAMETER_BAND[1],
+    pocket_corner_radius_max: float = CAP_POCKET_CORNER_RADIUS_MAX,
     register_bore_diameter_max: float = BLOCK_REGISTER_DIAMETER + BLOCK_REGISTER_DIAMETER_BAND[0],
     register_bore_diameter_min: float = BLOCK_REGISTER_DIAMETER + BLOCK_REGISTER_DIAMETER_BAND[1],
     register_boss_diameter_min: float = CAP_REGISTER_DIAMETER + CAP_REGISTER_DIAMETER_BAND[1],
@@ -368,6 +370,8 @@ def capture_bounds(
     whole-circle chamber excess limits that difference. Both projected flange
     faces and the unbroken block/cap lands must still cover the circle.
     """
+    if pocket_corner_radius_max < 0.0:
+        raise ValueError("cap chamber inside-corner maximum cannot be negative")
     if min(chamber_excess, stop_diameter, flange_diameter_min, carrier_engagement) <= 0.0:
         raise ValueError("capture sizes and engagement must be positive")
     if len(receiver_pattern) != 2 or len(cap_pattern) != 2:
@@ -440,9 +444,12 @@ def capture_bounds(
     station_stack = printed_band_mm(2) + printed_band_mm(3)
     nearest_carriage_bore = math.hypot(19.0 - station_stack, 13.0 - station_stack)
     floor_outer = nearest_carriage_bore - carriage_counterbore_diameter_max / 2.0 - stop_diameter / 2.0
+    # The peripheral corner may stop upset motion sooner. Reserve its entire
+    # radius so the FULL fixed stop circle still contacts a flat roof, rather
+    # than crediting an unmodeled concave corner as a horizontal stop.
     pocket_margin = (
         pocket_diameter_min / 2.0 * math.cos(cap_motion.rock)
-        - cap_shift - roof_shift - stop_diameter / 2.0
+        - cap_shift - roof_shift - stop_diameter / 2.0 - pocket_corner_radius_max
     )
     relative_center_offset = 2.0 * math.sqrt(2.0) * printed_band_mm(CAP_CENTER_LOCATION_PLACES)
     aperture_margin = (
@@ -508,6 +515,23 @@ def capture_bounds(
     )
     if min(margins) <= 0.0:
         raise ValueError("opposing-stop contact or running clearance is lost")
+    # Centered normal assembly is feasible, not guaranteed for arbitrary
+    # register-slop poses. C2 still accepts actual full-face gaps and a free
+    # pin turn. The measured chamber allowance already includes face variation;
+    # no minimum flange chamfer is credited. For a quarter-circle corner,
+    # (r-a)^2+(r-b)^2 <= r^2 gives r <= a+b+sqrt(2ab).
+    normal_radial_gap = (
+        pocket_diameter_min - (PIN_FLANGE_DIA + PIN_FLANGE_DIA_BAND[0])
+    ) / 2.0
+    normal_roof_gap = CAP_CHAMBER_EXCESS[0] - PIN_LOWER_GAP[1]
+    if min(normal_radial_gap, normal_roof_gap) <= 0.0:
+        raise ValueError("cap chamber has no centered normal running clearance")
+    normal_corner_limit = (
+        normal_radial_gap + normal_roof_gap
+        + math.sqrt(2.0 * normal_radial_gap * normal_roof_gap)
+    )
+    if pocket_corner_radius_max >= normal_corner_limit:
+        raise ValueError("cap chamber corner prevents centered normal running clearance")
     if available_penetration < CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:
         raise ValueError("cap screw has insufficient available penetration for 1.5D complete threads")
     return CaptureBounds(
