@@ -2970,6 +2970,8 @@ def _synthetic_primary_measurements():
             carriage_under_pin_not_above_plane=True,
             prebearing_capture_coverage=spec.PREBEARING_CAPTURE_REQUIRED_COVERAGE,
             prebearing_capture_evidence=f"SYNTHETIC PRE-BEARING BENCH ONLY: fixed matched cartridge {support}",
+            upper_bearing_profile_status="accepted",
+            upper_bearing_receiving_evidence=f"SYNTHETIC C1R RECEIVING ONLY: matched upper bearing {support}",
             coverage=spec.PRIMARY_CAPTURE_REQUIRED_COVERAGE,
             primary_take_up_without_secondary_contact=True,
             evidence="SYNTHETIC BENCH TEST RECORD ONLY: not an actual installed acceptance",
@@ -3138,6 +3140,7 @@ def test_both_passes_reuse_the_same_physical_retainer_and_prebearing_trial() -> 
             {"fitted_retainer_thickness_mm": math.nextafter(original.fitted_retainer_thickness_mm, math.inf)},
             {"min_tip_recess_mm": math.nextafter(original.min_tip_recess_mm, math.inf)},
             {"prebearing_capture_evidence": "SYNTHETIC DIFFERENT CARTRIDGE TRIAL"},
+            {"upper_bearing_receiving_evidence": "SYNTHETIC DIFFERENT RECEIVED BEARING"},
         ):
             mutated = list(records)
             mutated[indexes[0]] = replace(original, **change)
@@ -3392,10 +3395,11 @@ def test_every_original_residual_pair_uses_its_grounded_proof_on_both_passes(
                 assert any("full-clock circular pin-section/screw" in basis for basis in proof.basis)
             key = _fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))
             residuals.add(key)
-            proof = capture_fixture_census[key]
+            proof = qualified_capture_fixture_census[key]
             assert proof.upset == "SOURCE_CAPTURE_JOINT"
             assert any("bore-mouth/flange shield" in basis for basis in proof.basis)
             assert proof.upset_gap <= 0.0  # not a static recessed-bearing box certificate
+            assert capture_fixture_census[key].upset == "UNRESOLVED"  # no actual receiving record
             for offset in range(2):
                 key = _fixture_pair(pass_name, (spec.CARRIAGE_SCREW, 4 * support + offset),
                                     (spec.PIVOT_CAP_SCREW, 4 * support + 2 + offset))
@@ -3499,7 +3503,7 @@ def test_bearing_shield_is_not_a_fixed_bearing_height_or_axial_play_assumption()
         - retention.PIN_FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
         - retention.CAP_CHAMBER_EXCESS[1] - bounds.cap_roof_rise)
     assert shield["solid flange barrier"] > 0.0
-    primary = {}
+    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
     for support in range(2):
         assert spec._capture_fixture_joint((spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1),
                                            bounds, "inner", primary) is not None
@@ -3517,7 +3521,8 @@ def test_bearing_shield_refuses_both_radial_cover_failure_boundaries(field, marg
     for epsilon in (-1e-8, 1e-8):
         changed = replace(bounds, **{field: boundary + epsilon})
         assert spec.capture_fixture_bearing_shield_bounds(changed)[margin] == pytest.approx(epsilon, abs=1e-12)
-        joint = spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), changed, "inner", {})
+        primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
+        joint = spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), changed, "inner", primary)
         assert (joint is not None) == (epsilon > 0.0)
 
 
@@ -3537,20 +3542,64 @@ def test_bearing_shield_has_both_barrier_and_bore_guidance_boundary_sides(margin
     # More flange thickness helps the barrier, and more race width keeps the
     # mid-plane deeper in the bore. The other four obligations remain intact.
     assert (value > 0.0) == (epsilon > 0.0)
-    assert (spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is not None) == (epsilon > 0.0)
+    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
+    assert (spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is not None) == (epsilon > 0.0)
 
 
 def test_bearing_shield_does_not_bypass_register_material_in_the_bearing_footprint(monkeypatch) -> None:
     bounds = retention.capture_bounds()
     monkeypatch.setattr(pivot_cap, "REGISTER_POINTS", ((-1.0, 0.0), (1.0, 0.0)))
     assert spec.capture_fixture_bearing_shield_bounds(bounds)["register radial separator"] < 0.0
-    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is None
+    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
+    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is None
 
 
 def test_upper_bearing_contact_barrier_still_needs_exact_native_baseline() -> None:
-    census = spec.capture_fixture_clearance_census(samples=3)
+    census = spec.capture_fixture_clearance_census(samples=3, primary_measurements=_synthetic_primary_measurements())
     for pass_name in trammel.PASS_RADIUS:
         for support in range(2):
             proof = census[_fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))]
             assert proof.upset == "UNRESOLVED" and proof.upset_gap <= 0.0
             assert any("static recess/AABB separation alone is not credited" in basis for basis in proof.basis)
+
+
+def test_upper_bearing_receiving_status_and_evidence_have_no_verified_defaults() -> None:
+    record = _synthetic_primary_measurements()[0]
+    for field in ("upper_bearing_profile_status", "upper_bearing_receiving_evidence"):
+        values = vars(record).copy()
+        del values[field]
+        with pytest.raises(TypeError):
+            spec.PrimaryCaptureMeasurement(**values)
+    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
+    bounds = retention.capture_bounds()
+    assert min(spec.capture_fixture_bearing_shield_bounds(bounds).values()) > 0.0
+    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is None
+    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is not None
+
+
+@pytest.mark.parametrize("status", ("rejected", "uninspected", "unknown", "ACCEPTED", True, None))
+def test_only_explicitly_accepted_actual_upper_bearing_profile_can_qualify(status) -> None:
+    records = _synthetic_primary_measurements()
+    bad = replace(records[0], upper_bearing_profile_status=status)
+    with pytest.raises(ValueError, match="ACCEPTED C1R"):
+        spec.qualify_primary_capture_measurements((bad, *records[1:]))
+
+
+@pytest.mark.parametrize("evidence", ("", " ", None, False))
+def test_accepted_upper_bearing_profile_needs_separate_actual_receiving_authority(evidence) -> None:
+    records = _synthetic_primary_measurements()
+    bad = replace(records[0], upper_bearing_receiving_evidence=evidence)
+    with pytest.raises(ValueError, match="C1R upper-bearing receiving evidence"):
+        spec.qualify_primary_capture_measurements((bad, *records[1:]))
+
+
+def test_c1r_actual_upper_bearing_receiving_conditions_are_user_facing() -> None:
+    instructions = " ".join(spec.CARTRIDGE_STEPS)
+    for requirement in (
+        "C1R.", "BEFORE PRESSING EACH UPPER 6200", "ACTUAL OD 29.991-30.000",
+        "WIDTH 8.88-9.00", "FULL-CIRCUMFERENCE", "CYLINDRICAL OD LAND",
+        "AXIAL MID-PLANE BETWEEN END FACES", "ACCEPTED/REJECTED/UNINSPECTED",
+        "RECEIVING EVIDENCE BY SUPPORT", "FIT ACCEPTED ONLY",
+        "REPLACE AND REINSPECT", "CATALOGUE/MODEL SHAPE IS NOT INSPECTION",
+    ):
+        assert requirement in instructions

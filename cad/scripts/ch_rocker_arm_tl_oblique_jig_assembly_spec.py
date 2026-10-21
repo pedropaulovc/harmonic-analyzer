@@ -81,6 +81,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Literal
 
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
@@ -1681,7 +1682,13 @@ ASSEMBLY_CHECKS = (
 )
 
 CARTRIDGE_STEPS = (
-    "C1. BEFORE FINAL PRESS ASSEMBLY, MEASURE EACH ACTUAL BLOCK SHOULDER/"
+    "C1R. BEFORE PRESSING EACH UPPER 6200, CHECK ACTUAL OD 29.991-30.000 "
+    "AND WIDTH 8.88-9.00. ITS INTACT OUTER RING MUST HAVE A FULL-CIRCUMFERENCE "
+    "CYLINDRICAL OD LAND AT THE AXIAL MID-PLANE BETWEEN END FACES. RECORD "
+    "ACCEPTED/REJECTED/UNINSPECTED STATUS AND RECEIVING EVIDENCE BY SUPPORT. "
+    "FIT ACCEPTED ONLY; REPLACE AND REINSPECT REJECTED/UNINSPECTED BEARINGS. "
+    "CATALOGUE/MODEL SHAPE IS NOT INSPECTION.",
+    "C1. BEFORE FINAL PRESS ASSEMBLY, COMPLETE C1R. MEASURE EACH ACTUAL BLOCK SHOULDER/"
     "UPPER-BEARING FACE STACK AND FIT THE PIN'S LOWER BOSS HEIGHT FOR THE "
     "C2 GAPS; DO NOT PLAN POST-PRESS MACHINING. COMPLETE C2A ON "
     "TOPCAPTUREFIT WITH THE FINAL MACHINED PARTS BEFORE PRESSING ANY "
@@ -2650,6 +2657,10 @@ class PrimaryCaptureMeasurement:
     Secondary gaps are to the carrier at the mechanically established
     PRIMARY retainer/clevis take-up. A cotter/head touching first is failure,
     not an extra uplift stop. There are no inferred or verified defaults.
+    C1R receiving status independently accepts the actual upper bearing's
+    published OD/width limits and intact, uninterrupted full-circumference
+    cylindrical OD land at its axial mid-plane. Its actual evidence authority
+    is reused for the same support on both passes, never inferred from CAD.
     """
 
     pass_name: str
@@ -2668,6 +2679,8 @@ class PrimaryCaptureMeasurement:
     carriage_under_pin_not_above_plane: bool
     prebearing_capture_coverage: tuple[str, ...]
     prebearing_capture_evidence: str
+    upper_bearing_profile_status: Literal["accepted", "rejected", "uninspected"]
+    upper_bearing_receiving_evidence: str
     coverage: tuple[str, ...]
     primary_take_up_without_secondary_contact: bool
     evidence: str
@@ -2676,7 +2689,7 @@ class PrimaryCaptureMeasurement:
 def qualify_primary_capture_measurements(
     records: tuple[PrimaryCaptureMeasurement, ...],
 ) -> dict[tuple[str, int], PrimaryCaptureMeasurement]:
-    """Accept only complete, quantified C2A/C4/C5 physical capture evidence.
+    """Accept only complete C1R receiving and quantified C2A/C4/C5 evidence.
 
     This validates supplied evidence, not whether a measurement was performed.
     In particular it is NOT a native CAD build/import prerequisite and makes
@@ -2713,6 +2726,11 @@ def qualify_primary_capture_measurements(
             raise ValueError(f"primary capture {key} needs the actual carriage under pin at or below the mounting plane")
         if not isinstance(record.prebearing_capture_evidence, str) or not record.prebearing_capture_evidence.strip():
             raise ValueError(f"primary capture {key} needs actual pre-bearing trial evidence")
+        if record.upper_bearing_profile_status != "accepted":
+            raise ValueError(f"primary capture {key} needs ACCEPTED C1R actual upper-bearing OD/width and intact mid-plane OD-land inspection")
+        if (not isinstance(record.upper_bearing_receiving_evidence, str)
+                or not record.upper_bearing_receiving_evidence.strip()):
+            raise ValueError(f"primary capture {key} needs actual C1R upper-bearing receiving evidence, not catalogue/model shape")
         if number(record.min_tip_recess_mm, "minimum pre-bearing tip recess") < retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:
             raise ValueError(f"primary capture {key} lacks minimum net pin-tip/carriage clearance")
         if number(record.fitted_retainer_thickness_mm, "finished retainer thickness") <= 0.0:
@@ -2755,6 +2773,10 @@ def qualify_primary_capture_measurements(
                   for (_pass, s), record in accepted.items() if s == support}
         if len(trials) != 1:
             raise ValueError(f"support {support} must reuse the SAME physical pre-bearing capture trial on BOTH passes")
+        receiving = {record.upper_bearing_receiving_evidence
+                     for (_pass, s), record in accepted.items() if s == support}
+        if len(receiving) != 1:
+            raise ValueError(f"support {support} must reuse the SAME physical C1R upper-bearing receiving inspection on BOTH passes")
     return accepted
 
 
@@ -2849,6 +2871,11 @@ def _capture_fixture_joint(
     if families == {PIVOT_CAP, BEARING}:
         cap_index = i if a == PIVOT_CAP else j
         bearing_index = i if a == BEARING else j
+        record = primary.get((pass_name, cap_index))
+        if (record is None or record.upper_bearing_profile_status != "accepted"
+                or not isinstance(record.upper_bearing_receiving_evidence, str)
+                or not record.upper_bearing_receiving_evidence.strip()):
+            return None
         if bearing_index % len(BEARING_SEAT_Z) != len(BEARING_SEAT_Z) - 1:
             return None
         if (PLACEMENTS[PIVOT_CAP][cap_index] != PIVOT_CAP_PLACEMENTS[cap_index]
@@ -2865,6 +2892,7 @@ def _capture_fixture_joint(
                 "balls/seals remain in the intact purchased bearing. Positive flange "
                 "thickness separates that stop from the flat cap roof; both registers remain radially outside. "
                 "No bearing friction, pullout force, fixed outer-ring height or invented internal axial-play limit. "
+                f"Supplied C1R actual upper-bearing receiving authority: {record.upper_bearing_receiving_evidence}. "
                 + "; ".join(f"{name}={value:.9g} mm" for name, value in shield.items())
             )
         return None
@@ -3408,7 +3436,8 @@ def capture_fixture_clearance_census(
     remaining failed separators are explicitly UNRESOLVED.
     Cap screws are fixed to the block's engaged threads, not carried by cap
     motion. An extracting upper bearing instead needs the bore-mouth/flange
-    shield and exact native baseline; its static recess is never upset proof.
+    shield, ACCEPTED actual C1R receiving record and exact native baseline;
+    its static recess is never upset proof.
 
     This is conditional source geometry, not as-built acceptance. C2-C5 actual
     gaps, seated heads/registers, full threads, accepted TL-29 fit-up, actual
@@ -3767,6 +3796,14 @@ def capture_fixture_clearance_census(
                             f"{retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:g} mm into block above actual Z0 mounting plane, uncertainty included, "
                             "through ENTIRE free flange/rim capture motion including tilt; actual carriage under pin must have no above-plane obstacle. "
                             "Normal C2 free assembly or assumed pressed-bearing internal endplay is not that lower-tip proof."
+                        )
+                    if families == {PIVOT_CAP, BEARING} and common:
+                        missing.append(
+                            "need ACCEPTED C1R actual upper-bearing receiving record: OD 29.991-30.000 mm, "
+                            "width 8.88-9.00 mm, intact outer ring with uninterrupted full-circumference "
+                            "cylindrical OD land at its axial mid-plane; named physical-support evidence "
+                            "reused on both passes, plus positive bore-mouth/flange shield and exact native baseline. "
+                            "Catalogue/native profile or normal recess alone is not that inspection."
                         )
                     if PIVOT_LOCK_WIRE in families:
                         missing.append("wire: this physical installed cubic-control tube/turned-in-tail enclosure loses separation after the cap-frame rock/yaw bound; route/head contacts do not exempt external pairs")
