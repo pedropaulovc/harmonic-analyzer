@@ -7,20 +7,26 @@ r"""Create the MHA-CH-00 channel assembly fitter package (four sheets).
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    balloon per BOM row.
 3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
-   length, a cropped 4:1 detail of the south end with the spring set, and
-   steps 1-8. The south bracket is set off a wave disc spring that preloads
+   length, a cropped 4:1 detail of the south end with the spring set, an
+   installed 3:1 top view of the bracket tap mouth, and steps 1-8. The south
+   bracket is set off a wave disc spring that preloads
    the bank north, and the plain pivot shaft is cut to fit and held by a set
    screw in each ear (#948 ruling R, PR #1292; user, 2026-10-10).
 4. LEVER BANK FIT-UP: the keepers, fulcrum shaft and levers isolated at 1:1
    with the keeper lug span, the 1:2 keeper plan view with the keepers'
-   three settings off the top frame's datums, and the remaining steps: the
-   keepers' bench pair-ream and DRO fit-up on the top frame, the bars pinned
-   to the levers, the lever bank threaded, the set screws staked and the
-   springs hooked.
+   three settings off the top frame's datums, an installed 3:1 top view of
+   the keeper tap mouth, and the remaining steps: the keepers' bench pair-ream
+   and DRO fit-up on the top frame, the bars pinned to the levers, the lever
+   bank threaded, the set screws staked and the springs hooked.
 
 The settings are the assembly's own model dimensions (the hidden rocker-bank,
 lever-bank and keeper-plan settings sketches, build_ch_channel_assembly), not
 numbers in note text; the steps are numbered by ``ch_channel_assembly_steps``.
+
+The installed tap-mouth views show the existing receivers, recessed screws
+and shafts, with attached two-point staking instructions. They do not model
+or claim to show finished upset metal; acceptance of that lock depiction
+still requires the native sheet and machinist review.
 """
 
 from __future__ import annotations
@@ -46,8 +52,12 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 import _config
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_balloons import (
     BalloonAnchor,
+    _anchor_model_points,
+    _stems_matching,
+    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -65,8 +75,9 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _drawing_leader_notes import add_leader_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -93,6 +104,8 @@ from ch_channel_lever_spec import (
     HUB_LENGTH as LEVER_HUB_LENGTH,
     HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
 )
+import ch_fulcrum_keeper_spec as keeper_spec
+import ch_fulcrum_shaft_spec as fulcrum_shaft_spec
 from ch_fulcrum_keeper_spec import (
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
@@ -107,6 +120,8 @@ from ch_pivot_bracket_spec import (
     FOOT_W as BRACKET_FOOT_W,
     SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
 )
+import ch_pivot_bracket_spec as bracket_spec
+import ch_pivot_shaft_spec as pivot_shaft_spec
 from ch_pivot_shaft_spec import DOME_HEIGHT
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
@@ -667,6 +682,98 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+
+
+@dataclass(frozen=True)
+class _InstalledLock:
+    """Existing installed geometry and its staking instruction, not stake shape."""
+
+    bank: BankView
+    sheet: str
+    receiver: str
+    screw: str
+    shaft: str
+    item: int
+    step_key: str
+    apex_mm: float
+    crown_radius_mm: float
+    crown_axis: int
+    flat_point_mm: tuple[float, float, float]
+    caption_xy: tuple[float, float]
+    note_xy: tuple[float, float]
+
+    @property
+    def note_text(self) -> str:
+        return "\n".join(
+            (
+                f"ITEM {self.item}, {BOM_PART_NUMBERS[self.screw]}",
+                "STAKE EACH TAP MOUTH",
+                f"AT 2 POINTS (STEP {steps.step_number(self.step_key)})",
+                "BOTH BRACKETS" if self.receiver == explode.BRACKET else "BOTH KEEPERS",
+            )
+        )
+
+
+# Top looks directly into the existing crown/apex tap and recessed socket.
+# These are native installed-parts views, not an invented staked configuration.
+# Their crops retain receiver metal and the shaft emerging on either side.
+_BRACKET_LOCK = _InstalledLock(
+    bank=BankView(
+        "INSTALLED NORTH BRACKET",
+        (3, 1),
+        (_PIVOT_X, _PIVOT_Y + bracket_spec.APEX_ABOVE_BORE, PIVOT_BRACKET_Z[1]),
+        (0.165, 0.039),
+        frozenset({explode.BRACKET, explode.BRACKET_SET_SCREW, "ch-pivot-shaft"}),
+        crop_radius_mm=7.0,
+        parts="TOP VIEW",
+        orientation="*Top",
+    ),
+    sheet=SHEET_NAMES[2],
+    receiver=explode.BRACKET,
+    screw=explode.BRACKET_SET_SCREW,
+    shaft="ch-pivot-shaft",
+    item=4,
+    step_key="set-screws-driven",
+    apex_mm=bracket_spec.EAR_TOP_Y,
+    crown_radius_mm=bracket_spec.EAR_ARCH_R,
+    crown_axis=2,
+    flat_point_mm=(
+        0.0,
+        pivot_shaft_spec.SHAFT_DIA / 2.0 - pivot_shaft_spec.FLAT_DEPTH,
+        -pivot_shaft_spec.NORTH_FLAT_STATION,
+    ),
+    caption_xy=(0.018, 0.061),
+    note_xy=(0.018, 0.044),
+)
+_KEEPER_LOCK = _InstalledLock(
+    bank=BankView(
+        "INSTALLED NORTH KEEPER",
+        (3, 1),
+        (
+            _FULCRUM_X,
+            _FULCRUM_Y + keeper_spec.CROWN_R,
+            FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF,
+        ),
+        (0.165, 0.036),
+        frozenset({explode.KEEPER, explode.KEEPER_SET_SCREW, "ch-fulcrum-shaft"}),
+        crop_radius_mm=7.0,
+        parts="TOP VIEW",
+        orientation="*Top",
+    ),
+    sheet=SHEET_NAMES[3],
+    receiver=explode.KEEPER,
+    screw=explode.KEEPER_SET_SCREW,
+    shaft="ch-fulcrum-shaft",
+    item=10,
+    step_key=steps.SET_SCREWS_STAKED_KEY,
+    apex_mm=keeper_spec.CROWN_TOP_Y,
+    crown_radius_mm=keeper_spec.CROWN_R,
+    crown_axis=0,
+    flat_point_mm=(0.0, fulcrum_shaft_spec.FLAT_HEIGHT, KEEPER_Z_OFF),
+    caption_xy=(0.134, 0.095),
+    note_xy=(0.134, 0.077),
+)
+_INSTALLED_LOCKS = (_BRACKET_LOCK, _KEEPER_LOCK)
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
 # rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
@@ -935,7 +1042,7 @@ def _fitup_notes() -> tuple[str, str]:
         "set-screws-driven": (
             f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
             "APEX TAP ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP "
-            "MOUTH AT 2 POINTS. "
+            "MOUTH AT 2 POINTS. SEE INSTALLED NORTH BRACKET VIEW. "
             # The bracket's engagement fact; the lifted arch meets rule 18
             # (ch_pivot_bracket_spec), so no exception is declared for it.
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
@@ -981,7 +1088,8 @@ def _fitup_notes() -> tuple[str, str]:
         steps.SET_SCREWS_STAKED_KEY: (
             f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
             f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {fulcrum_set_screw} SET "
-            "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
+            "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS. "
+            "SEE INSTALLED NORTH KEEPER VIEW."
         ),
         # The anchors thread into the summing plate and are jammed by their
         # nuts at MHA-HA-00, which owns that joint, its lock and its
@@ -1389,6 +1497,7 @@ def _place_exploded_sheet(
         label="channel",
     )
     items = _validate_bom(adapter, table)
+    _assert_lock_bom_items(items)
     landings = add_component_bom_balloons(
         adapter,
         exploded,
@@ -1625,6 +1734,245 @@ def _mark_detail(
         raise RuntimeError(f"failed to letter the {label}")
 
 
+def _assert_lock_bom_items(items: tuple[tuple[str, str], ...]) -> None:
+    actual = dict(items)
+    for lock in _INSTALLED_LOCKS:
+        if actual.get(lock.screw) != str(lock.item):
+            raise RuntimeError(
+                f"{lock.bank.title}: BOM item {actual.get(lock.screw)!r}, "
+                f"expected {lock.item} for {lock.screw}"
+            )
+
+
+def _lock_components(adapter: Any, view: Any, lock: _InstalledLock) -> tuple[Any, Any]:
+    """Prove the existing receiver, seated screw and shaft share this joint."""
+    label = lock.bank.title
+    leaves = _view_component_leaves(adapter, view, label=label)
+    chosen = {}
+    for stem, count in ((lock.receiver, 2), (lock.screw, 2), (lock.shaft, 1)):
+        matches = [
+            leaf
+            for leaf in leaves
+            if leaf.visible and _stems_matching(leaf.identities, frozenset({stem}))
+        ]
+        if len(matches) != count:
+            raise RuntimeError(f"{label}: {len(matches)} visible {stem}, expected {count}")
+        chosen[stem] = max(
+            matches,
+            key=lambda leaf: _anchor_model_points(
+                adapter, leaf, ((0.0, 0.0, 0.0),), {}, stem=stem, label=label
+            )[0][2],
+        )
+        component = _early_bound(chosen[stem].component, "IComponent2")
+        base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
+        total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+        base_values = tuple(float(value) for value in base.ArrayData)
+        total_values = tuple(float(value) for value in total.ArrayData)
+        if (
+            len(base_values) != 16
+            or len(total_values) != 16
+            or not all(math.isfinite(value) for value in (*base_values, *total_values))
+            or any(abs(a - b) > 1e-9 for a, b in zip(base_values, total_values))
+        ):
+            raise RuntimeError(f"{label}: {stem} has no finite collapsed transform")
+        if int(_early_bound(view, "IView").GetVisibleEntityCount2(component, 1)) <= 0:
+            raise RuntimeError(f"{label}: no visible model edges for {stem}")
+
+    receiver = chosen[lock.receiver]
+    (apex,) = _anchor_model_points(
+        adapter,
+        receiver,
+        ((0.0, lock.apex_mm / 1000.0, 0.0),),
+        {},
+        stem=lock.receiver,
+        label=label,
+    )
+    if math.dist(apex, lock.bank.model_centre_m) > 1e-7:
+        raise RuntimeError(f"{label}: receiver tap is not at the installed view centre")
+    (flat,) = _anchor_model_points(
+        adapter,
+        chosen[lock.shaft],
+        (tuple(value / 1000.0 for value in lock.flat_point_mm),),
+        {},
+        stem=lock.shaft,
+        label=label,
+    )
+    cup, above = _anchor_model_points(
+        adapter,
+        chosen[lock.screw],
+        ((0.0, 0.0, 0.0), (0.0, 0.001, 0.0)),
+        {},
+        stem=lock.screw,
+        label=label,
+    )
+    if math.dist(cup, flat) > 1e-7 or math.dist(
+        tuple(b - a for a, b in zip(cup, above)), (0.0, 0.001, 0.0)
+    ) > 1e-9:
+        raise RuntimeError(f"{label}: set screw is not cup-down on the native shaft flat")
+    return receiver, chosen[lock.screw]
+
+
+def _lock_crown_face(face: Any, lock: _InstalledLock) -> bool:
+    surface = _early_bound(face, "IFace2").GetSurface()
+    if surface is None:
+        raise RuntimeError(f"{lock.bank.title}: receiver face has no surface")
+    surface = _early_bound(surface, "ISurface")
+    if not surface.IsCylinder():
+        return False
+    params = tuple(float(value) for value in surface.CylinderParams)
+    if len(params) != 7 or not all(math.isfinite(value) for value in params):
+        raise RuntimeError(f"{lock.bank.title}: unreadable native crown cylinder")
+    axis = lock.crown_axis
+    transverse = 2 if axis == 0 else 0
+    return (
+        abs(abs(params[3 + axis]) - 1.0) < 1e-6
+        and all(abs(params[3 + i]) < 1e-6 for i in range(3) if i != axis)
+        and abs(params[transverse]) < 1e-6
+        and abs(params[1] - (lock.apex_mm - lock.crown_radius_mm) / 1000.0) < 1e-6
+        and abs(params[6] - lock.crown_radius_mm / 1000.0) < 1e-6
+    )
+
+
+def _lock_mouth_edge(
+    adapter: Any, view: Any, lock: _InstalledLock, receiver: Any
+) -> tuple[Any, tuple[float, float]]:
+    """Select actual tap/exterior-crown topology, never a guessed minor circle.
+
+    Hole Wizard owns entry-mouth defaults. The off-axis point only ranks native
+    edges; neither it nor the returned leader landing locates either stake.
+    """
+    label = lock.bank.title
+    offset = lock.crown_radius_mm / 8.0 / 1000.0
+    seed = (offset, lock.apex_mm / 1000.0, offset)
+    candidates = []
+    for raw in visible_view_entities(view, 1, label=f"{label} tap mouth"):
+        edge = _early_bound(raw, "IEdge")
+        owner = _early_bound(edge, "IEntity").GetComponent()
+        if owner is None or str(_early_bound(owner, "IComponent2").Name2) != receiver.path:
+            continue
+        faces = tuple(
+            face for face in (edge.GetTwoAdjacentFaces2() or ()) if face is not None
+        )
+        names = []
+        for face in faces:
+            feature = _early_bound(face, "IFace2").GetFeature()
+            names.append(
+                "" if feature is None else str(_early_bound(feature, "IFeature").Name)
+            )
+        if "SetScrewTap" not in names or not any(
+            _lock_crown_face(face, lock) for face in faces
+        ):
+            continue
+        values = tuple(float(value) for value in (edge.GetClosestPointOn(*seed) or ()))
+        if len(values) != 5 or not all(math.isfinite(value) for value in values[:4]):
+            raise RuntimeError(f"{label}: tap-mouth edge has no finite closest point")
+        point = values[:3]
+        if point[1] < (lock.apex_mm - lock.crown_radius_mm / 2.0) / 1000.0:
+            continue
+        candidates.append((math.dist(point, seed), edge, point))
+    candidates.sort(key=lambda row: row[0])
+    if not candidates or (
+        len(candidates) > 1 and abs(candidates[0][0] - candidates[1][0]) < 1e-8
+    ):
+        raise RuntimeError(f"{label}: no unambiguous visible receiver tap-mouth edge")
+    _, edge, point = candidates[0]
+    (model_point,) = _anchor_model_points(
+        adapter, receiver, (point,), {}, stem=lock.receiver, label=label
+    )
+    tip = model_point_in_view(adapter, view, model_point, label=f"{label} tap mouth")
+    if (
+        len(tip) != 2
+        or not all(math.isfinite(value) for value in tip)
+        or math.dist(tip, lock.bank.centre) >= lock.bank.crop_radius_mm * lock.bank.mm
+    ):
+        raise RuntimeError(f"{label}: native tap mouth is outside its installed crop")
+    return edge, (tip[0], tip[1])
+
+
+def _lock_note_box(note: Any, *, label: str) -> None:
+    extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
+    if (
+        len(extent) != 6
+        or not all(math.isfinite(value) for value in extent)
+        or extent[3] <= extent[0]
+        or extent[4] <= extent[1]
+    ):
+        raise RuntimeError(f"{label}: unreadable native note extent {extent!r}")
+    _assert_box_on_sheet((extent[0], extent[1], extent[3], extent[4]), label=label)
+
+
+def _assert_installed_lock(
+    adapter: Any, lock: _InstalledLock, view: Any, note: Any, caption: Any
+) -> None:
+    _activate_sheet(adapter, lock.sheet)
+    view = _early_bound(view, "IView")
+    label = lock.bank.title
+    if (
+        bool(view.IsExploded())
+        or not bool(view.IsCropped())
+        or tuple(float(value) for value in view.ScaleRatio) != lock.bank.scale
+    ):
+        raise RuntimeError(f"{label}: installed crop/scale/collapsed state changed")
+    outline = _view_outline(view, label=label)
+    if not all(math.isfinite(value) for value in outline):
+        raise RuntimeError(f"{label}: nonfinite native installed-view outline")
+    _assert_view_on_sheet(view, label=label)
+    centre = model_point_in_view(
+        adapter, view, lock.bank.model_centre_m, label=f"{label} centre"
+    )
+    if (
+        len(centre) != 2
+        or not all(math.isfinite(value) for value in centre)
+        or math.dist(centre, lock.bank.centre) > VIEW_POSITION_TOL_M
+    ):
+        raise RuntimeError(f"{label}: installed crop centre moved")
+    receiver, _screw = _lock_components(adapter, view, lock)
+    edge, tip = _lock_mouth_edge(adapter, view, lock, receiver)
+    for native, text in ((note, lock.note_text), (caption, lock.bank.label_text)):
+        native = _early_bound(native, "INote")
+        if str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n") != text:
+            raise RuntimeError(f"{label}: installed-view note text changed")
+        annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
+        if int(annotation.OwnerType) != 0:
+            raise RuntimeError(f"{label}: installed-view note is not view-owned")
+        _lock_note_box(native, label=label)
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    _assert_attached_to(
+        adapter, annotation, edge, entity_type="EDGE", what="staking note", label=label
+    )
+    points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+    if len(points) < 6 or not all(math.isfinite(value) for value in points):
+        raise RuntimeError(f"{label}: unreadable native staking leader")
+    _assert_leader_lands(annotation, tip, what="staking note", label=label)
+
+
+def _place_installed_lock(adapter: Any, lock: _InstalledLock) -> Callable[[], None]:
+    _activate_sheet(adapter, lock.sheet)
+    view = _placed_bank_view(adapter, lock.bank)
+    _crop(adapter, view, lock.bank)
+    receiver, _screw = _lock_components(adapter, view, lock)
+    edge, tip = _lock_mouth_edge(adapter, view, lock, receiver)
+    note = add_attached_note(
+        adapter,
+        view,
+        text=lock.note_text,
+        entity_xy=tip,
+        attached_to=edge,
+        note_xy=lock.note_xy,
+        label=f"{lock.bank.title} two-point staking",
+    )
+    _activate_view(adapter, view, label=lock.bank.title)
+    caption = add_note(adapter, lock.bank.label_text, *lock.caption_xy)
+    if caption is None:
+        raise RuntimeError(f"{lock.bank.title}: failed to label the installed view")
+
+    def settled() -> None:
+        _assert_installed_lock(adapter, lock, view, note, caption)
+
+    settled()
+    return settled
+
+
 def _exploded_detail(adapter: Any, detail: BankView) -> None:
     """One enlarged, exploded hardware cluster: placed, isolated, cropped to
     its circle and labelled under it."""
@@ -1784,6 +2132,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     )
     _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
+    locks_settled = tuple(_place_installed_lock(adapter, lock) for lock in _INSTALLED_LOCKS)
 
     for name, text in notes.DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
@@ -1805,7 +2154,13 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     )
     _assert_settings(displays)
     _break_line_at_text(displays[asm.LUG_SPAN_DIMENSION], label=asm.LUG_SPAN_DIMENSION)
-    return lambda: _assert_settings(displays)
+
+    def settled() -> None:
+        _assert_settings(displays)
+        for lock_settled in locks_settled:
+            lock_settled()
+
+    return settled
 
 
 def _break_line_at_text(display: Any, *, label: str) -> None:

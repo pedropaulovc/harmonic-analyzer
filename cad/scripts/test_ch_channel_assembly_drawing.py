@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 import _buildgraph
 from _assembly_contract import assembly_contract
@@ -1187,3 +1188,426 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     for n in (1, 2):
         pair = frozenset((f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT
+
+
+class _LockComponent:
+    def __init__(self, name, origin, rotation=None):
+        rotation = rotation or (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+        self.Name2 = name
+        self.Transform2 = SimpleNamespace(
+            ArrayData=(*rotation, *origin, 1.0, 0.0, 0.0, 0.0)
+        )
+        self.total = self.Transform2
+        self.edge_count = 3
+
+    def GetTotalTransform(self, presentation):
+        return self.total if presentation else self.Transform2
+
+
+class _LockSurface:
+    def __init__(self, params=None):
+        self.CylinderParams = params
+
+    def IsCylinder(self):
+        return self.CylinderParams is not None
+
+
+class _LockFace:
+    def __init__(self, feature, params=None):
+        self.feature = SimpleNamespace(Name=feature)
+        self.surface = _LockSurface(params)
+
+    def GetFeature(self):
+        return self.feature
+
+    def GetSurface(self):
+        return self.surface
+
+
+class _LockEdge:
+    def __init__(self, owner, faces, point):
+        self.owner = owner
+        self.faces = faces
+        self.closest = (*point, 0.5, 0.0)
+
+    def GetComponent(self):
+        return self.owner
+
+    def GetTwoAdjacentFaces2(self):
+        return self.faces
+
+    def GetClosestPointOn(self, x, y, z):
+        return self.closest
+
+
+class _LockView:
+    def __init__(self, lock):
+        radius = lock.bank.crop_radius_mm * lock.bank.mm
+        x, y = lock.bank.centre
+        self.outline = (x - radius, y - radius, x + radius, y + radius)
+        self.ScaleRatio = lock.bank.scale
+        self.exploded = False
+        self.cropped = True
+        self.projection_offset = (0.0, 0.0)
+
+    def IsExploded(self):
+        return self.exploded
+
+    def IsCropped(self):
+        return self.cropped
+
+    def GetOutline(self):
+        return self.outline
+
+    def GetVisibleEntityCount2(self, component, kind):
+        assert kind == 1
+        return component.edge_count
+
+
+class _LockAnnotation:
+    def __init__(self, edge, tip):
+        self.OwnerType = 0
+        self.edge = edge
+        self.tip = tip
+        self.dangling = False
+        self.count = 1
+        self.leaders = 1
+
+    def GetAttachedEntities3(self):
+        return (self.edge,) if self.count else ()
+
+    def GetAttachedEntityCount3(self):
+        return self.count
+
+    def GetAttachedEntityTypes(self):
+        return (1,) if self.count else ()
+
+    def GetLeaderCount(self):
+        return self.leaders
+
+    def IsDangling(self):
+        return self.dangling
+
+    def GetLeaderPointsAtIndex(self, index):
+        assert index == 0
+        return (0.1, 0.1, 0.0, *self.tip, 0.0)
+
+
+class _LockNote:
+    def __init__(self, text, xy, annotation):
+        self.text = text.replace("\n", "\r\n")
+        self.annotation = annotation
+        self.extent = (
+            xy[0],
+            xy[1] - len(text.splitlines()) * NOTE_LINE_PITCH,
+            0.0,
+            xy[0] + 0.064,
+            xy[1],
+            0.0,
+        )
+
+    def GetText(self):
+        return self.text
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetExtent(self):
+        return self.extent
+
+
+@pytest.fixture(params=drawing._INSTALLED_LOCKS, ids=("bracket", "keeper"))
+def installed_lock_scene(request, monkeypatch):
+    """Native-consumer doubles; these do not establish a rendered lock depiction."""
+    import _drawing_attachment
+    import _drawing_balloons
+
+    lock = request.param
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda adapter, name: None)
+    monkeypatch.setattr(drawing, "_activate_view", lambda adapter, view, **kwargs: None)
+    adapter = SimpleNamespace(
+        _attempt=lambda call, default=None: call(),
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+    )
+    view = _LockView(lock)
+    apex = lock.apex_mm / 1000.0
+    centre = lock.bank.model_centre_m
+    rotation = (
+        (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+        if lock.receiver == drawing.explode.BRACKET
+        else (0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0)
+    )
+    receiver = _LockComponent(
+        f"{lock.receiver}-2", (centre[0], centre[1] - apex, centre[2]), rotation
+    )
+    if lock.receiver == drawing.explode.BRACKET:
+        shaft_origin = (
+            drawing.ROCKER_PIVOT_XY[0] / 1000.0,
+            drawing.ROCKER_PIVOT_XY[1] / 1000.0,
+            (
+                drawing.PIVOT_BRACKET_Z[1]
+                + drawing.pivot_shaft_spec.NORTH_FLAT_STATION
+            ) / 1000.0,
+        )
+    else:
+        shaft_origin = (
+            drawing.LEVER_FULCRUM_XY[0] / 1000.0,
+            drawing.LEVER_FULCRUM_XY[1] / 1000.0,
+            drawing.FULCRUM_KEEPER_CENTRE_Z / 1000.0,
+        )
+    shaft = _LockComponent(f"{lock.shaft}-1", shaft_origin)
+    cup = tuple(a + b / 1000.0 for a, b in zip(shaft_origin, lock.flat_point_mm))
+    screw = _LockComponent(f"{lock.screw}-2", cup)
+    south_receiver = _LockComponent(
+        f"{lock.receiver}-1", (centre[0], centre[1] - apex, centre[2] - 0.15), rotation
+    )
+    south_screw = _LockComponent(f"{lock.screw}-1", (cup[0], cup[1], cup[2] - 0.15))
+    components = (receiver, south_receiver, screw, south_screw, shaft)
+    leaves = [
+        SimpleNamespace(
+            visible=True,
+            identities=frozenset({component.Name2.rsplit("-", 1)[0]}),
+            component=component,
+            path=component.Name2,
+        )
+        for component in components
+    ]
+    monkeypatch.setattr(drawing, "_view_component_leaves", lambda *args, **kwargs: leaves)
+    radius = lock.crown_radius_mm / 1000.0
+    crown_axis = [0.0, 0.0, 0.0]
+    crown_axis[lock.crown_axis] = 1.0
+    crown = _LockFace("ReceiverCrown", (0.0, apex - radius, 0.0, *crown_axis, radius))
+    tap = _LockFace("SetScrewTap", (0.0, apex, 0.0, 0.0, 1.0, 0.0, 0.001))
+    q = 0.0012
+    point = (q, apex - radius + math.sqrt(radius**2 - q**2), q)
+    mouth = _LockEdge(receiver, (tap, crown), point)
+    bore = _LockFace(
+        "ShaftBore", (0.0, apex - radius, 0.0, *crown_axis, 0.00325)
+    )
+    internal = _LockEdge(receiver, (tap, bore), point)
+    socket = _LockEdge(screw, (tap, crown), point)
+    unrelated = _LockEdge(receiver, (_LockFace("SocketCut"), crown), point)
+    edges = [internal, socket, unrelated, mouth]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *args, **kwargs: edges)
+
+    def project(adapter, view, point, **kwargs):
+        x, y = lock.bank.plan_xy(point[0] * 1000.0, point[2] * 1000.0)
+        dx, dy = view.projection_offset
+        return x + dx, y + dy
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    receiver_leaf = leaves[0]
+    _edge, tip = drawing._lock_mouth_edge(adapter, view, lock, receiver_leaf)
+    annotation = _LockAnnotation(mouth, tip)
+    note = _LockNote(lock.note_text, lock.note_xy, annotation)
+    caption = _LockNote(lock.bank.label_text, lock.caption_xy, _LockAnnotation(None, tip))
+    return SimpleNamespace(
+        lock=lock,
+        adapter=adapter,
+        view=view,
+        leaves=leaves,
+        receiver=receiver,
+        receiver_leaf=receiver_leaf,
+        screw=screw,
+        shaft=shaft,
+        crown=crown,
+        mouth=mouth,
+        edges=edges,
+        point=point,
+        tip=tip,
+        note=note,
+        caption=caption,
+    )
+
+
+def test_installed_lock_consumer_accepts_real_topology_and_registered_operation(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    drawing._assert_installed_lock(
+        scene.adapter, scene.lock, scene.view, scene.note, scene.caption
+    )
+    step = _step_body(scene.lock.step_key)
+    assert scene.lock.bank.title in step
+    assert drawing.BOM_PART_NUMBERS[scene.lock.screw] in scene.note.GetText()
+    assert f"STEP {steps.step_number(scene.lock.step_key)}" in scene.note.GetText()
+    assert "2 POINTS" in scene.note.GetText()
+    assert "OPPOSITE" not in scene.note.GetText()
+    assert "FINISHED" not in scene.caption.GetText()
+    assert scene.lock.bank.orientation == "*Top"
+    assert scene.lock.bank.stems == frozenset(
+        {scene.lock.receiver, scene.lock.screw, scene.lock.shaft}
+    )
+
+
+def test_native_mouth_selection_uses_receiver_feature_and_exterior_crown(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    edge, tip = drawing._lock_mouth_edge(
+        scene.adapter, scene.view, scene.lock, scene.receiver_leaf
+    )
+    assert edge is scene.mouth
+    # The actual edge point need not lie on an inferred drill/crown intersection.
+    transformed = drawing._anchor_model_points(
+        scene.adapter,
+        scene.receiver_leaf,
+        (scene.point,),
+        {},
+        stem=scene.lock.receiver,
+        label="native mouth",
+    )[0]
+    assert tip == pytest.approx(
+        scene.lock.bank.plan_xy(transformed[0] * 1000.0, transformed[2] * 1000.0)
+    )
+    scene.edges.remove(scene.mouth)
+    with pytest.raises(RuntimeError, match="tap-mouth edge"):
+        drawing._lock_mouth_edge(
+            scene.adapter, scene.view, scene.lock, scene.receiver_leaf
+        )
+
+
+@pytest.mark.parametrize("kind", ("tied", "truncated", "nonfinite", "outside"))
+def test_native_mouth_selection_refuses_ambiguous_or_unreadable_geometry(
+    installed_lock_scene, kind
+):
+    scene = installed_lock_scene
+    if kind == "tied":
+        scene.edges.append(_LockEdge(scene.receiver, scene.mouth.faces, scene.point))
+    elif kind == "truncated":
+        scene.mouth.closest = (0.0, 0.0)
+    elif kind == "nonfinite":
+        scene.mouth.closest = (math.nan, *scene.mouth.closest[1:])
+    else:
+        scene.mouth.closest = (0.02, scene.point[1], 0.02, 0.5, 0.0)
+    with pytest.raises(RuntimeError):
+        drawing._lock_mouth_edge(
+            scene.adapter, scene.view, scene.lock, scene.receiver_leaf
+        )
+
+
+@pytest.mark.parametrize(
+    "kind", ("shaft", "screw", "receiver", "rotated", "exploded", "hidden")
+)
+def test_installed_lock_refuses_displaced_or_missing_native_joint_members(
+    installed_lock_scene, kind
+):
+    scene = installed_lock_scene
+    if kind == "hidden":
+        scene.screw.edge_count = 0
+    elif kind == "shaft":
+        scene.leaves.pop()
+    elif kind == "exploded":
+        values = list(scene.receiver.Transform2.ArrayData)
+        values[10] += 0.01
+        scene.receiver.total = SimpleNamespace(ArrayData=values)
+    else:
+        component = scene.receiver if kind == "receiver" else scene.screw
+        values = list(component.Transform2.ArrayData)
+        if kind == "rotated":
+            values[4] = -1.0
+        else:
+            values[9] += 0.001
+        component.Transform2 = SimpleNamespace(ArrayData=values)
+        component.total = component.Transform2
+    with pytest.raises(RuntimeError):
+        drawing._lock_components(scene.adapter, scene.view, scene.lock)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (
+        "wrong-edge", "detached", "dangling", "sheet-owned", "moved-tip",
+        "nonfinite-leader", "moved-centre", "exploded", "uncropped", "scale",
+        "nonfinite-outline",
+    ),
+)
+def test_installed_lock_final_consumer_refuses_lost_native_contracts(
+    installed_lock_scene, kind
+):
+    scene = installed_lock_scene
+    if kind == "wrong-edge":
+        scene.note.annotation.edge = scene.edges[0]
+    elif kind == "detached":
+        scene.note.annotation.count = 0
+    elif kind == "dangling":
+        scene.note.annotation.dangling = True
+    elif kind == "sheet-owned":
+        scene.note.annotation.OwnerType = 1
+    elif kind == "moved-tip":
+        scene.note.annotation.tip = (scene.tip[0] + 0.004, scene.tip[1])
+    elif kind == "nonfinite-leader":
+        scene.note.annotation.tip = (math.nan, scene.tip[1])
+    elif kind == "moved-centre":
+        scene.view.projection_offset = (0.002, 0.0)
+    elif kind == "exploded":
+        scene.view.exploded = True
+    elif kind == "uncropped":
+        scene.view.cropped = False
+    elif kind == "scale":
+        scene.view.ScaleRatio = (1, 2)
+    else:
+        scene.view.outline = (math.nan, *scene.view.outline[1:])
+    with pytest.raises(RuntimeError):
+        drawing._assert_installed_lock(
+            scene.adapter, scene.lock, scene.view, scene.note, scene.caption
+        )
+
+
+@pytest.mark.parametrize(
+    "extent",
+    (
+        (0.02, 0.02, 0.0, 0.08),
+        (0.02, 0.02, 0.0, math.nan, 0.05, 0.0),
+        (0.02, 0.02, 0.0, 0.01, 0.05, 0.0),
+        (0.001, 0.02, 0.0, 0.08, 0.05, 0.0),
+        (0.30, 0.02, 0.0, 0.36, 0.05, 0.0),
+    ),
+)
+def test_installed_lock_refuses_bad_or_out_of_field_native_note_extents(
+    installed_lock_scene, extent
+):
+    scene = installed_lock_scene
+    scene.note.extent = extent
+    with pytest.raises(RuntimeError):
+        drawing._assert_installed_lock(
+            scene.adapter, scene.lock, scene.view, scene.note, scene.caption
+        )
+
+
+def test_installed_lock_placement_rechecks_actual_attachment_at_finalize(
+    installed_lock_scene, monkeypatch,
+):
+    scene = installed_lock_scene
+    monkeypatch.setattr(drawing, "_placed_bank_view", lambda *args: scene.view)
+    monkeypatch.setattr(drawing, "_crop", lambda *args: None)
+    monkeypatch.setattr(drawing, "add_note", lambda *args: scene.caption)
+
+    def attach(adapter, view, *, text, entity_xy, attached_to, note_xy, label):
+        return _LockNote(text, note_xy, _LockAnnotation(attached_to, entity_xy))
+
+    monkeypatch.setattr(drawing, "add_attached_note", attach)
+    settled = drawing._place_installed_lock(scene.adapter, scene.lock)
+    settled()
+    # Changing the installed source geometry after insertion must not export a
+    # stale note that still happens to have a plausible string and leader.
+    values = list(scene.screw.Transform2.ArrayData)
+    values[9] += 0.001
+    scene.screw.Transform2 = SimpleNamespace(ArrayData=values)
+    scene.screw.total = scene.screw.Transform2
+    with pytest.raises(RuntimeError, match="shaft flat"):
+        settled()
+
+
+def test_installed_lock_item_labels_refuse_changed_native_bom_numbering():
+    items = tuple((stem, str(i)) for i, stem in enumerate(drawing.BOM_COMPONENTS, 1))
+    drawing._assert_lock_bom_items(items)
+    for lock in drawing._INSTALLED_LOCKS:
+        changed = tuple(
+            (stem, "99" if stem == lock.screw else item) for stem, item in items
+        )
+        with pytest.raises(RuntimeError, match="BOM item"):
+            drawing._assert_lock_bom_items(changed)
