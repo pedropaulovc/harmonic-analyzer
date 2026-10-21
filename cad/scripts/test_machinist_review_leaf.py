@@ -8,9 +8,11 @@ import threading
 from contextlib import nullcontext
 from dataclasses import replace
 import importlib.util
+import os
+import sys
 import json
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from doit.loader import load_tasks
@@ -554,11 +556,13 @@ def test_registered_selection_reaches_real_cli_reviewers_and_judge(
     task = next(dodo._machinist_review_tasks())
     # The task's frozen settings own command AND key even if the ambient
     # selector or internal carrier changes after graph generation.
-    selected = task["actions"][0][1][2]
+    snapshot = task["actions"][0][1][2]
+    assert isinstance(snapshot, str)
+    selected = review_settings.from_carrier(snapshot)
     assert selected == review_settings.resolve_settings(
         reviewer=expected[0], judge_reviewer=expected[0],
     )
-    assert isinstance(selected, review_settings.ReviewSettings)
+    assert snapshot == selected.canonical()
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-after-snapshot")
     monkeypatch.setenv(review_settings.SETTINGS_ENV, "{broken-after-snapshot")
     keyed_settings = []
@@ -574,7 +578,6 @@ def test_registered_selection_reaches_real_cli_reviewers_and_judge(
     execute, arguments = task["actions"][0]
     execute(*arguments)
     assert keyed_settings == [selected]
-    assert keyed_settings[0] is selected
     assert sorted(review_sessions.seen) == sorted([
         ("reviewer", *expected), ("reviewer", *expected), ("reviewer", *expected),
         ("judge", *expected),
@@ -609,7 +612,9 @@ def test_complete_carrier_reaches_real_cli_with_independent_frozen_roles(
     )
     task = next(dodo._machinist_review_tasks())
     snapshot = task["actions"][0][1][2]
-    assert snapshot == selected
+    assert isinstance(snapshot, str)
+    assert snapshot == selected.canonical()
+    assert review_settings.from_carrier(snapshot) == selected
     monkeypatch.setenv(review_settings.SETTINGS_ENV, "{broken-after-graph")
     keyed = []
     monkeypatch.setattr(
@@ -622,14 +627,16 @@ def test_complete_carrier_reaches_real_cli_with_independent_frozen_roles(
     )
     execute, arguments = task["actions"][0]
     execute(*arguments)
-    assert len(keyed) == 1 and keyed[0] is snapshot
+    assert keyed == [review_settings.from_carrier(snapshot)]
     blind = (selected.reviewer, selected.model, selected.effort)
     judge = (selected.judge_reviewer, selected.judge_model, selected.judge_effort)
     assert sorted(review_sessions.seen) == sorted([
         ("reviewer", *blind), ("reviewer", *blind), ("reviewer", *blind),
         ("judge", *judge),
     ])
-    aggregate = dodo._read_machinist_aggregate("probe", snapshot)
+    aggregate = dodo._read_machinist_aggregate(
+        "probe", review_settings.from_carrier(snapshot)
+    )
     assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == blind
     assert tuple(aggregate["judge"][field] for field in ("reviewer", "model", "effort")) == judge
     assert aggregate["judge"]["skipped"] is False
@@ -649,16 +656,151 @@ def test_graph_freezes_one_six_field_snapshot_before_yielding_any_review(inputs,
     monkeypatch.setattr(
         dodo, "mode_for_drawing", lambda _script: MachinistReviewMode.LEARN,
     )
+    selections = []
+    select = dodo._machinist_review_settings
+
+    def select_once():
+        selections.append(None)
+        return select()
+
+    monkeypatch.setattr(dodo, "_machinist_review_settings", select_once)
     tasks = dodo._machinist_review_tasks()
     first = next(tasks)
     monkeypatch.setenv(review_settings.SETTINGS_ENV, "{broken-after-first-task")
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-after-first-task")
     second = next(tasks)
     snapshot = first["actions"][0][1][2]
-    assert isinstance(snapshot, review_settings.ReviewSettings)
-    assert snapshot == selected
-    assert second["actions"][0][1][2] is snapshot
+    assert isinstance(snapshot, str)
+    assert snapshot == selected.canonical()
+    assert review_settings.from_carrier(snapshot) == selected
+    assert second["actions"][0][1][2] == snapshot
     assert list(tasks) == []
+    assert selections == [None]
+
+
+@pytest.mark.parametrize("mode", REVIEWED_MODES)
+@pytest.mark.parametrize(
+    ("selector", "explicit"),
+    [
+        (None, None),
+        ("claude", None),
+        ("codex", None),
+        ("invalid-with-complete-carrier", review_settings.resolve_settings(
+            reviewer="codex", model="explicit-review", effort="high",
+            judge_reviewer="claude", judge_model="explicit-judge", judge_effort="low",
+        )),
+        ("invalid-with-complete-carrier", review_settings.resolve_settings(
+            reviewer="claude", model="explicit-review", effort="low",
+            judge_reviewer="codex", judge_model="explicit-judge", judge_effort="high",
+        )),
+    ],
+)
+def test_registered_review_serializes_with_selected_pool_without_execution(
+    inputs, monkeypatch, selector, explicit, mode
+):
+    """Exercise the selected pool implementation, never a serializer stand-in."""
+    import builtins
+    import subprocess
+
+    from doit.task import dict_to_task
+
+    # Match build.py's selected-pool convention. An explicitly selected but
+    # unavailable checkout is an error; only the absent optional sibling skips.
+    selected_pool = os.environ.get("SOLIDWORKS_POOL_HOME")
+    pool = Path(
+        selected_pool if selected_pool is not None else REPO_ROOT.parent / "solidworks-pool"
+    ).resolve()
+    runner_path = pool / "agent" / "job_runner.py"
+    if not runner_path.is_file():
+        if selected_pool is not None:
+            pytest.fail(f"selected pool serializer is unavailable: {runner_path}")
+        pytest.skip("real serializer requires SOLIDWORKS_POOL_HOME or sibling solidworks-pool")
+
+    dodo = inputs.module
+    if selector is not None:
+        monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
+    if explicit is not None:
+        monkeypatch.setenv(review_settings.SETTINGS_ENV, explicit.canonical())
+    expected = explicit or review_settings.resolve_settings(
+        reviewer=selector or "claude", judge_reviewer=selector or "claude",
+    )
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    monkeypatch.setattr(dodo, "mode_for_drawing", lambda _script: mode)
+    task = dict_to_task(next(dodo._machinist_review_tasks()))
+    assert len(task.actions) == 1
+    registered = task.actions[0]
+    assert registered.py_callable is dodo._cached_machinist_review_action
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("graph serialization attempted execution or host work")
+
+    for name in (
+        "_machinist_review_dir", "_machinist_review_stamp",
+        "_machinist_review_cache_key", "_machinist_review_command",
+        "_probe_cache", "_run_subprocess",
+    ):
+        monkeypatch.setattr(dodo, name, forbidden)
+    for name in ("restore", "store"):
+        monkeypatch.setattr(dodo._cache, name, forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(os, "system", forbidden)
+    if hasattr(os, "startfile"):
+        monkeypatch.setattr(os, "startfile", forbidden)
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        assert name.split(".")[0] not in {
+            "machinist_review", "win32com", "pythoncom", "pywintypes",
+            "comtypes", "SolidworksMCP", "solidworks_mcp", "_solidworks", "winreg",
+        }, f"graph serialization imported reviewer/native module {name}"
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    # Load all relative dependencies from this checkout in an isolated package,
+    # without changing the selected pool, environment, or global import path.
+    package_name = "_machinist_transport_selected_pool"
+    assert not any(
+        name == package_name or name.startswith(package_name + ".")
+        for name in sys.modules
+    )
+    package = ModuleType(package_name)
+    package.__path__ = [str(pool / "agent")]
+    monkeypatch.setitem(sys.modules, package_name, package)
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    module_name = package_name + ".job_runner"
+    spec = importlib.util.spec_from_file_location(module_name, runner_path)
+    runner = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, module_name, runner)
+    try:
+        spec.loader.exec_module(runner)
+        serializer = runner._python_action_record
+        assert Path(runner.__file__).resolve() == runner_path
+        assert Path(serializer.__code__.co_filename).resolve() == runner_path
+        assert Path(runner._normalized_action_value.__code__.co_filename).resolve() == runner_path
+        record = serializer(inputs.root, task.name, 0, registered)
+        assert record == {
+            "kind": "python",
+            "callable": "dodo._cached_machinist_review_action",
+            "args": ["probe", mode.value, expected.canonical()],
+            "kwargs": {},
+        }
+        exported = json.loads(json.dumps(record))
+        assert type(exported["args"][2]) is str
+        assert exported["args"][2] == expected.canonical()
+        assert review_settings.from_carrier(exported["args"][2]) == expected
+
+        # The same real serializer must reject the former typed action args.
+        # Construct a doit action but do not execute or patch its executor.
+        old_task = dict_to_task({
+            "name": task.name,
+            "actions": [(dodo._cached_machinist_review_action, ["probe", mode, expected])],
+        })
+        with pytest.raises(runner.JobRunnerError, match="unsupported type .*ReviewSettings"):
+            serializer(inputs.root, old_task.name, 0, old_task.actions[0])
+    finally:
+        for name in tuple(sys.modules):
+            if name.startswith(package_name + "."):
+                sys.modules.pop(name, None)
 
 
 @pytest.mark.parametrize(
@@ -721,15 +863,35 @@ def test_invalid_selector_fails_before_graph_inputs_cache_or_output_changes(
     "settings",
     [
         None,
+        1,
+        {},
+        review_settings.resolve_settings(),
         {"reviewer": "codex", "model": "gpt-6-astra", "effort": "low"},
-        review_settings.resolve_settings().canonical(),
+        "",
+        "{broken",
+        "null",
+        "[]",
+        "1",
+        '"settings"',
+        "{}",
         *(
-            replace(review_settings.resolve_settings(), **{field: value})
-            for field in review_settings.SETTING_FIELDS
-            for value in ("", "two tokens", None, 1)
+            json.dumps({
+                field: getattr(review_settings.resolve_settings(), field)
+                for field in review_settings.SETTING_FIELDS if field != missing
+            })
+            for missing in review_settings.SETTING_FIELDS
         ),
-        replace(review_settings.resolve_settings(), reviewer="invalid"),
-        replace(review_settings.resolve_settings(), judge_reviewer="invalid"),
+        json.dumps({
+            **json.loads(review_settings.resolve_settings().canonical()),
+            "extra": "unexpected",
+        }),
+        *(
+            replace(review_settings.resolve_settings(), **{field: value}).canonical()
+            for field in review_settings.SETTING_FIELDS
+            for value in ("", "two tokens", None, 1, True, [], {})
+        ),
+        replace(review_settings.resolve_settings(), reviewer="invalid").canonical(),
+        replace(review_settings.resolve_settings(), judge_reviewer="invalid").canonical(),
     ],
 )
 def test_direct_action_rejects_unresolved_or_invalid_settings_before_work(
@@ -739,20 +901,31 @@ def test_direct_action_rejects_unresolved_or_invalid_settings_before_work(
     stamp = dodo._machinist_review_stamp("probe")
     stamp.parent.mkdir(parents=True, exist_ok=True)
     stamp.write_text("prior success")
+    directory = dodo._machinist_review_dir("probe")
+    directory.mkdir(parents=True)
+    evidence = directory / "prior-evidence.json"
+    evidence.write_text("prior evidence")
 
     def forbidden(*_args, **_kwargs):
         pytest.fail("invalid action settings performed review work")
 
     monkeypatch.setattr(dodo, "_machinist_review_dir", forbidden)
+    monkeypatch.setattr(dodo, "_machinist_review_stamp", forbidden)
     monkeypatch.setattr(dodo, "_machinist_review_cache_key", forbidden)
     monkeypatch.setattr(dodo, "_probe_cache", forbidden)
     monkeypatch.setattr(dodo, "_run_subprocess", forbidden)
     monkeypatch.setattr(dodo._cache, "store", forbidden)
-    with pytest.raises(ValueError, match="ReviewSettings|reviewer|model|effort|HARMONIC_MACHINIST_REVIEW_SETTINGS"):
+    message = (
+        "registered machinist review requires a complete settings carrier"
+        if not isinstance(settings, str)
+        else "HARMONIC_MACHINIST_REVIEW_SETTINGS"
+    )
+    with pytest.raises(ValueError, match=message):
         dodo._cached_machinist_review_action(
             "probe", MachinistReviewMode.ENFORCE, settings
         )
     assert stamp.read_text() == "prior success"
+    assert evidence.read_text() == "prior evidence"
 
 
 @pytest.mark.parametrize(("changed", "value"), [
@@ -859,9 +1032,9 @@ def test_cached_verdict_policy_and_error_publication(action, verdict, mode, hit)
     action.state.update(verdict=verdict, hit=hit, code=0 if verdict == "SHIP" else 1)
     if mode is MachinistReviewMode.ENFORCE and verdict != "SHIP":
         with pytest.raises(RuntimeError, match=f"{verdict}, gating_count=2"):
-            action.dodo._cached_machinist_review_action("probe", mode, action.settings)
+            action.dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
     else:
-        action.dodo._cached_machinist_review_action("probe", mode, action.settings)
+        action.dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
     assert action.calls["run"] == int(not hit)
     assert action.calls["store"] == int(not hit and verdict != "ERROR")
     assert len(action.calls["warnings"]) == int(
@@ -955,11 +1128,11 @@ def test_provider_error_is_not_cached_and_forced_refresh_overrides_learning(
         )
         with pytest.raises(RuntimeError, match=f"{verdict}, gating_count="):
             action.dodo._cached_machinist_review_action(
-                "probe", MachinistReviewMode.LEARN, action.settings
+                "probe", MachinistReviewMode.LEARN, action.settings.canonical()
             )
     else:
         action.dodo._cached_machinist_review_action(
-            "probe", MachinistReviewMode.LEARN, action.settings
+            "probe", MachinistReviewMode.LEARN, action.settings.canonical()
         )
         assert f"{verdict}, gating_count=" in action.calls["warnings"][0]
     assert action.calls["store"] == 0
@@ -973,7 +1146,7 @@ def test_failed_runner_cannot_reuse_a_previous_aggregate(action, monkeypatch):
     (directory / "probe.aggregate.json").write_text('{"verdict": "SHIP"}')
     monkeypatch.setattr(action.dodo, "_run_subprocess", lambda *_args, **_kwargs: 2)
     action.dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.LEARN, action.settings
+        "probe", MachinistReviewMode.LEARN, action.settings.canonical()
     )
     assert action.calls["store"] == 0
     assert "ERROR" in action.calls["warnings"][0]
@@ -986,7 +1159,7 @@ def test_cache_hit_replaces_instead_of_mixing_previous_evidence(action):
     old_attempt.write_text("{}")
     action.state["hit"] = True
     action.dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.LEARN, action.settings
+        "probe", MachinistReviewMode.LEARN, action.settings.canonical()
     )
     assert not old_attempt.exists()
     assert action.calls["run"] == 0
@@ -1003,9 +1176,9 @@ def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mo
     monkeypatch.setattr(action.dodo, "_probe_cache", locked)
     if mode is MachinistReviewMode.ENFORCE:
         with pytest.raises(RuntimeError, match="ERROR"):
-            action.dodo._cached_machinist_review_action("probe", mode, action.settings)
+            action.dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
     else:
-        action.dodo._cached_machinist_review_action("probe", mode, action.settings)
+        action.dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
         assert "ERROR" in action.calls["warnings"][0]
     assert action.calls["run"] == action.calls["store"] == 0
     assert not action.dodo._machinist_review_stamp("probe").exists()
@@ -1020,7 +1193,7 @@ def test_invalid_refresh_carrier_is_not_demoted_to_a_learning_warning(
     monkeypatch.setattr(action.dodo, "_probe_cache", malformed)
     with pytest.raises(ValueError, match="HARMONIC_CACHE_REFRESH"):
         action.dodo._cached_machinist_review_action(
-            "probe", MachinistReviewMode.LEARN, action.settings
+            "probe", MachinistReviewMode.LEARN, action.settings.canonical()
         )
     assert not action.calls["warnings"]
 
@@ -1065,9 +1238,9 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     monkeypatch.setattr(cache, "store", action.original_store)
     if mode is MachinistReviewMode.ENFORCE and winner == "FIX":
         with pytest.raises(RuntimeError, match="FIX, gating_count=2"):
-            dodo._cached_machinist_review_action("probe", mode, action.settings)
+            dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
     else:
-        dodo._cached_machinist_review_action("probe", mode, action.settings)
+        dodo._cached_machinist_review_action("probe", mode, action.settings.canonical())
     assert dodo._read_machinist_aggregate("probe", action.settings)["verdict"] == winner
     assert (directory / "winner-evidence.json").is_file()
     assert not (directory / "loser-only-attempt.json").exists()
@@ -1147,13 +1320,13 @@ def test_losing_review_keeps_action_selection_when_carrier_changes(
     monkeypatch.setattr(dodo._cache, "store", store)
     monkeypatch.setattr(dodo._cache, "restore", restore)
     if winner_matches_selected:
-        dodo._cached_machinist_review_action("probe", mode, selected)
+        dodo._cached_machinist_review_action("probe", mode, selected.canonical())
         assert dodo._read_machinist_aggregate("probe", selected)["verdict"] == "SHIP"
     else:
         with pytest.raises(
             RuntimeError, match="could not adopt canonical reports.*provenance mismatch"
         ):
-            dodo._cached_machinist_review_action("probe", mode, selected)
+            dodo._cached_machinist_review_action("probe", mode, selected.canonical())
         assert dodo._read_machinist_aggregate("probe", drifted)["verdict"] == "SHIP"
     assert dodo._machinist_review_stamp("probe").exists() == winner_matches_selected
     assert phases == ["store", "restore"]
@@ -1191,7 +1364,7 @@ def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, fail
         monkeypatch.setattr(dodo.shutil, "rmtree", locked_cleanup)
     with pytest.raises(RuntimeError, match="canonical|share-locked"):
         dodo._cached_machinist_review_action(
-            "probe", MachinistReviewMode.LEARN, action.settings
+            "probe", MachinistReviewMode.LEARN, action.settings.canonical()
         )
     assert not dodo._machinist_review_stamp("probe").exists()
     assert not action.calls["warnings"]
@@ -1303,7 +1476,7 @@ def test_selection_is_both_doit_and_remote_cache_input(inputs, monkeypatch, fiel
     assert _review_key(dodo, settings=selected) != key
     assert changed["file_dep"] == first["file_dep"]
     assert dodo._machinist_review_file_deps("probe") == changed["file_dep"]
-    assert changed["actions"][0][1][2] == selected
+    assert changed["actions"][0][1][2] == selected.canonical()
     monkeypatch.setenv(review_settings.SETTINGS_ENV, default.canonical())
     assert _review_key(dodo, settings=default) == key
 
@@ -1324,7 +1497,7 @@ def test_selection_graph_and_contextual_keys_never_create_settings_files(inputs,
         monkeypatch.setenv(review_settings.SETTINGS_ENV, selected.canonical())
         task = next(dodo._machinist_review_tasks())
         assert task["file_dep"] == dependencies
-        assert task["actions"][0][1][2] == selected
+        assert task["actions"][0][1][2] == selected.canonical()
         keys.append(_review_key(dodo, settings=selected))
     assert keys[0] == keys[2] != keys[1]
     assert {path: path.read_bytes() if path.is_file() else None for path in inputs.root.rglob("*")} == before
@@ -1353,7 +1526,7 @@ def test_all_off_graph_validates_current_carrier_after_dodo_preimport(dodo, monk
 def test_missing_explicitly_failed_attempt_does_not_reject_partial_ship(action, hit):
     action.state.update(hit=hit, run_errors=("r1",), missing_runs=("r1",))
     action.dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.ENFORCE, action.settings
+        "probe", MachinistReviewMode.ENFORCE, action.settings.canonical()
     )
     assert action.calls["store"] == int(not hit)
     assert action.dodo._machinist_review_stamp("probe").exists()
@@ -1363,7 +1536,7 @@ def test_missing_explicitly_failed_attempt_does_not_reject_partial_ship(action, 
 def test_partial_run_ship_keeps_matching_failed_run_provenance_cacheable(action, hit):
     action.state.update(hit=hit, run_errors=("r1",))
     action.dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.ENFORCE, action.settings
+        "probe", MachinistReviewMode.ENFORCE, action.settings.canonical()
     )
     assert action.calls["run"] == int(not hit)
     assert action.calls["store"] == int(not hit)
@@ -1379,7 +1552,7 @@ def test_all_run_error_skips_judge_without_publishing_or_stamping(action, hit):
     )
     with pytest.raises(RuntimeError, match="all runs failed"):
         action.dodo._cached_machinist_review_action(
-            "probe", MachinistReviewMode.ENFORCE, action.settings
+            "probe", MachinistReviewMode.ENFORCE, action.settings.canonical()
         )
     assert action.calls["store"] == 0
     assert not action.dodo._machinist_review_stamp("probe").exists()
@@ -1410,7 +1583,7 @@ def test_wrong_selection_or_incomplete_reports_never_cache_or_stamp(action, hit,
     action.state["edit"] = corrupt
     with pytest.raises(RuntimeError):
         action.dodo._cached_machinist_review_action(
-            "probe", MachinistReviewMode.ENFORCE, action.settings
+            "probe", MachinistReviewMode.ENFORCE, action.settings.canonical()
         )
     assert action.calls["run"] == int(not hit)
     assert action.calls["store"] == 0
@@ -1428,7 +1601,7 @@ def test_codex_action_emits_exact_selected_options_and_checks_executed_judge(act
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-after-selection")
     monkeypatch.setenv(review_settings.SETTINGS_ENV, "{broken-after-selection")
     action.dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.ENFORCE, selected
+        "probe", MachinistReviewMode.ENFORCE, selected.canonical()
     )
     command = action.calls["commands"][0]
     assert command[command.index("--runs") + 1] == "3"
