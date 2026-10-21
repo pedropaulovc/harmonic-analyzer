@@ -1576,10 +1576,20 @@ Both objects were present; that direct segment comparison cannot distinguish
 a different sketch entity from an interface/dispatch identity difference.
 Do not attribute either failure to the zero-span hypothesis.
 
+The r7 guard exposed an unsupported sketch-to-feature binding: `IFeature.Name`
+read a16-double transform instead of a string. Native owner/type/ID comparison
+and rim selection were never reached. A generated wrapper's declared members
+do not establish that the returned dispatch supports that interface.
+
 For this part recipe's sketch segments, use the native identity documented by
 `ISketchSegment.GetID`: **owning sketch name + segment type + ordered ID pair**.
-`GetSketch` supplies the owner; cast it to `IFeature` for `Name`, as in the SDK
-Get Names of Sketch Segments example. IDs alone are not unique across owners
+`GetSketch` supplies an `ISketch`, not a proven `IFeature` dispatch. Resolve its
+owner through the actual part feature inventory, including child sketches:
+`IFeatureManager.GetFeatures(False)`, profile-feature `GetSpecificFeature2`,
+and native sketch identity with positive self controls. Require exactly one
+matching owner, and read `Name` only from that actual tree `IFeature`.
+Reject unavailable or ambiguous ownership; do not cache across rebuilds.
+IDs alone are not unique across owners
 or segment types. Require valid native identity fields and exact equality at
 selection readback and at the dimension's actual annotation attachments, both
 before and after final rebuild. Keep the Wizard point's `IsSame==1` guard,
@@ -1597,6 +1607,13 @@ own an across-flats acceptance band. Attach the height precision's functional
 reason to the height dimension itself, and remove only the native hole-callout
 thread-class variable where the title block already owns 2B. Keep live
 thread/drill/depth variables and reject resolved text that still repeats 2B.
+
+Hole-callout variable arrays return concrete variable dispatches. Follow the
+existing precision helper's dynamic metadata read for `VariableName`/`Type`,
+then bind the matching concrete string interface for `String`. Merely wrapping
+a returned variable as the declared base `ICalloutVariable` can invoke an
+incompatible DISPID. Preserve the native2B value before and after print-only
+class removal; the drawing's title block does not change the model fit.
 
 Keep nominal model travel separate from published operating capacity. The
 accepted shortest rod and longest thread move nominal runout X149.50 to

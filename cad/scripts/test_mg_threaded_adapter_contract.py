@@ -2,7 +2,9 @@
 
 The adapter census checks the pinned SDK MRO, NOT the COM contracts beneath it.
 The separate native-member check parses the generated typelib as data and catches
-wrong explicit interface bindings; neither check proves native execution.
+undeclared members, call arity and result-shape mistakes on explicit bindings.
+It cannot prove that QI supplied the requested interface or that a DISPID applies
+to a live dispatch. Dynamic callout metadata needs its behavioral/native gates.
 Starred adapter arguments remain symbolic: geometry tests/native gates own data.
 """
 
@@ -178,6 +180,78 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
     identifier = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetID")
     identifier.args.append(ast.Constant(0))
     assert "ISketchSegment.GetID arguments" in _undeclared_bound_calls(mutated)
+    inventory = next(node for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetFeatures")
+    assert _can_bind(inventory, _native_declaration("IFeatureManager")[0]["GetFeatures"])
+    mutated = copy.deepcopy(tree)
+    inventory = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetFeatures")
+    inventory.args.append(ast.Constant(False))
+    assert "IFeatureManager.GetFeatures arguments" in _undeclared_bound_calls(mutated)
+    assert "FeatureManager" in _native_declaration("IModelDoc2")[1]["_prop_map_get_"]
+
+
+def _native_return_type(method):
+    """Read generated invocation metadata as AST data, never import COM."""
+    invocations = [
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr in ("InvokeTypes", "_ApplyTypes_")
+    ]
+    assert len(invocations) == 1, f"{method.name}: expected one native invocation"
+    invocation = invocations[0]
+    result_index = 3 if invocation.func.attr == "InvokeTypes" else 2
+    return ast.literal_eval(invocation.args[result_index])
+
+
+@pytest.mark.parametrize("interface, member, retval", (
+    ("IFeatureManager", "GetFeatures", 12),
+    ("IFeature", "GetTypeName2", 8),
+    ("IFeature", "GetSpecificFeature2", 9),
+    ("ISketchSegment", "GetSketch", 9),
+    ("ISketchSegment", "GetType", 3),
+    ("ISketchSegment", "GetID", 12),
+    ("ISldWorks", "IsSame", 3),
+    ("ISelectionMgr", "GetSelectedObjectCount2", 3),
+    ("ISelectionMgr", "GetSelectedObject6", 9),
+    ("ISelectionMgr", "GetSelectedObjectType3", 3),
+    ("ISelectionMgr", "SetSelectionPoint2", 11),
+    ("ISelectionMgr", "GetSelectionPointInSketchSpace2", 12),
+    ("ISketchArc", "GetCenterPoint2", 9),
+    ("ISketchArc", "GetRadius", 5),
+    ("IMathTransform", "Inverse", 9),
+    ("ISldWorks", "GetMathUtility", 9),
+    ("IMathUtility", "CreatePoint", 9),
+    ("IMathPoint", "MultiplyTransform", 9),
+    ("IModelDoc2", "AddDimension2", 9),
+    ("IModelDoc2", "AddHorizontalDimension2", 9),
+    ("IModelDoc2", "ClearSelection2", 24),
+    ("IModelDoc2", "GraphicsRedraw2", 24),
+    ("ISldWorks", "SetUserPreferenceToggle", 24),
+    ("ISldWorks", "GetUserPreferenceToggle", 11),
+    ("IDisplayDimension", "GetDimension2", 9),
+    ("IDisplayDimension", "GetAnnotation", 9),
+    ("IAnnotation", "GetAttachedEntities3", 12),
+    ("IAnnotation", "GetAttachedEntityTypes", 12),
+    ("IAnnotation", "IsDangling", 11),
+    ("IDimension", "GetArcEndCondition", 3),
+    ("IDimension", "SetArcEndCondition", 3),
+))
+def test_clamp_native_methods_have_declared_result_shapes_not_adapter_contracts(interface, member, retval) -> None:
+    methods, maps = _native_declaration(interface)
+    assert member in methods
+    assert all(member not in values for values in maps.values())
+    assert _native_return_type(methods[member]) == (retval, 0)
+
+
+def test_native_return_type_census_distinguishes_void_mutators() -> None:
+    # Positive controls exercise both generated calling forms. A VT_VOID
+    # setter cannot be used as a success boolean even though the adapter can.
+    setter = _native_declaration("ISldWorks")[0]["SetUserPreferenceToggle"]
+    assert _native_return_type(setter) == (24, 0)
+    assert _native_return_type(_native_declaration("IFeatureManager")[0]["GetFeatures"]) == (12, 0)
+    mutated = copy.deepcopy(setter)
+    invocation = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "InvokeTypes")
+    invocation.args[3] = ast.Tuple(elts=[ast.Constant(11), ast.Constant(0)], ctx=ast.Load())
+    assert _native_return_type(mutated) != _native_return_type(setter)
 
 
 @pytest.mark.parametrize("recipe", ("draw_mg_magnifying_bracket.py", "draw_mg_magnifying_lever.py"))

@@ -257,33 +257,111 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> None:
     if len(entities) != entity_count or len(entity_types) != entity_count:
         raise RuntimeError("native lever thread callout attachment census is incomplete")
     app = adapter.swApp
+    self_comparisons = []
     for label, obj in (("callout", note), ("owner", owner), *(("attachment", entity) for entity in entities)):
         result = int(app.IsSame(obj, obj))
+        self_comparisons.append({"role": label, "code": result})
         if result != 1:
             raise RuntimeError(f"native lever {label} identity comparison unsupported: self={result}")
-    if owner_type == 0 and int(app.IsSame(owner, native)) != 1:
+    owner_to_front = int(app.IsSame(owner, native)) if owner_type == 0 else None
+    if owner_type == 0 and owner_to_front != 1:
         raise RuntimeError("native lever thread callout belongs to another drawing view")
-    if not note.SetText(PRINT_THREAD_CALLOUT):
+    audit = {
+        "requested_text": PRINT_THREAD_CALLOUT,
+        "stage": "before_set_text",
+        "before": {
+            "text": original, "owner_type": owner_type, "owner_present": True,
+            "attached_count": entity_count, "attached_types": entity_types,
+            "entities_reported": len(entities), "dangling": dangling,
+            "self_comparisons": self_comparisons, "owner_to_front": owner_to_front,
+        },
+        "after": {},
+    }
+    evidence = json.dumps(audit, sort_keys=True)
+    _telemetry.info(
+        f"lever native thread callout audit: {evidence}",
+        operation_stage=audit["stage"], auditJSON=evidence, failed_conditions="[]",
+    )
+    audit["setter_result"] = bool(note.SetText(PRINT_THREAD_CALLOUT))
+    if not audit["setter_result"]:
         raise RuntimeError("native lever thread drawing callout refused its print-only text")
     rebuild_drawing(adapter, label="omit title-block thread class from lever drawing callout")
-    current = _early_bound(thread.ThreadCallout, "INote")
-    if current is None or int(app.IsSame(note, current)) != 1:
-        raise RuntimeError("lever thread text mutation replaced its native drawing callout")
-    current_annotation = _early_bound(current.GetAnnotation(), "IAnnotation")
-    current_entities = tuple(current_annotation.GetAttachedEntities3() or ())
-    if (
-        str(current.GetText() or "") != PRINT_THREAD_CALLOUT
-        or int(current_annotation.OwnerType) != owner_type
-        or current_annotation.Owner is None
-        or int(app.IsSame(owner, current_annotation.Owner)) != 1
-        or int(current_annotation.GetAttachedEntityCount3()) != entity_count
-        or tuple(current_annotation.GetAttachedEntityTypes() or ()) != entity_types
-        or len(current_entities) != len(entities)
-        or any(int(app.IsSame(before, after)) != 1 for before, after in zip(entities, current_entities))
-        or bool(current_annotation.IsDangling()) != dangling
-    ):
-        raise RuntimeError("lever thread drawing callout lost its text, ownership or native attachment")
-    _telemetry.info(f"lever drawing INote text rewritten: native seed={count}, owner_type={owner_type}, attached_count={entity_count}")
+    audit["stage"] = "readback"
+    after = audit["after"]
+    reading = "ICThread.ThreadCallout"
+    try:
+        current = _early_bound(thread.ThreadCallout, "INote")
+        after["note_present"] = current is not None
+        if current is not None:
+            reading = "INote.GetText"
+            after["text"] = current.GetText()
+            if after["text"] is None:
+                raise RuntimeError("INote.GetText returned None; native text reader unavailable")
+            reading = "ISldWorks.IsSame(note,current)"
+            after["note_same"] = int(app.IsSame(note, current))
+            after["note_self"] = int(app.IsSame(current, current))
+            reading = "INote.GetAnnotation"
+            current_annotation = _early_bound(current.GetAnnotation(), "IAnnotation")
+            reading = "IAnnotation.OwnerType"
+            after["owner_type"] = int(current_annotation.OwnerType)
+            reading = "IAnnotation.Owner"
+            current_owner = current_annotation.Owner
+            after["owner_present"] = current_owner is not None
+            reading = "ISldWorks.IsSame(owner,current_owner)"
+            after["owner_same"] = int(app.IsSame(owner, current_owner)) if current_owner is not None else None
+            after["owner_self"] = int(app.IsSame(current_owner, current_owner)) if current_owner is not None else None
+            reading = "IAnnotation.GetAttachedEntities3"
+            current_entities = tuple(current_annotation.GetAttachedEntities3() or ())
+            after["entities_reported"] = len(current_entities)
+            reading = "IAnnotation.GetAttachedEntityCount3"
+            after["attached_count"] = int(current_annotation.GetAttachedEntityCount3())
+            reading = "IAnnotation.GetAttachedEntityTypes"
+            after["attached_types"] = tuple(current_annotation.GetAttachedEntityTypes() or ())
+            reading = "ISldWorks.IsSame(attached entities)"
+            after["entity_same"] = [int(app.IsSame(before, actual)) for before, actual in zip(entities, current_entities)]
+            after["entity_self"] = [int(app.IsSame(actual, actual)) for actual in current_entities]
+            reading = "IAnnotation.IsDangling"
+            after["dangling"] = current_annotation.IsDangling()
+            if after["dangling"] is None:
+                raise RuntimeError("IAnnotation.IsDangling returned None; native dangling-state reader unavailable")
+    except Exception as exc:
+        audit["stage"] = f"readback:{reading}"
+        audit["failed"] = ["reader_unavailable"]
+        audit["read_error"] = {"field": reading, "type": type(exc).__name__, "message": str(exc)}
+        evidence = json.dumps(audit, sort_keys=True, default=repr)
+        _telemetry.info(
+            f"lever native thread callout audit: {evidence}",
+            operation_stage=audit["stage"], auditJSON=evidence,
+            failed_conditions=json.dumps(audit["failed"]),
+        )
+        raise RuntimeError(f"lever native thread callout readback failed; audit={evidence}") from exc
+    # Evaluate every native readback before deciding; short-circuiting this
+    # inventory hid which actual R7 field changed after SetText/rebuild.
+    conditions = {
+        "note_present": after["note_present"],
+        "note_identity": after.get("note_same") == 1,
+        "text": after.get("text") == PRINT_THREAD_CALLOUT,
+        "owner_type": after.get("owner_type") == owner_type,
+        "owner_identity": after.get("owner_present", False) and after.get("owner_same") == 1,
+        "attached_count": after.get("attached_count") == entity_count,
+        "attached_types": after.get("attached_types") == entity_types,
+        "entities_reported": after.get("entities_reported") == len(entities),
+        "entity_identity": all(code == 1 for code in after.get("entity_same", ())),
+        "dangling": after.get("dangling") == dangling,
+    }
+    audit["stage"] = "readback_complete"
+    audit["conditions"] = conditions
+    audit["failed"] = [name for name, passed in conditions.items() if not passed]
+    evidence = json.dumps(audit, sort_keys=True, default=repr)
+    _telemetry.info(
+        f"lever native thread callout audit: {evidence}",
+        operation_stage=audit["stage"], auditJSON=evidence,
+        failed_conditions=json.dumps(audit["failed"]),
+    )
+    if not conditions["note_present"] or not conditions["note_identity"]:
+        raise RuntimeError(f"lever thread text mutation replaced its native drawing callout; audit={evidence}")
+    if audit["failed"]:
+        raise RuntimeError(f"lever thread drawing callout lost its text, ownership or native attachment; audit={evidence}")
 
 
 

@@ -642,7 +642,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     assert front.entity_kinds == [3, 4]
 
 
-def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, fault=None):
+def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, nullable_empty_arrays=False, fault=None):
     """Expose a drawing ICThread/INote graph, separate from native part metadata."""
     view = SimpleNamespace() if view is None else view
     state = SimpleNamespace(
@@ -650,10 +650,15 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
         entity_types=tuple(attachment_types), dangling=False,
         model_thread=SimpleNamespace(ThreadCallout=spec.THREAD_CALLOUT, thread_class="2A"),
     )
+    def attached_types():
+        if fault == "post_types_unavailable" and state.writes:
+            raise RuntimeError("native attached-type getter refused after mutation")
+        return None if nullable_empty_arrays else state.entity_types
+
     annotation = SimpleNamespace(
         OwnerType=int(sheet_owned), Owner=object() if sheet_owned else view,
-        GetAttachedEntities3=lambda: state.entities,
-        GetAttachedEntityTypes=lambda: state.entity_types,
+        GetAttachedEntities3=lambda: None if nullable_empty_arrays else state.entities,
+        GetAttachedEntityTypes=attached_types,
         GetAttachedEntityCount3=lambda: len(state.entities) + int(fault == "incomplete_attachments"),
         IsDangling=lambda: state.dangling,
     )
@@ -677,7 +682,26 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
         elif fault == "dangling":
             state.dangling = True
         elif fault == "note_replaced":
-            state.thread.ThreadCallout = SimpleNamespace()
+            state.thread.ThreadCallout = SimpleNamespace(
+                GetText=lambda: state.text, GetAnnotation=lambda: annotation,
+            )
+        elif fault == "note_removed":
+            state.thread.ThreadCallout = None
+        elif fault == "owner_removed":
+            annotation.Owner = None
+        elif fault == "windows_newlines":
+            state.text = text.replace("\n", "\r\n")
+        elif fault == "multiple_post_changes":
+            state.text = "native returned text\r\nwith extra row"
+            annotation.Owner, annotation.OwnerType = object(), 3
+            state.entities, state.entity_types = (object(), object()), (46, 46)
+            state.dangling = True
+        elif fault == "post_text_unavailable":
+            state.text = None
+        elif fault == "post_text_empty":
+            state.text = ""
+        elif fault == "post_dangling_unavailable":
+            state.dangling = None
         return True
 
     state.note = SimpleNamespace(
@@ -694,17 +718,24 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
         annotation.OwnerType = 3
     elif fault == "other_view_owner":
         annotation.Owner = object()
-    adapter = SimpleNamespace(swApp=SimpleNamespace(
-        IsSame=lambda first, second: 2 if fault == "identity_unsupported" else int(first is second),
-    ))
+    def same(first, second):
+        if fault == "identity_unsupported":
+            return 2
+        if fault == "owner_comparison_unsupported" and state.writes and first is annotation.Owner and second is annotation.Owner:
+            return 2
+        return int(first is second)
+
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=same))
     return adapter, view, state
 
 
 @pytest.mark.parametrize("sheet_owned", (False, True))
-@pytest.mark.parametrize("attachment_types", ((), (1,), (2,)))
-def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_metadata(monkeypatch, attachment_types, sheet_owned) -> None:
-    adapter, view, state = _native_thread_note_adapter(attachment_types=attachment_types, sheet_owned=sheet_owned)
+@pytest.mark.parametrize("attachment_types, nullable_empty_arrays", (((), False), ((), True), ((1,), False), ((2,), False)))
+def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_metadata(monkeypatch, attachment_types, nullable_empty_arrays, sheet_owned) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=attachment_types, nullable_empty_arrays=nullable_empty_arrays, sheet_owned=sheet_owned)
     original_entities, original_owner = state.entities, state.note.GetAnnotation().Owner
+    records = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     drawing._print_native_thread_callout(adapter, view)
     assert state.thread.ThreadCallout is state.note
@@ -716,6 +747,16 @@ def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_
     assert "2A" not in state.note.GetText()
     assert state.model_thread.ThreadCallout == f"{joint.THREAD} UNC-2A\nMATES MHA-MG-01 BRACKET"
     assert state.model_thread.thread_class == "2A"
+    if nullable_empty_arrays:
+        assert state.note.GetAnnotation().GetAttachedEntities3() is None
+        assert state.note.GetAnnotation().GetAttachedEntityTypes() is None
+        assert state.note.GetAnnotation().GetAttachedEntityCount3() == 0
+    for message, attributes in records:
+        payload = message.split("audit: ", 1)[1]
+        audit = json.loads(payload)
+        assert attributes["auditJSON"] == payload
+        assert attributes["operation_stage"] == audit["stage"]
+        assert json.loads(attributes["failed_conditions"]) == audit.get("failed", [])
 
 
 @pytest.mark.parametrize("fault, message", (
@@ -735,6 +776,15 @@ def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_
     ("attachment_type_changed", "lost its text, ownership or native attachment"),
     ("dangling", "lost its text, ownership or native attachment"),
     ("note_replaced", "replaced its native drawing callout"),
+    ("note_removed", "replaced its native drawing callout"),
+    ("owner_removed", "lost its text, ownership or native attachment"),
+    ("windows_newlines", "lost its text, ownership or native attachment"),
+    ("multiple_post_changes", "lost its text, ownership or native attachment"),
+    ("owner_comparison_unsupported", "lost its text, ownership or native attachment"),
+    ("post_types_unavailable", "native thread callout readback failed"),
+    ("post_text_unavailable", "native thread callout readback failed"),
+    ("post_dangling_unavailable", "native thread callout readback failed"),
+    ("post_text_empty", "lost its text, ownership or native attachment"),
 ))
 def test_thread_class_override_refuses_unsupported_or_changed_native_identity(monkeypatch, fault, message) -> None:
     adapter, view, state = _native_thread_note_adapter(attachment_types=(2,), fault=fault)
@@ -743,3 +793,107 @@ def test_thread_class_override_refuses_unsupported_or_changed_native_identity(mo
         drawing._print_native_thread_callout(adapter, view)
     assert state.model_thread.ThreadCallout.endswith("MATES MHA-MG-01 BRACKET")
     assert "UNC-2A" in state.model_thread.ThreadCallout and state.model_thread.thread_class == "2A"
+
+
+@pytest.mark.parametrize("fault, failed", (
+    ("ignored_text", {"text"}),
+    ("windows_newlines", {"text"}),
+    ("post_text_empty", {"text"}),
+    ("owner_changed", {"owner_identity"}),
+    ("owner_comparison_unsupported", {"owner_identity"}),
+    ("attachment_changed", {"entity_identity"}),
+    ("multiple_post_changes", {
+        "text", "owner_type", "owner_identity", "attached_count",
+        "attached_types", "entities_reported", "entity_identity", "dangling",
+    }),
+))
+def test_native_thread_audit_records_every_actual_postcondition_before_refusing(monkeypatch, fault, failed) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=(2,), fault=fault)
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._print_native_thread_callout(adapter, view)
+    audit = json.loads(str(caught.value).split("; audit=", 1)[1])
+    assert json.loads(messages[-1][0].split("audit: ", 1)[1]) == audit
+    assert messages[-1][1]["operation_stage"] == audit["stage"]
+    assert json.loads(messages[-1][1]["auditJSON"]) == audit
+    assert set(json.loads(messages[-1][1]["failed_conditions"])) == failed
+    assert audit["stage"] == "readback_complete" and audit["setter_result"] is True
+    assert set(audit["failed"]) == failed
+    assert audit["before"]["text"] == spec.THREAD_CALLOUT
+    assert audit["before"]["attached_count"] == 1 and audit["before"]["attached_types"] == [2]
+    assert audit["before"]["self_comparisons"] == [
+        {"role": "callout", "code": 1}, {"role": "owner", "code": 1}, {"role": "attachment", "code": 1},
+    ]
+    after = audit["after"]
+    assert after["text"] == state.text
+    assert after["owner_type"] == state.note.GetAnnotation().OwnerType
+    assert after["attached_count"] == after["entities_reported"] == len(state.entities)
+    assert after["attached_types"] == list(state.entity_types)
+    assert after["dangling"] is state.dangling
+    assert after["note_same"] == after["note_self"] == 1
+    assert len(after["entity_same"]) == 1
+    assert after["entity_self"] == [1] * len(state.entities)
+    if fault == "owner_comparison_unsupported":
+        assert after["owner_same"] == after["owner_self"] == 2
+    if fault == "multiple_post_changes":
+        assert after["owner_same"] == 0 and after["entity_same"] == [0]
+        assert after["text"] == "native returned text\r\nwith extra row"
+    if fault == "windows_newlines":
+        assert "\r\n" in after["text"] and "\r" not in audit["requested_text"]
+
+
+def test_native_thread_audit_names_unavailable_post_reader_without_inventing_zero_state(monkeypatch) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=(2,), fault="post_types_unavailable")
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="readback failed") as caught:
+        drawing._print_native_thread_callout(adapter, view)
+    audit = json.loads(str(caught.value).split("; audit=", 1)[1])
+    assert audit["read_error"] == {
+        "field": "IAnnotation.GetAttachedEntityTypes",
+        "type": "RuntimeError",
+        "message": "native attached-type getter refused after mutation",
+    }
+    assert audit["before"]["attached_types"] == [2]
+    assert audit["after"]["attached_count"] == 1
+    assert audit["after"]["note_same"] == 1 and audit["after"]["text"] == state.text
+    assert "attached_types" not in audit["after"] and "dangling" not in audit["after"]
+    assert audit["stage"] == "readback:IAnnotation.GetAttachedEntityTypes"
+    assert json.loads(messages[-1][0].split("audit: ", 1)[1]) == audit
+    assert messages[-1][1]["operation_stage"] == audit["stage"]
+    assert json.loads(messages[-1][1]["auditJSON"]) == audit
+    assert json.loads(messages[-1][1]["failed_conditions"]) == ["reader_unavailable"]
+
+
+@pytest.mark.parametrize("fault, field, reader", (
+    ("post_text_unavailable", "text", "INote.GetText"),
+    ("post_dangling_unavailable", "dangling", "IAnnotation.IsDangling"),
+))
+def test_native_thread_audit_preserves_null_scalar_readback_and_marks_the_exact_reader(monkeypatch, fault, field, reader) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=(2,), fault=fault)
+    records = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="readback failed") as caught:
+        drawing._print_native_thread_callout(adapter, view)
+    audit = json.loads(str(caught.value).split("; audit=", 1)[1])
+    assert audit["after"][field] is None
+    assert audit["read_error"]["field"] == reader
+    assert "returned None" in audit["read_error"]["message"]
+    assert audit["stage"] == f"readback:{reader}"
+    assert audit["failed"] == ["reader_unavailable"]
+    assert audit["before"]["dangling"] is False
+    if field == "text":
+        assert "note_same" not in audit["after"]
+    else:
+        assert audit["after"]["text"] == state.text == spec.PRINT_THREAD_CALLOUT
+        assert audit["after"]["note_same"] == 1
+        assert audit["after"]["attached_count"] == 1
+    message, attributes = records[-1]
+    assert json.loads(message.split("audit: ", 1)[1]) == audit
+    assert json.loads(attributes["auditJSON"]) == audit
+    assert attributes["operation_stage"] == audit["stage"]
+    assert json.loads(attributes["failed_conditions"]) == ["reader_unavailable"]

@@ -314,7 +314,10 @@ def test_mouth_section_shows_both_chamfer_legs_on_the_axis_plane(monkeypatch, fa
             drawing._mouth_section(object(), parent)
 
 
-def _tap_name_adapter(*, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
+def _tap_name_adapter(monkeypatch, *, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
+    """Model distinct returned dispatch metadata and concrete string interfaces."""
+    from win32com.client import dynamic
+
     state = SimpleNamespace(selected=None, notes=[], deleted=[])
 
     def clear(_all):
@@ -379,16 +382,44 @@ def _tap_name_adapter(*, count=1, fault=None, definition=None, resolved=None, na
         variables = (*variables, state.native_class)
     elif fault == "non_string_class":
         state.native_class.Type = 1
+    native_by_dispatch, native_by_wrapper = {}, {}
+    state.metadata_reads, state.variable_bindings = [], []
+    returned = []
+    for variable in variables:
+        pointer = object()
+        wrapper = SimpleNamespace(_oleobj_=pointer)
+        native_by_dispatch[pointer] = variable
+        native_by_wrapper[id(wrapper)] = variable
+        returned.append(wrapper)
+
+    def dispatch(pointer):
+        variable = native_by_dispatch[pointer]
+        state.metadata_reads.append(variable.VariableName)
+        return variable
+
+    original_bind = drawing._early_bound
+
+    def bind(value, interface):
+        if id(value) in native_by_wrapper:
+            # R7: merely relabelling this concrete dispatch as the base
+            # interface invokes an incompatible VariableName DISPID.
+            assert interface == "ICalloutStringVariable", "unsafe base-interface DISPID on returned variable dispatch"
+            state.variable_bindings.append(interface)
+            return native_by_wrapper[id(value)]
+        return original_bind(value, interface)
+
+    monkeypatch.setattr(dynamic, "Dispatch", dispatch)
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     callout = SimpleNamespace(
         GetText=get_text, SetText=set_text, IsHoleCallout=lambda: True,
-        GetHoleCalloutVariables=lambda: variables,
+        GetHoleCalloutVariables=lambda: tuple(returned),
     )
     return adapter, view, callout, state, required
 
 
 @pytest.mark.parametrize("count", (0, 1, 2))
 def test_automatic_tap_name_cleanup_keeps_the_associative_thread_and_required_notes(monkeypatch, count) -> None:
-    adapter, view, callout, state, required = _tap_name_adapter(count=count)
+    adapter, view, callout, state, required = _tap_name_adapter(monkeypatch, count=count)
     definition = callout.GetText(5)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     assert drawing._curate_tap_callout(adapter, view, callout) == count
@@ -400,11 +431,13 @@ def test_automatic_tap_name_cleanup_keeps_the_associative_thread_and_required_no
     assert "<hw-threaddesc>" in callout.GetText(5) and "<hw-thru>" in callout.GetText(5)
     assert "MATES MHA-MG-03 LEVER" in callout.GetText(1)
     assert joint.THREAD in callout.GetText(1) and "2B" not in callout.GetText(1)
+    assert state.metadata_reads == ["hw-threaddesc", "hw-threadclass"]
+    assert state.variable_bindings == ["ICalloutStringVariable"]
 
 
 @pytest.mark.parametrize("missing", ("<hw-threaddesc>", "<hw-threadclass>", "<hw-thru>"))
 def test_tap_name_is_not_removed_without_an_authoritative_native_thread_callout(monkeypatch, missing) -> None:
-    adapter, view, callout, state, _required = _tap_name_adapter()
+    adapter, view, callout, state, _required = _tap_name_adapter(monkeypatch)
     definition = callout.GetText(5).replace(missing, "")
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     with pytest.raises(RuntimeError, match="native thread description/class/extent"):
@@ -415,7 +448,7 @@ def test_tap_name_is_not_removed_without_an_authoritative_native_thread_callout(
 
 @pytest.mark.parametrize("resolved", ("", "THRU MATES MHA-MG-03 LEVER", "10-32 UNF 2B THRU"))
 def test_tap_name_cleanup_requires_the_actual_resolved_thread_size(monkeypatch, resolved) -> None:
-    adapter, view, callout, state, _required = _tap_name_adapter(resolved=resolved)
+    adapter, view, callout, state, _required = _tap_name_adapter(monkeypatch, resolved=resolved)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     with pytest.raises(RuntimeError, match="no resolved native thread size"):
         drawing._curate_tap_callout(adapter, view, callout)
@@ -432,7 +465,7 @@ def test_tap_name_cleanup_requires_the_actual_resolved_thread_size(monkeypatch, 
     ("lost_resolved_size", "lost its resolved thread size"),
 ))
 def test_tap_curation_refuses_lost_or_modified_native_thread_metadata(monkeypatch, fault, message) -> None:
-    adapter, view, callout, state, _required = _tap_name_adapter(fault=fault)
+    adapter, view, callout, state, _required = _tap_name_adapter(monkeypatch, fault=fault)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     with pytest.raises(RuntimeError, match=message):
         drawing._curate_tap_callout(adapter, view, callout)
@@ -440,7 +473,7 @@ def test_tap_curation_refuses_lost_or_modified_native_thread_metadata(monkeypatc
 
 
 def test_tap_curation_preserves_a_nondefault_native_class_instead_of_hiding_it(monkeypatch) -> None:
-    adapter, view, callout, state, _required = _tap_name_adapter(native_class="3B")
+    adapter, view, callout, state, _required = _tap_name_adapter(monkeypatch, native_class="3B")
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     with pytest.raises(RuntimeError, match="not the title-block default 2B"):
         drawing._curate_tap_callout(adapter, view, callout)
@@ -450,7 +483,7 @@ def test_tap_curation_preserves_a_nondefault_native_class_instead_of_hiding_it(m
 
 @pytest.mark.parametrize("fault", ("selection_refused", "deletion_ignored"))
 def test_tap_name_cleanup_requires_native_selection_and_actual_deletion(monkeypatch, fault) -> None:
-    adapter, view, callout, state, _required = _tap_name_adapter(fault=fault)
+    adapter, view, callout, state, _required = _tap_name_adapter(monkeypatch, fault=fault)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
     with pytest.raises(RuntimeError, match="redundant tap feature-name note"):
         drawing._curate_tap_callout(adapter, view, callout)
@@ -459,7 +492,7 @@ def test_tap_name_cleanup_requires_native_selection_and_actual_deletion(monkeypa
 
 def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_moving_its_tip(monkeypatch, tmp_path) -> None:
     """Replay observed collisions; relocated native ink still needs seat proof."""
-    adapter, side, callout, state, required = _tap_name_adapter()
+    adapter, side, callout, state, required = _tap_name_adapter(monkeypatch)
     source = tmp_path / "bracket.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
