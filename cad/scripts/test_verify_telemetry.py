@@ -637,7 +637,9 @@ def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_pa
     assert _by_name(spans, "gear.read_links") == []
 
 
-def _phase_case(monkeypatch, tmp_path, *, manifest=True, parameter=True):
+def _phase_case(
+    monkeypatch, tmp_path, *, manifest=True, parameter=True, manifest_copies=1
+):
     """Use the existing inert result/model/attempt ports without sleeps or COM."""
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
     monkeypatch.setattr(verify, "_assert_fresh", lambda *_: True)
@@ -674,7 +676,7 @@ def _phase_case(monkeypatch, tmp_path, *, manifest=True, parameter=True):
         lambda _: [
             {"key": key, "params": {"distance": 1.0}}
             for key in ("pen_travel", "lever_rock", "slide")
-        ] if manifest else [],
+        ] * manifest_copies if manifest else [],
     )
     monkeypatch.setattr(verify, "author_dof_drives", author)
     monkeypatch.setattr(verify.pen_driver, "install", install)
@@ -729,13 +731,14 @@ def test_whole_kinematic_sweeps_have_bounded_phase_spans(monkeypatch, tmp_path, 
 
 
 @pytest.mark.parametrize("kind", ["motion", "chain"])
-@pytest.mark.parametrize("missing", ["manifest", "parameter"])
+@pytest.mark.parametrize("missing", ["manifest", "ambiguous", "parameter"])
 def test_kinematic_early_return_omits_unexecuted_phases(
     monkeypatch, tmp_path, kind, missing
 ):
     adapter = _phase_case(
         monkeypatch, tmp_path,
         manifest=missing != "manifest", parameter=missing != "parameter",
+        manifest_copies=2 if missing == "ambiguous" else 1,
     )
     capture = _attach_capture()
     report = verify.Report()
@@ -747,6 +750,15 @@ def test_kinematic_early_return_omits_unexecuted_phases(
     prepared = kind == "motion" or missing == "parameter"
     assert len(_by_name(spans, f"verify.{kind}.prepare")) == int(prepared)
     assert len(_by_name(spans, "verify.cleanup")) == int(kind == "motion")
+    (root,) = _by_name(spans, "pipeline.verify:phase-contract")
+    assert len({s.context.trace_id for s in spans}) == 1
+    if prepared:
+        (prepare,) = _by_name(spans, f"verify.{kind}.prepare")
+        assert prepare.status.status_code.name == "ERROR"
+        assert prepare.status.description == report.failed[0][1]
+        assert prepare.parent.span_id == root.context.span_id
+    if kind == "motion":
+        _assert_phase_tree(spans, ["verify.cleanup"])
 
 
 @pytest.mark.parametrize("kind", ["motion", "chain"])
@@ -809,11 +821,20 @@ def test_kinematic_phase_errors_keep_propagation_and_cleanup(
         assert not _by_name(spans, f"verify.{kind}.restore")
 
 
-@pytest.mark.parametrize("case", ["normal", "missing", "parameter", "raised"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "normal", "missing", "manifest", "ambiguous", "parameter", "raised",
+        "offstation", "interference",
+    ],
+)
 def test_pass_walk_phase_parentage_and_failed_gate_conversion(monkeypatch, tmp_path, case):
     import json
 
-    adapter = _phase_case(monkeypatch, tmp_path, parameter=case != "parameter")
+    adapter = _phase_case(
+        monkeypatch, tmp_path, parameter=case != "parameter",
+        manifest=case != "manifest", manifest_copies=2 if case == "ambiguous" else 1,
+    )
     name = verify.SWEEP_OWNER
     if case != "missing":
         verify._sweep_sidecar_path(name).write_text(
@@ -834,6 +855,20 @@ def test_pass_walk_phase_parentage_and_failed_gate_conversion(monkeypatch, tmp_p
             raise RuntimeError("readback failed")
 
         monkeypatch.setattr(verify, "component_transform", fail)
+    elif case == "offstation":
+        original = verify.component_transform
+
+        def offstation(*args):
+            transform = original(*args)
+            transform[9] = 1.0
+            return transform
+
+        monkeypatch.setattr(verify, "component_transform", offstation)
+    elif case == "interference":
+        def interference(*_, **__):
+            raise RuntimeError("interference found")
+
+        monkeypatch.setattr(verify, "check_no_interference", interference)
     capture = _attach_capture()
     report = verify.Report()
     spans = _run_phase(capture, lambda: verify._verify_pass_sweep(adapter, name, report))
@@ -843,7 +878,14 @@ def test_pass_walk_phase_parentage_and_failed_gate_conversion(monkeypatch, tmp_p
     _assert_phase_tree(spans, ["verify.cleanup"])
     (root,) = _by_name(spans, "pipeline.verify:phase-contract")
     assert walk.parent.span_id == root.context.span_id
-    assert walk.status.status_code.name == ("ERROR" if case == "raised" else "OK")
+    assert walk.status.status_code.name == ("OK" if case == "normal" else "ERROR")
+    preparation_failed = case in ("missing", "manifest", "ambiguous", "parameter")
+    assert prepare.status.status_code.name == ("ERROR" if preparation_failed else "OK")
+    if preparation_failed:
+        assert prepare.status.description == walk.status.description
+    (gate,) = _by_name(spans, "gate")
+    assert gate.status.status_code.name == ("OK" if case == "normal" else "ERROR")
+    assert gate.parent.span_id == root.context.span_id
     assert bool(report.failed) == (case != "normal")
     if case == "raised":
         assert "sweep walk raised: readback failed" in report.failed[0][1]

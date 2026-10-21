@@ -1238,20 +1238,38 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
     are mated on the pins' (coincident named axes, picked by name)."""
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
-    with _telemetry.span("verify.pass_sweep.prepare"):
+    with _telemetry.span("verify.pass_sweep.prepare") as sp:
         path = _sweep_sidecar_path(name)
         if not path.exists():
+            sp.set_status(
+                _telemetry.Status(
+                    _telemetry.StatusCode.ERROR,
+                    f"no sweep sidecar {path.name} -- rebuild {name}",
+                )
+            )
             return [f"no sweep sidecar {path.name} -- rebuild {name}"]
         sweep = json.loads(path.read_text(encoding="utf-8"))
         key = sweep["drive_key"]
         specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
         if len(specs) != 1:
+            sp.set_status(
+                _telemetry.Status(
+                    _telemetry.StatusCode.ERROR,
+                    f"expected exactly 1 recorded {key} drive spec, found {len(specs)}",
+                )
+            )
             return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
         (mate,) = await author_dof_drives(adapter, specs)
         param = adapter._attempt(
             lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
         )
         if param is None:
+            sp.set_status(
+                _telemetry.Status(
+                    _telemetry.StatusCode.ERROR,
+                    f"cannot read D1@{mate} on the transient {key} drive",
+                )
+            )
             return [f"cannot read D1@{mate} on the transient {key} drive"]
         tolerance = float(sweep["pose_tolerance_mm"])
 
@@ -1313,8 +1331,12 @@ async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
     log(f"--- {name}: pass sweep ---")
     try:
         try:
-            with _telemetry.span("verify.pass_sweep.walk"):
+            with _telemetry.span("verify.pass_sweep.walk") as sp:
                 failures = await _walk_pass_sweep(adapter, name)
+                if failures:
+                    sp.set_status(
+                        _telemetry.Status(_telemetry.StatusCode.ERROR, "; ".join(failures))
+                    )
         except Exception as exc:  # noqa: BLE001 -- the gate reports it
             failures = [f"sweep walk raised: {exc}"]
         report.gate(
@@ -1371,7 +1393,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         # install the equation on it, then sweep as usual. The doc is mutated
         # in memory only -- verify never saves, and the ``finally`` below
         # discards it.
-        with _telemetry.span("verify.motion.prepare"):
+        with _telemetry.span("verify.motion.prepare") as sp:
             travel = [s for s in load_dof_manifest(name) if s.get("key") == "pen_travel"]
             if len(travel) != 1:
                 report.failed.append(
@@ -1382,6 +1404,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
                     )
                 )
                 _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
+                sp.set_status(
+                    _telemetry.Status(_telemetry.StatusCode.ERROR, report.failed[-1][1])
+                )
                 return
             (travel_mate,) = await author_dof_drives(adapter, travel)
             base_mm = abs(float(travel[0]["params"]["distance"]))
@@ -1396,6 +1421,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
                     )
                 )
                 _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
+                sp.set_status(
+                    _telemetry.Status(_telemetry.StatusCode.ERROR, report.failed[-1][1])
+                )
                 return
             base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
             info = await pen_driver.install(
@@ -1618,12 +1646,15 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         d_hook = math.dist(hook, anchor)
         return d_axis, d_hook, pos
 
-    with _telemetry.span("verify.chain.prepare"):
+    with _telemetry.span("verify.chain.prepare") as sp:
         replayed = await author_dof_drives(adapter, specs)
         mate = replayed[0]
         param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
         if param is None:
             report.failed.append((f"chain:{name}:driver", f"cannot read D1@{mate}"))
+            sp.set_status(
+                _telemetry.Status(_telemetry.StatusCode.ERROR, report.failed[-1][1])
+            )
             return
         rest_rad = float(_read_member(param, "SystemValue"))
 
