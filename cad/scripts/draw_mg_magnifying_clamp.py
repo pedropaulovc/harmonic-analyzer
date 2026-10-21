@@ -585,6 +585,207 @@ def _add_stock_note(adapter: Any, view: Any) -> None:
         raise
 
 
+def _audit_flat_correspondence(adapter, view, source_display, display, source_entities, source_types, attached, types, attempted, *, name):
+    """Read-only failure census; no result can supply or replace an attachment."""
+    import pythoncom
+    from solidworks_mcp.adapters._generated.sldworks_2026 import (
+        IAnnotation, IDimension, IFace2, IFeature, IModelDoc2, IModelDocExtension,
+        ISketch, ISketchPoint, ISketchSegment, IView,
+    )
+
+    classes = {
+        "IAnnotation": IAnnotation, "IDimension": IDimension, "IFace2": IFace2,
+        "IFeature": IFeature, "IModelDoc2": IModelDoc2, "ISketch": ISketch,
+        "IModelDocExtension": IModelDocExtension,
+        "ISketchPoint": ISketchPoint, "ISketchSegment": ISketchSegment, "IView": IView,
+    }
+    stage = f"{name}.correspondence-diagnostic"
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    rows = []
+
+    def capture(reader, callback, *, objects=False, requires=()):
+        row = {"reader": reader, "status": "skipped", "error": None}
+        rows.append(row)
+        result = None
+        if all(value is not None for value in requires):
+            try:
+                result = callback()
+                row["status"] = "null" if result is None else "read"
+                row["value"] = {"present": result is not None, "python_type": type(result).__name__} if objects else result
+            except Exception as exc:
+                row.update(status="unavailable", error=repr(exc))
+        _telemetry.info(
+            f"clamp correspondence census reader: {reader}: {json.dumps(row, default=repr)}",
+            operation_stage=stage, census_reader=reader, census_row=json.dumps(row, default=repr),
+        )
+        return result
+
+    def native(label, raw, interface):
+        if raw is None:
+            return None
+        expected = classes[interface]
+        queries = {}
+        choices = [(interface, expected.CLSID), ("IDispatch", pythoncom.IID_IDispatch)]
+        if interface in ("ISketchPoint", "ISketchSegment"):
+            other = "ISketchSegment" if interface == "ISketchPoint" else "ISketchPoint"
+            choices.append((other, classes[other].CLSID))
+        for kind, iid in choices:
+            def capability(iid=iid):
+                try:
+                    pointer = raw._oleobj_.QueryInterface(iid, pythoncom.IID_IUnknown)
+                    return {"iid": str(iid), "supported": True if pointer is not None else None, "hresult": 0 if pointer is not None else None}
+                except pythoncom.com_error as exc:
+                    return {"iid": str(iid), "supported": False if exc.hresult == -2147467262 else None, "hresult": exc.hresult}
+            queries[kind] = capture(f"{label}.QI.{kind}", capability)
+        if any(queries[kind] is None or queries[kind]["supported"] is not True for kind in (interface, "IDispatch")):
+            return None
+        if interface in ("ISketchPoint", "ISketchSegment") and (queries[other] is None or queries[other]["supported"] is not False):
+            return None
+        bound = capture(f"{label}.bind.{interface}", lambda: _early_bound(raw, interface), objects=True)
+        capture(f"{label}.self", lambda: app.IsSame(bound, bound), requires=(bound,))
+        capture(f"{label}.parameter-form", lambda: {
+            "raw_wrapper": type(raw).__name__, "bound_wrapper": type(bound).__name__,
+            "raw_dispatch": type(raw._oleobj_).__name__, "bound_dispatch": type(bound._oleobj_).__name__,
+            "same_dispatch_wrapper": raw._oleobj_ is bound._oleobj_,
+        }, requires=(bound,))
+        return bound
+
+    source = capture("view.ReferencedDocument", lambda: view.ReferencedDocument, objects=True)
+    source = native("source-document", source, "IModelDoc2")
+    drawing = native("drawing-document", adapter.currentModel, "IModelDoc2")
+    active = capture("application.ActiveDoc", lambda: app.ActiveDoc, objects=True)
+    active = native("active-document", active, "IModelDoc2")
+    for role, document in (("source", source), ("drawing", drawing), ("active", active)):
+        capture(f"{role}.GetPathName", lambda document=document: document.GetPathName(), requires=(document,))
+        capture(f"{role}.GetTitle", lambda document=document: document.GetTitle(), requires=(document,))
+        capture(f"{role}.GetType", lambda document=document: document.GetType(), requires=(document,))
+        capture(f"{role}.GetSaveFlag.before", lambda document=document: document.GetSaveFlag(), requires=(document,))
+    capture("active.same-drawing", lambda: app.IsSame(active, drawing), requires=(active, drawing))
+    capture("active.same-source", lambda: app.IsSame(active, source), requires=(active, source))
+    extension = capture("source.Extension", lambda: source.Extension, objects=True, requires=(source,))
+    extension = native("source.Extension", extension, "IModelDocExtension")
+    drawing_extension = capture("drawing.Extension", lambda: drawing.Extension, objects=True, requires=(drawing,))
+    drawing_extension = native("drawing.Extension", drawing_extension, "IModelDocExtension")
+    dimensions, features, feature_sketches = {}, {}, {}
+    for role, item in (("source", source_display), ("drawing", display)):
+        dimension = capture(f"{role}.GetDimension2", lambda item=item: item.GetDimension2(0), objects=True)
+        dimension = native(f"{role}.dimension", dimension, "IDimension")
+        dimensions[role] = dimension
+        capture(f"{role}.FullName", lambda dimension=dimension: dimension.FullName, requires=(dimension,))
+        feature = capture(f"{role}.GetFeatureOwner", lambda dimension=dimension: dimension.GetFeatureOwner(), objects=True, requires=(dimension,))
+        features[role] = native(f"{role}.feature-owner", feature, "IFeature")
+        capture(f"{role}.feature.Name", lambda role=role: features[role].Name, requires=(features[role],))
+        feature_type = capture(f"{role}.feature.GetTypeName2", lambda role=role: features[role].GetTypeName2(), requires=(features[role],))
+        if feature_type in ("ProfileFeature", "3DProfileFeature"):
+            feature_sketch = capture(f"{role}.feature.GetSpecificFeature2", lambda role=role: features[role].GetSpecificFeature2(), objects=True)
+            feature_sketches[role] = native(f"{role}.feature.sketch", feature_sketch, "ISketch")
+        annotation = capture(f"{role}.GetAnnotation", lambda item=item: item.GetAnnotation(), objects=True)
+        annotation = native(f"{role}.annotation", annotation, "IAnnotation")
+        owner_type = capture(f"{role}.annotation.OwnerType", lambda annotation=annotation: annotation.OwnerType, requires=(annotation,))
+        owner = capture(f"{role}.annotation.Owner", lambda annotation=annotation: annotation.Owner, objects=True, requires=(annotation,))
+        if type(owner_type) is int and owner_type in (0, 3, 4):
+            owner = native(f"{role}.annotation-owner", owner, "IView" if owner_type == 0 else "IModelDoc2")
+            expected_owner = view if owner_type == 0 else source
+            capture(f"{role}.annotation-owner.expected", lambda owner=owner, expected_owner=expected_owner: app.IsSame(owner, expected_owner), requires=(owner, expected_owner))
+    capture("dimension.source-vs-imported", lambda: app.IsSame(dimensions["source"], dimensions["drawing"]), requires=tuple(dimensions.values()))
+    capture("dimension.feature-source-vs-imported", lambda: app.IsSame(features["source"], features["drawing"]), requires=tuple(features.values()))
+
+    def entity_owner(label, entity, interface):
+        bound = native(label, entity, interface)
+        capture(f"{label}.GetID", lambda: tuple(bound.GetID() or ()), requires=(bound,))
+        if interface == "ISketchSegment":
+            capture(f"{label}.GetType", lambda: bound.GetType(), requires=(bound,))
+        owner = capture(f"{label}.GetSketch", lambda: bound.GetSketch(), objects=True, requires=(bound,))
+        return bound, native(f"{label}.owner", owner, "ISketch")
+
+    owners = {}
+    for role, interface, selection_types in (("point", "ISketchPoint", (11, 25)), ("flat", "ISketchSegment", (10,))):
+        model_inputs = capture(f"{role}.source-inputs", lambda: [entity for entity, kind in zip(source_entities, source_types, strict=True) if kind in selection_types], objects=True)
+        view_inputs = capture(f"{role}.drawing-inputs", lambda: [entity for entity, kind in zip(attached, types, strict=True) if kind in selection_types], objects=True)
+        capture(f"{role}.input-counts", lambda: {"source": len(model_inputs), "drawing": len(view_inputs)}, requires=(model_inputs, view_inputs))
+        if model_inputs is None or view_inputs is None or len(model_inputs) != 1 or len(view_inputs) != 1:
+            continue
+        model_entity, model_owner = entity_owner(f"source.{role}", model_inputs[0], interface)
+        view_entity, view_owner = entity_owner(f"drawing.{role}", view_inputs[0], interface)
+        owners[role] = model_owner, view_owner
+        # GetCorresponding2's applicability mentions persistent references.
+        # Record eligibility in each actual document; nonempty bytes alone do
+        # NOT establish ownership or identity, and are never compared here.
+        for context, owner_extension, entity in (
+            ("source-native", extension, model_entity),
+            ("drawing-in-source", extension, view_inputs[0]),
+            ("drawing-native", drawing_extension, view_inputs[0]),
+        ):
+            reference = capture(f"{role}.{context}.GetPersistReference3", lambda: owner_extension.GetPersistReference3(entity), objects=True, requires=(owner_extension, entity))
+            capture(f"{role}.{context}.persistent-reference", lambda: {"length": len(reference), "hex": bytes(reference).hex()}, requires=(reference,))
+        previous = next((row for row in attempted if row["role"] == role and row["mapping_attempted"]), None)
+        if previous is not None:
+            capture(f"reverse.{role}.raw-already-attempted", lambda: {"mapped_present": previous["mapped_present"], "repeated": False})
+        else:
+            mapped = capture(f"reverse.{role}.raw.GetCorresponding2", lambda: extension.GetCorresponding2(view_inputs[0]), objects=True, requires=(extension,))
+            native(f"reverse.{role}.raw-result", mapped, interface)
+        # An unchanged _oleobj_ is the same native parameter, not a new control.
+        distinct_bound = capture(f"reverse.{role}.bound-dispatch-distinct", lambda: view_entity._oleobj_ is not view_inputs[0]._oleobj_, requires=(view_entity,))
+        if distinct_bound is True:
+            mapped = capture(f"reverse.{role}.bound.GetCorresponding2", lambda: extension.GetCorresponding2(view_entity), objects=True, requires=(extension,))
+            native(f"reverse.{role}.bound-result", mapped, interface)
+        else:
+            capture(f"reverse.{role}.bound-not-probed", lambda: {"distinct_bound": distinct_bound})
+        mapped_owner = capture(f"reverse.{role}.owner.GetCorresponding2", lambda: extension.GetCorresponding2(view_owner), objects=True, requires=(extension, view_owner))
+        mapped_owner = native(f"reverse.{role}.owner-result", mapped_owner, "ISketch")
+        capture(f"reverse.{role}.owner-same-source", lambda: app.IsSame(mapped_owner, model_owner), requires=(mapped_owner, model_owner))
+        forward = capture(f"forward.{role}.GetCorresponding", lambda: view.GetCorresponding(model_entity), objects=True, requires=(model_entity,))
+        forward, forward_owner = entity_owner(f"forward.{role}.result", forward, interface)
+        capture(f"forward.{role}.owner-same-drawing", lambda: app.IsSame(forward_owner, view_owner), requires=(forward_owner, view_owner))
+        # IDs are recorded independently, never equated across model/view frames.
+        capture(f"forward.{role}.same-context-IDs", lambda: (tuple(forward.GetID() or ()), tuple(view_entity.GetID() or ())), requires=(forward, view_entity))
+    if "point" in owners:
+        for role, owner in zip(("source", "drawing"), owners["point"], strict=True):
+            feature_sketch = feature_sketches.get(role)
+            capture(f"{role}.point-owner-same-dimension-feature", lambda owner=owner, feature_sketch=feature_sketch: app.IsSame(owner, feature_sketch), requires=(owner, feature_sketch))
+        forward_owner = capture("forward.source-sketch.GetCorresponding", lambda: view.GetCorresponding(owners["point"][0]), objects=True, requires=(owners["point"][0],))
+        forward_owner = native("forward.source-sketch.result", forward_owner, "ISketch")
+        capture("forward.source-sketch.same-drawing", lambda: app.IsSame(forward_owner, owners["point"][1]), requires=(forward_owner, owners["point"][1]))
+    view_feature = capture("forward.dimension-feature.GetCorresponding", lambda: view.GetCorresponding(features["source"]), objects=True, requires=(features["source"],))
+    view_feature = native("forward.dimension-feature.result", view_feature, "IFeature")
+    feature_type = capture("forward.dimension-feature.GetTypeName2", lambda: view_feature.GetTypeName2(), requires=(view_feature,))
+    if feature_type in ("ProfileFeature", "3DProfileFeature"):
+        feature_sketch = capture("forward.dimension-feature.GetSpecificFeature2", lambda: view_feature.GetSpecificFeature2(), objects=True)
+        feature_sketch = native("forward.dimension-feature.sketch", feature_sketch, "ISketch")
+        if "point" in owners:
+            capture("forward.dimension-feature.sketch-same-drawing", lambda: app.IsSame(feature_sketch, owners["point"][1]), requires=(feature_sketch, owners["point"][1]))
+
+    # Existing stock-note topology control, WITHOUT selecting or adding a note.
+    block = capture("control.part.FeatureByName", lambda: _early_bound(source, "IPartDoc").FeatureByName("Block"), objects=True, requires=(source,))
+    block = native("control.block", block, "IFeature")
+    view_block = capture("control.view.GetCorresponding", lambda: view.GetCorresponding(block), objects=True, requires=(block,))
+    view_block = native("control.view-block", view_block, "IFeature")
+    faces = capture("control.view-block.GetFaces", lambda: tuple(view_block.GetFaces() or ()), objects=True, requires=(view_block,))
+    selector = PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)
+    source_face = capture("control.source-flat", lambda: resolve_faces(source, {"flat": selector})["flat"], objects=True, requires=(source,))
+    source_face = native("control.source-flat", source_face, "IFace2")
+    matches = []
+    for index, face in enumerate(faces or ()):
+        geometry = capture(f"control.face[{index}].geometry", lambda face=face: face_geometry(face), objects=True)
+        if geometry is not None and capture(f"control.face[{index}].selector", lambda geometry=geometry: selector.matches(geometry)):
+            matches.append(face)
+    capture("control.view-flat-count", lambda: len(matches))
+    if len(matches) == 1:
+        view_face = native("control.view-flat", matches[0], "IFace2")
+        canonical = capture("control.GetCorrespondingEntity2", lambda: extension.GetCorrespondingEntity2(view_face), objects=True, requires=(extension, view_face))
+        canonical = native("control.canonical-face", canonical, "IFace2")
+        capture("control.canonical-same-source", lambda: app.IsSame(canonical, source_face), requires=(canonical, source_face))
+    for role, document in (("source", source), ("drawing", drawing), ("active", active)):
+        capture(f"{role}.GetSaveFlag.after", lambda document=document: document.GetSaveFlag(), requires=(document,))
+    _telemetry.info(
+        f"clamp correspondence failure census complete: name={name}, readers={len(rows)}; original attachment refusal retained",
+        operation_stage=stage, diagnostic_reader_count=len(rows),
+        diagnostic_unavailable_count=sum(row["status"] == "unavailable" for row in rows),
+        diagnostic_null_count=sum(row["status"] == "null" for row in rows),
+        diagnostic_only=True, original_refusal_retained=True,
+    )
+
+
 def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> dict[str, Any]:
     """Read all three genuine imported dimensions and their independently checked source."""
     native_view = _early_bound(view, "IView")
@@ -620,7 +821,13 @@ def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> 
         if len(flats) != 1:
             raise RuntimeError(f"{name}: source common flat unavailable: types={source_types!r}")
         source_point = _point_flat_attachment(source_adapter, source_display, flats[0], stage=f"{name}.drawing-source")
-        imported_point = _point_flat_attachment(source_adapter, display, flats[0], stage=f"{name}.drawing-import", drawing_view=native_view)
+        imported_point = _point_flat_attachment(
+            source_adapter, display, flats[0], stage=f"{name}.drawing-import", drawing_view=native_view,
+            failure_observer=lambda attached, types, attempted: _audit_flat_correspondence(
+                adapter, native_view, source_display, display, source_entities, source_types,
+                attached, types, attempted, name=name,
+            ),
+        )
         if imported_point != source_point:
             raise RuntimeError(f"{name}: imported native point identity differs: actual={imported_point!r}, source={source_point!r}")
         result[name] = annotation

@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import math
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
@@ -885,7 +885,7 @@ def _create_tap_projection(adapter: Any, point: Any, circle: Any, name: str) -> 
     return line
 
 
-def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str, drawing_view: Any | None = None) -> tuple[str, str, int, int]:
+def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str, drawing_view: Any | None = None, failure_observer: Callable[[tuple[Any, ...], tuple[Any, ...], list[dict[str, Any]]], None] | None = None) -> tuple[str, str, int, int]:
     """Prove model point/flat keys, explicitly mapping view-context attachments."""
     import _telemetry
 
@@ -915,7 +915,7 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str,
             mapped_entities = []
             previous_owners = None
             for role, entity, interface in (("point", points[0], "ISketchPoint"), ("flat", segments[0], "ISketchSegment")):
-                row = {"role": role, "interface": interface, "mapped_present": None, "contexts": {}, "shared_model_owner": None, "view_owner_present": None, "view_owner_self": None, "view_owner_match": None}
+                row = {"role": role, "interface": interface, "mapping_attempted": False, "mapped_present": None, "contexts": {}, "shared_model_owner": None, "view_owner_present": None, "view_owner_self": None, "view_owner_match": None}
                 mappings.append(row)
                 owners = {}
                 for context in ("drawing", "model"):
@@ -927,6 +927,7 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str,
                             operation_stage=f"{stage}.correspondence-before", attachment_role=role,
                             correspondence_method="IModelDocExtension.GetCorresponding2", correspondence=repr(row),
                         )
+                        row["mapping_attempted"] = True
                         candidate = extension.GetCorresponding2(entity)
                         row["mapped_present"] = candidate is not None
                         _telemetry.info(
@@ -1013,6 +1014,17 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str,
         attachment_correspondence=repr(mappings),
     )
     if error is not None:
+        if failure_observer is not None:
+            try:
+                # Preserve the EXACT failing native handles, not a second
+                # GetAttachedEntities3 result. Observer output cannot accept,
+                # retry, or replace this failure.
+                failure_observer(attached, types, mappings)
+            except Exception as diagnostic_error:
+                _telemetry.info(
+                    f"clamp correspondence failure observer unavailable: {diagnostic_error!r}",
+                    operation_stage=f"{stage}.failure-observer", diagnostic_error=repr(diagnostic_error),
+                )
         raise RuntimeError(f"{stage}: {error}") from error
     return point_key
 
