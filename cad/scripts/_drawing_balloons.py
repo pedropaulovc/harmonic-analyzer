@@ -492,9 +492,7 @@ def add_auto_balloons(
             raise RuntimeError(f"{label}: {stem} item {item} has no native annotation")
         annotation = _early_bound(annotation, "IAnnotation")
         entities = tuple(annotation.GetAttachedEntities3() or ())
-        kinds = tuple(
-            int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())
-        )
+        kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
         if len(entities) != 1 or kinds != (_SEL_EDGES,) or entities[0] is None:
             raise RuntimeError(
                 f"{label}: {stem} item {item} must attach to one native EDGE; "
