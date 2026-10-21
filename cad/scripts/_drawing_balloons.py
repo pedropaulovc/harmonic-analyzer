@@ -534,7 +534,7 @@ def add_auto_balloons(
     items: Sequence[tuple[str, str]],
     label: str,
 ) -> list[BalloonLanding]:
-    """Insert one native EDGE/Square balloon per requested ``(stem, BOM item)``.
+    """Insert native EDGE balloons; diagnostic Circle for MG lever/SM, else Square.
 
     Keep AutoBalloon5's positions, with no sheet-coordinate picks or spreading.
     Every returned item must occur exactly once and attach to one real edge of
@@ -560,9 +560,18 @@ def add_auto_balloons(
         )
         for stem, item in items
     }
-    _telemetry.annotate(expected=len(expected), attachment="EDGE", layout=1)
+    # TEMPORARY DIAGNOSTIC — NEVER MERGE: change only these two native layouts.
+    layout = (
+        2  # swBalloonLayoutType_e.swDetailingBalloonLayout_Circle
+        if label in (
+            "magnifier lever group exploded BOM coverage",
+            "summing exploded-view BOM coverage",
+        )
+        else 1  # swBalloonLayoutType_e.swDetailingBalloonLayout_Square
+    )
+    _telemetry.annotate(expected=len(expected), attachment="EDGE", layout=layout)
     balloons = _create_auto_balloons(
-        adapter, view, label=label, attachment="edge", layout=1
+        adapter, view, label=label, attachment="edge", layout=layout
     )
     seen: set[str] = set()
     landings: list[BalloonLanding] = []
