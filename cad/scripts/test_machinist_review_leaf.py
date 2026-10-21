@@ -560,6 +560,8 @@ def test_direct_action_rejects_unresolved_or_invalid_profile_before_work(
 def test_effective_profile_invalidates_real_freshness_and_cached_action(
     action, review_sessions, monkeypatch, changed
 ):
+    from doit.task import Stream, dict_to_task
+
     from test_artifact_cache import _BlockBlobService
 
     dodo = action.dodo
@@ -587,16 +589,25 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
 
     monkeypatch.setattr(dodo, "_run_subprocess", run)
 
-    def execute():
-        task = next(dodo._machinist_review_tasks())
-        work, arguments = task["actions"][0]
-        work(*arguments)
-        key = _review_key(dodo, label=label)
-        return task["uptodate"][0], key, dict(cache._KEY_INPUTS[(label, key)])
+    def registered_task():
+        return dict_to_task(next(dodo._machinist_review_tasks()))
 
-    initial, first_key, first_inputs = execute()
-    saved = {"_config_changed": initial.config_digest}
-    assert next(dodo._machinist_review_tasks())["uptodate"][0](None, saved)
+    def freshness(task, values):
+        check, args, kwargs = task.uptodate[0]
+        return check(task, values, *args, **kwargs)
+
+    def execute(previous):
+        task = registered_task()
+        # Task construction registers config_changed's saver; doit evaluates
+        # freshness before execution and saves values only after success.
+        assert not freshness(task, previous)
+        assert task.execute(Stream(0)) is None
+        task.save_extra_values()
+        key = _review_key(dodo, label=label)
+        return dict(task.values), key, dict(cache._KEY_INPUTS[(label, key)])
+
+    saved, first_key, first_inputs = execute({})
+    assert freshness(registered_task(), saved)
     assert len(commands) == 1 and len(review_sessions.seen) == 4
     with monkeypatch.context() as change:
         if changed == "backend":
@@ -613,9 +624,8 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
             change.setitem(review_config.DEFAULT_MODELS, "claude", "other-model")
         else:
             change.setitem(review_config.DEFAULT_EFFORTS, "claude", "high")
-        tracker = next(dodo._machinist_review_tasks())["uptodate"][0]
-        assert not tracker(None, saved)
-        second, second_key, second_inputs = execute()
+        assert not freshness(registered_task(), saved)
+        second_saved, second_key, second_inputs = execute(saved)
         assert first_key != second_key
         assert len(commands) == 2 and len(review_sessions.seen) == 8
         field = "reviewer" if changed == "backend" else changed
@@ -623,10 +633,10 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
             "backend": "claude", "model": "claude-opus-5-5", "effort": "medium",
         }[changed]
 
-    reverted = next(dodo._machinist_review_tasks())["uptodate"][0]
-    assert reverted(None, saved)
-    assert not reverted(None, {"_config_changed": second.config_digest})
-    _, restored_key, _ = execute()
+    reverted = registered_task()
+    assert freshness(reverted, saved)
+    assert not freshness(reverted, second_saved)
+    _, restored_key, _ = execute(second_saved)
     assert restored_key == first_key
     assert len(commands) == 2 and len(review_sessions.seen) == 8
     aggregate = dodo._read_machinist_aggregate("probe")
