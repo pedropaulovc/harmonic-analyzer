@@ -289,6 +289,11 @@ LEVER_LABEL = "lever group exploded"
 # The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.258)
 STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
+# R21 sheet 4: the last CHECK's "... ROCKED THROUGH" crosses the tolerance
+# panel at x=612.002 pt. At 72 columns, THROUGH starts row 2; the same native
+# glyph advances put both rows at least 14.6 mm left of that panel, without
+# adding a row or moving the checks toward the preceding assembly steps.
+WIRE_CHECK_LINE_WIDTH = 72
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
 # Machinist review r2: the caption at the field's left corner sat ~40 mm left
@@ -512,7 +517,12 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
-ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+ASSEMBLY_CHECKS = "\n".join(
+    (
+        _wrapped(notes.ASSEMBLY_CHECKS[:-1], width=STEPS_LINE_WIDTH),
+        _wrapped(notes.ASSEMBLY_CHECKS[-1:], width=WIRE_CHECK_LINE_WIDTH),
+    )
+)
 CHECKS_XY = (
     STEPS_XY[0],
     STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,

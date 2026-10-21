@@ -409,29 +409,68 @@ def test_native_rim_blocks_leave_section_arrows_bore_callout_and_own_witness(mon
         assert 0.0669971 + 0.002 < line_y < 0.07695 - 0.002
 
 
-def test_upper_width_lane_clears_actual_a_arrow_ink_not_a_padding_air_floor(monkeypatch) -> None:
+def test_upper_width_station_clears_a_stroke_and_neighboring_native_ink(monkeypatch) -> None:
     state = _front_drawing_layout(monkeypatch)
+    # R21's actual A glyph and 6.35 primitives. The arrow-only R18
+    # regression missed the flat witness running through A's left stroke.
     a_ink = Box(0.0652137, 0.1761622, 0.0710726, 0.1823344)
-    original_width_ink = Box(0.0712621, 0.1721558, 0.0797953, 0.1757211)
-    _x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
-    dy = y - 0.174
-    moved = Box(
-        original_width_ink.xmin, original_width_ink.ymin + dy,
-        original_width_ink.xmax, original_width_ink.ymax + dy,
+    original_width_ink = Box(0.0712621, 0.1861558, 0.0797953, 0.1897211)
+    original_witness = Segment(0.06595, 0.17245, 0.06595, 0.1862219, "ext-line")
+    marker = AnnotationGeometry(
+        label="section-line A", kind="section", owner="front", text_boxes=(a_ink,),
+        segments=(Segment(0.085, 0.17745, 0.073, 0.17745, "arrow"),), exact=True,
     )
+    width = AnnotationGeometry(
+        label="LeverBoreFromZFlat", kind="dim", owner="front",
+        text_boxes=(original_width_ink,), segments=(original_witness,), exact=True,
+    )
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    before = SheetGeometry(
+        name="Sheet1", width=template.width_m, height=template.height_m,
+        region=DrawableRegion.from_margins(
+            template.width_m, template.height_m,
+            left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
+        ),
+        annotations=(width, marker),
+    )
+    assert any(
+        item.a == marker.label and item.b == width.label
+        for item in find_text_on_line(before)
+    )
+    assert segment_box_overlap_length(original_witness, a_ink) > 0.006
+
+    # Use the recipe's actual native-curation output. R21 measures the
+    # witness end 1.7781 mm below that station; the regenerated seat must
+    # still prove the predicted hang/reflow outside the witness span.
+    x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
+    dx, dy = x - 0.075475, y - 0.188
+    moved = Box(
+        original_width_ink.xmin + dx, original_width_ink.ymin + dy,
+        original_width_ink.xmax + dx, original_width_ink.ymax + dy,
+    )
+    shortened = Segment(0.06595, 0.17245, 0.06595, y - 0.0017781, "ext-line")
+    after = replace(before, annotations=(
+        replace(width, text_boxes=(moved,), segments=(shortened,)), marker,
+    ))
+    assert find_text_on_line(after) == []
+    assert find_border_breaches(after) == []
+    assert segment_box_distance(shortened, a_ink) >= ARROW_TEXT_CLEARANCE_M
 
     def arrow_gap(anchor_y):
-        # R18's real left width arrow; native line is 2.7781 mm below anchor.
         arrow = (0.06595, anchor_y - 0.0027781, 0.0003,
                  -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0)
         return min(segment_box_distance(segment, a_ink) for segment in arrowhead_segments(arrow))
 
     assert arrow_gap(0.1865) < ARROW_TEXT_CLEARANCE_M
     assert arrow_gap(y) >= ARROW_TEXT_CLEARANCE_M
-    # GetOutline contains 5.5879 mm of lower padding here. The 1.5 mm
-    # overlap tolerance is not a 1.5 mm air floor against that padded box.
-    assert moved.ymax < 0.189915
-    assert 0.1955029 - moved.ymax > 0.005
+    # Whole-view neighbors stay fixed: the wrapped Height, its top
+    # extension, and the top view's separate diagonal 6.35 label.
+    height_top_witness = Segment(0.084, 0.17145, 0.035, 0.17145, "ext-line")
+    height_ink_top = 0.1655555
+    diagonal_ink = Box(0.0387871, 0.1841558, 0.0473203, 0.1877212)
+    assert segment_box_distance(height_top_witness, moved) >= ARROW_TEXT_CLEARANCE_M
+    assert moved.ymin - height_ink_top >= ARROW_TEXT_CLEARANCE_M
+    assert diagonal_ink.ymin - moved.ymax >= ARROW_TEXT_CLEARANCE_M
 
 
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:
