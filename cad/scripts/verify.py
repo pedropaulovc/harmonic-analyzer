@@ -1238,21 +1238,22 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
     are mated on the pins' (coincident named axes, picked by name)."""
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
-    path = _sweep_sidecar_path(name)
-    if not path.exists():
-        return [f"no sweep sidecar {path.name} -- rebuild {name}"]
-    sweep = json.loads(path.read_text(encoding="utf-8"))
-    key = sweep["drive_key"]
-    specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
-    if len(specs) != 1:
-        return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
-    (mate,) = await author_dof_drives(adapter, specs)
-    param = adapter._attempt(
-        lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
-    )
-    if param is None:
-        return [f"cannot read D1@{mate} on the transient {key} drive"]
-    tolerance = float(sweep["pose_tolerance_mm"])
+    with _telemetry.span("verify.pass_sweep.prepare"):
+        path = _sweep_sidecar_path(name)
+        if not path.exists():
+            return [f"no sweep sidecar {path.name} -- rebuild {name}"]
+        sweep = json.loads(path.read_text(encoding="utf-8"))
+        key = sweep["drive_key"]
+        specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
+        if len(specs) != 1:
+            return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
+        (mate,) = await author_dof_drives(adapter, specs)
+        param = adapter._attempt(
+            lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
+        )
+        if param is None:
+            return [f"cannot read D1@{mate} on the transient {key} drive"]
+        tolerance = float(sweep["pose_tolerance_mm"])
 
     def _drive(drive_mm: float) -> None:
         param.SystemValue = drive_mm / 1000.0
@@ -1312,7 +1313,8 @@ async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
     log(f"--- {name}: pass sweep ---")
     try:
         try:
-            failures = await _walk_pass_sweep(adapter, name)
+            with _telemetry.span("verify.pass_sweep.walk"):
+                failures = await _walk_pass_sweep(adapter, name)
         except Exception as exc:  # noqa: BLE001 -- the gate reports it
             failures = [f"sweep walk raised: {exc}"]
         report.gate(
@@ -1320,8 +1322,9 @@ async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
             lambda: _expect(not failures, "; ".join(failures)),
         )
     finally:
-        discard_open_documents(adapter)
-        adapter.currentModel = None
+        with _telemetry.span("verify.cleanup"):
+            discard_open_documents(adapter)
+            adapter.currentModel = None
 
 
 def _pen_marker_name(adapter: Any) -> str:
@@ -1368,86 +1371,91 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         # install the equation on it, then sweep as usual. The doc is mutated
         # in memory only -- verify never saves, and the ``finally`` below
         # discards it.
-        travel = [s for s in load_dof_manifest(name) if s.get("key") == "pen_travel"]
-        if len(travel) != 1:
-            report.failed.append(
-                (
-                    f"motion:{name}:dof-manifest",
-                    f"expected exactly 1 recorded pen_travel drive spec, found "
-                    f"{len(travel)} -- rebuild pen",
+        with _telemetry.span("verify.motion.prepare"):
+            travel = [s for s in load_dof_manifest(name) if s.get("key") == "pen_travel"]
+            if len(travel) != 1:
+                report.failed.append(
+                    (
+                        f"motion:{name}:dof-manifest",
+                        f"expected exactly 1 recorded pen_travel drive spec, found "
+                        f"{len(travel)} -- rebuild pen",
+                    )
                 )
+                _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
+                return
+            (travel_mate,) = await author_dof_drives(adapter, travel)
+            base_mm = abs(float(travel[0]["params"]["distance"]))
+            param = adapter._attempt(
+                lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None
             )
-            _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
-            return
-        (travel_mate,) = await author_dof_drives(adapter, travel)
-        base_mm = abs(float(travel[0]["params"]["distance"]))
-        param = adapter._attempt(
-            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None
-        )
-        if param is None:
-            report.failed.append(
-                (
-                    f"motion:{name}:pen-driver-install",
-                    f"cannot read D1@{travel_mate} on the transient travel mate",
+            if param is None:
+                report.failed.append(
+                    (
+                        f"motion:{name}:pen-driver-install",
+                        f"cannot read D1@{travel_mate} on the transient travel mate",
+                    )
                 )
+                _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
+                return
+            base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
+            info = await pen_driver.install(
+                adapter, travel_mate, base_doc, base_doc / base_mm
             )
-            _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
-            return
-        base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
-        info = await pen_driver.install(
-            adapter, travel_mate, base_doc, base_doc / base_mm
-        )
-        log(
-            f"pen driver (transient): {info['links']}-link chain, scale "
-            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg"
-        )
-        log(
-            f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
-            f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---"
-        )
-        marker = _pen_marker_name(adapter)
+            log(
+                f"pen driver (transient): {info['links']}-link chain, scale "
+                f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg"
+            )
+            log(
+                f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
+                f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---"
+            )
+            marker = _pen_marker_name(adapter)
 
         # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
         # so the mate sits at its build datum -- tip0 is the saved render pose.
-        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
-        _rebuild(adapter)
-        tip0 = _tip_y_mm(adapter, marker)
-
-        sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
-        for theta in _MOTION_SWEEP_DEG:
-            await pen_driver.set_crank_deg(adapter, theta)
+        with _telemetry.span("verify.motion.rest"):
+            await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
             _rebuild(adapter)
-            got = _tip_y_mm(adapter, marker) - tip0
-            want = pen_driver.expected_tip_disp_mm(math.radians(theta))
-            sweep.append((theta, got, want))
-            err = abs(got - want)
-            emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
-            emit(
-                f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
-                f"want={want:+8.4f}  |err|={err:.2e}"
-            )
-        worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
+            tip0 = _tip_y_mm(adapter, marker)
+
+        with _telemetry.span("verify.motion.sweep"):
+            sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
+            for theta in _MOTION_SWEEP_DEG:
+                await pen_driver.set_crank_deg(adapter, theta)
+                _rebuild(adapter)
+                got = _tip_y_mm(adapter, marker) - tip0
+                want = pen_driver.expected_tip_disp_mm(math.radians(theta))
+                sweep.append((theta, got, want))
+                err = abs(got - want)
+                emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
+                emit(
+                    f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+                    f"want={want:+8.4f}  |err|={err:.2e}"
+                )
+            worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
 
         # Interference at the two poses furthest from the rest datum (the stroke
         # extremes the pen carriage is most likely to bind at).
-        far = sorted(
-            _MOTION_SWEEP_DEG,
-            key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))),
-        )[-2:]
-        interference: list[tuple[float, str]] = []
-        for theta in far:
-            await pen_driver.set_crank_deg(adapter, theta)
-            _rebuild(adapter)
-            try:
-                check_no_interference(
-                    adapter, allowed_pairs=allowed_interference_pairs(name)
-                )
-            except Exception as exc:  # noqa: BLE001 -- collect, gate below
-                interference.append((theta, str(exc)))
+        with _telemetry.span("verify.motion.extremes"):
+            far = sorted(
+                _MOTION_SWEEP_DEG,
+                key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))),
+            )[-2:]
+            interference: list[tuple[float, str]] = []
+            for theta in far:
+                await pen_driver.set_crank_deg(adapter, theta)
+                _rebuild(adapter)
+                try:
+                    check_no_interference(
+                        adapter, allowed_pairs=allowed_interference_pairs(name)
+                    )
+                except Exception as exc:  # noqa: BLE001 -- collect, gate below
+                    interference.append((theta, str(exc)))
 
         # Leave the doc at its deterministic rest datum (matches the saved pose).
-        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
-        _rebuild(adapter)
+        with _telemetry.span("verify.motion.restore"):
+            await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+            _rebuild(adapter)
 
         report.gate(
             f"motion:{name}:tip-traces-truth",
@@ -1475,7 +1483,8 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         # dirty referenced child (the preflight/cut_release discard rationale).
         # Discard by title on EVERY exit -- including the early returns above --
         # so no later open/close hits the modal (codex #201). verify never saves.
-        discard_open_documents(adapter)
+        with _telemetry.span("verify.cleanup"):
+            discard_open_documents(adapter)
 
 
 # Magnifier live-chain sweep (WIRE 1). Small angles: the real machine's lever
@@ -1520,7 +1529,8 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     try:
         await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
-        discard_open_documents(adapter)
+        with _telemetry.span("verify.cleanup"):
+            discard_open_documents(adapter)
 
 
 async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
@@ -1608,50 +1618,54 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         d_hook = math.dist(hook, anchor)
         return d_axis, d_hook, pos
 
-    replayed = await author_dof_drives(adapter, specs)
-    mate = replayed[0]
-    param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
-    if param is None:
-        report.failed.append((f"chain:{name}:driver", f"cannot read D1@{mate}"))
-        return
-    rest_rad = float(_read_member(param, "SystemValue"))
+    with _telemetry.span("verify.chain.prepare"):
+        replayed = await author_dof_drives(adapter, specs)
+        mate = replayed[0]
+        param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
+        if param is None:
+            report.failed.append((f"chain:{name}:driver", f"cannot read D1@{mate}"))
+            return
+        rest_rad = float(_read_member(param, "SystemValue"))
 
-    def _set_lever(rad: float) -> None:
-        param.SystemValue = rad
+        def _set_lever(rad: float) -> None:
+            param.SystemValue = rad
+            _rebuild(adapter)
+
         _rebuild(adapter)
-
-    _rebuild(adapter)
-    wheel0, (axis0, hook0, wire_pos0) = _wheel_deg(), _wire_state()
-    worst_axis = abs(axis0 - r_expect)
-    worst_hook = hook0
-    wheel_angles: list[float] = []
-    for delta in _CHAIN_SWEEP_DEG:
-        _set_lever(rest_rad + math.radians(delta))
-        d_axis, d_hook, _ = _wire_state()
-        w = _wheel_deg()
-        wheel_angles.append(w)
-        worst_axis = max(worst_axis, abs(d_axis - r_expect))
-        worst_hook = max(worst_hook, d_hook)
-        emit = (
-            _telemetry.success
-            if abs(d_axis - r_expect) <= _CHAIN_AXIS_TOL_MM
-            and d_hook <= _CHAIN_HOOK_TOL_MM
-            else _telemetry.error
-        )
-        emit(
-            f"lever {delta:+5.2f} deg  wheel {w - wheel0:+8.3f} deg  "
-            f"wire-axis d={d_axis:7.4f} (want {r_expect:g})  hook res={d_hook:.4f}"
-        )
-    wheel_span = max(wheel_angles) - min(wheel_angles)
+        wheel0, (axis0, hook0, wire_pos0) = _wheel_deg(), _wire_state()
+        worst_axis = abs(axis0 - r_expect)
+        worst_hook = hook0
+        wheel_angles: list[float] = []
+    with _telemetry.span("verify.chain.sweep"):
+        for delta in _CHAIN_SWEEP_DEG:
+            _set_lever(rest_rad + math.radians(delta))
+            d_axis, d_hook, _ = _wire_state()
+            w = _wheel_deg()
+            wheel_angles.append(w)
+            worst_axis = max(worst_axis, abs(d_axis - r_expect))
+            worst_hook = max(worst_hook, d_hook)
+            emit = (
+                _telemetry.success
+                if abs(d_axis - r_expect) <= _CHAIN_AXIS_TOL_MM
+                and d_hook <= _CHAIN_HOOK_TOL_MM
+                else _telemetry.error
+            )
+            emit(
+                f"lever {delta:+5.2f} deg  wheel {w - wheel0:+8.3f} deg  "
+                f"wire-axis d={d_axis:7.4f} (want {r_expect:g})  hook res={d_hook:.4f}"
+            )
+        wheel_span = max(wheel_angles) - min(wheel_angles)
 
     # Restore the recorded rest pose, measure the drift, then discard UNSAVED.
-    _set_lever(rest_rad)
-    wheel_back = abs(_wheel_deg() - wheel0)
-    _, _, wire_back_pos = _wire_state()
-    wire_back = math.dist(wire_back_pos, wire_pos0)
-    title = str(_read_member(model, "GetTitle"))
-    adapter._attempt(lambda: adapter.swApp.CloseDoc(title), default=None)
-    adapter.currentModel = None
+    with _telemetry.span("verify.chain.restore"):
+        _set_lever(rest_rad)
+        wheel_back = abs(_wheel_deg() - wheel0)
+        _, _, wire_back_pos = _wire_state()
+        wire_back = math.dist(wire_back_pos, wire_pos0)
+    with _telemetry.span("verify.cleanup"):
+        title = str(_read_member(model, "GetTitle"))
+        adapter._attempt(lambda: adapter.swApp.CloseDoc(title), default=None)
+        adapter.currentModel = None
 
     report.gate(
         f"chain:{name}:wire-rides-hub",
