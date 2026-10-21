@@ -34,7 +34,7 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
-    add_component_bom_balloons,
+    add_auto_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
     position_bom_balloon,
@@ -49,6 +49,7 @@ from _drawing_common import (
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
+from _drawing_fr_ch_native_probe import run_native_compatibility_probe
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
@@ -1674,8 +1675,10 @@ def _reattach_frame_balloons(
 
 
 def _place_package(adapter: Any) -> Callable[[], None]:
-    """Place every sheet; return the check that proves every balloon again
-    after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
+    """Prepare the existing package through its one-shot native sheet-2 probe.
+
+    The diagnostic retains evidence and stops before later placement/save/export.
+    """
     _create_mixed_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
@@ -1739,16 +1742,25 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         label="frame",
     )
     balloon_items = _validate_frame_bom(adapter, table)
-    landings = add_component_bom_balloons(
+    # Diagnostic only: preserve the existing explicit instance pins as acceptance
+    # criteria, not AutoBalloon hints. Never run manual reattachment/short leaders.
+    landings = run_native_compatibility_probe(
         adapter,
         exploded,
         items=balloon_items,
-        anchors=FRAME_BALLOON_ANCHORS,
+        required_instances={
+            stem: anchor.instance
+            for stem, anchor in FRAME_BALLOON_ANCHORS.items()
+            if anchor.instance is not None
+        },
         label="frame exploded-view BOM coverage",
-        margin=0.012,
-    )
-    proof = _reattach_frame_balloons(
-        adapter, exploded, [landing.note for landing in landings], balloon_items
+        artifact_stem=ARTIFACT_STEM,
+        place=lambda: add_auto_balloons(
+            adapter,
+            exploded,
+            items=balloon_items,
+            label="frame exploded-view BOM coverage",
+        ),
     )
     _add_note_block(
         adapter,
@@ -1787,7 +1799,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         (0.300, 0.074),
         label="assembly isometric caption",
     )
-    return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
+    return lambda: assert_balloon_landings(adapter, landings)
 
 
 async def build(adapter: Any) -> dict[str, str]:
