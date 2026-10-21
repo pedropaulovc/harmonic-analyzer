@@ -573,9 +573,10 @@ receiver centreline. Receiver-callout and caption placements live in the
 drawing recipe rather than a second set of coordinates here.
 
 Detail D retains the complete 10:1 knife envelope, native exterior angle arc,
-outboard flank text, ridge round and datum A. Local witness gaps preserve
-their attachment landings; the parent-view identifier must clear the
-screw-pattern dimensions.
+outboard flank text, ridge round and datum A. The flank-text shelf sits below
+the detail boundary and height dimension; its native leader clearance still
+requires rendered inspection. Local witness gaps preserve their attachment
+landings; the parent-view identifier must clear the screw-pattern dimensions.
 
 Recorded historical ink and analytical replays are not after-change
 acceptance. Native readbacks, audit and enlarged-sheet inspection must prove

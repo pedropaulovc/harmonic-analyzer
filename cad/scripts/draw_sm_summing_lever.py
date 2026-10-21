@@ -1519,10 +1519,10 @@ DETAIL_KEEP = {
     "FlankToSide": (0.058, 0.184),
     "KnifeRidgeRadius": (0.181, 0.219),
 }
-# R16's upper shelf connected to the far/lower arrow through the angle arc.
-# Keep that arc seed; below the height caption its leader approaches from
-# below/outside instead. Recheck the regenerated ink, not just this request.
-FLANK_TEXT_XY = (0.051, 0.130)
+# Keep the native arc seed; place its text below the detail boundary and
+# height dimension so neither line crosses the text. The leader approaches
+# the lower arc endpoint from below; verify regenerated native ink.
+FLANK_TEXT_XY = (0.051, 0.081)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native
