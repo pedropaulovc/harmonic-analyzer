@@ -141,12 +141,14 @@ _NUMBER_CENTRE = (
 )
 
 
+@_telemetry.traced("drawing.purchased_source_hash")
 def _source_file_sha256(source: Path) -> str:
     """Read source bytes without loading the native part or buffering the file."""
     with Path(source).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+@_telemetry.traced("drawing.purchased_source_open", label_param="label")
 def _open_supplier_source_read_only(adapter: Any, source: Path, *, label: str) -> Any:
     """Acquire the exact native part read-only; session teardown owns its close.
 

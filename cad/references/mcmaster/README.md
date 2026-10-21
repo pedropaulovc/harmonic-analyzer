@@ -1542,6 +1542,10 @@ save, and a source-part SHA-256 check before opening and after drawing
 finalization rejects any persisted source-byte change. Existing build teardown
 discards document changes without saving. Restoration failures are recorded
 separately from any primary capture failure.
+Read-only source acquisition and each whole-file hash have aggregate timing
+spans, `drawing.purchased_source_open` and `drawing.purchased_source_hash`;
+there is no per-chunk instrumentation. Their cost must be measured on the
+next native canary, not inferred from source-only tests.
 
 The [native presentation-save receipt](../../docs/pipeline/evidence/vm2-datum-placement/probes/rack-source-save-callout/receipt.json)
 records `SetText` dirtying the source part and drawing `SaveAs3` persisting
