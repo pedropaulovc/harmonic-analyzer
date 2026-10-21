@@ -152,12 +152,20 @@ SHOULDER_Y_TOL_M = 0.0003
 # same run when their strings agree and their lower-left corners lie within
 # this window (COM positions sit ~0.9 mm below the glyphs).
 INK_MATCH_WINDOW_M = 0.003
-# Model edges print as 0.25 mm solid black strokes (annotation ink 0.18 mm,
-# section lines 0.35 mm, the frame and title block grey).
-MODEL_EDGE_WIDTH_M = (0.00022, 0.00030)
-# A dashed stroke whose ends both lie within this of an annotation's segment
-# is that annotation's ink, not a hidden model edge.
-HIDDEN_EDGE_ON_ANNOTATION_M = 0.0001
+# The selected templates print visible edges at 0.35 mm and annotations at
+# 0.13 mm. Retained calibration dumps print 0.25 mm edges / 0.18 mm annotations.
+# Keep separate edge bands: widening one band would accept intermediate inks,
+# and lowering its floor would turn legacy annotation strokes into model edges.
+MODEL_EDGE_WIDTH_BANDS_M = ((0.00022, 0.00030), (0.00033, 0.00037))
+ANNOTATION_STROKE_MAX_M = 0.00022
+HIDDEN_EDGE_MAX_WIDTH_M = 0.00030
+# Geometric tolerances do not grow when the template's printed edges get heavier.
+LEADER_CROSSING_MERGE_M = 0.00030
+# Endpoint proximity alone is insufficient for solid strokes: flattened curves
+# can be shorter than this tolerance. Require section ink to align as well.
+EDGE_ON_ANNOTATION_M = 0.0001
+# About 1.15 degrees, independent of stroke length.
+SECTION_INK_PARALLEL_SIN_MAX = 0.02
 
 # Symbol tokens IDisplayData returns unresolved; each renders as ONE glyph.
 _TOKEN = re.compile(r"<[^<>]+>")
@@ -350,11 +358,11 @@ HOLE_CENTER_TOL_M = 0.00005
 # countersinks' outer rings fit 1.639 and 1.634 mm, the dowels 0.796 and
 # 0.792 mm.
 HOLE_RADIUS_TOL_M = 0.00002
-# A leader lands on a ring when its end lies within a model-edge stroke
-# width of it: RD2's arrow tip sits 0.009 mm off hole A's inner ring and
-# DetailItem357's leader end 0.004 mm off hole B's outer one, while a
-# countersink's two rings print 0.36 mm apart.
-HOLE_LANDING_TOL_M = MODEL_EDGE_WIDTH_M[1]
+# A leader lands on a ring within the retained 0.30 mm geometric tolerance:
+# RD2's arrow tip sits 0.009 mm off hole A's inner ring and DetailItem357's
+# leader end 0.004 mm off hole B's outer one, while a countersink's two rings
+# print 0.36 mm apart. Heavier template strokes must not widen this tolerance.
+HOLE_LANDING_TOL_M = 0.00030
 
 
 def is_hidden(annotation: Mapping[str, Any]) -> bool:
@@ -622,12 +630,11 @@ def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
 
 
 def ink_annotation_strokes(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's solid strokes thinner than a model edge: annotation ink."""
-    low, _high = MODEL_EDGE_WIDTH_M
+    """Solid annotation ink, including current 0.13 and legacy 0.18 mm strokes."""
     return [
         Segment(*_floats(raw)[:4], "line")
         for raw in (dump.get("ink") or {}).get("strokes", ())
-        if float(raw[4]) < low and not raw[5]
+        if float(raw[4]) < ANNOTATION_STROKE_MAX_M and not raw[5]
     ]
 
 
@@ -860,34 +867,53 @@ def _printed_leader_starts(
     return out, ambiguities
 
 
-def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's model-edge strokes (``MODEL_EDGE_WIDTH_M``, solid black)."""
-    low, high = MODEL_EDGE_WIDTH_M
-    return [
-        Segment(*_floats(raw)[:4], "geometry")
-        for raw in (dump.get("ink") or {}).get("strokes", ())
-        if low <= float(raw[4]) <= high and not raw[5]
-    ]
+def ink_edges(dump: Mapping[str, Any], *, sections: Sequence[AnnotationGeometry] = ()) -> list[Segment]:
+    """Solid model edges, attributing only ambiguous heavy ink to sections."""
+    if not sections:
+        return [
+            Segment(*_floats(raw)[:4], "geometry")
+            for raw in (dump.get("ink") or {}).get("strokes", ())
+            if not raw[5] and any(low <= float(raw[4]) <= high for low, high in MODEL_EDGE_WIDTH_BANDS_M)
+        ]
+    legacy: list[Segment] = []
+    heavy: list[Segment] = []
+    legacy_band, heavy_band = MODEL_EDGE_WIDTH_BANDS_M
+    for raw in (dump.get("ink") or {}).get("strokes", ()):
+        if raw[5]:
+            continue
+        width = float(raw[4])
+        if legacy_band[0] <= width <= legacy_band[1]:
+            legacy.append(Segment(*_floats(raw)[:4], "geometry"))
+        elif heavy_band[0] <= width <= heavy_band[1]:
+            heavy.append(Segment(*_floats(raw)[:4], "geometry"))
+    return legacy + _unclaimed_model_edges(heavy, sections)
 
 
 def ink_dashed_strokes(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's dashed strokes no wider than a model edge: hidden edges
-    (Hidden Lines Visible prints them at 0.18 mm) among centre marks,
-    cosmetic threads and other annotations' dashes, which
-    ``_hidden_model_edges`` separates."""
+    """Dashed candidate hidden edges (current 0.13 mm, retained 0.18 mm),
+    among centre marks, cosmetic threads and other annotations' dashes,
+    which ``_unclaimed_model_edges`` separates."""
     return [
         Segment(*_floats(raw)[:4], "hidden")
         for raw in (dump.get("ink") or {}).get("strokes", ())
-        if float(raw[4]) <= MODEL_EDGE_WIDTH_M[1] and raw[5]
+        if float(raw[4]) <= HIDDEN_EDGE_MAX_WIDTH_M and raw[5]
     ]
 
 
-def _hidden_model_edges(
-    dashed: Sequence[Segment], annotations: Sequence[AnnotationGeometry], tol: float = HIDDEN_EDGE_ON_ANNOTATION_M
+def _unclaimed_model_edges(
+    strokes: Sequence[Segment],
+    annotations: Sequence[AnnotationGeometry],
+    tol: float = EDGE_ON_ANNOTATION_M,
+    *,
+    require_parallel: bool = True,
 ) -> list[Segment]:
-    """The dashed strokes that are NOT an annotation's own ink: the pieces
-    whose both ends lie on some annotation segment (a centre mark, a thread,
-    a dimension's dashed extension) belong to that annotation."""
+    """Strokes not claimed by the supplied native annotations.
+
+    Solid callers supply only heavy section annotations and require nearly
+    parallel directions as well as endpoint proximity. Proximity alone swallows
+    short flattened arc pieces crossed by an annotation at arbitrary angles.
+    Dashed callers retain the existing endpoint-only attribution policy.
+    """
     own = [
         segment
         for annotation in annotations
@@ -896,17 +922,28 @@ def _hidden_model_edges(
     ]
     grid = SegmentGrid(list(enumerate(own)))
 
-    def on_annotation(dash: Segment) -> bool:
+    def aligned(stroke: Segment, segment: Segment) -> bool:
+        scale = stroke.length * segment.length
+        return scale > 0.0 and abs(
+            (stroke.x1 - stroke.x0) * (segment.y1 - segment.y0)
+            - (stroke.y1 - stroke.y0) * (segment.x1 - segment.x0)
+        ) <= SECTION_INK_PARALLEL_SIN_MAX * scale
+
+    def on_annotation(stroke: Segment) -> bool:
         reach = Box(
-            min(dash.x0, dash.x1) - tol, min(dash.y0, dash.y1) - tol, max(dash.x0, dash.x1) + tol, max(dash.y0, dash.y1) + tol
+            min(stroke.x0, stroke.x1) - tol,
+            min(stroke.y0, stroke.y1) - tol,
+            max(stroke.x0, stroke.x1) + tol,
+            max(stroke.y0, stroke.y1) + tol,
         )
         return any(
-            point_segment_distance((dash.x0, dash.y0), segment) <= tol
-            and point_segment_distance((dash.x1, dash.y1), segment) <= tol
+            (not require_parallel or aligned(stroke, segment))
+            and point_segment_distance((stroke.x0, stroke.y0), segment) <= tol
+            and point_segment_distance((stroke.x1, stroke.y1), segment) <= tol
             for _index, segment in grid.near(reach)
         )
 
-    return [dash for dash in dashed if not on_annotation(dash)]
+    return [stroke for stroke in strokes if not on_annotation(stroke)]
 
 
 def _anchor(box: Box, reference: int) -> tuple[float, float]:
@@ -2245,7 +2282,6 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         for view in views
         if len(_floats(view.get("outline"))) >= 4
     ]
-    edges = view_edges(ink_edges(dump), outlines)
     annotation_strokes = ink_annotation_strokes(dump)
 
     view_geometry = []
@@ -2289,15 +2325,6 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 strokes=annotation_strokes,
             )
         )
-        if edges.get(name):
-            annotations.append(
-                AnnotationGeometry(
-                    label=f"view {name} geometry",
-                    kind="geometry",
-                    owner=name,
-                    segments=tuple(edges[name]),
-                )
-            )
     for annotation in dump.get("sheet_annotations", ()):
         if not sheet_owned(annotation):
             continue
@@ -2318,10 +2345,18 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                     exact=True,
                 )
             )
+    # Only the current heavy edge family shares section-line weight. Preserve
+    # legacy 0.25 mm edges even when they lie on or near section annotations.
+    sections = [annotation for annotation in annotations if annotation.kind == "section-line"]
+    edges = view_edges(ink_edges(dump, sections=sections), outlines)
+    for name, solid in edges.items():
+        annotations.append(
+            AnnotationGeometry(label=f"view {name} geometry", kind="geometry", owner=name, segments=tuple(solid))
+        )
     # Hidden Lines Visible edges print dashed: they are view geometry too, so
     # text over one is text on a line. Attributed like the solid edges, once
     # every annotation's own dashes are known.
-    hidden = view_edges(_hidden_model_edges(ink_dashed_strokes(dump), annotations), outlines)
+    hidden = view_edges(_unclaimed_model_edges(ink_dashed_strokes(dump), annotations, require_parallel=False), outlines)
     for name, dashes in hidden.items():
         index = next(
             (i for i, a in enumerate(annotations) if a.kind == "geometry" and a.owner == name), None
@@ -3055,7 +3090,7 @@ def find_leaders_over_part(
                         crossings.append((to_tip, point))
                 remaining -= piece.length
             crossings.sort(reverse=True)
-            merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > MODEL_EDGE_WIDTH_M[1]]
+            merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > LEADER_CROSSING_MERGE_M]
             if not merged:
                 continue
             over = merged[0][0]
@@ -3695,7 +3730,7 @@ def find_edgeless_views(model: SheetModel) -> list[Finding]:
             sheet=model.geometry.name,
             a=f"view {name}",
             b="",
-            detail=f"view {name!r} has an outline but no printed 0.25 mm model edge",
+            detail=f"view {name!r} has an outline but no unclaimed printed model edge at a supported weight",
         )
         for name, pictorial in model.edgeless
     ]
@@ -3851,9 +3886,10 @@ GATING_KINDS = frozenset(
 #
 # These kinds read zero on all 111 drawings, counting the latest layout.audit
 # span of each stem on this lineage: 91180520b's fleet run, with the stems that
-# #1105 re-placed rebuilt on top. "view-edges-missing" is also zero here, but it
-# fires 157 times with the 0.13/0.18 mm line weights (c45096c90), so it waits
-# for that branch. "leader-through-own-text" is held out too. The datum-origin
+# #1105 re-placed rebuilt on top. "view-edges-missing" was also zero there, but
+# fired 157 times with the 0.13/0.18 mm line weights (c45096c90). Enforcement
+# still needs fleet evidence at the selected weights. "leader-through-own-text"
+# is held out too. The datum-origin
 # boxing removed 4 of its 5 findings. A balloon leader now starts where the PDF
 # prints it (BALLOON_LEADER_RING_M), which cleared frame-assembly's balloon 5
 # (0.47 mm inside its ring at 20260928T124727673Z) on replay, but it still
@@ -3886,9 +3922,9 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # sm-knife-mount's sheet is crowded (three frames, a stacked frame pair and a
 # frame-attached datum over a 25 mm block), and its placements were tuned
 # against this audit, so it enforces every gating kind but
-# "view-edges-missing": its front and right views print their edges but
-# none the audit reads as a 0.25 mm model edge, the line-weight false
-# positive the fleet holds that kind out for (see above).
+# "view-edges-missing": the recorded front/right PDFs used the ambiguous
+# 0.18 mm family, outside the retained calibration and selected template
+# edge bands. Keep this exemption until fleet evidence supports enforcement.
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),

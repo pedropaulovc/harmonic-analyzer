@@ -369,9 +369,17 @@ def test_a_dimension_text_under_a_note_fails_the_clearance(note_x, expected):
     assert all(severity(f) is FindingSeverity.GATING for f in audit_dump(dump) if f.kind == "text-clearance")
 
 
-def test_text_crossed_by_a_foreign_view_edge_is_found():
-    """MHA-DT-21's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
-    outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
+@pytest.mark.parametrize(
+    ("edge_width", "annotation_width"), [(0.00025, 0.00018), (0.00035, 0.00013)], ids=["calibration", "template"]
+)
+def test_text_crossed_by_a_foreign_view_edge_is_found(tmp_path, edge_width, annotation_width):
+    """MHA-DT-21's ADJUSTER ENTRY, through real PDF width extraction."""
+    from _pdf_ink import page_ink, read_pdf_ink
+
+    pdf = _weight_contrast_pdf(tmp_path / "contrast.pdf", edge_width, annotation_width)
+    ink = page_ink(read_pdf_ink(pdf)[0])
+    assert sorted(stroke[4] for stroke in ink["strokes"]) == pytest.approx([annotation_width, edge_width], abs=1e-7)
+    assert len(ink_edges({"ink": ink})) == 1
     # A single vertical model edge of the right view at x = 0.130.
     right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
     callout = _hole_callout(
@@ -380,12 +388,13 @@ def test_text_crossed_by_a_foreign_view_edge_is_found():
         [("ADJUSTER ENTRY", 0.100, 0.118)],
     )
     front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
-    printed = [["ADJUSTER ENTRY", 0.1002, 0.1189, 0.1400, 0.1222]]  # runs the width of its shoulder
-    findings = audit_dump(
-        _dump(views=[front, right_view], strokes=_edges((0.130, 0.080, 0.130, 0.160)), spans=printed)
-    )
+    # The PDF carries the real text, the crossed model edge and a thin leader.
+    dump = _dump(views=[front, right_view])
+    dump["ink"] = ink
+    findings = audit_dump(dump)
     hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
     assert len(hits) == 1
+    assert severity(hits[0]) is FindingSeverity.GATING
 
 
 def test_text_crossed_by_a_hidden_edge_is_found_but_not_by_its_own_centre_mark():
@@ -989,18 +998,19 @@ def test_com_text_the_pdf_never_printed_gates_but_symbols_do_not():
     assert severity(unmatched[0]) is FindingSeverity.GATING
 
 
-def test_model_edges_are_solid_quarter_millimetre_strokes_owned_by_the_smallest_view():
-    """Model edges print 0.25 mm solid black; annotation ink is 0.18 mm and
-    hidden lines are dashed. An edge belongs to the innermost outline holding
-    it (a detail drawn inside its parent's box), and none outside every view."""
+@pytest.mark.parametrize(
+    ("edge_width", "annotation_width"), [(0.00025, 0.00018), (0.00035, 0.00013)], ids=["calibration", "template"]
+)
+def test_model_edges_are_owned_by_the_smallest_view_without_annotation_ink(edge_width, annotation_width):
+    """Keep the two real weight families distinct; retain detail-view ownership."""
     dump = {
         "ink": {
             "strokes": [
-                [0.12, 0.12, 0.13, 0.12, 0.00025, 0],  # parent edge
-                [0.15, 0.15, 0.16, 0.15, 0.00025, 0],  # inside the detail
-                [0.12, 0.13, 0.13, 0.13, 0.00018, 0],  # annotation line
-                [0.12, 0.14, 0.13, 0.14, 0.00025, 1],  # hidden line
-                [0.30, 0.30, 0.31, 0.30, 0.00025, 0],  # in no view
+                [0.12, 0.12, 0.13, 0.12, edge_width, 0],  # parent edge
+                [0.15, 0.15, 0.16, 0.15, edge_width, 0],  # inside the detail
+                [0.12, 0.13, 0.13, 0.13, annotation_width, 0],  # annotation line
+                [0.12, 0.14, 0.13, 0.14, edge_width, 1],  # dashed, not a solid edge
+                [0.30, 0.30, 0.31, 0.30, edge_width, 0],  # in no view
             ]
         }
     }
@@ -1009,6 +1019,64 @@ def test_model_edges_are_solid_quarter_millimetre_strokes_owned_by_the_smallest_
     owned = view_edges(edges, [("parent", Box(0.10, 0.10, 0.20, 0.20)), ("detail", Box(0.14, 0.14, 0.17, 0.17))])
     assert [(e.x0, e.y0) for e in owned["parent"]] == [(0.12, 0.12)]
     assert [(e.x0, e.y0) for e in owned["detail"]] == [(0.15, 0.15)]
+
+
+@pytest.mark.parametrize(
+    ("width", "edge", "annotation"),
+    [
+        (0.00013, False, True),
+        (0.00018, False, True),
+        (0.00025, True, False),
+        (0.00032, False, False),
+        (0.00035, True, False),
+        (0.00050, False, False),
+    ],
+)
+def test_weight_bands_do_not_promote_annotation_or_unrelated_ink(width, edge, annotation):
+    from _layout_audit import ink_annotation_strokes
+
+    dump = _dump(strokes=_edges((0.12, 0.12, 0.13, 0.12), width=width))
+    assert bool(ink_edges(dump)) is edge
+    assert bool(ink_annotation_strokes(dump)) is annotation
+
+
+def _weight_contrast_pdf(path, edge_width, annotation_width, *, extra_paths=""):
+    """Vector-only fixture in sheet metres, with native PDF stroke widths."""
+    from _pdf_ink import POINT_M
+
+    stream = (
+        f"{edge_width / POINT_M} w 0 G "
+        f"{0.130 / POINT_M} {0.080 / POINT_M} m {0.130 / POINT_M} {0.160 / POINT_M} l S\n"
+        f"{annotation_width / POINT_M} w "
+        f"{0.100 / POINT_M} {0.118 / POINT_M} m {0.140 / POINT_M} {0.118 / POINT_M} l S\n"
+        f"BT /F1 12 Tf {0.1002 / POINT_M} {0.1189 / POINT_M} Td (ADJUSTER ENTRY) Tj ET\n"
+    ).encode("ascii")
+    stream += extra_paths.encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {SHEET_W / POINT_M} {SHEET_H / POINT_M}] "
+            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ).encode("ascii"),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{index} 0 obj\n".encode() + obj + b"\nendobj\n"
+    startxref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{startxref}\n%%EOF"
+    ).encode()
+    path.write_bytes(bytes(out))
+    return path
 
 
 # cone-tip-block section A-A: GetLineInfo answers (0, -8)..(0, 8) mm -- the
@@ -1038,6 +1106,178 @@ def test_a_section_line_runs_between_its_arrow_tails_with_its_printed_labels():
     assert model.unmatched == ()
     lost = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS[:1]))
     assert lost.unmatched == (("section-line A", "A"),)
+
+
+def test_heavy_section_ink_is_not_model_geometry_but_nearby_and_crossing_edges_remain():
+    view = _view("Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), sections=[CTB_SECTION_A])
+    section_ink = [
+        (0.072, 0.209, 0.072, 0.241),  # cutting line
+        (0.072, 0.209, 0.084, 0.209),  # first arrow shaft
+        (0.072, 0.241, 0.084, 0.241),  # second arrow shaft
+    ]
+    model_ink = [
+        (0.0722, 0.210, 0.0722, 0.240),  # 0.2 mm beside the cutting line
+        (0.060, 0.225, 0.090, 0.225),  # crosses it, not an annotation stroke
+    ]
+    dump = _dump(
+        views=[view], spans=CTB_SECTION_A_SPANS, strokes=_edges(*section_ink, *model_ink, width=0.00035)
+    )
+    model = sheet_model(dump)
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in geometry.segments] == model_ink
+    [section] = [a for a in model.geometry.annotations if a.kind == "section-line"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in section.segments] == [
+        section_ink[1], section_ink[2], section_ink[0]
+    ]
+
+
+@pytest.mark.parametrize("offset", [0.0, 0.00005], ids=["collinear", "nearby"])
+def test_legacy_model_edge_survives_heavy_section_attribution_in_pdf(tmp_path, offset):
+    from _pdf_ink import POINT_M, page_ink, read_pdf_ink
+
+    legacy_edge = (0.072 + offset, 0.210, 0.072 + offset, 0.240)
+    section_edge = (0.072, 0.209, 0.072, 0.241)
+    paths = ""
+    for width, (x0, y0, x1, y1) in [(0.00035, section_edge), (0.00025, legacy_edge)]:
+        paths += (
+            f"{width / POINT_M} w {x0 / POINT_M} {y0 / POINT_M} m "
+            f"{x1 / POINT_M} {y1 / POINT_M} l S\n"
+        )
+    pdf = _weight_contrast_pdf(tmp_path / "mixed-section.pdf", 0.00035, 0.00013, extra_paths=paths)
+    ink = page_ink(read_pdf_ink(pdf)[0])
+    strokes = [stroke for stroke in ink["strokes"] if 0.068 <= stroke[0] <= 0.076]
+    assert sorted(stroke[4] for stroke in strokes) == pytest.approx([0.00025, 0.00035], abs=1e-7)
+    view = _view("Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), sections=[CTB_SECTION_A])
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS, strokes=strokes))
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    [edge] = geometry.segments
+    assert (edge.x0, edge.y0, edge.x1, edge.y1) == pytest.approx(legacy_edge, abs=1e-7)
+    assert model.edgeless == ()
+
+
+def test_removing_heavy_section_ink_from_model_edges_keeps_its_text_collision_gating():
+    dimension = _dim("OverCut", "12.0", 0.070, 0.223)
+    view = _view(
+        "Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), [dimension], sections=[CTB_SECTION_A]
+    )
+    dump = _dump(
+        views=[view],
+        spans=CTB_SECTION_A_SPANS,
+        strokes=_edges((0.072, 0.209, 0.072, 0.241), width=0.00035),
+    )
+    findings = [
+        finding
+        for finding in audit_dump(dump)
+        if finding.kind == "text-on-line"
+    ]
+    assert [finding.b for finding in findings] == ["section-line A"]
+    assert severity(findings[0]) is FindingSeverity.GATING
+
+
+def test_a_tiny_perpendicular_model_edge_is_not_claimed_by_a_crossing_annotation():
+    from types import SimpleNamespace
+
+    from _layout_audit import _unclaimed_model_edges
+
+    edge = Segment(0.01, 0.00995, 0.01, 0.01005, "geometry")
+    leader = SimpleNamespace(kind="leader", segments=[Segment(0.005, 0.01, 0.015, 0.01, "leader")])
+    assert _unclaimed_model_edges([edge], [leader]) == [edge]
+    # Dashed attribution deliberately retains the pre-existing endpoint policy.
+    assert _unclaimed_model_edges([edge], [leader], require_parallel=False) == []
+
+
+def test_small_pdf_ring_survives_crossing_section_leader_and_centre_mark(tmp_path):
+    from _pdf_ink import POINT_M, page_ink, read_pdf_ink
+
+    cx, cy, radius = 0.072, 0.225, 0.003
+    k = 0.5522847498
+    # Half a flattened piece: crossings must not fall on curve vertices.
+    phase = math.pi / 128
+
+    def xy(x, y):
+        rx = x * math.cos(phase) - y * math.sin(phase)
+        ry = x * math.sin(phase) + y * math.cos(phase)
+        return f"{(cx + rx * radius) / POINT_M} {(cy + ry * radius) / POINT_M}"
+
+    curves = [
+        ((1, k), (k, 1), (0, 1)),
+        ((-k, 1), (-1, k), (-1, 0)),
+        ((-1, -k), (-k, -1), (0, -1)),
+        ((k, -1), (1, -k), (1, 0)),
+    ]
+    paths = f"{0.00035 / POINT_M} w {xy(1, 0)} m\n"
+    paths += "\n".join(" ".join(xy(*point) for point in curve) + " c" for curve in curves) + "\nS\n"
+    pdf = _weight_contrast_pdf(tmp_path / "small-ring.pdf", 0.00035, 0.00013, extra_paths=paths)
+    ink = page_ink(read_pdf_ink(pdf)[0])
+    ring = [stroke for stroke in ink["strokes"] if 0.068 <= stroke[0] <= 0.076]
+    assert len(ring) == 128
+    # The historical proximity-only policy would swallow these crossed pieces.
+    assert any(
+        (s[0] - cx) * (s[2] - cx) < 0 and max(abs(s[0] - cx), abs(s[2] - cx)) < 0.0001
+        for s in ring
+    )
+    assert any(
+        (s[1] - cy) * (s[3] - cy) < 0 and max(abs(s[1] - cy), abs(s[3] - cy)) < 0.0001
+        for s in ring
+    )
+    leader = _hole_callout("Crossing", [(0.065, cy, 0.079, cy)], [])
+    mark = {
+        "type": 13, "name": "CM1",
+        "display": {"lines": [_line(0.065, 0.218, 0.079, 0.232)]},
+    }
+    view = _view(
+        "Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588),
+        [leader, mark], sections=[CTB_SECTION_A],
+    )
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS, strokes=ring))
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in geometry.segments] == [tuple(stroke[:4]) for stroke in ring]
+
+
+def test_leader_over_part_retains_crossings_of_short_small_ring_pieces():
+    phase = math.pi / 128
+
+    def rotate(x, y):
+        dx, dy = x - 0.170, y - 0.150
+        return (
+            0.170 + dx * math.cos(phase) - dy * math.sin(phase),
+            0.150 + dx * math.sin(phase) + dy * math.cos(phase),
+        )
+
+    ring = [
+        (*rotate(x0, y0), *rotate(x1, y1))
+        for x0, y0, x1, y1 in _ring(0.170, 0.150, 0.003, sides=128)
+    ]
+    assert any(
+        (y0 - 0.150) * (y1 - 0.150) < 0 and max(abs(y0 - 0.150), abs(y1 - 0.150)) < 0.0001
+        for _x0, y0, _x1, y1 in ring
+    )
+    tip = (0.230, 0.150)
+    note = {
+        "type": 6, "name": "AcrossRing", "visible": 1, "owner_type": 0,
+        "leaders": [[0.140, 0.150, 0.0, *tip, 0.0]],
+        "display": {
+            "arrows": [[*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "FEATURE", "pos": [0.125, 0.151, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "FEATURE", "balloon": False},
+    }
+    view = _view("Part", (0.150, 0.130, 0.240, 0.170), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_edges(*ring, width=0.00035)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.extra["over_part_mm"] == pytest.approx(63.0, abs=0.1)
+    assert finding.extra["edge_crossings"] == 2
+
+
+def test_solid_model_edge_collinear_under_thin_callout_leader_remains_geometry():
+    callout = _hole_callout("Collinear", [(0.100, 0.120, 0.200, 0.180)], [])
+    edge = (0.140, 0.144, 0.160, 0.156)
+    view = _view("Part", (0.090, 0.110, 0.210, 0.190), [callout])
+    model = sheet_model(_dump(views=[view], strokes=_edges(edge, width=0.00035)))
+    [native] = [a for a in model.geometry.annotations if a.kind != "geometry"]
+    assert native.segments  # The native collinear annotation really is present.
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in geometry.segments] == [edge]
 
 
 # cone-swing-platform, Drawing View2: the 6.76 hole callout's leader runs

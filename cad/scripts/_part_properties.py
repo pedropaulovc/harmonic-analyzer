@@ -13,6 +13,34 @@ from _com import _early_bound, _read_member
 from _source_identity import _git_commit_year, _git_sha
 
 
+def title_block_properties() -> dict[str, str]:
+    """Return the shared sheet-format specifications from title_block.yaml.
+
+    Parts, assemblies and template text measurement use the same linked values,
+    independently of any model registry or release identity.
+    """
+    import _config
+
+    return {
+        "TOL_LIN_X": str(_config.title_block("linear_1pl")["display"]),
+        "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
+        "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),
+        "TOL_ANG": str(_config.title_block("angular")["display"]),
+        "TOL_SURFACE": str(_config.title_block("surface")["display"]),
+        # Sheet-format notes link these values rather than hardcoding them.
+        "TOL_EDGE_BREAK_R": str(_config.title_block("edge_break")["display_r"]),
+        "TOL_CHAMFER_MAX": str(_config.title_block("edge_break")["display_chamfer"]),
+        "TOL_INSIDE_CORNER": (
+            f"R{float(_config.title_block('inside_corner')['radius_mm']):.1f} MAX"
+        ),
+        "THREAD_TYPE": str(_config.title_block("thread")["type"]),
+        "THREAD_CLASS": str(_config.title_block("thread")["class"]),
+        # The DRILLED HOLES row carries the general unilateral tolerance.
+        "TOL_HOLE_MINUS": str(_config.title_block("drilled_hole")["display_minus"]),
+        "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
+    }
+
+
 def part_properties(part_name: str) -> dict[str, str]:
     """SolidWorks custom properties for ``part_name`` from the parts registry.
 
@@ -37,21 +65,7 @@ def part_properties(part_name: str) -> dict[str, str]:
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
-    props["TOL_LIN_X"] = str(_config.title_block("linear_1pl")["display"])
-    props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
-    props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
-    props["TOL_ANG"] = str(_config.title_block("angular")["display"])
-    props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
-    # Edge-break and thread-class rows (2026-09 template): the sheet-format
-    # notes are $PRPSHEET links, so the numbers live here, not in the DRWDOT.
-    props["TOL_EDGE_BREAK_R"] = str(_config.title_block("edge_break")["display_r"])
-    props["TOL_CHAMFER_MAX"] = str(_config.title_block("edge_break")["display_chamfer"])
-    props["THREAD_TYPE"] = str(_config.title_block("thread")["type"])
-    props["THREAD_CLASS"] = str(_config.title_block("thread")["class"])
-    # DRILLED HOLES general tolerance (unilateral); the title block's DRILLED
-    # HOLES row reads these via $PRPSHEET and supplies the +/- around them.
-    props["TOL_HOLE_MINUS"] = str(_config.title_block("drilled_hole")["display_minus"])
-    props["TOL_HOLE_PLUS"] = str(_config.title_block("drilled_hole")["display_plus"])
+    props.update(title_block_properties())
     # Per-channel stretched springs (build_ch_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
