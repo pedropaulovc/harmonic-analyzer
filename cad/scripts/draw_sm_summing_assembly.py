@@ -42,10 +42,7 @@ import sm_summing_explode_spec as explode
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
-from _drawing_balloons import (
-    BalloonAnchor,
-    BalloonLanding,
-)
+from _drawing_balloons import BalloonLanding
 from _drawing_common import (
     DrawingOutputs,
     new_project_drawing,
@@ -58,7 +55,11 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_group_perf_probe import native_input_identity, run_matched_group_probe
+from _drawing_group_perf_probe import native_input_identity
+from _drawing_sm_attachment_probe import (
+    SmAttachmentCandidateInvalid,
+    run_sm_attachment_probe,
+)
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -220,9 +221,6 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# Diagnostic manual arm: exact BALLOON_ANCHORS from fb1fe894e595c397d0945af042f7071f16200299,
-# recipe blob eb018a8805b7185df499ec4ab409ca8bb3b39765.
-OLD_EXPLODED_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
@@ -810,17 +808,25 @@ def exploded_caption_xy(bom_bottom: float) -> tuple[float, float]:
 
 
 def _assert_exploded_caption(
-    adapter: Any, table: Any, note: Any
+    adapter: Any, table: Any, note: Any, readback: dict[str, Any]
 ) -> tuple[float, float, float, float]:
     _activate_sheet(adapter, SHEET_NAMES[1])
     bottom, top = _bom_vertical_limits(table)
     extent = tuple(float(value) for value in note.GetExtent())
+    readback["bom_vertical_limits_m"] = (bottom, top)
+    readback["caption_extent_m"] = extent
     if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
-        raise RuntimeError(f"summing exploded caption has invalid extent {extent!r}")
+        raise SmAttachmentCandidateInvalid(
+            f"summing exploded caption has invalid extent {extent!r}"
+        )
     box = (extent[0], extent[1], extent[3], extent[4])
+    readback["caption_box_m"] = box
     if box[2] <= box[0] or box[3] <= box[1]:
-        raise RuntimeError(f"summing exploded caption has empty extent {extent!r}")
+        raise SmAttachmentCandidateInvalid(
+            f"summing exploded caption has empty extent {extent!r}"
+        )
     gap = bottom - box[3]
+    readback["caption_gap_m"] = gap
     _telemetry.info(
         "summing BOM and exploded caption native clearance",
         bom_top_mm=top * 1000.0,
@@ -828,12 +834,17 @@ def _assert_exploded_caption(
         caption_box_mm=tuple(value * 1000.0 for value in box),
         caption_gap_mm=gap * 1000.0,
     )
-    _assert_box_on_sheet(box, label="summing exploded caption")
+    try:
+        _assert_box_on_sheet(box, label="summing exploded caption")
+    except RuntimeError as error:
+        # This pure box assertion has no native collaborator to suppress.
+        raise SmAttachmentCandidateInvalid(str(error)) from error
     if gap < EXPLODED_CAPTION_MIN_GAP:
-        raise RuntimeError(
+        raise SmAttachmentCandidateInvalid(
             f"summing exploded caption has {gap * 1000.0:.3f} mm below the BOM; "
             f"requires {EXPLODED_CAPTION_MIN_GAP * 1000.0:.1f} mm"
         )
+    readback["caption_bounds_valid"] = True
     return box
 
 
@@ -843,6 +854,7 @@ def _assert_exploded_balloon_bounds(
     table: Any,
     landings: list[BalloonLanding],
     caption_box: tuple[float, float, float, float],
+    readback: dict[str, Any],
 ) -> None:
     """Read final native circles against the sheet, rebuilt BOM and caption."""
     _activate_sheet(adapter, SHEET_NAMES[1])
@@ -858,14 +870,37 @@ def _assert_exploded_balloon_bounds(
     ):
         raise RuntimeError("summing BOM has invalid native column widths or position")
     bom_box = (left, bottom, left + sum(widths), top)
+    readback["bom_box_m"] = bom_box
+    circles = readback["balloon_circles"] = []
     for landing in landings:
         note = _early_bound(landing.note, "INote")
         item = str(note.GetBomBalloonText(True)).strip()
         label = f"summing exploded: {landing.stem} item {item}"
-        circle = rendered_balloon_circle(note, label=label)
+        try:
+            circle = rendered_balloon_circle(note, label=label)
+        except RuntimeError as error:
+            # Only the existing display helper's explicit invalid-render bounds
+            # are failed candidates. Unexpected COM/runtime errors still abort.
+            message = str(error).removeprefix(f"{label}: ")
+            if type(error) is not RuntimeError or message == str(error) or not (
+                message in (
+                    "balloon has no annotation",
+                    "balloon has no rendered display data",
+                    "multiple rendered full-circle balloon primitives",
+                    "no rendered full-circle balloon primitive",
+                )
+                or message.startswith("invalid rendered arc data: ")
+                or message.startswith("invalid rendered sheet-circle geometry: ")
+            ):
+                raise
+            raise SmAttachmentCandidateInvalid(str(error)) from error
         x, y, radius = circle
         bounds = (x - radius, y - radius, x + radius, y + radius)
-        _assert_box_on_sheet(bounds, label=label)
+        circles.append({"stem": landing.stem, "item": item, "circle_m": circle, "bounds_m": bounds})
+        try:
+            _assert_box_on_sheet(bounds, label=label)
+        except RuntimeError as error:
+            raise SmAttachmentCandidateInvalid(str(error)) from error
         for name, keepout in (("BOM", bom_box), ("caption", caption_box)):
             if (
                 bounds[0] <= keepout[2]
@@ -873,10 +908,11 @@ def _assert_exploded_balloon_bounds(
                 and bounds[1] <= keepout[3]
                 and bounds[3] >= keepout[1]
             ):
-                raise RuntimeError(
+                raise SmAttachmentCandidateInvalid(
                     f"{label}: rendered circle bounds={bounds!r} intersects "
                     f"{name}={keepout!r} (sheet metres) after the final rebuild"
                 )
+    readback["balloon_bounds_valid"] = True
 
 
 def _place_exploded_sheet(
@@ -925,6 +961,10 @@ def _place_exploded_sheet(
     def finish_and_assert_bounds(
         current_adapter: Any, landings: list[BalloonLanding]
     ) -> None:
+        readback = report["bounds"] = {
+            "stage": "post-helper diagnostic, after caption rebuild",
+            "scope": "actual circles/field/BOM/caption; NOT full-sheet/PDF/machinist proof",
+        }
         bottom, _top = _bom_vertical_limits(table)
         caption = _add_note_block(
             current_adapter,
@@ -935,8 +975,12 @@ def _place_exploded_sheet(
         )
         if not current_adapter.currentModel.EditRebuild3():
             raise RuntimeError("summing exploded caption rebuild failed")
-        caption_box = _assert_exploded_caption(current_adapter, table, caption)
-        _assert_exploded_balloon_bounds(current_adapter, table, landings, caption_box)
+        caption_box = _assert_exploded_caption(
+            current_adapter, table, caption, readback
+        )
+        _assert_exploded_balloon_bounds(
+            current_adapter, table, landings, caption_box, readback
+        )
 
     return exploded, items, finish_and_assert_bounds
 
@@ -977,15 +1021,10 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.sm_summing_assembly")
 async def build(adapter: Any) -> dict[str, str]:
-    """Diagnostic ONLY: exploded10 ABBA, STOP before later sheets/publication."""
-    await run_matched_group_probe(
+    """Diagnostic ONLY: EDGE/FACE/FACE/EDGE, no later sheets/publication."""
+    await run_sm_attachment_probe(
         adapter,
         template=DRAWING_TEMPLATES[SPEC.layout].path,
-        case="sm-exploded-10",
-        manual_recipe_blob="eb018a8805b7185df499ec4ab409ca8bb3b39765",
-        anchors=OLD_EXPLODED_ANCHORS,
-        label="summing exploded-view BOM coverage",
-        margin=BALLOON_MARGIN,
         prepare_arm=_prepare_exploded_perf_arm,
     )
 
