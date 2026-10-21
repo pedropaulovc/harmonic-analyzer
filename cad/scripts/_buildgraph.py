@@ -969,9 +969,9 @@ def _module_by_path() -> dict[Path, str]:
 
 
 # --- Machine-wide store of pure syntax facts -------------------------------------
-# Every doit graph load parses and walks each local module up to three times
-# (imports, config reads, drawing-registry reads): ~1400 parses, measured as most
-# of the load once path resolution was memoized. A farm leaf loads the graph twice
+# Graph loads extract pure syntax facts for imports, stamping, config reads and
+# drawing registries. Imports, stamping and config share one ephemeral parse.
+# A farm leaf loads the graph twice
 # (prepare's export and execute's ``build.py run``) and the submitter once per
 # command, and between loads almost no source changes. These facts are pure
 # functions of a file's TEXT, so they are kept across processes keyed by the
@@ -1147,14 +1147,32 @@ def _assembly_source_names(source: str) -> frozenset[str]:
     return _AssemblySources(source).collect()
 
 
-class _ModuleSyntax(NamedTuple):
-    """Syntax facts of ONE source text: what it imports, and what each top-level
-    function calls.
+# The config-accessor modules the read-set analysis tracks. (``_config_asm``,
+# the assembly-only module that held the M6.8 ``placement`` accessor, was
+# deleted with the mirror layer -- #151.)
+_CONFIG_MODULES: frozenset[str] = frozenset({"_config"})
 
-    Deliberately holds nothing that depends on WHERE the text came from, so the
-    import-closure analysis and the stamping call graph can share a single parse
-    (see :func:`_module_syntax`). Aliases are kept verbatim and in source order:
-    both consumers replay them into dicts where the last binding wins.
+
+def _literal_first_arg(call: ast.Call) -> str | None:
+    """The first positional arg of ``call`` if it is a string literal, else None
+    (no arg, or a non-literal/dynamic arg)."""
+    arg = call.args[0] if call.args else None
+    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return arg.value
+    return None
+
+
+class _ConfigUse(Enum):
+    CALL = "call"
+    REFERENCE = "reference"
+
+
+class _SourceFacts(NamedTuple):
+    """Unresolved syntax of ONE source text, independent of its path.
+
+    Import aliases retain whole-tree BFS order: consumers replay them into
+    dicts where the last binding wins. Unknown config use is None, not an empty
+    read set, and does not discard useful import or function facts.
     """
 
     imports: tuple[tuple[str, str | None], ...]
@@ -1162,6 +1180,87 @@ class _ModuleSyntax(NamedTuple):
         tuple[int, str | None, tuple[tuple[str, str | None], ...]], ...
     ]
     functions: tuple[tuple[str, frozenset[str], frozenset[tuple[str, str]]], ...]
+    config_references: tuple[tuple[str, _ConfigUse, str | None], ...] | None
+
+
+def _encode_source_facts(facts: _SourceFacts) -> tuple:
+    """Persist builtin containers only, never the NamedTuple or Enum classes."""
+    return (
+        facts.imports,
+        facts.from_imports,
+        facts.functions,
+        None
+        if facts.config_references is None
+        else tuple(
+            (attr, use.value, argument)
+            for attr, use, argument in facts.config_references
+        ),
+    )
+
+
+def _decode_source_facts(raw: object) -> _SourceFacts:
+    """Reject the whole record on malformed syntax, including unknown Enum tags."""
+    if type(raw) is not tuple or len(raw) != 4:
+        raise ValueError("invalid source facts")
+    imports, from_imports, functions, references = raw
+
+    def is_import_name(record: object) -> bool:
+        return (
+            type(record) is tuple
+            and len(record) == 2
+            and type(record[0]) is str
+            and (record[1] is None or type(record[1]) is str)
+        )
+
+    if type(imports) is not tuple or not all(map(is_import_name, imports)):
+        raise ValueError("invalid source imports")
+    if type(from_imports) is not tuple:
+        raise ValueError("invalid source from-imports")
+    for record in from_imports:
+        if (
+            type(record) is not tuple
+            or len(record) != 3
+            or type(record[0]) is not int
+            or record[0] < 0
+            or (record[1] is not None and type(record[1]) is not str)
+            or type(record[2]) is not tuple
+            or not all(map(is_import_name, record[2]))
+        ):
+            raise ValueError("invalid source from-import")
+    if type(functions) is not tuple:
+        raise ValueError("invalid source functions")
+    for record in functions:
+        if (
+            type(record) is not tuple
+            or len(record) != 3
+            or type(record[0]) is not str
+            or type(record[1]) is not frozenset
+            or not all(type(name) is str for name in record[1])
+            or type(record[2]) is not frozenset
+            or not all(
+                type(call) is tuple
+                and len(call) == 2
+                and all(type(name) is str for name in call)
+                for call in record[2]
+            )
+        ):
+            raise ValueError("invalid source function")
+    if references is not None:
+        if type(references) is not tuple:
+            raise ValueError("invalid source config references")
+        for record in references:
+            if (
+                type(record) is not tuple
+                or len(record) != 3
+                or type(record[0]) is not str
+                or type(record[1]) is not str
+                or (record[2] is not None and type(record[2]) is not str)
+            ):
+                raise ValueError("invalid source config reference")
+        references = tuple(
+            (attr, _ConfigUse(use), argument) for attr, use, argument in references
+        )
+    return _SourceFacts(imports, from_imports, functions, references)
 
 
 def _function_call_names(
@@ -1182,29 +1281,25 @@ def _function_call_names(
 
 
 @functools.lru_cache(maxsize=1024)
-@_persisted_facts("module_syntax", encode=tuple, decode=lambda raw: _ModuleSyntax(*raw))
-def _module_syntax(text: str) -> _ModuleSyntax:
-    """Parse one source CONTENT once, for every syntax consumer of it.
+@_persisted_facts(
+    "source_facts", encode=_encode_source_facts, decode=_decode_source_facts
+)
+def _source_facts(text: str, config_modules: frozenset[str]) -> _SourceFacts:
+    """Share one parse and whole-tree walk across import, stamping and config reads.
 
-    ``_direct_local_imports`` and the stamping call graph each used to parse the
-    same ~570 local modules, and the call graph re-parsed all of them once per
-    stamping contract -- three full-repo parses per ``doit`` graph load. They now
-    share this one.
-
-    Keyed by CONTENT, never by path or file time: a same-size/same-mtime rewrite
-    produces a different key and is re-analyzed, and two files that happen to
-    hold identical text share the work. The parsed tree is DROPPED on return --
-    retaining every module's AST measured ~195 MB, these facts a few hundred kB
-    -- and every path-dependent decision (relative-import anchoring, local-module
-    membership, which stamping primitive counts) stays with the caller, so
-    identical text in two different packages can still resolve differently.
+    Keyed by CONTENT and config-module names, never by path or file time.
+    The tree and node tuple are DROPPED on return: retaining every module's AST
+    measured ~195 MB. Only immutable unresolved facts survive. Relative-import
+    anchoring, local-module membership, stamping primitives and config-family
+    membership remain caller-owned, so identical text can resolve differently.
     """
     tree = ast.parse(text)
+    nodes = tuple(ast.walk(tree))
     imports: list[tuple[str, str | None]] = []
     from_imports: list[
         tuple[int, str | None, tuple[tuple[str, str | None], ...]]
     ] = []
-    for node in ast.walk(tree):
+    for node in nodes:
         if isinstance(node, ast.Import):
             imports.extend((alias.name, alias.asname) for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -1215,15 +1310,52 @@ def _module_syntax(text: str) -> _ModuleSyntax:
                     tuple((alias.name, alias.asname) for alias in node.names),
                 )
             )
-    return _ModuleSyntax(
-        tuple(imports),
-        tuple(from_imports),
-        tuple(
-            (node.name, *_function_call_names(node))
-            for node in tree.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ),
+    functions = tuple(
+        (node.name, *_function_call_names(node))
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     )
+    import_facts = tuple(imports)
+    from_import_facts = tuple(from_imports)
+    aliases = set(config_modules)
+    for node in nodes:
+        if isinstance(node, ast.ImportFrom) and node.module in config_modules:
+            return _SourceFacts(import_facts, from_import_facts, functions, None)
+        if isinstance(node, ast.Import):
+            aliases.update(
+                alias.asname
+                for alias in node.names
+                if alias.name in config_modules and alias.asname
+            )
+    calls: dict[int, str | None] = {}
+    for node in nodes:
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in aliases
+        ):
+            calls[id(node.func)] = _literal_first_arg(node)
+    attribute_receivers = {
+        id(node.value) for node in nodes if isinstance(node, ast.Attribute)
+    }
+    references = []
+    for node in nodes:
+        if (
+            isinstance(node, ast.Name)
+            and node.id in aliases
+            and id(node) not in attribute_receivers
+        ):
+            # Passing/aliasing the module can hide arbitrary config reads.
+            return _SourceFacts(import_facts, from_import_facts, functions, None)
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in aliases
+        ):
+            use = _ConfigUse.CALL if id(node) in calls else _ConfigUse.REFERENCE
+            references.append((node.attr, use, calls.get(id(node))))
+    return _SourceFacts(import_facts, from_import_facts, functions, tuple(references))
 
 
 @functools.lru_cache(maxsize=None)
@@ -1264,7 +1396,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
             parent = parent.rpartition(".")[0]
 
     current_module = _module_by_path().get(_resolved(path))
-    syntax = _module_syntax(read_source(path))
+    syntax = _source_facts(read_source(path), _CONFIG_MODULES)
     for name, _asname in syntax.imports:
         add(name)
     for level, module, names in syntax.from_imports:
@@ -1980,88 +2112,6 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     return fam
 
 
-# The config-accessor modules the read-set analysis tracks. (``_config_asm``,
-# the assembly-only module that held the M6.8 ``placement`` accessor, was
-# deleted with the mirror layer -- #151.)
-_CONFIG_MODULES: frozenset[str] = frozenset({"_config"})
-
-
-def _literal_first_arg(call: ast.Call) -> str | None:
-    """The first positional arg of ``call`` if it is a string literal, else None
-    (no arg, or a non-literal/dynamic arg)."""
-    arg = call.args[0] if call.args else None
-    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-        return arg.value
-    return None
-
-
-class _ConfigUse(Enum):
-    CALL = "call"
-    REFERENCE = "reference"
-
-
-@functools.lru_cache(maxsize=512)
-@_persisted_facts(
-    "config_references",
-    encode=lambda refs: None
-    if refs is None
-    else tuple((attr, use.value, argument) for attr, use, argument in refs),
-    decode=lambda raw: None
-    if raw is None
-    else tuple((attr, _ConfigUse(use), argument) for attr, use, argument in raw),
-)
-def _config_references_in_text(
-    text: str, config_modules: frozenset[str]
-) -> tuple[tuple[str, _ConfigUse, str | None], ...] | None:
-    """Extract immutable syntax facts once per source content, not per consumer.
-
-    Shared helpers occur in many task closures. Repeating their AST walks made
-    config analysis dominate task loading. Do not cache resolved config tokens
-    here: family membership and accessor mappings are evaluated by the caller.
-    None denotes an unclassifiable import or escaped module reference, never
-    an empty read set.
-    """
-    nodes = tuple(ast.walk(ast.parse(text)))
-    aliases = set(config_modules)
-    for node in nodes:
-        if isinstance(node, ast.ImportFrom) and node.module in config_modules:
-            return None
-        if isinstance(node, ast.Import):
-            aliases.update(
-                alias.asname
-                for alias in node.names
-                if alias.name in config_modules and alias.asname
-            )
-    calls: dict[int, str | None] = {}
-    for node in nodes:
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id in aliases
-        ):
-            calls[id(node.func)] = _literal_first_arg(node)
-    attribute_receivers = {
-        id(node.value) for node in nodes if isinstance(node, ast.Attribute)
-    }
-    references = []
-    for node in nodes:
-        if (
-            isinstance(node, ast.Name)
-            and node.id in aliases
-            and id(node) not in attribute_receivers
-        ):
-            return None  # passing/aliasing the module can hide arbitrary reads
-        if (
-            isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Name)
-            and node.value.id in aliases
-        ):
-            use = _ConfigUse.CALL if id(node) in calls else _ConfigUse.REFERENCE
-            references.append((node.attr, use, calls.get(id(node))))
-    return tuple(references)
-
-
 def _config_tokens_in_source(path: Path) -> frozenset[str]:
     """Resolve ONE source's config reads; reject every unclassified use.
 
@@ -2069,7 +2119,7 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
     which re-reads a source whose (mtime_ns, size) moved, and
     accessor/family resolution is not memoized by this function.
     """
-    references = _config_references_in_text(read_source(path), _CONFIG_MODULES)
+    references = _source_facts(read_source(path), _CONFIG_MODULES).config_references
     if references is None:
         raise _UnknownConfigUse
     tokens: set[str] = set()
@@ -2234,7 +2284,7 @@ def _module_call_graph(
         if text is None:
             continue
         try:
-            syntax = _module_syntax(text)
+            syntax = _source_facts(text, _CONFIG_MODULES)
         except SyntaxError:
             continue
         n2q: dict[str, tuple[str, str]] = {}
