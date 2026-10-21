@@ -1674,9 +1674,19 @@ def _create_component_bom_balloon(
             _emit_bom_association_failure(
                 adapter, view, note, choice, stem, expected_item, item, before, _bom_diagnostics
             )
-        raise RuntimeError(
+        failure = RuntimeError(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
+        if _bom_diagnostics is not None and _bom_diagnostics.get("probe") is not None:
+            try:
+                _bom_diagnostics["probe"](
+                    failed_view=view, note=note, choice=choice, stem=stem,
+                    expected_item=expected_item, item=item, before=before,
+                )
+            except Exception as probe_error:
+                failure.add_note("Temporary PD BOM ABA probe failed; see chained probe/cleanup errors.")
+                raise failure from probe_error
+        raise failure
     landing = BalloonLanding(
         stem=stem,
         instance=choice.instance,
@@ -1720,8 +1730,9 @@ def add_component_bom_balloons(
     validated by the drawing. This is not a missing-step fallback: when supplied
     (including an empty mapping), no source explode is queried or shown.
     ``None`` retains the native view explode-step reader.
-    ``_bom_diagnostics`` is a private PD-only, read-only failure observation;
-    it retains only the preceding proved insertion and never changes placement.
+    ``_bom_diagnostics`` retains the preceding proved insertion for PD failure
+    observation; its temporary private ``probe`` callback may run a controlled
+    BOM-only ABA experiment before the original strict item failure is raised.
     """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")

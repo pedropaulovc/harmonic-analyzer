@@ -28,13 +28,14 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import hashlib
 import json
 import math
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
@@ -44,7 +45,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _chain as chain
 from _check import check
-from _com import _com_invoke, _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _component_references import component_identity
 from sh_vn_chain_link_spec import (
     INNER_LINK_BOM_DESCRIPTION,
@@ -60,6 +61,11 @@ from _drawing_balloons import (
     BalloonLanding,
     _anchor_model_points,
     _AnchorChoice,
+    _bom_diagnostic_attachment,
+    _bom_diagnostic_edge,
+    _bom_diagnostic_read,
+    _bom_diagnostic_table,
+    _bom_diagnostic_view,
     _create_component_bom_balloon,
     _shown_instances,
     _spread_balloons,
@@ -2521,6 +2527,244 @@ def _balloon_collar_on_its_rear_rim(
     )
 
 
+def _pd_bom_probe_sources(source: Any) -> dict[str, Any]:
+    """Strict, bounded saved-byte/dirty/active-configuration evidence; no saves."""
+    source = _early_bound(source, "IModelDoc2")
+    components = _early_bound(_bind(source, "IAssemblyDoc"), "IAssemblyDoc").GetComponents(False)
+    if not isinstance(components, (tuple, list)) or len(components) > 256:
+        raise RuntimeError("PD BOM ABA source occurrences unavailable or exceed 256")
+    documents = {}
+    for raw in (source, *(
+        _early_bound(component, "IComponent2").GetModelDoc2() for component in components
+    )):
+        if raw is None:
+            raise RuntimeError("PD BOM ABA requires every source occurrence resolved")
+        document = _early_bound(raw, "IModelDoc2")
+        path = document.GetPathName()
+        if not isinstance(path, str) or not path or len(path) > 512:
+            raise RuntimeError("PD BOM ABA source path unavailable or exceeds 512 characters")
+        documents[path] = document
+        if len(documents) > 64:
+            raise RuntimeError("PD BOM ABA source documents exceed 64")
+    result = {}
+    for path, document in sorted(documents.items()):
+        dirty = document.GetSaveFlag()
+        manager = _early_bound(document.ConfigurationManager, "IConfigurationManager")
+        active = _early_bound(manager.ActiveConfiguration, "IConfiguration").Name
+        if type(dirty) is not bool or not isinstance(active, str) or not active or len(active) > 512:
+            raise RuntimeError("PD BOM ABA source dirty/configuration state unavailable")
+        with open(path, "rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        result[path] = {"sha256": digest, "dirty": dirty, "active_configuration": active}
+    return result
+
+
+def _probe_pd_bom_configuration_aba(
+    adapter: Any, *, context: dict[str, Any], pieces: Sequence[Any],
+    snapshot: BomSnapshot, views: Sequence[Any], items: dict[str, str],
+    failed_view: Any, note: Any, choice: _AnchorChoice, stem: str,
+    expected_item: str, item: str, before: Any,
+) -> None:
+    """Temporary AEB5 experiment: BOM-only mutation, exact restoration, then fail."""
+    if stem != "pd-vn-transgear-pivot-screw" or item != "*":
+        return
+    previous = context.get("previous_success")
+    if previous is None or previous[5] != "pd-transgear-arm":
+        raise RuntimeError("PD BOM ABA unavailable: no already-successful arm control")
+    arm_before, arm_item, arm_note, arm_choice, arm_view, _arm_stem = previous
+    if (expected_item != items[stem] or arm_item != items["pd-transgear-arm"]
+            or adapter.swApp.IsSame(arm_view, failed_view) != 1
+            or context["configuration"] != "Default Simplified"
+            or len(views) != 3 or len(pieces) != 2 or len(snapshot) != 43):
+        raise RuntimeError("PD BOM ABA baseline/control does not match approved experiment")
+    table = _early_bound(context["table"], "ITableAnnotation")
+    bom = _early_bound(context["table"], "IBomTableAnnotation")
+    feature = _early_bound(bom.BomFeature, "IBomFeature")
+    source = _early_bound(failed_view, "IView").ReferencedDocument
+
+    def configurations() -> tuple[tuple[str, ...], tuple[bool, ...]]:
+        raw = feature.GetConfigurations(False, None)
+        if not (isinstance(raw, (tuple, list)) and len(raw) == 2
+                and all(isinstance(values, (tuple, list)) for values in raw)):
+            raise RuntimeError("PD BOM ABA unknown native configuration-array shape")
+        names, flags = tuple(raw[0]), tuple(raw[1])
+        if (len(names) != 2 or len(flags) != 2 or set(names) != {"Default", "Default Simplified"}
+                or any(type(flag) is not bool for flag in flags)):
+            raise RuntimeError("PD BOM ABA requires exactly the two known configurations")
+        return names, flags
+
+    def columns() -> tuple[Any, ...]:
+        if table.TotalColumnCount != 6 or table.ColumnCount != 4:
+            raise RuntimeError("PD BOM ABA columns exceed five typed columns plus unsupported tail")
+        if feature.PartConfigurationGrouping != 3 or feature.DisplayAsOneItem is not False:
+            raise RuntimeError("PD BOM ABA grouping changed")
+        return tuple(
+            (table.GetColumnType3(index, True), table.GetColumnTitle2(index, True),
+             table.DisplayedText2(0, index, True),
+             bom.GetColumnCustomProperty(index) if index < 5 else None,
+             _bom_column_hidden(table, index, label="PD BOM ABA") if index < 5 else None,
+             table.GetColumnWidth(index) if index < 4 else None)
+            for index in range(6)
+        )
+
+    def bindings() -> tuple[Any, ...]:
+        view_states = []
+        for raw_view in views:
+            view = _early_bound(raw_view, "IView")
+            values = (view.GetName2(), view.GetReferencedModelName(), view.ReferencedConfiguration,
+                      view.GetKeepLinkedToBOM(), view.GetKeepLinkedToBOMName())
+            if any(not isinstance(value, (str, bool)) or (
+                isinstance(value, str) and len(value) > 512
+            ) for value in values):
+                raise RuntimeError("PD BOM ABA view context unavailable or exceeds bounds")
+            view_states.append(values)
+        attachments = []
+        for balloon, anchor in ((note, choice), (arm_note, arm_choice)):
+            annotation = _early_bound(_early_bound(balloon, "INote").GetAnnotation(), "IAnnotation")
+            entities = annotation.GetAttachedEntities3()
+            kinds = annotation.GetAttachedEntityTypes()
+            dangling = annotation.IsDangling()
+            if (not isinstance(entities, (tuple, list)) or len(entities) != 1
+                    or tuple(kinds or ()) != (1,) or dangling is not False
+                    or adapter.swApp.IsSame(entities[0], anchor.edge) != 1):
+                raise RuntimeError("PD BOM ABA balloon attachment is not the original single edge")
+            component = _early_bound(
+                _early_bound(_bind(entities[0], "IEntity"), "IEntity").GetComponent(), "IComponent2"
+            )
+            owner = (component.GetPathName(), component.Name2,
+                     component.ReferencedConfiguration, component.ComponentReference)
+            if any(not isinstance(value, str) or len(value) > 512 for value in owner):
+                raise RuntimeError("PD BOM ABA attachment identity unavailable or exceeds bounds")
+            attachments.append((owner, tuple(kinds), dangling, 1))
+        return tuple(view_states), tuple(attachments)
+
+    original = configurations()
+    if tuple(name for name, shown in zip(*original) if shown) != (context["configuration"],):
+        raise RuntimeError("PD BOM ABA baseline is not Simplified-only")
+    baseline_columns = columns()
+    baseline_bindings = bindings()
+    baseline_sources = _pd_bom_probe_sources(source)
+
+    def phase(name: str, configuration: str, setter: Callable[[], Any] | None) -> None:
+        errors = []
+        setter_return = None
+        if setter is not None:
+            try:
+                setter_return = setter()
+                if setter_return is not True:
+                    raise RuntimeError("PD BOM ABA setter did not return True")
+            except Exception as error:
+                error.add_note(f"{name}: SetConfigurations")
+                errors.append(error)
+            # Also rebuild after a throwing/partially effective setter, once only.
+            try:
+                rebuild_drawing(adapter, label=f"PD BOM ABA {name}")
+            except Exception as error:
+                error.add_note(f"{name}: rebuild")
+                errors.append(error)
+        # Observe the SAME notes before any strict row/grid/source proof can refuse.
+        phase_context = {"table": context["table"], "configuration": configuration}
+        observation = _bom_diagnostic_read(lambda: {
+            "phase": name, "contract": "AEB5",
+            "setter_return": _bom_diagnostic_read(lambda: setter_return),
+            "expected_shape": {"typed_columns": 5, "unsupported_tail": 1, "data_rows": 43},
+            "caps": {"sources": 64, "occurrences": 256, "text": 512, "columns": 16,
+                     "rows_including_header": 64, "matches": 4, "members": 8,
+                     "configurations": 2, "pieces": 2},
+            "configuration": configuration,
+            "failed_item": _bom_diagnostic_read(lambda: _early_bound(note, "INote").GetBomBalloonText(True)),
+            "arm_item": _bom_diagnostic_read(lambda: _early_bound(arm_note, "INote").GetBomBalloonText(True)),
+            "configurations_raw": _bom_diagnostic_read(lambda: feature.GetConfigurations(False, None)),
+            "views": [_bom_diagnostic_read(lambda: _bom_diagnostic_view(view), raw=True) for view in views],
+            "before": before, "arm_before": arm_before,
+            "retained_selected_edge": _bom_diagnostic_read(lambda: _bom_diagnostic_edge(
+                choice.edge, [views[1].ReferencedConfiguration, configuration],
+            ), raw=True),
+            "attachments": [
+                _bom_diagnostic_read(lambda: _bom_diagnostic_attachment(
+                    adapter, balloon, anchor, [views[1].ReferencedConfiguration, configuration],
+                ), raw=True)
+                for balloon, anchor in ((note, choice), (arm_note, arm_choice))
+            ],
+            "rows": [
+                _bom_diagnostic_read(lambda: _bom_diagnostic_table(
+                    phase_context, views[1].ReferencedConfiguration, expected,
+                ), raw=True)
+                for expected in (expected_item, arm_item)
+            ],
+        }, raw=True)
+        if "error" in observation:
+            errors.append(RuntimeError(f"{name}: immediate observation: {observation['error']}"))
+            observation.update(phase=name, contract="AEB5")
+        try:
+            _telemetry.info("drawing.pd_bom_configuration_aba " + json.dumps(observation, separators=(",", ":")))
+        except Exception as error:
+            error.add_note(f"{name}: immediate observation")
+            errors.append(error)
+        expected_configurations = (
+            (original[0], tuple(value == "Default" for value in original[0]))
+            if configuration == "Default" else original
+        )
+        proof = {
+            "phase": name, "expected_failed_item": expected_item, "expected_arm_item": arm_item,
+            "hypothesis_item_observed": observation.get("failed_item") == (
+                expected_item if configuration == "Default" else item
+            ),
+        }
+        # Every cleanup proof gets its own attempt, even after an earlier refusal.
+        for label, read, expected in (
+            ("configurations", configurations, expected_configurations),
+            ("columns", columns, baseline_columns),
+            ("view_attachment_bindings", bindings, baseline_bindings),
+            ("arm_item", lambda: _early_bound(arm_note, "INote").GetBomBalloonText(True), arm_item),
+            ("all_43_rows_and_grids", lambda: _assert_bom_pieces(
+                pieces, header_count=1, total_rows=44, configuration=configuration,
+                expected_snapshot=snapshot,
+            ), None),
+            ("sources", lambda: _pd_bom_probe_sources(source), baseline_sources),
+        ):
+            try:
+                actual = read()
+                if label == "sources":
+                    proof["sources"] = actual
+                if actual != expected:
+                    raise RuntimeError(f"PD BOM ABA {label} changed")
+                proof[label + "_unchanged"] = True
+            except Exception as error:
+                error.add_note(f"{name}: {label}")
+                errors.append(error)
+                proof[label + "_error"] = f"{type(error).__name__}: {error}"[:512]
+        proof["errors"] = [f"{type(error).__name__}: {error}"[:512] for error in errors]
+        try:
+            _telemetry.info("drawing.pd_bom_configuration_aba_proof " + json.dumps(proof, separators=(",", ":")))
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            raise ExceptionGroup(f"PD BOM ABA {name} failed", errors)
+
+    phase("A-baseline", context["configuration"], None)
+    probe_error = None
+    try:
+        phase("B-default", "Default", lambda: feature.SetConfigurations(
+            True, bool_array([True]), bstr_array(["Default"]),
+        ))
+    except Exception as error:
+        probe_error = error
+    finally:
+        try:
+            phase("A-restored", context["configuration"], lambda: feature.SetConfigurations(
+                False, bool_array(original[1]), bstr_array(original[0]),
+            ))
+        except Exception as cleanup_error:
+            if probe_error is not None:
+                probe_error.add_note("Exact BOM restoration/proof also failed; see chained cleanup errors.")
+                raise probe_error from cleanup_error
+            raise
+    if probe_error is not None:
+        raise probe_error
+    # Success still returns to the ORIGINAL '*' mismatch: never qualify/save this drawing.
+
+
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
 ) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
@@ -2621,6 +2865,11 @@ def _place_bom_sheet(
     iso_items, inner_items = transgear_balloon_items(items)
     iso_label = "paper-drive transgear BOM coverage"
     bom_diagnostics: dict[str, Any] = {"table": table, "configuration": bom_configuration}
+    # Temporary, explicitly mutating diagnostic; the ordinary item guard still fails.
+    bom_diagnostics["probe"] = lambda **failure: _probe_pd_bom_configuration_aba(
+        adapter, context=bom_diagnostics, pieces=pieces, snapshot=bom_snapshot,
+        views=(reference, view, inner), items=items, **failure,
+    )
     landings = add_component_bom_balloons(
         adapter,
         view,
