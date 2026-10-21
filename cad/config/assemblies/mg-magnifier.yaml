@@ -63,6 +63,6 @@ machinist_exceptions:
     reason: "owner ruling #1559 (2026-10-15): thread the rod end into the block, which carries no rotational load; the seated shoulder is the joint's datum and the thread only holds it there, with no set screw, bonding or lock (mg_rod_clamp_joint.py); full-thread engagement stays at least 1.5D at the printed worst case"
   - id: "MB-1667-MG"
     kind: "accept"
-    where: "sheet 2 wheel-group exploded view (items 1-4, 12-18) and sheet 3 lever-group exploded view (items 5-11): only the groups disabled by #1795"
+    where: "sheet 2 wheel-group exploded view and sheet 3 lever-group exploded view: BOM items 1-18 collectively, only the groups disabled by #1795; group membership follows the existing wheel/lever component families, not an inferred per-view item-number split"
     finding: "missing BOM-to-part item balloons 1-18 from those disabled groups (rule 22); absence of those same balloons elsewhere in the package is the same known omission"
     reason: "Owner decision 2026-10-21 accepts the existing #1795 bypass temporarily while #1667 is root-caused. Item 19's enabled finished-wire balloon on sheet 4 is NOT exempt. This does not accept wrong owners, wrong item numbers, dangling or otherwise defective present balloons, new unrelated omissions, or other assembly findings. Restore only after the linked #1667 fix is validated; remove MB-1667-MG and its TODO(#1667) with that restoration."
