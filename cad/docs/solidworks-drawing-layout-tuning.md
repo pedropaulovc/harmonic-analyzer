@@ -1612,9 +1612,10 @@ and the pinned SDK interface IID. Only `E_NOINTERFACE` means that interface is
 unsupported; other failures remain unavailable. Reject ambiguous or unsupported
 classification. A generated `_early_bound` wrapper's fallback is not capability
 proof, and capability does not replace the native sketch-entity identity keys.
-Keep optional internal inventories and point-ID diagnostics separate from
-mandatory definition/interface/identity evidence; telemetry failure must not
-create an unrelated constraint-acceptance requirement.
+Native point IDs/typed keys and definition/interface/self/owner checks are
+mandatory. Keep optional internal inventories and diagnostic coordinate reads
+separate; their unavailability must not add a constraint-acceptance requirement.
+Required alignment/geometry readbacks remain mandatory.
 
 The r5 attempt failed earlier, at the combined selected-count/circle-identity
 guard, before setting or reading a native pick. The r6 positive control then
@@ -1653,10 +1654,10 @@ identities; dimension attachment identity must match those endpoints, while
 constraint definition entities must match the real Wizard point and converted
 circle/centre. Keep exact native types/counts, non-null attachments, not-dangling,
 measured value, driven ownership and acceptance-band checks after final rebuild.
-Raw cross-proxy `IsSame` results remain diagnostic, not the point/segment
-identity oracle; unavailable native keys never pass. Log operation stage, count, types,
-availability, raw codes and actual/expected keys. Do not substitute coordinate
-equality or a fixed number for actual constrained geometry.
+These identity guards log native keys, not removed cross-proxy equality codes.
+Self/owner `IsSame` controls remain mandatory. Log operation stage, count, types,
+availability and actual/expected keys; unavailable native keys never pass.
+Do not substitute coordinate equality or a fixed number for actual constrained geometry.
 
 The actual Wizard entry point is external to the active bore witness sketch:
 native selection reports `swSelEXTSKETCHPOINTS=25`, still an `ISketchPoint`.
