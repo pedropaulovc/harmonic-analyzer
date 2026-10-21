@@ -98,9 +98,10 @@ owns cartridge dimensions and intact-rigid upset bounds; the pure
 owns supplier dimensions. Native builders own the model and its manufacturing
 dimensions; each manufactured part's sheet imports those dimensions and precision.
 The safety path is carrier → top washer and clevis cross-pin → pivot pin's
-integral flange → cap and block floor → block → carriage, **not** bearing
-press-fit pullout. Both ends remain positively retained in both pass pairs;
-there is no skid.
+integral full flange → opposing cap and block-floor stops → block → carriage,
+**not** bearing press-fit pullout or bearing axial restraint. Two integral
+registers retain each cap in XY without reliance on clamp friction. Both ends
+remain positively captured against uplift in both pass pairs; there is no skid.
 
 For a pass change, isolate the machine and support the carrier before removing
 **both** top retainers; only then lift the carrier. Refit both retainers and
@@ -109,20 +110,42 @@ wire with freshly formed pieces. Destructive **upward** pivot-pin extraction
 requires replacement of the service pin and both bearings in that cartridge,
 not reuse after a through-ball extraction load.
 
-The capture stack raises the carrier/work setup by 10.5 mm. The pivot-pin end
-is nominally **4 mm above the finished work**. The source-derived intact-rigid
-bound includes both end uplift and tipping across the full carrier/handle
-width; it is not limited to the small travel at a support pin. Cap pocket and
-aperture centres use ordinary coordinates from the same stock corner, while
-cap-bolt coordinates remain relative to the actual pocket axis at the block
-seating face. Neither nominal concentric CAD circles nor a loose stock edge
-replaces those manufacturing limits.
+The capture stack raises the carrier/work setup by **12.5 mm**, including the
+1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
+end is nominally **4 mm above the finished work**. The cap is 50 × 74 ×
+11.50 mm, with the ordinary ±0.51 mm thickness band, not a new precision
+control. The block wing is 66 mm wide, spans −54.5 to −9 mm, and uses 5/8 in
+raw stock; the physical nut-bracket location is unchanged.
 
-These are geometry limits, not force or deflection certification. No
-toolholder/spindle envelope is supplied in the repository: accept the actual
-installed tooling clearance before cutting, including both complete sweeps,
-the calculated upset, actual formed locks and measurement/runout uncertainty.
-The retained-pin dimensions do not prove collision freedom.
+Source B supplies direct functional inspections, not new GD&T controls:
+inspect the pivot-pin functional face variation ≤0.05 mm over Ø35 mm and
+each of the four carrier bores' axis variation ≤0.05 mm over 10.5 mm.
+Use the actual inspection notes and ordinary stock-corner coordinates for
+cap pocket/aperture locations; cap-bolt coordinates remain relative to the
+actual pocket axis at the block seating face. Nominal concentric CAD circles
+and a loose stock edge do not replace these inspections.
+
+Use CBS Fasteners NAS1352N5H12, 5/16-18 × 3/4 in drilled-head A286 screws,
+as defined by the retention hardware provider. Block threads are THRU.
+Inspect physical complete full-form screw/receiver overlap ≥1.5D =
+11.90625 mm; overall screw length or a nominal fully threaded native solid
+alone is not proof. Seat clean, dry, free-running actual screws in a cross
+pattern at **0.50 ±0.05 N·m**. The cap must seat on all faces, with cap/block
+base gap ≤0.05 mm over the **whole mounting footprint**. Independently,
+underhead gap must be ≤0.05 mm over each **whole accessible head bearing
+footprint**. These are separate allowances and are spent separately in the
+motion bound; then safety-wire heads in pairs in the tightening direction.
+This is an engineering seating torque, not a minimum-preload or force
+certification, generic shop-qualified torque, or new approval claim.
+
+The source-derived intact-rigid bound includes both end uplift and tipping
+across the full carrier/handle width, not just small support-pin travel.
+Captured geometry supplies no strength, bump-force or deflection
+certification. Installed toolholder/spindle clearance remains **UNVERIFIED**
+without real measurement authority: accept actual installed-tool clearance
+before cutting over both complete sweeps, the calculated upset, actual formed
+locks and measurement/runout uncertainty. Retained-pin dimensions alone do
+not prove collision freedom.
 
 
 ## Drawing package layout

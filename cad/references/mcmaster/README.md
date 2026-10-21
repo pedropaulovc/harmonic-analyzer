@@ -397,14 +397,26 @@ vendor CAD, replica-gate evidence or a load rating.
 
 | Number | Quantity in jig | Supplier identity and primary source |
 |---|---:|---|
-| MHA-CH-06-TL-VN-73 | 8 | Hardware Specialty [NAS1352N4H12, supplier product 1216451](https://www.hardwarespecialty.com/Product/1216451), predrilled 1/4-20 × 3/4 in socket-head cap screw; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
+| MHA-CH-06-TL-VN-73 | 8 | CBS Fasteners [NAS1352N5H12](https://cbsfasteners.com/nas-fastener-inventory/), listed “5/16-18 X 3/4 SHC A286 DRLD”; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
 | MHA-CH-06-TL-VN-74 | 2 | Huyett [CLPS6-0187-1250D](https://www.huyett.com/clps6-0187-1250d), headed clevis pin, 3/16 × 1-1/4 in, 316 stainless, plain finish |
 | MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter pin |
 | MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless safety wire, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
 
-NAS1352N4H12 is purchased A286; the catalog's AISI 304 native material is a
-rendering surrogate, not its purchasing specification. The clevis pin's
-actual diameter limits, not the listing's rounded 0.188 in nominal, control
+Purchase TL-VN-73 as the listed **A286** NAS1352N5H12; the native AISI 304
+material-library surrogate is a rendering representation only, not a material
+substitution or purchasing authority. The retention hardware provider owns
+the catalogue limits. The native fully threaded solid and the overall
+3/4 in length do not certify complete full-form engagement: inspect actual
+screws and THRU receiving threads for ≥1.5D = 11.90625 mm physical overlap.
+For assembly, use clean, dry, free-running actual screws; seat cross-pattern
+at 0.50 ±0.05 N·m with the cap seated on all faces, cap/block base gap
+≤0.05 mm over the whole mounting footprint, and independently underhead gap
+≤0.05 mm over the whole accessible head bearing footprint. Spend these
+independent allowances separately; then pair-wire in the tightening direction.
+This engineering seating torque establishes neither minimum preload
+nor force/strength certification.
+
+The clevis pin's actual diameter limits, not the listing's rounded 0.188 in nominal, control
 the fitted top-washer stack. The wire quantity counts installed formed
 pieces, not four spools. TL-VN-72 remains retired. See
 [captured-pivot authority and service instructions](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling)

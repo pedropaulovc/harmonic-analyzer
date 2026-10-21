@@ -280,12 +280,18 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 
 def test_census_includes_real_new_methods_without_demanding_extrusion_in_wrappers() -> None:
+    assert len(RECIPES) == len(set(RECIPES)) == 10
+    for recipe in RECIPES[2:4]:
+        calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
+        assert {"create_sketch", "create_cut_extrude"} <= calls
     cap_calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / RECIPES[3]))}
-    assert {"create_part", "create_extrusion", "create_cut_extrude"} <= cap_calls
+    assert {"create_part", "create_extrusion", "create_cut_extrude", "add_chamfer"} <= cap_calls
     hardware_units = {path for recipe in HARDWARE_RECIPES for path in _census_units(recipe)}
     calls = {call.func.attr for path in hardware_units for call in sdk._adapter_calls(sdk._tree(path))}
     assert {"create_part", "create_revolve", "create_cut_extrude", "create_axis"} <= calls
     assert STOCK_GEOMETRY in hardware_units
+    screw_units = _census_units(HARDWARE_RECIPES[0])
+    assert SCRIPTS / "diagnostics" / "diag_build_NAS1352N5H12.py" in screw_units
     for recipe in HARDWARE_RECIPES:
         units = _census_units(recipe)
         assert STOCK_WRAPPER in units

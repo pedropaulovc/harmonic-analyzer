@@ -58,6 +58,7 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_spec as retention
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
@@ -233,15 +234,23 @@ LEVER_TO_CARRIER = Fastener(
 )
 CAP_TO_BLOCK = Fastener(
     "TL-30 capture cap to TL-22 pivot block",
-    "1/4-20",
+    "5/16-18",
     SHCS,
     "3/4",
     len(retention.CAP_BOLT_CENTERS) * RAILS,
     retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH,
     pivot_block.BLOCK_HEIGHT,
     note=(
-        "NAS1352N4H12 drilled heads positively safety-wired in pairs; "
-        "retention_spec bounds complete-thread engagement at tolerance limits"
+        f"{retention_hardware.SCREW_SUPPLIER} {retention_hardware.SCREW_SKU}; "
+        "inspect actual complete full-form overlap >=1.5D (11.90625 mm) in THRU "
+        "block threads; overall length and nominal overlap alone are not proof. "
+        "Seat clean, dry, free-running actual screws cross-pattern at "
+        "0.50 +/-0.05 Nm; cap must seat on all faces with cap/block base gap "
+        "<=0.05 mm over the whole mounting footprint; independently, underhead "
+        "gap must be <=0.05 mm over the whole accessible head bearing footprint. "
+        "Spend these two independent gap allowances separately, then "
+        "safety-wire heads in pairs in the tightening direction. Engineering "
+        "seating torque is not a minimum-preload or force certification"
     ),
 )
 FASTENERS: tuple[Fastener, ...] = (

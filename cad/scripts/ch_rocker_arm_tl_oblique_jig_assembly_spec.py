@@ -929,7 +929,7 @@ BOM_DESCRIPTIONS = {
     LEVER_SCREW: lever_screw.CALLOUT,
     BLOCK_LOCK_WASHER: f"{block_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
     LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
-    PIVOT_CAP_SCREW: "1/4-20 X 3/4 DRILLED-HEAD SHCS",
+    PIVOT_CAP_SCREW: cap_screw.CALLOUT,
     PIVOT_CLEVIS_PIN: "3/16 HEADED CLEVIS PIN",
     PIVOT_COTTER: "1/16 X 1/2 SPLIT COTTER",
     PIVOT_LOCK_WIRE: "0.032 IN STAINLESS LOCK WIRE, FORMED",
@@ -1711,9 +1711,23 @@ CAPTURE_STEPS = (
     "BE 0.10-0.15. CONTACT LANDS MUST BE CLEAR OF SEALS. THE FLANGE RIM "
     "NORMALLY FLOATS; NO CAP, BLOCK OR RETAINER MAY DRAG THE ROTATING PIN "
     "OR CARRIER. DO NOT PRELOAD THE BEARINGS TO OBTAIN THESE GAPS.",
-    f"C3. FIT FOUR {_item(PIVOT_CAP_SCREW)} NAS1352N4H12 SCREWS TO EACH CAP. "
-    "USE THE SHOP'S APPROVED 1/4-20 A286/6061-ALUMINIUM JOINT TORQUE PROCEDURE, THEN "
-    f"LOCK EACH PAIR WITH NEW 0.032 STAINLESS WIRE {_item(PIVOT_LOCK_WIRE)} "
+    f"C3. FIT FOUR {_item(PIVOT_CAP_SCREW)} {retention_hardware.SCREW_SKU} "
+    "SCREWS PER CAP. CLEAN/DRY THREADS AND FACES; EACH SCREW MUST FREE-RUN "
+    "BEFORE SEATING, WITHOUT FILLET INTERFERENCE OR BOTTOMING. TIGHTEN "
+    f"CROSSWISE TO {retention.CAP_SEATING_TORQUE_NM:.2f} +/- "
+    f"{retention.CAP_SEATING_TORQUE_BAND_NM:.2f} N·m. THIS IS A SEATING "
+    "INSTRUCTION, NOT A MINIMUM PRELOAD OR BUMP-LOAD RATING.",
+    "C3A. BEFORE WIRING, CHECK A SEPARATE 0.05 MAX CAP/BLOCK GAP AROUND "
+    "THE WHOLE MOUNTING-LAND PERIMETER AND 0.05 MAX UNDER EACH HEAD OVER "
+    "ITS WHOLE ACCESSIBLE BEARING FOOTPRINT. FLAT FACES MUST SEAT; "
+    "REGISTERS MUST NOT BOTTOM. DO NOT PULL A GAP SHUT WITH THE SCREWS: "
+    "RE-MACHINE OR REPLACE A FAILED PART. THESE TWO GAP ALLOWANCES ARE "
+    "INDEPENDENT AND ARE BOTH INCLUDED IN THE UPSET BOUND.",
+    "C3B. MEASURE FULL-THREAD INTERVAL [S0,S1] FROM THE SCREW UNDERHEAD, "
+    "[B0,B1] DOWN FROM BLOCK TOP, AND SEATED HEAD HEIGHT H ABOVE BLOCK. "
+    "ENGAGEMENT = MIN(B1,S1-H)-MAX(B0,S0-H), ALL IN MM; REQUIRE 11.91 MIN "
+    "AT EVERY SCREW. CHAMFERS, RUNOUT AND TIP THREADS DO NOT COUNT.",
+    f"C3C. LOCK EACH PAIR WITH NEW 0.032 STAINLESS WIRE {_item(PIVOT_LOCK_WIRE)} "
     "PULLING EACH HEAD TOWARD TIGHTENING. ROUTE SINGLE STRANDS THROUGH "
     "DRILLED HEADS; KEEP TWISTED PAIRS AND TURNED-IN TAILS IN THE CHANNELS. "
     "THREADLOCKER IS NOT THE POSITIVE LOCK.",
@@ -1829,7 +1843,7 @@ def _component_local_boxes() -> dict[str, Box3]:
         BEARING: _axis_y_box(trammel.BEARING_OD / 2.0, 0.0, trammel.BEARING_WIDTH),
         PIVOT_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (-retention.BLOCK_WING_HALF_WIDTH, retention.BLOCK_WING_HALF_WIDTH), (0.0, pivot_block.BLOCK_HEIGHT)),
         PIVOT_PIN: ((-flange_radius, flange_radius), (-flange_radius, flange_radius), (0.0, pivot_pin.OVERALL_LENGTH)),
-        PIVOT_CAP: ((-pivot_cap.WIDTH / 2.0, pivot_cap.WIDTH / 2.0), (-pivot_cap.LENGTH / 2.0, pivot_cap.LENGTH / 2.0), (0.0, pivot_cap.HEIGHT)),
+        PIVOT_CAP: ((-pivot_cap.WIDTH / 2.0, pivot_cap.WIDTH / 2.0), (-pivot_cap.LENGTH / 2.0, pivot_cap.LENGTH / 2.0), (-pivot_cap.REGISTER_PROJECTION, pivot_cap.HEIGHT)),
         PIVOT_RETAINER: ((-pivot_retainer.OUTER_DIA / 2.0, pivot_retainer.OUTER_DIA / 2.0), (-pivot_retainer.OUTER_DIA / 2.0, pivot_retainer.OUTER_DIA / 2.0), (0.0, pivot_retainer.THICKNESS)),
         PIVOT_CLEVIS_PIN: ((-retention_hardware.CLEVIS_HEAD_HEIGHT_MAX, retention_hardware.CLEVIS_LENGTH_MAX), (-clevis_radius, clevis_radius), (-clevis_radius, clevis_radius)),
         PIVOT_COTTER: ((pivot_cotter.INSTALLED_X_MIN, pivot_cotter.INSTALLED_X_MAX), (-pivot_cotter.INSTALLED_Y_HALF_WIDTH, pivot_cotter.INSTALLED_Y_HALF_WIDTH), (pivot_cotter.INSTALLED_Z_MIN, pivot_cotter.INSTALLED_Z_MAX)),
@@ -2248,9 +2262,7 @@ def _upset_fixture_padding(
     bounds: retention.CaptureBounds,
 ) -> tuple[float, float, float]:
     """Additional (XY, down, up) for the intact rigid captured mechanism."""
-    pin_face_angle = bounds.flange_tilt + math.atan(
-        retention.PIN_FLANGE_PERPENDICULARITY / retention.PIN_FLANGE_SQUARENESS_SPAN
-    )
+    pin_face_angle = bounds.pin_tilt
     seat_height = (
         retention.PIN_LOWER_GAP[1] + retention.PIN_FLANGE_THICK
         + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
@@ -2276,7 +2288,15 @@ def _upset_fixture_padding(
             + radius * (1.0 - math.cos(bounds.carrier_tilt))
         )
         height_change = height * (1.0 - math.cos(bounds.carrier_tilt))
-        rise = max(retention.point_lift_bound(point, pass_name, bounds) for point in coordinates)
+        # These source prisms start at nominal CAD, whereas point_lift_bound
+        # is relative to an actual normal pose. Enclose either datum without
+        # adding the fixed carrier-bore manufacturing bias twice.
+        slope = max(bounds.carrier_slope_change, math.tan(bounds.carrier_tilt))
+        end_slope = min(slope, (bounds.support_lift + bounds.support_drop) / span)
+        rise = max(
+            bounds.support_lift + max(a[0] - x, x - b[0], 0.0) * end_slope
+            + abs(y - a[1]) * slope for x, y in coordinates
+        )
         return xy, bounds.support_drop + rise - bounds.support_lift + height_change, rise + height_change
     ancestor = stem
     while ancestor in LOCKED_TO and ancestor != PIVOT_PIN:
@@ -2290,15 +2310,21 @@ def _upset_fixture_padding(
         # of the carrier. A full radial overbound avoids relying on that yaw.
         if stem in (PIVOT_CLEVIS_PIN, PIVOT_COTTER):
             xy += 2.0 * radius
-        vertical = retention.CAP_CHAMBER_EXCESS[1] + radius * math.sin(pin_face_angle) + height * (1.0 - math.cos(pin_face_angle))
+        vertical = (
+            retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
+            + radius * math.sin(pin_face_angle) + height * (1.0 - math.cos(pin_face_angle))
+        )
         return xy, vertical, vertical
     if stem in (PIVOT_CAP, PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
-        # No clamp-friction credit: include cap translation and its pattern-limited
-        # yaw as well as the centre shift used in the opposing-stop proof.
+        # Cap yaw is limited by its TWO integral registers, not by an
+        # independently maximized translation plus a four-bolt-hole yaw.
+        # AABB padding may conservatively combine those derived extrema.
         cap_radius = math.hypot(pivot_cap.WIDTH / 2.0, pivot_cap.LENGTH / 2.0)
-        bolt_span = min(abs(b - a) for a, b in (retention.CAP_BOLT_X_OFFSETS, retention.CAP_BOLT_Y_OFFSETS))
-        yaw = math.atan2(2.0 * bounds.cap_lateral_shift, max(0.0, bolt_span - 2.0 * bounds.cap_lateral_shift))
-        return bounds.cap_lateral_shift + 2.0 * cap_radius * math.sin(yaw / 2.0), 0.0, 0.0
+        xy = (
+            bounds.cap_lateral_shift + 2.0 * cap_radius * math.sin(bounds.cap_yaw / 2.0)
+            + pivot_cap.HEIGHT * math.sin(bounds.cap_tilt)
+        )
+        return xy, retention.CAP_VERTICAL_MOTION_ENCLOSURE, bounds.cap_top_rise
     return 0.0, 0.0, 0.0
 
 

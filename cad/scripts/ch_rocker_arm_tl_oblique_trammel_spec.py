@@ -399,7 +399,7 @@ PIVOT_BLOCK_HEIGHT = (
 # lower boss. The broad Ø36 flange is relieved clear of the seal and its rim
 # is fitted above the block floor, independently of the bearing press fits.
 # The raised cartridge leaves block height and the carriage unchanged.
-PIN_COLLAR_PROUD = 14.5
+PIN_COLLAR_PROUD = 15.5
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing

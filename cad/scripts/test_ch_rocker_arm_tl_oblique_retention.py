@@ -32,15 +32,35 @@ CONTACT_MARGINS = (
 )
 
 
-def test_capture_uses_actual_component_patterns_and_unchanged_functional_fits() -> None:
-    receiver = tuple((x - block.BORE_X, y) for x, y in block.CAP_TAP_POINTS)
-    assert receiver == cap.BOLT_POINTS == retention.CAP_BOLT_CENTERS
+def test_capture_uses_actual_component_patterns_and_unchanged_functional_fits(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, value in (
+        ("CAP_REGISTER_PROJECTION", cap.REGISTER_PROJECTION),
+        ("CAP_REGISTER_PROJECTION_PLACES", cap.REGISTER_PROJECTION_PLACES),
+        ("CAP_REGISTER_END_CHAMFER_MAX", cap.REGISTER_END_CHAMFER_MAX),
+        ("BLOCK_REGISTER_DEPTH", block.REGISTER_DEPTH),
+        ("BLOCK_REGISTER_DEPTH_PLACES", block.REGISTER_DEPTH_PLACES),
+        ("PIN_STOP_FACE_VARIATION_MAX", pin.STOP_FACE_VARIATION_MAX),
+        ("PIN_STOP_FACE_MEASUREMENT_DIAMETER", pin.STOP_FACE_MEASUREMENT_DIAMETER),
+        ("CARRIER_AXIS_DEVIATION_MAX", carrier.PIN_AXIS_DEVIATION_MAX),
+        ("CARRIER_AXIS_MEASUREMENT_SPAN", carrier.PIN_AXIS_MEASUREMENT_SPAN),
+    ):
+        monkeypatch.setattr(retention, name, value)
+    receiver = tuple((x - block.BORE_X, y) for x, y in block.REGISTER_POINTS)
+    assert receiver == cap.REGISTER_POINTS == retention.CAP_REGISTER_CENTERS
+    assert tuple((x - block.BORE_X, y) for x, y in block.CAP_TAP_POINTS) == cap.BOLT_POINTS
     actual = retention.capture_bounds(
         receiver_pattern=receiver,
-        cap_pattern=cap.BOLT_POINTS,
-        receiver_location_band=printed_band_mm(block.CAP_TAP_LOCATION_PLACES),
-        cap_location_band=printed_band_mm(cap.POSITION_PLACES),
-        cap_hole_diameter_max=cap.HOLE_DIA + cap.DRILLED_BAND[0],
+        cap_pattern=cap.REGISTER_POINTS,
+        receiver_location_band=printed_band_mm(block.REGISTER_LOCATION_PLACES),
+        cap_location_band=printed_band_mm(cap.REGISTER_LOCATION_PLACES),
+        register_bore_diameter_min=block.REGISTER_DIA + block.REGISTER_DIA_BAND[1],
+        register_bore_diameter_max=block.REGISTER_DIA + block.REGISTER_DIA_BAND[0],
+        register_boss_diameter_min=cap.REGISTER_DIA + cap.REGISTER_BAND[1],
+        register_boss_diameter_max=cap.REGISTER_DIA + cap.REGISTER_BAND[0],
+        flange_diameter_min=pin.FLANGE_DIA + pin.FLANGE_DIA_BAND[1],
+        flange_thickness_max=pin.FLANGE_THICK + printed_band_mm(pin.FLANGE_THICK_PLACES),
+        pocket_diameter_min=cap.POCKET_DIA + cap.POCKET_BAND[1],
+        pocket_diameter_max=cap.POCKET_DIA + cap.POCKET_BAND[0],
         bearing_bore_diameter_max=block.BORE_DIA_MAX,
         carriage_counterbore_diameter_max=block.CBORE_DIA + printed_band_mm(2),
         carrier_clearance=carrier.PIN_CLEARANCE_MAX,
@@ -61,54 +81,47 @@ def test_capture_uses_actual_component_patterns_and_unchanged_functional_fits() 
     assert engagement > 0.0
 
 
-def test_bolt_hole_and_thread_stops_bound_translation_without_clamp_friction() -> None:
+def test_integral_registers_bound_translation_without_screw_crest_or_friction() -> None:
     bounds = retention.capture_bounds()
-    thread_float = (
-        retention.CAP_TAP_THREAD_PITCH_DIAMETER_MAX
-        - retention.CAP_BOLT_THREAD_PITCH_DIAMETER_MIN
-    ) / 2.0
-    hole_float = (
-        cap.HOLE_DIA + cap.DRILLED_BAND[0] - hardware.SCREW_MAJOR_DIA_MIN
-    ) / 2.0
-    receiver_band = printed_band_mm(block.CAP_TAP_LOCATION_PLACES)
-    cap_band = printed_band_mm(cap.POSITION_PLACES)
-    assert thread_float > 0.0 and hole_float > 0.0
-    assert retention.CAP_BOLT_THREAD_MAJOR_MIN == hardware.SCREW_MAJOR_DIA_MIN
-    assert bounds.cap_lateral_shift == pytest.approx(
-        math.hypot(receiver_band + cap_band + thread_float + hole_float,
-                   receiver_band + cap_band + thread_float + hole_float)
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    rock = math.radians(retention.CAP_ROCK_ENCLOSURE_DEGREES)
+    register_float = (
+        (block.REGISTER_DIA + block.REGISTER_DIA_BAND[0]) / (2.0 * math.cos(gamma))
+        - (cap.REGISTER_DIA + cap.REGISTER_BAND[1]) / 2.0
+        + retention.CAP_VERTICAL_MOTION_ENCLOSURE * math.tan(gamma + rock)
     )
-    # Removing either float gives a genuinely smaller, nonconservative answer.
-    assert bounds.cap_lateral_shift > math.sqrt(2.0) * (receiver_band + cap_band + hole_float)
-    assert bounds.cap_lateral_shift > math.sqrt(2.0) * (receiver_band + cap_band + thread_float)
-    minimum_floor = (
-        cap.HEIGHT - printed_band_mm(cap.HEIGHT_PLACES)
-        - cap.COUNTERBORE_DEPTH - printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
-    )
-    assert minimum_floor > retention.CAP_BOLT_PITCH  # a whole crest, not nominal shank OD
+    assert bounds.cap_lateral_shift == pytest.approx(math.sqrt(2.0) * (
+        printed_band_mm(block.REGISTER_LOCATION_PLACES)
+        + printed_band_mm(cap.REGISTER_LOCATION_PLACES) + register_float
+    ))
+    assert min(bounds.register_assembly_clearance, bounds.register_bottom_clearance,
+               bounds.register_engagement) > 0.0
     under_head_max = (
         cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
         - cap.COUNTERBORE_DEPTH + printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
     )
-    full_engagement = hardware.SCREW_LENGTH_MIN - under_head_max - retention.CAP_BOLT_PITCH
-    assert bounds.screw_engagement == pytest.approx(full_engagement)
-    assert full_engagement >= 1.5 * hardware.SCREW_MAJOR_DIA_MAX
+    assert bounds.screw_available_penetration == pytest.approx(hardware.SCREW_LENGTH_MIN - under_head_max)
+    assert bounds.screw_available_penetration >= retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
 
 
 def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> None:
     bounds = retention.capture_bounds()
-    theta = math.atan(retention.CAP_CHAMBER_EXCESS[1] / retention.STOP_CONTACT_DIAMETER)
+    theta = math.atan((retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise) / retention.STOP_CONTACT_DIAMETER)
     assert bounds.flange_tilt == pytest.approx(theta)
+    face_bias = math.atan(pin.STOP_FACE_VARIATION_MAX / pin.STOP_FACE_MEASUREMENT_DIAMETER)
+    assert bounds.pin_tilt == pytest.approx(theta + face_bias)
     radius_min = (pin.FLANGE_DIA + pin.FLANGE_DIA_BAND[1]) / 2.0
-    thick_max = pin.FLANGE_THICK + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+    thick_max = pin.FLANGE_THICK + printed_band_mm(pin.FLANGE_THICK_PLACES)
+    half_height = thick_max / 2.0 + (pin.FLANGE_DIA + pin.FLANGE_DIA_BAND[0]) / 2.0 * math.tan(face_bias)
+    roof_shift = (thick_max + retention.CAP_CHAMBER_EXCESS[1]) * math.sin(bounds.cap_tilt)
     flange_float = (
-        (cap.POCKET_DIA + cap.POCKET_BAND[0]) / 2.0
-        - radius_min * math.cos(theta) + thick_max / 2.0 * math.sin(theta)
+        (cap.POCKET_DIA + cap.POCKET_BAND[0]) / 2.0 + roof_shift
+        - radius_min * math.cos(bounds.pin_tilt) + half_height * math.sin(bounds.pin_tilt)
     )
     assert bounds.flange_lateral_shift == pytest.approx(flange_float)
     projected_face_radius = (
-        (radius_min - pin.FLANGE_EDGE_BREAK_MAX) * math.cos(theta)
-        - thick_max / 2.0 * math.sin(theta)
+        (radius_min - pin.FLANGE_EDGE_BREAK_MAX) * math.cos(bounds.pin_tilt)
+        - half_height * math.sin(bounds.pin_tilt)
     )
     stop_radius = retention.STOP_CONTACT_DIAMETER / 2.0
     assert bounds.flange_contact_margin == pytest.approx(
@@ -126,7 +139,8 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
         nearest_carriage - (block.CBORE_DIA + printed_band_mm(2)) / 2.0 - stop_radius
     )
     assert bounds.cap_pocket_margin == pytest.approx(
-        (cap.POCKET_DIA + cap.POCKET_BAND[1]) / 2.0 - bounds.cap_lateral_shift - stop_radius
+        (cap.POCKET_DIA + cap.POCKET_BAND[1]) / 2.0 * math.cos(bounds.cap_tilt)
+        - bounds.cap_lateral_shift - roof_shift - stop_radius
     )
     center_band = printed_band_mm(cap.CENTER_LOCATION_PLACES)
     center_offset = max(
@@ -134,24 +148,22 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
         for ax, ay, px, py in product((-center_band, center_band), repeat=4)
     )
     assert bounds.cap_aperture_margin == pytest.approx(
-        stop_radius - bounds.cap_lateral_shift - center_offset
+        stop_radius - bounds.cap_lateral_shift - roof_shift - center_offset
         - (cap.APERTURE_DIA + retention.CAP_APERTURE_BAND[0]) / 2.0
     )
     assert all(getattr(bounds, field) > 0.0 for field in CONTACT_MARGINS)
     # The connected operating branch is limited by opposing faces, not fit friction.
     assert retention.STOP_CONTACT_DIAMETER * math.tan(theta) == pytest.approx(
-        retention.CAP_CHAMBER_EXCESS[1]
+        retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
     )
 
 
 def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> None:
     bounds = retention.capture_bounds()
-    pin_tilt = bounds.flange_tilt + math.atan(
-        retention.PIN_FLANGE_PERPENDICULARITY / retention.PIN_FLANGE_SQUARENESS_SPAN
-    )
+    pin_tilt = bounds.flange_tilt + math.atan(pin.STOP_FACE_VARIATION_MAX / pin.STOP_FACE_MEASUREMENT_DIAMETER)
     expected_tilt = (
         pin_tilt
-        + math.atan(retention.CARRIER_HOLE_PERPENDICULARITY / retention.CARRIER_ENGAGEMENT_MIN)
+        + math.atan(carrier.PIN_AXIS_DEVIATION_MAX / carrier.PIN_AXIS_MEASUREMENT_SPAN)
         + math.atan(carrier.PIN_CLEARANCE_MAX / retention.CARRIER_ENGAGEMENT_MIN)
     )
     assert bounds.carrier_tilt == pytest.approx(expected_tilt)
@@ -160,30 +172,192 @@ def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> Non
     center_offset = 2.0 * math.sqrt(2.0) * printed_band_mm(cap.CENTER_LOCATION_PLACES)
     assert bounds.pin_aperture_clearance == pytest.approx(
         cap.APERTURE_DIA / 2.0 - boss_radius / math.cos(pin_tilt)
-        - bounds.flange_lateral_shift - cap_height_max * math.tan(pin_tilt)
+        - bounds.flange_lateral_shift - (cap_height_max + bounds.cap_top_rise) * math.tan(pin_tilt)
         - center_offset
     )
     seat_min = (
-        pin.FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-        + pin.UPPER_BOSS_HEIGHT - printed_band_mm(retention.PIN_UPPER_BOSS_PLACES)
+        pin.FLANGE_THICK - printed_band_mm(pin.FLANGE_THICK_PLACES)
+        + pin.UPPER_BOSS_HEIGHT - printed_band_mm(pin.UPPER_BOSS_PLACES)
     )
-    outline_band = printed_band_mm(cap.OUTLINE_PLACES)
-    center_band = printed_band_mm(cap.CENTER_LOCATION_PLACES)
-    farthest_corner = max(
-        math.hypot(cx - px, cy - py)
-        for width, length, px, py in product(
-            (cap.WIDTH - outline_band, cap.WIDTH + outline_band),
-            (cap.LENGTH - outline_band, cap.LENGTH + outline_band),
-            (cap.WIDTH / 2.0 - center_band, cap.WIDTH / 2.0 + center_band),
-            (cap.LENGTH / 2.0 - center_band, cap.LENGTH / 2.0 + center_band),
-        )
-        for cx, cy in product((0.0, width), (0.0, length))
-    ) + bounds.flange_lateral_shift
+    edge_band = printed_band_mm(cap.OUTLINE_PLACES) + printed_band_mm(cap.CENTER_LOCATION_PLACES)
+    farthest_corner = math.hypot(cap.WIDTH / 2.0 + edge_band, cap.LENGTH / 2.0 + edge_band) + bounds.flange_lateral_shift
+    floor_rise = (
+        retention.STOP_CONTACT_DIAMETER / 2.0 - bounds.cap_lateral_shift - bounds.flange_lateral_shift
+    ) * math.tan(bounds.flange_tilt)
+    fit_z = carrier.PIN_CLEARANCE_MAX * math.tan(expected_tilt)
+    assert floor_rise > 0.0
     assert bounds.cap_running_clearance == pytest.approx(
-        seat_min - cap_height_max - farthest_corner * math.tan(expected_tilt)
+        seat_min * math.cos(pin_tilt) + floor_rise - cap_height_max - bounds.cap_top_rise
+        - farthest_corner * math.tan(expected_tilt) - fit_z
     )
     assert bounds.pin_aperture_clearance > 0.0
     assert bounds.cap_running_clearance > 0.0
+
+
+def test_relative_carrier_motion_cancels_fixed_bore_bias_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    bounds = retention.capture_bounds()
+    bore_bias = math.atan(carrier.PIN_AXIS_DEVIATION_MAX / carrier.PIN_AXIS_MEASUREMENT_SPAN)
+    face_bias = math.atan(pin.STOP_FACE_VARIATION_MAX / pin.STOP_FACE_MEASUREMENT_DIAMETER)
+    fit_angle = math.atan(carrier.PIN_CLEARANCE_MAX / retention.CARRIER_ENGAGEMENT_MIN)
+    normal_angle = math.atan(
+        (retention.PIN_LOWER_GAP[1] - retention.PIN_LOWER_GAP[0]) / retention.STOP_CONTACT_DIAMETER
+    )
+    assert bounds.carrier_tilt == pytest.approx(bounds.flange_tilt + face_bias + bore_bias + fit_angle)
+    expected_motion = bounds.flange_tilt + normal_angle + 2.0 * face_bias + 2.0 * fit_angle
+    assert bounds.carrier_motion_tilt == pytest.approx(expected_motion)
+    assert bounds.carrier_slope_change == pytest.approx(math.tan(expected_motion))
+    monkeypatch.setattr(retention, "CARRIER_AXIS_DEVIATION_MAX", 0.0)
+    unbiased = retention.capture_bounds()
+    assert bounds.carrier_tilt - unbiased.carrier_tilt == pytest.approx(bore_bias)
+    assert bounds.carrier_motion_tilt == pytest.approx(unbiased.carrier_motion_tilt)
+    monkeypatch.setattr(retention, "PIN_STOP_FACE_VARIATION_MAX", 0.0)
+    square = retention.capture_bounds()
+    assert unbiased.carrier_motion_tilt - square.carrier_motion_tilt == pytest.approx(2.0 * face_bias)
+    no_fit_rock = retention.capture_bounds(carrier_clearance=0.0)
+    assert square.carrier_motion_tilt - no_fit_rock.carrier_motion_tilt == pytest.approx(2.0 * fit_angle)
+
+
+def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.MonkeyPatch) -> None:
+    bounds = retention.capture_bounds()
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    rock = math.radians(retention.CAP_ROCK_ENCLOSURE_DEGREES)
+    receiver_band = printed_band_mm(block.REGISTER_LOCATION_PLACES)
+    cap_band = printed_band_mm(cap.REGISTER_LOCATION_PLACES)
+    radial_float = (
+        (block.REGISTER_DIA + block.REGISTER_DIA_BAND[0]) / (2.0 * math.cos(gamma))
+        - (cap.REGISTER_DIA + cap.REGISTER_BAND[1]) / 2.0
+        + retention.CAP_VERTICAL_MOTION_ENCLOSURE * math.tan(gamma + rock)
+    )
+    head_z = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES) - (
+        cap.COUNTERBORE_DEPTH - printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
+    ) + retention.CAP_BASE_SEATING_GAP_MAX
+    head_radius = (
+        cap.HEAD_BEARING_DIAMETER_MIN / 2.0 + retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX
+        + math.sqrt(2.0) * printed_band_mm(cap.POSITION_PLACES) + head_z * math.tan(gamma)
+    )
+    registers = cap.REGISTER_POINTS
+    register_radius = max(math.hypot(*p) for p in registers) + math.sqrt(2.0) * cap_band
+    span_min = (math.dist(*registers) - 2.0 * math.sqrt(2.0) * cap_band) * math.cos(rock)
+    coefficient = max(
+        sum(math.dist(point, register) for register in registers)
+        + 2.0 * (head_radius + math.sqrt(2.0) * receiver_band + radial_float)
+        for point in cap.BOLT_POINTS
+    ) / span_min
+    endpoint_motion = 2.0 * radial_float + 2.0 * register_radius * (1.0 - math.cos(rock))
+    contact_radius = max(math.hypot(*p) for p in cap.BOLT_POINTS) + head_radius + bounds.cap_lateral_shift
+    expected = (
+        endpoint_motion * coefficient + 2.0 * head_z * math.sin(rock)
+        + 2.0 * contact_radius * (1.0 - math.cos(rock))
+    )
+    assert bounds.cap_floor_migration == pytest.approx(expected)
+    assert bounds.cap_floor_migration > 0.0
+    assert bounds.cap_yaw > 0.0
+    head_gap = retention.CAP_HEAD_SEATING_GAP_MAX
+    monkeypatch.setattr(retention, "CAP_HEAD_SEATING_GAP_MAX", 0.0)
+    seated_head = retention.capture_bounds()
+    assert bounds.cap_head_release - seated_head.cap_head_release == pytest.approx(head_gap)
+    # A separately accepted cap/block base gap survives even with the head
+    # seated. Neither inspection may silently stand in for the other.
+    migration_release = (
+        expected * math.tan(gamma)
+        + 2.0 * (cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)) * (1.0 - math.cos(rock))
+    )
+    assert seated_head.cap_head_release == pytest.approx(retention.CAP_BASE_SEATING_GAP_MAX + migration_release)
+    assert 0.0 < bounds.cap_tilt < rock
+    assert 0.0 < bounds.cap_roof_rise < retention.CAP_VERTICAL_MOTION_ENCLOSURE
+    assert 0.0 < bounds.cap_top_rise < retention.CAP_VERTICAL_MOTION_ENCLOSURE
+
+
+def test_excessive_head_release_cannot_escape_connected_motion_enclosure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(retention, "CAP_HEAD_SEATING_GAP_MAX", cap.HEIGHT)
+    with pytest.raises(ValueError):
+        retention.capture_bounds()
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_register_engagement_boundary_includes_end_chamfer(
+    monkeypatch: pytest.MonkeyPatch, fraction: float,
+) -> None:
+    bounds = retention.capture_bounds()
+    monkeypatch.setattr(retention, "CAP_REGISTER_END_CHAMFER_MAX",
+                        cap.REGISTER_END_CHAMFER_MAX + fraction * bounds.register_engagement)
+    if fraction < 1.0:
+        assert retention.capture_bounds().register_engagement > 0.0
+    else:
+        with pytest.raises(ValueError, match="register"):
+            retention.capture_bounds()
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_register_receiver_bottom_boundary(
+    monkeypatch: pytest.MonkeyPatch, fraction: float,
+) -> None:
+    bounds = retention.capture_bounds()
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    monkeypatch.setattr(retention, "BLOCK_REGISTER_DEPTH",
+                        block.REGISTER_DEPTH - fraction * bounds.register_bottom_clearance / math.cos(gamma))
+    if fraction < 1.0:
+        assert retention.capture_bounds().register_bottom_clearance > 0.0
+    else:
+        with pytest.raises(ValueError, match="register"):
+            retention.capture_bounds()
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_cap_running_clearance_boundary_keeps_correlated_floor_rise(
+    monkeypatch: pytest.MonkeyPatch, fraction: float,
+) -> None:
+    bounds = retention.capture_bounds()
+    monkeypatch.setattr(retention, "PIN_UPPER_BOSS_HEIGHT",
+                        pin.UPPER_BOSS_HEIGHT - fraction * bounds.cap_running_clearance / math.cos(bounds.pin_tilt))
+    if fraction < 1.0:
+        assert retention.capture_bounds().cap_running_clearance > 0.0
+    else:
+        with pytest.raises(ValueError, match="clearance"):
+            retention.capture_bounds()
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+@pytest.mark.parametrize("field,parameter", (
+    ("floor_inner_margin", "bearing_bore_diameter_max"),
+    ("floor_counterbore_margin", "carriage_counterbore_diameter_max"),
+))
+def test_fixed_stop_floor_boundaries(field: str, parameter: str, fraction: float) -> None:
+    bounds = retention.capture_bounds()
+    original = block.BORE_DIA_MAX if parameter == "bearing_bore_diameter_max" else block.CBORE_DIA + printed_band_mm(2)
+    changes = {parameter: original + 2.0 * fraction * getattr(bounds, field)}
+    if fraction < 1.0:
+        assert getattr(retention.capture_bounds(**changes), field) > 0.0
+    else:
+        with pytest.raises(ValueError, match="contact"):
+            retention.capture_bounds(**changes)
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_register_assembly_boundary_uses_both_manufactured_patterns(fraction: float) -> None:
+    bounds = retention.capture_bounds()
+    bore_min = block.REGISTER_DIA + block.REGISTER_DIA_BAND[1]
+    changes = {"register_bore_diameter_min": bore_min - 2.0 * fraction * bounds.register_assembly_clearance}
+    if fraction < 1.0:
+        assert retention.capture_bounds(**changes).register_assembly_clearance > 0.0
+    else:
+        with pytest.raises(ValueError, match="register"):
+            retention.capture_bounds(**changes)
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_flange_outer_overlap_boundary_covers_both_finite_faces(fraction: float) -> None:
+    bounds = retention.capture_bounds()
+    diameter_min = pin.FLANGE_DIA + pin.FLANGE_DIA_BAND[1]
+    changes = {
+        "flange_diameter_min": diameter_min - fraction * bounds.flange_contact_margin / math.cos(bounds.pin_tilt),
+    }
+    if fraction < 1.0:
+        assert retention.capture_bounds(**changes).flange_contact_margin > 0.0
+    else:
+        with pytest.raises(ValueError, match="contact"):
+            retention.capture_bounds(**changes)
+
 
 
 @pytest.mark.parametrize("pass_name,a,b", PASSES)
@@ -192,7 +366,7 @@ def test_lift_bounds_cover_interior_supports_and_extremal_end_width_pitch_points
 ) -> None:
     bounds = retention.capture_bounds()
     span = b[0] - a[0]
-    angular_slope = math.tan(bounds.carrier_tilt)
+    angular_slope = bounds.carrier_slope_change
     end_slope = min(angular_slope, (bounds.support_lift + bounds.support_drop) / span)
     # Include both actual support stations, midspan, both plate ends, both
     # width extremes, and the support line (A2/B2 is NOT Y=0).
@@ -237,9 +411,8 @@ def test_top_washer_is_fitted_to_upper_edge_loaded_gap_not_nominal_hole_center()
     assert gap - center_loaded == pytest.approx((pin.CROSS_HOLE_DIA - hardware.CLEVIS_DIA) / 2.0)
     assert 0.0 < retainer.THICKNESS < retainer.SUPPLY_MIN_THICKNESS < retainer.STOCK_THICKNESS
     assert retainer.OUTER_DIA > retainer.BORE_DIA > pin.FIT_DIA
-    assert retention.capture_bounds().support_lift == pytest.approx(
-        retention.CAP_CHAMBER_EXCESS[1] + retention.TOP_RUNNING_GAP[1]
-    )
+    bounds = retention.capture_bounds()
+    assert bounds.support_lift > retention.CAP_CHAMBER_EXCESS[1] + gap
 
 
 @pytest.mark.parametrize("gap", retention.TOP_RUNNING_GAP)
@@ -301,8 +474,8 @@ def test_fitted_chamber_rejects_both_tight_and_excessive_clearance(excess: float
 @pytest.mark.parametrize("changes", (
     {"chamber_excess": 10.0},
     {"flange_diameter_min": 30.0},
-    {"cap_hole_diameter_max": 12.0},
-    {"cap_hole_diameter_max": 1.0},
+    {"register_bore_diameter_min": cap.REGISTER_DIA + cap.REGISTER_BAND[0]},
+    {"register_boss_diameter_min": 1.0},
     {"receiver_location_band": 3.0},
     {"cap_location_band": 3.0},
     {"pocket_diameter_max": 42.0},
@@ -320,12 +493,23 @@ def test_geometric_mutants_lose_capture_or_running_contact(changes: dict[str, fl
 def test_relocated_pattern_cannot_hide_behind_nominal_symmetric_defaults(pattern_name: str) -> None:
     # Start with the ACTUAL block/cap pattern. Translate it without changing
     # its spacing: using only a nominal pattern would miss this loss of stop overlap.
-    source = tuple((x - block.BORE_X, y) for x, y in block.CAP_TAP_POINTS) if pattern_name == "receiver_pattern" else cap.BOLT_POINTS
+    source = tuple((x - block.BORE_X, y) for x, y in block.REGISTER_POINTS) if pattern_name == "receiver_pattern" else cap.REGISTER_POINTS
     relocated = tuple((x + 3.0, y + 3.0) for x, y in source)
-    with pytest.raises(ValueError, match="contact|clearance"):
+    with pytest.raises(ValueError, match="register"):
         retention.capture_bounds(**{pattern_name: relocated})
-    with pytest.raises(ValueError, match="four"):
+    with pytest.raises(ValueError, match="register"):
         retention.capture_bounds(**{pattern_name: source[:-1]})
+
+
+@pytest.mark.parametrize("pattern_name", ("receiver_pattern", "cap_pattern"))
+def test_register_spacing_mismatch_cannot_cancel_at_pattern_centroid(pattern_name: str) -> None:
+    source = tuple((x - block.BORE_X, y) for x, y in block.REGISTER_POINTS) if pattern_name == "receiver_pattern" else cap.REGISTER_POINTS
+    mismatched = ((source[0][0] - 1.0, source[0][1]), (source[1][0] + 1.0, source[1][1]))
+    assert tuple(sum(p[axis] for p in mismatched) for axis in (0, 1)) == tuple(
+        sum(p[axis] for p in source) for axis in (0, 1)
+    )
+    with pytest.raises(ValueError, match="register"):
+        retention.capture_bounds(**{pattern_name: mismatched})
 
 
 def test_cap_material_acceptance_rejects_real_wall_and_floor_mutants() -> None:

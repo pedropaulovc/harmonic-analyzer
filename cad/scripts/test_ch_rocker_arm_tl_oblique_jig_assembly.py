@@ -208,12 +208,15 @@ def test_pivot_blocks_and_pins_sit_on_the_pin_stations() -> None:
     assert spec.PIN_TOP_Z == pytest.approx(
         trammel.CARRIER_UNDERSIDE_Z + pivot_pin.CARRIER_LENGTH
     )
-    assert (
-        trammel.CARRIER_UNDERSIDE_Z,
-        trammel.CARRIER_TOP_Z,
-        spec.PART_TOP_Z,
-        spec.PIN_TOP_Z,
-    ) == pytest.approx((78.2, 90.2, 98.7, 102.7))
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(
+        trammel.PIVOT_BLOCK_TOP_Z + trammel.PIN_COLLAR_PROUD
+    )
+    assert trammel.CARRIER_TOP_Z - trammel.CARRIER_UNDERSIDE_Z == pytest.approx(
+        trammel.CARRIER_THICK
+    )
+    assert spec.PART_TOP_Z - trammel.CARRIER_TOP_Z == pytest.approx(
+        trammel.RISER_THICK + trammel.STRAP_THICK
+    )
     assert spec.PIN_TOP_Z - spec.PART_TOP_Z == pytest.approx(
         retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL
     )
@@ -845,6 +848,17 @@ def test_caps_screws_and_safety_wire_close_on_each_block_receiver_pattern() -> N
         ))
         for actual, expected in zip(cap_rows, block_rows, strict=True):
             assert actual == pytest.approx(expected)
+        # Both integral bosses enter their own receivers below the seating face.
+        assert len(retention.CAP_REGISTER_CENTERS) == 2
+        for x, y in retention.CAP_REGISTER_CENTERS:
+            assert _image(cap_rows, cap_origin, (x, y, 0.0)) == pytest.approx(
+                _image(block_rows, block_origin, (
+                    pivot_block.BORE_X + x, y, pivot_block.BLOCK_HEIGHT,
+                ))
+            )
+            assert _image(cap_rows, cap_origin, (
+                x, y, -retention.CAP_REGISTER_PROJECTION,
+            ))[2] > block_origin[2] + pivot_block.BLOCK_HEIGHT - retention.BLOCK_REGISTER_DEPTH
         for slot, (x, y) in enumerate(retention.CAP_BOLT_CENTERS):
             screw_index = index * 4 + slot
             screw_origin, screw_rows = spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][screw_index]
@@ -1401,7 +1415,11 @@ FASTENER_TABLE = {
     "RISER_TO_CARRIER": ("#4-40 X 5/8 B18.6.3 FLAT HEAD", 4, 10.4014, -1.5986),
     "CR_CLAMP": ("1/4-20 X 7/8 SHCS", 1, 12.0, 1.725),
     "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, -1.586),
-    "CAP_TO_BLOCK": ("1/4-20 X 3/4 SHCS", 8, 16.05, -7.95),
+    "CAP_TO_BLOCK": (
+        "5/16-18 X 3/4 SHCS", 8,
+        retention_hardware.SCREW_LENGTH - (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH),
+        retention_hardware.SCREW_LENGTH - (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH) - pivot_block.BLOCK_HEIGHT,
+    ),
 }
 
 
@@ -1885,3 +1903,28 @@ def test_full_sweep_fixture_prisms_cover_interstitial_poses_and_rigid_upset(
         )
         assert fixture.z_max >= top + rise - 1e-9
         assert fixture.z_min <= bottom - bounds.support_drop + 1e-9
+
+
+@pytest.mark.parametrize("pass_name", ("inner", "outer"))
+def test_cap_fixture_prisms_include_registered_yaw_and_vertical_release(pass_name: str) -> None:
+    bounds = retention.capture_bounds()
+    fixtures = {
+        fixture.label: fixture
+        for fixture in spec.captured_fixture_envelopes(samples=3)
+    }
+    for rail, (origin, _rows) in zip(spec.RAILS, spec.PLACEMENTS[spec.PIVOT_CAP], strict=True):
+        fixture = fixtures[f"{pass_name}: pivot cap {rail}"]
+        assert fixture.z_max >= origin[2] + retention.CAP_HEIGHT + bounds.cap_top_rise
+        for theta in spec.sweep_thetas(pass_name, samples=21):
+            station = spec.carriage_stations(pass_name, theta)[rail] + pivot_block.BORE_X
+            for sign in (-1.0, 1.0):
+                yaw = sign * bounds.cap_yaw
+                for x in (-retention.CAP_WIDTH / 2.0, retention.CAP_WIDTH / 2.0):
+                    for y in (-retention.CAP_LENGTH / 2.0, retention.CAP_LENGTH / 2.0):
+                        turned = (
+                            x * math.cos(yaw) - y * math.sin(yaw),
+                            x * math.sin(yaw) + y * math.cos(yaw),
+                        )
+                        assert _inside_xy(fixture.xy, trammel.rail_point(
+                            rail, station + turned[0], turned[1],
+                        ))

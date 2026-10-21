@@ -19,8 +19,8 @@ and outer race. This is a fitted acceptance, not a tolerance-stack promise
 or a bearing-preload adjustment. The cap pocket is separately fitted to the
 actual flange thickness and local floor/ceiling variation.
 
-The Ø36 flange is 3 thick; the upper Ø12.7 boss is nominally 11.35 from
-flange top to carrier seat, reaching block-local Z38.5.
+The Ø36 flange is 3 thick; the upper Ø12.7 boss is nominally 12.35 from
+flange top to carrier seat, reaching block-local Z39.5.
 The Ø10 h6 carrier journal extends 24.5 above that seat. Its real Ø5 cross
 hole lies 18.5 above the seat and 6 from the end for the removable headed
 clevis pin and split cotter. Both journal fit diameters remain unchanged:

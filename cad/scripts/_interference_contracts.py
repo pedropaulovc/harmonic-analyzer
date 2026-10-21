@@ -934,7 +934,9 @@ JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into the nut bracket
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.401409)  # #4-40 into the carrier
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 12.0)  # 1/4-20 through the carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
-JIG_PIVOT_CAP_SCREW_THREAD = (6.35, 5.105, 19.05 - (10.50 - 7.500))
+JIG_PIVOT_CAP_SCREW_THREAD = (7.9375, 6.528, 19.05 - (11.50 - 8.500))
+# Only the actual 5/16-18 major-envelope/tap-drill annulus is necessary
+# overlap; cap, screw heads and safety wire receive no blanket exception.
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
 JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut

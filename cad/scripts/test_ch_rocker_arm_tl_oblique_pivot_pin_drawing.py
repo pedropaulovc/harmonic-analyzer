@@ -200,9 +200,11 @@ def test_captured_flange_and_raised_seat_are_the_actual_pin_profile() -> None:
     assert spec.FLANGE_BOTTOM_STATION + trammel.BEARING_RECESS == pytest.approx(24.15)
     assert spec.FLANGE_TOP_STATION - spec.FLANGE_BOTTOM_STATION == 3.0
     assert spec.CARRIER_STATION - spec.FLANGE_TOP_STATION == pytest.approx(spec.UPPER_BOSS_HEIGHT)
-    assert spec.UPPER_BOSS_HEIGHT == retention.PIN_UPPER_BOSS_HEIGHT == 11.35
-    assert spec.CARRIER_STATION + trammel.BEARING_RECESS == 38.5
-    assert spec.CROSS_HOLE_STATION == 56.0
+    assert spec.UPPER_BOSS_HEIGHT == retention.PIN_UPPER_BOSS_HEIGHT
+    assert spec.CARRIER_STATION + trammel.BEARING_RECESS == pytest.approx(
+        trammel.PIVOT_BLOCK_HEIGHT + trammel.PIN_COLLAR_PROUD
+    )
+    assert spec.CROSS_HOLE_STATION - spec.CARRIER_STATION == retention.PIN_CROSS_HOLE_FROM_SEAT
     assert spec.CROSS_HOLE_DIA == 5.0
     assert spec.OVERALL_LENGTH - spec.CROSS_HOLE_STATION == 6.0
 
