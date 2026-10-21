@@ -2990,6 +2990,16 @@ def qualified_capture_fixture_census():
     )
 
 
+@pytest.fixture(scope="module")
+def production_capture_fixture_census():
+    # Exercise the production default once, not once per boundary case.
+    # Its continuous intersample allowance is much tighter than samples=5.
+    return spec.capture_fixture_clearance_census(
+        native_baseline="SYNTHETIC TEST ATTESTATION ONLY: exact current whole-model neutral baseline",
+        primary_measurements=_synthetic_primary_measurements(),
+    )
+
+
 def test_primary_measurement_api_has_no_verified_or_measured_defaults() -> None:
     with pytest.raises(TypeError):
         spec.PrimaryCaptureMeasurement(pass_name="inner", support=0)
@@ -3409,9 +3419,50 @@ def test_every_original_residual_pair_uses_its_grounded_proof_on_both_passes(
     assert len(residuals) == 28
     assert len(qualified_capture_fixture_census) == 4680
     assert all(qualified_capture_fixture_census[key].source_resolved for key in residuals)
-    # This explicitly labelled synthetic record set exercises source closure,
-    # not a native run or installed acceptance. No pair is dropped.
-    assert all(proof.source_resolved for proof in qualified_capture_fixture_census.values())
+
+
+def test_production_default_census_resolves_all_4680_source_pairs(
+    production_capture_fixture_census,
+) -> None:
+    # Labelled synthetic records exercise conditional SOURCE closure, not
+    # native execution or installed acceptance. No physical pair is dropped.
+    assert len(production_capture_fixture_census) == 4680
+    assert all(proof.source_resolved for proof in production_capture_fixture_census.values()), {
+        key: proof.missing
+        for key, proof in production_capture_fixture_census.items()
+        if not proof.source_resolved
+    }
+
+
+def test_coarse_sweep_enclosures_remain_unresolved_instead_of_claiming_clearance(
+    qualified_capture_fixture_census, production_capture_fixture_census, monkeypatch,
+) -> None:
+    key = _fixture_pair("inner", (spec.PIVOT_PIN, 0), (spec.RISER, 0))
+    coarse = qualified_capture_fixture_census[key]
+    production = production_capture_fixture_census[key]
+    assert len(qualified_capture_fixture_census) == len(production_capture_fixture_census)
+    assert coarse.nominal == coarse.upset == "UNRESOLVED"
+    assert coarse.nominal_gap < 0.0 and coarse.upset_gap < 0.0
+    assert coarse.missing and not coarse.source_resolved
+    assert production.nominal == production.upset == "CONTINUOUS_SEPARATOR"
+    assert production.nominal_gap > 0.0 and production.upset_gap > 0.0
+    assert production.source_resolved and not production.missing
+    assert spec.fixture_sweep_allowance("inner", 5) > spec.fixture_sweep_allowance("inner")
+
+    # The guard must reject these real cached coarse proofs even with complete
+    # labelled records and baseline. Reuse the module census, not another run.
+    def cached_coarse_census(**kwargs):
+        assert kwargs["samples"] == 5
+        assert kwargs["primary_measurements"] == _synthetic_primary_measurements()
+        return qualified_capture_fixture_census
+
+    monkeypatch.setattr(spec, "capture_fixture_clearance_census", cached_coarse_census)
+    with pytest.raises(ValueError, match="unresolved capture/fixture"):
+        spec.require_capture_fixture_clearance(
+            native_baseline="SYNTHETIC TEST ATTESTATION ONLY: exact current whole-model neutral baseline",
+            samples=5,
+            primary_measurements=_synthetic_primary_measurements(),
+        )
 
 
 def test_pin_screw_radial_separator_has_both_sides_of_its_capture_translation_boundary() -> None:
