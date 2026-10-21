@@ -1406,7 +1406,7 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
 # VIEW G carries the shared positive rib profile and its derived reach.
 # The title block owns the R1 MAX ceiling; the counter web stays independently sized.
 FRONT_KEEP = {
-    "AnchorHeight": (0.183, 0.235),
+    "AnchorHeight": (0.145, 0.235),
     "WebThickness": (0.215, 0.247),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),

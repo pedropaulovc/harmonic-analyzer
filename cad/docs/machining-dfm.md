@@ -431,6 +431,8 @@ View G locates the boss's axial ends through the **CENTRED ON 5.08 WEB**
 caption attached to its native **19.05** length dimension. The boss and
 counter web share Y=0; this does not centre either feature on the asymmetric
 7.00 coefficient plate.
+The combined length/caption text sits left of View G, clear of the boss and
+web outlines; R14's original text position overlapped those outlines.
 
 The receiver's new Z span already overlaps the first spring station; the
 source-neighbour intent is **X reach 35.75 mm before the worst nut footprint
