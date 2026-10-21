@@ -153,6 +153,10 @@ from _machinist_review_mode import (  # noqa: E402
     MachinistReviewMode,
     mode_for_drawing,
 )
+from machinist_review_config import (  # noqa: E402
+    ReviewProfile,
+    registered_review_profile,
+)
 from _refresh_tier import (  # noqa: E402  (FULL / PARTS / EXPLODE tier choice)
     ExplodePlan,
     RefreshTier,
@@ -3218,6 +3222,7 @@ def task_verify():
 # Keep the non-inert local-import closure pinned in test_machinist_review_leaf.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
+    "machinist_review_config.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
 )
@@ -3267,13 +3272,41 @@ def _machinist_review_stamp(stem: str) -> Path:
     return REPORTS / f"check-machinist-review-{stem}.ok"
 
 
-def _machinist_review_command(stem: str) -> list[str]:
+def _machinist_review_profile() -> ReviewProfile:
+    return registered_review_profile(
+        os.environ.get("HARMONIC_MACHINIST_REVIEWER", "claude")
+    )
+
+
+def _machinist_review_cache_key(
+    stem: str, profile: ReviewProfile, label: str | None = None
+) -> str:
+    # The config module is a real review input. Its contextual digest records
+    # both its actual source and the frozen effective profile, keeping normal
+    # cache-key provenance instead of adding a virtual file or a post-hoc salt.
+    config_path = (SCRIPTS_DIR / "machinist_review_config.py").resolve()
+    effective = json.dumps(profile._asdict(), sort_keys=True, separators=(",", ":"))
+
+    def digest(path: str) -> str:
+        source = ContentChecker._digest(path)
+        if Path(path).resolve() == config_path:
+            return hashlib.sha256(f"{source}\0{effective}".encode()).hexdigest()
+        return source
+
+    return _cache.cache_key(_machinist_review_file_deps(stem), digest, label)
+
+
+def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
         "--kind", spec.source_kind, "--runs", "3",
         "--report-dir", str(_machinist_review_dir(stem)),
+        "--reviewer", profile.backend, "--model", profile.model,
+        "--effort", profile.effort,
+        "--judge-reviewer", profile.backend, "--judge-model", profile.model,
+        "--judge-effort", profile.effort,
     ]
 
 
@@ -3317,13 +3350,20 @@ def _evaluate_machinist_review(
 
 
 @_cache.keyed_action
-def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> None:
+def _cached_machinist_review_action(
+    stem: str, mode: MachinistReviewMode, profile: ReviewProfile
+) -> None:
     """Review on the submitter, caching verdicts BEFORE enforcing their policy.
 
     Cache the complete leaf directory, including attempt evidence and per-run
     reports: no transcripts or source snapshots are pruned from the payload.
     Provider/runner errors never publish and never leave a freshness stamp.
     """
+    if not isinstance(profile, ReviewProfile):
+        raise ValueError("registered machinist review requires a resolved ReviewProfile")
+    # Validate direct action callers too, before removing stamps or probing.
+    # Do not reselect defaults: this snapshot also owns the task's freshness.
+    registered_review_profile(profile.backend)
     label = f"check:machinist_review:{stem}"
     directory = _machinist_review_dir(stem)
     stamp = _machinist_review_stamp(stem)
@@ -3331,7 +3371,7 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
-        key = _cache_key(_machinist_review_file_deps(stem), label)
+        key = _machinist_review_cache_key(stem, profile, label)
         try:
             # Restore into a clean evidence directory: an archive must not be
             # mixed with attempts retained under a previous input key.
@@ -3354,7 +3394,7 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
                 _tag_cache_key(work, key)
                 work.set_attribute("cache", "miss")
                 code = _run_subprocess(
-                    _machinist_review_command(stem), label,
+                    _machinist_review_command(stem, profile), label,
                     log_stem=f"machinist-review-{stem}", task=label,
                 )
             aggregate = _read_machinist_aggregate(stem)
@@ -3409,6 +3449,7 @@ def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
 
 
 def _machinist_review_tasks():
+    profile = _machinist_review_profile()
     for stem, mode in _reviewed_drawings():
         deps = _machinist_review_file_deps(stem)
         directory = _machinist_review_dir(stem)
@@ -3421,6 +3462,7 @@ def _machinist_review_tasks():
             "uptodate": [
                 config_changed({
                     "mode": mode.value, "inputs": [_rel_tag(dep) for dep in deps],
+                    "profile": profile._asdict(),
                 }),
                 not _cache.forced_refresh(f"check:machinist_review:{stem}"),
             ],
@@ -3433,7 +3475,7 @@ def _machinist_review_tasks():
                     for run in range(1, 4)
                 ),
             ],
-            "actions": [(_cached_machinist_review_action, [stem, mode])],
+            "actions": [(_cached_machinist_review_action, [stem, mode, profile])],
             "clean": True,
             "verbosity": 2,
         }

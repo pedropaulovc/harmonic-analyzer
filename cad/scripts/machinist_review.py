@@ -102,6 +102,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 import _telemetry  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
+import machinist_review_config as review_config  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     SheetStore,
     create_server as _create_sheet_server,
@@ -127,15 +128,7 @@ CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
 # Parallel reviews share CODEX_HOME; one thread repairs its auth link at a time.
 _CODEX_AUTH_LOCK = threading.Lock()
 
-DEFAULT_MODELS = {
-    "claude": "claude-opus-5-5",
-    "codex": "gpt-6-astra",
-}
-DEFAULT_EFFORTS = {
-    "claude": "medium",
-    "codex": "low",
-}
-REVIEWERS = tuple(DEFAULT_MODELS)
+REVIEWERS = tuple(review_config.DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # Owner ruling 2026-10-18: a confirmed finding gates only when two blind runs
@@ -1803,8 +1796,8 @@ def _review_session(
     snapshot = ReviewPackage(package.name, package.kind, tuple(snapshot_sources))
     mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
-    model = model or DEFAULT_MODELS[reviewer]
-    effort = effort or DEFAULT_EFFORTS[reviewer]
+    model = model or review_config.DEFAULT_MODELS[reviewer]
+    effort = effort or review_config.DEFAULT_EFFORTS[reviewer]
     executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
@@ -2150,10 +2143,10 @@ def aggregate_package(
     """Collect independent blind runs, then adjudicate all their finding claims."""
     if runs < 1:
         raise ValueError("runs must be at least 1")
-    model = model or DEFAULT_MODELS[reviewer]
-    effort = effort or DEFAULT_EFFORTS[reviewer]
-    judge_model = judge_model or DEFAULT_MODELS[judge_reviewer]
-    judge_effort = judge_effort or DEFAULT_EFFORTS[judge_reviewer]
+    model = model or review_config.DEFAULT_MODELS[reviewer]
+    effort = effort or review_config.DEFAULT_EFFORTS[reviewer]
+    judge_model = judge_model or review_config.DEFAULT_MODELS[judge_reviewer]
+    judge_effort = judge_effort or review_config.DEFAULT_EFFORTS[judge_reviewer]
     with _telemetry.span(
         "machinist_review.aggregate", name=package.name, run_count=runs
     ) as span:
@@ -2516,18 +2509,18 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--model",
         help=(
-            f"reviewer model (defaults: {DEFAULT_MODELS}; "
+            f"reviewer model (defaults: {review_config.DEFAULT_MODELS}; "
             "claude also takes claude-fable-5-1)"
         ),
     )
     parser.add_argument(
         "--effort",
-        help=f"reasoning effort (defaults: {DEFAULT_EFFORTS})",
+        help=f"reasoning effort (defaults: {review_config.DEFAULT_EFFORTS})",
     )
     parser.add_argument("--runs", type=int, default=3, help="parallel blind runs per package")
     parser.add_argument("--judge-reviewer", choices=REVIEWERS, default="claude")
-    parser.add_argument("--judge-model", help=f"judge model (defaults: {DEFAULT_MODELS})")
-    parser.add_argument("--judge-effort", help=f"judge effort (defaults: {DEFAULT_EFFORTS})")
+    parser.add_argument("--judge-model", help=f"judge model (defaults: {review_config.DEFAULT_MODELS})")
+    parser.add_argument("--judge-effort", help=f"judge effort (defaults: {review_config.DEFAULT_EFFORTS})")
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
     parser.add_argument(

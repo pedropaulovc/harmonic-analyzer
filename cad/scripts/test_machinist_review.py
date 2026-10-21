@@ -23,6 +23,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from PIL import Image, ImageDraw
 
 import machinist_review as mr
+import machinist_review_config as review_config
 import machinist_review_sheets_mcp as sheets
 
 SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
@@ -4019,7 +4020,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     assert saved == aggregate
     assert (directory / "sample.aggregate.md").is_file()
     assert "sample.aggregate.md" in mr.write_index(directory).read_text(encoding="utf-8")
-    assert aggregate["judge"]["model"] == mr.DEFAULT_MODELS[reviewer]
+    assert aggregate["judge"]["model"] == review_config.DEFAULT_MODELS[reviewer]
     assert aggregate["judge"]["prompt_sha256"]
 
 

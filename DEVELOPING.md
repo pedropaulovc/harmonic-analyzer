@@ -21,6 +21,28 @@ Markdown are named `<stem>.aggregate.{json,md}`; per-run JSON and retained attem
 evidence remain alongside them. A cache hit evaluates the same verdict without
 calling a model.
 
+Set `HARMONIC_MACHINIST_REVIEWER=claude|codex` in the submitter's environment
+**before launching the build** to select both the blind reviewers and their judge.
+Unset selects Claude; each backend uses the standalone CLI's existing model/effort
+defaults (Claude: `claude-opus-5-5` / `medium`; Codex: `gpt-6-astra` / `low`).
+For example, in PowerShell:
+
+```powershell
+$env:HARMONIC_MACHINIST_REVIEWER = "codex"
+uv run --frozen python build.py --verbosity warning
+```
+
+Other values, including an empty value, fail at review-task generation before
+cache probing or report/stamp changes. The graph freezes the effective backend,
+model and effort for task freshness, cache identity and explicit CLI arguments
+for both roles. Changing that profile invalidates freshness and selects a separate
+cache entry; reverting can reuse only that profile's verdict. Cache provenance
+retains the real `machinist_review_config.py` source path: its contextual digest
+combines the file's content digest with canonical effective-profile JSON.
+No native CAD recipe imports that configuration. This variable applies only to
+registered review leaves; standalone `machinist_review.py` keeps its independent
+reviewer/judge flags and defaults.
+
 Draw scripts default to `MachinistReviewMode.OFF`: no review task exists, so
 `build` and `release` spend no model tokens on the sheet. To opt in, import
 `MachinistReviewMode` from `_machinist_review_mode` and declare
