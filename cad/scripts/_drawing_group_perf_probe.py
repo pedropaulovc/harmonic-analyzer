@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import re
+from sys import exception as _active_exception
 import time
 from typing import Any, Awaitable, Callable, Mapping, NoReturn, Sequence
 
@@ -437,12 +438,29 @@ async def run_matched_group_probe(
                     )
                     row["status"] = "passed"
                 finally:
-                    row["preference_after"] = _preference(adapter)
-                    if row["preference_after"] != row["preference_before"]:
-                        phase = "preference_restoration"
-                        raise RuntimeError(
-                            "group probe: document visible-edge preference changed"
-                        )
+                    primary_error = _active_exception()
+                    try:
+                        row["preference_after"] = _preference(adapter)
+                        if row["preference_after"] != row["preference_before"]:
+                            raise RuntimeError(
+                                "group probe: document visible-edge preference changed"
+                            )
+                    except BaseException as exc:
+                        row["preference_error"] = f"{type(exc).__name__}: {exc}"
+                        # Keep an exceptional helper/proof failure and its phase
+                        # primary. A handled manual miss is no longer propagating:
+                        # retain it separately, but a preference failure must abort.
+                        if primary_error is None:
+                            if (
+                                row.get("failure_classification")
+                                == "manual_selection_miss"
+                            ):
+                                row.update(
+                                    prior_failure_classification="manual_selection_miss",
+                                    prior_error=row["error"],
+                                )
+                            phase = "preference_restoration"
+                            raise
             except BaseException as exc:
                 row.update(
                     status="failed",
