@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _transforms
+import _drawing_balloons as balloons
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import joint_retention
@@ -858,37 +858,7 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
     assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
 
 
-def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
-    import math
-
-    import mg_vn_wheel_axle_front_washer_spec as washer
-    import mg_vn_wheel_axle_nut_spec as nut
-
-    def screen(point):
-        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
-        x, y, z = -point[0], point[1], -point[2]
-        return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
-
-    wx, wy, wz = drawing.FRONT_WASHER_BALLOON_POINT_MM
-    assert wz == 0.0 and math.hypot(wx, wy) == pytest.approx(washer.OD / 2.0)
-    nx, ny, nz = drawing.LOCKNUT_BALLOON_POINT_MM
-    # On the flat facing 240 deg (corners on the local +-Y meridian).
-    normal = math.radians(240.0)
-    assert nz == 0.0
-    assert nx * math.cos(normal) + ny * math.sin(normal) == pytest.approx(
-        nut.ACROSS_FLATS / 2.0
-    )
-    axle = screen((0.0, 0.0, 1.0))  # the stack's explode runs along local +z
-    for point, side in (
-        (drawing.FRONT_WASHER_BALLOON_POINT_MM, (-0.5, math.sqrt(3.0) / 2.0)),
-        (drawing.LOCKNUT_BALLOON_POINT_MM, (0.5, -math.sqrt(3.0) / 2.0)),
-    ):
-        sx, sy = screen(point)
-        length = math.hypot(sx, sy)
-        assert (sx / length, sy / length) == pytest.approx(side)
-        assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
-    anchors = drawing.BALLOON_ANCHORS
-    assert anchors["mg-vn-wheel-axle-nut"].instance == "mg-vn-wheel-axle-nut-2"
+def test_the_locknut_is_exploded_farthest_along_the_axle() -> None:
     # Instance 2 is the locknut, exploded farthest out.
     farthest = min(
         (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
@@ -934,42 +904,387 @@ def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
     assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
 
 
-@pytest.mark.parametrize(
-    ("stem", "station", "radius", "rows"),
-    [
-        (
-            "mg-magnifying-lever",
-            assembly.LEVER_ROD_DIA / 2.0,
-            assembly.LEVER_ROD_DIA / 2.0,
-            _transforms.ROT_Y_180,
-        ),
-        (
-            # The shoulder's Ø5 edge (#1559): the old x = R station now falls
-            # on the turned-down thread, so a point at radius R is off the rod.
-            "mg-magnifying-vertical-rod",
-            assembly.VROD_SHOULDER_X,
-            assembly.VROD_DIA / 2.0,
-            _transforms.compose_rows(
-                _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180
-            ),
-        ),
-    ],
-)
-def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
-    stem: str, station: float, radius: float, rows: list[list[float]]
-) -> None:
-    x, y, z = drawing.BALLOON_ANCHORS[stem].point_mm
-    assert x == pytest.approx(station)
-    assert math.hypot(y, z) == pytest.approx(radius)
-    normal = [
-        sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
-        for j in range(3)
+
+
+@pytest.fixture
+def native_balloon_bindings(monkeypatch):
+    # Bind only at the COM boundary; keep item, family and owner validation real.
+    monkeypatch.setattr(balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(balloons, "_bind", lambda value, _kind: value)
+    monkeypatch.setattr(
+        balloons._sw_type_info, "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
+    return SimpleNamespace(_attempt=lambda operation, default=None: operation())
+
+
+class _NativeBalloon:
+    def __init__(self, item="1", owner="sub-1/mg-wheel-bar-1"):
+        self.item = item
+        self.entities = [SimpleNamespace(
+            GetComponent=lambda: SimpleNamespace(Name2=owner)
+        )]
+        self.kinds = [balloons._SEL_EDGES]
+        self.circle = (0.15, 0.16, 0.004)
+
+    def GetBomBalloonText(self, upper):
+        assert upper is True
+        return self.item
+
+    def GetName(self):
+        return f"balloon-{self.item}"
+
+    def GetAnnotation(self):
+        return self
+
+    def GetAttachedEntities3(self):
+        return self.entities
+
+    def GetAttachedEntityTypes(self):
+        return self.kinds
+
+    def SetPosition(self, *_args):
+        pytest.fail("native balloon position must remain untouched")
+
+
+@pytest.fixture
+def auto_balloon_scene(monkeypatch, native_balloon_bindings):
+    adapter = native_balloon_bindings
+    view = object()
+    native = [_NativeBalloon(), _NativeBalloon("2", "sub-1/mg-wheel-axle-1")]
+    leaves = [
+        balloons._ComponentLeaf(
+            name=path, component=object(), identities=frozenset({stem}),
+            visible=visible, path=path,
+        )
+        for stem, path, visible in (
+            ("mg-wheel-bar", "sub-1/mg-wheel-bar-1", True),
+            ("mg-wheel-bar", "sub-2/mg-wheel-bar-1", False),
+            ("mg-wheel-axle", "sub-1/mg-wheel-axle-1", True),
+        )
     ]
-    assert sum(normal) > 0.0  # faces the +X+Y+Z viewer
-    if stem == "mg-magnifying-lever":
-        # Square to the rod axis, and straight at the viewer.
-        assert sum(normal) == pytest.approx(math.sqrt(2.0))
+    monkeypatch.setattr(balloons, "_view_component_leaves", lambda *a, **k: leaves)
+
+    def create(actual_adapter, actual_view, **kwargs):
+        assert actual_adapter is adapter and actual_view is view
+        assert kwargs["attachment"] == "edge" and kwargs["layout"] == 1
+        return native
+
+    monkeypatch.setattr(balloons, "_create_auto_balloons", create)
+    monkeypatch.setattr(
+        balloons, "_spread_balloons",
+        lambda *a, **k: pytest.fail("native positions must not be re-ringed"),
+    )
+    return SimpleNamespace(
+        adapter=adapter, view=view, native=native,
+        items=[("mg-wheel-bar", "1"), ("mg-wheel-axle", "2")],
+    )
+
+
+def _add_native(scene, items=None):
+    return balloons.add_auto_balloons(
+        scene.adapter, scene.view,
+        items=scene.items if items is None else items, label="native regression",
+    )
+
+
+def test_native_balloons_validate_exact_items_without_moving_them(auto_balloon_scene):
+    scene = auto_balloon_scene
+    scene.native.reverse()  # Native order need not be BOM order.
+    scene.native[1].entities[0] = SimpleNamespace(
+        GetComponent=lambda: SimpleNamespace(Name2="SUB-1/MG-WHEEL-BAR-1")
+    )
+    circles = [note.circle for note in scene.native]
+    landings = _add_native(scene)
+    assert [landing.note for landing in landings] == scene.native
+    assert [landing.stem for landing in landings] == ["mg-wheel-axle", "mg-wheel-bar"]
+    assert landings[1].instance == "SUB-1/MG-WHEEL-BAR-1"
+    assert all(landing.sheet_xy is None for landing in landings)
+    assert [note.circle for note in scene.native] == circles
+
+
+@pytest.mark.parametrize(
+    "items",
+    [[], [("mg-wheel-bar", "1"), ("mg-wheel-bar", "2")],
+     [("mg-wheel-bar", "1"), ("mg-wheel-axle", "1")]],
+)
+def test_native_balloons_refuse_ambiguous_requests(auto_balloon_scene, items):
+    with pytest.raises(ValueError):
+        _add_native(auto_balloon_scene, items)
+
+
+@pytest.mark.parametrize(
+    ("numbers", "error"),
+    [(("1", "1"), "duplicate native BOM item"),
+     (("1", "99"), "unexpected native BOM item"),
+     (("1",), "missing native BOM items"),
+     (("?", "2"), "unresolved item")],
+)
+def test_native_balloons_refuse_wrong_item_coverage(auto_balloon_scene, numbers, error):
+    scene = auto_balloon_scene
+    scene.native[:] = [_NativeBalloon(number) for number in numbers]
+    with pytest.raises(RuntimeError, match=error):
+        _add_native(scene)
+
+
+@pytest.mark.parametrize(
+    "owner",
+    ["mg-wheel-bar-1", "sub-2/mg-wheel-bar-1", "sub-1/mg-wheel-axle-1", ""],
+)
+def test_native_balloons_require_shown_full_path_owner(auto_balloon_scene, owner):
+    scene = auto_balloon_scene
+    scene.native[0] = _NativeBalloon(owner=owner)
+    with pytest.raises(RuntimeError, match="not a shown instance"):
+        _add_native(scene)
+
+
+@pytest.mark.parametrize(
+    ("entities", "kinds"),
+    [([], []), ([None], [balloons._SEL_EDGES]),
+     ([object()], [2]), ([object(), object()], [balloons._SEL_EDGES] * 2),
+     ([object()], [])],
+)
+def test_native_balloons_require_one_real_edge(auto_balloon_scene, entities, kinds):
+    note = auto_balloon_scene.native[0]
+    note.entities, note.kinds = entities, kinds
+    with pytest.raises(RuntimeError, match="one native EDGE"):
+        _add_native(auto_balloon_scene)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [None, "native", "set_false", "set_raises", "set_readback",
+     "restore_false", "restore_raises", "restore_readback"],
+)
+def test_normal_edge_weight_is_scoped_and_restoration_is_required(
+    monkeypatch, native_balloon_bindings, failure,
+):
+    constants = {
+        "swLineFontVisibleEdgesThickness": 11, "swDetailingNoOptionSpecified": 0,
+        "swLW_NORMAL": 1, "swLW_THICK": 2,
+        "swPageSetupPrinterNormalLineWeight": 12,
+        "swPageSetupPrinterThickLineWeight": 13,
+    }
+    monkeypatch.setattr(balloons._sw_type_info, "constant", constants.__getitem__)
+    state = SimpleNamespace(slot=2, writes=[], native_calls=0)
+
+    def set_slot(preference, option, slot):
+        assert (preference, option) == (11, 0)
+        state.writes.append(slot)
+        restoring = len(state.writes) == 2
+        state.slot = slot  # Even a failed setter may mutate the document.
+        phase = "restore" if restoring else "set"
+        if failure == f"{phase}_readback":
+            state.slot = 7
+        if failure == f"{phase}_raises":
+            raise RuntimeError(f"{phase} exploded")
+        return failure != f"{phase}_false"
+
+    extension = SimpleNamespace(
+        GetUserPreferenceInteger=lambda *_: state.slot,
+        GetUserPreferenceDouble=lambda preference, option: {12: 0.00018, 13: 0.00035}[preference],
+        SetUserPreferenceInteger=set_slot,
+    )
+    result = [object()]
+
+    def native(options):
+        state.native_calls += 1
+        assert state.slot == 1
+        if failure == "native":
+            raise RuntimeError("native exploded")
+        return result
+
+    invoke = lambda: balloons._auto_balloon_edges_with_normal_weight(
+        SimpleNamespace(Extension=extension),
+        SimpleNamespace(AutoBalloon5=native), object(), label="weight regression",
+    )
+    if failure is None:
+        assert invoke() is result
     else:
-        # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
-        # for any even segment count (r12 missed mid-chord at 1:2).
-        assert (y, z) == pytest.approx((-radius, 0.0))
+        with pytest.raises(RuntimeError):
+            invoke()
+    assert state.writes == [1, 2]
+    assert state.native_calls == (0 if failure in {"set_false", "set_raises", "set_readback"} else 1)
+    if failure != "restore_readback":
+        assert state.slot == 2
+
+
+@pytest.mark.parametrize("attachment", [None, "face", "edge"])
+def test_auto_creation_preserves_default_face_and_explicit_edge_paths(
+    monkeypatch, native_balloon_bindings, attachment,
+):
+    note, options, calls = _NativeBalloon(), SimpleNamespace(), []
+    model = SimpleNamespace(
+        CreateAutoBalloonOptions=lambda: options,
+        AutoBalloon5=lambda actual: calls.append(("face", actual)) or [note],
+        ClearSelection2=lambda clear: calls.append(("clear", clear)),
+    )
+    native_balloon_bindings.currentModel = model
+    monkeypatch.setattr(balloons, "_activate_and_select_view", lambda *a, **k: None)
+    monkeypatch.setattr(
+        balloons, "rebuild_drawing", lambda *a, **k: calls.append(("rebuild", None))
+    )
+
+    def guarded(draw, ddoc, actual, *, label):
+        assert draw is model and ddoc is model
+        calls.append(("edge", actual))
+        return [note]
+
+    monkeypatch.setattr(balloons, "_auto_balloon_edges_with_normal_weight", guarded)
+    kwargs = {} if attachment is None else {"attachment": attachment}
+    assert balloons._create_auto_balloons(
+        native_balloon_bindings, object(), label="creation regression", **kwargs
+    ) == [note]
+    assert options.LeaderAttachmentToFaces is (attachment != "edge")
+    assert [call[0] for call in calls] == [
+        "edge" if attachment == "edge" else "face", "clear", "rebuild"
+    ]
+
+
+@pytest.fixture
+def final_balloon_scene(monkeypatch):
+    activated = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda adapter, name: activated.append(name))
+    monkeypatch.setattr(
+        drawing, "rendered_balloon_circle", lambda note, *, label: note.circle
+    )
+    note = _NativeBalloon()
+    landing = balloons.BalloonLanding(
+        stem="mg-wheel-bar", instance="sub-1/mg-wheel-bar-1",
+        note=note, sheet_xy=None, label="final regression",
+    )
+    caption = SimpleNamespace(
+        extent=(0.02, 0.02, 0.0, 0.04, 0.03, 0.0),
+    )
+    caption.GetExtent = lambda: caption.extent
+    return SimpleNamespace(
+        adapter=object(), note=note, landings=[landing],
+        caption=caption, activated=activated,
+    )
+
+
+@pytest.mark.parametrize("group", ["wheel", "lever"])
+@pytest.mark.parametrize("side", range(4))
+def test_final_balloon_bounds_read_changed_geometry_on_every_call(
+    final_balloon_scene, group, side,
+):
+    scene = final_balloon_scene
+    field = drawing.WHEEL_FIELD if group == "wheel" else drawing.LEVER_FIELD
+    x, y = (field[0] + field[2]) / 2, (field[1] + field[3]) / 2
+    radius = min(field[2] - field[0], field[3] - field[1]) / 10
+    scene.note.circle = (x, y, radius)
+    scene.caption.extent = (field[0] - 0.03, field[1], 0, field[0] - 0.02, field[3], 0)
+
+    def check():
+        if group == "wheel":
+            drawing._assert_wheel_balloon_bounds(scene.adapter, scene.landings)
+        else:
+            drawing._assert_lever_balloon_bounds(scene.adapter, scene.landings, scene.caption)
+
+    check()
+    coordinates = [x, y]
+    coordinates[side % 2] = field[side] + (radius / 2 if side < 2 else -radius / 2)
+    scene.note.circle = (*coordinates, radius)  # Centre inside, rendered rim outside.
+    with pytest.raises(RuntimeError, match="leaves .*FIELD"):
+        check()
+    assert scene.activated == [drawing.SHEET_NAMES[1 if group == "wheel" else 2]] * 2
+
+
+def test_final_lever_bounds_reread_caption_and_refuse_collision(final_balloon_scene):
+    scene = final_balloon_scene
+    left, bottom, right, top = drawing.LEVER_FIELD
+    x, y = (left + right) / 2, (bottom + top) / 2
+    scene.note.circle = (x, y, 0.004)
+    drawing._assert_lever_balloon_bounds(scene.adapter, scene.landings, scene.caption)
+    scene.caption.extent = (x - 0.01, y - 0.01, 0, x + 0.01, y + 0.01, 0)
+    with pytest.raises(RuntimeError, match="intersects lever caption"):
+        drawing._assert_lever_balloon_bounds(scene.adapter, scene.landings, scene.caption)
+
+
+@pytest.mark.parametrize(
+    "extent",
+    [(0, 0, 0), (0, 0, 0, math.nan, 1, 0),
+     (0, 0, 0, math.inf, 1, 0), (1, 0, 0, 1, 1, 0), (0, 1, 0, 1, 0, 0)],
+)
+def test_final_lever_bounds_refuse_invalid_caption_extent(final_balloon_scene, extent):
+    scene = final_balloon_scene
+    scene.caption.extent = extent
+    with pytest.raises(RuntimeError, match="caption has (invalid|empty) extent"):
+        drawing._assert_lever_balloon_bounds(scene.adapter, scene.landings, scene.caption)
+
+
+def test_native_balloons_refuse_missing_annotation(auto_balloon_scene):
+    auto_balloon_scene.native[0].GetAnnotation = lambda: None
+    with pytest.raises(RuntimeError, match="no native annotation"):
+        _add_native(auto_balloon_scene)
+
+
+@pytest.fixture
+def final_bom_scene(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    items = {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)}
+    landings = []
+    for stem, item in items.items():
+        note = _NativeBalloon(item)
+        note.is_bom = True
+        note.is_attached = True
+        note.is_dangling = False
+        note.IsBomBalloon = lambda note=note: note.is_bom
+        note.IsAttached = lambda note=note: note.is_attached
+        note.IsDangling = lambda note=note: note.is_dangling
+        landings.append(balloons.BalloonLanding(
+            stem=stem, instance=f"assembly/{stem}-1",
+            note=note, sheet_xy=None, label="final BOM regression",
+        ))
+    return SimpleNamespace(items=items, landings=landings)
+
+
+def test_final_bom_accepts_current_native_items_for_every_family(final_bom_scene):
+    scene = final_bom_scene
+    drawing._assert_balloon_bom(scene.landings, scene.items)
+
+
+@pytest.mark.parametrize("changed_item", ["999", "?", ""])
+def test_final_bom_rereads_native_items_after_initial_pass(final_bom_scene, changed_item):
+    scene = final_bom_scene
+    drawing._assert_balloon_bom(scene.landings, scene.items)
+    scene.landings[0].note.item = changed_item
+    with pytest.raises(RuntimeError):
+        drawing._assert_balloon_bom(scene.landings, scene.items)
+
+
+@pytest.mark.parametrize(
+    ("state", "value"),
+    [("is_bom", False), ("is_attached", False), ("is_dangling", True)],
+)
+def test_final_bom_refuses_detached_or_non_bom_notes(final_bom_scene, state, value):
+    scene = final_bom_scene
+    drawing._assert_balloon_bom(scene.landings, scene.items)
+    setattr(scene.landings[0].note, state, value)
+    with pytest.raises(RuntimeError):
+        drawing._assert_balloon_bom(scene.landings, scene.items)
+
+
+@pytest.mark.parametrize("coverage", ["missing", "duplicate", "unexpected"])
+def test_final_bom_requires_exact_family_coverage(final_bom_scene, coverage):
+    scene = final_bom_scene
+    if coverage == "missing":
+        scene.landings.pop()
+    elif coverage == "duplicate":
+        scene.landings[-1] = scene.landings[0]
+    else:
+        original = scene.landings[-1]
+        scene.landings[-1] = balloons.BalloonLanding(
+            stem="unrelated-component", instance=original.instance,
+            note=original.note, sheet_xy=None, label=original.label,
+        )
+    with pytest.raises(RuntimeError):
+        drawing._assert_balloon_bom(scene.landings, scene.items)
+
+
+def test_final_bom_refuses_missing_native_annotation(final_bom_scene):
+    scene = final_bom_scene
+    scene.landings[0].note.GetAnnotation = lambda: None
+    with pytest.raises(RuntimeError):
+        drawing._assert_balloon_bom(scene.landings, scene.items)
