@@ -8,6 +8,7 @@ allowed: the fixed sequence ends in an explicit STOP before cache publication.
 from __future__ import annotations
 
 import hashlib
+import math
 from pathlib import Path
 import re
 from sys import exception as _active_exception
@@ -42,6 +43,38 @@ class GroupPerfProbeStop(RuntimeError):
             "INTENTIONAL GROUP PERFORMANCE DIAGNOSTIC STOP before save/export/cache "
             f"publication; status={report['status']}; report={report['report_path']}"
         )
+
+
+def assert_matched_setup(actual: dict, expected: dict) -> None:
+    """Keep diagnostic setup exact except for picometre-scale outline roundoff."""
+    if not isinstance(actual, dict) or not isinstance(expected, dict):
+        raise RuntimeError("group probe matched context differs: setup dictionaries")
+    if actual.keys() != expected.keys():
+        raise RuntimeError("group probe matched context differs: setup keys")
+    for key in actual:
+        if key not in ("fitted_outline_m", "wheel_fitted_outline_m"):
+            if actual[key] != expected[key]:
+                raise RuntimeError(f"group probe matched context differs: setup.{key}")
+            continue
+        for outline in (actual[key], expected[key]):
+            if not isinstance(outline, (list, tuple)) or len(outline) != 4:
+                raise RuntimeError(f"group probe invalid setup outline: {key}")
+            for coordinate in outline:
+                if type(coordinate) not in (int, float):
+                    raise RuntimeError(f"group probe invalid setup outline: {key}")
+                try:
+                    finite = math.isfinite(coordinate)
+                except OverflowError:
+                    finite = False
+                if not finite:
+                    raise RuntimeError(f"group probe nonfinite setup outline: {key}")
+        # Predeclared 1 pm absolute only: <3e-9 pixels at 2.098 px/mm.
+        # This admits double roundoff, not meaningful fitted-view movement.
+        if not all(
+            math.isclose(left, right, rel_tol=0.0, abs_tol=1e-12)
+            for left, right in zip(actual[key], expected[key])
+        ):
+            raise RuntimeError(f"group probe matched context differs: setup.{key}")
 
 
 def _file_identity(path: Path) -> dict[str, Any]:
@@ -387,13 +420,16 @@ async def run_matched_group_probe(
                     )
                 row["preference_before"] = _preference(adapter)
                 # Equal inputs and fit are prerequisites, not a certificate system.
+                assert_matched_setup(
+                    row["setup"],
+                    row["setup"] if baseline is None else baseline["setup"],
+                )
                 if baseline is None:
                     baseline = row
                 else:
                     for key in (
                         "template",
                         "native_inputs",
-                        "setup",
                         "items",
                         "preference_before",
                     ):
