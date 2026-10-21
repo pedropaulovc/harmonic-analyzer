@@ -174,8 +174,6 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     # The process line leads the callout; the native size starts the next row.
     assert notes.BRACKET_TAP_CALLOUT_PROCESS.endswith("\n")
     assert notes.BRACKET_SCREW_NUMBER in notes.BRACKET_TAP_CALLOUT_PROCESS
-    assert notes.BRACKET_TAP_CALLOUT_PROCESS.splitlines()[-1] == joint.THREAD_EXTENT_REQUIREMENT
-    assert joint.THREAD_EXTENT_REQUIREMENT == "THREAD EXTENT WITHIN DRILL CYLINDER"
     assert '"hw-threaddepth": THREAD_DEPTH' in drawing_source
     assert '"hw-tapdrldepth": DRILL_DEPTH' in drawing_source
     assert "bracket tap callout omits native depths" in drawing_source
@@ -921,12 +919,6 @@ def bracket_depth_callout(monkeypatch):
     drill = native("hw-tapdrldepth", 6.50)
     unrelated = native("hw-threaddia", 2.1844)
     variables = [unrelated.raw, thread.raw, drill.raw]
-    definitions = {
-        5: f"{notes.BRACKET_TAP_CALLOUT_PROCESS}#2-56 <hw-threadsize>",
-        6: "<hw-threaddepth> MIN",
-        7: "<hw-tapdrldepth>",
-        8: "",
-    }
     dispatched = []
     bound = []
 
@@ -947,12 +939,11 @@ def bracket_depth_callout(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", early_bound)
     callout = SimpleNamespace(
         GetHoleCalloutVariables=lambda: variables,
-        GetText=lambda part: definitions[part],
     )
     return SimpleNamespace(
         dress=lambda: drawing._dress_bracket_depth_callout(callout),
         thread=thread, drill=drill, unrelated=unrelated, variables=variables,
-        dispatched=dispatched, bound=bound, definitions=definitions,
+        dispatched=dispatched, bound=bound,
     )
 
 
@@ -989,18 +980,6 @@ def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_cal
     assert effective_limits == pytest.approx((5.99, 7.01))
     physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
     assert effective_limits == pytest.approx(physical_limits)
-
-
-@pytest.mark.parametrize("replacement", ["", "THREAD EXTENT UNBOUNDED"])
-def test_bracket_depth_callout_requires_the_printed_thread_extent_process(
-    bracket_depth_callout, replacement,
-) -> None:
-    case = bracket_depth_callout
-    required = "THREAD EXTENT WITHIN DRILL CYLINDER"
-    assert required in case.definitions[5]
-    case.definitions[5] = case.definitions[5].replace(required, replacement)
-    with pytest.raises(RuntimeError, match="omits bounded physical thread extent"):
-        case.dress()
 
 
 @pytest.mark.parametrize(("member", "wrong_mm"), [("thread", 4.90), ("drill", 6.00)])
@@ -1447,22 +1426,6 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
     case.callouts[0][2].hole_callout = False
     with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
         drawing._finished_thread_annotation_check(case.adapter, case.callouts)
-
-
-@pytest.mark.parametrize("replacement", ["", "THREAD EXTENT UNBOUNDED"])
-def test_finished_bracket_callout_preserves_the_printed_thread_extent_process(
-    monkeypatch, replacement,
-) -> None:
-    case = _thread_annotation_drawing(monkeypatch)
-    bracket_callout = case.callouts[-1][2]
-    required = "THREAD EXTENT WITHIN DRILL CYLINDER"
-    assert required in bracket_callout.definitions[5]
-    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
-    drawing._remove_redundant_thread_notes(case.adapter)
-    check()
-    bracket_callout.definitions[5] = bracket_callout.definitions[5].replace(required, replacement)
-    with pytest.raises(RuntimeError, match="authored native hole callout changed"):
-        check()
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
@@ -2247,3 +2210,350 @@ def test_middle_rib_cut_ink_refuses_malformed_native_arrays(monkeypatch, damage)
         state.values[-1] = 0.0
     with pytest.raises(RuntimeError, match="middle-rib"):
         drawing._middle_rib_cut_ink(case.plan)
+
+
+def _settled_middle_rib_ink(monkeypatch):
+    """Run the real section assembly/callback and real native ink readers.
+
+    Only authoring and projection are seatless seams. The display collector,
+    note extent union, source-detail decoder, foreign census and layout gate
+    are deliberately not mocked.
+    """
+    import _drawing_layout_audit
+
+    source = _native_middle_rib_profile(monkeypatch)
+    interfaces = {}
+
+    def native(value, *kinds):
+        interfaces[id(value)] = kinds
+        return value
+
+    def bind(value, kind):
+        assert value is not None, f"null {kind} binding"
+        assert kind in interfaces[id(value)], (kind, interfaces[id(value)])
+        return value
+
+    part = native(source.view.ReferencedDocument, "IPartDoc")
+    feature = native(part.FeatureByName("MiddleRibProfile"), "IFeature")
+    profile = native(feature.GetSpecificFeature2(), "ISketch")
+    for segment in profile.GetSketchSegments():
+        native(segment, "ISketchSegment", "ISketchLine")
+        if segment.GetType() == 0:
+            native(segment.start, "ISketchPoint")
+            native(segment.end, "ISketchPoint")
+
+    class Data:
+        def __init__(self, text, xy):
+            self.rows = {key: [] for key, _count, _getters in _drawing_layout_audit._DISPLAY_PRIMITIVES}
+            self.texts = [{"t": text, "pos": (*xy, 0.0), "h": 0.003, "ref": 0, "ang": 0.0}]
+            self.refuse = set()
+            native(self, "IDisplayData")
+
+        def __getattr__(self, member):
+            if member in self.refuse:
+                raise RuntimeError(f"native {member} refused")
+            for key, count, getters in _drawing_layout_audit._DISPLAY_PRIMITIVES:
+                if member == count:
+                    return lambda: len(self.rows[key])
+                if member in getters:
+                    return lambda index: self.rows[key][index]
+            if member == "GetTextCount":
+                return lambda: len(self.texts)
+            text_fields = {
+                "GetTextAtIndex": "t", "GetTextPositionAtIndex": "pos",
+                "GetTextHeightAtIndex": "h", "GetTextRefPositionAtIndex": "ref",
+                "GetTextAngleAtIndex": "ang",
+            }
+            if member in text_fields:
+                return lambda index: self.texts[index][text_fields[member]]
+            if member == "GetTextFontAtIndex":
+                return lambda _index: "Arial"
+            if member in ("GetTextLineSpacingAtIndex", "GetTextInBoxWidthAtIndex"):
+                return lambda _index: 0.0
+            raise AttributeError(member)
+
+    def annotation(text, box, *, dimension=False):
+        data = Data(text, box[:2])
+        ann = native(SimpleNamespace(
+            Visible=1, OwnerType=0, dangling=False, data=data,
+            GetType=lambda: 4 if dimension else 6,
+            IsDangling=lambda: ann.dangling,
+            GetDisplayData=lambda: ann.data,
+        ), "IAnnotation")
+        if dimension:
+            model = native(SimpleNamespace(
+                FullName="MidRibLeftX@MiddleRibProfile@sm-summing-lever.SLDPRT",
+                SystemValue=drawing.RIB_PLATE_REACH / 1000.0,
+            ), "IDimension")
+            specific = native(SimpleNamespace(
+                GetDimension2=lambda _index: model,
+                GetText=lambda _part: notes.DIMENSION_CALLOUTS_ABOVE["MidRibLeftX"],
+            ), "IDisplayDimension")
+        else:
+            specific = native(SimpleNamespace(
+                text=text, box=box, PropertyLinkedText="",
+                GetText=lambda: specific.text,
+                GetExtent=lambda: (*specific.box[:2], 0.0, *specific.box[2:], 0.0),
+                GetAnnotation=lambda: ann,
+            ), "INote")
+        ann.GetSpecificAnnotation = lambda: specific
+        ann.specific = specific
+        return ann
+
+    def line(first, second):
+        return (0.0, 0.0, 0.0, 0.0, *first, 0.0, *second, 0.0)
+
+    def arrow(tip, direction=(0.0, -1.0)):
+        return (*tip, 0.0, *direction, 0.0, 0.001, 0.002, 0.0, 0.0, 0.0, 1.0)
+
+    def view(outline, *, kind=0):
+        value = native(SimpleNamespace(
+            Type=kind, outline=outline, annotations=[], notes=[], circles=[],
+            info=[], labels=[], metadata=None, ReferencedDocument=part,
+            Position=(0.0, 0.0), Angle=0.0,
+            Name=f"synthetic native view type {kind}", IsCropped=lambda: False,
+            UpdateViewDisplayGeometry=lambda: None,
+            GetOutline=lambda: value.outline,
+            GetAnnotationCount=lambda: len(value.annotations),
+            GetAnnotations=lambda: tuple(value.annotations),
+            GetNotes=lambda: tuple(value.notes),
+            GetDetailCircleCount2=lambda: value.metadata or (len(value.circles), len(value.info)),
+            GetDetailCircles=lambda: tuple(value.circles),
+            GetDetailCircleInfo2=lambda: value.info,
+            GetDetailCircleStrings=lambda: value.labels,
+        ), "IView")
+        return value
+
+    reach = annotation("34.188 THEORETICAL", (0.223, 0.259, 0.260, 0.262), dimension=True)
+    reach.data.rows["lines"] = [line((0.210, 0.245), (0.240, 0.255))]
+    reach.data.rows["arrows"] = [arrow((0.210, 0.245))]
+    caption = annotation("SECTION L-L", (0.160, 0.216, 0.190, 0.219))
+    caption.specific.PropertyLinkedText = "SECTION <VLLABEL>"
+    plan_label = annotation(
+        drawing.MIDDLE_RIB_PLAN_NOTE, (0.077, 0.030, 0.095, 0.034),
+    )
+    section = view((0.145, 0.225, 0.255, 0.250), kind=2)
+    section.annotations = [reach, caption]
+    section.notes = [caption.specific]
+    plan = view((0.100, 0.040, 0.180, 0.090))
+    plan.annotations = [plan_label]
+    cut = native(SimpleNamespace(
+        surface_only=True, GetLabel=lambda: "L",
+        SetDisplayOnlySurfaceCut=lambda value: setattr(cut, "surface_only", value),
+        GetDisplayOnlySurfaceCut=lambda: cut.surface_only,
+    ), "IDrSection")
+    section.GetSection = lambda: cut
+    plan.GetSectionLines = lambda: (cut,)
+    plan.GetSectionLineInfo2 = lambda: (
+        1.0, 0.0, 1.0,
+        0.0, 0.090, 0.060, 0.0, 0.190, 0.060, 0.0,
+        0.090, 0.060, 0.0, 0.085, 0.060, 0.0, 0.001, 0.002, 0.0,
+        0.190, 0.060, 0.0, 0.195, 0.060, 0.0, 0.001, 0.002, 0.0,
+        0.080, 0.070, 0.0, 0.198, 0.070, 0.0, 0.003,
+    )
+    back = view((0.280, 0.140, 0.320, 0.190))
+    letter_k = annotation("K", (0.285, 0.215, 0.290, 0.220))
+    letter_k.data.rows["lines"] = [line((0.287, 0.215), (0.287, 0.200))]
+    letter_k.data.rows["arrows"] = [arrow((0.287, 0.200))]
+    back.annotations = [letter_k]
+    back.circles = [native(SimpleNamespace(GetLabel=lambda: "J"), "IDetailCircle")]
+    back.labels = ["J"]
+    back.info = [
+        1.0, -1.0, 0.300, 0.200, 0.0, 0.304, 0.200, 0.0,
+        0.304, 0.200, 0.0, 0.0, 0.310, 0.205, 0.0, 0.003, 0.0,
+    ]
+    detail = view((0.040, 0.040, 0.060, 0.070), kind=3)
+    detail_caption = annotation("DETAIL J", (0.040, 0.025, 0.065, 0.029))
+    # This native caption is intentionally absent from GetAnnotations.
+    detail.notes = [detail_caption.specific]
+    sheet = view((0.0, 0.0, 0.4318, 0.2794))
+    transform = native(object(), "IMathTransform")
+    sketch = native(SimpleNamespace(
+        segments=[], ModelToSketchTransform=transform,
+        GetSketchSegments=lambda: tuple(sketch.segments),
+    ), "ISketch")
+    section.GetSketch = lambda: sketch
+
+    def math_point(xyz):
+        point = native(SimpleNamespace(ArrayData=tuple(xyz)), "IMathPoint")
+        point.MultiplyTransform = lambda _transform: point
+        return point
+
+    utility = native(SimpleNamespace(CreatePoint=math_point), "IMathUtility")
+    drawing_doc = native(SimpleNamespace(
+        ActivateSheet=lambda _name: True, ActivateView=lambda _name: True,
+        GetFirstView=lambda: sheet,
+    ), "IDrawingDoc")
+    adapter = SimpleNamespace(
+        currentModel=drawing_doc,
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b), GetMathUtility=lambda: utility),
+        _get_attr_or_call=source.adapter._get_attr_or_call,
+    )
+
+    def project(_adapter, owner, xyz, **_kwargs):
+        origin = drawing.MIDDLE_RIB_SECTION_ORIGIN if owner is section else drawing.MIDDLE_RIB_PLAN_CENTER
+        return origin[0] + xyz[0], origin[1] + xyz[1]
+
+    def centerline(_adapter, owner, ends, **_kwargs):
+        assert owner is section
+        points = []
+        for end in ends:
+            xyz = (*project(adapter, owner, drawing._metres(end)), 0.0)
+            points.append(native(SimpleNamespace(**dict(zip("XYZ", xyz, strict=True))), "ISketchPoint"))
+        segment = native(SimpleNamespace(
+            Color=0, GetStartPoint2=lambda: points[0], GetEndPoint2=lambda: points[1],
+        ), "ISketchSegment", "ISketchLine")
+        sketch.segments.append(segment)
+        return segment
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: plan)
+    monkeypatch.setattr(drawing, "create_section_view", lambda *_args, **_kwargs: section)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "native view")
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda a, v, xyzs, **kwargs: tuple(project(a, v, xyz, **kwargs) for xyz in xyzs),
+    )
+    monkeypatch.setattr(drawing, "_owned_centerline", centerline)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: [reach])
+    monkeypatch.setattr(drawing, "add_property_linked_note", lambda *_args: plan_label.specific)
+    for name in (
+        "set_hidden_lines_removed", "_set_tangent_edges",
+        "_hidden_lines_removed_without_greyed_pass", "rebuild_drawing",
+        "_apply_callouts", "position_section_caption",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    actual_section, actual_plan, check = drawing._middle_rib_section(
+        adapter, neighboring_views=(back, detail),
+    )
+    assert actual_section is section and actual_plan is plan
+    return SimpleNamespace(
+        adapter=adapter, check=check, reach=reach, caption=caption, section=section,
+        plan_label=plan_label, back=back, detail=detail, detail_caption=detail_caption,
+        letter_k=letter_k, line=line, arrow=arrow, native=native,
+    )
+
+
+def test_middle_rib_settled_callback_accepts_complete_native_ink(monkeypatch) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    case.check()
+
+
+@pytest.mark.parametrize("visible", [0, 2, 3])
+def test_middle_rib_settled_callback_refuses_hidden_or_unknown_native_dd(monkeypatch, visible) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    case.reach.Visible = visible
+    with pytest.raises(RuntimeError, match="required native ink is hidden"):
+        case.check()
+
+
+@pytest.mark.parametrize("damage", ["dangling", "empty", "no-text", "no-strokes", "unreadable", "truncated"])
+def test_middle_rib_settled_callback_requires_readable_native_dd_ink(monkeypatch, damage) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    if damage == "dangling":
+        case.reach.dangling = True
+    elif damage in ("empty", "no-text"):
+        case.reach.data.texts.clear()
+        if damage == "empty":
+            for rows in case.reach.data.rows.values():
+                rows.clear()
+    elif damage == "no-strokes":
+        case.reach.data.rows["lines"].clear()
+    elif damage == "unreadable":
+        case.reach.data.refuse.add("GetTextPositionAtIndex")
+    else:
+        case.reach.data.rows["lines"][0] = [0.0] * 9
+    with pytest.raises(RuntimeError, match="native.*(ink|dimension|text|strokes)"):
+        case.check()
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["missing", "hidden", "empty", "wrong-label", "empty-display", "wrong-display-label", "lost-field"],
+)
+def test_middle_rib_settled_callback_requires_the_native_section_caption(monkeypatch, damage) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    if damage == "missing":
+        case.section.notes.clear()
+        case.section.annotations.remove(case.caption)
+    elif damage == "hidden":
+        case.caption.Visible = 3
+    elif damage in ("empty", "wrong-label"):
+        case.caption.specific.text = "" if damage == "empty" else "SECTION K-K"
+    elif damage == "empty-display":
+        case.caption.data.texts.clear()
+    elif damage == "wrong-display-label":
+        case.caption.data.texts[0]["t"] = "SECTION K-K"
+    else:
+        case.caption.specific.PropertyLinkedText = "SECTION L-L"
+    with pytest.raises(RuntimeError, match="caption.*(native|text)|readable SECTION L-L"):
+        case.check()
+
+
+@pytest.mark.parametrize("primitive", ["leader", "arrow"])
+def test_middle_rib_settled_callback_rejects_k_ink_when_only_its_leader_or_arrow_crowds(
+    monkeypatch, primitive,
+) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    # Synthetic stress case: this fake extent deliberately reports text only,
+    # not a claim about INote.GetExtent's native contract. Its parent outline
+    # stays clear; only display ink moves into L-L to exercise the union.
+    text_box = drawing._middle_rib_annotation_box(
+        case.adapter, case.letter_k, label="K own-body text", text_only=True,
+    )
+    assert text_box == case.letter_k.specific.box
+    if primitive == "leader":
+        case.letter_k.data.rows["lines"] = [case.line((0.287, 0.215), (0.240, 0.240))]
+    else:
+        case.letter_k.data.rows["arrows"] = [case.arrow((0.254, 0.240))]
+    assert drawing.boxes_clear(text_box, case.section.outline, gap=0.002)
+    assert drawing.boxes_clear(case.back.outline, case.section.outline, gap=0.002)
+    with pytest.raises(RuntimeError, match="crowds existing receiver view 0 annotation"):
+        case.check()
+
+
+@pytest.mark.parametrize("primitive", ["fence", "label", "caption"])
+def test_middle_rib_settled_callback_rejects_detail_j_ink_outside_view_outlines(
+    monkeypatch, primitive,
+) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    if primitive == "fence":
+        case.back.info[2:11] = [0.254, 0.240, 0.0, 0.258, 0.240, 0.0, 0.258, 0.240, 0.0]
+    elif primitive == "label":
+        case.back.info[12:14] = [0.200, 0.240]
+    else:
+        case.detail_caption.specific.box = (0.200, 0.235, 0.220, 0.239)
+        case.detail_caption.data.texts[0]["pos"] = (0.200, 0.235, 0.0)
+    assert drawing.boxes_clear(case.back.outline, case.section.outline, gap=0.002)
+    assert drawing.boxes_clear(case.detail.outline, case.section.outline, gap=0.002)
+    with pytest.raises(RuntimeError, match="crowds existing receiver view .* (detail J|annotation)"):
+        case.check()
+
+
+@pytest.mark.parametrize("damage", ["missing-objects", "missing-info", "truncated", "missing-label", "nonfinite"])
+def test_middle_rib_settled_callback_refuses_unreadable_native_detail_j(monkeypatch, damage) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    if damage == "missing-objects":
+        case.back.metadata = (1, len(case.back.info))
+        case.back.circles.clear()
+    elif damage == "missing-info":
+        case.back.info = None
+        case.back.metadata = (1, 17)
+    elif damage == "truncated":
+        case.back.info.pop()
+    elif damage == "missing-label":
+        case.back.labels.clear()
+    else:
+        case.back.info[2] = math.nan
+    with pytest.raises(RuntimeError, match="native.*detail-circle|native parent detail-circle"):
+        case.check()
+
+
+def test_middle_rib_note_extent_does_not_hide_a_native_display_read_refusal(monkeypatch) -> None:
+    case = _settled_middle_rib_ink(monkeypatch)
+    case.letter_k.data.refuse.add("GetArrowHeadCount")
+    with pytest.raises(RuntimeError, match="native ink read refused"):
+        case.check()

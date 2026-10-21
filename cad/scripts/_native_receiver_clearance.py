@@ -12,8 +12,10 @@ proves positive air for the addition; NO intended-contact exemption applies.
 The filled plate/pad tools cannot erase new rib material in a spring hole:
 the complete hole column is beyond the preserved rib reach. The knife prism
 is inside the invariant cylinder; the middle/opposite ribs and anchor boss
-are outside this Z strip. Only copies are transformed/consumed. No document,
-configuration, feature suppression, component pose or motion state is edited.
+are outside this Z strip. Configured bodies and root-relative transforms come
+directly from each enumerated occurrence, never a root name lookup. Only copies
+are transformed/consumed. No document, configuration, feature suppression,
+component pose or motion state is edited.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ import _telemetry
 import sm_summing_lever_spec as lever
 from _com import _early_bound, _read_member
 from _hole_spec import blind_cut_dia_mm
-from _native_spring_contact import _component_solids, _transformed_body_copy
+from _native_spring_contact import _transformed_body_copy
 from solidworks_mcp.adapters.com_variant import double_array
 
 OLD_DEPTH_MM = 8.20
@@ -73,6 +75,21 @@ def _solid(raw: Any, label: str) -> Any:
     if faults is not None and int(_early_bound(faults, "IFaultEntity").Count) != 0:
         raise RuntimeError(f"{label}: native solid has faults")
     return body
+
+
+def _occurrence_solids(component: Any, label: str) -> tuple[list[Any], Any]:
+    """Keep the configured IComponent2 returned by GetComponents(False)."""
+    name = str(_read_member(component, "Name2"))
+    # Early-bound GetBodies3 returns (bodies, BodiesInfo); 0 = swSolidBody.
+    # GetComponentByName is top-level-only, even when Name2 includes parents.
+    result = component.GetBodies3(0)
+    if not isinstance(result, tuple) or len(result) != 2 or not result[0]:
+        raise RuntimeError(f"{label}: no actual solid bodies for {name}")
+    # Transform2 is already relative to the active assembly's root, not parent.
+    transform = _early_bound(_read_member(component, "Transform2"), "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{label}: component transform unavailable: {name}")
+    return [_solid(raw, label) for raw in result[0]], transform
 
 
 def _copy(body: Any, label: str) -> Any:
@@ -295,7 +312,7 @@ def assert_receiver_added_strip(adapter: Any, asm_name: str) -> list[dict[str, A
     receiver = found["sm-summing-lever"][0]
     _assert_receiver(receiver)
     receiver_name = str(_read_member(receiver, "Name2"))
-    bodies, transform = _component_solids(assembly, receiver_name, "receiver strip")
+    bodies, transform = _occurrence_solids(receiver, "receiver strip")
     if len(bodies) != 1:
         raise RuntimeError("receiver strip: expected the one actual configured lever solid")
     modeler = _early_bound(adapter.swApp.GetModeler(), "IModeler")
@@ -310,7 +327,7 @@ def assert_receiver_added_strip(adapter: Any, asm_name: str) -> list[dict[str, A
         for component in instances:
             name = str(_read_member(component, "Name2"))
             label = f"receiver strip / {name}"
-            solids, pose = _component_solids(assembly, name, label)
+            solids, pose = _occurrence_solids(component, label)
             placed = [_solid(_transformed_body_copy(body, pose, label), label) for body in solids]
             overlap, closest, witnesses = 0.0, math.inf, None
             for strip in added:

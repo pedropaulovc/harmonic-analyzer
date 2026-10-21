@@ -63,10 +63,11 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
 FLANGE_THICKNESS_BAND = 0.13
 
-# Owner approval 2026-10-20: preserve the existing rib profiles and extend only
+# Owner selected 2026-10-20: preserve the existing rib profiles and extend only
 # the -Z receiver inward to 9.40 +/-0.51, retaining its front entry and both
-# hole axes. This was an explicit geometry decision, not a timeout selection,
-# orientation approval, or wall waiver. The opposite end rib remains 5.08 deep.
+# hole axes. The opposite end rib remains 5.08 deep. This geometry is retained,
+# but the selection relied on a thread-root bound that 2B does not establish;
+# production wall approval remains pending the owner's tap/process decision.
 # The unchanged cylindrical drill takes the ordinary title-block .XX band,
 # including two pitches of tap lead, its whole point, and drill wander.
 PLATE_THICKNESS_BAND = 0.05
@@ -97,6 +98,8 @@ ENGAGEMENT_MIN = (
     ENGAGEMENT - SCREW_LENGTH_MINUS - GRIP_BAND - SCREW_TIP_CHAMFER - EDGE_BREAK
 )
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
+# Native full-thread geometry only: the printed MIN is not an upper bound on
+# the physical axial extent of the actual thread.
 THREAD_DEPTH = 4.95
 DRILL_DEPTH = 6.50
 DRILL_DEPTH_MIN = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[0]
@@ -196,15 +199,19 @@ def drill_notch_distance(
 RECEIVER_DRILL_NOTCH_WALL_MIN = drill_notch_distance(
     RECEIVER_NOTCH_AXIAL_GAP_MIN, RECEIVER_NOTCH_HEIGHT_MIN, TAP_DRILL_RADIUS_MAX,
 ) - DRILL_WANDER_MAX
-# The native full-thread design is still 4.95 +/-0.05, but a printed MIN does
-# not establish an upper extent. Bound the major envelope along the ENTIRE
-# maximum cylindrical drill, not merely the native full-thread length.
-RECEIVER_THREAD_NOTCH_WALL_MIN = cylindrical_notch_distance(
+# Conditional analysis at the BASIC major diameter SCREW_MAJOR_DIA, over the
+# entire bounded drill cylinder, not a minimum wall for the actual thread.
+# ASME B1.1-2003 §§5.5/8.3.2 leaves the maximum INTERNAL major diameter
+# unspecified (established by the unworn tool crest); basic is its minimum.
+# Primary source: https://fpg-co.com/Standards/ASME%20B1.1%202008.pdf
+# This result applies only IF the actual internal root diameter is no greater
+# than basic major AND its actual axial extent stays within that cylinder.
+# Neither printed 2B nor thread-depth MIN guarantees these conditions. It is
+# not a lower bound on actual internal-root wall and is not a pass condition;
+# a qualified off-the-shelf tap/process remains an owner decision.
+CONDITIONAL_BASIC_MAJOR_NOTCH_WALL = cylindrical_notch_distance(
     RECEIVER_NOTCH_AXIAL_GAP_MIN, RECEIVER_NOTCH_HEIGHT_MIN, SCREW_MAJOR_DIA / 2.0,
 ) - DRILL_WANDER_MAX
-# This process requirement bounds tapping by the existing finite cylinder
-# (currently 7.01 maximum); it is not a newly inferred printed thread maximum.
-THREAD_EXTENT_REQUIREMENT = "THREAD EXTENT WITHIN DRILL CYLINDER"
 
 COUNTERBORE_END_WALL_MIN = (
     min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]
@@ -225,13 +232,9 @@ if TAP_LEAD_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead")
 if DRILL_POINT_RIB_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill breaks out of the front rib")
-if min(
-    RECEIVER_DRILL_NOTCH_WALL_MIN, RECEIVER_THREAD_NOTCH_WALL_MIN,
-) < LOCAL_WALL_HARD_FLOOR:
+if RECEIVER_DRILL_NOTCH_WALL_MIN < LOCAL_WALL_HARD_FLOOR:
     raise AssertionError("magnifying bracket receiver notch loses 1.5 mm hard-floor wall")
-if min(
-    RECEIVER_DRILL_NOTCH_WALL_MIN, RECEIVER_THREAD_NOTCH_WALL_MIN,
-) < RECEIVER_NOTCH_WALL_REQUIRED:
+if RECEIVER_DRILL_NOTCH_WALL_MIN < RECEIVER_NOTCH_WALL_REQUIRED:
     raise AssertionError("magnifying bracket receiver notch loses approved 2.0 mm wall")
 if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
     raise AssertionError("magnifying bracket counterbore loses head float")

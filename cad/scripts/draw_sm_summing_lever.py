@@ -59,8 +59,8 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_annotation_extent import boxes_clear
-from _drawing_layout_audit import annotation_display
-from _layout_audit import display_box, estimated_text_runs
+from _drawing_layout_audit import _DISPLAY_PRIMITIVES, annotation_display
+from _layout_audit import _detail_circles, display_box, estimated_text_runs
 from _drawing_dimensions import (
     set_basic_dimension,
     set_dimension_callouts,
@@ -97,7 +97,6 @@ from magnifying_bracket_joint_layout import (
     RIB_DEPTH,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
-    THREAD_EXTENT_REQUIREMENT,
 )
 from sm_summing_lever_notes import (
     BACK_VIEW_LETTER,
@@ -1033,9 +1032,9 @@ def _middle_rib_source_tangents(
 ) -> tuple[tuple[tuple[float, float, float], tuple[float, float, float]], ...]:
     """Visible plate joins and buried vertex, read from the actual native sketch.
 
-    The construction ink extends the real slants; it does not redraw a different
-    rib or manufacture a dimension to the visible join. All returned points are
-    part millimetres in the untransformed Front-plane sketch.
+    These are sampled drawing-construction endpoints, not automatically
+    model-linked lines. The settled callback proves coincidence for the current
+    build. Returned points are part millimetres in the Front-plane sketch.
     """
     if view.ReferencedDocument is None:
         raise RuntimeError("missing paired native middle-rib tangents: no source part")
@@ -1108,21 +1107,99 @@ def _require_middle_rib_layout(
 
 def _middle_rib_annotation_box(
     adapter: Any, annotation: Any, *, label: str, text_only: bool = False,
+    required_dimension: bool = False, required_text: bool = False,
+    expected_text: str | None = None,
 ) -> tuple[float, ...] | None:
-    """Native note extents or complete display geometry, never an anchor square."""
+    """Conservatively union native note extents with measured display ink."""
     annotation = _early_bound(annotation, "IAnnotation")
-    if int(annotation.Visible) in (2, 3):
+    visible, kind = annotation.Visible, annotation.GetType()
+    if type(kind) is not int or kind < 0:
+        raise RuntimeError(f"{label}: unreadable native annotation type {kind!r}")
+    if type(visible) is not int or visible not in (0, 1, 2, 3):
+        raise RuntimeError(f"{label}: unreadable native annotation visibility {visible!r}")
+    if required_dimension or required_text:
+        if visible != 1 or annotation.IsDangling() is not False:
+            raise RuntimeError(f"{label}: required native ink is hidden or dangling")
+    if visible in (2, 3):
         return None
-    if int(annotation.GetType()) == 6:
-        extent = tuple(float(value) for value in _early_bound(
-            annotation.GetSpecificAnnotation(), "INote"
-        ).GetExtent())
-        if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
-            raise RuntimeError(f"{label}: invalid native note extent {extent}")
-        return extent[0], extent[1], extent[3], extent[4]
+    if required_dimension and (type(kind) is not int or kind != 4):
+        raise RuntimeError(f"{label}: required native ink is not a display dimension")
     display, errors = annotation_display(adapter, annotation)
     if errors:
         raise RuntimeError(f"{label}: native ink read refused: {errors}")
+    # The shared collector records refusals, but an empty native row can be
+    # filtered out. Match the native counts before accepting its geometry.
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    lengths = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11}
+    for key, member, _getters in (*_DISPLAY_PRIMITIVES, ("texts", "GetTextCount", ())):
+        count = getattr(data, member)()
+        rows = display.get(key, ())
+        if type(count) is not int or count < 0 or len(rows) != count:
+            raise RuntimeError(f"{label}: unreadable native {member} rows/count")
+        if key == "texts":
+            continue
+        if key == "ellipses" and count:
+            raise RuntimeError(f"{label}: native ellipse ink cannot be bounded by the display reader")
+        for row in rows:
+            if (
+                not all(math.isfinite(value) for value in row)
+                or (key in lengths and len(row) != lengths[key])
+            ):
+                raise RuntimeError(f"{label}: invalid native {key} ink {row!r}")
+            if key in ("polylines", "polygons"):
+                header, count_index = (7, 6) if key == "polylines" else (5, 4)
+                if (
+                    len(row) < header or row[count_index] < 0
+                    or row[count_index] != int(row[count_index])
+                    or len(row) != header + 3 * int(row[count_index])
+                    or (key == "polylines" and (row[0] != 0.0 or row[1] != 0.0))
+                ):
+                    raise RuntimeError(f"{label}: unreadable native {key} ink {row!r}")
+            if display_box({key: [row]}) is None:
+                raise RuntimeError(f"{label}: unreadable native {key} stroke footprint")
+    # Refuse unusable text instead of letting display_box silently drop a run.
+    for text in display.get("texts", ()):
+        if (
+            type(text.get("t")) is not str
+            or len(text.get("pos", ())) != 3
+            or not all(math.isfinite(value) for value in text["pos"])
+            or not math.isfinite(text.get("h", math.nan)) or text["h"] <= 0.0
+            or not math.isfinite(text.get("ang", math.nan))
+        ):
+            raise RuntimeError(f"{label}: invalid native text ink {text!r}")
+    if required_dimension or required_text:
+        if not any(text["t"].strip() for text in display.get("texts", ())):
+            raise RuntimeError(f"{label}: required native ink has no readable text")
+    if expected_text is not None:
+        drawn = "".join(text["t"] for text in display.get("texts", ()))
+        if "".join(expected_text.upper().split()) not in "".join(drawn.upper().split()):
+            raise RuntimeError(f"{label}: required native ink does not draw {expected_text!r}")
+    if required_dimension and not any(
+        len(line) == 10 and all(math.isfinite(value) for value in line)
+        and (line[4], line[5]) != (line[7], line[8])
+        for line in display.get("lines", ())
+    ):
+        raise RuntimeError(f"{label}: required native dimension has no drawn dimension strokes")
+    if kind == 6:
+        extent = tuple(float(value) for value in _early_bound(
+            annotation.GetSpecificAnnotation(), "INote"
+        ).GetExtent())
+        if (
+            len(extent) != 6 or not all(math.isfinite(value) for value in extent)
+            or extent[0] >= extent[3] or extent[1] >= extent[4]
+        ):
+            raise RuntimeError(f"{label}: invalid native note extent {extent}")
+        text_box = extent[0], extent[1], extent[3], extent[4]
+        # Conservatively union the native extent and display ink. The extent
+        # can already include leaders; do not replace it with estimated text.
+        strokes = {key: rows for key, rows in display.items() if key != "texts"}
+        box = None if text_only else display_box(strokes, advance=0.8)
+        if box is None:
+            return text_box
+        return (
+            min(text_box[0], box.xmin), min(text_box[1], box.ymin),
+            max(text_box[2], box.xmax), max(text_box[3], box.ymax),
+        )
     if text_only:
         display = {"texts": display.get("texts", ())}
     box = display_box(display, advance=0.8)
@@ -1132,7 +1209,154 @@ def _middle_rib_annotation_box(
             f"{label}: {estimates} unreported glyph widths conservatively estimated; "
             "native strokes/positions/heights measured; PDF ink review still required"
         )
+    if box is None and not text_only:
+        raise RuntimeError(f"{label}: visible native annotation has no readable ink")
     return None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
+
+
+def _middle_rib_view_annotations(view: Any, *, label: str) -> tuple[Any, ...]:
+    """Read the counted native annotation census without losing unknown ink."""
+    count = view.GetAnnotationCount()
+    raw = view.GetAnnotations()
+    if (
+        type(count) is not int or count < 0
+        or (raw is not None and type(raw) not in (tuple, list))
+        or len(raw or ()) != count
+    ):
+        raise RuntimeError(f"{label}: unreadable native annotation census {count!r}, {raw!r}")
+    return tuple(_early_bound(item, "IAnnotation") for item in (raw or ()))
+
+
+def _middle_rib_detail_ink(view: Any, *, label: str) -> dict[str, tuple[float, ...]]:
+    """Native parent fences/labels, which GetOutline/GetAnnotations do not bound."""
+    native_name = view_type = cropped = metadata = raw_circles = None
+    try:
+        native_name = view.Name
+        view_type = view.Type
+        cropped = view.IsCropped()
+        metadata = view.GetDetailCircleCount2()
+        raw_circles = view.GetDetailCircles()
+    finally:
+        circle_count = len(raw_circles) if type(raw_circles) in (tuple, list) else None
+        _telemetry.debug(
+            f"{label}: native detail census view={native_name!r}, Type={view_type!r}, "
+            f"IsCropped={cropped!r}, GetDetailCircleCount2={metadata!r}, "
+            f"len(GetDetailCircles)={circle_count!r}"
+        )
+    if (
+        type(metadata) is not tuple or len(metadata) != 2
+        or any(type(value) is not int or value < 0 for value in metadata)
+    ):
+        raise RuntimeError(f"{label}: invalid native detail-circle count/size {metadata!r}")
+    count, size = metadata
+    if raw_circles is not None and type(raw_circles) not in (tuple, list):
+        raise RuntimeError(f"{label}: unreadable native detail-circle objects")
+    circles = tuple(_early_bound(raw, "IDetailCircle") for raw in (raw_circles or ()))
+    if not circles:
+        # A detail view's crop can appear in GetDetailCircleInfo2 without being
+        # a parent source circle. Only actual IDetailCircle objects are sources.
+        if count and view.Type != 3:  # swDrawingDetailView
+            raise RuntimeError(f"{label}: missing native parent detail-circle objects")
+        return {}
+    info = view.GetDetailCircleInfo2()
+    labels = view.GetDetailCircleStrings()
+    if (
+        len(circles) != count
+        or type(info) not in (tuple, list) or len(info) != size or not info
+        or any(type(value) not in (int, float) or not math.isfinite(value) for value in info)
+        or info[0] != count
+        or type(labels) not in (tuple, list) or len(labels) != count
+        or any(type(text) is not str or not text.strip() for text in labels)
+        or len(set(labels)) != count
+        or sorted(circle.GetLabel() for circle in circles) != sorted(labels)
+    ):
+        raise RuntimeError(f"{label}: unreadable native detail-circle geometry/labels")
+    # Validate the complete flat records before the shared decoder's tolerant
+    # truncation handling; no missing fence, label or arrow may disappear.
+    offset = 1
+    for _number in range(count):
+        if offset + 16 > size:
+            raise RuntimeError(f"{label}: truncated native detail-circle geometry")
+        arrows = info[offset + 15]
+        if arrows < 0 or arrows != int(arrows) or offset + 16 + 9 * int(arrows) > size:
+            raise RuntimeError(f"{label}: truncated native detail-circle arrows")
+        offset += 16 + 9 * int(arrows)
+    if any(value != 0.0 for value in info[offset:]):
+        raise RuntimeError(f"{label}: nonzero unused native detail-circle geometry")
+    ink = {}
+    decoded = _detail_circles(info)
+    if len(decoded) != count:
+        raise RuntimeError(f"{label}: incomplete native detail-circle geometry")
+    offset = 1
+    for text, (center, start, end, text_pt, (height, _)) in zip(labels, decoded, strict=True):
+        arrows = int(info[offset + 15])
+        cx, cy = center
+        radius = math.dist(center, start)
+        if (
+            radius <= 0.0 or height <= 0.0
+            or not math.isclose(radius, math.dist(center, end), abs_tol=1e-7)
+        ):
+            raise RuntimeError(f"{label}: invalid native detail-circle radius/text height")
+        # A complete circular envelope conservatively includes the source arc.
+        # textPt is upper-left, as in the shared detail-circle audit reader.
+        x, y = text_pt
+        box = [
+            min(cx - radius, x), min(cy - radius, y - height),
+            max(cx + radius, x + 0.8 * height * len(text)), max(cy + radius, y),
+        ]
+        offset += 16
+        for _index in range(int(arrows)):
+            arrow = info[offset:offset + 9]
+            if min(arrow[6:8]) <= 0.0 or math.hypot(arrow[3], arrow[4]) == 0.0:
+                raise RuntimeError(f"{label}: invalid native detail-circle arrow")
+            arrow_box = display_box({"arrows": [(*arrow, 0.0, 0.0, 1.0)]})
+            if arrow_box is None:
+                raise RuntimeError(f"{label}: unreadable native detail-circle arrow ink")
+            box = [
+                min(box[0], arrow_box.xmin), min(box[1], arrow_box.ymin),
+                max(box[2], arrow_box.xmax), max(box[3], arrow_box.ymax),
+            ]
+            offset += 9
+        ink[f"{label} detail {text}"] = tuple(box)
+        _telemetry.info(
+            f"{label} detail {text}: native fence/arrow/label position and height measured; "
+            "unreported label width conservatively estimated; PDF ink review still required"
+        )
+    return ink
+
+
+def _middle_rib_foreign_ink(
+    adapter: Any, *, neighboring_views: tuple[Any, ...], sheet_view: Any,
+    plan_note_annotation: Any,
+) -> dict[str, tuple[float, ...]]:
+    """Assemble foreign view bodies, captions, annotations and source details."""
+    neighbors = {}
+    for index, raw_view in enumerate((*neighboring_views, sheet_view)):
+        view = _early_bound(raw_view, "IView")
+        name = f"existing receiver view {index}"
+        if index < len(neighboring_views):
+            view.UpdateViewDisplayGeometry()
+            neighbors[f"{name} outline"] = tuple(float(value) for value in view.GetOutline())
+            neighbors.update(_middle_rib_detail_ink(view, label=name))
+        annotations = list(_middle_rib_view_annotations(view, label=name))
+        if index < len(neighboring_views):
+            raw_notes = view.GetNotes()
+            if raw_notes is not None and type(raw_notes) not in (tuple, list):
+                raise RuntimeError(f"{name}: unreadable native view captions")
+            if view.Type == 3 and len(raw_notes or ()) != 1:
+                raise RuntimeError(f"{name}: missing native detail caption")
+            for raw_note in raw_notes or ():
+                note = _early_bound(raw_note, "INote")
+                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+                if not any(adapter.swApp.IsSame(annotation, other) == 1 for other in annotations):
+                    annotations.append(annotation)
+        for annotation_index, annotation in enumerate(annotations):
+            if int(annotation.OwnerType) == 2 or adapter.swApp.IsSame(annotation, plan_note_annotation) == 1:
+                continue
+            box = _middle_rib_annotation_box(adapter, annotation, label=name)
+            if box is not None:
+                neighbors[f"{name} annotation {annotation_index}"] = box
+    return neighbors
 
 
 def _middle_rib_cut_ink(plan: Any) -> dict[str, tuple[float, ...]]:
@@ -1255,6 +1479,14 @@ def _middle_rib_section(
     reach_annotation = _early_bound(annotations[0], "IAnnotation")
     _apply_callouts(adapter, annotations, label="middle-rib L-L")
     position_section_caption(adapter, section, MIDDLE_RIB_CAPTION_XY, label="middle-rib L-L")
+    captions = [
+        _early_bound(raw, "INote") for raw in (section.GetNotes() or ())
+        if "<VLLABEL>" in str(_early_bound(raw, "INote").PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError("middle-rib L-L lost its native linked section caption")
+    caption = captions[0]
+    caption_annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
     if drawing.ActivateView(view_name(adapter, plan)) is not True:
         raise RuntimeError("failed to activate the middle-rib cut-location plan")
     plan_note = _early_bound(add_property_linked_note(
@@ -1295,6 +1527,25 @@ def _middle_rib_section(
                     or math.dist(actual, expected) > 1e-9
                 ):
                     raise RuntimeError(f"middle-rib tangent extension {index} no longer meets its native profile")
+        _middle_rib_annotation_box(
+            adapter, reach_annotation, label="middle-rib theoretical reach",
+            required_dimension=True,
+        )
+        captions_now = [
+            _early_bound(raw, "INote") for raw in (section.GetNotes() or ())
+            if "<VLLABEL>" in str(_early_bound(raw, "INote").PropertyLinkedText or "")
+        ]
+        if (
+            len(captions_now) != 1
+            or adapter.swApp.IsSame(captions_now[0].GetAnnotation(), caption_annotation) != 1
+            or "SECTION L-L" not in " ".join(str(caption.GetText() or "").upper().split())
+            or int(caption_annotation.OwnerType) != 0
+        ):
+            raise RuntimeError("middle-rib L-L lost its readable SECTION L-L caption")
+        caption_box = _middle_rib_annotation_box(
+            adapter, caption_annotation, label="middle-rib SECTION L-L caption", required_text=True,
+            expected_text="SECTION L-L",
+        )
         display = _early_bound(reach_annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         full_name = str(dimension.FullName)
@@ -1312,7 +1563,7 @@ def _middle_rib_section(
         ):
             raise RuntimeError("middle-rib L-L lost its native theoretical-reach dimension")
         _telemetry.info(f"middle-rib imported source {full_name}: {dimension.SystemValue} m")
-        new_ink = {}
+        new_ink = {"middle-rib SECTION L-L caption": (caption_box, MIDDLE_RIB_SECTION_REGION)}
         for name, view, region in (
             ("middle-rib L-L", section, MIDDLE_RIB_SECTION_REGION),
             ("middle-rib cut plan", plan, MIDDLE_RIB_PLAN_REGION),
@@ -1320,7 +1571,12 @@ def _middle_rib_section(
             view.UpdateViewDisplayGeometry()
             outline = tuple(float(value) for value in view.GetOutline())
             new_ink[f"{name} outline"] = (outline, region)
-            for index, raw_annotation in enumerate(view.GetAnnotations() or ()):
+            view_annotations = list(_middle_rib_view_annotations(view, label=name))
+            if view is section and not any(
+                adapter.swApp.IsSame(raw, caption_annotation) == 1 for raw in view_annotations
+            ):
+                view_annotations.append(caption_annotation)
+            for index, raw_annotation in enumerate(view_annotations):
                 if adapter.swApp.IsSame(raw_annotation, plan_note_annotation) == 1:
                     continue
                 box = _middle_rib_annotation_box(adapter, raw_annotation, label=f"{name} annotation {index}")
@@ -1331,28 +1587,25 @@ def _middle_rib_section(
                 )
                 if text_box is not None and not boxes_clear(text_box, outline, gap=0.002):
                     raise RuntimeError(f"{name} text {index} crowds its own cut: {text_box}, {outline}")
-        note_box = _middle_rib_annotation_box(adapter, plan_note_annotation, label="middle-rib plan label")
+        note_box = _middle_rib_annotation_box(
+            adapter, plan_note_annotation, label="middle-rib plan label", required_text=True,
+        )
         if note_box is None:
             raise RuntimeError("middle-rib cut plan lost its readable label")
         new_ink["middle-rib plan label"] = (note_box, MIDDLE_RIB_PLAN_REGION)
-        if not boxes_clear(note_box, new_ink["middle-rib cut plan outline"][0], gap=0.002):
+        plan_text_box = _middle_rib_annotation_box(
+            adapter, plan_note_annotation, label="middle-rib plan label text", text_only=True,
+        )
+        if not boxes_clear(plan_text_box, new_ink["middle-rib cut plan outline"][0], gap=0.002):
             raise RuntimeError("middle-rib plan label crowds its own cut-location view")
         for name, box in _middle_rib_cut_ink(plan).items():
             new_ink[name] = (box, MIDDLE_RIB_PLAN_REGION)
-        neighbors = {}
-        # Include sheet-owned labels, not just the four neighboring view boxes.
-        for index, raw_view in enumerate((*neighboring_views, drawing.GetFirstView())):
-            view = _early_bound(raw_view, "IView")
-            name = f"existing receiver view {index}"
-            if index < len(neighboring_views):
-                neighbors[f"{name} outline"] = tuple(float(value) for value in view.GetOutline())
-            for annotation_index, raw_annotation in enumerate(view.GetAnnotations() or ()):
-                annotation = _early_bound(raw_annotation, "IAnnotation")
-                if int(annotation.OwnerType) == 2 or adapter.swApp.IsSame(annotation, plan_note_annotation) == 1:
-                    continue
-                box = _middle_rib_annotation_box(adapter, annotation, label=name)
-                if box is not None:
-                    neighbors[f"{name} annotation {annotation_index}"] = box
+        neighbors = _middle_rib_foreign_ink(
+            adapter, neighboring_views=neighboring_views, sheet_view=drawing.GetFirstView(),
+            plan_note_annotation=plan_note_annotation,
+        )
+        if not any(name.endswith(f" detail {RIB_END_DETAIL_LETTER}") for name in neighbors):
+            raise RuntimeError("receiver view lost its native Detail J source fence/label")
         _require_middle_rib_layout(new_ink, neighbors)
         _telemetry.success(f"middle-rib native allocated ink: {new_ink}; foreign ink: {neighbors}")
 
@@ -2357,8 +2610,6 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
-    if THREAD_EXTENT_REQUIREMENT not in str(callout.GetText(5) or ""):
-        raise RuntimeError("bracket tap callout omits bounded physical thread extent")
 
 
 async def build(adapter: Any) -> dict[str, str]:

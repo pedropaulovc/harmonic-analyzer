@@ -177,19 +177,35 @@ The sharp external rib-cap/plate-underside notch is a finite surface corner,
 not an infinite underside plane inside the rib. At the adverse bands, the
 118° cone's nearest point is **0.03956345 mm past the cylindrical shoulder**;
 subtracting the full-vector **0.03966197 mm** 0.3° wander bound gives a local
-pilot-to-corner bound of **2.10745219 mm**. Conservatively extending the screw
-major-radius envelope over the *entire bounded drill cylinder* gives
-**2.03942169 mm**. Both exceed the unchanged 2.0 mm target and 1.5 mm floor.
+pilot-to-corner bound of **2.10745219 mm**, above the unchanged 2.0 mm target
+and 1.5 mm floor. This is a **pilot-hole** bound, not a finished-thread guarantee.
 The old 8.20 mm receiver's corresponding pilot bound was only **1.20291600 mm**;
 its **1.24257797 mm** un-wandered closest point was the shoulder, not the cone
 tip or an interior cone point. A point-containment margin is not a wall.
 
-Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**.
-The feature callout additionally requires **THREAD EXTENT WITHIN DRILL CYLINDER**:
-MIN is not permission for unlimited thread beyond the finite volume charged by
-the wall proof. Existing engagement, screw-tip, tap-lead, head-float and other
-local-wall guards remain independent. `magnifying_bracket_joint_layout` owns
-the printed-band, cone and wander calculations.
+**Finished-thread wall proof remains pending; this repair is not approved for
+release on the pilot result alone.** ASME B1.1-2003 §§5.5 and 8.3.2(a,b)
+specify the internal **minimum** major diameter but leave its **maximum**
+unspecified, determined by the unworn cutting-tool crest
+([primary standard text, PDF filename says 2008](https://fpg-co.com/Standards/ASME%20B1.1%202008.pdf)).
+The screw's basic Ø2.1844 is therefore not an upper bound on the hole root.
+The previously reported **2.03942169 mm** is only a conditional calculation:
+it assumes internal major diameter no greater than that basic diameter and
+physical thread extent no farther than the 7.01 mm maximum drill cylinder.
+Neither condition follows from the printed 2B thread or **4.95 MIN**.
+
+Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**;
+the modeled Hole Wizard pilot does not reproduce the cut thread roots. The
+unapproved, radially ambiguous `THREAD EXTENT WITHIN DRILL CYLINDER` process
+line is removed rather than treated as authority for new limits. A real
+off-the-shelf tap's maximum cutting-crest diameter and a qualified axial
+process need evidence and an owner decision; H/GH tap limits control **pitch**
+diameter and cannot substitute for root-OD evidence. No geometry increase or
+bespoke tighter finished-root limit is inferred. Existing engagement,
+screw-tip, tap-lead, head-float and other valid local guards remain independent.
+`magnifying_bracket_joint_layout` retains the actual printed-band pilot guard
+and labels the basic-major calculation conditional, with no thread-wall pass
+assertion.
 
 End-rib **35.75** dimensions name **END RIB FACES** only. The unchanged middle
 rib's **35.75** is the *theoretical intersection of its tangent slants*, buried
@@ -199,10 +215,16 @@ The dedicated cut-face-only section L-L imports the actual native
 from the actual source sketch. It does not reprofile the rib to make a visible
 35.75 endpoint. View F retains its top-referenced row and centreline without
 the duplicate 2.54 reference.
+The imported dimension is model-associative. The tangent extensions are
+recipe-generated drawing construction sampled from the source sketch; their
+settled check proves coincidence in the current build, not automatic updating
+after a later saved-part edit. Regenerate the drawing after such an edit.
 
-These are local analytic bounds, not a claim that every installed clearance
-has been measured. Part-save checks require native trimmed faces/closest-point
-witnesses for both drills and the original middle-rib profile. The affected
+These are local analytic results, not a claim that every installed clearance
+or finished-thread wall has been proved. Part-save checks require native
+trimmed pilot faces/closest-point witnesses and the original middle-rib profile.
+Those modeled pilot checks cannot certify unmodeled internal thread roots.
+The affected
 `ha-harmonic-analyzer` assembly adds a localized native new-strip check against
 configured installed neighbors, independent of allowed whole-part contacts;
 `sm-summing` and `mg-magnifier` alone do not contain all cross-subassembly pairs.

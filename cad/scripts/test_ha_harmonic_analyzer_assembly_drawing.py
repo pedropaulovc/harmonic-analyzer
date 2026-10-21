@@ -220,7 +220,6 @@ class _ReceiverBody:
         self.tag = tag
         self.consumed = False
         self.Check3 = type("Faults", (), {"Count": 0})()
-        scene.bodies.append(self)
 
     def GetType(self):
         return 0
@@ -233,6 +232,7 @@ class _ReceiverBody:
 
     def ApplyTransform(self, transform):
         assert self.temporary and not self.consumed
+        self.scene.transforms.append((self.tag, transform))
         if self.scene.transform_fail:
             return False
         values = transform.ArrayData
@@ -257,7 +257,6 @@ class _ReceiverBody:
             if (tool.predicate(point) if tool.predicate else point in tool.points)
         }
         points = selected if operation == 15901 else self.points - selected
-        self.scene.operations.append((operation, self.tag, tool.tag))
         if not points:
             return None, 0
         return (_ReceiverBody(self.scene, points, temporary=True, tag=self.tag),), 0
@@ -306,6 +305,7 @@ class _ReceiverComponent:
 
     def GetBodies3(self, kind):
         assert kind == 0
+        self.scene.body_reads.append(self)
         return tuple(self.bodies), tuple(0 for _ in self.bodies)
 
     def FeatureByName(self, name):
@@ -339,7 +339,8 @@ class _ReceiverScene:
     def __init__(self):
         import _native_receiver_clearance as native
 
-        self.bodies, self.operations, self.boxes = [], [], []
+        self.boxes = []
+        self.body_reads, self.transforms, self.root_lookups = [], [], []
         self.boolean_fail = self.transform_fail = self.exploded = False
         self.bad_distance = None
         self.depth, self.cap = 9.40, -66.8
@@ -359,7 +360,8 @@ class _ReceiverScene:
         return tuple(reversed(self.components))  # Native order is unspecified.
 
     def GetComponentByName(self, name):
-        return next((c for c in self.components if c.Name2 == name), None)
+        self.root_lookups.append(name)
+        raise AssertionError(f"root GetComponentByName cannot resolve nested occurrence aliases: {name}")
 
     def GetModeler(self):
         return self
@@ -436,6 +438,55 @@ def test_receiver_strip_measures_every_actual_nested_pair_and_machine_witness(re
     assert all(row["material_scope"] == native.MATERIAL_SCOPE and row["claim"] == native.CLAIM for row in records)
     assert all(row["closest_points_mm"][0][1] > 900.0 for row in records)
     assert all(not b.consumed for c in receiver_scene.components for b in c.bodies)
+
+
+def test_receiver_strip_uses_enumerated_occurrence_bodies_and_distinct_root_relative_poses(receiver_scene):
+    import math
+    import _native_receiver_clearance as native
+
+    occurrences = {component.Name2: component for component in receiver_scene.components}
+    originals = {name: component.bodies[0].points for name, component in occurrences.items()}
+    for index, component in enumerate(occurrences.values()):
+        assert "/" in component.Name2  # None is a top-level lookup key.
+        values = list(component.Transform2.ArrayData)
+        values[9:12] = (0.5 + index / 100.0, 0.98 + index / 1000.0, -0.004 - index / 1000.0)
+        component.Transform2.ArrayData = tuple(values)
+
+    records = native.assert_receiver_added_strip(receiver_scene, builder.ASM_NAME)
+
+    assert receiver_scene.root_lookups == []
+    assert len(receiver_scene.body_reads) == len(occurrences)
+    assert {id(component) for component in receiver_scene.body_reads} == {
+        id(component) for component in occurrences.values()
+    }
+    assert {name for name, _pose in receiver_scene.transforms} == set(occurrences)
+    assert all(pose is occurrences[name].Transform2 for name, pose in receiver_scene.transforms)
+
+    def placed_points(name, points):
+        translation = occurrences[name].Transform2.ArrayData[9:12]
+        return {
+            tuple(value + 1000.0 * offset for value, offset in zip(point, translation, strict=True))
+            for point in points
+        }
+
+    receiver_name = next(name for name in occurrences if "/sm-summing-lever-" in name)
+    added = placed_points(receiver_name, {
+        point for point in originals[receiver_name]
+        if point[:2] in {(20.0, 8.0), (35.9, 2.7), (-20.0, 0.0)}
+    })
+    for record in records:
+        neighbor = record["neighbor"]
+        fixed = placed_points(neighbor, originals[neighbor])
+        first, second = record["closest_points_mm"]
+        assert any(first == pytest.approx(point) for point in added)
+        assert any(second == pytest.approx(point) for point in fixed)
+        assert record["closest_distance_mm"] == pytest.approx(
+            min(math.dist(p, q) for p in added for q in fixed)
+        )
+    assert all(
+        component.bodies[0].points == originals[name] and not component.bodies[0].consumed
+        for name, component in occurrences.items()
+    )
 
 
 def test_receiver_strip_does_not_mistake_existing_intended_plate_contact_for_air_failure(receiver_scene):
@@ -579,7 +630,7 @@ def receiver_save_pipeline(tmp_path, monkeypatch):
         monkeypatch.setattr(_assembly, name, lambda *_a, **_k: None)
     monkeypatch.setattr(_assembly, "rebuild_if_needed_before_save", lambda *_: False)
     monkeypatch.setattr(_assembly, "_save_new_assembly_as_copy", lambda *_: events.append("save"))
-    monkeypatch.setattr(_assembly, "save_assembly_in_place", lambda _a, _n, changed: (
+    monkeypatch.setattr(_assembly, "save_assembly_in_place", lambda _a, _n, changed, **_kwargs: (
         events.append("save" if changed else "skip_save") or changed
     ))
     return NS(adapter=adapter, events=events, proof=proof, target=target, module=_assembly)

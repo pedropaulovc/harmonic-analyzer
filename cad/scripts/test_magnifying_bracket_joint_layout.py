@@ -171,18 +171,43 @@ def test_printed_receiver_stack_bounds_the_external_notch_not_a_bottom_wall() ->
     assert joint.TAP_DRILL_RADIUS_MAX == pytest.approx(0.94)
     assert joint.DRILL_POINT_DEPTH_MAX == pytest.approx(0.5648084)
     assert joint.RECEIVER_DRILL_NOTCH_WALL_MIN == pytest.approx(2.107452191676)
-    assert joint.RECEIVER_THREAD_NOTCH_WALL_MIN == pytest.approx(2.039421687432)
     assert joint.LOCAL_WALL_HARD_FLOOR == 1.5
     assert joint.RECEIVER_NOTCH_WALL_REQUIRED == 2.0
-    assert min(
-        joint.RECEIVER_DRILL_NOTCH_WALL_MIN, joint.RECEIVER_THREAD_NOTCH_WALL_MIN,
-    ) >= joint.RECEIVER_NOTCH_WALL_REQUIRED
+    assert joint.RECEIVER_DRILL_NOTCH_WALL_MIN >= joint.RECEIVER_NOTCH_WALL_REQUIRED
+
+
+def test_basic_major_notch_wall_is_conditional_not_an_actual_thread_bound() -> None:
+    # This assumes both an actual root no larger than basic major and an
+    # actual axial thread extent no longer than the bounded drill cylinder.
+    # ASME B1.1-2003 §§5.5/8.3.2 supplies no internal-major maximum, and
+    # neither 2B nor the printed thread-depth MIN establishes those assumptions.
+    expected = math.hypot(1.88, 1.98 - 2.1844 / 2.0) - joint.DRILL_WANDER_MAX
+    assert joint.CONDITIONAL_BASIC_MAJOR_NOTCH_WALL == pytest.approx(2.039421687432)
+    assert joint.CONDITIONAL_BASIC_MAJOR_NOTCH_WALL == pytest.approx(expected)
     assert joint.THREAD_DEPTH_BAND == 0.05
-    assert joint.THREAD_EXTENT_REQUIREMENT == "THREAD EXTENT WITHIN DRILL CYLINDER"
-    # A changed native full-thread design must not shorten the conservative
-    # major envelope: that bound covers the entire maximum drill cylinder.
+    # Changing native full-thread geometry does not establish a physical upper
+    # extent or change the cylinder assumed by this conditional calculation.
     changed = _joint_with_values(THREAD_DEPTH=4.96)
-    assert changed["RECEIVER_THREAD_NOTCH_WALL_MIN"] == joint.RECEIVER_THREAD_NOTCH_WALL_MIN
+    assert changed["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] == joint.CONDITIONAL_BASIC_MAJOR_NOTCH_WALL
+
+
+@pytest.mark.parametrize(
+    ("root_diameter_extra", "axial_extent_extra"), ((0.5, 0.0), (0.0, 0.1)),
+)
+def test_unknown_root_and_extent_cannot_inherit_the_basic_major_wall(
+    root_diameter_extra: float, axial_extent_extra: float,
+) -> None:
+    # Illustrative counterexamples, not standard maxima or approved processes:
+    # the print supplies neither of the physical bounds used by the analysis.
+    illustrative_root = joint.SCREW_MAJOR_DIA + root_diameter_extra
+    illustrative_extent = joint.DRILL_DEPTH_MAX + axial_extent_extra
+    wall = joint.cylindrical_notch_distance(
+        joint.RIB_DEPTH - joint.RIB_DEPTH_BAND - illustrative_extent,
+        joint.RECEIVER_NOTCH_HEIGHT_MIN,
+        illustrative_root / 2.0,
+    ) - joint.DRILL_WANDER_MAX
+    assert wall < joint.RECEIVER_NOTCH_WALL_REQUIRED
+    assert joint.CONDITIONAL_BASIC_MAJOR_NOTCH_WALL > joint.RECEIVER_NOTCH_WALL_REQUIRED
 
 
 @pytest.mark.parametrize(
@@ -279,9 +304,9 @@ def _consumer_with_joint_values(monkeypatch, consumer_name: str, **values):
         return importlib.import_module(consumer_name)
 
 
-def test_receiver_depth_and_band_discriminate_the_major_notch_wall_boundary() -> None:
-    # The entire Dmax cylinder carries the major diameter, independently of
-    # where the native 4.95 +/-0.05 full-thread design ends.
+def test_receiver_depth_and_band_discriminate_conditional_basic_major_analysis() -> None:
+    # Assume basic major over the entire Dmax cylinder, independently of the
+    # native full-thread design. Crossing 2.0 here is NOT a production refusal.
     h = (5.08 - 0.51) - (2.54 + 0.05)
     radial_gap = h - 2.1844 / 2.0
     axial_gap = math.sqrt((2.0 + joint.DRILL_WANDER_MAX) ** 2 - radial_gap**2)
@@ -292,15 +317,16 @@ def test_receiver_depth_and_band_discriminate_the_major_notch_wall_boundary() ->
         ("RIB_DEPTH", minimum_rib + 0.51, 1),
         ("RIB_DEPTH_BAND", 9.4 - minimum_rib, -1),
     ):
-        safe = _joint_with_values(**{name: boundary + direction * epsilon})
-        assert safe["RECEIVER_THREAD_NOTCH_WALL_MIN"] > 2.0
-        assert safe["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
-        assert safe["DRILL_POINT_RIB_MARGIN_MIN"] > 0.0
-        with pytest.raises(AssertionError, match="receiver notch loses approved 2.0 mm wall"):
-            _joint_with_values(**{name: boundary - direction * epsilon})
+        above = _joint_with_values(**{name: boundary + direction * epsilon})
+        below = _joint_with_values(**{name: boundary - direction * epsilon})
+        assert above["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] > 2.0
+        assert below["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] < 2.0
+        for analysis in (above, below):
+            assert analysis["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
+            assert analysis["DRILL_POINT_RIB_MARGIN_MIN"] > 0.0
 
 
-def test_adverse_plate_and_top_referenced_row_discriminate_notch_wall_boundary() -> None:
+def test_plate_and_row_discriminate_conditional_basic_major_analysis() -> None:
     axial_gap = (9.4 - 0.51) - 7.01
     required_h = 2.1844 / 2.0 + math.sqrt(
         (2.0 + joint.DRILL_WANDER_MAX) ** 2 - axial_gap**2,
@@ -312,8 +338,55 @@ def test_adverse_plate_and_top_referenced_row_discriminate_notch_wall_boundary()
         ("RECEIVER_ROW_FROM_TOP", 5.08 - 0.51 - 0.05 - required_h, -1),
         ("RECEIVER_ROW_BAND", 5.08 - 0.51 - 2.54 - required_h, -1),
     ):
+        above = _joint_with_values(**{name: boundary + direction * epsilon})
+        below = _joint_with_values(**{name: boundary - direction * epsilon})
+        assert above["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] > 2.0
+        assert below["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] < 2.0
+        for analysis in (above, below):
+            assert analysis["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
+
+
+def test_receiver_depth_and_band_reject_lost_printed_pilot_wall() -> None:
+    # Solve the pilot's cone-interior distance independently of the
+    # conditional basic-major cylinder and of the cached wall calculation.
+    k = 1.0 / joint.DRILL_POINT_H
+    normal = math.hypot(1.0, k)
+    axial_gap = (
+        normal * (2.0 + joint.DRILL_WANDER_MAX) - (1.98 - 0.94)
+    ) / k
+    minimum_rib = 7.01 + axial_gap
+    epsilon = 1e-6
+    for name, boundary, direction in (
+        ("RIB_DEPTH", minimum_rib + 0.51, 1),
+        ("RIB_DEPTH_BAND", 9.4 - minimum_rib, -1),
+    ):
         safe = _joint_with_values(**{name: boundary + direction * epsilon})
-        assert safe["RECEIVER_THREAD_NOTCH_WALL_MIN"] > 2.0
+        advance = safe["cone_notch_closest_advance"](
+            safe["RECEIVER_NOTCH_AXIAL_GAP_MIN"], 1.98, 0.94,
+        )
+        assert 0.0 < advance < safe["DRILL_POINT_DEPTH_MAX"]
+        assert safe["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
+        assert safe["DRILL_POINT_RIB_MARGIN_MIN"] > 0.0
+        with pytest.raises(AssertionError, match="receiver notch loses approved 2.0 mm wall"):
+            _joint_with_values(**{name: boundary - direction * epsilon})
+
+
+def test_adverse_plate_and_top_referenced_row_reject_lost_printed_pilot_wall() -> None:
+    k = 1.0 / joint.DRILL_POINT_H
+    normal = math.hypot(1.0, k)
+    required_h = 0.94 + normal * (2.0 + joint.DRILL_WANDER_MAX) - k * 1.88
+    epsilon = 1e-6
+    for name, boundary, direction in (
+        ("LEVER_PLATE_THICKNESS", 0.51 + 2.54 + 0.05 + required_h, 1),
+        ("LEVER_PLATE_THICKNESS_BAND", 5.08 - 2.54 - 0.05 - required_h, -1),
+        ("RECEIVER_ROW_FROM_TOP", 5.08 - 0.51 - 0.05 - required_h, -1),
+        ("RECEIVER_ROW_BAND", 5.08 - 0.51 - 2.54 - required_h, -1),
+    ):
+        safe = _joint_with_values(**{name: boundary + direction * epsilon})
+        advance = safe["cone_notch_closest_advance"](
+            1.88, safe["RECEIVER_NOTCH_HEIGHT_MIN"], 0.94,
+        )
+        assert 0.0 < advance < safe["DRILL_POINT_DEPTH_MAX"]
         assert safe["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
         with pytest.raises(AssertionError, match="receiver notch loses approved 2.0 mm wall"):
             _joint_with_values(**{name: boundary - direction * epsilon})
@@ -321,8 +394,8 @@ def test_adverse_plate_and_top_referenced_row_discriminate_notch_wall_boundary()
 
 def test_printed_pilot_diameter_has_its_own_cone_interior_wall_guard() -> None:
     # Solve the line-interior distance independently, including the radius's
-    # contribution to the full-vector wander. At this adverse diameter the
-    # pilot, not the major-cylinder envelope, controls the local wall.
+    # contribution to the full-vector wander. This is the printed pilot's
+    # own guard; no actual internal-root maximum is assumed.
     q = joint.DRILL_POINT_H
     k = 1.0 / q
     normal = math.hypot(1.0, k)
@@ -336,9 +409,10 @@ def test_printed_pilot_diameter_has_its_own_cone_interior_wall_guard() -> None:
     advance = safe["cone_notch_closest_advance"](1.88, 1.98, safe["TAP_DRILL_RADIUS_MAX"])
     assert 0.0 < advance < safe["DRILL_POINT_DEPTH_MAX"]
     assert safe["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
-    assert safe["RECEIVER_THREAD_NOTCH_WALL_MIN"] > 2.0
-    adverse_wander = wander_slope * (7.01 + (radius_boundary + epsilon / 2.0) * q)
-    assert math.hypot(1.88, 1.98 - 2.1844 / 2.0) - adverse_wander > 2.0
+    adverse_radius = radius_boundary + epsilon / 2.0
+    adverse_wander = wander_slope * (7.01 + adverse_radius * q)
+    adverse_line_distance = (k * 1.88 + 1.98 - adverse_radius) / normal - adverse_wander
+    assert adverse_line_distance < 2.0
     with pytest.raises(AssertionError, match="receiver notch loses approved 2.0 mm wall"):
         _joint_with_values(TAP_DRILL_PRINTED_DIA=diameter_boundary + epsilon)
 
@@ -346,28 +420,35 @@ def test_printed_pilot_diameter_has_its_own_cone_interior_wall_guard() -> None:
 @pytest.mark.parametrize(
     "consumer_name", ("build_sm_summing_lever", "build_mg_magnifying_bracket"),
 )
-def test_actual_consumers_import_only_with_the_receiver_notch_wall(
+def test_actual_consumers_use_pilot_guard_not_conditional_thread_analysis(
     monkeypatch, consumer_name: str,
 ) -> None:
+    k = 1.0 / joint.DRILL_POINT_H
+    normal = math.hypot(1.0, k)
+    boundary = 0.51 + 7.01 + (
+        normal * (2.0 + joint.DRILL_WANDER_MAX) - (1.98 - 0.94)
+    ) / k
     epsilon = 1e-6
-    boundary = 9.356309368690575
-    safe = _consumer_with_joint_values(
-        monkeypatch, consumer_name, RIB_DEPTH=boundary + epsilon,
-    )
-    if consumer_name == "build_sm_summing_lever":
-        assert safe.RECEIVER_RIB_T == pytest.approx(boundary + epsilon)
-        assert safe.LEVER_HOLE_POINTS == joint.LEVER_HOLE_POINTS
-        assert safe.TAP_SPEC == joint.TAP_SPEC
-    else:
-        assert safe.FLANGE_Z == joint.SIDE_PLATE_Z
-        assert safe.BRACKET_HOLE_POINTS == joint.BRACKET_HOLE_POINTS
+    analysis = _joint_with_values(RIB_DEPTH=9.3)
+    assert analysis["CONDITIONAL_BASIC_MAJOR_NOTCH_WALL"] < 2.0
+    assert analysis["RECEIVER_DRILL_NOTCH_WALL_MIN"] > 2.0
+    for rib_depth in (boundary + epsilon, 9.3):
+        accepted = _consumer_with_joint_values(
+            monkeypatch, consumer_name, RIB_DEPTH=rib_depth,
+        )
+        if consumer_name == "build_sm_summing_lever":
+            assert accepted.RECEIVER_RIB_T == pytest.approx(rib_depth)
+            assert accepted.LEVER_HOLE_POINTS == joint.LEVER_HOLE_POINTS
+            assert accepted.TAP_SPEC == joint.TAP_SPEC
+        else:
+            assert accepted.FLANGE_Z == joint.SIDE_PLATE_Z
+            assert accepted.BRACKET_HOLE_POINTS == joint.BRACKET_HOLE_POINTS
     for rib_depth, failure in (
         (boundary - epsilon, "approved 2.0 mm wall"),
-        (9.3, "approved 2.0 mm wall"),  # pilot passes; full-cylinder major does not
         (8.2, "1.5 mm hard-floor wall"),
     ):
-        # All these depths retain axial point containment. Wall and
-        # containment must remain distinct protections at both consumers.
+        # Both depths retain axial point containment. Pilot wall and point
+        # containment remain distinct protections at both real consumers.
         assert (
             rib_depth - 0.51 - 7.01 - joint.DRILL_POINT_DEPTH_MAX
             - joint.DRILL_WANDER_MAX
@@ -435,6 +516,7 @@ def test_rib_depth_and_band_discriminate_point_containment_boundary() -> None:
 
 
 def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
+    """Check nominal/basic-major geometry, not physical internal-root bounds."""
     thread_radius = joint.SCREW_MAJOR_DIA / 2.0
     assert min(
         point[0] for point in joint.LEVER_HOLE_POINTS
@@ -472,7 +554,7 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     end_rise = lever_build.edge_rib_half_height(reach)
     slant_reach = reach * rise / (rise - end_rise)
     tap_x = max(point[0] for point in joint.LEVER_HOLE_POINTS)
-    # The whole thread envelope sits inboard of the end face, under the slant.
+    # The whole nominal basic-major envelope sits inboard, under the slant.
     assert tap_x + thread_radius + joint.POSITION_BAND < reach - joint.LINEAR_BAND
     rib_half_height = lever_build.edge_rib_half_height(tap_x)
     rib_normal_margin = (

@@ -12,11 +12,7 @@ offline drawing test.
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import (
-    LINEAR_BAND,
-    SCREW_THREAD,
-    THREAD_EXTENT_REQUIREMENT,
-)
+from magnifying_bracket_joint_layout import LINEAR_BAND, SCREW_THREAD
 from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
@@ -173,15 +169,13 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # reference dimensions in parentheses are welcome): linear, no Ø glyph.
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
-# The bounded cylindrical drill contains both its cone and all actual thread.
-# The native 4.95 MIN controls usable thread, not an unlimited physical thread
-# extent. The explicit process line bounds that extent by the existing drill
-# cylinder; the pure wall contract conservatively charges the major envelope
-# over that whole cylinder. No screw, thread engagement or hole axis changes.
+# The ordinary bounded drill depth charges the pilot cone and wander. It does
+# not establish the finished internal thread's maximum root diameter or extent.
+# A standard 2B thread and the existing full-thread MIN do not supply those
+# upper bounds; qualified tooling/process evidence and owner review remain open.
 BRACKET_TAP_CALLOUT_PROCESS = (
     "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
-    f"{THREAD_EXTENT_REQUIREMENT}\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
