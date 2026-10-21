@@ -122,6 +122,7 @@ def test_release_revision_mismatch_fails_before_staging_or_publication(
     monkeypatch.setattr(cut_release, "CAD_ROOT", cad)
     monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "MIGRATED_PLANS", ())
     monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems)
 
     def check_plan_revision(stem: str, out: Path, *, revision: str) -> None:
@@ -155,7 +156,7 @@ def test_release_revision_mismatch_fails_before_staging_or_publication(
     with pytest.raises(SystemExit) as failure:
         cut_release.main()
 
-    assert str(failure.value) == f"!!  traveler plan {stems[-1]}: line 9: {detail}"
+    assert str(failure.value) == f"!!  process plan {stems[-1]}: line 9: {detail}"
     assert calls == [(stem, cad / "out", "v22") for stem in stems]
 
 
@@ -181,6 +182,7 @@ def test_release_refuses_placeholder_measurements_before_side_effects(
     monkeypatch.setattr(cut_release, "CAD_ROOT", tmp_path / "cad")
     monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(plans, "MIGRATED_PLANS", ())
     monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
     monkeypatch.setattr(plans, "check_plan_revision", lambda *_a, **_k: None)
 
@@ -215,10 +217,10 @@ def test_release_refuses_placeholder_measurements_before_side_effects(
 
 
 @pytest.fixture
-def enrolled_revision_plans(
+def revision_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[Path, ...]:
-    """Synthetic enrolled plans; never read or rewrite the stale tracked plans."""
+    """Synthetic migrated-held and enrolled plans; never mutate tracked sources."""
     stems = ("ch_rocker_arm", "ch_pivot_shaft")
     plans = {}
     for stem, quote in zip(stems, ('"', "'"), strict=True):
@@ -232,20 +234,25 @@ def enrolled_revision_plans(
             ).encode("utf-8")
         )
         plans[stem] = plan
-    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems)
-    monkeypatch.setattr(cut_release._process_plans, "plan_path", plans.__getitem__)
+    monkeypatch.setattr(cut_release._process_plans, "MIGRATED_PLANS", stems[:1])
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems[1:])
+    monkeypatch.setattr(cut_release._process_plans, "PROCESS_ROOT", tmp_path / "process")
     return tuple(plans.values())
 
 
 def test_published_release_advances_tracked_revision(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...],
+    revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_text("next_revision: v22\n", encoding="utf-8")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
-    originals = {plan: plan.read_bytes() for plan in enrolled_revision_plans}
+    originals = {plan: plan.read_bytes() for plan in revision_plans}
+    historical = tmp_path / "process" / "synthetic_historical" / "plan.toml"
+    historical.parent.mkdir(parents=True)
+    historical_bytes = b'# provenance only\n[drawing]\nrevision = "v7"\n'
+    historical.write_bytes(historical_bytes)
 
     assert cut_release.advance_configured_revision("v22") == "v23"
     assert source.read_text(encoding="utf-8") == "next_revision: v23\n"
@@ -253,23 +260,29 @@ def test_published_release_advances_tracked_revision(
         assert plan.read_bytes() == original.replace(
             b'revision = "v22"', b'revision = "v23"'
         ).replace(b"revision = 'v22'", b"revision = 'v23'")
+    assert historical.read_bytes() == historical_bytes
 
 
 def test_revision_advance_is_staged_before_publish(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...],
+    revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_bytes(b"next_revision: v22\n")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
-    originals = {plan: plan.read_bytes() for plan in enrolled_revision_plans}
+    originals = {plan: plan.read_bytes() for plan in revision_plans}
+    # An enrolled migrated participant must not be prepared or installed twice.
+    monkeypatch.setattr(
+        cut_release._process_plans, "TRAVELER_STEMS",
+        tuple(plan.parent.name for plan in (*revision_plans[::-1], revision_plans[-1])),
+    )
 
     prepared = cut_release.prepare_configured_revision_advance("v22")
     try:
         assert prepared.next_version == "v23"
         assert [path for path, _ in prepared.updates] == [
-            source, *enrolled_revision_plans
+            source, *revision_plans
         ]
         assert all(temporary.exists() for _, temporary in prepared.updates)
         assert source.read_bytes() == b"next_revision: v22\n"
@@ -286,6 +299,7 @@ def test_revision_advance_is_staged_before_publish(
     assert all(not temporary.exists() for _, temporary in prepared.updates)
 
 
+@pytest.mark.parametrize("participant", [0, 1])
 @pytest.mark.parametrize(
     "drawing",
     [
@@ -297,15 +311,15 @@ def test_revision_advance_is_staged_before_publish(
         '[drawing]\nrevision = "v22"\n[drawing]\nrevision = "v22"\n',
     ],
 )
-def test_invalid_enrolled_revision_discards_every_prepared_file(
+def test_invalid_participant_revision_discards_every_prepared_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...], drawing: str,
+    revision_plans: tuple[Path, ...], drawing: str, participant: int,
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_bytes(b"next_revision: v22\n")
-    enrolled_revision_plans[-1].write_text(drawing, encoding="utf-8")
+    revision_plans[participant].write_text(drawing, encoding="utf-8")
     originals = {
-        path: path.read_bytes() for path in (source, *enrolled_revision_plans)
+        path: path.read_bytes() for path in (source, *revision_plans)
     }
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
@@ -320,12 +334,12 @@ def test_invalid_enrolled_revision_discards_every_prepared_file(
 
 def test_revision_prepare_io_failure_discards_all_temps(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...],
+    revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_bytes(b"next_revision: v22\n")
     originals = {
-        path: path.read_bytes() for path in (source, *enrolled_revision_plans)
+        path: path.read_bytes() for path in (source, *revision_plans)
     }
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
@@ -350,7 +364,7 @@ def test_revision_prepare_io_failure_discards_all_temps(
 
 def test_revision_install_reports_ordered_partial_install_and_discards_temps(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...],
+    revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_bytes(b"next_revision: v22\n")
@@ -361,7 +375,7 @@ def test_revision_install_reports_ordered_partial_install_and_discards_temps(
     installed = []
 
     def refuse_second_plan(temporary: Path, destination: Path) -> None:
-        if destination == enrolled_revision_plans[-1]:
+        if destination == revision_plans[-1]:
             raise PermissionError("plan is read-only")
         replace(temporary, destination)
         installed.append(destination)
@@ -370,17 +384,17 @@ def test_revision_install_reports_ordered_partial_install_and_discards_temps(
     try:
         with pytest.raises(RuntimeError, match="partial revision install") as failure:
             prepared.commit()
-        assert installed == [source, enrolled_revision_plans[0]]
+        assert installed == [source, revision_plans[0]]
         assert str(source) in str(failure.value)
-        assert str(enrolled_revision_plans[0]) in str(failure.value)
-        assert str(enrolled_revision_plans[1]) in str(failure.value)
+        assert str(revision_plans[0]) in str(failure.value)
+        assert str(revision_plans[1]) in str(failure.value)
         assert source.read_bytes() == b"next_revision: v23\n"
         assert (
-            tomllib.loads(enrolled_revision_plans[0].read_text())["drawing"]["revision"]
+            tomllib.loads(revision_plans[0].read_text())["drawing"]["revision"]
             == "v23"
         )
         assert (
-            tomllib.loads(enrolled_revision_plans[1].read_text())["drawing"]["revision"]
+            tomllib.loads(revision_plans[1].read_text())["drawing"]["revision"]
             == "v22"
         )
     finally:
@@ -388,21 +402,126 @@ def test_revision_install_reports_ordered_partial_install_and_discards_temps(
     assert all(not temporary.exists() for _, temporary in prepared.updates)
 
 
-def test_empty_enrollment_advances_only_release_yaml(
+def test_empty_revision_scope_advances_only_release_yaml(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_bytes(b"next_revision: v22\r\n# unchanged\r\n")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "MIGRATED_PLANS", ())
     monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", ())
     monkeypatch.setattr(
         cut_release._process_plans, "plan_path",
-        lambda _stem: pytest.fail("empty enrollment opened a plan"),
+        lambda _stem: pytest.fail("empty revision scope opened a plan"),
     )
 
     assert cut_release.advance_configured_revision("v22") == "v23"
     assert source.read_bytes() == b"next_revision: v23\r\n# unchanged\r\n"
+
+
+def test_empty_enrollment_still_advances_migrated_held_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    revision_plans: tuple[Path, ...],
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_bytes(b"next_revision: v22\n")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", ())
+    held, unenrolled = revision_plans
+    original_unenrolled = unenrolled.read_bytes()
+
+    assert cut_release.advance_configured_revision("v22") == "v23"
+    assert tomllib.loads(held.read_text())["drawing"]["revision"] == "v23"
+    assert unenrolled.read_bytes() == original_unenrolled
+    assert cut_release._process_plans.TRAVELER_STEMS == ()
+
+
+@pytest.fixture
+def revision_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    revision_plans: tuple[Path, ...],
+) -> tuple[tuple[Path, ...], Path]:
+    """Exercise real revision validation without COM or a qualified held export."""
+    plans = cut_release._process_plans
+    cad = tmp_path / "cad"
+    native = cad / "out" / "sldasm"
+    native.mkdir(parents=True)
+    (native / f"{cut_release.TOP_ASSEMBLY}.SLDASM").write_bytes(b"synthetic native")
+    scene = cad / "out" / "scene.json"
+    scene.write_text('{"unit":"mm"}', encoding="utf-8")
+    manifest, _step = plans.bundle_paths(revision_plans[1].parent.name, cad / "out")
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('[drawing]\nrevision = "v22"\n', encoding="utf-8")
+    monkeypatch.setattr(cut_release, "CAD_ROOT", cad)
+    monkeypatch.setattr(cut_release, "OUT_SLDASM", native)
+    monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release, "_git", lambda *_a, **_k: "")
+    monkeypatch.setattr(plans, "shop_placeholders", lambda: ())
+    return revision_plans, manifest
+
+
+@pytest.mark.parametrize("held_export", ["absent", "stale", "malformed"])
+def test_preflight_checks_held_freshness_without_requiring_exports(
+    revision_preflight, held_export: str
+) -> None:
+    sources, _manifest = revision_preflight
+    plans = cut_release._process_plans
+    held_manifest, _step = plans.bundle_paths(
+        sources[0].parent.name, cut_release.CAD_ROOT / "out"
+    )
+    if held_export != "absent":
+        held_manifest.parent.mkdir(parents=True)
+        held_manifest.write_text(
+            '[drawing]\nrevision = "v7"\n' if held_export == "stale" else "not TOML [",
+            encoding="utf-8",
+        )
+
+    cut_release.preflight("v22", allow_dirty=False)
+    assert plans.TRAVELER_STEMS == (sources[1].parent.name,)
+
+
+def test_preflight_rejects_stale_held_revision_before_release_work(
+    revision_preflight, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sources, _manifest = revision_preflight
+    sources[0].write_bytes(
+        sources[0].read_bytes().replace(b'revision = "v22"', b'revision = "v21"')
+    )
+
+    def forbidden(*_a, **_k):
+        pytest.fail("held revision mismatch reached release work")
+
+    monkeypatch.setattr(cut_release, "_git", forbidden)
+    with pytest.raises(
+        SystemExit,
+        match="process plan ch_rocker_arm: line 5:.*configured revision 'v22'",
+    ):
+        cut_release.preflight("v22", allow_dirty=False)
+
+
+@pytest.mark.parametrize(
+    ("authored", "exported"),
+    [("v21", "v22"), ("v22", "v21"), ("v21", "v21"), ("v22", None)],
+)
+def test_preflight_keeps_enrolled_revision_validation_strict(
+    revision_preflight, monkeypatch: pytest.MonkeyPatch,
+    authored: str, exported: str | None,
+) -> None:
+    sources, manifest = revision_preflight
+    plans = cut_release._process_plans
+    # Enrollment keeps manifest validation even if the stem is also migrated.
+    monkeypatch.setattr(plans, "MIGRATED_PLANS", tuple(p.parent.name for p in sources))
+    sources[1].write_text(f'[drawing]\nrevision = "{authored}"\n', encoding="utf-8")
+    if exported is None:
+        manifest.unlink()
+    else:
+        manifest.write_text(f'[drawing]\nrevision = "{exported}"\n', encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="process plan ch_pivot_shaft:"):
+        cut_release.preflight("v22", allow_dirty=False)
 
 
 def test_explicit_compact_version_is_accepted() -> None:
@@ -781,7 +900,7 @@ def test_release_never_seals_a_failed_traveler_verification(
 @pytest.fixture
 def prepared_readme_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    enrolled_revision_plans: tuple[Path, ...],
+    revision_plans: tuple[Path, ...],
 ) -> tuple[Path, Path, Path]:
     """Real local picture staging; only CAD building and external publication are isolated."""
     release_dir = tmp_path / "release"
@@ -883,7 +1002,7 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
     release_root, images, revision = prepared_readme_release
     plans = tuple(
         cut_release._process_plans.plan_path(stem)
-        for stem in cut_release._process_plans.TRAVELER_STEMS
+        for stem in cut_release._process_plans.revision_stems()
     )
     original_revisions = {path: path.read_bytes() for path in (revision, *plans)}
     warnings: list[str] = []
@@ -970,7 +1089,7 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
         cut_release.main()
 
     assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
-    for stem in cut_release._process_plans.TRAVELER_STEMS:
+    for stem in cut_release._process_plans.revision_stems():
         plan = cut_release._process_plans.plan_path(stem)
         assert tomllib.loads(plan.read_text())["drawing"]["revision"] == "v22"
     for name in trim_renders.README_IMAGE_NAMES:
@@ -1008,7 +1127,7 @@ def test_postpublish_image_install_failure_preserves_revision_and_identifies_rec
     for name in trim_renders.README_IMAGE_NAMES:
         assert (images / name).read_bytes() == b"previous release image"
     assert not tuple(revision.parent.glob(".release.yaml.*.tmp"))
-    for stem in cut_release._process_plans.TRAVELER_STEMS:
+    for stem in cut_release._process_plans.revision_stems():
         plan = cut_release._process_plans.plan_path(stem)
         assert str(plan) in message
         assert tomllib.loads(plan.read_text())["drawing"]["revision"] == "v22"
@@ -1022,7 +1141,7 @@ def test_postpublish_partial_revision_install_names_all_recovery_paths(
     _, _images, revision = prepared_readme_release
     plans = tuple(
         cut_release._process_plans.plan_path(stem)
-        for stem in cut_release._process_plans.TRAVELER_STEMS
+        for stem in cut_release._process_plans.revision_stems()
     )
     url = "https://github.com/example/repo/releases/tag/v22"
     monkeypatch.setattr(cut_release, "_gh", lambda *_args: url)

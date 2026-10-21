@@ -417,10 +417,11 @@ depends only on its own `package:features:<stem>` leaf, not `package:features`, 
 pinned prechips 0.2.0 and `cad/process/` with a strict **exit 0 only** policy:
 bad input, machining blockers and required unknowns all fail without a stamp.
 Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
-Enrollment is currently empty: the tracked legacy plans remain as provenance,
-not runnable plans or machining approval. A part enrolls only after a migrated
-plan reaches exit 0 on real exported geometry. Releases ship verified travelers
-under `travelers/<stem>/` and list them in the notes. See [feature exports and
+Traveler enrollment is currently empty. Migrated plans may track revisions while
+held from enrollment; neither a plan's presence nor its current revision is
+machining approval. A part enrolls only after a migrated plan reaches exit 0 on
+real exported geometry. Releases ship verified travelers under `travelers/<stem>/`
+and list them in the notes. See [feature exports and
 travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
@@ -441,12 +442,13 @@ travelers](cad/docs/pipeline/features-travelers.md).
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
   publisher run on the submitter, precompute README images before the tag, and
-  install them with the `next_revision` and enrolled plan revision bumps only
+  install them with the `next_revision` and migrated/enrolled plan revision bumps only
   after publication succeeds.
 - The release follow-up PR is exempt from the three merge gates ONLY if its
   entire diff is the `cad/config/release.yaml` `next_revision` bump, the matching
-  `[drawing].revision` literal lines in enrolled `cad/process/<stem>/plan.toml`
-  files, and generated README image files. It may merge immediately. Other plan
+  `[drawing].revision` literal lines in migrated or enrolled
+  `cad/process/<stem>/plan.toml` files, and generated README image files. It may
+  merge immediately. Other plan
   or shop changes, code, prose, docs, README markup/layout or any other change
   stays in an ordinary PR and MUST pass every gate.
 - For a supervised farm release, launch only
@@ -459,11 +461,14 @@ travelers](cad/docs/pipeline/features-travelers.md).
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Every enrolled process
-  plan's tracked `[drawing].revision` literal must match it. The publisher stages
-  all revision updates before publishing and advances them together afterward;
-  the release agent MUST merge that generated-only follow-up before the next
-  release. `--no-publish` leaves all tracked revisions and images byte-identical.
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Every migrated or enrolled
+  process plan in `_process_plans.revision_stems()` must keep its tracked
+  `[drawing].revision` literal equal to it. This revision-only scope does not
+  enroll held plans or qualify them for machining: build/release traveler
+  participation remains `TRAVELER_STEMS`. The publisher stages all revision
+  updates before publishing and advances them together afterward; the release
+  agent MUST merge that generated-only follow-up before the next release.
+  `--no-publish` leaves all tracked revisions and images byte-identical.
 
 ### Release notes
 

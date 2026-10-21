@@ -774,7 +774,7 @@ failure names its other likely causes instead.
 
 Never launch the `release` target through `farm-run.ps1`: it runs in a
 disposable snapshot, and cleanup would discard the publisher's post-release
-tracked image, `release.yaml` and enrolled process-plan revision updates. Launch
+tracked image, `release.yaml` and migrated/enrolled process-plan revision updates. Launch
 with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing,
 check and enrolled traveler gates). Once successful, restore the complete `cad/out` from the
 recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into

@@ -3783,6 +3783,8 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        SCRIPTS_DIR / "test_machinist_review_overlays.py",
+        SCRIPTS_DIR / "test_machinist_review_precheck.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         SCRIPTS_DIR / "test_machinist_review_bench.py",
@@ -3854,10 +3856,10 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
-            # The enrolled revision contract reads plans rather than importing them.
+            # Migrated/enrolled revision and label contracts read plans at runtime.
             *(
                 str(_process_plans.plan_path(stem).resolve())
-                for stem in _process_plans.TRAVELER_STEMS
+                for stem in _process_plans.revision_stems()
             ),
             # The shop-data contract reads the tracked shop inputs at runtime.
             *(str(path.resolve()) for path in _process_plans.shop_paths()),
