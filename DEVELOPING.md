@@ -1769,9 +1769,11 @@ and restoration under `verify.motion.*`; magnifier phases use `verify.chain.*`.
 Jig driving and readback run under `verify.pass_sweep.walk`, including its
 `.prepare` child. Existing document teardown uses `verify.cleanup`. These are
 whole-loop phases, not per-pose spans, and add no native calls or gates.
-An escaping jig exception marks the walk ERROR before the existing gate records
-the failure. Magnifier cleanup remains normal-path-only; the outer build session
-still owns teardown after an exception. These timings do not establish a speedup.
+Handled preparation failures and returned jig findings mark their phases ERROR
+without adding exceptions. An escaping jig exception also marks the walk ERROR
+before the existing gate records the failure. Magnifier cleanup remains
+normal-path-only; the outer build session still owns teardown after an exception.
+These timings do not establish a speedup.
 
 ### Backend: Azure Blob over HTTPS (443)
 
