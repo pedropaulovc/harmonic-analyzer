@@ -860,7 +860,7 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
 
 
 class _NativeWheelBalloon:
-    """A returned native note with independently readable item and attachment."""
+    """A returned native note with readable item, attachment and rendered circle."""
 
     def __init__(self, item: str, owner: str):
         self.item = item
@@ -870,6 +870,7 @@ class _NativeWheelBalloon:
             SimpleNamespace(GetComponent=lambda: SimpleNamespace(Name2=self.owner)),
         )
         self.kinds = (1,)  # swSelEDGES
+        self.circle = (0.100, 0.150, 0.0047)
 
     def GetBomBalloonText(self, _upper):
         return self.item
@@ -882,6 +883,17 @@ class _NativeWheelBalloon:
 
     def GetAttachedEntityTypes(self):
         return self.kinds
+
+    def GetDisplayData(self):
+        return self
+
+    def GetArcCount(self):
+        return 1
+
+    def GetArcAtIndex2(self, _index):
+        x, y, radius = self.circle
+        point = (x + radius, y, 0.0)
+        return (0, 0, -1, -1, *point, *point, x, y, 0.0, 0.0, 0.0, 1.0, 1.0)
 
 
 @pytest.fixture
@@ -920,7 +932,15 @@ def native_wheel_balloons(monkeypatch):
         except Exception:
             return default
 
-    adapter = SimpleNamespace(_attempt=attempt)
+    model = SimpleNamespace(sheet=drawing.SHEET_NAMES[0], EditRebuild3=lambda: True)
+
+    def activate_sheet(name):
+        model.sheet = name
+        return True
+
+    model.ActivateSheet = activate_sheet
+    model.GetCurrentSheet = lambda: SimpleNamespace(GetName=lambda: model.sheet)
+    adapter = SimpleNamespace(_attempt=attempt, currentModel=model)
     # Only the native generation boundary is replaced; view-family resolution,
     # BOM text, EDGE types and full component ownership use production readers.
     monkeypatch.setattr(
@@ -1063,6 +1083,94 @@ def test_native_wheel_attachments_remain_checked_after_the_final_rebuild(
     fixture.notes[0].owner = fixture.notes[1].owner
     with pytest.raises(RuntimeError, match="changed after the final rebuild"):
         _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+def test_native_wheel_circles_fit_without_changing_native_placement(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    before = [(note.circle, note.owner) for note in fixture.notes]
+    drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    assert [(note.circle, note.owner) for note in fixture.notes] == before
+    assert fixture.adapter.currentModel.sheet == drawing.SHEET_NAMES[1]
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+
+
+@pytest.mark.parametrize("boundary", ["left", "bottom", "right", "top"])
+def test_native_wheel_rejects_circle_crossing_field_with_its_centre_inside(
+    native_wheel_balloons,
+    boundary,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    landing = landings[-1]
+    radius = 0.0047
+    left, bottom, right, top = drawing.WHEEL_FIELD
+    mid_x, mid_y = (left + right) / 2.0, (bottom + top) / 2.0
+    x, y = {
+        "left": (left + radius / 2.0, mid_y),
+        "bottom": (mid_x, bottom + radius / 2.0),
+        "right": (right - radius / 2.0, mid_y),
+        "top": (mid_x, top - radius / 2.0),
+    }[boundary]
+    landing.note.circle = (x, y, radius)
+    assert left < x < right and bottom < y < top
+    bounds = (x - radius, y - radius, x + radius, y + radius)
+    with pytest.raises(RuntimeError, match="rendered circle") as error:
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    message = str(error.value)
+    assert landing.stem in message
+    assert f"item {landing.note.item}" in message
+    assert repr(bounds) in message
+    assert repr(drawing.WHEEL_FIELD) in message
+
+
+def test_native_wheel_rejects_circle_in_bom_even_when_inside_the_sheet(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    landing = landings[-1]
+    x = drawing.WHEEL_FIELD[2] - 0.001
+    y = (drawing.BOM_BOTTOM + drawing.BOM_ANCHOR[1]) / 2.0
+    radius = drawing.BOM_ANCHOR[0] - x + 0.001
+    landing.note.circle = (x, y, radius)
+    bounds = (x - radius, y - radius, x + radius, y + radius)
+    assert _inside(bounds, drawing.INNER_BORDER)
+    assert _overlap(
+        bounds,
+        (
+            drawing.BOM_ANCHOR[0],
+            drawing.BOM_BOTTOM,
+            drawing.INNER_BORDER[2],
+            drawing.BOM_ANCHOR[1],
+        ),
+    )
+    assert drawing.WHEEL_FIELD[0] < x < drawing.WHEEL_FIELD[2]
+    with pytest.raises(RuntimeError, match="leaves WHEEL_FIELD"):
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+
+
+def test_native_wheel_circle_bounds_are_reread_after_the_final_rebuild(
+    native_wheel_balloons,
+) -> None:
+    fixture = native_wheel_balloons
+    landings = fixture.create()
+    drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
+    note = landings[-1].note
+
+    def final_rebuild():
+        _x, y, radius = note.circle
+        note.circle = (drawing.WHEEL_FIELD[2] - radius / 2.0, y, radius)
+        return True
+
+    fixture.adapter.currentModel.EditRebuild3 = final_rebuild
+    drawing.rebuild_drawing(fixture.adapter, label="finalize_drawing")
+    # The native edge owner is still correct: only the rendered circle moved.
+    _drawing_balloons.assert_balloon_landings(fixture.adapter, landings)
+    with pytest.raises(RuntimeError, match="after the final rebuild"):
+        drawing._assert_wheel_balloon_bounds(fixture.adapter, landings)
 
 
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:

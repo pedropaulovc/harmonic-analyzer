@@ -21,6 +21,8 @@ Sheet 2, WHEEL GROUP + BOM: the builder-owned MG_MAGNIFIER_EXPLODED
 presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
 BOM (part number, description, vendor SKU, quantity) and one native EDGE/Square
 balloon per family, retaining SolidWorks' positions after BOM/owner validation.
+After the final rebuild, every wheel balloon's rendered circle must remain
+wholly in WHEEL_FIELD, clear of the BOM and caption/title-block fields.
 Sheet 3, LEVER GROUP: the same explode with only the lever group shown,
 manually ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
@@ -1062,8 +1064,10 @@ def _fit_ring(
     *,
     label: str,
 ) -> tuple[float, float]:
-    """Scale the view down the ladder until its balloon ring fits ``field``,
-    centre the ring there and prove it inside; return the scale."""
+    """Scale and centre the planned balloon ring in ``field``; return the scale.
+
+    AutoBalloon5's native positions still need the settled rendered-circle check.
+    """
     current = [tuple(float(value) for value in _early_bound(view, "IView").ScaleRatio)]
 
     def outline_at(scale: tuple[float, float]) -> Box:
@@ -1087,6 +1091,35 @@ def _fit_ring(
     ):
         raise RuntimeError(f"{label}: balloon ring {ring!r} leaves its field {field!r}")
     return scale
+
+
+@_telemetry.traced("drawing.mg_wheel_balloon_bounds")
+def _assert_wheel_balloon_bounds(adapter: Any, landings: list[BalloonLanding]) -> None:
+    """Prove native wheel circles stay wholly in WHEEL_FIELD after final rebuild.
+
+    The field reserves the caption/title block below and the BOM to its right.
+    Read the rendered ink, not insertion-time positions or annotation anchors;
+    leave SolidWorks' placement and every native attachment untouched.
+    """
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    for landing in landings:
+        note = _early_bound(landing.note, "INote")
+        item = str(note.GetBomBalloonText(True)).strip()
+        label = f"magnifier {WHEEL_LABEL}: {landing.stem} item {item}"
+        circle = rendered_balloon_circle(note, label=label)
+        x, y, radius = circle
+        bounds = (x - radius, y - radius, x + radius, y + radius)
+        if not (
+            bounds[0] >= WHEEL_FIELD[0]
+            and bounds[1] >= WHEEL_FIELD[1]
+            and bounds[2] <= WHEEL_FIELD[2]
+            and bounds[3] <= WHEEL_FIELD[3]
+        ):
+            raise RuntimeError(
+                f"{label}: rendered circle (x, y, radius)={circle!r}, "
+                f"bounds={bounds!r} leaves WHEEL_FIELD={WHEEL_FIELD!r} "
+                "(sheet metres) after the final rebuild"
+            )
 
 
 def exploded_caption(group: str, scale: tuple[float, float]) -> str:
@@ -1681,12 +1714,13 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
         )
     }
-    landings = add_auto_balloons(
+    wheel_landings = add_auto_balloons(
         adapter,
         wheel,
         items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
     )
+    landings = list(wheel_landings)
     for sheet_name, view, ladder, field, stems, label in (
         (
             SHEET_NAMES[2],
@@ -1773,6 +1807,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             *settled_checks,
             lambda: assert_balloon_landings(adapter, landings),
+            lambda: _assert_wheel_balloon_bounds(adapter, wheel_landings),
         ),
     )
 
