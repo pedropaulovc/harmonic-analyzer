@@ -13,8 +13,9 @@ cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across
 the cup together, so wood and steel read as one rounded butt.  The smaller
 MHA-DT-32 head (Ø6) sets the pocket's matched fit.  Owner ruling B on #1375
 enlarges the body to retain a 1.5 pocket wall at the smallest body and largest
-pocket, with the existing +/-0.10 body band.  The head, pocket, floor, axial
-sizes, corner radius and bottom chamfer remain unchanged.
+pocket, with the existing +/-0.10 body band.  PR1694 option 2 retains that
+geometry and adds a pocket-side floor-hole mouth chamfer to clear the screw's
+concave under-head fillet throughout the handle's axial float.
 
 The pocket is bored to suit the MHA-DT-32 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
@@ -32,6 +33,8 @@ PURE DATA, no SolidWorks/COM imports.
 """
 
 from __future__ import annotations
+
+import math
 
 WALL_FLOOR_MM = 1.5
 BODY_DIA_TOL = 0.10
@@ -55,15 +58,38 @@ POCKET_DIA_MAX = 6.5
 # rather than retaining a sub-floor wall or tightening the body band.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
 BODY_DIA = round(POCKET_DIA_MAX + 2.0 * POCKET_WALL_FLOOR_MM + BODY_DIA_TOL, 6)
-# The head bears on the floor: the floor-to-wall corner may round no more than
-# the tightest radial clearance, so a sharp-edged, centred head still seats on
-# the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1 finding 5).
+# The floor-to-wall corner protrudes into the head pocket.  Its original
+# R0.1 MAX remains; the mating screw's minimum outer chamfer clears it even
+# when eccentric float consumes the pocket's radial clearance.
 POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
 POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
 POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
 # The floor hole passes the MHA-DT-32 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 4.2
+FLOOR_HOLE_DIA_MIN = FLOOR_HOLE_DIA
+FLOOR_HOLE_DIA_MAX = round(FLOOR_HOLE_DIA + 0.10, 6)
+# Explicit acceptance REQUIREMENTS on MHA-DT-32, not its actual design inputs.
+# The screw spec imports these and independently checks its own geometry.
+# This module must remain lower-level pure data: never import ScrewSpec.
+MATING_SCREW_UNDER_HEAD_FILLET_MAX = 0.1
+MATING_SCREW_HEAD_DIA_MIN = 5.9
+MATING_SCREW_SHOULDER_DIA_MIN = 3.92
+MATING_SCREW_HEAD_EDGE_BREAK_MIN = 0.11
+MATING_SCREW_HEAD_EDGE_BREAK_MAX = 0.26
+MATING_SCREW_HEAD_BEARING_FLOOR = 0.1
+MATING_SCREW_SEATED_GAP_MIN = 0.25
+# Native LIMIT at the maximum model leg; both orthogonal legs share one
+# global so the bevel is genuinely 45 degrees, not a typed drawing value.
+FLOOR_HOLE_MOUTH_CHAMFER = 0.25
+FLOOR_HOLE_MOUTH_CHAMFER_BAND = (0.0, -0.14)  # (upper, lower)
+FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+FLOOR_HOLE_MOUTH_CHAMFER_MIN = round(
+    FLOOR_HOLE_MOUTH_CHAMFER + FLOOR_HOLE_MOUTH_CHAMFER_BAND[1], 6
+)
+FLOOR_HOLE_MOUTH_CHAMFER_MAX = round(
+    FLOOR_HOLE_MOUTH_CHAMFER + FLOOR_HOLE_MOUTH_CHAMFER_BAND[0], 6
+)
 # The body's bottom edge, broken 45 degrees (owner ruling A on #1661): the
 # MHA-DT-08 counterbore floor's corner is rounded up to R0.3, so the leg's
 # lower limit clears it and the cup still seats on the floor, face flush.
@@ -78,6 +104,46 @@ FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 GENERAL_1PL_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
+# Correlated worst state: hole 4.30, shaft 3.92, offset .19 (not .20 with
+# those same sizes).  Every physical pair satisfies e <= (hole-shaft)/2.
+HEAD_RUNNING_OFFSET_MAX = round(
+    min(
+        POCKET_CLEARANCE[1] / 2.0,
+        (FLOOR_HOLE_DIA_MAX - MATING_SCREW_SHOULDER_DIA_MIN) / 2.0,
+    ),
+    6,
+)
+HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
+    MATING_SCREW_HEAD_DIA_MIN / 2.0
+    - MATING_SCREW_HEAD_EDGE_BREAK_MAX
+    - FLOOR_HOLE_DIA_MAX / 2.0
+    - FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    6,
+)
+HEAD_BEARING_RADIAL_MIN = round(
+    HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6
+)
+# E is a seated gap with the ferrule against the arm, not a running lower
+# bound: either complete corner envelope must clear at instantaneous gap 0.
+UNDER_HEAD_INNER_NORMAL_AIR_MIN = (
+    FLOOR_HOLE_MOUTH_CHAMFER_MIN - MATING_SCREW_UNDER_HEAD_FILLET_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_OUTER_NORMAL_AIR_MIN = (
+    MATING_SCREW_HEAD_EDGE_BREAK_MIN - POCKET_FLOOR_CORNER_R_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN = (
+    MATING_SCREW_SEATED_GAP_MIN - MATING_SCREW_UNDER_HEAD_FILLET_MAX
+)
+UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN = (
+    MATING_SCREW_SEATED_GAP_MIN - POCKET_FLOOR_CORNER_R_MAX
+)
+FLOOR_HOLE_STRAIGHT_LENGTH_MIN = round(
+    FLOOR_THICKNESS_MIN - FLOOR_HOLE_MOUTH_CHAMFER_MAX, 6
+)
+FLOOR_ROOT_RADIAL_MIN = round(
+    (BODY_DIA - BODY_DIA_TOL) / 2.0 - BODY_CHAMFER_MAX - FLOOR_HOLE_DIA_MAX / 2.0,
+    6,
+)
 # Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over
 # the largest body.
 STOCK_DIA = 0.5 * 25.4
@@ -89,6 +155,52 @@ for _ok, _what in (
         "pocket wall is under 1.5 at its limits (owner ruling B on #1375)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
+    (
+        0.0 < MATING_SCREW_SHOULDER_DIA_MIN < FLOOR_HOLE_DIA_MIN
+        and MATING_SCREW_HEAD_DIA_MIN > FLOOR_HOLE_DIA_MAX
+        and 0.0 < MATING_SCREW_UNDER_HEAD_FILLET_MAX,
+        "invalid mating screw head, shoulder or inner-fillet requirements",
+    ),
+    (
+        0.0
+        < FLOOR_HOLE_MOUTH_CHAMFER_MIN
+        <= FLOOR_HOLE_MOUTH_CHAMFER_MAX
+        == FLOOR_HOLE_MOUTH_CHAMFER
+        and FLOOR_HOLE_MOUTH_CHAMFER_BAND[0] == 0.0
+        and FLOOR_HOLE_MOUTH_CHAMFER_BAND[1] < 0.0
+        and FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE == 3,
+        "invalid native floor-hole mouth chamfer limits",
+    ),
+    (
+        0.0
+        < MATING_SCREW_HEAD_EDGE_BREAK_MIN
+        <= MATING_SCREW_HEAD_EDGE_BREAK_MAX
+        < MATING_SCREW_HEAD_DIA_MIN / 2.0,
+        "invalid mating screw outer chamfer requirements",
+    ),
+    (
+        UNDER_HEAD_INNER_NORMAL_AIR_MIN > 0.0,
+        "inner corner has no positive zero-gap air",
+    ),
+    (
+        UNDER_HEAD_OUTER_NORMAL_AIR_MIN > 0.0,
+        "outer corner has no positive zero-gap air",
+    ),
+    (
+        UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN > 0.0
+        and UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN > 0.0,
+        "seated gap does not clear both complete corner envelopes",
+    ),
+    (
+        0.0 <= HEAD_RUNNING_OFFSET_MAX <= POCKET_CLEARANCE[1] / 2.0,
+        "invalid physically available eccentric float",
+    ),
+    (
+        HEAD_BEARING_RADIAL_MIN >= MATING_SCREW_HEAD_BEARING_FLOOR > 0.0,
+        "under 0.1 of flat bearing annulus (not a strength proof)",
+    ),
+    (FLOOR_HOLE_STRAIGHT_LENGTH_MIN > 0.0, "mouth chamfer consumes the floor hole"),
+    (FLOOR_ROOT_RADIAL_MIN >= WALL_FLOOR_MM, "bottom chamfer consumes the floor root"),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):
     if not _ok:
@@ -102,6 +214,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PocketDia",
         "FloorHoleDia",
         "BodyChamfer",
+        "FloorHoleMouthChamfer",
         "PocketFloorRadius",
     },
 }
@@ -114,6 +227,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "OverallLength": 1,
         "PocketDepth": 2,
         "BodyChamfer": 1,
+        "FloorHoleMouthChamfer": 2,
         "PocketDia": 1,
         "FloorHoleDia": 1,
         "PocketFloorRadius": 1,

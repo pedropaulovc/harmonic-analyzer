@@ -12,6 +12,14 @@ at z=HEAD_LENGTH+SHOULDER_LENGTH, and the threaded section (a thread-relief
 groove against the seat face, then the full thread) to the tip at
 z=OVERALL_LENGTH.
 
+The printed relief diameter is the associative diametric-linear
+``ReliefDia@ScrewProfile`` control of the straight groove floor, driven by the
+``ReliefDia`` global.
+The underside has a real concave inner R0.1 MAX and a native outer
+0.11–0.26 X45 LIMIT bevel. Together with the cup's native mouth break they
+clear both corner envelopes at zero-gap eccentric float while preserving
+the actual under-head face, axial interfaces and minimum bearing annulus.
+
 PURE DATA, no SolidWorks/COM imports.  The part build and the drawing both read
 these names; the derived fit facts below are asserted at import so a retune of
 the handle, the arm or this screw that breaks the running fit fails before any
@@ -28,10 +36,21 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
-    FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
+    FLOOR_HOLE_DIA_MIN as CUP_FLOOR_HOLE_DIA_MIN,
+    FLOOR_HOLE_DIA_MAX as CUP_FLOOR_HOLE_DIA_MAX,
+    FLOOR_HOLE_MOUTH_CHAMFER_MIN as CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN,
+    FLOOR_HOLE_MOUTH_CHAMFER_MAX as CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    MATING_SCREW_UNDER_HEAD_FILLET_MAX,
+    MATING_SCREW_HEAD_DIA_MIN,
+    MATING_SCREW_SHOULDER_DIA_MIN,
+    MATING_SCREW_HEAD_EDGE_BREAK_MIN,
+    MATING_SCREW_HEAD_EDGE_BREAK_MAX,
+    MATING_SCREW_HEAD_BEARING_FLOOR,
+    MATING_SCREW_SEATED_GAP_MIN,
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
+    POCKET_FLOOR_CORNER_R_MAX as CUP_POCKET_FLOOR_CORNER_R_MAX,
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
@@ -48,34 +67,57 @@ from dt_crank_hub_geometry import (
     GENERAL_1PL_TOL_MM,
     MM_PER_IN,
 )
+from dt_drive_train_steps import step_ref
 
 
 STOCK_DIA = 0.25 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-35
 # butt cup's pocket, which is bored to suit it, and bears on the cup floor.
-# Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
-# the worst case, after an edge break on each.  Ø6 (user ruling 2026-09-30,
-# ch30 eight-views-4): the photographed head, which lets the cup and the butt
-# shrink to the photographed size.
+# Its +/-0.10 band protects the bearing annulus as well as the stock envelope.
+# The Ø6 head lets the cup and butt retain their photographed size.
 HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
-# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review): with the
-# slot's own band below, the worst case leaves 2.0 of head under the slot,
-# not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
-# longest head, at the widest fitted end play, stood 1.6 proud of the cup.
+HEAD_DIA_MIN = round(HEAD_DIA - HEAD_DIA_TOL, 6)
+HEAD_DIA_CALLOUT = "BEARING ANNULUS ON MHA-DT-35"
+# Owner-approved option2: the inner corner ADDS a concave tangent fillet.
+# The outer 45-degree bevel explicitly overrides the generic edge break
+# only here; its minimum clears the cup's protruding pocket-floor round.
+UNDER_HEAD_CORNER_RADIUS_MAX = MATING_SCREW_UNDER_HEAD_FILLET_MAX
+UNDER_HEAD_CORNER_TOL_TYPE = 6  # swTolType_e.swTolMAX
+HEAD_OUTER_CHAMFER_MIN = MATING_SCREW_HEAD_EDGE_BREAK_MIN
+HEAD_OUTER_CHAMFER_MAX = MATING_SCREW_HEAD_EDGE_BREAK_MAX
+HEAD_OUTER_CHAMFER = HEAD_OUTER_CHAMFER_MAX
+HEAD_OUTER_CHAMFER_BAND = (0.0, round(HEAD_OUTER_CHAMFER_MIN - HEAD_OUTER_CHAMFER_MAX, 6))
+HEAD_OUTER_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review) keeps
+# 1.5 of head under the deepest .X slot below.  Banded (Codex P2 on #1139,
+# user ruling 2026-09-30): at .X the longest head, at the widest fitted end
+# play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
+HEAD_LENGTH_CALLOUT = "HEAD; KEEPS TOP BELOW MHA-DT-35 FACE"
 SLOT_WIDTH = 1.0
-# Banded (MHA-DT-32 re-review): at .X the slot could print as nothing.
-SLOT_DEPTH = 1.0
-SLOT_DEPTH_TOL = 0.20
+# Routine (.X; the MHA-DT-32 machinist review of 04b95f481 called its
+# +/-0.20 band over-specification).  Codex P2 on #1694: a 1.0 depth at .X
+# admitted only 0.2 of driver seating.  Deepen the slot, not its tolerance:
+# 1.6 at .X retains the former 0.8 minimum and a 1.5 minimum head web.
+# This changes no mating surface or cup/head envelope.
+SLOT_DEPTH = 1.6
+SLOT_DEPTH_TOL = GENERAL_1PL_TOL_MM
+SLOT_DEPTH_MIN = round(SLOT_DEPTH - SLOT_DEPTH_TOL, 6)
+SLOT_DEPTH_MAX = round(SLOT_DEPTH + SLOT_DEPTH_TOL, 6)
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø4.00 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø4.00
 # (user ruling 2026-09-30): the tenon keeps 1.5 of oak over its bore.
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
+# Rule 4: the running fit names its mate at the callout, as the handle's
+# PIVOT_BORE_CALLOUT names this shoulder.  One line: SOLIDWORKS stores but
+# never prints a multi-line above-callout (draw_dt_cone_gear_shaft
+# _printable_above_callouts; the 04b95f481 sheet printed none).
+SHOULDER_CALLOUT = "RUNS IN MHA-DT-08 BORE"
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
@@ -83,6 +125,7 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # 2026-09-30) and the sheet breaks the seat edge 0.1 max, as MHA-DT-06 does its
 # tapped mouth: a 0.34 radial seat at the worst case.
 SEAT_EDGE_BREAK_MAX = 0.1
+SEAT_EDGE_BREAK_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # Arm face to the head's underside, which bears on the MHA-DT-35 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
 # turned to suit the bonded handle -- its measured length from the ferrule's
@@ -101,24 +144,27 @@ SHOULDER_LENGTH = round(HANDLE_STACK_NOMINAL + END_PLAY_NOMINAL, 6)
 # engagement at the worst case, so the #8-32's U33b exception (1.26D) stays
 # retired.
 THREAD_SIZE = "#4-40"
-# The threaded section is modelled as a plain cylinder at the basic #6 major
+# The threaded section is modelled as a plain cylinder at the basic #4 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
-# 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
-# pitches of die run-in still carries full thread across the arm's 7.94
-# (5/16-in) stock thickness, so the ARM governs the worst-case engagement,
-# not the screw (the 9.0 of U33b left the MHA-DT-32 machinist review short).
-# The tip is cut proud of the arm's inboard face and filed flush at assembly
-# (below).
+# 10.0 at the title block's .X (the MHA-DT-32 machinist review of 04b95f481
+# called the +0/-0.5 band's reason missing at the dimension): the shortest
+# thread section, 9.2, less the longest tip chamfer still carries full thread
+# past the thickest stock arm before filing (FILE_ALLOWANCE_MIN, asserted
+# below), so the ARM governs the worst-case engagement, not the screw (the
+# 9.0 of U33b left the MHA-DT-32 machinist review short).  The tip is cut
+# proud of the arm's inboard face and filed flush at assembly (below).
 THREAD_LENGTH = 10.0
-THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.39 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
-# print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-DT-32
-# re-review): at .X the 0.4 could print as nothing; +0.05/-0.10 keeps a real
-# chamfer that never cuts past the thread depth.
+# print gives the axial leg with an "X 45 DEG" callout.  A single MAX limit
+# (the MHA-DT-32 machinist review of 04b95f481 called +0.05/-0.10 at two
+# places over-specification; the R0.8 MAX fleet pattern): the tip is filed
+# away at assembly, so only the depth matters -- never past the thread.
+# SOLIDWORKS swTolMAX prints the nominal then "MAX", so the model value is
+# the limit.
 TIP_CHAMFER = 0.3
-TIP_CHAMFER_BAND = (0.05, -0.10)
+TIP_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 40
@@ -157,21 +203,23 @@ THREAD_FIT_OFFSET_MAX = round(
 )
 # Thread relief (Main's ruling on the die-runout doubt): a groove in the first RELIEF_WIDTH of the threaded section, against
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
-# pulls down tight on the arm face.  Routine (.X) sizes under the title-block
-# band.
-# Banded (Codex P1 on #1139): at .X the relief could stand above the thread
-# root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø1.85 +/-0.05 keeps the largest relief under the deepest die-cut root
-# estimated above, Ø1.937 (local reviews of 747487c71 and 21bb244c5).
-RELIEF_DIA = 1.85
-RELIEF_DIA_TOL = 0.05
-RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
-# Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
-# +/-0.10 band over-specification): at .X the straight floor past the
-# longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
-# (local review of 20dac9d3f: the lead is not floor), and the widest 3.0
-# still leaves the 1.5D engagement.
-RELIEF_WIDTH = 2.2
+# pulls down tight on the arm face.  Its width is routine (.X).
+# The maximum stays below the estimated deepest die-cut root, Ø1.937
+# (local reviews of 747487c71 and 21bb244c5).  A MAX alone admitted an
+# arbitrarily weak neck (Codex P2 on #1694): keep the previous 1.8 minimum
+# section for seating torque, at one place rather than the former 1.85
+# +/-0.05.  The nominal remains the upper limit, so the model stays unchanged.
+RELIEF_DIA = 1.9
+RELIEF_DIA_BAND = (0.0, -0.1)  # (upper, lower) deviations
+RELIEF_DIA_MIN = round(RELIEF_DIA + RELIEF_DIA_BAND[1], 6)
+RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_BAND[0], 6)
+# Routine at 2.4: at .X the straight floor excludes the longest lead AND the
+# largest thread-side floor radius, 1.6 - 0.4 - 0.2 = 1.0, keeping 1.5 #4-40
+# pitches of die run-out.  The widest 3.2 still leaves the 1.5D engagement.
+# Both inside corners are real geometry; neither consumes the flat seat.
+RELIEF_WIDTH = 2.4
+RELIEF_CORNER_RADIUS_MAX = 0.2
+RELIEF_CORNER_CALLOUT = "DIE RUNOUT"
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -188,11 +236,14 @@ RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
 )
 CHAMFER_CALLOUT = "X 45 DEG"
-# The 45-degree lead rides the relief's Ø callout rather than a third
-# dimension crowded into the 1.5-mm groove at 3:1 (machinist review).
-RELIEF_CALLOUT = (
-    f"{RELIEF_LEAD_LIMITS[0]:.1f}-{RELIEF_LEAD_LIMITS[1]:.1f} {CHAMFER_CALLOUT} LEAD"
-)
+HEAD_OUTER_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT}\nCLEARS MHA-DT-35\nFLOOR RADIUS"
+# Each chamfer leg is imported from its own native model dimension.  The
+# relief diameter's root reason is one ABOVE line (native multiline ABOVE
+# does not print); its seating reason and mate remain two BELOW lines.
+RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nLEAD INTO MHA-DT-06"
+RELIEF_DIA_ROOT_CALLOUT = f"BELOW {THREAD_SIZE} ROOT"
+RELIEF_DIA_CALLOUT = "NECK FOR SEATING\nON MHA-DT-06"
+SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-06"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.
 SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
@@ -220,7 +271,8 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
-THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
+THREAD_LENGTH_MIN = round(THREAD_LENGTH - GENERAL_1PL_TOL_MM, 6)
+THREAD_LENGTH_MAX = round(THREAD_LENGTH + GENERAL_1PL_TOL_MM, 6)
 HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
 
 # Head top below the cup's face at nominal: the head reads recessed in
@@ -241,28 +293,38 @@ HEAD_RECESS_WORST = round(
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
 CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
 # The slot's worst-case web: the shortest head under the deepest slot.
-SLOT_WEB_MIN = round(
-    HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
-)
-TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[1], 6),
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[0], 6),
-)
-# Under-head bearing annulus on the cup floor at the worst case: the smallest
-# head over the largest drilled floor hole, less a title-block edge break on
-# each, on the narrow side with the head pushed off-centre as far as its
-# running play allows (local review of fbf82ad96: the concentric figure
-# overstated it).  The play is the smaller of the head's in the pocket and
-# the shoulder's in the floor hole.
-_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + 0.10  # DRILLED HOLES +0.10/0
-HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
-    ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM, 6
-)
+SLOT_WEB_MIN = round(HEAD_LENGTH - HEAD_LENGTH_TOL - SLOT_DEPTH_MAX, 6)
+TIP_CHAMFER_MAX = TIP_CHAMFER
+# Explicit actual inputs, not duplicated mating requirements: the float is
+# correlated with the actual shaft/hole pair. At shaft3.92/hole4.30, e=.19;
+# the near hole edge is tangent to that shaft, never an incompatible holeMIN.
+_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA_MAX
 HEAD_RUNNING_OFFSET_MAX = round(
-    min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - (SHOULDER_DIA + SHOULDER_DIA_BAND[1])) / 2.0),
+    min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - SHOULDER_DIA_MIN) / 2.0),
     6,
 )
-HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6)
+HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
+    HEAD_DIA_MIN / 2.0 - HEAD_OUTER_CHAMFER_MAX
+    - _FLOOR_HOLE_MAX / 2.0 - CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    6,
+)
+HEAD_BEARING_RADIAL_MIN = round(
+    HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6
+)
+# The fitted E is a seated gap, not a minimum while the handle floats.
+# Both complete R envelopes must clear even at instantaneous zero gap.
+UNDER_HEAD_INNER_NORMAL_AIR_MIN = (
+    CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN - UNDER_HEAD_CORNER_RADIUS_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_OUTER_NORMAL_AIR_MIN = (
+    HEAD_OUTER_CHAMFER_MIN - CUP_POCKET_FLOOR_CORNER_R_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN = END_PLAY_RANGE[0] - UNDER_HEAD_CORNER_RADIUS_MAX
+UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN = END_PLAY_RANGE[0] - CUP_POCKET_FLOOR_CORNER_R_MAX
+UNDER_HEAD_FLAT_WITNESS_LENGTH = (
+    (HEAD_DIA - SHOULDER_DIA) / 2.0
+    - HEAD_OUTER_CHAMFER_MAX - UNDER_HEAD_CORNER_RADIUS_MAX
+)
 # Wood-on-steel running clearance, on diameter.
 DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
@@ -284,8 +346,10 @@ ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - GENERAL_1PL_TOL_MM, 6)
 # The straight floor the die's incomplete teeth run out into: the shortest
-# relief less the longest lead.
-RELIEF_FLOOR_MIN = round(RELIEF_WIDTH_MIN - RELIEF_LEAD_LIMITS[1], 6)
+# relief less the longest lead and the largest thread-side floor corner.
+RELIEF_FLOOR_MIN = round(
+    RELIEF_WIDTH_MIN - RELIEF_LEAD_LIMITS[1] - RELIEF_CORNER_RADIUS_MAX, 6
+)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -323,8 +387,9 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
     FULL_THREAD_WORST_PRINTED_ARM / THREAD_MODEL_DIA
 )
 # User ruling 2026-09-29 (ch11 p.14 re-check): the photographs show no screw
-# end on the arm's inboard face, so the screw is cut long, seated with its
-# threadlocker, then filed flush with that face and its edge broken.  The
+# end on the arm's inboard face, so the screw is cut long, seated shoulder
+# tight with no threadlocker, filed flush with that face and the tap mouth
+# staked onto it (MHA-DT-00 step crank-handle-fitted; rule 23, #1174).  The
 # drive train places that fitted state as the INSTALLED configuration (the
 # MHA-DT-30 precedent); the default stays the as-turned screw the sheet prints.
 # Filing removes at most FILE_ALLOWANCE_MAX, and even the shortest screw in
@@ -337,18 +402,19 @@ INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
 ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
-# The fitted shoulder and both head bands' reasons, stated once (user ruling
-# 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
-# after the 1d2be3aaf re-review called it over-specification unstated).
-DRAWING_NOTES = "\n".join(
+# The fitted shoulder's to-suit rule rides its local seat-to-under-head
+# reference (Main's r18 ruling); the tip-based 63/67 references stay plain.
+# The seat break and relief lead name their mates at their native chamfers;
+# only the tip's final assembly operation remains in the free note.
+FITTED_STEP = step_ref("crank-handle-fitted")
+UNDER_HEAD_CALLOUT = "\n".join(
     (
-        "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
-        f"  FACE (SHOULDER END, EDGE BROKEN {SEAT_EDGE_BREAK_MAX:.1f} MAX, ON MHA-DT-06) = FERRULE",
-        f"  FACE TO CUP FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
-        f"HEAD BEARS ON MHA-DT-35 FLOOR;",
-        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
+        "UNDER-HEAD FACED TO SUIT: SEAT",
+        "TO UNDER-HEAD = MHA-DT-08 FERRULE",
+        f"FACE TO MHA-DT-35 FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}",
     )
 )
+DRAWING_NOTES = f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}."
 
 # The shoulder's seat on the arm face: from the arm's printed maximum mouth
 # (the larger of it and the relief lead's envelope) out to the smallest
@@ -363,11 +429,13 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 1.85^2 = 2.69 mm^2
-# against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 69 percent.  Seating torque is therefore limited by the neck, not the thread;
-# the handle's working load is a hand grip and never loads it axially.
-NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
+# The relief neck is the screw's weakest section.  Evaluate the smallest
+# printed neck, Ø1.8: 2.54 mm^2, about 65 percent of the #4-40 UNC tensile
+# stress area (0.00604 in^2 = 3.90 mm^2).  This retains the previous minimum
+# section; the area ratio is not a seating-torque strength calculation.
+# No quantitative seating torque is specified.  The handle's working load
+# is a hand grip and never loads the screw axially.
+NECK_AREA = math.pi / 4.0 * RELIEF_DIA_MIN**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
@@ -376,10 +444,15 @@ for _ok, _what in (
         END_PLAY_RANGE[0] <= END_PLAY_NOMINAL <= END_PLAY_RANGE[1],
         "the modelled end play is outside the fitted band",
     ),
+    (END_PLAY_RANGE[0] >= MATING_SCREW_SEATED_GAP_MIN, "fitted end play is below the cup mating requirement"),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
         f"relief floor stands above the {THREAD_SIZE} external minor diameter",
+    ),
+    (
+        RELIEF_DIA_MIN >= 1.8,
+        "relief neck is below the previous 1.8 minimum seating section",
     ),
     (RELIEF_WIDTH < THREAD_LENGTH, "relief consumes the whole thread section"),
     (RELIEF_LEAD < RELIEF_WIDTH, "relief lead consumes the relief floor"),
@@ -437,9 +510,44 @@ for _ok, _what in (
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
         "the MHA-DT-35 pocket bored to suit the largest head leaves under its 1.5 wall",
     ),
-    (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 of under-head bearing on the cup floor"),
     (
-        CUP_FLOOR_HOLE_DIA > SHOULDER_DIA_MAX,
+        HEAD_DIA_MIN >= MATING_SCREW_HEAD_DIA_MIN
+        and SHOULDER_DIA_MIN >= MATING_SCREW_SHOULDER_DIA_MIN,
+        "actual head/shoulder minima violate the MHA-DT-35 mating requirements",
+    ),
+    (
+        0.0 < UNDER_HEAD_CORNER_RADIUS_MAX <= MATING_SCREW_UNDER_HEAD_FILLET_MAX,
+        "invalid inner under-head fillet",
+    ),
+    (
+        0.0 < HEAD_OUTER_CHAMFER_MIN <= HEAD_OUTER_CHAMFER_MAX
+        and HEAD_OUTER_CHAMFER_MIN >= MATING_SCREW_HEAD_EDGE_BREAK_MIN
+        and HEAD_OUTER_CHAMFER_MAX <= MATING_SCREW_HEAD_EDGE_BREAK_MAX
+        and HEAD_OUTER_CHAMFER == HEAD_OUTER_CHAMFER_MAX
+        and HEAD_OUTER_CHAMFER_BAND == (0.0, round(HEAD_OUTER_CHAMFER_MIN - HEAD_OUTER_CHAMFER_MAX, 6)),
+        "invalid outer under-head chamfer range",
+    ),
+    (
+        0.0 < CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN <= CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+        "invalid cup floor-hole mouth chamfer range",
+    ),
+    (UNDER_HEAD_INNER_NORMAL_AIR_MIN > 0.0, "inner under-head corner has no positive zero-gap air"),
+    (UNDER_HEAD_OUTER_NORMAL_AIR_MIN > 0.0, "outer under-head corner has no positive zero-gap air"),
+    (
+        min(UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN, UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN) > 0.0,
+        "under-head corner envelopes consume the seated end play",
+    ),
+    (UNDER_HEAD_FLAT_WITNESS_LENGTH > 0.0, "under-head corners consume the actual flat face"),
+    (
+        HEAD_LENGTH - HEAD_OUTER_CHAMFER_MAX > SLOT_DEPTH_MAX,
+        "outer under-head chamfer reaches the driver slot",
+    ),
+    (
+        HEAD_BEARING_RADIAL_MIN >= MATING_SCREW_HEAD_BEARING_FLOOR,
+        "under 0.1 of under-head bearing on the cup floor",
+    ),
+    (
+        CUP_FLOOR_HOLE_DIA_MIN > SHOULDER_DIA_MAX,
         "the MHA-DT-35 floor hole does not pass the shoulder",
     ),
     (HEAD_RECESS_NOMINAL >= 0.0, "the head stands proud of the cup at nominal"),
@@ -449,27 +557,35 @@ for _ok, _what in (
     ),
     (SHOULDER_DIA_MIN > THREAD_MODEL_DIA, "shoulder has no seat annulus"),
     (HEAD_LENGTH - SLOT_DEPTH >= 2.0, "under 2.0 of head remains under the slot"),
+    (SLOT_DEPTH_MIN >= 0.8, "under 0.8 of driver seating at the slot's printed limits"),
     (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at its limits"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-DT-32: {_what}")
 
 # Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-32
-# re-reviews, 2026-09-29): the seat face (the thread length, with its own band
-# for the engagement check), the under-head face (UnderHeadLocation, a
-# reference: the shoulder is turned to suit the bonded handle) and the head
-# face (the reference overall, for stock cut-off).  The head length, the slot
-# depth, the relief width and the two 45-degree legs are local sizes of their
-# features.  A head-face origin cannot work: the seat is fitted, so the thread
-# length would ride on the handle stack.
+# re-reviews, 2026-09-29): the seat face (the thread length), the under-head
+# face (UnderHeadLocation, a reference) and the head face (the reference
+# overall, for stock cut-off).  The fitted shoulder additionally prints its
+# existing local seat-to-under-head nominal as a reference with the to-suit
+# rule (Main's r18 ruling), not a second driving location.  The head length,
+# slot depth, relief width and 45-degree chamfer legs remain local sizes.
+# A head-face origin cannot work: the seat is fitted, so the thread length
+# would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
         "HeadLength",
+        "UnderHeadCornerRadius",
+        "HeadOuterChamfer",
         "ShoulderDia",
+        "ShoulderLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
+        "ReliefLead",
+        "ReliefCornerRadius",
+        "SeatEdgeBreak",
         "TipChamfer",
     },
     "SlotProfile": {"SlotWidth"},
@@ -477,24 +593,41 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"OverallLength", "UnderHeadLocation"},
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the shoulder diameter is
-# the running fit and prints its band at two places, the head diameter its
-# cup-floor bearing band, and the relief width prints at two places for the
-# 1.5D engagement rule; every other size is routine (.X), the fitted
-# shoulder length a reference.  The thread length carries its own +0/-0.5
-# band at one place.
+# the running fit and prints its band at two places, and the head diameter and
+# length their cup bands; the relief neck's one-place band retains its
+# minimum section.  Other sizes are routine (.X), a single MAX at one place,
+# or the fitted shoulder length's reference.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
         "HeadLength": 2,
+        "UnderHeadCornerRadius": 1,
+        "HeadOuterChamfer": 2,
         "ShoulderDia": 2,
+        "ShoulderLength": 1,
         "ThreadLength": 1,
-        "ReliefDia": 2,
+        "ReliefDia": 1,
         "ReliefWidth": 1,
-        "TipChamfer": 2,
+        "ReliefLead": 1,
+        "ReliefCornerRadius": 1,
+        "SeatEdgeBreak": 1,
+        "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
-    "DriverSlot": {"SlotDepth": 2},
+    "DriverSlot": {"SlotDepth": 1},
     "StationReference": {"OverallLength": 1, "UnderHeadLocation": 1},
+}
+# The single-limit dimensions: (feature, dimension) -> (limit mm, swTolType).
+SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
+    ("ScrewProfile", "TipChamfer"): (TIP_CHAMFER_MAX, TIP_CHAMFER_TOL_TYPE),
+    ("ScrewProfile", "SeatEdgeBreak"): (
+        SEAT_EDGE_BREAK_MAX,
+        SEAT_EDGE_BREAK_TOL_TYPE,
+    ),
+    ("ScrewProfile", "ReliefCornerRadius"): (RELIEF_CORNER_RADIUS_MAX, 6),  # swTolMAX
+    ("ScrewProfile", "UnderHeadCornerRadius"): (
+        UNDER_HEAD_CORNER_RADIUS_MAX, UNDER_HEAD_CORNER_TOL_TYPE,
+    ),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -503,6 +636,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-32 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "UnderHeadLocation"})
+REFERENCE_DIMENSIONS = frozenset({"ShoulderLength", "OverallLength", "UnderHeadLocation"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

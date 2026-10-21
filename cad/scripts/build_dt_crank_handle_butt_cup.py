@@ -8,6 +8,8 @@ a plain cup with a flat face; the handle's end round is turned on the oak only.
 Dimensions live in ``dt_crank_handle_butt_cup_spec``.
 Owner ruling B on #1375 enlarges only the body and its stock; the unchanged
 head pocket now retains the wall floor without a shortfall note or property.
+PR1694 option 2 adds only the pocket-side floor-hole mouth's native LIMIT
+chamfer; the outer BodyChamfer and pocket-floor R0.1 MAX stay unchanged.
 
 Layout: one revolve about local +X.  The cup's outer face is the origin
 plane (x=0); the body and floor run toward -X, into the handle, so in
@@ -55,6 +57,9 @@ from dt_crank_handle_butt_cup_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FLOOR_HOLE_DIA,
+    FLOOR_HOLE_MOUTH_CHAMFER,
+    FLOOR_HOLE_MOUTH_CHAMFER_BAND,
+    FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE,
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_DEPTH_TOL,
@@ -78,11 +83,15 @@ V_POCKET_FLOOR_CORNER = 2.0 * math.pi * (
     * (1.0 - math.pi / 4.0)
     + POCKET_FLOOR_CORNER_R_MAX**3 / 6.0
 )
+V_FLOOR_HOLE_MOUTH_CHAMFER = math.pi * (
+    FLOOR_HOLE_R * FLOOR_HOLE_MOUTH_CHAMFER**2
+    + FLOOR_HOLE_MOUTH_CHAMFER**3 / 3.0
+)
 V_CUP = math.pi * (
     BODY_R**2 * OVERALL_LENGTH
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
-) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0) + V_POCKET_FLOOR_CORNER
+) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0) + V_POCKET_FLOOR_CORNER - V_FLOOR_HOLE_MOUTH_CHAMFER
 
 
 def _pocket_floor_max_limit(adapter) -> None:
@@ -116,6 +125,40 @@ def _pocket_floor_max_limit(adapter) -> None:
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
 
 
+def _floor_hole_mouth_chamfer_limit(adapter) -> None:
+    """Print the real pocket-side 45-degree leg as a two-place native LIMIT."""
+    display, dimension = _named_dimension(adapter, "CupProfile", "FloorHoleMouthChamfer")
+    label = "FloorHoleMouthChamfer@CupProfile"
+    if not math.isclose(
+        float(dimension.SystemValue), FLOOR_HOLE_MOUTH_CHAMFER / 1000.0,
+        rel_tol=0.0, abs_tol=1e-9,
+    ) or bool(dimension.IsReference()):
+        raise RuntimeError(f"{label}: not the controlling maximum model leg")
+    display = _early_bound(display, "IDisplayDimension")
+    if not bool(display.ShowDimensionValue) or bool(display.GetOverride()) or any(
+        str(display.GetText(index) or "").strip() for index in (1, 2)
+    ):
+        raise RuntimeError(f"{label}: numeric value is overridden or decorated")
+    lower, upper = deviations(FLOOR_HOLE_MOUTH_CHAMFER_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: LIMIT values rejected")
+    if (
+        int(tolerance.Type) != FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = DRAWING_PRECISION["CupProfile"]["FloorHoleMouthChamfer"]
+    display.SetPrecision3(-1, -1, places, -1)
+    if (
+        int(display.GetPrimaryPrecision2()) != places
+        or int(display.GetPrimaryTolPrecision2()) != places
+    ):
+        raise RuntimeError(f"{label}: two-place native limit precision changed")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -129,6 +172,7 @@ async def build(adapter) -> dict[str, str]:
         ("PocketDepth", POCKET_DEPTH),
         ("FloorHoleDia", FLOOR_HOLE_DIA),
         ("BodyChamfer", BODY_CHAMFER),
+        ("FloorHoleMouthChamfer", FLOOR_HOLE_MOUTH_CHAMFER),
         ("PocketFloorRadius", POCKET_FLOOR_CORNER_R_MAX),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -137,8 +181,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Stepped section on the Front plane, revolved about the X axis: pocket
     # mouth -> face -> body OD -> bottom chamfer -> bottom -> floor hole ->
-    # flat floor -> tangent quarter arc -> pocket wall.  The round adds
-    # material inside the pocket, within the head's minimum radial clearance.
+    # mouth chamfer -> flat floor -> tangent quarter arc -> pocket wall.
+    # The old round adds material toward the head; its outer break clears it.
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -156,7 +200,8 @@ async def build(adapter) -> dict[str, str]:
         (-(OVERALL_LENGTH - BODY_CHAMFER), BODY_R),
         (-OVERALL_LENGTH, BODY_R - BODY_CHAMFER),
         (-OVERALL_LENGTH, FLOOR_HOLE_R),
-        (-POCKET_DEPTH, FLOOR_HOLE_R),
+        (-POCKET_DEPTH - FLOOR_HOLE_MOUTH_CHAMFER, FLOOR_HOLE_R),
+        (-POCKET_DEPTH, FLOOR_HOLE_R + FLOOR_HOLE_MOUTH_CHAMFER),
         floor_round_end,
     ]
     lines = await add_line_chain(adapter, points, close=False)
@@ -172,14 +217,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, [floor_round_start, points[0]], close=False
     )
     set_sketch_direct_db(adapter, False)
-    face, body_od, chamfer, bottom, floor_hole, floor_top = lines
+    face, body_od, chamfer, bottom, floor_hole, mouth_chamfer, floor_top = lines
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
     for line, (u0, v0), (u1, v1) in (
         *zip(lines, points, points[1:], strict=False),
         (pocket_wall, floor_round_start, points[0]),
     ):
         if u0 != u1 and v0 != v1:
-            continue  # the 45-degree bottom chamfer; its two legs define it
+            continue  # both 45-degree chamfers are defined by their two legs
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"cup profile {relation} {line}",
@@ -239,10 +284,25 @@ async def build(adapter) -> dict[str, str]:
         "cup bottom chamfer rise",
     )
     profile.record("BodyChamferRise", '"BodyChamfer"')
+    # Separate names/global from the unchanged outer BodyChamfer.  The axial
+    # leg prints; its radial counterpart stays hidden but equation-driven.
+    for name, kind in (
+        ("FloorHoleMouthChamfer", "horizontal_distance"),
+        ("FloorHoleMouthChamferRise", "vertical_distance"),
+    ):
+        await dimension_between(
+            adapter,
+            f"{mouth_chamfer}.start",
+            f"{mouth_chamfer}.end",
+            kind,
+            FLOOR_HOLE_MOUTH_CHAMFER,
+            f"cup pocket-side floor-hole mouth {name}",
+        )
+        profile.record(name, '"FloorHoleMouthChamfer"')
     for name, line, u_mid, radius in (
         ("BodyDia", body_od, -(OVERALL_LENGTH - BODY_CHAMFER) / 2.0, BODY_R),
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
-        ("FloorHoleDia", floor_hole, -(POCKET_DEPTH + OVERALL_LENGTH) / 2.0, FLOOR_HOLE_R),
+        ("FloorHoleDia", floor_hole, -(POCKET_DEPTH + FLOOR_HOLE_MOUTH_CHAMFER + OVERALL_LENGTH) / 2.0, FLOOR_HOLE_R),
     ):
         await add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 3.0), name
@@ -301,6 +361,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _pocket_floor_max_limit(adapter)
+    _floor_hole_mouth_chamfer_limit(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
