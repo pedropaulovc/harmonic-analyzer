@@ -3783,6 +3783,8 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        SCRIPTS_DIR / "test_machinist_review_overlays.py",
+        SCRIPTS_DIR / "test_machinist_review_precheck.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         SCRIPTS_DIR / "test_machinist_review_bench.py",

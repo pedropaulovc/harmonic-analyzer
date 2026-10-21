@@ -618,16 +618,13 @@ def test_enrolled_plan_revisions_match_configured_release():
 MIGRATED_PLANS = ("ch_rocker_arm",)
 
 
+# Revision freshness is an enrollment contract, checked separately above.
+# Held migrated plans retain their authored revision until revalidated/enrolled.
 def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
-    import yaml
-
-    release = Path(__file__).resolve().parents[1] / "config" / "release.yaml"
-    revision = yaml.safe_load(release.read_text())["next_revision"]
     for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
         text = plans.plan_path(stem).read_text(encoding="utf-8")
         plan = tomllib.loads(text)
         assert plan["part"] == stem.replace("_", "-")
-        assert plan["drawing"]["revision"] == revision
         # The wrapper passes the shop files; exact STEP refs exist only once bound.
         assert "paths" not in plan
         assert plans._REF.search(text) is None
