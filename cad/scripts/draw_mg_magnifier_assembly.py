@@ -1,8 +1,8 @@
 r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
-Diagnostic branch only: one held seat builds fresh current/historical/historical/
-current drawings through the wheel coverage probe, discards each, and STOPs.
-No arm or paired run can save/export a drawing.
+Diagnostic branch only: one held seat builds fresh current-template drawings with
+visible-edge weight slots THICK/NORMAL/NORMAL/THICK, discards each, and STOPs.
+No arm or paired run can save/export a drawing; no production fix is selected.
 
 Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
 and every assembly setting printed as the assembly's own model dimension
@@ -39,7 +39,7 @@ the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
@@ -88,7 +88,11 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
-from _drawing_template_probe import TemplateProbeStop, stop_after_template_probe
+from _drawing_template_probe import (
+    TemplateProbeStop,
+    apply_visible_edge_weight,
+    stop_after_template_probe,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -1646,27 +1650,18 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
-    """Run diagnostic ABBA on this adapter/seat; never return export outputs."""
-    global _TEMPLATE
-    original_template = _TEMPLATE
-    original_registry_template = DRAWING_TEMPLATES[SPEC.layout]
-    historical = replace(
-        original_template,
-        path=original_template.path.with_name("issue1667-historical-landscape.DRWDOT"),
-    )
-    sequence = (
-        ("current", original_template),
-        ("historical", historical),
-        ("historical", historical),
-        ("current", original_template),
-    )
-    out_dir = _seat_forensics._capture_dir("1667-template-balloon-probe")
+    """Run visible-edge weight ABBA on one seat; never return export outputs."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    sequence = ("THICK", "NORMAL", "NORMAL", "THICK")
+    out_dir = _seat_forensics._capture_dir("1667-visible-edge-weight-probe")
     seat_pid = int(adapter.swApp.GetProcessID())
     paired: dict[str, Any] = {
         "diagnostic_only": True,
         "intentional_stop_before_save_export": True,
         "proof": "aborted",
-        "sequence": [name for name, _template in sequence],
+        "sequence": list(sequence),
+        "changed_document_preference": "swLineFontVisibleEdgesThickness",
+        "template_source": "current_registry",
         "seat_pid": seat_pid,
         "seat_provenance": _seat_forensics.seat_provenance(adapter),
         "report_path": str(out_dir / "capture.json"),
@@ -1674,10 +1669,11 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     started = time.perf_counter()
     try:
-        for order, (name, template) in enumerate(sequence, start=1):
-            arm_dir = out_dir / f"{order:02d}-{name}"
+        for order, slot in enumerate(sequence, start=1):
+            arm_dir = out_dir / f"{order:02d}-{slot}"
             report: dict[str, Any] = {
-                "arm_name": name,
+                "arm_name": slot,
+                "weight_slot": slot,
                 "arm_order": order,
                 "template_path": str(template.path.resolve()),
                 "report_path": str(arm_dir / "capture.json"),
@@ -1689,13 +1685,14 @@ async def build(adapter: Any) -> dict[str, str]:
                 report["template_sha256"] = hashlib.sha256(
                     template.path.read_bytes()
                 ).hexdigest()
-                _TEMPLATE = template
-                DRAWING_TEMPLATES[SPEC.layout] = template
+                # Every fresh drawing uses the unchanged current registry template.
                 report["seat_pid_before"] = int(adapter.swApp.GetProcessID())
                 if report["seat_pid_before"] != seat_pid:
-                    raise RuntimeError(f"template arm {order}: SolidWorks seat changed")
-                await _build_template_probe_arm(adapter, out_dir=arm_dir, report=report)
-                raise RuntimeError(f"template arm {order}: probe returned without STOP")
+                    raise RuntimeError(f"weight arm {order}: SolidWorks seat changed")
+                await _build_weight_probe_arm(
+                    adapter, slot=slot, out_dir=arm_dir, report=report
+                )
+                raise RuntimeError(f"weight arm {order}: probe returned without STOP")
             except TemplateProbeStop:
                 report["diagnostic_stop"] = True
             finally:
@@ -1720,12 +1717,12 @@ async def build(adapter: Any) -> dict[str, str]:
                     }
                     if visible or resident:
                         raise RuntimeError(
-                            f"template arm {order}: documents survived discard: "
+                            f"weight arm {order}: documents survived discard: "
                             f"visible={visible!r}, resident={resident!r}"
                         )
                     report["seat_pid_after"] = int(adapter.swApp.GetProcessID())
                     if report["seat_pid_after"] != seat_pid:
-                        raise RuntimeError(f"template arm {order}: SolidWorks seat changed")
+                        raise RuntimeError(f"weight arm {order}: SolidWorks seat changed")
                 finally:
                     cleanup_error = sys.exception()
                     if cleanup_error is not None and cleanup_error is not failure:
@@ -1739,9 +1736,6 @@ async def build(adapter: Any) -> dict[str, str]:
                     _seat_forensics._write_failure_report(arm_dir, report)
         paired["proof"] = "completed"
     finally:
-        _TEMPLATE = original_template
-        DRAWING_TEMPLATES[SPEC.layout] = original_registry_template
-        paired["globals_restored"] = True
         paired["elapsed_ms"] = (time.perf_counter() - started) * 1000.0
         failure = sys.exception()
         if failure is not None:
@@ -1750,8 +1744,8 @@ async def build(adapter: Any) -> dict[str, str]:
     raise TemplateProbeStop(paired)
 
 
-async def _build_template_probe_arm(
-    adapter: Any, *, out_dir: Path, report: dict[str, Any]
+async def _build_weight_probe_arm(
+    adapter: Any, *, slot: str, out_dir: Path, report: dict[str, Any]
 ) -> None:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
@@ -1769,6 +1763,7 @@ async def _build_template_probe_arm(
         )
     _validate_source(source_model)
     _create_sheets(adapter)
+    apply_visible_edge_weight(adapter.currentModel, slot=slot, report=report)
     _place_assembled_sheet(adapter)
     # Every view's configuration and exploded state is final before the BOM
     # binds: a configuration switch after it re-dirties the source.
@@ -1831,7 +1826,7 @@ async def _build_template_probe_arm(
         wheel,
         items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
-        template=_TEMPLATE.path,
+        template=DRAWING_TEMPLATES[SPEC.layout].path,
         out_dir=out_dir,
         report=report,
     )

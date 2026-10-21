@@ -1,18 +1,20 @@
-"""Temporary issue-1667 same-seat template ABBA probe; NEVER merge into production.
+"""Temporary issue-1667 visible-edge weight ABBA probe; NEVER merge into production.
 
-Observers only read COM properties/returned notes. The only image is a desktop
-pixel grab after native creation and the unchanged production ownership proof.
-No drawing save/export is permitted: both complete and incomplete runs STOP.
+Only the document visible-edge line-font slot is changed. Observers read COM
+properties/returned notes. The only image is a desktop pixel grab after native
+creation and the unchanged production ownership proof. No save/export is permitted.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import math
 import sys
 import time
 from typing import Any, Callable, NoReturn, Sequence
 
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _com import _early_bound
 import _drawing_balloons as balloons
@@ -26,9 +28,71 @@ class TemplateProbeStop(RuntimeError):
     def __init__(self, report: dict[str, Any]) -> None:
         self.report = report
         super().__init__(
-            "INTENTIONAL TEMPLATE PROBE STOP before save/export; "
+            "INTENTIONAL VISIBLE-EDGE WEIGHT PROBE STOP before save/export; "
             f"proof={report['proof']}; report={report['report_path']}"
         )
+
+
+def apply_visible_edge_weight(
+    model: Any, *, slot: str, report: dict[str, Any]
+) -> None:
+    """Set only visible-edge slot selection; read, never write, its widths."""
+    started = time.perf_counter()
+    weight: dict[str, Any] = {
+        "preference": "swLineFontVisibleEdgesThickness",
+        "option": "swDetailingNoOptionSpecified",
+        "requested_slot_name": slot,
+    }
+    report["visible_edge_weight"] = weight
+    try:
+        extension = _early_bound(model.Extension, "IModelDocExtension")
+        preference = constant("swLineFontVisibleEdgesThickness")
+        option = constant("swDetailingNoOptionSpecified")
+        slots = {name: constant(f"swLW_{name}") for name in ("NORMAL", "THICK")}
+        thickness_preferences = {
+            "NORMAL": constant("swPageSetupPrinterNormalLineWeight"),
+            "THICK": constant("swPageSetupPrinterThickLineWeight"),
+        }
+        expected_m = {"NORMAL": 0.00018, "THICK": 0.00035}[slot]
+        weight.update(requested_slot=slots[slot], expected_thickness_m=expected_m)
+
+        def readback() -> dict[str, Any]:
+            read_started = time.perf_counter()
+            actual_slot = int(extension.GetUserPreferenceInteger(preference, option))
+            thickness_m = {
+                name: float(extension.GetUserPreferenceDouble(pref, option))
+                for name, pref in thickness_preferences.items()
+            }
+            slot_name = next(
+                (name for name, value in slots.items() if value == actual_slot), None
+            )
+            return {
+                "slot": actual_slot,
+                "slot_name": slot_name,
+                "thickness_m": thickness_m,
+                "slot_thickness_m": thickness_m.get(slot_name),
+                "readback_ms": (time.perf_counter() - read_started) * 1000.0,
+            }
+
+        weight["before"] = readback()
+        setter_started = time.perf_counter()
+        try:
+            result = extension.SetUserPreferenceInteger(preference, option, slots[slot])
+            weight["setter_return"] = result
+        finally:
+            weight["setter_ms"] = (time.perf_counter() - setter_started) * 1000.0
+        weight["after"] = readback()
+        if result is not True:
+            raise RuntimeError("failed to set document visible-edge weight slot")
+        after = weight["after"]
+        if after["slot"] != slots[slot]:
+            raise RuntimeError("document visible-edge weight slot readback differs")
+        if after["thickness_m"] != weight["before"]["thickness_m"]:
+            raise RuntimeError("document Normal/Thick slot widths changed")
+        if not math.isclose(after["slot_thickness_m"], expected_m, abs_tol=1e-10):
+            raise RuntimeError("document visible-edge slot thickness readback differs")
+    finally:
+        weight["elapsed_ms"] = (time.perf_counter() - started) * 1000.0
 
 
 def _read(probe: Callable[[], Any]) -> Any:
@@ -151,5 +215,5 @@ def stop_after_template_probe(
         )
         report["post_proof_capture_ms"] = (time.perf_counter() - started) * 1000.0
         written = _seat_forensics._write_failure_report(out_dir, report)
-        _telemetry.info(f"Template probe retained before save/export: {written['report']}")
+        _telemetry.info(f"Visible-edge weight probe retained before save/export: {written['report']}")
     raise TemplateProbeStop(report)
