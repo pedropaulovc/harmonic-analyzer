@@ -3104,6 +3104,41 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
+        if stem == "mg_magnifying_bracket":
+            # Disposable saved-native control only; never merge this override.
+            script = (SCRIPTS_DIR / "diagnostics/probe_mg_saved_thread_control.py").resolve()
+            contract = script.with_suffix(".json")
+            report = REPORTS / "diagnostics/mg-saved-thread-control.json"
+            deps = sorted(set([
+                str(script),
+                str(contract),
+                *_helper_deps(script),
+                *_config_deps(script),
+                _submodule_dep(),
+            ]))
+            yield {
+                "name": stem,
+                "file_dep": deps,
+                "task_dep": [],
+                "targets": [str(report)],
+                "uptodate": [not _cache.forced_refresh(f"drawing:{stem}")],
+                "actions": [
+                    (
+                        _cached_com_action,
+                        [
+                            f"drawing:{stem}",
+                            [sys.executable, str(script), "--disposable-source-tree"],
+                            deps,
+                            [report],
+                            "diagnostic-mg-saved-thread-control",
+                            None,
+                        ],
+                    )
+                ],
+                "clean": True,
+                "verbosity": 2,
+            }
+            continue
         yield {
             "name": stem,
             "file_dep": _drawing_file_deps(stem),
