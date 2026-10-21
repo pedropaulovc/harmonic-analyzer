@@ -2456,6 +2456,16 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
                 ).strip())
             cells[row][index] = "; ".join(sorted(values))
 
+    def set_custom_property(index, property_name):
+        if not 0 <= index < len(columns) or columns[index].kind != 204:
+            return False
+        column = columns[index]
+        column.property_name = property_name
+        column.raw_property_data = f'$PRP:"{property_name}"' if property_name else ""
+        cells[0][index] = property_name
+        bind_property(index, property_name)
+        return True
+
     def move_column(source, where, destination):
         if where not in (2, 3):
             return False
@@ -2473,6 +2483,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         if not 0 <= index < len(columns):
             return False
         insertion = index + (where == 3)
+        # Native 2352 inserts an already user-defined/custom-property column.
         columns.insert(
             insertion,
             SimpleNamespace(
@@ -2508,6 +2519,13 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             cells.pop(row + 1)
             native_rows.pop(row)
             state.row_keys.pop(row)
+        elif previous == kind == 204 and property_name == "Number":
+            # Native 2352: even this redundant retype reports success while
+            # clearing only the grouped T12/T18/T24 Qty, not its associations.
+            row = state.row_keys.index("pd-transgear-removable") + 1
+            for quantity_column, column in enumerate(columns):
+                if column.kind == 203:
+                    cells[row][quantity_column] = ""
         if kind == 204 and property_name:
             bind_property(index, property_name)
         return 0
@@ -2543,11 +2561,13 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.GetColumnType3.side_effect = column_type
     table.SetColumnType3.side_effect = set_column_type
     table.GetColumnCustomProperty.side_effect = custom_property
+    table.SetColumnCustomProperty.side_effect = set_custom_property
     table.SetColumnTitle2.side_effect = set_column_title
     table.GetColumnTitle2.side_effect = lambda index, include_hidden: displayed_text(
         0, index, include_hidden
     )
     table.DisplayedText.side_effect = lambda row, column: displayed_text(row, column, False)
+    table.Text2.side_effect = displayed_text
     table.DisplayedText2.side_effect = displayed_text
     table.RowHidden.side_effect = row_hidden
     table.IsCellTextEditable.return_value = True
@@ -2820,7 +2840,7 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
 
     return SimpleNamespace(
         model=model, components=components, table=table, adapter=adapter,
-        cells=cells, keys=keys, state=table._pd_state, insert=insert,
+        cells=cells, keys=keys, state=table._pd_state, insert=insert, view=view,
     )
 
 
@@ -2971,6 +2991,114 @@ def test_bom_insertion_refuses_hidden_physical_rows_before_number_binding(monkey
     assert scene.table.RowHidden(hidden_row) is True
 
 
+def test_native_custom_column_retype_reproduces_consumer_visible_grouped_quantity_loss(
+    monkeypatch,
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.table
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    counts = drawing._source_family_counts(scene.model)
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    before_quantities = tuple(row[3] for row in scene.cells)
+    gear_row = scene.keys.index("pd-transgear-removable") + 1
+    assert table.MoveColumn(1, 3, 3) is True
+    assert table.InsertColumn2(2, 1, "PART NUMBER", 0) is True
+    assert table.GetColumnType3(1, True) == (204, None, 0)
+    assert table.SetColumnHidden(4, True) is None
+    assert table.DisplayedText2(gear_row, 3, True) == "3"
+
+    assert table.SetColumnType3(1, 204, True, "Number") == 0
+    assert table.SetColumnTitle2(1, "PART NUMBER", True) is True
+    assert scene.adapter.currentModel.EditRebuild3() is True
+    assert table.RowCount == table.TotalRowCount == 44
+    assert table.GetColumnType3(3, True) == (203, None, 0)
+    assert table.GetColumnType3(4, True) == (201, None, 0)
+    assert table.ColumnHidden(4) is True
+    assert table.GetColumnCustomProperty(1) == "Number"
+    assert table.DisplayedText2(gear_row, 1, True) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
+    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == ""
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert {component.ReferencedConfiguration for component in table.GetComponents2(
+        gear_row, configuration
+    )} == {"T12 Simplified", "T18 Simplified", "T24 Simplified"}
+    assert tuple(row[3] for index, row in enumerate(scene.cells) if index != gear_row) == (
+        before_quantities[:gear_row] + before_quantities[gear_row + 1:]
+    )
+    assert {"1", "2"}.issubset(before_quantities)
+    with pytest.raises(RuntimeError, match="BOM quantity"):
+        drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+
+
+def test_place_bom_sheet_preserves_native_grouped_quantities_with_property_binding(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    before_members = {
+        key: tuple(id(component) for component in group)
+        for key, group in zip(scene.keys, scene.state.native_rows, strict=True)
+    }
+    before_identities = {
+        key: tuple(
+            (component.GetPathName(), component.ReferencedConfiguration, component.ComponentReference)
+            for component in group
+        )
+        for key, group in zip(scene.keys, scene.state.native_rows, strict=True)
+    }
+    # Isolate graphical view/split/balloon work, not the real insertion helper,
+    # Number binding, rebuilds, native identity checks or quantity consumers.
+    for name in (
+        "_activate_sheet", "set_high_quality_shaded_with_edges",
+        "apply_view_configuration", "_place_sheet_note", "_link_view_to_bom",
+        "_isolate_instances", "_shift_view", "_uncross_ring", "_spread_balloons",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_, **__: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *_, **__: scene.view)
+    monkeypatch.setattr(drawing, "_view_outline", lambda _: drawing.BOM_REFERENCE_LIMITS)
+    monkeypatch.setattr(drawing, "transgear_view_shift", lambda _: (0.0, 0.0))
+    monkeypatch.setattr(drawing, "inner_view_shift", lambda *_: (0.0, 0.0))
+    monkeypatch.setattr(drawing, "inner_view_scale", lambda *_: drawing.INNER_SCALE_LADDER[0])
+    monkeypatch.setattr(drawing, "_split_bom", lambda *_, **__: ())
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", lambda *_, **__: [])
+    monkeypatch.setattr(
+        drawing, "_balloon_collar_on_its_rear_rim",
+        lambda *_, **__: SimpleNamespace(note=object()),
+    )
+
+    _landings, table, items, _pieces, snapshot = drawing._place_bom_sheet(
+        scene.adapter, drawing._source_family_counts(scene.model)
+    )
+    assert table is scene.table
+    assert set(items) == set(drawing.BOM_PART_NUMBERS)
+    assert table.RowCount == table.TotalRowCount == 44
+    assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
+        (202, False), (204, False), (204, False), (203, False), (201, True)
+    )
+    assert table.GetColumnCustomProperty(1) == "Number"
+    assert table.BomFeature.PartConfigurationGrouping == 3
+    assert table.BomFeature.DisplayAsOneItem is False
+    proof_by_row = {row[0]: row for row in snapshot}
+    for row, key in enumerate(scene.keys, 1):
+        members = table.GetComponents2(row, configuration)
+        assert tuple(id(component) for component in members) == before_members[key]
+        assert tuple(
+            (component.GetPathName(), component.ReferencedConfiguration, component.ComponentReference)
+            for component in members
+        ) == before_identities[key]
+        assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
+    for key, quantity, configurations in (
+        ("pd-transgear-removable", 3, {"T12 Simplified", "T18 Simplified", "T24 Simplified"}),
+        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink Simplified"}),
+        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink Simplified"}),
+    ):
+        row = scene.keys.index(key) + 1
+        assert table.Text2(row, 3, True) == table.DisplayedText2(row, 3, True) == str(quantity)
+        assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], str(quantity))
+        assert sum(identity[2] for identity in proof_by_row[row][1]) == quantity
+        members = table.GetComponents2(row, configuration)
+        assert len(members) == quantity
+        assert {component.ReferencedConfiguration for component in members} == configurations
+    assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
+
+
 def test_native_part_number_conversion_reproduces_consumer_visible_group_loss(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     counts = drawing._source_family_counts(scene.model)
@@ -2994,7 +3122,7 @@ def test_native_part_number_conversion_reproduces_consumer_visible_group_loss(mo
     "failure",
     (
         "move", "move-noop", "insert", "insert-noop", "hide-readback",
-        "number-type-status", "number-property-readback", "initial-inconsistent-counts",
+        "number-property-status", "number-property-readback", "initial-inconsistent-counts",
     ),
 )
 def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failure):
@@ -3012,8 +3140,8 @@ def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failu
         scene.table.InsertColumn2.side_effect = lambda *_: False
     elif failure == "insert-noop":
         scene.table.InsertColumn2.side_effect = lambda *_: True
-    elif failure == "number-type-status":
-        scene.table.SetColumnType3.side_effect = lambda *_: 1
+    elif failure == "number-property-status":
+        scene.table.SetColumnCustomProperty.side_effect = lambda *_: False
     elif failure == "number-property-readback":
         native_property = scene.table.GetColumnCustomProperty.side_effect
         scene.table.GetColumnCustomProperty.side_effect = lambda index: (
@@ -3030,6 +3158,48 @@ def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failu
         assert attributes[f"number_bind_{stage}_row_count"] == len(scene.keys) + 1
         assert json.loads(attributes[f"number_bind_{stage}_members"])
 
+
+
+@pytest.mark.parametrize("kind", (0, 201, 202, 203))
+def test_bom_insertion_refuses_noncustom_inserted_column(monkeypatch, kind):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_insert = scene.table.InsertColumn2.side_effect
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    before_quantities = tuple(row[3] for row in scene.cells)
+
+    def insert_column(where, index, name, width_style):
+        result = native_insert(where, index, name, width_style)
+        scene.state.columns[index + (where == 3)].kind = kind
+        return result
+
+    scene.table.InsertColumn2.side_effect = insert_column
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert scene.state.columns[1].kind == kind
+    assert scene.table.GetColumnCustomProperty(1) == ""
+    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert tuple(row[3] for row in scene.cells) == before_quantities
+
+
+@pytest.mark.parametrize("result", (None, 0, 1, "True"), ids=("none", "zero", "one", "string"))
+def test_bom_insertion_refuses_nonbool_property_setter_success(monkeypatch, result):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_set = scene.table.SetColumnCustomProperty.side_effect
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    before_quantities = tuple(row[3] for row in scene.cells)
+
+    def set_custom_property(index, property_name):
+        assert native_set(index, property_name) is True
+        return result
+
+    scene.table.SetColumnCustomProperty.side_effect = set_custom_property
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert scene.table.GetColumnCustomProperty(1) == "Number"
+    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert tuple(row[3] for row in scene.cells) == before_quantities
 
 @pytest.mark.parametrize(
     "fault",
@@ -3351,6 +3521,7 @@ def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
     assert scene.table.MoveColumn(index, 3, 0) is False
     assert scene.table.InsertColumn2(2, index, "PART NUMBER", 0) is False
     assert scene.table.SetColumnType3(index, 204, True, "Number") == 1
+    assert scene.table.SetColumnCustomProperty(index, "Number") is False
     assert scene.table.SetColumnTitle2(index, "PART NUMBER", True) is False
     with pytest.raises(IndexError):
         scene.table.SetColumnHidden(index, True)

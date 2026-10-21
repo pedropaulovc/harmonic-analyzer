@@ -498,11 +498,12 @@ class _NumberTable:
         self.RowCount = 2
         self.TotalRowCount = 2
         self.hidden_rows = set()
-        self.type_status = 0
-        self.property_readback = "Number"
+        self.property_result = True
+        self.property_readback = None
         self.accept_title = True
         self.accept_move = True
         self.accept_insert = True
+        self.inserted_kind = 204
         self.accept_hide = True
         self.number_display_override = None
         self.title_writes = []
@@ -571,7 +572,12 @@ class _NumberTable:
         target = index + (where == 3)
         self.columns.insert(
             target,
-            {"kind": 0, "property": None, "hidden": False, "width": 0.02},
+            {
+                "kind": self.inserted_kind,
+                "property": None,
+                "hidden": False,
+                "width": 0.02,
+            },
         )
         for row_index, row in enumerate(self.cells):
             row.insert(target, title if row_index == 0 else "")
@@ -604,9 +610,30 @@ class _NumberTable:
         column = self._column_index(column, include_hidden)
         if column is None:
             raise IndexError("invalid physical column binding")
-        if self.type_status:
-            return self.type_status
+        was_custom = self.columns[column]["kind"] == 204
         self.columns[column].update(kind=kind, property=f'$PRP:"{property_name}"')
+        self._fill_custom_property(column, property_name)
+        if was_custom and kind == 204 and property_name == "Number":
+            # Native2352: redundant custom-to-custom typing clears grouped Qty
+            # without removing the row's native component associations.
+            if len(self.components) > 1:
+                for index, state in enumerate(self.columns):
+                    if state["kind"] == 203:
+                        self.cells[1][index] = ""
+        return 0
+
+    def SetColumnCustomProperty(self, column, property_name):
+        """SDK BOOL setter binds only existing user-defined (204) columns."""
+        physical = self._column_index(column, True)
+        if physical is None or self.columns[physical]["kind"] != 204:
+            return False
+        if not self.property_result:
+            return self.property_result
+        self._fill_custom_property(physical, property_name)
+        return self.property_result
+
+    def _fill_custom_property(self, column, property_name):
+        self.columns[column]["custom_property"] = property_name
         self.cells[0][column] = property_name
         number = ""
         if self.components:
@@ -625,13 +652,14 @@ class _NumberTable:
             if self.number_display_override is None
             else self.number_display_override
         )
-        return 0
 
     def GetColumnCustomProperty(self, column):
         physical = self._column_index(column, True)
         if physical is None or self.columns[physical]["kind"] != 204:
             return ""
-        return self.property_readback
+        if self.property_readback is not None:
+            return self.property_readback
+        return self.columns[physical].get("custom_property", "")
 
     def SetColumnTitle2(self, column, title, include_hidden):
         column = self._column_index(column, include_hidden)
@@ -661,8 +689,9 @@ def number_binding(unwrapped_com, monkeypatch):
 
 @pytest.mark.parametrize("member", ["LeverWire", "LeverWire Simplified"])
 @pytest.mark.parametrize("advertised_excess", [0, 1])
+@pytest.mark.parametrize("occurrences", [1, 3])
 def test_number_column_binds_native_property_and_reads_actual_configuration(
-    number_binding, member, advertised_excess
+    number_binding, member, advertised_excess, occurrences
 ):
     adapter, _rebuilds = number_binding
     properties = {
@@ -671,8 +700,17 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         ("LeverWire", "Number"): "WRONG-UNSIMPLIFIED-NUMBER",
         (member, "Number"): NUMBER,
     }
-    component = _component(properties=properties, configuration=member)
-    table = _NumberTable([component], advertised_excess=advertised_excess)
+    components = [
+        _component(
+            f"native-wire-{ordinal}",
+            properties=properties,
+            configuration=member,
+            reference=f"LeverWire:{ordinal}",
+        )
+        for ordinal in range(1, occurrences + 1)
+    ]
+    table = _NumberTable(components, advertised_excess=advertised_excess)
+    table.cells[1][2] = str(occurrences)
     table.cells[0][1] = " part number "
     tables._bind_bom_number_property(
         adapter,
@@ -681,7 +719,7 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         label="wire",
     )
     assert table.GetColumnCustomProperty(1) == "Number"
-    assert table.GetColumnType3(1, True) == (204, '$PRP:"Number"', 0)
+    assert table.GetColumnType3(1, True)[0] == 204
     assert table.title_writes
     assert all(
         include_hidden is True for _column, _title, include_hidden in table.title_writes
@@ -697,7 +735,7 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
     assert table.GetColumnType3(2, False)[0] == 201
     assert table.DisplayedText2(0, 2, True) == "QTY."
     assert table.DisplayedText(0, 2).strip().upper() == "PART NUMBER"
-    assert table.DisplayedText2(1, 2, True) == "1"
+    assert table.DisplayedText2(1, 2, True) == str(occurrences)
     assert table.DisplayedText2(1, 2, False) == "native-key"
     assert table.DisplayedText(1, 2) == "native-key"
     snapshot = tables.validate_bom_number_property(
@@ -707,7 +745,8 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         expected_rows=2,
         occurrence_quantities=True,
     )
-    assert snapshot[0][2:] == (NUMBER, "1")
+    assert snapshot[0][2:] == (NUMBER, str(occurrences))
+    assert table.GetComponents2(1, "Default Simplified") == tuple(components)
     table.cells[1][3] = "999"
     assert table.DisplayedText(1, 2) == "999"
     assert (
@@ -771,7 +810,7 @@ def test_number_column_uses_document_property_only_when_actual_member_has_none(
 @pytest.mark.parametrize(
     "fault",
     [
-        "column-type",
+        "inserted-type",
         "move",
         "insert",
         "hide",
@@ -783,8 +822,8 @@ def test_number_column_uses_document_property_only_when_actual_member_has_none(
 def test_number_column_binding_refuses_native_metadata_failures(number_binding, fault):
     adapter, rebuilds = number_binding
     table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
-    if fault == "column-type":
-        table.type_status = 1
+    if fault == "inserted-type":
+        table.inserted_kind = 0
     elif fault == "move":
         table.accept_move = False
     elif fault == "insert":
@@ -801,6 +840,23 @@ def test_number_column_binding_refuses_native_metadata_failures(number_binding, 
         tables._bind_bom_number_property(
             adapter, table, configuration="Default", label="wire"
         )
+    assert rebuilds == []
+
+
+@pytest.mark.parametrize("binding_result", [False, 1], ids=["false", "non-bool-one"])
+def test_number_column_binding_refuses_non_true_property_result(
+    number_binding, binding_result
+):
+    adapter, rebuilds = number_binding
+    table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
+    table.property_result = binding_result
+    with pytest.raises(RuntimeError, match="Number property binding failed"):
+        tables._bind_bom_number_property(
+            adapter, table, configuration="Default", label="wire"
+        )
+    # A truthy non-BOOL can accompany populated cells; neither proves success.
+    assert table.GetColumnCustomProperty(1) == ("Number" if binding_result else "")
+    assert table.DisplayedText2(1, 1, True) == (NUMBER if binding_result else "")
     assert rebuilds == []
 
 

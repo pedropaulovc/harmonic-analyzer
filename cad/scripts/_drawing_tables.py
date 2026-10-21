@@ -1187,7 +1187,7 @@ def _bind_bom_number_property(
         inserted = _bom_physical_columns(table, label=label)
         if (
             len(inserted) != len(moved) + 1
-            or inserted[column] not in ((0, False), (204, False))
+            or inserted[column] != (204, False)
             or inserted != moved[:column] + (inserted[column],) + moved[column:]
         ):
             raise RuntimeError(f"{label} BOM column sequence changed during insertion")
@@ -1198,21 +1198,20 @@ def _bind_bom_number_property(
         retained = inserted[:-1] + ((201, True),)
         if _bom_physical_columns(table, label=label) != retained:
             raise RuntimeError(f"{label} BOM retained native column is not hidden")
-        with observe_mutation("after_bind_Number") as outcome:
-            result = table.SetColumnType3(
-                column,
-                204,
-                True,
-                "Number",  # swBomTableColumnType_CustomProperty
-            )
-            outcome["return"] = repr(result)[:160]
-        status = int(result)
-        if status != 0:  # swColumnTypeStatus_Success
-            raise RuntimeError(f"{label} BOM Number column type failed: {status}")
-        # SetColumnType3 already binds its PropertyData; do not rebind the column.
         annotation = _sw_type_info.early_bound_or_flag(
-            table, "IBomTableAnnotation", "GetColumnCustomProperty"
+            table, "IBomTableAnnotation", "SetColumnCustomProperty"
         )
+        # The inserted column is already custom-property typed. Retyping it
+        # cleared a grouped paper-drive quantity despite reporting success.
+        # Bind its property without changing either native column's type.
+        with observe_mutation("after_bind_Number") as outcome:
+            outcome["method"] = "SetColumnCustomProperty"
+            result = annotation.SetColumnCustomProperty(column, "Number")
+            outcome["return"] = repr(result)[:160]
+        if result is not True:
+            raise RuntimeError(
+                f"{label} BOM Number property binding failed: {result!r}"
+            )
         if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
             raise RuntimeError(f"{label} BOM Number property binding did not persist")
         with observe_mutation("after_set_Number_title") as outcome:
