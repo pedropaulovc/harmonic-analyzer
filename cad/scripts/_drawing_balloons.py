@@ -380,13 +380,14 @@ def _create_auto_balloons(
     allow_empty: bool = False,
     layout: int = 1,
     attachment: Literal["face", "edge"] = "face",
+    _diagnostic: dict[str, Any] | None = None,
 ) -> list[Any]:
     """Create item-number balloons for one selected view without repositioning."""
     if layout not in range(1, 7):
         raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
     if attachment not in ("face", "edge"):
         raise ValueError(f"{label}: invalid auto-balloon attachment {attachment!r}")
-    _activate_and_select_view(adapter, view, label=label)
+    selected_name = _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     options = ddoc.CreateAutoBalloonOptions()
@@ -404,9 +405,22 @@ def _create_auto_balloons(
     options.ItemNumberStart = 1
     options.ItemNumberIncrement = 1
     options.ItemOrder = 1
-    notes = ddoc.AutoBalloon5(options)
+    if _diagnostic is not None:
+        from _drawing_template_probe import observe_notes, observe_options
+
+        _diagnostic["before_native"] = observe_options(adapter, options, selected_name)
+    call_started = time.perf_counter()
+    try:
+        notes = ddoc.AutoBalloon5(options)
+    finally:
+        if _diagnostic is not None:
+            _diagnostic["native_call_ms"] = (time.perf_counter() - call_started) * 1000.0
+    if _diagnostic is not None:
+        _diagnostic["pre_rebuild"] = observe_notes(adapter, notes)
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="_create_auto_balloons")
+    if _diagnostic is not None:
+        _diagnostic["post_rebuild"] = observe_notes(adapter, notes)
     if not notes or isinstance(notes, str):
         if allow_empty:
             return []
@@ -445,6 +459,7 @@ def add_auto_balloons(
     *,
     items: Sequence[tuple[str, str]],
     label: str,
+    _diagnostic: dict[str, Any] | None = None,
 ) -> list[BalloonLanding]:
     """Insert one native EDGE/Square balloon per requested ``(stem, BOM item)``.
 
@@ -474,7 +489,7 @@ def add_auto_balloons(
     }
     _telemetry.annotate(expected=len(expected), attachment="EDGE", layout=1)
     balloons = _create_auto_balloons(
-        adapter, view, label=label, attachment="edge", layout=1
+        adapter, view, label=label, attachment="edge", layout=1, _diagnostic=_diagnostic
     )
     seen: set[str] = set()
     landings: list[BalloonLanding] = []

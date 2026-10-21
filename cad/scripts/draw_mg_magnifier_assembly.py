@@ -63,7 +63,6 @@ from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
-    add_auto_balloons,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -85,6 +84,7 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
+from _drawing_template_probe import stop_after_template_probe
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -1714,11 +1714,13 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
         )
     }
-    wheel_landings = add_auto_balloons(
+    # Diagnostic branch only: identical production insertion, then STOP, never export.
+    wheel_landings = stop_after_template_probe(
         adapter,
         wheel,
         items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
+        template=_TEMPLATE.path,
     )
     landings = list(wheel_landings)
     for sheet_name, view, ladder, field, stems, label in (

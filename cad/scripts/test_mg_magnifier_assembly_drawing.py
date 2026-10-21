@@ -949,7 +949,7 @@ def native_wheel_balloons(monkeypatch):
     return SimpleNamespace(
         notes=native,
         owners=owners,
-        create=lambda: drawing.add_auto_balloons(
+        create=lambda: _drawing_balloons.add_auto_balloons(
             adapter, view, items=items, label="magnifier wheel BOM coverage"
         ),
         adapter=adapter,
