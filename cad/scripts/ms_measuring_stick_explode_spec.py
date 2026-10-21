@@ -3,13 +3,14 @@
 Names the MS_EXPLODED presentation and the ordered native steps that open it:
 the disassembly order, MHA-MS-00's assembly sequence read back to front --
 the cover and its screws off the open side, the screws clear of the cover, the
-bar out of the opened window, then the thumbscrew down its axis. Each step is
+bar out of the opened window, then the thumbscrew up its axis. Each step is
 (label, families, axis, signed distance mm) along the assembly's global axes.
 Positions come from the opened model; distances are presentation offsets, not
-dimensions, sized for the drawing's *Isometric (it looks from +X+Y+Z, the
-closed side): each further -Z step slides a part up and right on the sheet,
-so the screws withdraw far enough to clear the cover's outline instead of
-hiding behind it, and the thumbscrew drops clear of the block.
+dimensions. The named ISO FRONT-TOP-LEFT looks from -X+Y+Z with +Y up, so the
+thumbscrew remains above the block in both the working and exploded views.
+Positive Z steps move parts right and down, clear of the cover; the screw
+backs out upward. This mirrors the original projected separation vertically
+without changing its physical disassembly distances.
 
 No local imports: an explode edit reaches the measuring-stick builder and its
 drawing, never the top assembly that parks the stick by its placement spec.
@@ -20,8 +21,8 @@ from __future__ import annotations
 EXPLODED_VIEW_NAME = "MS_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 EXPLODE_STEPS = (
-    ("cover comes off", ("ms-stop-plate", "ms-vn-stop-plate-screw"), "z", -24.0),
-    ("plate screws withdraw", ("ms-vn-stop-plate-screw",), "z", -26.0),
-    ("stick leaves window", ("ms-stick",), "z", -12.0),
-    ("thumbscrew backs out", ("ms-vn-thumb-screw",), "y", -22.0),
+    ("cover comes off", ("ms-stop-plate", "ms-vn-stop-plate-screw"), "z", 24.0),
+    ("plate screws withdraw", ("ms-vn-stop-plate-screw",), "z", 26.0),
+    ("stick leaves window", ("ms-stick",), "z", 12.0),
+    ("thumbscrew backs out", ("ms-vn-thumb-screw",), "y", 22.0),
 )

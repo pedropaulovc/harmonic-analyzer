@@ -677,6 +677,115 @@ the two as conflicting locations; resolve it with one key note on the priming
 sheet saying which is which (top-frame `ORIENTATION_KEY_TEXT`), never by
 flipping the model names.
 
+Assembly opening views and fitter projections have separate contracts. MG's
+standard Front faces machine −Z, matching HA; its named fitter views preserve
+the back/left inspection and exploded projections independently of that remap.
+
+Named-camera placement does not establish the source model's active
+configuration. `NameView`, `ShowNamedView2` and
+`CreateDrawViewFromModelView3` document the view/orientation, while
+`IView.ReferencedConfiguration` selects the drawing view's configuration;
+`IModelDoc2.ShowConfiguration2` separately activates the source configuration.
+MG's native drawing at `d58d05d82` reached the wheel balloons with the view in
+`Default Simplified`, zero readable explode steps and the source in `Default`.
+That proves the configuration mismatch, not that the named camera itself
+reactivated a captured configuration. The former recommendation to activate
+the source configuration around the balloon reader is superseded by r7 at
+`6bb872b2b` (artifact225): the source was clean at scope entry, 137.8 s, then
+dirty at 138.3 s immediately after
+`ShowConfiguration2("Default Simplified")`, before any balloon operation.
+Restoring the configuration cannot undo that source mutation.
+
+Documented `IConfiguration` explode-step reads are configuration scoped, but
+native reads still returned zero steps. `ShowExploded2` applies to the current
+configuration; there is no evidenced immutable native-API workaround for this
+MG path. Do not activate the model or show/collapse its explode during drawing
+generation. The builder instead verifies the native presentation and stores
+aggregate world translations in metres for **every** top-level instance,
+including zero offsets, separately for `Default` and `Default Simplified`.
+These are file-level custom properties, authored before the builder's normal
+save and bound to the configuration, named view, explode-step count and a
+required `contract_sha256`. This SHA-256 fingerprints canonical JSON of the
+ordered current `plan_explode(instances)`: each step's label, raw member
+selectors, axis, distance in millimetres and resolved component names.
+The assembly remains saved collapsed in `Default`.
+
+The drawing reads those properties through `GetCustomInfoValue("", name)`,
+validates their owner/view/step count, exact current instance membership and
+fingerprint against the current resolved explode contract, and passes the
+referenced drawing configuration's translations to associative edge balloons.
+Changes to axes, distances, member selectors or resolved instance membership
+therefore reject stale metadata even when the step count is unchanged.
+This proves recipe freshness, not detection of external native explode edits
+that leave the stored metadata and current recipe unchanged.
+Missing or invalid metadata fails with a request to rebuild
+`assembly:mg_magnifier`; no nominal-spec or direct-step fallback is allowed.
+Simplified drawing views, original camera geometry and final associative
+balloon landing proofs remain required. Place/configure views, isolate groups,
+set tangent edges and fit before binding the complete BOM to the whole-assembly
+reference; drawing-view configurations remain final once the BOM binds.
+
+The narrower native run at PR1764 head `e3d66daf9` (artifact198) first records
+`magnifier source went DIRTY after lever ClampStation above callout` at
+31.8 s. Earlier checkpoints, including model-item import/curation, are clean.
+That checkpoint immediately followed
+`_drawing_dimensions.set_dimension_callouts` →
+`IDisplayDimension.SetText(3, "CLAMP STATION: SETS MAGNIFICATION")`.
+It identifies a source save-flag mutation, not a geometry change. The
+[native source-hash controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
+already reproduce imported/source dimension identity (`IsSame == 1`), callout
+`SetText` dirtying the source, and drawing `SaveAs3` persisting that mutation.
+
+The API ownership matters: `IDisplayDimension.SetText` edits the native
+dimension's text, returns void and has no drawing-only ownership argument.
+`swDimensionTextParts_e` uses 3/4 for the above/below callout compartments;
+neither replaces or hides the native numeric value (unlike `SetText(0, ...)`).
+`AddDisplayText` is not a persistent replacement: its documented graphics are
+temporary and revert when the dimension changes. The drawing-only
+`DimensionLowerText` argument to `IModelDocExtension.EditDimensionProperties`
+is a separate lane, not the required above/below callouts. No proven
+drawing-only setter preserves these exact callout compartments.
+
+All four MG setting callouts now belong to the assembly model:
+`mg_magnifier_assembly_spec.SETTING_CALLOUTS` owns the exact text and native
+compartments for PressGauge, Endshake, ClampStation and FixtureDrop.
+`build_mg_magnifier_assembly` authors them beside their reference dimensions,
+strictly reads each compartment back and marks/blanks the chains before its
+normal assembly save, following `build_pd_transgear_arm`'s model-text pattern.
+The drawing only imports the associative native dimensions and checks their
+inherited text, precision and stack tolerances, initially and once settled.
+It must reject a stale assembly lacking the text, not stamp it during drawing
+generation. Setting callout wording now re-keys `assembly:mg_magnifier` and
+requires rebuilding that source and its drawing; BOM/step/check prose remains
+drawing-only and must not enter the assembly builder's import closure.
+
+The temporary per-operation crop/settings checkpoints and synthetic
+checkpoint-attribution tests are superseded by this native evidence. Keep
+read-only `magnifier.source_save_flag` phase telemetry, the initial clean
+source guard, and the final fail-closed refusal before drawing `SaveAs3`.
+MG also captures a streaming SHA-256 baseline before opening the source and
+always logs expected/actual source SHA-256 plus `GetSaveFlag` in native
+`task.log`: before finalization, in settled checks immediately before
+`SaveAs3`, and after finalization (including a failed finalization). Either
+different bytes or a dirty flag fails closed. The post-finalization proof
+also revalidates saved `Default`, collapsed presentation and metadata; if
+finalization already failed, a proof failure is warned without replacing the
+primary exception. These checks do not save, reset or repair the source.
+Never save a dirty released source, clear its flag, replace native dimensions
+with free-text notes, or assume identical text setters are harmless. The
+immutable metadata contract and offline fakes do not establish byte/source
+cleanliness or a native pass. Native acceptance still requires the rebuilt
+assembly's callout and metadata readbacks, saved `Default` collapsed state,
+simplified views, printed dimension text, associative edge balloon landings,
+and unchanged source identity throughout drawing generation.
+
+MS's working pose has the thumbscrew above the stick, both standalone and
+parked in HA. Its graduated face remains against the fixed clamp wall and is
+therefore underneath; the named underside inspection view shows that scale.
+The HA parking height comes from the rotated assembly envelope, not the
+thumbscrew head. Native orientation checks must inspect component axes, not
+infer physical placement from a camera.
+
 **g. Picking one of four identical bores.**
 Don't: `SelectByID2("CylinderFace", "FACE", 0, 0, 0, ...)` and hope. A generated
 face name is not stable across rebuilds, and four identical bores make the name

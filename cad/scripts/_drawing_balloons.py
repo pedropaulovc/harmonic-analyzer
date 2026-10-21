@@ -368,7 +368,8 @@ def _spread_balloons(
     for angle, (_theta, _x, _y, _item, (annotation, offset)) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle) + offset[0]
         target_y = center_y + radius_y * math.sin(angle) + offset[1]
-        if not annotation.SetPosition(target_x, target_y, 0.0):
+        positioned = annotation.SetPosition(target_x, target_y, 0.0)
+        if not positioned:
             raise RuntimeError("failed to re-ring a BOM balloon")
 
 
@@ -846,7 +847,10 @@ def _path_prefixes(path: str) -> list[str]:
 
 @_telemetry.traced("drawing.explode_offsets", label_param="label")
 def _view_explode_offsets(
-    adapter: Any, view: Any, *, label: str
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
 ) -> dict[str, tuple[float, float, float]]:
     """Each exploded component's explode translation, in model metres, keyed
     by its casefolded full instance path (:func:`_component_path`).
@@ -891,7 +895,10 @@ def _view_explode_offsets(
     read = "direct"
     if count == 0:
         count = _shown_explode_step_count(
-            model, configuration, configuration_name, label=label
+            model,
+            configuration,
+            configuration_name,
+            label=label,
         )
         read = "shown on model"
         if not bool(bound.IsExploded()):
@@ -937,7 +944,11 @@ def _view_explode_offsets(
 
 
 def _shown_explode_step_count(
-    model: Any, configuration: Any, configuration_name: str, *, label: str
+    model: Any,
+    configuration: Any,
+    configuration_name: str,
+    *,
+    label: str,
 ) -> int:
     """Show the active configuration's one named explode on the model, then
     collapse it again, and return the step count that makes readable."""
@@ -956,10 +967,12 @@ def _shown_explode_step_count(
         raise RuntimeError(
             f"{label}: {configuration_name!r} owns explodes {names!r}, not one"
         )
-    if not bool(assembly.ShowExploded2(True, names[0])):
+    shown = bool(assembly.ShowExploded2(True, names[0]))
+    if not shown:
         raise RuntimeError(f"{label}: cannot show {names[0]!r} on the model")
     count = int(configuration.GetNumberOfExplodeSteps())
-    if not bool(assembly.ShowExploded2(False, names[0])):
+    collapsed = bool(assembly.ShowExploded2(False, names[0]))
+    if not collapsed:
         raise RuntimeError(f"{label}: cannot collapse {names[0]!r} on the model")
     return count
 
@@ -1689,6 +1702,7 @@ def add_component_bom_balloons(
     anchors: Mapping[str, BalloonAnchor],
     label: str,
     margin: float = 0.014,
+    explode_offsets: Mapping[str, tuple[float, float, float]] | None = None,
 ) -> list[BalloonLanding]:
     """Insert and ring one checked balloon per requested component family.
 
@@ -1699,6 +1713,12 @@ def add_component_bom_balloons(
     sheet naming it, with nothing half-placed. Returns each balloon's
     :class:`BalloonLanding`, for :func:`assert_balloon_landings` to prove
     again after the drawing's last rebuild.
+
+    ``explode_offsets`` supplies model-metre translations keyed by casefolded
+    full instance path, already native-verified by the source builder and
+    validated by the drawing. This is not a missing-step fallback: when supplied
+    (including an empty mapping), no source explode is queried or shown.
+    ``None`` retains the native view explode-step reader.
     """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")
@@ -1716,7 +1736,11 @@ def add_component_bom_balloons(
         stem: _shown_instances(leaves, stem, anchors[stem], label=label)
         for stem in stems
     }
-    offsets = _view_explode_offsets(adapter, view, label=label)
+    offsets = (
+        _view_explode_offsets(adapter, view, label=label)
+        if explode_offsets is None
+        else explode_offsets
+    )
     frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
     projected = (
         model_points_in_view(
@@ -1773,7 +1797,10 @@ def add_component_bom_balloons(
         for (stem, item), choice in zip(items, picks)
     ]
     _spread_balloons(
-        adapter, view, [landing.note for landing in landings], margin=margin
+        adapter,
+        view,
+        [landing.note for landing in landings],
+        margin=margin,
     )
     rebuild_drawing(adapter, label="add_component_bom_balloons")
     _telemetry.success(f"{label}: inserted {len(landings)} targeted balloons")

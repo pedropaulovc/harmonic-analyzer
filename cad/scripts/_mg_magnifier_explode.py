@@ -5,11 +5,13 @@ drawing only consumes it. Each step of ``mg_magnifier_explode_spec.EXPLODE_STEPS
 is authored along a global axis, read back as a world translation of exactly
 the intended instances (every other instance, the lever wire included, reads
 unmoved), and the assembly is collapsed again before save -- the saved
-operational pose is proven unchanged,
-transform for transform. The same steps are authored in Default and in
-Default Simplified (as ``MG_MAGNIFIER_EXPLODED Simplified``): a drawing view
-shows the explode of the configuration it references, and the exploded
-sheets' views at 1:2 and smaller reference the thread-free one.
+operational pose is proven unchanged, transform for transform. The measured
+aggregate world translations are stored as file-level custom properties during
+this builder-owned preparation: the drawing need not activate a configuration
+or show an explode on the released source to project its associative balloons.
+The same steps are authored in Default and in Default Simplified (as
+``MG_MAGNIFIER_EXPLODED Simplified``): a drawing view shows the explode of the
+configuration it references, and the exploded sheets use the thread-free one.
 """
 
 from __future__ import annotations
@@ -22,11 +24,14 @@ from typing import Any, NamedTuple
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
+from _custom_properties import apply_custom_properties
 from _simplified_names import simplified_name
 from mg_magnifier_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
+    encode_explode_offsets,
+    explode_offsets_property,
     exploded_view_name,
     plan_explode,
 )
@@ -155,6 +160,7 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
     except ValueError as exc:
         raise RuntimeError(f"{view_name}: {exc}") from exc
     expected = {name: [0.0, 0.0, 0.0] for name in by_name}
+    verified_offsets: dict[str, tuple[float, float, float]] = {}
     directions = _global_directions(adapter, assembly)
 
     _create_named_view(model, assembly, configuration_name, view_name)
@@ -337,6 +343,7 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                             delta = tuple(
                                 current[i + 9] - baseline[name][i + 9] for i in range(3)
                             )
+                            verified_offsets[name] = delta
                             if any(
                                 abs(delta[i] - expected[name][i]) > 1e-7
                                 for i in range(3)
@@ -410,6 +417,15 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(
             f"{view_name}: named presentation is not owned by {configuration_name}"
         )
+    apply_custom_properties(
+        adapter,
+        {
+            explode_offsets_property(configuration_name): encode_explode_offsets(
+                configuration_name, verified_offsets, instances
+            )
+        },
+        model=model,
+    )
     _telemetry.success(
         f"{view_name}: {len(plan)} native steps verified in world space; "
         f"all {len(by_name)} instances restored to the saved pose"
