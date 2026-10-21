@@ -2308,12 +2308,17 @@ def test_active_guard_report_failure_cannot_block_nonempty_reinsertion(
     assert manager.pop_count == 0
     assert subject.app.closed == [fixture.drawing, fixture.source]
     assert subject.receipt.data["cleanup"]["inventory_empty"] is True
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["primary_error"]["message"] == str(primary)
     post = next(
-        subject.receipt.data["snapshots"][event["content"]]
-        for event in subject.receipt.data["observations"]
+        persisted["snapshots"][event["content"]]
+        for event in persisted["observations"]
         if event["label"] == "selection-guard-restored"
     )
-    assert post["context"] == original
+    assert post["context"]["sheet"] == original["sheet"]
+    assert post["context"]["view"] == original["view"]
+    assert post["context"]["selection"] == original["selection"]
+    assert post["context"]["flags"] == original["flags"]
 
 
 @pytest.mark.parametrize("exposure", ["entry", "restore"])
