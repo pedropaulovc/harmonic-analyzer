@@ -534,6 +534,102 @@ def test_local_title_fit_preserves_full_name_number_and_never_touches_material(m
             check_title()
 
 
+@pytest.mark.parametrize("failure", [None, "missing", "duplicate"])
+def test_existing_thread_callout_targets_upper_cylindrical_boundary_not_cut_face(monkeypatch, failure):
+    radius = spec.RADIUS / 1000
+    y = (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
+
+    def edge(at_y, at_radius):
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(0.0, at_y, 0.0, 0.0, 1.0, 0.0, at_radius),
+        )
+        return SimpleNamespace(GetCurve=lambda: curve)
+
+    thread_rim = edge(y, radius)
+    edges = [
+        edge(0.0, radius - spec.LOWER_FACTORY_CHAMFER / 1000),
+        edge(spec.LOWER_FACTORY_CHAMFER / 1000, radius),
+        edge(spec.LENGTH / 1000, radius - spec.CUT_END_CHAMFER_MAX / 1000),
+        edge(y, radius - spec.CUT_END_CHAMFER_MAX / 1000),
+    ]
+    if failure != "missing":
+        edges.append(thread_rim)
+    if failure == "duplicate":
+        edges.append(edge(y, radius))
+    monkeypatch.setattr(draw, "visible_view_entities", lambda *_args, **_kwargs: edges)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    if failure:
+        with pytest.raises(RuntimeError, match="expected one visible native rim"):
+            draw.upper_thread_blank_edge(object())
+    else:
+        assert draw.upper_thread_blank_edge(object()) is thread_rim
+    assert spec.THREAD in draw.THREAD_CALLOUT
+    assert "2A" not in draw.THREAD_CALLOUT  # No fabricated qualification of kit stock.
+
+
+@pytest.mark.parametrize("failure", [
+    None, "missing", "duplicate", "name_value", "number_value", "sheet", "view",
+])
+def test_local_title_fit_preserves_full_name_number_and_never_touches_material(monkeypatch, failure):
+    number = ROW["number"]
+    name_link = draw.property_link("SW-Title(Title)")
+    number_link = draw.property_link("Number")
+
+    def note(link, text):
+        return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
+
+    name = note(
+        f"<FONT size=15PTS>{name_link}",
+        "shortened name" if failure == "name_value" else draw.PART_STEM,
+    )
+    number_note = note(number_link, "wrong" if failure == "number_value" else number)
+    material = note(draw.property_link("Material"), ROW["material"])
+    notes = [name, number_note, material]
+    if failure == "missing":
+        notes.remove(number_note)
+    if failure == "duplicate":
+        notes.append(note(number_link, number))
+    for index, item in enumerate(notes):
+        next_note = notes[index + 1] if index + 1 < len(notes) else None
+        item.GetNext = lambda next_note=next_note: next_note
+    sheet = object()
+    sheet_view = SimpleNamespace(GetFirstNote2=lambda: notes[0])
+    active = []
+    document = SimpleNamespace(
+        GetCurrentSheet=lambda: None if failure == "sheet" else sheet,
+        GetFirstView=lambda: None if failure == "view" else sheet_view,
+        ActivateSheet=lambda value: active.append(value) or True,
+    )
+    adapter = SimpleNamespace(currentModel=document)
+    fitted, settled = [], []
+
+    def fit(_adapter, drawing, actual_sheet, item, *, label, minimum):
+        assert _adapter is adapter and drawing is document and actual_sheet is sheet
+        fitted.append((item, label, minimum))
+        return lambda: settled.append((item, active[-1]))
+
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "_fit_title_note", fit)
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.fit_stud_title_block(adapter, sheet_name="REWORK", number=number)
+    else:
+        check_title = draw.fit_stud_title_block(
+            adapter, sheet_name="REWORK", number=number,
+        )
+        assert [(item, minimum) for item, _label, minimum in fitted] == [
+            (name, 0.003), (number_note, 0.003),
+        ]
+        assert material not in [item for item, _label, _minimum in fitted]
+        check_title()
+        assert active == ["REWORK"]
+        assert settled == [(name, "REWORK"), (number_note, "REWORK")]
+        document.ActivateSheet = lambda _name: False
+        with pytest.raises(RuntimeError, match="failed to activate"):
+            check_title()
+
+
 @pytest.mark.parametrize("failure", [
     None, "feature", "definition", "type", "angle", "degrees", "length_as_angle",
     "nan", "infinite", "distance",
@@ -919,6 +1015,11 @@ def test_drawing_keeps_native_chamfer_end_view_and_part_only_rework_sheet(monkey
         (draw.FRONT_KEEP, spec.DRAWING_DIMENSIONS),
         (draw.END_KEEP, spec.DRAWING_DIMENSIONS),
     ]
+    assert transfers == [
+        ("CutEndChamfer", views[0], draw.CHAMFER_DIMENSION_XY, views[1]),
+    ]
+    assert deleted == [views[1]]
+    assert offsets == [(["CutEndChamfer"], {"CutEndChamfer": draw.CHAMFER_TEXT_XY})]
     assert control_calls == [["FinishedLength", "CutEndChamfer"]]
 
     assert callouts == [(["FinishedLength", "CutEndChamfer"], math.pi / 4)]

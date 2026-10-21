@@ -38,6 +38,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     rebuild_drawing,
     DrawingOutputs,
@@ -51,7 +52,8 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_notes import add_property_linked_note
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -93,9 +95,9 @@ TOP_CENTER = (0.222, 0.185)
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
 ISO_NOTE_XY = (0.356, 0.082)
-# The four-line functional requirement occupies the clear paper between the
-# riser-X lanes and the lowest pin-spacing lane, left of B2's extension lines.
-# B2DX is above this band; the section and isometric keep their repaired places.
+# The four-row functional requirement occupies the clear paper between the
+# riser-X lanes and the lowest pin-spacing lane, left of B1's extension line.
+# The section and isometric keep their repaired places.
 PIN_AXIS_NOTE_XY = (0.250, 0.116)
 INSPECTION_NOTE_CHAR_HEIGHT = 0.0035
 
@@ -134,7 +136,13 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "A1X": _xy(-112.0, -136.4),  # lane y 104
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
     "A2DX": _xy(-193.0, 110.7),  # lane y 222
-    "B2DX": _xy(232.0, -78.0),  # text x338/y136, above the inspection-note band
+    # Review 88c6d (r1/r2/r3.clarity.1): centred on its 3.6 mm span, B2DX's
+    # three rows were struck by both B1/B2 extension lines. Its rows stand
+    # wholly outboard of them and of the 520.0's +X extension line (sheet x
+    # 352), text ~358..386 x 131..147, above the isometric (top ~121) and
+    # below the 130.0's lower extension line (152.5); only its dimension line
+    # runs out under the text, crossing extension lines (rule 14 allows).
+    "B2DX": _xy(300.0, -72.0),
     # Carrier r11: A2DY's text crossed the top border; it stands ~17 under it.
     "A2DY": _xy(_LEFT[1], 139.0),
     "B2DY": _xy(_RIGHT[1], 70.7),
@@ -473,6 +481,49 @@ def _circle_edge(
                 continue
             return edge
     raise RuntimeError(f"carrier view shows no {label}")
+
+
+def _pin_axis_inspection_callout(adapter: Any, top: Any):
+    """Keep the four-bore acceptance linked to an identified pin-bore rim."""
+    x, y = part_spec.PIN_HOLES["B1"]
+    edge = _circle_edge(
+        adapter,
+        top,
+        part_spec.PIN_HOLE_DIA,
+        "B1 pin-axis inspection bore",
+        center_x_mm=x,
+        center_y_mm=y,
+    )
+    note = add_attached_note(
+        adapter,
+        top,
+        text=property_link("Pin Axis Inspection"),
+        entity=edge,
+        attached_to=edge,
+        entity_type="EDGE",
+        note_xy=PIN_AXIS_NOTE_XY,
+        label="four pin-bore axis inspection",
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("pin-axis inspection callout has no text format")
+    text_format = _early_bound(text_format, "ITextFormat")
+    text_format.CharHeight = INSPECTION_NOTE_CHAR_HEIGHT
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError("failed to set pin-axis inspection callout text height")
+
+    def settled() -> None:
+        _assert_attached_to(
+            adapter,
+            annotation,
+            edge,
+            entity_type="EDGE",
+            what="inspection callout",
+            label="four pin-bore axis inspection",
+        )
+
+    return settled
 
 
 _THREAD_LABEL_LAYER = "OBLIQUE-CARRIER-THREAD-LABEL-HIDDEN"
@@ -979,12 +1030,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _append_callout_below(callout, function, label=f"{label} callout")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    add_property_linked_note(
-        adapter,
-        "Pin Axis Inspection",
-        *PIN_AXIS_NOTE_XY,
-        char_height=INSPECTION_NOTE_CHAR_HEIGHT,
-    )
+    inspection_settled = _pin_axis_inspection_callout(adapter, top)
     import_cosmetic_threads(adapter, iso)
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
@@ -995,6 +1041,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Carrier Plate Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(inspection_settled,),
     )
 
 

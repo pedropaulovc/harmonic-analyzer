@@ -16,9 +16,7 @@ from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
 from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
@@ -33,7 +31,7 @@ from ch_rocker_arm_tl_oblique_pivot_retainer_spec import REFERENCE_SKETCHES
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-retainer"
 MATERIAL = "Plain Carbon Steel"
-_SAVED_DRAWING_PROPERTIES = ("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note", "Retainer Setup")
+_SAVED_DRAWING_PROPERTIES = ("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -93,7 +91,13 @@ async def build(adapter) -> dict[str, str]:
     bodies = tuple(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ())
     if len(bodies) != 1:
         raise RuntimeError(f"retainer: expected one solid, found {len(bodies)}")
-    set_dimension_bilateral_tolerance(adapter, "WasherProfile", "WasherBore", *deviations(spec.DRILLED_BAND))
+    # No model band: the bore prints DRILL, so the title block's DRILLED HOLES
+    # row (spec DRILLED_BAND, 10.20-10.30) is its whole tolerance (rule 3).
+    _, dimension = _named_dimension(adapter, "WasherProfile", "WasherBore")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolNONE
+    if int(tolerance.Type) != 0:
+        raise RuntimeError("retainer bore kept a native band over the DRILLED HOLES row")
     display, dimension = _named_dimension(adapter, "Washer", "FinishedThickness")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 0  # swTolNONE: actual fitted gap controls this REF nominal
@@ -113,7 +117,7 @@ async def build(adapter) -> dict[str, str]:
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     author_part_pmi(adapter, surface_finishes=spec.SURFACE_FINISHES)
-    apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE, "Retainer Setup": spec.SETUP_NOTE})
+    apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE})
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

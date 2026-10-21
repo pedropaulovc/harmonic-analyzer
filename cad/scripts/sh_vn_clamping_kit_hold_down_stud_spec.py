@@ -108,69 +108,15 @@ DIMENSION_CALLOUTS = {
     "FinishedLength": "FINISHED; UPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
 }
-DRAWING_NOTES = (
-    "THREAD NOT MODELLED.\n"
-    "LOWER FACTORY END AND LOADED THREADS UNMODIFIED.\n"
-    "RETAIN FULL ACTUAL SEATED NUT THREAD SPAN.\n"
-    "REJECT INCOMPATIBLE SETUP; NO DEEPER INSERTION."
-)
 STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; PM {SKU} KIT"
 LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
+DRAWING_NOTES = "\n".join((STOCK_NOTE, LOWER_END_NOTE))
 
-# The stud's drawing package is the sole complete rework/installed-fit
-# instruction authority. Numeric fabrication controls remain native dimensions
-# on REWORK; these are measured acceptance instructions on MEASURE-AND-FIT.
-# Named keys keep required-property declarations statically readable while the
-# instruction mapping remains the single authority for their source values.
-STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY = "Stud Measurement Instructions"
-STUD_FIT_LIMITS_PROPERTY = "Stud Fit Limits"
-STUD_REWORK_ACCEPTANCE_PROPERTY = "Stud Rework Acceptance"
-REWORK_INSTRUCTION_PROPERTIES = {
-    STUD_MEASUREMENT_INSTRUCTIONS_PROPERTY: (
-        "BEFORE CUTTING - RECORD MEASURED MIN/MAX (mm)\n"
-        "Use actual kit parts; include measurement uncertainty.\n"
-        "Kit D/H/N and complete-thread bands remain UNVERIFIED.\n"
-        "Mark LOWER factory end and original insertion; preserve both.\n"
-        "B: base-bar thickness at each stud.\n"
-        "D: lower-end to bar underside at the unchanged installed seat.\n"
-        "H: minimum bar-top to block/wing underside over BOTH full passes.\n"
-        "N: seated bearing face to far end of actual complete nut threads.\n"
-        "W: actual washer stack; this setup adds none.\n"
-        "U: bound proposed CUT-end setback to first complete external thread.\n"
-        "Do NOT reuse stock-end U; gauge new end and remeasure after trimming.\n"
-        "Record original lower loaded complete-thread interval.\n"
-        "Inspect full nut-thread span; body height is not thread depth."
-    ),
-    STUD_FIT_LIMITS_PROPERTY: (
-        "PRE-CUT CONDITIONAL LIMITS - EACH STUD\n"
-        "Lmin/Lmax: finished-length limits on REWORK, NOT stock length.\n"
-        "Gmin = Bmin + Hmin + Dmin - Lmax\n"
-        f"Require Gmin >= {CLEARANCE_MIN:.1f} mm.\n"
-        "Qmin = Lmin - Dmax - Bmax - Wmax - Nmax - Umax\n"
-        f"Require Qmin >= {COMPLETE_PROJECTION_PITCHES:g} COMPLETE {THREAD} PITCH.\n"
-        "Chamfer MAX does NOT bound U; measure complete threads separately.\n"
-        "Retain ENTIRE actual seated nut complete-thread span engaged.\n"
-        "Retain original loaded lower complete-thread interval intact.\n"
-        "No cut through engaged threads; no deeper insertion rescue.\n"
-        "Unknown measurements or failed limits: REJECT INCOMPATIBLE SETUP."
-    ),
-    STUD_REWORK_ACCEPTANCE_PROPERTY: (
-        "REWORK AND INSTALLED ACCEPTANCE\n"
-        f"Apply to all {QUANTITY} hold-down studs; retain each original lower end.\n"
-        "Shorten unused UPPER end only; protect lower/loaded threads.\n"
-        "Meet finished length and cut-end chamfer on REWORK.\n"
-        "After trimming, deburr and gauge complete external threads.\n"
-        "Measure U independently; recheck full actual nut-span engagement.\n"
-        "Restore original insertion; fully seat nuts; add no washer.\n"
-        "Do not force assembly, bottom deeper or cut engaged threads.\n"
-        f"With final clamping, hand-sweep BOTH complete passes: G >= {CLEARANCE_MIN:.1f} mm\n"
-        "to every moving block/wing throughout each sweep; check every stud.\n"
-        f"Confirm >= {COMPLETE_PROJECTION_PITCHES:g} COMPLETE {THREAD} PITCH beyond each seated nut,\n"
-        "with its ENTIRE actual complete internal thread span engaged.\n"
-        "Repeat after final clamping; REJECT any incompatible setup.\n"
-        "No force, preload or strength certification."
-    ),
-}
+# REWORK carries the native fabrication controls. MHA-CH-06-TL-00, steps
+# HD1-HD3 on sheet 10, owns the measured stack and installed acceptance.
+# The drawing imports that assembly's reference; no duplicate saved note
+# properties compete with it. The conditional geometric helper below remains
+# the numeric contract, not a claim of verified delivered-kit measurements.
 
 
 @dataclass(frozen=True)

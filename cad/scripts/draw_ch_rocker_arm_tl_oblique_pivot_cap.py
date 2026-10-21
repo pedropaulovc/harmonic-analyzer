@@ -1,9 +1,9 @@
 """Native model-derived MHA-CH-06-TL-30 captured-flange cap drawing.
 
-Access and envelope, fitted sections, cap-screw locations, and integral
+Access and envelope, fitted chamber, cap-screw locations, and integral
 registers have separate full-scale sheets. The underside views show the actual
 flange pocket, bolt holes and registers in solid lines. A-A shows the fitted
-pocket and B-B the head-seat entry reliefs.
+pocket.
 The register sheet's aligned XZ (*Top) projection retains the register
 free-end chamfer's native dimension; it cannot transfer into the YZ view.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
@@ -25,8 +25,9 @@ from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name,
 
 from _check import check
 from _com import _early_bound
-from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, stamp_drawing_summary
+from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_leaders import set_near_side_diameter
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
@@ -61,7 +62,6 @@ TOP_CENTER = (0.180, 0.190)
 RIGHT_CENTER = (0.335, TOP_CENTER[1])
 BOTTOM_CENTER = (0.115, 0.170)
 SECTION_CENTER = (0.300, 0.180)
-BOLT_SECTION_CENTER = (0.300, 0.100)
 BOLT_CENTER = (0.210, 0.170)
 REGISTER_FRONT_CENTER = (0.115, 0.175)
 REGISTER_BOTTOM_CENTER = (0.320, 0.175)
@@ -73,55 +73,57 @@ ISO_CENTER = (0.080, 0.059)
 ISO_SCALE = (1, 1)
 ISO_NOTE_XY = (0.025, 0.110)
 SHEET_HEADING_XY = (0.025, 0.260)
-# The long head, aperture and relief callouts fan out left of their rims.
+# The long head and aperture callouts fan out left of their rims.
 # Ordinary centre coordinates and the mouth-width lane occupy the right/bottom.
 TOP_KEEP = {
     "CapWidth": (0.180, 0.110), "CapLength": (0.285, 0.190),
     "CounterboreDia": (0.065, 0.175), "ApertureDia": (0.080, 0.245),
     "ApertureCenterX": (0.1675, 0.140), "ApertureCenterY": (0.225, 0.175),
-    "WireWidth": (0.245, 0.120),
-    "EntryReliefDia": (0.075, 0.130),
+    "WireWidth": (0.265, 0.105),
 }
-RIGHT_KEEP = {"CounterboreDepth": (0.280, 0.245), "WireDepth": (0.370, 0.145)}
+# Keep the head-diameter leader on its near rim, away from the bore centre.
+# Four fitted-head acceptance lines use the existing left shoulder, below
+# the heading and above the access views; native extents remain the gate.
+RIGHT_KEEP = {"CounterboreDepth": (0.280, 0.240), "WireDepth": (0.370, 0.145)}
 # A dedicated underside owns the corner-to-pocket coordinates and fitted
 # sections; neither bolt nor register callout shoulders share these lanes.
 BOTTOM_KEEP = {
     "PocketDia": (0.060, 0.233),
     "PocketCenterX": (0.1275, 0.115), "PocketCenterY": (0.070, 0.15125),
 }
-# f0c native readback: crossing the X319.3 mm attachment flips this full
-# 124 mm shoulder rightward. Keep X260 left of it, above the underside's
-# Y213.088 mm padded outline and left of the finish symbol's X269.5 mm.
-SECTION_KEEP = {"CapHeight": (0.365, 0.180), "PocketDepth": (0.260, 0.236)}
-BOLT_SECTION_KEEP = {"EntryReliefDepth": (0.365, 0.140)}
+# Keep the fitted-pocket block above the enlarged underside's padded top.
+# Its left shoulder stays left of the measured X319.3 mm attachment and
+# finish-symbol lane; native extents remain the acceptance authority.
+SECTION_KEEP = {"CapHeight": (0.365, 0.180), "PocketDepth": (0.260, 0.240)}
 # Signed bolt coordinates still witness the actual pocket axis. Allocate lanes
 # for the entire three-row block, not just its numeric anchor: the native left
 # Y blocks extended 61 mm leftward and the lower right X/Y rows touched.
+# jig-1772 clarity: the Ø9.20 leader crossed the lower-right 14.500's line
+# (Y92 mm), and the upper-left 14.500's line printed at Y207 mm inside the
+# outline's top edge (Y208 mm). The drill block now stands above the lowered
+# lower-right row, under Bolt1Y's block (Y127 mm); the upper-left row lifts
+# clear of the outline, still below Bolt2X's lane.
 BOLT_KEEP = {
-    "BoltHoleDia": (0.300, 0.080),
-    "Bolt1X": (0.300, 0.100), "Bolt3X": (0.120, 0.095),
-    "Bolt2X": (0.300, 0.245), "Bolt4X": (0.145, 0.215),
+    "BoltHoleDia": (0.300, 0.115),
+    "Bolt1X": (0.300, 0.090), "Bolt3X": (0.120, 0.095),
+    "Bolt2X": (0.300, 0.245), "Bolt4X": (0.145, 0.230),
     "Bolt1Y": (0.285, 0.135), "Bolt2Y": (0.285, 0.215),
     "Bolt3Y": (0.100, 0.135), "Bolt4Y": (0.100, 0.240),
 }
 REGISTER_KEEP = {
     "RegisterDia": (0.262, 0.115),
     "Register1X": (0.370, 0.095), "Register2X": (0.310, 0.240),
-    "Register1Y": (0.350, 0.135), "Register2Y": (0.240, 0.228),
+    "Register1Y": (0.350, 0.135), "Register2Y": (0.240, 0.232),
 }
 REGISTER_PROJECTION_KEEP = {"RegisterProjection": (0.160, 0.110)}
 REGISTER_END_KEEP = {"RegisterEndChamfer": (0.220, 0.252)}
 SECTION_LINE_MODEL = ((-part_spec.WIDTH / 2.0 - 4.0, 0.0, 0.0), (part_spec.WIDTH / 2.0 + 4.0, 0.0, 0.0))
-BOLT_SECTION_LINE_MODEL = tuple(
-    (x, min(y for _, y in part_spec.BOLT_POINTS), 0.0)
-    for x in (-part_spec.WIDTH / 2.0 - 4.0, part_spec.WIDTH / 2.0 + 4.0)
-)
 
 part_metadata(
     precision_sources=("DRAWING_PRECISION_BY_NAME",),
     fields={
         "material.thickness": (part_spec.TOTAL_HEIGHT, ("TOTAL_HEIGHT", "HEIGHT", "REGISTER_PROJECTION")),
-        "volume_mm3": (part_spec.VOLUME_MM3, ("VOLUME_MM3", "nominal_volume_mm3", "nominal_register_volume_mm3", "nominal_entry_relief_volume_mm3")),
+        "volume_mm3": (part_spec.VOLUME_MM3, ("VOLUME_MM3", "nominal_volume_mm3", "nominal_register_volume_mm3")),
     },
 )
 requirement(
@@ -140,7 +142,7 @@ requirement(
         "width_nominal": (part_spec.LENGTH / 2.0, ("LENGTH",)),
         "dia": (limits(part_spec.POCKET_DIA, part_spec.DRAWING_PRECISION_BY_NAME["PocketDia"], part_spec.POCKET_BAND), ("POCKET_DIA", "POCKET_BAND")),
         "dia_nominal": (part_spec.POCKET_DIA, ("POCKET_DIA",)),
-        "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["PocketDepth"], part_spec.CENTER_LOCATION_NOTE)), ("DIMENSION_CALLOUTS", "CHAMBER_EXCESS_MIN", "CHAMBER_EXCESS_MAX", "LOWER_GAP_MIN", "LOWER_GAP_MAX", "CENTER_LOCATION_NOTE")),
+        "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["PocketDepth"], part_spec.CENTER_LOCATION_NOTE)), ("DIMENSION_CALLOUTS", "CHAMBER_EXCESS_MIN", "CHAMBER_EXCESS_MAX", "CENTER_LOCATION_NOTE")),
     },
     precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["PocketDia"], "station": part_spec.CENTER_LOCATION_PLACES, "width": part_spec.CENTER_LOCATION_PLACES},
 )
@@ -181,32 +183,23 @@ for _index, (_x, _y) in enumerate(part_spec.BOLT_POINTS, 1):
         precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["BoltHoleDia"], "station": part_spec.POSITION_PLACES, "width": part_spec.POSITION_PLACES},
     )
     requirement(
-        f"head_recess_{_index}", kind="counterbore", faces=(CylinderFace(part_spec.COUNTERBORE_DIA, contains_x_mm=_x, contains_y_mm=_y),), requirements=("dia", "depth", "note"),
-        # The controlled depth interval, bound STEP face and imported depth
-        # dimension retain the machining depth; no separate nominal is needed.
-        fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (limits(part_spec.COUNTERBORE_DIA, part_spec.COUNTERBORE_DIAMETER_PLACES), ("COUNTERBORE_DIA",)), "dia_nominal": (part_spec.COUNTERBORE_DIA, ("COUNTERBORE_DIA",)), "depth": (limits(part_spec.COUNTERBORE_DEPTH, part_spec.COUNTERBORE_DEPTH_PLACES), ("COUNTERBORE_DEPTH",)), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["CounterboreDia"], part_spec.DIMENSION_CALLOUTS["CounterboreDepth"])), ("DIMENSION_CALLOUTS",))},
-        precision={"dia": part_spec.COUNTERBORE_DIAMETER_PLACES, "depth": part_spec.COUNTERBORE_DEPTH_PLACES},
-    )
-    requirement(
-        f"head_entry_relief_{_index}", kind="counterbore",
-        faces=(CylinderFace(
-            part_spec.ENTRY_RELIEF_DIA, contains_x_mm=_x, contains_y_mm=_y,
-            contains_z_mm=part_spec.HEIGHT - part_spec.COUNTERBORE_DEPTH - part_spec.ENTRY_RELIEF_DEPTH / 2.0,
-        ),),
-        requirements=("dia", "depth", "note"),
+        f"head_recess_{_index}", kind="counterbore", faces=(CylinderFace(part_spec.COUNTERBORE_DIA, contains_x_mm=_x, contains_y_mm=_y),), requirements=("dia", "head_recess", "whole_floor_min", "note"),
+        # Actual fitted-head recess and whole-floor acceptance control this
+        # feature. The representative machining depth has no +/- authority.
         fields={
-            "at": ([_x, _y, part_spec.HEIGHT - part_spec.COUNTERBORE_DEPTH], ("BOLT_POINTS", "HEIGHT", "COUNTERBORE_DEPTH", "__frame__")),
-            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "dia": (limits(part_spec.ENTRY_RELIEF_DIA, part_spec.ENTRY_RELIEF_DIAMETER_PLACES, part_spec.ENTRY_RELIEF_BAND), ("ENTRY_RELIEF_DIA", "ENTRY_RELIEF_BAND")),
-            "dia_nominal": (part_spec.ENTRY_RELIEF_DIA, ("ENTRY_RELIEF_DIA",)),
-            "depth": (limits(part_spec.ENTRY_RELIEF_DEPTH, part_spec.ENTRY_RELIEF_DEPTH_PLACES), ("ENTRY_RELIEF_DEPTH", "ENTRY_RELIEF_DEPTH_PLACES")),
-            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["EntryReliefDia"], part_spec.DIMENSION_CALLOUTS["EntryReliefDepth"])), ("DIMENSION_CALLOUTS", "SCREW_SKU")),
+            "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+            "dia": (limits(part_spec.COUNTERBORE_DIA, part_spec.COUNTERBORE_DIAMETER_PLACES), ("COUNTERBORE_DIA",)),
+            "dia_nominal": (part_spec.COUNTERBORE_DIA, ("COUNTERBORE_DIA",)),
+            "depth_ref": (part_spec.COUNTERBORE_DEPTH, ("COUNTERBORE_DEPTH",)),
+            "head_recess": ([part_spec.HEAD_RECESS_MIN, part_spec.HEAD_RECESS_MAX], ("HEAD_RECESS_MIN", "HEAD_RECESS_MAX", "fitted_counterbore_acceptance")),
+            "whole_floor_min": (part_spec.COUNTERBORE_FLOOR_MIN, ("COUNTERBORE_FLOOR_MIN", "fitted_counterbore_acceptance")),
+            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["CounterboreDia"], part_spec.DIMENSION_CALLOUTS["CounterboreDepth"])), ("DIMENSION_CALLOUTS", "SCREW_SKU", "HEAD_RECESS_MIN", "HEAD_RECESS_MAX", "COUNTERBORE_FLOOR_MIN")),
         },
-        precision={"dia": part_spec.ENTRY_RELIEF_DIAMETER_PLACES, "depth": part_spec.ENTRY_RELIEF_DEPTH_PLACES},
+        precision={"dia": part_spec.COUNTERBORE_DIAMETER_PLACES, "depth_ref": part_spec.DRAWING_PRECISION_BY_NAME["CounterboreDepth"]},
     )
 requirement(
-    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "note"),
-    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS",))},
+    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "depth_over_whole_floor", "normal_installed_wire_recess_min", "note"),
+    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "depth_over_whole_floor": (True, ("DIMENSION_CALLOUTS", "WIRE_CAPTURE_BOUNDS")), "normal_installed_wire_recess_min": (part_spec.wire_capture.NORMAL_WIRE_RECESS_MIN, (("ch_rocker_arm_tl_oblique_cap_wire_clearance", "NORMAL_WIRE_RECESS_MIN"), "WIRE_CAPTURE_BOUNDS")), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS", "WIRE_CAPTURE_BOUNDS", ("ch_rocker_arm_tl_oblique_cap_wire_clearance", "NORMAL_WIRE_RECESS_MIN")))},
     precision={"width": part_spec.CHANNEL_PLACES, "depth": part_spec.CHANNEL_PLACES},
 )
 
@@ -292,6 +285,15 @@ def _annotate_views(adapter: Any, views: tuple[tuple[Any, dict[str, tuple[float,
     }, location="below")
     if "PocketDia" in names:
         _assert_pocket_corner_callout(adapter, annotations)
+    if "CounterboreDia" in names:
+        head_diameters = [
+            annotation for annotation in annotations
+            if dimension_name(adapter, annotation) == "CounterboreDia"
+        ]
+        if len(head_diameters) != 1:
+            raise RuntimeError(f"expected one native head diameter, found {len(head_diameters)}")
+        set_near_side_diameter(head_diameters[0], "cap CounterboreDia")
+        rebuild_drawing(adapter, label="cap head near-side diameter")
 
 
 def _activate_sheet(adapter: Any, drawing: Any, name: str, heading: str) -> None:
@@ -324,16 +326,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_template_center_marks(top, expected=1 + len(part_spec.BOLT_POINTS), label="top access")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    _activate_sheet(adapter, drawing, SHEET_NAMES[1], "FITTED CHAMBER AND ENTRY RELIEFS - UNDERSIDE")
+    _activate_sheet(adapter, drawing, SHEET_NAMES[1], "FITTED CHAMBER - UNDERSIDE")
     bottom = place_view(adapter, str(SOURCE), "*Back", *BOTTOM_CENTER, scale=VIEW_SCALE)
     line = [_project(adapter, bottom, point, "cap section line") for point in SECTION_LINE_MODEL]
     section = create_section_view(adapter, bottom, line_start=line[0], line_end=line[1], view_xy=SECTION_CENTER, section_label="A", scale=VIEW_SCALE, label="cap central pocket section")
-    bolt_line = [_project(adapter, bottom, point, "cap bolt-row section line") for point in BOLT_SECTION_LINE_MODEL]
-    bolt_section = create_section_view(adapter, bottom, line_start=bolt_line[0], line_end=bolt_line[1], view_xy=BOLT_SECTION_CENTER, section_label="B", scale=VIEW_SCALE, label="cap flat-bottom underhead entry relief section")
     _annotate_views(adapter, (
         (bottom, BOTTOM_KEEP, "underside flange chamber"),
         (section, SECTION_KEEP, "A-A fitted flange chamber"),
-        (bolt_section, BOLT_SECTION_KEEP, "B-B flat-bottom underhead entry relief"),
     ))
     underside_centres = 1 + len(part_spec.BOLT_POINTS) + len(part_spec.REGISTER_POINTS)
     _assert_template_center_marks(bottom, expected=underside_centres, label="fitted-chamber underside")

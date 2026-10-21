@@ -5,7 +5,7 @@ swmaker00000a, drawing leaf 2026-10-21T05:32:39Z. All 20 gating records are
 visible paper defects, not collector phantoms: five strike the flange/upper-boss
 stack, three strike the bearing-end lead, eight involve the carrier-end lead,
 cross-hole size or 6.0 station, three involve the lower-boss/fit/radius group,
-and one is the inspection note's right-border overrun.
+and one is the former prose inspection note's right-border overrun.
 
 Keep the 3:1 profile and 2:1 pictorial. The upper-boss block occupies the
 90.5..164 mm witness bay; the flange and fitted lower-boss blocks stack in
@@ -14,26 +14,37 @@ the 213.5..279.5 mm bay. In particular the lower-boss line is above its
 R0.2 MAX shoulder at Y134.2219 mm or its material-arc leader. The radius
 itself, its attachment and the measured (1.15) reference remain unchanged.
 
-The two left callouts have separate rows outside X90.5; the bearing-end lead
-uses clear paper below the pictorial. Budget the inspection note's measured
-107.7045 mm native extent, not character count. Raising the bearing-fit block
-also separates it from the flange-diameter block. Of the six advisory records,
-the cross-hole diameter crossing its own axis-location witness is an ordinary
-dimension intersection, not a text collision; the other five motivate the
-same lane repairs. No finding is masked or reclassified here. These are
+The top-end lead has its row outside X90.5; the bearing-end lead
+uses clear paper below the pictorial. The obsolete numeric inspection note
+is replaced by model-owned, face-attached total axial runout frames. Raising
+the bearing-fit block separates it from the flange-diameter block. Of the six
+advisory records, the cross-hole diameter crossing its own axis-location witness
+is an ordinary dimension intersection, not a text collision; the other five
+motivate the same lane repairs. No finding is masked or reclassified here. These are
 measured-boundary placement choices, not after-fix native acceptance: the
 owner must regenerate the audit/PDF and inspect complete text and leaders.
+
+The review-resume-88c6d PDF (sha256 dd56976a...) showed every upper-left
+route to the Ø5 cross hole crossing both the 6.0 station line (Y189.2 mm,
+X84.1..114.8) and the top-lead line (Y187.4, X86.9..98.4). The drill
+callout therefore sits on the clear paper under the carrier journal, right
+of the hole and of the Ø10 dimension line (X94.5), between the Ø10 fit
+block (top Y96.3) and the R0.2 MAX row (bottom Y133.8), so its leader
+rises from the block's near (left) end into the hole crossing only the
+journal outline.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
+from _com import _early_bound
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -43,8 +54,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_gdt import (
+    add_datum_feature,
+    add_feature_control_frame,
+    assert_datum_landing,
+    assert_frame_datums_defined,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
@@ -52,11 +70,14 @@ from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as part_spec
 from _feature_requirements import part_metadata, requirement
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _gtol_cylinder import CylinderFace
+from _gtol_face_resolve import resolve_faces
+from _gtol_frame import gtol_frame_signature
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
     BEARING_LENGTH,
+    CALLOUTS_ABOVE,
     CARRIER_STATION,
     COLLAR_DIA,
     COLLAR_HEIGHT,
@@ -84,10 +105,13 @@ PROFILE_CENTER = (0.185, 0.164)
 ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (2, 1)
 ISO_NOTE_XY = (0.325, 0.252)
-# The native four-row note is 107.7045 mm wide. Keep its whole extent clear
-# of the right border, bearing-fit text and 66 mm title-block keep-out.
-STOP_FACE_NOTE_XY = (0.302, 0.096)
-INSPECTION_NOTE_CHAR_HEIGHT = 0.0035
+# Native FCF corners below their respective flange faces. These are placement
+# requests, not after-fix paper evidence; the final native audit must pass.
+STOP_FACE_FRAME_XY = {
+    "flange_upper_stop": (0.176, 0.104),
+    "flange_lower_stop": (0.214, 0.104),
+}
+BEARING_DATUM_XY = (0.296, 0.145)
 _ABOVE = PROFILE_CENTER[1] + part_spec.FLANGE_DIA / 2.0 * _S
 _BELOW = PROFILE_CENTER[1] - part_spec.FLANGE_DIA / 2.0 * _S
 
@@ -118,7 +142,7 @@ PROFILE_KEEP = {
     "LowerBossHeight": (0.245, 0.202),
     "CarrierFilletR": (_x(CARRIER_STATION) - 0.012, 0.137),
     "SeatFilletR": (_x(COLLAR_STATION) + 0.012, 0.137),
-    "CrossHoleDia": (0.050, 0.230),
+    "CrossHoleDia": (0.1468, 0.111),
     "CrossHoleFromEnd": (_x(OVERALL_LENGTH - part_spec.CROSS_HOLE_FROM_END / 2.0), 0.192),
 }
 CENTERLINE_PICK = (_x(CARRIER_STATION - 5.0), PROFILE_CENTER[1] + 0.003)
@@ -129,7 +153,9 @@ _FROM_TOP = ("top_face", (("draw_ch_rocker_arm_tl_oblique_pivot_pin", "build"),)
 _FROM_BOTTOM = ("bottom_face", (("draw_ch_rocker_arm_tl_oblique_pivot_pin", "build"),))
 
 
-part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
+part_metadata(
+    precision_sources=("DRAWING_PRECISION_BY_NAME", "GEOMETRIC_CONTROLS"),
+)
 
 requirement(
     "top_face",
@@ -245,7 +271,11 @@ requirement(
             ("BEARING_DIA", "BEARING_PRINT_BAND"),
         ),
         "dia_nominal": (part_spec.BEARING_DIA, ("BEARING_DIA",)),
-        "note": (part_spec.BEARING_NOTE, ("BEARING_NOTE", "RACE_BORE_BAND")),
+        "note": (
+            part_spec.BEARING_NOTE,
+            ("BEARING_NOTE", ("_mcmaster_5972k41", "BORE_BAND")),
+        ),
+        "datum": (part_spec.PART_DATUMS[0].letter, ("PART_DATUMS",)),
     },
     precision={"dia": part_spec.FIT_PLACES},
 )
@@ -294,14 +324,13 @@ requirement(
     precision={"dia": 2, "length": part_spec.FLANGE_THICK_PLACES},
 )
 
-for _stop_name, _normal, _station in (
-    ("flange_lower_stop", (0.0, 0.0, -1.0), part_spec.FLANGE_BOTTOM_STATION),
-    ("flange_upper_stop", (0.0, 0.0, 1.0), part_spec.FLANGE_TOP_STATION),
-):
+for _stop_control in part_spec.GEOMETRIC_CONTROLS:
+    _normal = _stop_control.face.normal
+    _station = _stop_control.face.offset_mm / _normal[2]
     requirement(
-        _stop_name,
+        _stop_control.key,
         kind="face",
-        faces=(PlanarFace(_normal, _normal[2] * _station),),
+        faces=(_stop_control.face,),
         requirements=("note",),
         fields={
             "normal": (list(_normal), ("__frame__",)),
@@ -309,13 +338,12 @@ for _stop_name, _normal, _station in (
                 {"frame": "model", "axis": "z", "value": _station},
                 ("FLANGE_BOTTOM_STATION", "FLANGE_TOP_STATION"),
             ),
+            # Manifest's text projection of the native frame, not a separate
+            # prose inspection authority or an alternative circle-only limit.
             "note": (
-                " ".join(part_spec.STOP_FACE_INSPECTION_NOTE.splitlines()),
-                (
-                    "STOP_FACE_INSPECTION_NOTE",
-                    "STOP_FACE_VARIATION_MAX",
-                    "STOP_FACE_MEASUREMENT_DIAMETER",
-                ),
+                f"TOTAL AXIAL RUNOUT {_stop_control.tolerance} "
+                f"TO DATUM {_stop_control.datums[0]}",
+                ("GEOMETRIC_CONTROLS", "PART_DATUMS"),
             ),
         },
     )
@@ -329,14 +357,21 @@ requirement(
             contains_z_mm=part_spec.COLLAR_STATION + part_spec.LOWER_BOSS_HEIGHT / 2.0,
         ),
     ),
-    requirements=("note",),
+    requirements=("dia", "note"),
     fields={
         "axis": _AXIS,
+        # The upper boss's one CollarDia prints "2X": it holds this boss too.
+        "dia": (
+            limits(part_spec.COLLAR_DIA, part_spec.COLLAR_PLACES),
+            ("COLLAR_DIA", "CALLOUTS_ABOVE"),
+        ),
+        "dia_nominal": (part_spec.COLLAR_DIA, ("COLLAR_DIA",)),
         "note": (
             " ".join(part_spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()),
             ("LOWER_BOSS_HEIGHT", "DIMENSION_CALLOUTS"),
         ),
     },
+    precision={"dia": part_spec.COLLAR_PLACES},
 )
 
 requirement(
@@ -347,10 +382,8 @@ requirement(
     fields={
         "axis": ([1.0, 0.0, 0.0], ("__frame__",)),
         "at": ([0.0, 0.0, part_spec.CROSS_HOLE_STATION], ("CROSS_HOLE_STATION",)),
-        "dia": (
-            limits(part_spec.CROSS_HOLE_DIA, 2, part_spec.CROSS_HOLE_BAND),
-            ("CROSS_HOLE_DIA", "CROSS_HOLE_BAND"),
-        ),
+        # An ordinary drilled hole: the title block's DRILLED HOLES row.
+        "dia": (drilled_limits(part_spec.CROSS_HOLE_DIA, 2), ("CROSS_HOLE_DIA",)),
         "dia_nominal": (part_spec.CROSS_HOLE_DIA, ("CROSS_HOLE_DIA",)),
         "station": (limits(part_spec.CROSS_HOLE_FROM_END, part_spec.LENGTH_PLACES), ("CROSS_HOLE_FROM_END",)),
         "station_nominal": (part_spec.CROSS_HOLE_FROM_END, ("CROSS_HOLE_FROM_END",)),
@@ -359,6 +392,79 @@ requirement(
     },
     precision={"dia": 2, "station": part_spec.LENGTH_PLACES},
 )
+
+
+def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
+    """Attach A to its real cylinder and each native frame to its stop face.
+
+    Reuse the part-owned PMI/knob-shaft path. SDK IModelDoc2::InsertGtol
+    derives its attachment from the prior selection; the existing helpers
+    set that landing before insertion and verify current-format frame XML.
+    No coordinate hit-test, silhouette substitute or post-insertion setter.
+    """
+    datum = part_spec.PART_DATUMS[0]
+    controls = part_spec.GEOMETRIC_CONTROLS
+    model = _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2")
+    faces = resolve_faces(
+        model, {datum.key: datum.face, **{row.key: row.face for row in controls}}
+    )
+    # The lower flank of the reachable k5 journal, well away from its chamfer
+    # and shoulder. Stop tips lie on the Ø35 subset of the full annular faces.
+    points = (
+        (0.0, -part_spec.BEARING_DIA / 2000.0, part_spec.BEARING_LENGTH / 2000.0),
+        *(
+            (0.0, -part_spec.STOP_FACE_MEASUREMENT_DIAMETER / 2000.0,
+             row.face.offset_mm / row.face.normal[2] / 1000.0)
+            for row in controls
+        ),
+    )
+    projected = model_points_in_view(adapter, profile, points, label="pivot stop controls")
+    datum_landing, *stop_landings = projected
+    tag = add_datum_feature(
+        adapter, profile, entity=faces[datum.key], entity_type="FACE",
+        symbol_xy=BEARING_DATUM_XY, datum=datum.letter,
+        leader_attach_xy=datum_landing, label="k5 bearing-journal datum axis",
+    )
+    frames = {}
+    for index in range(len(controls)):
+        control = controls[index]
+        landing = stop_landings[index]
+        frames[control.key] = add_feature_control_frame(
+            adapter, profile, entity=faces[control.key], entity_type="FACE",
+            leader_attach_xy=landing, frame_xy=STOP_FACE_FRAME_XY[control.key],
+            characteristic=control.characteristic, tolerance=control.tolerance,
+            datums=control.datums, diameter=control.tolerance_zone == "diametral",
+            label=control.key,
+        )
+
+    def settled() -> None:
+        assert_frame_datums_defined((profile,), label="pivot stop controls")
+        _assert_attached_to(
+            adapter, _early_bound(tag.GetAnnotation(), "IAnnotation"), faces[datum.key],
+            entity_type="FACE", what="datum feature", label=datum.key, expected_leaders=0,
+        )
+        assert_datum_landing(
+            adapter, tag, expected_xy=datum_landing, label="bearing-journal datum A"
+        )
+        for index in range(len(controls)):
+            control = controls[index]
+            landing = stop_landings[index]
+            gtol = _early_bound(frames[control.key], "IGtol")
+            if int(gtol.GetFrameCount()) != 1:
+                raise RuntimeError(f"{control.key}: expected one axial-runout frame")
+            frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
+            if gtol_frame_signature(frame.GetSymbolXml()) != gtol_frame_signature(control.frame_xml):
+                raise RuntimeError(f"{control.key}: settled frame changed its control")
+            annotation = _early_bound(gtol.GetAnnotation(), "IAnnotation")
+            _assert_attached_to(
+                adapter, annotation, faces[control.key], entity_type="FACE",
+                what="feature-control frame", label=control.key,
+            )
+            _assert_leader_lands(
+                annotation, landing, what="feature-control frame", label=control.key
+            )
+
+    return settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -372,7 +478,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Finish",
         "Quantity",
         "Isometric View Note",
-        "Stop Face Inspection",
     )
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
@@ -411,16 +516,12 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # drawing-guidelines.md rule 4: each fit band names its mate and its fit.
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     add_view_centerline(
         adapter, profile, face_xy=CENTERLINE_PICK, label="pivot pin axis"
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    add_property_linked_note(
-        adapter,
-        "Stop Face Inspection",
-        *STOP_FACE_NOTE_XY,
-        char_height=INSPECTION_NOTE_CHAR_HEIGHT,
-    )
+    stop_controls_settled = _add_stop_face_controls(adapter, profile)
 
     return await finalize_drawing(
         adapter,
@@ -428,6 +529,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Pivot Pin Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(stop_controls_settled,),
     )
 
 

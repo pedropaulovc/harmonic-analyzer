@@ -26,11 +26,12 @@ hole lies 18.5 above the seat and 6 from the end for the removable headed
 clevis pin and split cotter. Both journal fit diameters remain unchanged:
 Ø10 k5 in the bearings and Ø10 h6 in the carrier's Ø10 H7 holes.
 
-Both flange stop faces are inspected relative to the bearing-journal axis
-before pressing the pin into its bearings. Each face's total axial height /
-indicator variation over a full turn at the inspection diameter is limited
-by STOP_FACE_INSPECTION_NOTE; nominally square revolved faces alone do not
-establish this acceptance.
+Both broad annular flange stop faces carry total axial runout 0.05 to datum
+A, the bearing-journal cylinder, inspected before pressing into the bearings.
+The full-face control includes the Ø35 inspection circle: opposing readings
+differ by at most 0.05, so face-axis tilt is bounded by atan(0.05 / 35), as
+used by capture_bounds. It also limits radial form variation that the old
+single-circle inspection did not. Nominally square CAD faces are not proof.
 
 Both ends carry 0.5 x 45 degree leads. The carrier-end lead is 0.5 MAX
 to preserve the cross-hole end ligament. Both seating shoulders are R0.2
@@ -48,10 +49,15 @@ after this extraction; no damage-free removal or bearing-reuse claim.
 
 from __future__ import annotations
 
+import _config
+import _mcmaster_5972k41 as bearing_catalogue
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _fit_deviations import deviations
-from _printed_tolerance import printed_band_mm
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 STOCK_DIA = 38.1  # 1-1/2 in 1144 round
 LENGTH_PLACES = 1
@@ -66,13 +72,12 @@ if not BEARING_DA_MIN <= COLLAR_DIA - printed_band_mm(COLLAR_PLACES):
 # --- Matched fits (ISO 286, 6-10 mm row: IT5 0.006, IT6 0.009, IT7 0.015) -----
 FIT_DIA = trammel.BEARING_BORE  # ⚙ 10
 FIT_PLACES = 3
-RACE_BORE_BAND = (0.0, -0.008)  # (upper, lower): 6200-2RS bore (inventory)
 PIN_HOLE_BAND = (0.015, 0.0)  # Ø10 H7, the carrier's reamed pin holes
 BEARING_BAND = (0.007, 0.001)  # k5 (docstring: p6 would preload the 6200s)
 CARRIER_BAND = (0.0, -0.009)  # h6
 
 _bearing_low, _bearing_high = deviations(BEARING_BAND)
-_race_low, _race_high = deviations(RACE_BORE_BAND)
+_race_low, _race_high = deviations(bearing_catalogue.BORE_BAND)
 BEARING_INTERFERENCE_MIN = round(_bearing_low - _race_high, 6)
 BEARING_INTERFERENCE_MAX = round(_bearing_high - _race_low, 6)
 if (BEARING_INTERFERENCE_MIN, BEARING_INTERFERENCE_MAX) != (0.001, 0.015):
@@ -108,7 +113,12 @@ FLANGE_EDGE_BREAK_MAX = retention.PIN_FLANGE_EDGE_BREAK_MAX
 # provenance without introducing a second inspection authority.
 STOP_FACE_VARIATION_MAX = retention.PIN_STOP_FACE_VARIATION_MAX
 STOP_FACE_MEASUREMENT_DIAMETER = retention.PIN_STOP_FACE_MEASUREMENT_DIAMETER
+# The clevis cross hole is an ordinary drilled hole: the retention stack
+# analyses the title block's DRILLED HOLES row, which the plain two-place
+# "Ø5.00 DRILL THRU" callout already prints (rules 2 and 3).
 CROSS_HOLE_BAND = retention.PIN_CROSS_HOLE_BAND
+if deviations(CROSS_HOLE_BAND) != (0.0, drilled_oversize_mm()):
+    raise AssertionError("the analysed cross-hole band is not the DRILLED HOLES row")
 FLANGE_BOTTOM_STATION = BEARING_LENGTH + LOWER_BOSS_HEIGHT
 FLANGE_TOP_STATION = FLANGE_BOTTOM_STATION + FLANGE_THICK
 CROSS_HOLE_DIA = retention.PIN_CROSS_HOLE_DIA
@@ -207,29 +217,49 @@ CARRIER_CALLOUT = (
 BEARING_NOTE = " ".join(BEARING_CALLOUT.splitlines())
 CARRIER_NOTE = " ".join(CARRIER_CALLOUT.splitlines())
 LEAD_CHAMFER_CALLOUT = "X 45° LEAD CHAMFER"
+# The flange's ±0.10 band runs in the positive-capture cap's pocket.
+CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
 DIMENSION_CALLOUTS = {
     "BearingDia": BEARING_CALLOUT,
     "CarrierDia": CARRIER_CALLOUT,
     "BottomChamfer": LEAD_CHAMFER_CALLOUT,
     "TopChamfer": LEAD_CHAMFER_CALLOUT,
-    "FlangeDia": "CAP POCKET RUNNING CLEARANCE",
+    "FlangeDia": f"RUNNING FIT IN {CAP_NUMBER}",
+    # Three rows of at most 22 characters stay inside the 1.15's witness bay
+    # (X213.5-279.5 less 3.5 each side, about 2.5 mm a character).
     "LowerBossHeight": (
-        f"FIT TL-22 FLOOR GAP\n{retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f}; NO PRELOAD\n"
-        "CLEAR BEARING SEAL"
+        "FIT MHA-CH-06-TL-22\n"
+        f"FLOOR GAP {retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f};\n"
+        "NO PRELOAD, CLEAR SEAL"
     ),
     "CrossHoleDia": "DRILL THRU\nHEADED CLEVIS PIN",
     "UpperBossHeight": "SETS CARRIER CLEARANCE\nOVER CAP",
-    "FlangeThick": f"EDGE BREAK {FLANGE_EDGE_BREAK_MAX:.2f} MAX\nBOTH STOP FACES",
 }
+# The title block's own edge break (rule 2) stays within the break the
+# stop-face capture analysis allows, so the flange thickness has no callout.
+_TITLE_EDGE_BREAK = _config.title_block("edge_break")
+if max(_TITLE_EDGE_BREAK["radius_mm"], _TITLE_EDGE_BREAK["chamfer_max_mm"]) > FLANGE_EDGE_BREAK_MAX:
+    raise AssertionError("the title block's edge break exceeds the flange's analysed break")
+# One CollarDia drives both narrow bosses (the profile's horizontal-points
+# relation), so its Ø prints once as "2X".
+CALLOUTS_ABOVE = {"CollarDia": "2X"}
 
-# This functional acceptance is exported as its own source-model property,
-# not a general manufacturing note or a geometric-control frame. The part's
-# process row supplies the ordinary indicator setup before press assembly.
-STOP_FACE_INSPECTION_NOTE = (
-    f"BOTH FLANGE STOP FACES: {STOP_FACE_VARIATION_MAX:.2f} MAX TOTAL\n"
-    f"HEIGHT/INDICATOR VARIATION ACROSS Ø{STOP_FACE_MEASUREMENT_DIAMETER:.2f},\n"
-    "ALL AZIMUTHS, TO BEARING-JOURNAL AXIS.\n"
-    "CAP/BLOCK STOPS; INSPECT BEFORE PRESS."
+# Pin-only rule-5 acceptance: user selected standard GD&T on 2026-10-21.
+# Total axial runout places each entire annular face between planes normal
+# to the actual journal datum axis, 0.05 apart. Its Ø35 subset therefore
+# retains the existing capture bound; no assembled-bearing/C2 credit is used.
+PART_DATUMS = (
+    PartDatum("A", CylinderFace(BEARING_DIA, contains_z_mm=BEARING_LENGTH / 2.0)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "flange_lower_stop", "total_runout", f"{STOP_FACE_VARIATION_MAX:.2f}",
+        PlanarFace((0.0, 0.0, -1.0), -FLANGE_BOTTOM_STATION), ("A",),
+    ),
+    GeometricControl(
+        "flange_upper_stop", "total_runout", f"{STOP_FACE_VARIATION_MAX:.2f}",
+        PlanarFace((0.0, 0.0, 1.0), FLANGE_TOP_STATION), ("A",),
+    ),
 )
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

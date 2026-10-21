@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import inspect
 import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, Mock
+
+import pytest
 
 import _config
+import _drawing_leader_notes
 import _drawing_marks
 import build_ch_rocker_arm_tl_oblique_carrier as part
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
@@ -663,56 +664,94 @@ def test_native_part_writes_and_guards_the_axis_inspection_property(monkeypatch)
     assert "Pin Axis Inspection" in part._SAVED_DRAWING_PROPERTIES
 
 
-def test_drawing_consumes_the_required_axis_inspection_property(
-    monkeypatch, tmp_path
+@pytest.mark.parametrize("failure", (None, "wrong_bore", "missing_leader", "dangling"))
+def test_axis_inspection_callout_keeps_its_identified_bore_and_live_leader(
+    monkeypatch, failure
 ) -> None:
-    source = tmp_path / "carrier.SLDPRT"
-    source.touch()
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    model = MagicMock()
-    model.Extension.GetUserPreferenceInteger.return_value = 1
-    adapter = SimpleNamespace(currentModel=object(), open_model=AsyncMock())
-    read_properties = Mock()
-    add_note = Mock()
-    monkeypatch.setattr(drawing, "check", lambda _label, result: result)
+    """Exercise the production attached-note and settled attachment guards."""
+    def rim(point):
+        x, y = point
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(
+                x / 1000.0, 0.0, -y / 1000.0,
+                0.0, 1.0, 0.0, spec.PIN_HOLE_DIA / 2000.0,
+            ),
+        )
+        return SimpleNamespace(GetCurve=lambda: curve)
+
+    bores = {name: rim(point) for name, point in spec.PIN_HOLES.items()}
+    expected = bores["B1"]
+    state = SimpleNamespace(attached=expected, leaders=0, dangling=False)
+    text_format = SimpleNamespace(CharHeight=0.005)
+    formats, inserted = [], []
+
+    def leader(*_args):
+        state.leaders = 1
+        return 0
+
+    def set_format(index, use_doc, value):
+        formats.append((index, use_doc, value.CharHeight))
+        return True
+
+    annotation = SimpleNamespace(
+        GetAttachedEntityCount3=lambda: 1,
+        GetAttachedEntities3=lambda: (state.attached,),
+        GetAttachedEntityTypes=lambda: (1,),
+        GetLeaderCount=lambda: state.leaders,
+        IsDangling=lambda: state.dangling,
+        SetLeader3=leader,
+        SetPosition2=lambda *_args: True,
+        GetTextFormat=lambda _index: text_format,
+        SetTextFormat=set_format,
+    )
+    note = SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    def insert(text):
+        inserted.append(text)
+        return note
+
+    document = SimpleNamespace(InsertNote=insert, ClearSelection2=lambda _all: None)
+    adapter = SimpleNamespace(
+        currentModel=document,
+        _attempt=lambda call, **_kwargs: call(),
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+    )
+    top = SimpleNamespace(GetVisibleComponents=lambda: (object(),))
+    selected = []
+
+    def select(_adapter, view, entity_type, xy, *, label, entity):
+        selected.append((view, entity_type, xy, entity))
+        return entity
+
+    monkeypatch.setattr(
+        drawing, "visible_component_entities", lambda *_args: tuple(bores.values())
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "read_required_properties", read_properties)
+    monkeypatch.setattr(_drawing_leader_notes, "_select_view_entity", select)
     monkeypatch.setattr(
-        drawing, "new_project_drawing", Mock(return_value=(model, object()))
-    )
-    monkeypatch.setattr(drawing, "place_view", Mock(return_value=object()))
-    monkeypatch.setattr(
-        drawing, "_view_mapper", lambda _adapter, _view: lambda _xyz: (0.0, 0.0)
+        _drawing_leader_notes._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args: value,
     )
     monkeypatch.setattr(
-        drawing.hidden_sketches, "curate_view_dimensions", Mock(return_value=[])
+        _drawing_leader_notes, "rebuild_drawing", lambda *_args, **_kwargs: None
     )
-    monkeypatch.setattr(drawing, "_pin_section", Mock(return_value=[]))
-    monkeypatch.setattr(drawing, "add_native_hole_callout", Mock(return_value=object()))
-    monkeypatch.setattr(drawing, "_circle_edge", Mock(return_value=object()))
-    for name in (
-        "stamp_drawing_summary",
-        "set_hidden_lines_removed",
-        "assert_imported_precision",
-        "set_dimension_callouts",
-        "_set_callout_texts",
-        "_strip_thread_class",
-        "_append_callout_below",
-        "import_cosmetic_threads",
-        "_hide_thread_labels",
-    ):
-        monkeypatch.setattr(drawing, name, Mock())
-    monkeypatch.setattr(drawing, "add_property_linked_note", add_note)
-    outputs = {"drawing": "carrier"}
-    monkeypatch.setattr(drawing, "finalize_drawing", AsyncMock(return_value=outputs))
-    assert asyncio.run(drawing.build(adapter)) == outputs
-    assert "Pin Axis Inspection" in read_properties.call_args.kwargs["required"]
-    add_note.assert_any_call(
-        adapter,
-        "Pin Axis Inspection",
-        *drawing.PIN_AXIS_NOTE_XY,
-        char_height=drawing.INSPECTION_NOTE_CHAR_HEIGHT,
-    )
+    settled = drawing._pin_axis_inspection_callout(adapter, top)
+    assert selected == [(top, "EDGE", None, expected)]
+    assert inserted == [drawing.property_link("Pin Axis Inspection")]
+    assert formats == [(0, False, drawing.INSPECTION_NOTE_CHAR_HEIGHT)]
+    if failure == "wrong_bore":
+        state.attached = bores["A1"]
+    elif failure == "missing_leader":
+        state.leaders = 0
+    elif failure == "dangling":
+        state.dangling = True
+    if failure is None:
+        settled()
+    else:
+        with pytest.raises(RuntimeError, match="lost its edge attachment"):
+            settled()
 
 
 def test_axis_inspection_note_and_relocated_b2dx_have_separate_paper_bands() -> None:
@@ -737,5 +776,11 @@ def test_axis_inspection_note_and_relocated_b2dx_have_separate_paper_bands() -> 
     assert b2y - 10.0 > note[3] + 3.0
     assert b2y + 10.0 < _on_sheet(0.0, spec.OUTLINE_Y[0])[1] - 3.0
     assert note[2] + 3.0 < _on_sheet(*spec.PIN_HOLES["B1"])[0]
-    iso_left = drawing.ISO_CENTER[0] * 1000.0 - 30.0
-    assert b2x + 15.0 + 2.0 < iso_left
+    # Review 88c6d: B2DX's rows (~28 wide, "SETS R816 ON") stand wholly
+    # outboard of B2's extension line and the 520.0's at the plate's +X end,
+    # so neither strikes the text, and above the isometric.
+    half_width = len("SETS R816 ON") * 2.36 / 2.0
+    assert b2x - half_width - 3.0 > _on_sheet(spec.OUTLINE_X[1], 0.0)[0]
+    assert b2x + half_width < _BORDER[2] - 3.0
+    iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
+    assert b2y - 8.0 - 3.0 > iso_top

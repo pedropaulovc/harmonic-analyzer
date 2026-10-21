@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 import importlib
 import math
 from pathlib import Path
@@ -14,6 +15,7 @@ import ch_rocker_arm_tl_oblique_retention_spec as cartridge
 import ch_rocker_arm_tl_vn_oblique_pivot_cotter_spec as cotter
 import ch_rocker_arm_tl_vn_oblique_pivot_cap_screw_spec as screw
 import ch_rocker_arm_tl_vn_oblique_pivot_lock_wire_spec as wire
+import ch_rocker_arm_tl_oblique_cap_wire_clearance as wire_capture
 
 SCRIPTS = Path(__file__).resolve().parent
 PREFIX = "ch_rocker_arm_tl_vn_oblique_pivot_"
@@ -249,18 +251,20 @@ def test_modeled_bends_have_room_for_the_round_wire_section():
                    for segment in tightened)
 
 
-def test_wire_is_continuous_with_twists_loops_and_bent_ends_below_cap():
+def test_representative_normal_wire_is_continuous_and_fits_fitted_depth_window():
     segments = wire.installed_wire_segments()
     assert segments
     for previous, following in zip(segments, segments[1:]):
         assert previous[-1] == pytest.approx(following[0])
     radius = hardware.WIRE_DIA / 2
     from _printed_tolerance import printed_band_mm
-    counterbore_depth_band = printed_band_mm(cartridge.CAP_COUNTERBORE_DEPTH_PLACES)
+    fitted = cartridge.fitted_counterbore_bounds()
     channel_band = printed_band_mm(cartridge.CAP_WIRE_CHANNEL_PLACES)
-    floor_max = (cartridge.CAP_COUNTERBORE_DEPTH + counterbore_depth_band
-                 - cartridge.CAP_WIRE_CHANNEL_DEPTH + channel_band)
-    top_min = cartridge.CAP_COUNTERBORE_DEPTH - counterbore_depth_band
+    # This certifies the representative normal route, not arbitrary installed
+    # head angles or cap motion. Actual fitted depth bounds replace the REF
+    # model depth; there is no manufactured counterbore-depth tolerance band.
+    floor_max = fitted.depth_at_head_max - cartridge.CAP_WIRE_CHANNEL_DEPTH + channel_band
+    top_min = fitted.depth_at_head_min - cartridge.CAP_HEAD_SEATING_GAP_MAX
     nas_low = hardware.SCREW_HEAD_HEIGHT_MIN - hardware.SCREW_WIRE_FROM_TOP_MAX
     nas_high = hardware.SCREW_HEAD_HEIGHT_MAX - hardware.SCREW_WIRE_FROM_TOP_MIN
     assert wire.swept_wire_z_bounds(segments) == pytest.approx(
@@ -423,3 +427,59 @@ def test_hardware_provider_does_not_import_its_cartridge_consumer():
     modules = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
     assert "ch_rocker_arm_tl_oblique_retention_spec" not in modules
     assert all(not module.startswith("build_") for module in modules if module)
+
+
+def test_capture_wire_uses_maximum_head_radius_and_complete_native_route():
+    assert wire.OUTER_BEND_RADIUS == pytest.approx(
+        hardware.SCREW_HEAD_DIA_MAX / 2
+        + hardware.SCREW_HEAD_ECCENTRICITY_MAX
+        + hardware.WIRE_DIA / 2 + 0.35
+    )
+    assert wire.ENTRY_SHOULDER_OFFSET == pytest.approx(0.20)
+    assert wire.ENTRY_SHOULDER_RISE == pytest.approx(1.00)
+    result = wire_capture.require_wire_capture_geometry()
+    assert all(value > 0 for value in vars(result).values())
+    assert result.surface_clearance == min(
+        result.lateral_clearance, result.channel_floor_clearance, result.top_clearance
+    )
+    # This is the real head-bearing support, not a nonexistent closed X wall
+    # at the enlarged counterbore's full-width outward mouth.
+    assert result.head_support_x_clearance == pytest.approx(
+        cartridge.capture_bounds().cap_head_floor_x_margin
+    )
+
+
+def test_capture_wire_consumes_the_shared_register_pose_bound(monkeypatch):
+    captured = cartridge.capture_bounds()
+    monkeypatch.setattr(
+        cartridge, "capture_bounds",
+        lambda: replace(
+            captured,
+            cap_register_endpoint_offset=2 * captured.cap_register_endpoint_offset,
+        ),
+    )
+    with pytest.raises(ValueError, match="wire"):
+        wire_capture.require_wire_capture_geometry()
+
+
+def test_capture_wire_detects_changed_interior_height_not_only_endpoints():
+    segments = wire.installed_wire_segments()
+    # Alter a central bridge control while preserving every cubic endpoint.
+    index = min(range(len(segments)), key=lambda i: max(abs(p[0]) for p in segments[i]))
+    changed = [list(segment) for segment in segments]
+    x, y, z = changed[index][1]
+    changed[index][1] = (x, y, z + 6.0)
+    changed = tuple(tuple(segment) for segment in changed)
+    assert all(a[0] == b[0] and a[-1] == b[-1] for a, b in zip(segments, changed))
+    with pytest.raises(ValueError, match="wire"):
+        wire_capture.require_wire_capture_geometry(segments=changed)
+
+
+def test_deep_groove_cannot_remove_the_guaranteed_head_bearing_floor():
+    with pytest.raises(ValueError, match="head_bearing_floor_clearance"):
+        wire_capture.require_wire_capture_geometry(channel_depth=9.0)
+
+
+def test_whole_wire_certificate_cannot_pass_an_empty_route():
+    with pytest.raises(ValueError, match="nonempty"):
+        wire_capture.require_wire_capture_geometry(segments=())

@@ -171,7 +171,6 @@ def test_walls_hold_rule_17_from_the_spec_values() -> None:
     ):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
         assert math.isclose(spec.WORST_WALLS[wall], 2.105, abs_tol=1e-6)
-    assert spec.CALLOUTS_BELOW["BlockLength"] == "SETS C'BORE WALL 2.10 MIN"
     assert spec.CALLOUTS_BELOW["BlockWidth"] == "SETS C'BORE\nWALL 2.10 MIN"
 
 
@@ -189,7 +188,6 @@ def test_horizontal_dimensions_keep_their_rows_off_their_lines() -> None:
     # more than its value and row).
     keep = drawing.PLAN_KEEP
     assert keep["BlockLength"][1] <= keep["HoleColumn2X"][1] - 6.0
-    assert "\n" not in spec.CALLOUTS_BELOW["BlockLength"]
 
 
 def test_side_screw_walls_at_worst_case() -> None:
@@ -346,11 +344,6 @@ def test_carriage_screws_seat_and_reach_the_carriage_thread() -> None:
     # The vendor's 5 deep thread keeps it under rule 18's 1.5D; the callout
     # states the same worst case (shortest screw, highest floor) as a fact.
     assert spec.ENGAGEMENT_MAX < spec.ENGAGEMENT_TARGET == 6.0
-    # One row (review r8: the three-row block never printed), both limits
-    # (review r11: the band holds the screw off the thread's bottom too).
-    assert spec.CALLOUTS_ABOVE["CboreFloor"] == (
-        "SETS M4 X 20 ENGAGEMENT 3.85-4.95 IN 5.0 DEEP THREAD"
-    )
     cbore = _features()["screw_hole_1_counterbore"]
     assert cbore["dia"][0] > spec.SCREW_HEAD_DIA
     assert cbore["height"] == [15.47, 15.73]
@@ -558,7 +551,6 @@ def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
     assert spec.WING_LENGTH == spec.WING_X1 - spec.BLOCK_X0
     assert spec.WING_X1 == spec.BORE_X + spec.WING_AXIS_REACH
     assert spec.WING_AXIS_REACH == retention.BLOCK_WING_AXIS_REACH
-    assert spec.WING_AXIS_REACH_PLACES == retention.BLOCK_WING_AXIS_REACH_PLACES == 3
     assert spec.WING_WIDTH == 2.0 * retention.BLOCK_WING_HALF_WIDTH
     assert spec.SIDE_UNDER_HEAD == 35.6
     assert spec.BORE_X == -32.0
@@ -794,7 +786,8 @@ def test_thread_envelope_walls_reject_an_undersized_wing() -> None:
         - dx - printed_band_mm(spec.CAP_TAP_LOCATION_PLACES) - radius - sweep
     )
     assert min(spec.cap_receiver_walls(wing_width=56.0).values()) < spec.WALL_FLOOR
-    assert min(spec.cap_receiver_walls(wing_axis_reach=20.0).values()) < spec.WALL_FLOOR
+    too_short = spec.WING_AXIS_REACH - walls["cap thread to wing step"] + spec.WALL_FLOOR - 0.01
+    assert min(spec.cap_receiver_walls(wing_axis_reach=too_short).values()) < spec.WALL_FLOOR
     mouth = spec.cap_receiver_walls(depth=0.0)
     sweep = spec.BLOCK_HEIGHT * math.tan(
         math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES)
@@ -1000,3 +993,48 @@ def test_upper_register_diameter_shoulder_sits_above_the_y_station() -> None:
     )
     assert min(point[1] for point in moved) > max(point[1] for point in upper_y_line) + 0.003
     assert not segments_cross(moved, upper_y_line)
+
+
+@pytest.mark.parametrize("failure", [None, "aligned", "oversized", "rejected", "ignored"])
+def test_register_section_fits_native_outline_without_rotation_or_breaking_alignment(monkeypatch, failure) -> None:
+    position = [0.230, 0.155] if failure == "aligned" else [0.285, 0.064]
+    width, height = (0.060, 0.160) if failure != "oversized" else (0.180, 0.160)
+    native = SimpleNamespace(
+        Position=position, Angle=0.19, ScaleDecimal=2.0,
+        UpdateViewDisplayGeometry=lambda: None,
+        GetOutline=lambda: (
+            position[0] - width / 2.0, position[1] - height / 2.0,
+            position[0] + width / 2.0, position[1] + height / 2.0,
+        ),
+    )
+    moves = []
+
+    def move(values, children):
+        assert children is False
+        moves.append(tuple(values))
+        if failure == "rejected":
+            return False
+        if failure == "aligned":
+            position[0] = values[0]  # Native horizontal alignment fixes Y.
+        elif failure != "ignored":
+            position[:] = values
+        return True
+
+    native.SetViewPosition = move
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    if failure in (None, "aligned"):
+        drawing._fit_register_section(object(), native)
+        x0, y0, x1, y1 = drawing.REGISTER_SECTION_REGION
+        outline = native.GetOutline()
+        assert x0 <= outline[0] < outline[2] <= x1
+        assert y0 <= outline[1] < outline[3] <= y1
+        assert len(moves) == 1
+        if failure == "aligned":
+            assert position[1] == 0.155
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._fit_register_section(object(), native)
+        assert len(moves) == (0 if failure == "oversized" else 1 if failure == "rejected" else 4)
+    assert native.Angle == 0.19 and native.ScaleDecimal == 2.0

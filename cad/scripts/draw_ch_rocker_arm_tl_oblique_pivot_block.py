@@ -28,7 +28,7 @@ from _drawing_common import (
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_dimension_import import curate_view_dimensions
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, offset_dimension_text, set_dimension_callouts
 from _drawing_hole_callout import (
     add_native_hole_callout,
     compose_hole_callout_prefix,
@@ -87,27 +87,31 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # A separate 2:1 plan owns the wing's direct bearing-axis reach and four cap
 # taps. Both reference the bearing axis directly, never a loose edge chain.
 # Section A-A is on the bearing axis; full section B-B shows the remaining
-# carriage-counterbore floor from the carriage seat. Removed view C looks at
-# the original tail's +Y face and carries the nut-bracket hole stations.
+# carriage-counterbore floor from the carriage seat. Removed view C, on its
+# own sheet, looks at the original tail's +Y face and carries the nut-bracket
+# hole stations. The register-depth section has its own parent/cutting line.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
-SHEET_NAMES = ("Bearing and carriage", "Capture wing", "Register recesses")
+SHEET_NAMES = (
+    "Bearing and carriage", "Capture wing", "Register recesses",
+    "Register depth", "Nut bracket interface",
+)
 CAPTURE_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
 PLAN_CENTER = (0.130, 0.192)
 # A-A remains vertically aligned with the plan.
-SECTION_A_CENTER = (PLAN_CENTER[0], 0.073)
+SECTION_A_CENTER = (PLAN_CENTER[0], 0.088)
 ISO_CENTER = (0.385, 0.232)
 ISO_NOTE_XY = (0.355, 0.200)
-CAPTION_A_XY = (0.155, 0.024)
-# The removed side view remains clear of the title block.
-SIDE_CENTER = (0.308, 0.102)
+CAPTION_A_XY = (0.155, 0.035)
+# View C no longer shares B-B's caption/dimension lanes.
+SIDE_CENTER = (0.210, 0.155)
 SIDE_VIEW_LETTER = "C"
 SIDE_VIEW_LETTER_HEIGHT = 0.005
 SIDE_VIEW_ARROW_TIP = (5.0, BLOCK_WIDTH / 2.0, BLOCK_HEIGHT)
 SIDE_VIEW_LETTER_OFFSET = (-0.0018, 0.0105)
 SIDE_VIEW_CAPTION = f"VIEW {SIDE_VIEW_LETTER}"
-SIDE_VIEW_CAPTION_XY = (0.3005, 0.0775)
+SIDE_VIEW_CAPTION_XY = (0.210, 0.115)
 # Cutting line on the top face, past the outline (model mm).
 CUT_A_X = (BLOCK_X0 - 4.0, BLOCK_X1 + 4.0)
 # Full-width B-B through the unchanged -X carriage-hole column.
@@ -146,9 +150,18 @@ CAPTURE_KEEP = {
     "CapTapLowerY": (35.0, -12.5, _H),
     "CapTapUpperY": (43.0, 12.5, _H),
 }
+# Offset only linear text, leaving each native dimension line outside the
+# silhouette. None of these complete qualifiers sits between its witnesses.
+CAPTURE_TEXT_POSITIONS = {
+    "WingAxisReach": (0.300, 0.250),
+    "CapTapLeftX": (0.070, 0.100),
+    "CapTapRightX": (0.310, 0.090),
+}
 REGISTER_PLAN_CENTER = (0.170, 0.190)
-REGISTER_SECTION_CENTER = (0.285, 0.064)
-REGISTER_CAPTION_XY = (0.285, 0.025)
+REGISTER_SECTION_PLAN_CENTER = (0.140, 0.170)
+REGISTER_SECTION_CENTER = (0.325, 0.165)
+REGISTER_SECTION_REGION = (0.240, 0.070, 0.410, 0.260)
+REGISTER_CAPTION_XY = (0.140, 0.065)
 REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     "CapRegisterLeftX": (BORE_X - 8.0, -41.0, _H),
     "CapRegisterRightX": (BORE_X + 8.0, -49.0, _H),
@@ -159,30 +172,37 @@ REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     # above the upper-Y station's witness/line (native top Y238 mm).
     "CapRegister2Dia": (BLOCK_X1 + 10.0, 33.0, _H),
 }
-REGISTER_SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    "CapRegisterDepth": (BORE_X - 19.0, -24.0, _H + 5.0),
-}
+REGISTER_SECTION_KEEP = {"CapRegisterDepth": (0.140, 0.095)}
 # One straight vertical section through both receivers and the bearing axis.
 # Extending beyond both wing sides makes the cylindrical flat floors visible.
 _REGISTER_FIRST, _REGISTER_SECOND = part_spec.CAP_REGISTER_POINTS
 _REGISTER_DELTA = tuple(
     b - a for a, b in zip(_REGISTER_FIRST, _REGISTER_SECOND, strict=True)
 )
+_REGISTER_CUT_Y_CLEARANCE = max(BLOCK_WIDTH, part_spec.WING_WIDTH) / 2.0 + 7.0
+_REGISTER_START_FACTOR = (
+    -_REGISTER_CUT_Y_CLEARANCE - _REGISTER_FIRST[1]
+) / _REGISTER_DELTA[1]
+_REGISTER_END_FACTOR = (
+    _REGISTER_CUT_Y_CLEARANCE - _REGISTER_FIRST[1]
+) / _REGISTER_DELTA[1]
 REGISTER_CUT_START = tuple(
-    a - 0.25 * d for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
+    a + _REGISTER_START_FACTOR * d
+    for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
 )
 REGISTER_CUT_END = tuple(
-    b + 0.25 * d for b, d in zip(_REGISTER_SECOND, _REGISTER_DELTA, strict=True)
+    a + _REGISTER_END_FACTOR * d
+    for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
 )
-_OTHER_SHEET_DIMENSIONS = set(CAPTURE_KEEP) | set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # In A-A, the carriage seat is model Z0, not the counterbored top face.
     "SideScrewRowZ": (BLOCK_X1 + 4.0, 0.0, -10.5),
     # Hang each seat-depth block outside its span, beside the left end face.
     "TopBoreDepth": (BLOCK_X0 - 7.0, 0.0, _H + 8.25),
     "BottomBoreDepth": (BLOCK_X0 - 7.0, 0.0, -8.75),
-    # The puller opening hangs under the section, off its silhouette.
-    "ShoulderHoleDia": (BORE_X, 0.0, _H + 7.5),
+    # A short near-side diameter leader puts the full puller callout in the
+    # open lane right of A-A, not on its lower edge or between its witnesses.
+    "ShoulderHoleDia": (BLOCK_X1 + 25.0, 0.0, -1.0),
     # Seat-corner fillets share one native maximum-radius callout.
     "SeatFilletR": (-20.0, 0.0, -4.0),
 }
@@ -203,16 +223,16 @@ def _hung_clear(callouts: dict[str, str]) -> dict[str, str]:
 
 
 SIDE_KEEP: dict[str, tuple[float, float, float]] = {
-    # X stations from the -X end over the view (model -Z is sheet up), rows
-    # y 132 and 140, each text left of the +X hole's witness line (x 348);
-    # left of section B-B's caption.
+    # Baseline X stations from the -X end, above the removed side view.
     "SideScrew1X": (-29.5, _HW, -4.0),
     "SideScrew2X": (-24.5, _HW, -8.0),
-    # The 24.00 right of the +X end (line x 386, text ~380..393 centred in
-    # its span at y 100), under the side callout (y >= 135), inside the
-    # border (419). Close-c4-r4: A-A's right lane now holds the side row.
+    # Height stays to the right; its carriage-seat datum is named in A-A.
     "BlockHeight": (BLOCK_X1 + 4.0, _HW, _H / 2.0),
 }
+_OTHER_SHEET_DIMENSIONS = (
+    set(CAPTURE_KEEP) | set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
+    | set(SIDE_KEEP)
+)
 
 # The screw holes' native callout over the plan, under the top border:
 # four rows, ~60 x 22 mm, projected at x ~182..242, y ~239..261.
@@ -261,12 +281,8 @@ SEAT_FRAME_EDGE = (
 SEAT_FRAME_CORNER = (BORE_X + part_spec.SHOULDER_HOLE_DIA / 2.0 + 1.0, 0.0, _H + 2.0)
 _SEAT_GDT_SOURCE = ("draw_ch_rocker_arm_tl_oblique_pivot_block", "_seat_gdt")
 
-# The side screws' native callout right of the side view, over it and under
-# the isometric's note (y 200): four rows (2X DRILL Ø4.98 THRU ALL, the
-# counterbore, the mate, the walls' shortfall), ~60 x 22 mm at x ~352..412,
-# y ~135..157. Its leader drops to the +X counterbore's upper-right rim
-# (x ~350), right of the 55.000 station's witness line (x 344).
-SIDE_CALLOUT_XY = (0.382, 0.146)
+# The dedicated interface sheet keeps the full native hole callout above
+# the view; the selected upper-right counterbore rim remains unchanged.
 _SIDE_CBORE_R = SIDE_CBORE_DIA / 2.0
 SIDE_CALLOUT_EDGE = (
     SIDE_SCREW_HOLES[1][0] + _SIDE_CBORE_R * math.sqrt(0.5),
@@ -412,7 +428,7 @@ for _side, _face_z, _entry_z, _axis, _coaxial in (
             # The rule-4 matched-fit callout names the mate (BORE_MATE).
             "note": (
                 " ".join(part_spec.BORE_CALLOUT.splitlines()),
-                ("BORE_CALLOUT", "BORE_MATE", "BEARING_OD_BAND"),
+                ("BORE_CALLOUT", "BORE_MATE"),
             ),
             **_coaxial,
         },
@@ -1015,12 +1031,12 @@ def _label_side_view(adapter: Any, plan: Any, on_plan: Any) -> None:
     )
     if note is None:
         raise RuntimeError(f"failed to add the view {SIDE_VIEW_LETTER} arrow")
-    if add_note(adapter, SIDE_VIEW_CAPTION, *SIDE_VIEW_CAPTION_XY) is None:
-        raise RuntimeError(f"failed to add the {SIDE_VIEW_CAPTION!r} caption")
+    if add_note(adapter, f"{SIDE_VIEW_CAPTION} ON SHEET 5", 0.300, 0.100) is None:
+        raise RuntimeError("failed to cross-reference the removed side view")
 
 
 def _register_recess_sheet(adapter: Any) -> None:
-    """Native plan ordinates and a solid-line section through both flat floors."""
+    """Native register XY ordinates; the depth section is on sheet 4."""
     plan = place_view(
         adapter, str(SOURCE), "*Front", *REGISTER_PLAN_CENTER, scale=CAPTURE_SCALE
     )
@@ -1036,26 +1052,7 @@ def _register_recess_sheet(adapter: Any) -> None:
         view_label="register recess plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section = create_section_view(
-        adapter, plan,
-        line_start=on_plan((*REGISTER_CUT_START, _H)),
-        line_end=on_plan((*REGISTER_CUT_END, _H)),
-        view_xy=REGISTER_SECTION_CENTER,
-        section_label="D",
-        scale=CAPTURE_SCALE,
-        partial=False,
-        label="flat-bottom register recess section",
-    )
-    set_hidden_lines_removed(adapter, section)
-    on_section = _view_mapper(adapter, section)
-    annotations += curate_view_dimensions(
-        adapter, section,
-        keep={name: on_section(xyz) for name, xyz in REGISTER_SECTION_KEEP.items()},
-        view_label="register recess section D-D",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    position_section_caption(adapter, section, REGISTER_CAPTION_XY, label="pivot block D")
-    names = set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
+    names = set(REGISTER_KEEP)
     set_dimension_callouts(
         adapter, annotations,
         {name: text for name, text in CALLOUTS_BELOW.items() if name in names},
@@ -1068,6 +1065,99 @@ def _register_recess_sheet(adapter: Any) -> None:
         {name: DRAWING_PRECISION_BY_NAME[name] for name in names},
     )
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
+    if add_note(adapter, "REGISTER DEPTH: SECTION D-D ON SHEET 4", 0.025, 0.080) is None:
+        raise RuntimeError("failed to cross-reference the register-depth sheet")
+
+
+def _fit_register_section(adapter: Any, section: Any) -> None:
+    """Fit the native outline while retaining its section-parent alignment."""
+    native = _early_bound(section, "IView")
+    x0, y0, x1, y1 = REGISTER_SECTION_REGION
+    target = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        outline = tuple(float(value) for value in native.GetOutline())
+        if outline[2] - outline[0] > x1 - x0 or outline[3] - outline[1] > y1 - y0:
+            raise RuntimeError(f"register-depth section exceeds its reserved region: {outline}")
+        center = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+        if x0 <= outline[0] < outline[2] <= x1 and y0 <= outline[1] < outline[3] <= y1:
+            return
+        position = tuple(float(value) for value in native.Position)
+        moved = [position[axis] + target[axis] - center[axis] for axis in (0, 1)]
+        # SetViewPosition preserves native alignment and may constrain this
+        # request to its alignment vector. Accept any clear aligned result,
+        # not an unattainable preferred centre; never break the alignment.
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to centre register-depth section")
+        rebuild_drawing(adapter, label=f"register-depth section centred {attempt}")
+    raise RuntimeError("aligned register-depth section cannot fit its reserved region")
+
+
+def _register_section_sheet(adapter: Any) -> None:
+    """An unrotated native D-D and its cutting-line parent, free of XY callouts."""
+    plan = place_view(
+        adapter, str(SOURCE), "*Front", *REGISTER_SECTION_PLAN_CENTER, scale=CAPTURE_SCALE
+    )
+    set_hidden_lines_removed(adapter, plan)
+    on_plan = _view_mapper(adapter, plan)
+    section = create_section_view(
+        adapter, plan,
+        line_start=on_plan((*REGISTER_CUT_START, _H)),
+        line_end=on_plan((*REGISTER_CUT_END, _H)),
+        view_xy=REGISTER_SECTION_CENTER,
+        section_label="D", scale=CAPTURE_SCALE, partial=False,
+        label="flat-bottom register recess section",
+    )
+    set_hidden_lines_removed(adapter, section)
+    _fit_register_section(adapter, section)
+    annotations = curate_view_dimensions(
+        adapter, section, keep=REGISTER_SECTION_KEEP,
+        view_label="register recess section D-D",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(
+        adapter, annotations, {name: CALLOUTS_BELOW[name] for name in REGISTER_SECTION_KEEP},
+    )
+    assert_imported_precision(
+        adapter, annotations, {name: DRAWING_PRECISION_BY_NAME[name] for name in REGISTER_SECTION_KEEP},
+    )
+    position_section_caption(adapter, section, REGISTER_CAPTION_XY, label="pivot block D")
+    if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
+        raise RuntimeError("failed to identify the register-ordinate sheet")
+
+
+def _side_screw_sheet(adapter: Any) -> None:
+    """The removed nut-bracket interface, no longer under section B-B."""
+    side = place_view(adapter, str(SOURCE), "*Top", *SIDE_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (side, iso):
+        set_hidden_lines_removed(adapter, view)
+    on_side = _view_mapper(adapter, side)
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter, side,
+        keep={name: on_side(xyz) for name, xyz in SIDE_KEEP.items()},
+        view_label="nut-bracket side view C",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, annotations, {name: DRAWING_PRECISION_BY_NAME[name] for name in SIDE_KEEP},
+    )
+    side_callout = add_native_hole_callout(
+        adapter, side, edge_xy=on_side(SIDE_CALLOUT_EDGE),
+        callout_xy=(0.300, 0.225), label="nut-bracket screw counterbores",
+    )
+    _set_screw_hole_callout(
+        side_callout, SIDE_CALLOUT_BELOW, reference=None, label="side screw holes",
+    )
+    set_hole_callout_precision(
+        side_callout, SIDE_CALLOUT_PRECISION, label="nut-bracket screw counterbores",
+    )
+    if add_note(adapter, SIDE_VIEW_CAPTION, *SIDE_VIEW_CAPTION_XY) is None:
+        raise RuntimeError("failed to caption the removed side view")
+    if add_note(adapter, "VIEWING DIRECTION C ON SHEET 1", 0.025, 0.260) is None:
+        raise RuntimeError("failed to cross-reference the side viewing direction")
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+
 
 
 def _wing_axis_manufacturing_dimension(adapter: Any, annotations: list[Any]) -> None:
@@ -1139,11 +1229,9 @@ async def build(adapter: Any) -> dict[str, str]:
     on_plan = _view_mapper(adapter, plan)
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    side = place_view(adapter, str(SOURCE), "*Top", *SIDE_CENTER, scale=VIEW_SCALE)
-    for view in (plan, iso, side):
+    for view in (plan, iso):
         set_hidden_lines_removed(adapter, view)
 
-    on_side = _view_mapper(adapter, side)
     annotations = curate_view_dimensions(
         adapter,
         plan,
@@ -1154,15 +1242,6 @@ async def build(adapter: Any) -> dict[str, str]:
     section_a, side_row = _bore_axis_section(adapter, source_model, plan)
     annotations += side_row
     on_a = _view_mapper(adapter, section_a)
-    # The side stations live on SideScrewReference, a sketch the part saves
-    # hidden: the side view shows it per view (_drawing_hidden_sketches).
-    annotations += hidden_sketches.curate_view_dimensions(
-        adapter,
-        side,
-        keep={name: on_side(xyz) for name, xyz in SIDE_KEEP.items()},
-        view_label="side view",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     # The floor height lives on CboreFloorReference, a sketch the part saves
     # hidden: _drawing_hidden_sketches shows it while B-B is cut and curated.
     annotations += _cbore_floor_section(adapter, source_model, plan)
@@ -1171,13 +1250,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations,
         {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in _OTHER_SHEET_DIMENSIONS},
     )
-    # Natively the bore's leader runs rim to rim through the centre and across
-    # line A (jig-r2); one arrow on the near (left) rim keeps it short and
-    # above the line.
-    bore_dia = [a for a in annotations if dimension_name(adapter, a) == "BoreDia"]
-    if len(bore_dia) != 1:
-        raise RuntimeError(f"expected one BoreDia dimension, found {len(bore_dia)}")
-    set_near_side_diameter(bore_dia[0], "pivot block bore diameter")
+    for name in ("BoreDia", "ShoulderHoleDia"):
+        diameters = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(diameters) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(diameters)}")
+        set_near_side_diameter(diameters[0], f"pivot block {name}")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(
@@ -1195,20 +1272,6 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_MATE_CALLOUT,
         reference=f"({part_spec.CBORE_DEPTH:.{part_spec.CALLOUT_PLACES}f})",
         label="carriage screw holes",
-    )
-    side_callout = add_native_hole_callout(
-        adapter,
-        side,
-        edge_xy=on_side(SIDE_CALLOUT_EDGE),
-        callout_xy=SIDE_CALLOUT_XY,
-        label="nut-bracket screw counterbores",
-    )
-    _set_screw_hole_callout(
-        side_callout, SIDE_CALLOUT_BELOW, reference=None, label="side screw holes"
-    )
-    # The counterbore's walls take three places; the THRU size the template's two.
-    set_hole_callout_precision(
-        side_callout, SIDE_CALLOUT_PRECISION, label="nut-bracket screw counterbores"
     )
     _seat_gdt(adapter, section_a, on_a)
     _label_side_view(adapter, plan, on_plan)
@@ -1235,6 +1298,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, capture_annotations,
         {name: text for name, text in CALLOUTS_BELOW.items() if name in CAPTURE_KEEP},
     )
+    offset_dimension_text(adapter, capture_annotations, CAPTURE_TEXT_POSITIONS)
     _wing_axis_manufacturing_dimension(adapter, capture_annotations)
     tap_x, tap_y = part_spec.CAP_TAP_POINTS[1]
     cap_tap_callout = add_native_hole_callout(
@@ -1249,6 +1313,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("cannot activate register-recess sheet")
     _register_recess_sheet(adapter)
+    if not ddoc.ActivateSheet(SHEET_NAMES[3]):
+        raise RuntimeError("cannot activate register-depth sheet")
+    _register_section_sheet(adapter)
+    if not ddoc.ActivateSheet(SHEET_NAMES[4]):
+        raise RuntimeError("cannot activate nut-bracket interface sheet")
+    _side_screw_sheet(adapter)
 
     return await finalize_drawing(
         adapter,
@@ -1262,7 +1332,11 @@ async def build(adapter: Any) -> dict[str, str]:
             SHEET_NAMES[0]: SHEET_SCALE,
             SHEET_NAMES[1]: CAPTURE_SCALE,
             SHEET_NAMES[2]: CAPTURE_SCALE,
+            SHEET_NAMES[3]: CAPTURE_SCALE,
+            SHEET_NAMES[4]: SHEET_SCALE,
         },
+        redundant_note_substrings=("5/16-18 Tapped Hole",),
+        expected_redundant_notes=4,
     )
 
 

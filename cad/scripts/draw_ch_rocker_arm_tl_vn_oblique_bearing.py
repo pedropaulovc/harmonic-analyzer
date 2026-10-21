@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the oblique-trammel pivot bearing."""
+"""Create the VN-52 purchased drawing, including its receiving-acceptance note."""
 
 from __future__ import annotations
 

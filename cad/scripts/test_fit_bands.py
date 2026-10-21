@@ -316,18 +316,19 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("ch_rocker_arm_tl_oblique_retention_spec", "PIN_CROSS_HOLE_BAND"): (
         "the clevis cross-hole's drilled band, indexed by the actual loaded "
-        "top-retainer stack and authored on the native pivot pin"
+        "top-retainer stack; the pivot pin spec ties it to the title block's "
+        "DRILLED HOLES row, which its plain drilled callout prints"
     ),
     ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_POCKET_DIAMETER_BAND"): (
         "indexed for the worst flange-to-pocket shift and contact margin; "
         "also authored on the native cap's PocketDia"
     ),
     ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_APERTURE_BAND"): (
-        "indexed for the largest cap aperture in the positive-stop margin"
+        "indexed for minimum pin running clearance and maximum positive-stop aperture"
     ),
     ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_BOLT_CLEARANCE_BAND"): (
-        "indexed with the sourced screw major limits and printed locations "
-        "to bound the cap's lateral shift"
+        "indexed for guaranteed head-floor coverage and exclusion of through "
+        "holes from the fixed-world floor witnesses"
     ),
 }
 

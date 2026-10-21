@@ -160,6 +160,10 @@ Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
 hold-down washer or force the assembly; reject an incompatible setup.
 Measure the actual complete-thread setback separately: the cut-end chamfer
 limit alone does not bound incomplete threads or establish nut engagement.
+The complete installed authority is **TL-00, HD1–HD3, sheet 10**. The stud's
+single REWORK sheet cites that authority rather than duplicating it. HD1/HD2
+retain actual B/D/H/N/W/U intervals and finished L limits; HD3 repeats the
+installed checks after final clamping. Missing readings reject the setup.
 
 These are actual fit-up requirements, not invented PM kit tolerance bands.
 The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal
@@ -185,12 +189,13 @@ envelope inspections remain required; the top cut alone does not certify
 all hardware clearances.
 
 The ten-sheet fitter package keeps cartridge manufacture, pressing, joint
-acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) on sheet 8. The new
+acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) on sheet 8.
 **TOPCAPTUREFIT** sheet 9 is the single complete instruction authority for
-C2A and C4/C5 actual qualification; operation, pass changes and machine
-acceptance (C6/C7, **CAPTUREANDOPERATION**) move to sheet 10. The operation
-sheet retains the finished isometric at 1:15 without competing with the
-cartridge or top-fit instructions.
+C2A and C4/C5 actual qualification; operation, pass changes, the complete
+installed stud contract (HD1–HD3), and machine acceptance remain on
+**CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
+The source-derived tooling-clearance table occupies sheet 2's right column,
+above the unchanged-scale collapsed reference view. No sheet is renumbered.
 
 C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
 With the actual pin/block/cap benched without bearings and the cap temporarily
@@ -253,11 +258,152 @@ The source-derived intact-rigid bound includes both end uplift and tipping
 across the full carrier/handle width, not just small support-pin travel.
 The retained cap run/FIFO is immutable old-source API proof only, not
 current-geometry native validation. Captured geometry supplies no strength,
-bump-force or deflection certification. Installed toolholder/spindle clearance remains **UNVERIFIED**
-without real measurement authority: accept actual installed-tool clearance
-before cutting over both complete sweeps, the calculated upset, actual formed
-locks and measurement/runout uncertainty. Retained-pin dimensions alone do
-not prove collision freedom.
+bump-force or deflection certification. Installed toolholder/spindle clearance
+remains **UNVERIFIED** without actual measurement authority.
+
+The bearing purchase drawing MHA-CH-06-TL-VN-52 owns its receiving bands
+and intact full-circumference cylindrical OD-land inspection. Assembly C1
+uses qualified bearings, keeps the actual upper-bearing identity and
+qualification with its support, and retains the ring-specific press
+sequence. A valid supplier dimensional authority tied to the actual
+identity can establish the catalogue bands; it does not replace the
+physical OD-land inspection. Both passes reuse the same physical support
+record. Generic width does not specify separate race widths, internal
+endplay, extracted-ring attitude or all-material captured containment.
+The former width/2 vertical midplane shield inference is removed.
+Primary plate capture remains independent of bearing friction and of
+that separate installed all-material certificate.
+
+**Installed tooling acceptance is on design hold.** Carriage 2 is held by
+the carrier, not the leadscrew; the printed pass endpoints are operator
+limits, not mechanical stops. Captured motion can slide that carriage beyond
+the normal pass set. No positive installed certificate is valid until the
+user chooses a real travel constraint and the all-support bound is closed.
+The current source N values retain the correct **fixed-support** theorem;
+they are not a bound for the unconstrained installed mechanism.
+
+The tooling table begins on sheet 2 and continues in numbered, linked parts
+on existing instruction sheets. Whole paragraphs retain the same readable
+font/pitch. The BOM's 1:6 source view has an independent 140 mm room; small
+parts may use the clear paper below the BOM, with native BOM-growth refusal.
+Instruction references and the finished 1:15 view retain their scale and
+clearance checks; ten sheets and HD1–HD3 on sheet10 left remain unchanged.
+
+The fixed-support diagnostic compares global normal gaps with source N
+plus runout/measurement uncertainty. One positive radial or axial witness
+is sufficient for that diagnostic; the other need not be measured.
+Fill each cartridge, head-pair or component assembly's convex
+envelope, then take global extrema over their union (no bridge between
+distinct supports). The selected axis separates the **whole group**,
+not just its current radial/axial overlap; bridge holes and steps. R is
+distance to the actual registered spindle axis and Z increases toward it:
+`gR=min(group R)-max(step R)`,
+`gZ=max(min(step Z)-max(group Z),min(group Z)-max(step Z))`.
+Use global group extrema over BOTH complete normal sweeps and the actual
+tool step's full revolution **and entire used spindle-Z range**, from
+deepest cut through retraction. One shared uncertainty bounds the MAX error/
+runout of all reported axes, not an unspecified error on one branch.
+These whole-set distance/interval extrema are 1-Lipschitz under the printed N;
+footprint-conditioned clearances are not interchangeable. Gauge with the
+spindle isolated and the normal fixture seated.
+Missing coverage, touching or a shortfall cannot pass. Recheck
+after tool, depth or setup changes; preserve the actual step 6 cutting-axis
+register and reindicate if it changes.
+
+Under its **fixed-support premise**, N encloses local intact-rigid captured
+upset, one-end lift, yaw and handle rock. It does not cover free-carriage
+travel and never replaces C2A/C4/C5 primary qualification. Printed bands enlarge
+the actual 3D moment
+arms. The support-line and actual **unit** bore vectors are body-fixed:
+their separation L and dot product k do not change. The relative-rotation
+bound includes bore-to-face bias conditioning; common installation pitch/roll
+and unequal support heights do not change Euclidean displacement. Carrier
+functional inspection uses a no-play expanding arbor and a two-axis
+**resultant** limit .05 over 10.50, including setup error, not .05 per axis.
+Top-view bore centres transfer to the actual underside plane by the printed
+`Tmax*tan(alpha)` bound; that pad enters support separation, made/head
+moment arms and the actual stock R.
+Remote lever stock stays separate from the near-cut carrier/riser.
+No auxiliary setup-level survey or special metrology fixture is required.
+
+At step 12, caliper the actual head/washer cylinders about their carrier
+tap locations, in **carrier coordinates**: R is greatest in-plane reach
+about the normal through the tap at the carrier TOP, including washer float, eccentricity,
+tilt projection and allowed clocking. H is greatest normal distance
+above/below the carrier underside, bounded from stack lengths before
+fitting if hidden. The head moment arm is `sqrt((P+R)^2+H^2)`.
+The loaded **work/blank stack** has its own required R/H: R is greatest
+in-plane reach: take the MAX over BOTH active bore-pair TOP-face midpoints and both passes,
+located with a straightedge while the bores are accessible before step 9;
+H is greatest absolute normal distance from the carrier underside, every
+loaded layer included. Its moment arm is `sqrt((R+plane_pad)^2+H^2)`,
+without a HUB triangle overbound or stock-size cap. Keep the work rigidly
+clamped; stock slip is not certified. Flute contact does not waive any
+non-cutting tool-step check.
+
+The cartridge row uses the **filled convex outside envelope** of
+block/pin/cap/retainer. `ActualBearingEnclosureEvidence` must identify a
+real actual-profile analytical/physical containment proof for all material
+of both cartridges' bearings, full internal endplay **and** full captured
+outer-ring translation/tilt on both passes. Its exact envelope and matched
+support C2A/VN-52 references must agree with the primary records.
+There is no source-verified default, new manufacturing limit, or invented
+mandatory bench routine. A receiving caliper width/OD alone is not that
+proof. Missing/incomplete evidence leaves installed acceptance **UNVERIFIED**.
+The source census likewise leaves external bearing upset pairs unresolved;
+nominal vendor geometry is not actual all-material authority.
+
+Secondary gaps are from each normal **pin-seat point**. Before step 9,
+the whole filled exposed journal/seat envelope is an accessible conservative
+proxy if its centre is hidden. The complete C5C XYZ-box corner sphere
+encloses every coupled clock/endplay state, not one visible clocked cotter.
+
+Wire anchors are the **fixed screw heads**, not the floating cap. Gauge
+from each filled head-pair envelope and require gap greater than
+`max(L/2,T)+D/2`: L bounds every free head-to-head **individual-strand
+centreline** arc, T every free-end centreline path from a secured head,
+and D the actual maximum single-wire diameter measured before forming.
+These contour bounds include all
+permitted feeding/sliding. Pre-twist branch lengths and final trimmed
+tails qualify only when they bound that feeding; original whole cut
+length is conservative for each uncertain L/T. Every loop and tail must
+be included, and unknown anchor/contour coverage cannot verify. This
+encloses bending of intact secured, unstretched wire, not connection
+failure. Normal C3C formed-route clearance remains a separate check.
+
+The source census no longer credits cap-carried wire or wire/channel
+contact as a cap stop. The cap-owned
+`ch_rocker_arm_tl_oblique_cap_wire_clearance.require_wire_capture_geometry`
+encloses every cubic control hull and round section against the REAL open-mouth/
+groove/counterbore cut union throughout every captured cap pose. Its positive
+`surface_clearance` closes the corresponding source cap/wire separator and
+permits the fixed-wire/carrier plane separator; failure leaves external
+wire upset pairs unresolved. Authored placement guards prevent transferring
+that proof to displaced source wire/head/cap frames. This is the representative
+0/180 route, not a universal actual head-clock family. The wire/carrier
+plane separator likewise uses represented source geometry only. Actual
+C3C keeps the same authoritative .50 whole-route/tail normal recess below
+the actual roof, unforced; never loosen/over-torque heads to clock holes.
+Roof recess or contour length alone cannot qualify the actual lateral
+formed route through full captured cap motion. No executable full-free-cap
+hand-sweep is claimed after the heads clamp the cap. Explicit
+`ActualWireCaptureEvidence` must identify the actual full-capture swept-void
+proof, its state/scope, real open-mouth/counterbore/groove envelope and every
+physical row's matched C2A support reference. Missing proof remains unverified;
+no invented bench routine or strength claim substitutes for it.
+
+`source_tooling_clearance` retains the nominal-frame CAD prism diagnostic
+but cannot return an installed VERIFIED status. `installed_tooling_clearance`
+instead requires explicit actual both-pass gap coverage for every printed
+group and every named non-cutting step, complete actual tool-step census,
+actual hardware extents, the four physical primary records, explicit bearing
+all-material containment and actual wire swept-void proof. During the
+travel-design hold even an otherwise complete positive-gap matrix returns
+**UNVERIFIED**, not VERIFIED_GEOMETRY_ONLY. Known local gap shortfalls remain
+POTENTIAL_CONFLICT diagnostics. This temporary refusal is not a completed
+installed-clearance implementation: a real user-approved travel constraint
+and derived all-support enclosure must precede restored conditional positive
+acceptance. Synthetic/CAD cases are never actual installed evidence.
 
 
 ## Drawing package layout

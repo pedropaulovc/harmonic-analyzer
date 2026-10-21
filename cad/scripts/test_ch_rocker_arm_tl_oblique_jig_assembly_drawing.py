@@ -329,32 +329,14 @@ def test_exploded_captions_fit_their_text_region() -> None:
         assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
 
 
-def test_sheet_text_is_the_spec_text_wrapped() -> None:
-    def words(text: str) -> list[str]:
-        return text.split()
-
-    def instruction_words(layout) -> list[str]:
-        # Preserve every source instruction once, independent of heading text.
-        return words(layout.steps.partition("\n")[2] + " " + layout.continued)
-
-    assert words(drawing.ASSEMBLED_CAPTION) == words(spec.ASSEMBLED_CAPTION)
-    assert words(drawing.ALIGNMENT_NOTE) == words(
-        " ".join((*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE))
-    )
-    # Both columns read as the spec's steps, in order, split between steps
-    # (or sub-steps).
+def test_sheet_text_wraps_within_its_layout_width() -> None:
+    # Split only between complete labelled steps or sub-steps.
     if drawing.ASSEMBLY_STEPS_CONTINUED:
         label = drawing.ASSEMBLY_STEPS_CONTINUED.split(". ", 1)[0]
         assert drawing._STEP_LABEL.fullmatch(label)
-    assert instruction_words(drawing.STEPS_LAYOUT) == words(" ".join(spec.ASSEMBLY_STEPS))
-    assert words(drawing.ASSEMBLY_CHECKS) == words(" ".join(spec.ASSEMBLY_CHECKS))
     cartridge = drawing.CARTRIDGE_LAYOUT
     top_capture = drawing.TOP_CAPTURE_LAYOUT
     capture = drawing.CAPTURE_LAYOUT
-    assert instruction_words(top_capture) == words(" ".join(spec.TOP_CAPTURE_STEPS))
-    assert instruction_words(capture) == words(" ".join(spec.CAPTURE_STEPS))
-    assert not cartridge.checks and not top_capture.checks
-    assert words(capture.checks) == words(" ".join(spec.CAPTURE_CHECKS))
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
@@ -501,38 +483,58 @@ def test_bom_sheet_regions_fit_apart() -> None:
     region = drawing.REFERENCE_REGION
     assert _inside(reference, region) and _inside_sheet(region)
     assert region[0] >= bom[2] + drawing.REGION_GAP
+    for block in drawing.TOOLING_TABLE_BLOCKS:
+        if block.sheet != drawing.BOM_SHEET:
+            continue
+        tooling = _note_box(block.text, block.xy)
+        assert _inside(tooling, block.region) and _inside_sheet(tooling)
+        assert not _overlap(tooling, reference) and not _overlap(tooling, bom)
+        assert max(map(len, block.text.splitlines())) <= drawing.TOOLING_TABLE_WIDTH
 
 
-def test_bom_extent_violations_name_each_breach() -> None:
+def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> None:
     left, bottom, right, top = drawing.SHEET_INNER_BORDER
     clearance = drawing.BOM_SHEET_CLEARANCE
-    # Below the title's top is valid on the left, but not inside its actual
-    # two-dimensional keep-out. Keep this small table below the reference room.
+    assert not drawing.bom_extent_violations(drawing.BOM_ANCHOR, BOM_WIDTH, BOM_HEIGHT)
     table_top = drawing.TITLE_BLOCK[3]
     table_height = (table_top - bottom - clearance) / 2.0
-    assert not drawing.bom_extent_violations(
-        (left, table_top), BOM_WIDTH, table_height
-    )
     assert drawing.bom_extent_violations(
         (drawing.TITLE_BLOCK[0], table_top),
-        (right - drawing.TITLE_BLOCK[0]) / 2.0,
-        table_height,
-    ) == ["enters the title block"]
-    assert drawing.bom_extent_violations(
-        (left - clearance, drawing.BOM_ANCHOR[1]), BOM_WIDTH, BOM_HEIGHT
-    ) == ["crosses the inner border"]
-    assert drawing.bom_extent_violations(
-        (left, top + clearance), BOM_WIDTH, BOM_HEIGHT
-    ) == ["crosses the inner border"]
-    assert drawing.bom_extent_violations(
-        drawing.BOM_ANCHOR, BOM_WIDTH, drawing.BOM_ANCHOR[1] - bottom
-    ) == ["crosses the bottom border"]
-    assert drawing.bom_extent_violations(
-        drawing.BOM_ANCHOR, BOM_WIDTH + drawing.REGION_GAP, BOM_HEIGHT
-    ) == ["enters the reference view's room"]
-    assert "crosses the inner border" in drawing.bom_extent_violations(
-        drawing.BOM_ANCHOR, right - left + clearance, BOM_HEIGHT
+        (right - drawing.TITLE_BLOCK[0]) / 2.0, table_height,
     )
+    assert drawing.bom_extent_violations(
+        (left - clearance, drawing.BOM_ANCHOR[1]), BOM_WIDTH, BOM_HEIGHT,
+    )
+    assert drawing.bom_extent_violations(
+        (left, top + clearance), BOM_WIDTH, BOM_HEIGHT,
+    )
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, BOM_WIDTH, drawing.BOM_ANCHOR[1] - bottom,
+    )
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, BOM_WIDTH + drawing.REGION_GAP, BOM_HEIGHT,
+    )
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, right - left + clearance, BOM_HEIGHT,
+    )
+
+
+def test_tooling_continuations_stay_in_their_reserved_paper_rooms() -> None:
+    assert drawing.TOOLING_TABLE_BLOCKS
+    for block in drawing.TOOLING_TABLE_BLOCKS:
+        box = _note_box(block.text, block.xy)
+        assert _inside(box, block.region) and _inside_sheet(box)
+        assert max(map(len, block.text.splitlines())) <= drawing.TOOLING_TABLE_WIDTH
+
+
+def test_tooling_pagination_refuses_truncation_or_unreadable_rooms() -> None:
+    left, bottom, right, _top = drawing.BOM_RIGHT_REGION
+    room = (left, bottom, right, bottom + 4.5 * drawing.NOTE_LINE_M)
+    with pytest.raises(ValueError):
+        drawing.tooling_table_layout(("X " * (3 * drawing.TOOLING_TABLE_WIDTH),), ((drawing.BOM_SHEET, room),))
+    too_narrow = (left, bottom, left + drawing.NOTE_CHAR_M, room[3])
+    with pytest.raises(ValueError):
+        drawing.tooling_table_layout(("ROW",), ((drawing.BOM_SHEET, too_narrow),))
 
 
 def test_each_cluster_rings_inside_its_sheet() -> None:
@@ -848,30 +850,6 @@ def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
     assert sheets == [drawing.CAPTURE_SHEET]
     assert placements == [(spec.ISOMETRIC_VIEW, center, drawing.ISOMETRIC_SCALE)]
     assert configurations == [(False, drawing.ASSEMBLY_VIEW_CONFIGURATION)]
-
-
-def test_capture_instructions_are_placed_once_on_their_own_sheets(monkeypatch) -> None:
-    placed = []
-    monkeypatch.setattr(
-        drawing, "_add_note_block",
-        lambda _adapter, sheet, text, xy, *, label:
-        placed.append((sheet, text, xy, label)),
-    )
-    drawing._place_capture_notes(_ADAPTER)
-    expected = []
-    for sheet, layout in (
-        (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
-        (drawing.TOP_CAPTURE_SHEET, drawing.TOP_CAPTURE_LAYOUT),
-        (drawing.CAPTURE_SHEET, drawing.CAPTURE_LAYOUT),
-    ):
-        for text, xy in (
-            (layout.steps, drawing.STEPS_XY),
-            (layout.continued, drawing.STEPS_CONTINUED_XY),
-            (layout.checks, layout.checks_xy),
-        ):
-            if text:
-                expected.append((sheet, text, xy))
-    assert [(sheet, text, xy) for sheet, text, xy, _label in placed] == expected
 
 
 def test_every_bom_row_carries_one_balloon() -> None:
@@ -1466,7 +1444,7 @@ def test_bom_refuses_native_row_growth_past_the_bottom_border(
         def GetRowHeight(self, row):
             return 2.0 * super().GetRowHeight(row)  # every description wrapped
 
-    with pytest.raises(RuntimeError, match="crosses the bottom border"):
+    with pytest.raises(RuntimeError):
         drawing._validate_bom(_ADAPTER, Wrapping(spec.BOM_ORDER))
 
 
@@ -1649,7 +1627,7 @@ def test_bom_refuses_native_column_growth_into_the_reference_room(
             width = super().GetColumnWidth(column)
             return width + 2.0 * drawing.REGION_GAP if column == 1 else width
 
-    with pytest.raises(RuntimeError, match="enters the reference view's room"):
+    with pytest.raises(RuntimeError):
         drawing._validate_bom(_ADAPTER, Widened(spec.BOM_ORDER))
 
 

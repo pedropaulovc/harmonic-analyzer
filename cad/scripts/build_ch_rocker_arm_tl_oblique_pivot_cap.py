@@ -154,31 +154,6 @@ def _register_chamfer_maximum(adapter):
         raise RuntimeError("register chamfer MAX band did not persist")
 
 
-async def _entry_reliefs(adapter):
-    """Flat-bottom underhead fillet reliefs, starting at the real head-seat Z."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
-    dims = SketchDims()
-    check("underhead entry relief profile", await adapter.create_sketch(spec.BOLT_SEAT_PLANE))
-    for index, (x, y) in enumerate(spec.BOLT_POINTS, 1):
-        await define_circle(
-            adapter, x, y, spec.ENTRY_RELIEF_DIA / 2.0, f"entry relief {index}",
-            dims=dims,
-            names=(f"Entry{index}X", f"Entry{index}Y", "EntryReliefDia" if index == 1 else f"EntryReliefDia{index}"),
-            drives=('"BoltX"', '"BoltY"', '"EntryReliefDia"'),
-        )
-    await ensure_fully_defined(adapter, "underhead entry relief profile")
-    check("exit underhead entry relief profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "EntryReliefProfile")
-    jobs = dims.apply(adapter, "EntryReliefProfile")
-    check("flat-bottom underhead entry reliefs", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=spec.ENTRY_RELIEF_DEPTH),
-    ))
-    name_last_feature(adapter, "EntryReliefs")
-    jobs.append((name_dimensions(adapter, "EntryReliefs", ["EntryReliefDepth"])[0], '"EntryReliefDepth"'))
-    return jobs
-
-
 async def _section_reference(adapter):
     """A named hidden sketch IN A-A owns its two imported linear sizes."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
@@ -226,7 +201,6 @@ async def build(adapter) -> dict[str, str]:
         "RegisterX": abs(spec.REGISTER_POINTS[0][0]), "RegisterY": abs(spec.REGISTER_POINTS[0][1]),
         "RegisterDia": spec.REGISTER_DIA, "RegisterProjection": spec.REGISTER_PROJECTION,
         "RegisterEndChamfer": spec.REGISTER_END_CHAMFER_MAX,
-        "EntryReliefDia": spec.ENTRY_RELIEF_DIA, "EntryReliefDepth": spec.ENTRY_RELIEF_DEPTH,
     }
     for name, value in knobs.items():
         await set_global(adapter, name, f"{value}mm")
@@ -242,13 +216,11 @@ async def build(adapter) -> dict[str, str]:
     jobs.append((name_dimensions(adapter, "Cap", ["CapThickness"])[0], '"CapHeight"'))
     await volume_check(adapter, "cap blank", spec.WIDTH * spec.LENGTH * spec.HEIGHT, 0.1)
 
-    for name, offset, expression in (
-        (spec.TOP_PLANE, spec.HEIGHT, '"CapHeight"'),
-        (spec.BOLT_SEAT_PLANE, spec.HEIGHT - spec.COUNTERBORE_DEPTH, '"CapHeight"-"CounterboreDepth"'),
-    ):
-        check(name, await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=offset)))
-        name_last_feature(adapter, name)
-        jobs.append((name_dimensions(adapter, name, [f"{name}Offset"])[0], expression))
+    check(spec.TOP_PLANE, await adapter.create_plane(CreatePlaneParameters(
+        mode="offset", base_plane="Front Plane", offset=spec.HEIGHT,
+    )))
+    name_last_feature(adapter, spec.TOP_PLANE)
+    jobs.append((name_dimensions(adapter, spec.TOP_PLANE, [f"{spec.TOP_PLANE}Offset"])[0], '"CapHeight"'))
 
     for profile, cut, plane, dia, depth, reverse, both in (
         ("PocketProfile", "FlangePocket", "Front", spec.POCKET_DIA, spec.POCKET_DEPTH, True, False),
@@ -287,11 +259,10 @@ async def build(adapter) -> dict[str, str]:
         name_last_feature(adapter, cut)
         jobs.append((name_dimensions(adapter, cut, ["CounterboreDepth" if cut == "HeadRecesses" else "BoltCutDepth"])[0], '"CounterboreDepth"' if cut == "HeadRecesses" else '2*"CapHeight"'))
 
-    jobs += await _entry_reliefs(adapter)
-
     # Separate rectangles overlap the already-cut circular recesses. The
-    # outside endpoint overruns the stock by 1 mm to leave a genuinely open
-    # mouth, not a coincident-edge slit. Width matches the actual recess.
+    # outside endpoint overruns the stock by 1 mm: the complete X section is
+    # open across the recess width, not a circular pocket with a thin outer
+    # wall. Its full-depth mouth retains the same actual fitted floor minimum.
     for index, (x, y) in enumerate(spec.BOLT_POINTS, 1):
         edge = (spec.WIDTH / 2.0 + 1.0) * (1.0 if x > 0.0 else -1.0)
         x0, x1 = sorted((x, edge))
@@ -313,7 +284,7 @@ async def build(adapter) -> dict[str, str]:
     for axis, (x, y) in zip(spec.BOLT_AXES, spec.BOLT_POINTS, strict=True):
         await name_bore_axis(adapter, "Right Plane", x, "Top Plane", y, axis, drive_a='"BoltX"', drive_b='"BoltY"', drive_jobs=jobs)
         name_last_feature(adapter, axis)
-    blank_reference_geometry(adapter, ((spec.TOP_PLANE, "PLANE"), (spec.BOLT_SEAT_PLANE, "PLANE"), (spec.SECTION_PLANE, "PLANE")))
+    blank_reference_geometry(adapter, ((spec.TOP_PLANE, "PLANE"), (spec.SECTION_PLANE, "PLANE")))
     await force_rebuild(adapter)
     for dimension, expression in jobs:
         await drive_dimension(adapter, dimension, expression)
@@ -324,22 +295,24 @@ async def build(adapter) -> dict[str, str]:
     if len(bodies) != 1:
         raise RuntimeError(f"cap: expected one solid, found {len(bodies)}")
     set_dimension_bilateral_tolerance(adapter, "PocketProfile", "PocketDia", *deviations(spec.POCKET_BAND))
-    set_dimension_bilateral_tolerance(adapter, "ApertureProfile", "ApertureDia", *deviations(spec.APERTURE_BAND))
-    set_dimension_bilateral_tolerance(adapter, "BoltProfile", "BoltHoleDia", *deviations(spec.DRILLED_BAND))
-    for index in range(1, len(spec.BOLT_POINTS) + 1):
-        name = "EntryReliefDia" if index == 1 else f"EntryReliefDia{index}"
-        set_dimension_bilateral_tolerance(adapter, "EntryReliefProfile", name, *deviations(spec.ENTRY_RELIEF_BAND))
     for name in ("RegisterDia", "RegisterDia2"):
         set_dimension_bilateral_tolerance(adapter, "RegisterProfile", name, *deviations(spec.REGISTER_BAND))
     _register_chamfer_maximum(adapter)
-    # Fitted nominal is reference, not a second controlling depth band.
-    display, dimension = _named_dimension(adapter, spec.SECTION_REFERENCE, "PocketDepth")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 0  # swTolNONE
-    display.SetText(1, "(")
-    display.SetText(2, ")")
-    if str(display.GetText(1)) != "(" or str(display.GetText(2)) != ")" or int(tolerance.Type) != 0:
-        raise RuntimeError("pocket reference notation did not persist")
+    # Both fitted cuts retain representative model geometry, not a second
+    # controlling depth band. Verify their native values and REF notation.
+    for feature, name, nominal in (
+        (spec.SECTION_REFERENCE, "PocketDepth", spec.POCKET_DEPTH),
+        ("HeadRecesses", "CounterboreDepth", spec.COUNTERBORE_DEPTH),
+    ):
+        display, dimension = _named_dimension(adapter, feature, name)
+        if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
+            raise RuntimeError(f"{name}: reference nominal does not match its native cut")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 0  # swTolNONE
+        display.SetText(1, "(")
+        display.SetText(2, ")")
+        if str(display.GetText(1)) != "(" or str(display.GetText(2)) != ")" or int(tolerance.Type) != 0:
+            raise RuntimeError(f"{name}: reference notation did not persist")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)

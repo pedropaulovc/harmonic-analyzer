@@ -10,14 +10,17 @@ seated. Bearing axial behavior is not part of this acceptance.
 Two integral underside registers locate the cap in the block's flat-bottom
 receivers. Their free ends are chamfered; the roots remain unrelieved.
 
-The four circular counterbores are open to their nearest X edge over their
-FULL width and depth. Separate, shallower channels carry the doubled wire
-and tails between X pairs. No screw head, single wire, twist or tail may
-project above the cap plane. Safety-wire workmanship is accepted installed;
-these voids alone do not prove tightening-direction routing or bump strength.
-The head seat carries a localized flat-bottom entry relief for the sourced
-screw's underhead fillet. The remaining annular neck is positive geometry,
-not a two-millimetre body wall and not a preload/load-capacity certification.
+The four circular counterbores are fitted to the actual installed screw heads;
+their nominal depth is reference-only. Their FULL width and depth open to the
+nearest X edge, with the actual whole floor and mouths retained. Separate,
+shallower channels carry the doubled wire and tails between X pairs. No head
+or installed wire may project above the cap plane. The representative normal
+wire route is only a diagnostic. The separate whole-route capture proof is
+conditional on actual continuous-route acceptance and fixed heads; it gives
+no wire/contact stop, structural, universal head-clocking or elastic credit.
+Each screw has one cylindrical through bore below its head counterbore.
+That same bore clears the sourced underhead fillet; there is no intermediate
+entry shelf and no preload/load-capacity certification.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ import math
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
 import ch_rocker_arm_tl_vn_oblique_pivot_lock_wire_spec as lock_wire
+import ch_rocker_arm_tl_oblique_cap_wire_clearance as wire_capture
 from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -42,6 +46,9 @@ BOLT_POINTS = retention.CAP_BOLT_CENTERS
 HOLE_DIA = retention.CAP_BOLT_CLEARANCE_DIAMETER
 COUNTERBORE_DIA = retention.CAP_COUNTERBORE_DIAMETER
 COUNTERBORE_DEPTH = retention.CAP_COUNTERBORE_DEPTH
+HEAD_RECESS_MIN = retention.CAP_HEAD_RECESS_MIN
+HEAD_RECESS_MAX = retention.CAP_HEAD_RECESS_MAX
+COUNTERBORE_FLOOR_MIN = retention.CAP_COUNTERBORE_FLOOR_MIN
 CHANNEL_WIDTH = retention.CAP_WIRE_CHANNEL_WIDTH
 CHANNEL_DEPTH = retention.CAP_WIRE_CHANNEL_DEPTH
 REGISTER_POINTS = retention.CAP_REGISTER_CENTERS
@@ -53,11 +60,8 @@ REGISTER_PROJECTION_PLACES = retention.CAP_REGISTER_PROJECTION_PLACES
 REGISTER_END_CHAMFER_MAX = retention.CAP_REGISTER_END_CHAMFER_MAX
 TOTAL_HEIGHT = HEIGHT + REGISTER_PROJECTION
 APERTURE_BAND = retention.CAP_APERTURE_BAND
-ENTRY_RELIEF_DIA = retention.CAP_ENTRY_RELIEF_DIAMETER
-ENTRY_RELIEF_BAND = retention.CAP_ENTRY_RELIEF_BAND
-ENTRY_RELIEF_DEPTH = retention.CAP_ENTRY_RELIEF_DEPTH
-ENTRY_RELIEF_DEPTH_PLACES = retention.CAP_ENTRY_RELIEF_DEPTH_PLACES
-ENTRY_RELIEF_DIAMETER_PLACES = 2
+# Existing blank authority: cad/config/parts/ch-rocker-arm-tl-oblique-pivot-cap.yaml,
+# material_specification and process (including the minimum supplied length).
 STOCK_THICKNESS = 0.625 * 25.4
 STOCK_WIDTH = 2.5 * 25.4
 POCKET_BAND = retention.CAP_POCKET_DIAMETER_BAND
@@ -68,7 +72,6 @@ SCREW_THREAD_SOURCE_URL = hardware.SCREW_THREAD_SOURCE_URL
 SCREW_SKU = hardware.SCREW_SKU
 HEAD_DIAMETER_MAX = hardware.SCREW_HEAD_DIA_MAX
 HEAD_BEARING_DIAMETER_MIN = retention.CAP_BOLT_HEAD_BEARING_DIAMETER_MIN
-HEAD_HEIGHT_MAX = hardware.SCREW_HEAD_HEIGHT_MAX
 WIRE_DIAMETER = hardware.WIRE_DIA
 if HOLE_DIA < SCREW_MAJOR_LIMITS[1]:
     raise AssertionError("the minimum cap clearance hole will not pass the sourced screw")
@@ -78,28 +81,79 @@ OUTLINE_PLACES = retention.CAP_OUTLINE_PLACES
 CENTER_LOCATION_PLACES = retention.CAP_CENTER_LOCATION_PLACES
 CENTER_LOCATION_NOTE = "CENTRE X FROM COMMON -X STOCK EDGE; Y FROM COMMON -Y STOCK EDGE"
 POSITION_PLACES = retention.CAP_BOLT_LOCATION_PLACES
-COUNTERBORE_DEPTH_PLACES = retention.CAP_COUNTERBORE_DEPTH_PLACES
 COUNTERBORE_DIAMETER_PLACES = retention.CAP_COUNTERBORE_DIAMETER_PLACES
 CHANNEL_PLACES = retention.CAP_WIRE_CHANNEL_PLACES
 POSITION_TOLERANCE = printed_band_mm(POSITION_PLACES)
 HEIGHT_TOLERANCE = printed_band_mm(HEIGHT_PLACES)
 CHAMBER_EXCESS_MIN, CHAMBER_EXCESS_MAX = retention.CAP_CHAMBER_EXCESS
-LOWER_GAP_MIN, LOWER_GAP_MAX = retention.PIN_LOWER_GAP
 FITTED_POCKET_DEPTH_MAX = (
     retention.PIN_FLANGE_THICK
     + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
     + CHAMBER_EXCESS_MAX
 )
-COUNTERBORE_DEPTH_TOLERANCE = printed_band_mm(COUNTERBORE_DEPTH_PLACES)
 
 AXIS_NAME = "CaptureAxis"
 BOTTOM_PLANE = "Front Plane"
 TOP_PLANE = "CapTop"
 BOLT_AXES = tuple(f"CapBoltAxis{index}" for index in range(1, 5))
-BOLT_SEAT_PLANE = "CapBoltSeats"
 SECTION_PLANE = "CapSectionPlane"
 SECTION_REFERENCE = "CapSectionReference"
 REFERENCE_SKETCHES = (SECTION_REFERENCE,)
+
+
+def fitted_counterbore_acceptance(
+    *, head_recess: float, whole_floor_min: float, forced_fit: bool = False,
+) -> dict[str, float]:
+    """Accept measured NORMAL highest-head recess and the actual whole floor.
+
+    Recess is normal to the actual top with the identified screws seated.
+    The minimum floor includes every full-width outward mouth. These are
+    actual matched-hardware limits, not a tolerance on the REF model depth.
+    An incompatible head/floor slope cannot be accepted by forcing the fit.
+    """
+    if not all(math.isfinite(value) for value in (head_recess, whole_floor_min)):
+        raise ValueError("fitted counterbore measurements must be finite")
+    if forced_fit:
+        raise ValueError("fitted counterbore cannot require a forced fit")
+    # Picometre-scale equality absorbs subtraction roundoff at an exact
+    # limit; it is not an extra manufacturing allowance.
+    below = head_recess < HEAD_RECESS_MIN and not math.isclose(head_recess, HEAD_RECESS_MIN, rel_tol=0.0, abs_tol=1e-12)
+    above = head_recess > HEAD_RECESS_MAX and not math.isclose(head_recess, HEAD_RECESS_MAX, rel_tol=0.0, abs_tol=1e-12)
+    if below or above:
+        raise ValueError("fitted counterbore actual head recess is outside acceptance")
+    if whole_floor_min < COUNTERBORE_FLOOR_MIN:
+        raise ValueError("fitted counterbore whole floor/mouth is below acceptance")
+    return {"head_recess": head_recess, "whole_floor_min": whole_floor_min}
+
+
+def require_fitted_counterbore_geometry(
+    *, height: float = HEIGHT, counterbore_depth: float = COUNTERBORE_DEPTH,
+    actual_floor_min: float = COUNTERBORE_FLOOR_MIN,
+) -> dict[str, float]:
+    """Keep the representative native cut inside a constructive fitted window.
+
+    The native mean-height head is normal and seated. Its cut must meet the
+    actual recess acceptance and leave material even in a minimum-height cap.
+    Separately, the shared helper proves a parallel-floor machining window
+    for the full hardware/angular envelope; it does not waive actual fit-up.
+    """
+    if not all(math.isfinite(value) for value in (height, counterbore_depth, actual_floor_min)):
+        raise ValueError("fitted counterbore geometry must be finite")
+    if counterbore_depth <= 0.0:
+        raise ValueError("fitted counterbore nominal depth must be positive")
+    bounds = retention.fitted_counterbore_bounds(height=height)
+    nominal_floor = height - HEIGHT_TOLERANCE - counterbore_depth
+    accepted = fitted_counterbore_acceptance(
+        head_recess=counterbore_depth - hardware.SCREW_HEAD_HEIGHT,
+        whole_floor_min=min(actual_floor_min, nominal_floor),
+    )
+    if not bounds.depth_at_head_min <= counterbore_depth <= bounds.depth_at_head_max:
+        raise ValueError("fitted counterbore nominal cut is outside the constructive fit window")
+    return {
+        "nominal_head_recess": accepted["head_recess"],
+        "nominal_floor": nominal_floor,
+        "parallel_cut_floor": bounds.parallel_cut_floor_min,
+    }
 
 
 def clearance_geometry(
@@ -109,6 +163,7 @@ def clearance_geometry(
     hole_dia: float = HOLE_DIA, channel_width: float = CHANNEL_WIDTH,
     channel_depth: float = CHANNEL_DEPTH, points: tuple = BOLT_POINTS,
     fitted_pocket_depth_max: float = FITTED_POCKET_DEPTH_MAX,
+    actual_floor_min: float = COUNTERBORE_FLOOR_MIN,
 ) -> dict[str, float]:
     """Source-only worst-case material margins; never a load certificate.
 
@@ -117,7 +172,9 @@ def clearance_geometry(
     common -X/-Y stock corner. The opposite edge can be a full outline band
     nearer that corner, independently of the centre error. Shared pocket
     location cancels from pocket-to-bolt/channel margins. Mouths open at X;
-    no fictitious outside-X wall is counted.
+    no fictitious outside-X wall is counted. The actual whole-floor acceptance
+    governs fitted recesses; the representative nominal cut is also checked
+    for breakthrough, never assigned an invented depth tolerance.
     """
     cb_r = (counterbore_dia + printed_band_mm(COUNTERBORE_DIAMETER_PLACES)) / 2.0
     pocket_r = (pocket_dia + POCKET_BAND[0]) / 2.0
@@ -127,7 +184,7 @@ def clearance_geometry(
     center_band = printed_band_mm(CENTER_LOCATION_PLACES)
     near = tuple((abs(x) - POSITION_TOLERANCE, abs(y) - POSITION_TOLERANCE) for x, y in points)
     return {
-        "counterbore_floor": height - HEIGHT_TOLERANCE - counterbore_depth - COUNTERBORE_DEPTH_TOLERANCE,
+        "counterbore_floor": min(actual_floor_min, height - HEIGHT_TOLERANCE - counterbore_depth),
         "channel_floor": height - HEIGHT_TOLERANCE - channel_depth - printed_band_mm(CHANNEL_PLACES),
         "chamber_roof": height - HEIGHT_TOLERANCE - fitted_pocket_depth_max,
         "counterbore_to_chamber": min(math.hypot(x, y) - cb_r - pocket_r for x, y in near),
@@ -140,9 +197,13 @@ def clearance_geometry(
 
 
 def require_clearance_geometry(**changes: float) -> dict[str, float]:
+    require_fitted_counterbore_geometry(**{
+        name: changes[name] for name in ("height", "counterbore_depth", "actual_floor_min")
+        if name in changes
+    })
     margins = clearance_geometry(**changes)
     for name, value in margins.items():
-        if value < 2.0:
+        if not math.isfinite(value) or value < 2.0:
             raise ValueError(f"cap {name}: {value:.4f} mm is below the 2 mm material target")
     return margins
 
@@ -153,6 +214,7 @@ def register_clearance_geometry(
     pocket_dia: float = POCKET_DIA, aperture_dia: float = APERTURE_DIA,
     width: float = WIDTH, length: float = LENGTH, height: float = HEIGHT,
     counterbore_depth: float = COUNTERBORE_DEPTH, channel_depth: float = CHANNEL_DEPTH,
+    actual_floor_min: float = COUNTERBORE_FLOOR_MIN,
 ) -> dict[str, float]:
     """Conservative register-root material, including vertically separate voids.
 
@@ -177,84 +239,64 @@ def register_clearance_geometry(
         "register_to_aperture": nearest_axis - radius - (aperture_dia + APERTURE_BAND[0]) / 2.0,
         "register_to_x_edge": width / 2.0 - edge_error - max(abs(x) for x, _ in register_points) - radius,
         "register_to_y_edge": length / 2.0 - edge_error - max(abs(y) for _, y in register_points) - radius,
-        "register_to_head_void_floor": height - HEIGHT_TOLERANCE - counterbore_depth - COUNTERBORE_DEPTH_TOLERANCE,
+        "register_to_head_void_floor": min(actual_floor_min, height - HEIGHT_TOLERANCE - counterbore_depth),
         "register_to_wire_void_floor": height - HEIGHT_TOLERANCE - channel_depth - printed_band_mm(CHANNEL_PLACES),
     }
 
 
 def require_register_geometry(**changes: float) -> dict[str, float]:
+    require_fitted_counterbore_geometry(**{
+        name: changes[name] for name in ("height", "counterbore_depth", "actual_floor_min")
+        if name in changes
+    })
     margins = register_clearance_geometry(**changes)
     for name, value in margins.items():
-        if value < 2.0:
+        if not math.isfinite(value) or value < 2.0:
             raise ValueError(f"cap {name}: {value:.4f} mm is below the 2 mm material target")
     return margins
 
 
-def entry_relief_geometry(
-    *, height: float = HEIGHT, counterbore_depth: float = COUNTERBORE_DEPTH,
-    entry_depth: float = ENTRY_RELIEF_DEPTH, entry_dia: float = ENTRY_RELIEF_DIA,
-    hole_dia: float = HOLE_DIA, pocket_dia: float = POCKET_DIA,
-    head_bearing_dia_min: float = HEAD_BEARING_DIAMETER_MIN,
-) -> dict[str, float]:
-    """Actual relief boundaries; the localized annular neck is not a 2 mm wall.
-
-    The flat-head land is a concentric size margin only, using the effective
-    bearing OD after its edge break. No head runout, displaced-head radial
-    land, clamp friction or load certification is inferred.
-    """
-    entry_radius = (entry_dia + ENTRY_RELIEF_BAND[0]) / 2.0
-    relative = POSITION_TOLERANCE + printed_band_mm(REGISTER_LOCATION_PLACES)
-    return {
-        "entry_annular_neck": height - HEIGHT_TOLERANCE - counterbore_depth - COUNTERBORE_DEPTH_TOLERANCE - entry_depth - printed_band_mm(ENTRY_RELIEF_DEPTH_PLACES),
-        "entry_to_pocket": min(math.hypot(abs(x) - POSITION_TOLERANCE, abs(y) - POSITION_TOLERANCE) for x, y in BOLT_POINTS) - entry_radius - (pocket_dia + POCKET_BAND[0]) / 2.0,
-        "entry_to_register": min(
-            math.hypot(max(abs(x - bx) - relative, 0.0), max(abs(y - by) - relative, 0.0))
-            for x, y in REGISTER_POINTS for bx, by in BOLT_POINTS
-        ) - entry_radius - (REGISTER_DIA + REGISTER_BAND[0]) / 2.0,
-        "entry_inside_head_seat": (COUNTERBORE_DIA - printed_band_mm(COUNTERBORE_DIAMETER_PLACES)) / 2.0 - entry_radius,
-        "head_flat_concentric_land": (head_bearing_dia_min - 2.0 * entry_radius) / 2.0,
-        "entry_expansion_over_through_hole": (entry_dia + ENTRY_RELIEF_BAND[1] - hole_dia - DRILLED_BAND[0]) / 2.0,
-    }
-
-
-def require_entry_relief_geometry(**changes: float) -> dict[str, float]:
-    margins = entry_relief_geometry(**changes)
-    for name, value in margins.items():
-        if (name == "entry_to_pocket" and value < 2.0) or value <= 0.0:
-            raise ValueError(f"cap {name}: {value:.4f} mm fails the entry relief boundary")
-    return margins
+def require_fitted_head_capture(*, bounds: retention.CaptureBounds | None = None) -> float:
+    """Use the actual fitted-head/captured proof, not an axial REF-depth stack."""
+    if bounds is None:
+        bounds = retention.capture_bounds()
+    clearance = bounds.cap_head_running_clearance
+    if not math.isfinite(clearance) or clearance <= 0.0:
+        raise ValueError("cap fitted head loses captured running clearance")
+    return clearance
 
 
 def wire_clearance_geometry(
     *, wire_bounds: tuple[float, float] | None = None,
     counterbore_depth: float = COUNTERBORE_DEPTH,
-    channel_depth: float = CHANNEL_DEPTH, head_height_max: float = HEAD_HEIGHT_MAX,
+    channel_depth: float = CHANNEL_DEPTH,
+    head_seating_gap_max: float = retention.CAP_HEAD_SEATING_GAP_MAX,
 ) -> dict[str, float]:
-    """The actual formed side route, measured from the screw head-seat plane.
+    """Representative hand-formed side route in the NORMAL nominal cap pose.
 
-    Head height/W endpoints are spent by the wire provider. Head-seat depth
-    and channel depth vary independently; body height cancels. Nothing here
-    assumes a wire crosses over the head top.
+    The unchanged provider includes its hardware-height/hole endpoints. The
+    allowed underhead gap raises the head and route together; the shallowest
+    channel includes its own ordinary depth band. The head-seat depth is the
+    representative nominal cut, NOT a manufacturing depth interval.
+
+    Positive values show this normal route's vertical feasibility only.
+    They prove neither all accepted floor/head slopes nor contact-free cap
+    motion, wire flexibility, channel stops or structural retention.
     """
     wire_low, wire_high = wire_bounds if wire_bounds is not None else lock_wire.swept_wire_z_bounds(hardware_limits=True)
     return {
-        "head_below_cap": counterbore_depth - COUNTERBORE_DEPTH_TOLERANCE - head_height_max,
-        "formed_wire_below_cap": counterbore_depth - COUNTERBORE_DEPTH_TOLERANCE - wire_high,
-        "formed_wire_above_channel_floor": wire_low - (counterbore_depth + COUNTERBORE_DEPTH_TOLERANCE - channel_depth + printed_band_mm(CHANNEL_PLACES)),
+        "formed_wire_below_cap": counterbore_depth - wire_high - head_seating_gap_max,
+        "formed_wire_above_channel_floor": wire_low - (counterbore_depth - channel_depth + printed_band_mm(CHANNEL_PLACES)),
     }
 
 
 def require_wire_clearance_geometry(**changes) -> dict[str, float]:
+    """Guard the representative NORMAL source route, not captured motion."""
     margins = wire_clearance_geometry(**changes)
     for name, value in margins.items():
-        if value <= 0.0:
-            raise ValueError(f"cap {name}: {value:.4f} mm fails the formed wire envelope")
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError(f"cap {name}: {value:.4f} mm fails representative NORMAL wire feasibility")
     return margins
-
-
-def nominal_entry_relief_volume_mm3() -> float:
-    """Flat-bottom annuli below the head seat; through holes are already void."""
-    return len(BOLT_POINTS) * math.pi * (ENTRY_RELIEF_DIA**2 - HOLE_DIA**2) / 4.0 * ENTRY_RELIEF_DEPTH
 
 
 def nominal_register_volume_mm3() -> float:
@@ -290,13 +332,15 @@ def nominal_volume_mm3() -> float:
     pair_span = max(x for x, _ in BOLT_POINTS) - min(x for x, _ in BOLT_POINTS)
     row_count = len({y for _, y in BOLT_POINTS})
     total -= row_count * (pair_span * CHANNEL_WIDTH - 2.0 * half_strip) * CHANNEL_DEPTH
-    return total - nominal_entry_relief_volume_mm3() + nominal_register_volume_mm3()
+    return total + nominal_register_volume_mm3()
 
 
 GEOMETRY_MARGINS = require_clearance_geometry()
 REGISTER_GEOMETRY_MARGINS = require_register_geometry()
-ENTRY_RELIEF_MARGINS = require_entry_relief_geometry()
+FITTED_COUNTERBORE_GEOMETRY = require_fitted_counterbore_geometry()
+FITTED_HEAD_RUNNING_CLEARANCE = require_fitted_head_capture()
 WIRE_GEOMETRY_MARGINS = require_wire_clearance_geometry()
+WIRE_CAPTURE_BOUNDS = wire_capture.require_wire_capture_geometry()
 VOLUME_MM3 = nominal_volume_mm3()
 DRAWING_DIMENSIONS = {
     "CapProfile": {"CapWidth", "CapLength"},
@@ -305,8 +349,6 @@ DRAWING_DIMENSIONS = {
     "BoltProfile": {"BoltHoleDia", *(f"Bolt{index}{axis}" for index in range(1, 5) for axis in ("X", "Y"))},
     "HeadProfile": {"CounterboreDia"},
     "HeadRecesses": {"CounterboreDepth"},
-    "EntryReliefProfile": {"EntryReliefDia"},
-    "EntryReliefs": {"EntryReliefDepth"},
     "WireProfile1": {"WireWidth"},
     "WireChannels1": {"WireDepth"},
     SECTION_REFERENCE: {"CapHeight", "PocketDepth"},
@@ -320,9 +362,7 @@ DRAWING_PRECISION = {
     "ApertureProfile": {"ApertureCenterX": CENTER_LOCATION_PLACES, "ApertureCenterY": CENTER_LOCATION_PLACES, "ApertureDia": 2},
     "BoltProfile": {"BoltHoleDia": 2, **{f"Bolt{index}{axis}": POSITION_PLACES for index in range(1, 5) for axis in ("X", "Y")}},
     "HeadProfile": {"CounterboreDia": COUNTERBORE_DIAMETER_PLACES},
-    "HeadRecesses": {"CounterboreDepth": COUNTERBORE_DEPTH_PLACES},
-    "EntryReliefProfile": {"EntryReliefDia": ENTRY_RELIEF_DIAMETER_PLACES},
-    "EntryReliefs": {"EntryReliefDepth": ENTRY_RELIEF_DEPTH_PLACES},
+    "HeadRecesses": {"CounterboreDepth": 2},
     "WireProfile1": {"WireWidth": CHANNEL_PLACES},
     "WireChannels1": {"WireDepth": CHANNEL_PLACES},
     SECTION_REFERENCE: {"CapHeight": HEIGHT_PLACES, "PocketDepth": 2},
@@ -337,19 +377,27 @@ DIMENSION_CALLOUTS = {
         f"FLOOR/WALL CORNER R{POCKET_CORNER_RADIUS_MAX:.2f} MAX"
     ),
     "PocketDepth": (
-        "REF; FIT TO ACTUAL TL-23 FLANGE\n"
-        f"TOTAL CHAMBER EXCESS {CHAMBER_EXCESS_MIN:.2f}-{CHAMBER_EXCESS_MAX:.2f}\n"
-        "INCLUDING LOCAL FACE VARIATION;\nSCREWS FULLY SEATED AND LOCKED\n"
-        f"NORMAL LOWER GAP {LOWER_GAP_MIN:.2f}-{LOWER_GAP_MAX:.2f}; NO BEARING PRELOAD"
+        "REF; DEPTH = ACTUAL MHA-CH-06-TL-23\n"
+        f"FLANGE THK +{CHAMBER_EXCESS_MIN:.2f}/+{CHAMBER_EXCESS_MAX:.2f}, INCLUDING\n"
+        "LOCAL FACE VARIATION; SCREWS SEATED;\n"
+        "NO BEARING PRELOAD"
     ),
     "ApertureDia": "THRU; CLEARS TL-23 CARRIER SEAT",
     "BoltHoleDia": f"4X DRILL THRU; {SCREW_SKU}",
     "CounterboreDia": "4X COAXIAL WITH CLEARANCE HOLES;\nFULL WIDTH OPEN TO NEAREST X EDGE",
-    "CounterboreDepth": f"4X FROM TOP; {SCREW_SKU}\nSIDE WIRE ONLY; NEVER OVER HEAD TOP",
-    "EntryReliefDia": f"4X {SCREW_SKU}\nUNDERHEAD FILLET RELIEF",
-    "EntryReliefDepth": "4X BELOW HEAD SEAT;\nFLAT BOTTOM",
-    "WireWidth": "2X X-PAIR CHANNEL; TWIST AND TAIL\nALL WIRE BELOW CAP PLANE",
-    "WireDepth": "2X FROM TOP",
+    "CounterboreDepth": (
+        f"4X REF; FIT SEATED {SCREW_SKU}\n"
+        "HIGHEST HEAD RECESS NORMAL TO TOP\n"
+        f"ACTUAL {HEAD_RECESS_MIN:.2f} TO {HEAD_RECESS_MAX:.2f}; WHOLE FLOOR\n"
+        f"INCL FULL OUTWARD MOUTHS {COUNTERBORE_FLOOR_MIN:.2f} MIN"
+    ),
+    "WireWidth": (
+        "2X X-PAIR; WHOLE INSTALLED WIRE/TAILS\n"
+        f"NORMAL {wire_capture.NORMAL_WIRE_RECESS_MIN:.2f} MIN BELOW ACTUAL ROOF\n"
+        "UNFORCED FIT TO ACTUAL HEAD CLOCK;\n"
+        "NO LOOSENING/OVERTORQUE TO ALIGN"
+    ),
+    "WireDepth": "2X NORMAL TO\nACTUAL TOP;\nDEPTH LIMITS OVER\nWHOLE GROOVE FLOOR",
     **{f"Bolt{index}{axis}": "FROM POCKET AXIS;\nLOCATES TL-22 CAP SCREW" for index in range(1, 5) for axis in ("X", "Y")},
     "RegisterDia": "2X INTEGRAL; LOCATES IN TL-22 RECEIVERS",
     "RegisterProjection": "2X BELOW BLOCK SEATING FACE;\nLOCATES IN TL-22 RECEIVERS",

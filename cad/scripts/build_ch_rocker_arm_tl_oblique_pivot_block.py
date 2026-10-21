@@ -19,7 +19,7 @@ The two nut-bracket screw counterbores (PR C4) are a second, drilled along Y
 from the +Y face; their printed stations, from the -X end and the bottom
 face, live on the hidden Top-plane sketch ``SideScrewReference``.
 The hidden ``WingAxisReference`` measures the actual bearing-profile centre
-to the wing-profile step; its ordinary three-place span is the wing's +X
+to the wing-profile step; its ordinary two-place span is the wing's +X
 manufacturing authority. The internal wing length derives from that reach.
 
 Run (SolidWorks already open)::

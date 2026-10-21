@@ -29,7 +29,7 @@ between the races, the cavity's length, is at least 3.23, over the 3 mm
 an internal collet puller needs behind a 6200 (SKF TMIC C10-12). With the
 first bearing out, the second has the emptied seat behind it. The seat is
 a matched fit on the bought bearing's outer race (OD
-30 0/-0.009, inventory ``fixtures.trammel-6200-2rs``): 0.002-0.024 diametral interference.
+30 0/-0.009, McMaster 5972K41): 0.002-0.024 diametral interference.
 Sensitivity: the interference removes the outer race's float in its seat;
 any clearance there would be pivot-axis error, which is trammel-radius error
 1:1, so the seat carries the N6 band and nothing else on the block does.
@@ -132,6 +132,7 @@ from __future__ import annotations
 
 import math
 
+import _mcmaster_5972k41 as bearing_catalogue
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
@@ -187,7 +188,11 @@ CAP_REGISTER_DIA_BAND = retention.BLOCK_REGISTER_DIAMETER_BAND
 CAP_REGISTER_DEPTH = retention.BLOCK_REGISTER_DEPTH
 CAP_REGISTER_DEPTH_PLACES = retention.BLOCK_REGISTER_DEPTH_PLACES
 CAP_REGISTER_CALLOUT = "LOCATING RECESS FOR TL-30\nXY FROM BEARING AXIS"
-CAP_REGISTER_DEPTH_CALLOUT = "2X FLAT BOTTOM\nCLEARS TL-30 REGISTER"
+CAP_REGISTER_DEPTH_CALLOUT = (
+    "2X FLAT BOTTOM; MHA-CH-06-TL-30\n"
+    "REGISTER BOTTOM CLEARANCE\n"
+    "THROUGH CAP ROCK; NO BOTTOMING"
+)
 GENERAL_ANGULAR_BAND_DEGREES = retention.GENERAL_ANGULAR_BAND_DEGREES
 # Public cartridge-interface names shared by the integrated boundary checks.
 REGISTER_POINTS = CAP_REGISTER_POINTS
@@ -232,13 +237,11 @@ if min(cap_receiver_walls().values()) < WALL_TARGET:
 # --- Bearing seats ---------------------------------------------------------
 BORE_X = trammel.PIN_OFFSET  # ⚙ -32
 BEARING_OD = trammel.BEARING_OD  # ⚙ 30
-# The bought 6200-2RS outer-race OD deviation (inventory), (upper, lower).
-BEARING_OD_BAND = (0.0, -0.009)
 # ISO 286 N6 on Ø30 (over 18 to 30), (upper, lower).
 N6_BAND = (-0.011, -0.024)
 # The model and the sheet carry the seat at its low limit with a unilateral
 # band (one fact: 29.976 +0.013/0 is 29.976/29.989).
-_od_low, _od_high = deviations(BEARING_OD_BAND)
+_od_low, _od_high = deviations(bearing_catalogue.OD_BAND)
 _n6_low, _n6_high = deviations(N6_BAND)
 BORE_DIA = round(BEARING_OD + _n6_low, 3)
 BORE_BAND = (round(_n6_high - _n6_low, 3), 0.0)
@@ -345,8 +348,8 @@ if ENGAGEMENT_MAX >= ENGAGEMENT_TARGET:
 # (review r11 read the three places as rescuing the minimum alone): the
 # floor's band holds the screw between that minimum and the thread's bottom.
 CBORE_FLOOR_CALLOUT = (
-    f"SETS M4 X 20 ENGAGEMENT {ENGAGEMENT_MIN:.2f}-{ENGAGEMENT_MAX:.2f}"
-    f" IN {CARRIAGE_THREAD_DEPTH:.1f} DEEP THREAD"
+    f"SETS M4 X 20 ENGAGEMENT {ENGAGEMENT_MIN:.2f}-{ENGAGEMENT_MAX:.2f}\n"
+    f"IN {CARRIAGE_THREAD_DEPTH:.1f} DEEP THREAD"
 )
 
 # --- Side screws (PR C4): the TL-29 nut bracket ------------------------------
@@ -839,7 +842,7 @@ def _min_text(mm: float) -> str:
 # The functions the two-place plan sizes and the height, and the
 # three-place seat depths, serve (rule 4; docstring "The shoulder").
 LENGTH_WALL_CALLOUT = (
-    f"SETS C'BORE WALL {_min_text(WORST_WALLS['counterbore to +X end'])} MIN"
+    f"SETS C'BORE WALL\n{_min_text(WORST_WALLS['counterbore to +X end'])} MIN"
 )
 WIDTH_WALL_CALLOUT = (
     f"SETS C'BORE\nWALL {_min_text(WORST_WALLS['counterbore to block side'])} MIN"

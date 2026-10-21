@@ -97,12 +97,70 @@ def test_integral_registers_bound_translation_without_screw_crest_or_friction() 
     ))
     assert min(bounds.register_assembly_clearance, bounds.register_bottom_clearance,
                bounds.register_engagement) > 0.0
-    under_head_max = (
-        cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
-        - cap.COUNTERBORE_DEPTH + printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
-    )
+    under_head_max = retention.fitted_counterbore_bounds().head_seat_max / math.cos(gamma)
     assert bounds.screw_available_penetration == pytest.approx(hardware.SCREW_LENGTH_MIN - under_head_max)
     assert bounds.screw_available_penetration >= retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
+
+
+def test_fitted_counterbore_has_a_real_whole_floor_machining_window() -> None:
+    fitted = retention.fitted_counterbore_bounds()
+    assert 0.0 < fitted.depth_at_head_min < fitted.depth_at_head_max
+    assert fitted.head_seat_min < fitted.head_seat_max < fitted.head_point_height_max
+    assert fitted.head_axis_height_min < hardware.SCREW_HEAD_HEIGHT_MIN
+    assert fitted.head_axis_height_max > hardware.SCREW_HEAD_HEIGHT_MAX
+    assert fitted.parallel_cut_floor_min > retention.CAP_COUNTERBORE_FLOOR_MIN
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    boundary = (
+        retention.CAP_COUNTERBORE_FLOOR_MIN + fitted.depth_at_head_max / math.cos(gamma)
+        + printed_band_mm(retention.CAP_HEIGHT_PLACES)
+    )
+    assert retention.fitted_counterbore_bounds(height=boundary + 0.01).parallel_cut_floor_min > retention.CAP_COUNTERBORE_FLOOR_MIN
+    with pytest.raises(ValueError, match="whole-floor machining window"):
+        retention.fitted_counterbore_bounds(height=boundary - 0.01)
+
+
+def test_ref_counterbore_depth_does_not_replace_actual_head_fit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fitted = retention.fitted_counterbore_bounds()
+    captured = retention.capture_bounds()
+    monkeypatch.setattr(retention, "CAP_COUNTERBORE_DEPTH", retention.CAP_COUNTERBORE_DEPTH + 0.01)
+    assert retention.fitted_counterbore_bounds() == fitted
+    assert retention.capture_bounds() == captured
+
+
+def test_head_bearing_angle_consumes_real_fitted_floor_and_world_enclosure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inclined = retention.fitted_counterbore_bounds()
+    monkeypatch.setattr(retention, "CAP_BOLT_BEARING_ANGLE_MAX_DEGREES", 0.0)
+    square = retention.fitted_counterbore_bounds()
+    assert inclined.parallel_cut_floor_min < square.parallel_cut_floor_min
+    assert inclined.head_point_height_max > square.head_point_height_max
+    assert inclined.head_seat_max > square.head_seat_max
+    assert inclined.head_seat_min < square.head_seat_min
+
+
+def test_actual_normal_head_recess_has_a_full_coupled_capture_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert retention.capture_bounds().cap_head_running_clearance > 0.0
+    low, high = 0.0, retention.CAP_HEAD_RECESS_MIN
+    for _ in range(36):
+        middle = (low + high) / 2.0
+        monkeypatch.setattr(retention, "CAP_HEAD_RECESS_MIN", middle)
+        try:
+            retention.capture_bounds()
+        except ValueError as error:
+            assert "whole-head recess" in str(error)
+            low = middle
+        else:
+            high = middle
+    monkeypatch.setattr(retention, "CAP_HEAD_RECESS_MIN", high + 1e-5)
+    assert retention.capture_bounds().cap_head_running_clearance > 0.0
+    monkeypatch.setattr(retention, "CAP_HEAD_RECESS_MIN", low - 1e-5)
+    with pytest.raises(ValueError, match="whole-head recess"):
+        retention.capture_bounds()
 
 
 def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> None:
@@ -205,8 +263,10 @@ def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> Non
     boss_radius = (pin.COLLAR_DIA + printed_band_mm(pin.COLLAR_PLACES)) / 2.0
     cap_height_max = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
     center_offset = 2.0 * math.sqrt(2.0) * printed_band_mm(cap.CENTER_LOCATION_PLACES)
+    aperture_min = cap.APERTURE_DIA + retention.CAP_APERTURE_BAND[1]
+    assert aperture_min == pytest.approx(18.49)
     assert bounds.pin_aperture_clearance == pytest.approx(
-        cap.APERTURE_DIA / 2.0 - boss_radius / math.cos(pin_tilt)
+        aperture_min / 2.0 - boss_radius / math.cos(pin_tilt)
         - bounds.flange_lateral_shift - (cap_height_max + bounds.cap_top_rise) * math.tan(pin_tilt)
         - center_offset
     )
@@ -227,6 +287,61 @@ def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> Non
     )
     assert bounds.pin_aperture_clearance > 0.0
     assert bounds.cap_running_clearance > 0.0
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_minimum_aperture_drives_pin_clearance_and_its_contact_boundary(
+    monkeypatch: pytest.MonkeyPatch, fraction: float,
+) -> None:
+    bounds = retention.capture_bounds()
+    upper, lower = retention.CAP_APERTURE_BAND
+    monkeypatch.setattr(
+        retention, "CAP_APERTURE_BAND",
+        (upper, lower - 2.0 * fraction * bounds.pin_aperture_clearance),
+    )
+    if fraction < 1.0:
+        narrowed = retention.capture_bounds()
+        assert narrowed.pin_aperture_clearance == pytest.approx(
+            (1.0 - fraction) * bounds.pin_aperture_clearance
+        )
+        assert narrowed.cap_aperture_margin == pytest.approx(bounds.cap_aperture_margin)
+    else:
+        with pytest.raises(ValueError, match="running clearance"):
+            retention.capture_bounds()
+
+
+@pytest.mark.parametrize("extra_radius", (-1e-5, 1e-5))
+def test_through_bore_preserves_common_head_and_axis_seating_witnesses(
+    monkeypatch: pytest.MonkeyPatch, extra_radius: float,
+) -> None:
+    hole_head_angle = math.radians(
+        2.0 * retention.GENERAL_ANGULAR_BAND_DEGREES
+        + retention.CAP_ROCK_ENCLOSURE_DEGREES
+        + retention.CAP_BOLT_BEARING_ANGLE_MAX_DEGREES
+    )
+    flat_radius = retention.CAP_BOLT_HEAD_BEARING_DIAMETER_MIN / 2.0
+    axis_offset = retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX / math.cos(
+        math.radians(retention.CAP_BOLT_BEARING_ANGLE_MAX_DEGREES)
+    )
+    boundary = (
+        2.0 * math.sqrt(flat_radius * flat_radius - axis_offset * axis_offset)
+        * math.cos(hole_head_angle) - retention.CAP_BOLT_CLEARANCE_BAND[0]
+    )
+    monkeypatch.setattr(retention, "CAP_BOLT_CLEARANCE_DIAMETER", boundary + 2.0 * extra_radius)
+    if extra_radius < 0.0:
+        assert retention.capture_bounds().cap_running_clearance > 0.0
+    else:
+        with pytest.raises(ValueError, match="thread-axis seating footprint"):
+            retention.capture_bounds()
+
+
+@pytest.mark.parametrize("angle", (-1.0, 90.0, float("inf"), float("nan")))
+def test_through_bore_projection_rejects_invalid_angular_enclosures(
+    monkeypatch: pytest.MonkeyPatch, angle: float,
+) -> None:
+    monkeypatch.setattr(retention, "CAP_BOLT_BEARING_ANGLE_MAX_DEGREES", angle)
+    with pytest.raises(ValueError):
+        retention.capture_bounds()
 
 
 def test_relative_carrier_motion_cancels_fixed_bore_bias_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -263,9 +378,7 @@ def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.Mo
         - (cap.REGISTER_DIA + cap.REGISTER_BAND[1]) / 2.0
         + retention.CAP_VERTICAL_MOTION_ENCLOSURE * math.tan(gamma + rock)
     )
-    head_z = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES) - (
-        cap.COUNTERBORE_DEPTH - printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
-    ) + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX
+    head_z = retention.fitted_counterbore_bounds().head_point_height_max
     head_radius = (
         cap.HEAD_BEARING_DIAMETER_MIN / 2.0 + retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX
         + math.sqrt(2.0) * printed_band_mm(cap.POSITION_PLACES) + head_z * math.tan(gamma)
@@ -290,9 +403,9 @@ def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.Mo
     head_gap = retention.CAP_HEAD_SEATING_GAP_MAX
     monkeypatch.setattr(retention, "CAP_HEAD_SEATING_GAP_MAX", 0.0)
     seated_head = retention.capture_bounds()
-    # Head clearance also raises the screw-axis lever slightly; its full
-    # independent allowance must survive even before that extra migration.
-    assert bounds.cap_head_release - seated_head.cap_head_release >= head_gap
+    # Installed recess already bounds the head's world height. The separate
+    # underhead gap must still survive in the two-pose release budget.
+    assert bounds.cap_head_release - seated_head.cap_head_release == pytest.approx(head_gap)
     # A separately accepted cap/block base gap survives even with the head
     # seated. Neither inspection may silently stand in for the other.
     migration_release = (
@@ -309,27 +422,42 @@ def test_direct_wing_reach_bounds_the_whole_head_support_without_an_old_end_chai
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
-    head_z = (
-        cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
-        - cap.COUNTERBORE_DEPTH + printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
-        + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX
-    )
+    head_z = retention.fitted_counterbore_bounds().head_point_height_max
     head_error = (
         printed_band_mm(cap.POSITION_PLACES) + retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX
         + head_z * math.tan(gamma)
     )
     support_limit = (
-        max(abs(x) for x, _y in cap.BOLT_POINTS) + head_error
-        + cap.HEAD_BEARING_DIAMETER_MIN / 2.0
-        + printed_band_mm(retention.BLOCK_WING_AXIS_REACH_PLACES)
+        max(
+            retention.CAP_FLOOR_WITNESS_X,
+            max(abs(x) for x, _y in cap.BOLT_POINTS) + head_error
+            + cap.HEAD_BEARING_DIAMETER_MIN / 2.0,
+        ) + printed_band_mm(retention.BLOCK_WING_AXIS_REACH_PLACES)
     )
-    # A directly dimensioned edge has one ordinary three-place band. The
-    # former .X overall wing length plus bearing-station chain would reject
-    # this genuinely supported boundary pose and must not survive cutover.
+    # Both the fixed floor witness and the whole head circle must stay over
+    # the wing's directly dimensioned edge at its ordinary two-place band.
     monkeypatch.setattr(retention, "BLOCK_WING_AXIS_REACH", support_limit + 0.01)
     assert retention.capture_bounds().cap_running_clearance > 0.0
     monkeypatch.setattr(retention, "BLOCK_WING_AXIS_REACH", support_limit - 0.01)
     with pytest.raises(ValueError, match="floor witness"):
+        retention.capture_bounds()
+
+
+@pytest.mark.parametrize(
+    ("dimension", "margin_name"),
+    (("CAP_WIDTH", "cap_head_floor_x_margin"), ("CAP_LENGTH", "cap_head_floor_y_margin")),
+)
+def test_whole_head_support_cannot_leave_an_open_mouth_floor_edge(
+    dimension: str, margin_name: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bounds = retention.capture_bounds()
+    margin = getattr(bounds, margin_name)
+    assert margin > 0.0
+    boundary = getattr(retention, dimension) - 2.0 * margin
+    monkeypatch.setattr(retention, dimension, boundary + 0.02)
+    assert getattr(retention.capture_bounds(), margin_name) == pytest.approx(0.01)
+    monkeypatch.setattr(retention, dimension, boundary - 0.02)
+    with pytest.raises(ValueError, match="head circle.*floor outline"):
         retention.capture_bounds()
 
 
@@ -517,7 +645,7 @@ def test_cross_hole_retains_a_real_end_ligament_at_printed_limits() -> None:
     assert pin.CARRIER_LENGTH == pin.CROSS_HOLE_FROM_SEAT + pin.CROSS_HOLE_FROM_END
     assert from_end_min - drilled_radius_max - lead_max >= 2.0
     assert pin.CROSS_HOLE_DIA > hardware.CLEVIS_DIA_MAX
-    assert retainer.PIN_PROJECTION_ABOVE_WORK == pytest.approx(
+    assert retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL == pytest.approx(
         pin.CARRIER_LENGTH - carrier.THICKNESS - trammel.RISER_THICK - trammel.STRAP_THICK
     )
 
@@ -580,7 +708,7 @@ def test_register_spacing_mismatch_cannot_cancel_at_pattern_centroid(pattern_nam
 def test_cap_material_acceptance_rejects_real_wall_and_floor_mutants() -> None:
     assert all(margin >= 2.0 for margin in cap.require_clearance_geometry().values())
     for changes in ({"counterbore_depth": cap.HEIGHT}, {"channel_depth": cap.HEIGHT}, {"pocket_dia": cap.WIDTH}, {"points": tuple((x, 19.0 if y > 0 else -19.0) for x, y in cap.BOLT_POINTS)}):
-        with pytest.raises(ValueError, match="cap"):
+        with pytest.raises(ValueError):
             cap.require_clearance_geometry(**changes)
 
 

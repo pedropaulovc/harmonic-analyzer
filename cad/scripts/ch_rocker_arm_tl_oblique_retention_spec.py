@@ -54,15 +54,15 @@ CARRIER_ENGAGEMENT_MIN = 10.5  # 12-.8-.4 lower chamfer-.3 top edge allowance
 CARRIER_DIAMETRAL_CLEARANCE_MAX = 0.024  # existing H7/h6, unchanged
 
 BLOCK_SPINDLE_END = -54.5
-BLOCK_WING_AXIS_REACH = 21.200
-BLOCK_WING_AXIS_REACH_PLACES = 3
+BLOCK_WING_AXIS_REACH = 20.60
+BLOCK_WING_AXIS_REACH_PLACES = 2
 BLOCK_WING_END = trammel.PIN_OFFSET + BLOCK_WING_AXIS_REACH
-BLOCK_WING_HALF_WIDTH = 33.5
+BLOCK_WING_HALF_WIDTH = 36.0
 WING_BRACKET_CLEARANCE_MIN = 0.50
 BLOCK_STOP_EDGE_BREAK_MAX = 0.25
 CAP_WIDTH = 50.0  # X
-CAP_LENGTH = 75.0
-CAP_HEIGHT = 11.50
+CAP_LENGTH = 86.0
+CAP_HEIGHT = 11.60
 CAP_HEIGHT_PLACES = 2
 CAP_OUTLINE_PLACES = 1
 CAP_CENTER_LOCATION_PLACES = 2
@@ -72,25 +72,23 @@ CAP_POCKET_CORNER_RADIUS_MAX = 0.20  # local floor/wall finish limit; not a mode
 CAP_POCKET_DEPTH = 3.30  # REF; face to actual flange and chamber-excess requirement
 CAP_CHAMBER_EXCESS = (0.20, 0.30)
 CAP_APERTURE_DIAMETER = 19.0
-CAP_APERTURE_BAND = (0.10, 0.0)
-CAP_BOLT_X_OFFSETS = (-14.5, 14.5)
-CAP_BOLT_Y_OFFSETS = (-25.5, 25.5)
+CAP_APERTURE_BAND = (printed_band_mm(2), -printed_band_mm(2))
+CAP_BOLT_X_OFFSETS = (-13.25, 13.25)
+CAP_BOLT_Y_OFFSETS = (-28.5, 28.5)
 CAP_BOLT_CENTERS = tuple((x, y) for x in CAP_BOLT_X_OFFSETS for y in CAP_BOLT_Y_OFFSETS)
 CAP_BOLT_LOCATION_PLACES = 3
-CAP_BOLT_CLEARANCE_DIAMETER = 9.20
+CAP_BOLT_CLEARANCE_DIAMETER = 10.00
 CAP_BOLT_CLEARANCE_BAND = (0.10, 0.0)
-CAP_COUNTERBORE_DIAMETER = 16.50
+CAP_COUNTERBORE_DIAMETER = 21.00
 CAP_COUNTERBORE_DIAMETER_PLACES = 2
-CAP_COUNTERBORE_DEPTH = 8.500
-CAP_COUNTERBORE_DEPTH_PLACES = 3
-CAP_ENTRY_RELIEF_DIAMETER = 9.90
-CAP_ENTRY_RELIEF_BAND = (0.10, 0.0)
-CAP_ENTRY_RELIEF_DEPTH = 1.100
-CAP_ENTRY_RELIEF_DEPTH_PLACES = 3
-CAP_WIRE_CHANNEL_WIDTH = 2.50
-CAP_WIRE_CHANNEL_DEPTH = 6.50
+CAP_COUNTERBORE_DEPTH = 8.40  # REF; fit each actual seated NAS head
+CAP_HEAD_RECESS_MIN = 0.50
+CAP_HEAD_RECESS_MAX = 0.60
+CAP_COUNTERBORE_FLOOR_MIN = 2.00  # actual minimum over floor AND outward mouth
+CAP_WIRE_CHANNEL_WIDTH = 8.00
+CAP_WIRE_CHANNEL_DEPTH = 7.00
 CAP_WIRE_CHANNEL_PLACES = 2
-CAP_REGISTER_CENTERS = ((-4.5, -24.0), (4.5, 24.0))
+CAP_REGISTER_CENTERS = ((-2.5, -24.0), (2.5, 24.0))
 CAP_REGISTER_LOCATION_PLACES = 3
 CAP_REGISTER_DIAMETER = 6.0
 CAP_REGISTER_DIAMETER_BAND = (0.10, -0.10)
@@ -111,8 +109,6 @@ CAP_BOLT_HEAD_DIAMETER_MIN = hardware.SCREW_HEAD_DIA_MIN
 CAP_BOLT_HEAD_BEARING_DIAMETER_MIN = hardware.SCREW_HEAD_BEARING_DIA_MIN
 CAP_BOLT_HEAD_ECCENTRICITY_MAX = hardware.SCREW_HEAD_ECCENTRICITY_MAX
 CAP_BOLT_BEARING_ANGLE_MAX_DEGREES = hardware.SCREW_BEARING_ANGLE_MAX_DEGREES
-CAP_BOLT_FILLET_JUNCTION_DIAMETER_MAX = hardware.SCREW_FILLET_JUNCTION_DIA_MAX
-CAP_BOLT_FILLET_LENGTH_MAX = hardware.SCREW_FILLET_LENGTH_MAX
 CAP_BOLT_DIAMETER = hardware.SCREW_MAJOR_DIA_MAX
 CAP_BOLT_PITCH = hardware.SCREW_DIMS.pitch
 CAP_MIN_COMPLETE_THREAD_ENGAGEMENT = 1.5 * CAP_BOLT_DIAMETER
@@ -145,6 +141,103 @@ STOP_CONTACT_DIAMETER = 31.5
 
 
 @dataclass(frozen=True)
+class FittedCounterboreBounds:
+    """Geometric enclosures conditional on actual fitted-head acceptance."""
+
+    head_axis_height_min: float
+    head_axis_height_max: float
+    head_seat_min: float
+    head_seat_max: float
+    head_point_height_max: float
+    head_top_height_max: float
+    depth_at_head_min: float
+    depth_at_head_max: float
+    parallel_cut_floor_min: float
+
+
+def initial_cap_tilt() -> float:
+    return math.atan(math.hypot(
+        CAP_BASE_SEATING_GAP_MAX / (2.0 * CAP_FLOOR_WITNESS_X),
+        CAP_BASE_SEATING_GAP_MAX / (2.0 * CAP_FLOOR_WITNESS_Y),
+    ))
+
+
+def fitted_counterbore_bounds(*, height: float | None = None) -> FittedCounterboreBounds:
+    """Bound matched heads without turning the REF depth into a tolerance.
+
+    Installed recess is measured normal to the actual top over the WHOLE
+    head, after C3 seating. The actual floor, including each full-width
+    mouth, must retain CAP_COUNTERBORE_FLOOR_MIN. A floor parallel to the
+    actual top constructively fits the worst hardware; incompatible actual
+    floor/head slopes still require rejection or remachining, not forcing.
+
+    NAS H is axis-parallel. Its inclined bearing-plane reference need not
+    be guessed: moving any reference within the head envelope to the axis
+    costs at most radius*tan(bearing angle). This is a datum conversion,
+    not an additional manufactured tolerance. C3B must still measure the
+    actual complete-thread intervals; no bound here proves full threads.
+    """
+    body_height = CAP_HEIGHT if height is None else height
+    inputs = (
+        body_height, CAP_HEAD_RECESS_MIN, CAP_HEAD_RECESS_MAX,
+        CAP_COUNTERBORE_FLOOR_MIN, CAP_BASE_SEATING_GAP_MAX,
+        CAP_HEAD_SEATING_GAP_MAX, GENERAL_ANGULAR_BAND_DEGREES,
+        CAP_BOLT_BEARING_ANGLE_MAX_DEGREES,
+    )
+    if not all(math.isfinite(value) for value in inputs):
+        raise ValueError("fitted counterbore inputs must be finite")
+    if min(inputs[1:]) < 0.0 or CAP_HEAD_RECESS_MIN > CAP_HEAD_RECESS_MAX:
+        raise ValueError("fitted counterbore recess, floor and gaps are invalid")
+    gamma = math.radians(GENERAL_ANGULAR_BAND_DEGREES)
+    beta = math.radians(CAP_BOLT_BEARING_ANGLE_MAX_DEGREES)
+    initial_tilt = initial_cap_tilt()
+    roof_angle = gamma + initial_tilt
+    head_roof_angle = gamma + roof_angle
+    if head_roof_angle + beta >= math.pi / 2.0:
+        raise ValueError("fitted head angular enclosure is outside its valid domain")
+    radius = CAP_BOLT_HEAD_DIAMETER_MAX / 2.0 + CAP_BOLT_HEAD_ECCENTRICITY_MAX
+    conversion = radius * math.tan(beta)
+    axis_height_min = hardware.SCREW_HEAD_HEIGHT_MIN - conversion
+    axis_height_max = CAP_BOLT_HEAD_HEIGHT_MAX + conversion
+    if axis_height_min <= 0.0:
+        raise ValueError("fitted head has no positive axial height")
+    support_min = axis_height_min * math.cos(head_roof_angle)
+    support_max = axis_height_max + radius * math.sin(head_roof_angle)
+    height_min = body_height - printed_band_mm(CAP_HEIGHT_PLACES)
+    height_max = body_height + printed_band_mm(CAP_HEIGHT_PLACES)
+    depth_min = CAP_HEAD_RECESS_MIN + support_min
+    depth_max = CAP_HEAD_RECESS_MAX + support_max + CAP_HEAD_SEATING_GAP_MAX
+    parallel_floor = height_min - depth_max / math.cos(gamma)
+    if parallel_floor < CAP_COUNTERBORE_FLOOR_MIN:
+        raise ValueError("fitted counterbore has no whole-floor machining window")
+    # The head-axis intersection is inside the convex hull of the qualified
+    # accessible bearing footprint. Recess therefore bounds its distance to
+    # the roof. The socket void does not invalidate the axis-containing convex
+    # hull of the flat head-top material used for the top-plane witness.
+    flat_radius = CAP_BOLT_HEAD_BEARING_DIAMETER_MIN / 2.0
+    point_separation = support_min - (
+        flat_radius + CAP_BOLT_HEAD_ECCENTRICITY_MAX / math.cos(beta)
+    ) * math.sin(head_roof_angle + beta)
+    # H is mounting-normal thickness; convert it before subtracting actual
+    # roof-normal recess/support. Dividing those positive distances by the
+    # roof's world-Z cosine would only lower the point, so omit that credit.
+    top_height = CAP_BASE_SEATING_GAP_MAX + height_max / math.cos(initial_tilt)
+    seat_max = top_height - CAP_HEAD_RECESS_MIN - support_min
+    point_max = top_height - CAP_HEAD_RECESS_MIN - point_separation
+    seat_min = height_min - (CAP_HEAD_RECESS_MAX + support_max) / math.cos(roof_angle)
+    if min(seat_min, seat_max, point_max) <= 0.0:
+        raise ValueError("fitted head seating enclosure crosses the block plane")
+    return FittedCounterboreBounds(
+        head_axis_height_min=axis_height_min, head_axis_height_max=axis_height_max,
+        head_seat_min=seat_min, head_seat_max=seat_max,
+        head_point_height_max=point_max,
+        head_top_height_max=seat_max + axis_height_max + radius * math.sin(gamma),
+        depth_at_head_min=depth_min, depth_at_head_max=depth_max,
+        parallel_cut_floor_min=parallel_floor,
+    )
+
+
+@dataclass(frozen=True)
 class _CapMotion:
     shift: float
     yaw: float
@@ -155,6 +248,12 @@ class _CapMotion:
     rock: float
     outline_margin: float
     floor_support_margin: float
+    head_recess: float
+    register_endpoint_offset: float
+    register_span_min: float
+    register_endpoint_motion: float
+    head_floor_x_margin: float
+    head_floor_y_margin: float
 
 
 def _cap_motion(
@@ -169,9 +268,9 @@ def _cap_motion(
     |u(p)| <= E*(|p-r+|+|p-r-|)/|r+-r-|. Fixed machining errors affect the
     lever/separation, not E twice. Projection residuals enclose cap rock.
 
-    Each entry disk is smaller than the guaranteed flat head circle, hence
-    removes less than a semicircle. Two cap poses share a solid-floor head
-    point. Its fixed head height cancels; release is the measured initial
+    Each through-hole disk is smaller than the guaranteed flat head circle,
+    hence removes less than a semicircle. Two cap poses share a solid-floor
+    head point. Its fixed head height cancels; release is the measured initial
     gap plus material-coordinate migration times the CAP FLOOR's own slope,
     not a fresh 1-degree rotation of the carrier.
     """
@@ -195,21 +294,44 @@ def _cap_motion(
     if sine >= 1.0:
         raise ValueError("integral registers do not bound cap yaw")
     yaw = 2.0 * math.asin(sine)
-    head_z = CAP_HEIGHT + printed_band_mm(CAP_HEIGHT_PLACES) - (
-        CAP_COUNTERBORE_DEPTH - printed_band_mm(CAP_COUNTERBORE_DEPTH_PLACES)
-    ) + CAP_BASE_SEATING_GAP_MAX + CAP_HEAD_SEATING_GAP_MAX
+    fitted = fitted_counterbore_bounds()
+    head_z = fitted.head_point_height_max
     flat_radius = CAP_BOLT_HEAD_BEARING_DIAMETER_MIN / 2.0
-    if (CAP_ENTRY_RELIEF_DIAMETER + CAP_ENTRY_RELIEF_BAND[0]) / 2.0 >= flat_radius:
-        raise ValueError("entry relief removes the guaranteed flat head circle")
+    bearing_angle = math.radians(CAP_BOLT_BEARING_ANGLE_MAX_DEGREES)
+    hole_head_angle = 2.0 * gamma + rock_limit + bearing_angle
+    if min(gamma, rock_limit, bearing_angle) < 0.0 or not 0.0 <= hole_head_angle < math.pi / 2.0:
+        raise ValueError("through-bore/head angular enclosure is outside its valid domain")
+    # On the fixed head plane the angled through cylinder is an ellipse.
+    # Enclose it by its major-radius disk. Each of two cap poses then removes
+    # less than a semicircle of the guaranteed flat circle, leaving a common
+    # head point. The full flat_radius still conservatively bounds every
+    # possible world-point coordinate and its migration below.
+    hole_radius = (CAP_BOLT_CLEARANCE_DIAMETER + CAP_BOLT_CLEARANCE_BAND[0]) / (
+        2.0 * math.cos(hole_head_angle)
+    )
+    if hole_radius >= flat_radius:
+        raise ValueError("through bore removes the guaranteed flat head circle")
+    # The fitted-depth window also uses the head-axis seating gap. The
+    # retained outer-circle arc has a convex hull containing this central
+    # disk, even at the worst bore offset. Keep the eccentric thread-axis
+    # intersection inside it; a common rim point alone is not sufficient.
+    axis_offset = CAP_BOLT_HEAD_ECCENTRICITY_MAX / math.cos(bearing_angle)
+    if hole_radius * hole_radius + axis_offset * axis_offset >= flat_radius * flat_radius:
+        raise ValueError("through bore removes the qualified thread-axis seating footprint")
     bolt_band = printed_band_mm(CAP_BOLT_LOCATION_PLACES)
     head_error = bolt_band + CAP_BOLT_HEAD_ECCENTRICITY_MAX + head_z * math.tan(gamma)
     max_x = max(abs(x) for x, _ in CAP_BOLT_CENTERS) + head_error
     max_y = max(abs(y) for _, y in CAP_BOLT_CENTERS) + head_error
     edge_band = printed_band_mm(CAP_OUTLINE_PLACES) + printed_band_mm(CAP_CENTER_LOCATION_PLACES)
-    outline_margin = min(
-        CAP_WIDTH / 2.0 - edge_band - max_x - max_y * math.sin(yaw) - shift,
-        CAP_LENGTH / 2.0 - edge_band - max_y - max_x * math.sin(yaw) - shift,
-    ) - head_z * math.sin(rock_limit) - flat_radius
+    head_floor_x_margin = (
+        CAP_WIDTH / 2.0 - edge_band - max_x - max_y * math.sin(yaw)
+        - shift - head_z * math.sin(rock_limit) - flat_radius
+    )
+    head_floor_y_margin = (
+        CAP_LENGTH / 2.0 - edge_band - max_y - max_x * math.sin(yaw)
+        - shift - head_z * math.sin(rock_limit) - flat_radius
+    )
+    outline_margin = min(head_floor_x_margin, head_floor_y_margin)
     if outline_margin <= 0.0:
         raise ValueError("guaranteed head circle can leave the cap floor outline")
     point_radius = (
@@ -267,9 +389,7 @@ def _cap_motion(
             math.dist(witness, point) for witness in ((fx, 0.0), (-fx, 0.0), (0.0, fy), (0.0, -fy))
             for point in CAP_BOLT_CENTERS
         ) - hole_shift - (CAP_BOLT_CLEARANCE_DIAMETER + CAP_BOLT_CLEARANCE_BAND[0]) / 2.0,
-        CAP_HEIGHT - printed_band_mm(CAP_HEIGHT_PLACES)
-        - CAP_COUNTERBORE_DEPTH - printed_band_mm(CAP_COUNTERBORE_DEPTH_PLACES)
-        - CAP_ENTRY_RELIEF_DEPTH - printed_band_mm(CAP_ENTRY_RELIEF_DEPTH_PLACES),
+        CAP_COUNTERBORE_FLOOR_MIN,
     )
     if floor_support <= 0.0:
         raise ValueError("cap rocking proof loses a solid floor witness")
@@ -304,7 +424,59 @@ def _cap_motion(
     ) + 2.0 * (CAP_HEIGHT + printed_band_mm(CAP_HEIGHT_PLACES)) * (1.0 - math.cos(rock))
     if max(top_rise, roof_rise, bottom_drop) >= CAP_VERTICAL_MOTION_ENCLOSURE or rock >= rock_limit:
         raise ValueError("cap motion escapes its connected-branch enclosure")
-    return _CapMotion(shift, yaw, migration, release, roof_rise, top_rise, rock, outline_margin, floor_support)
+    # Recess is accepted over the actual WHOLE head in the normal pose.
+    # Track fixed head-top points against the SAME moving roof; do not charge
+    # NAS height/projection again as an independent recess loss. The finite
+    # head still needs its full 3-D enclosure for migration and LP support.
+    head_radius = CAP_BOLT_HEAD_DIAMETER_MAX / 2.0
+    head_top_z = fitted.head_top_height_max
+    top_error = bolt_band + CAP_BOLT_HEAD_ECCENTRICITY_MAX + head_top_z * math.tan(gamma)
+    top_x = max(abs(x) for x, _ in CAP_BOLT_CENTERS) + top_error + head_radius
+    top_y = max(abs(y) for _, y in CAP_BOLT_CENTERS) + top_error + head_radius
+    top_point_radius = (
+        head_radius + CAP_BOLT_HEAD_ECCENTRICITY_MAX + math.sqrt(2.0) * bolt_band
+        + head_top_z * math.tan(gamma)
+    )
+    top_coefficient = max(
+        sum(math.dist(point, register) for register in receiver_pattern)
+        + 2.0 * (top_point_radius + math.sqrt(2.0) * receiver_band + register_float)
+        for point in CAP_BOLT_CENTERS
+    ) / span_min
+    top_contact_radius = max(math.hypot(*p) for p in CAP_BOLT_CENTERS) + top_point_radius + shift
+    top_migration = (
+        endpoint_motion * top_coefficient + 2.0 * head_top_z * math.sin(rock_limit)
+        + 2.0 * top_contact_radius * (1.0 - math.cos(rock_limit))
+    )
+    top_descent = release * max(
+        max(0.0, top_x * sx + top_y * sy - 1.0) / (1.0 + bx * sx + by * sy)
+        for sx, sy in slopes
+    )
+    initial_tilt = initial_cap_tilt()
+    radial_envelope = head_radius + CAP_BOLT_HEAD_ECCENTRICITY_MAX
+    initial_base_at_rim = CAP_BASE_SEATING_GAP_MAX + (
+        radial_envelope + fitted.head_axis_height_max * math.sin(gamma)
+    ) * math.tan(initial_tilt)
+    if (
+        fitted.head_seat_min + fitted.head_axis_height_min * math.cos(gamma)
+        - radial_envelope * math.sin(gamma)
+    ) <= CAP_VERTICAL_MOTION_ENCLOSURE:
+        raise ValueError("fixed head-top enclosure crosses the moving cap base")
+    # In material coordinates d=c*(h(u)-z), c=cos(actual roof slope).
+    # The same roof intercept cancels. Since each head-top point remains
+    # above the cap base, the current-pose cosine term is favourable. Initial
+    # base QA is extended from the qualified head-axis centre to its rim.
+    roof_loss = (
+        top_migration * math.sin(gamma) + initial_base_at_rim + top_descent
+        + head_top_z * (1.0 - math.cos(initial_tilt))
+    )
+    head_recess = CAP_HEAD_RECESS_MIN - roof_loss
+    if head_recess <= 0.0:
+        raise ValueError("captured cap motion loses the fitted whole-head recess")
+    return _CapMotion(
+        shift, yaw, migration, release, roof_rise, top_rise, rock,
+        outline_margin, floor_support, head_recess, endpoint_offset, span_min, endpoint_motion,
+        head_floor_x_margin, head_floor_y_margin,
+    )
 
 
 @dataclass(frozen=True)
@@ -313,6 +485,11 @@ class CaptureBounds:
 
     cap_lateral_shift: float
     cap_yaw: float
+    cap_register_endpoint_offset: float
+    cap_register_span_min: float
+    cap_register_endpoint_motion: float
+    cap_head_floor_x_margin: float
+    cap_head_floor_y_margin: float
     cap_floor_migration: float
     cap_head_release: float
     cap_roof_rise: float
@@ -335,6 +512,7 @@ class CaptureBounds:
     support_lift: float
     support_drop: float
     cap_running_clearance: float
+    cap_head_running_clearance: float
     screw_available_penetration: float
 
     @property
@@ -476,7 +654,7 @@ def capture_bounds(
     seat_radius_max = (PIN_BOSS_DIAMETER + printed_band_mm(PIN_BOSS_DIAMETER_PLACES)) / 2.0
     max_cap_height = CAP_HEIGHT + printed_band_mm(CAP_HEIGHT_PLACES)
     aperture_clearance = (
-        CAP_APERTURE_DIAMETER / 2.0 - seat_radius_max / math.cos(pin_tilt)
+        (CAP_APERTURE_DIAMETER + CAP_APERTURE_BAND[1]) / 2.0 - seat_radius_max / math.cos(pin_tilt)
         - flange_float - (max_cap_height + cap_motion.top_rise) * math.tan(pin_tilt) - relative_center_offset
     )
     min_seat_above_floor = (
@@ -515,8 +693,11 @@ def capture_bounds(
         chamber_excess + projection_change + fit_z
         + seat_radius_max * math.tan(bore_axis_angle + gamma + carrier_fit_angle)
     )
-    available_penetration = CAP_BOLT_LENGTH_MIN - (
-        max_cap_height - (CAP_COUNTERBORE_DEPTH - printed_band_mm(CAP_COUNTERBORE_DEPTH_PLACES))
+    # This is only available AXIAL penetration. The actual engaged complete
+    # thread interval still requires C3B; a world-Z head height is not an
+    # axial distance when the tap axis is inclined.
+    available_penetration = (
+        CAP_BOLT_LENGTH_MIN - fitted_counterbore_bounds().head_seat_max / math.cos(gamma)
     )
     margins = (
         flange_margin, floor_inner, floor_outer, pocket_margin, aperture_margin,
@@ -545,6 +726,11 @@ def capture_bounds(
         raise ValueError("cap screw has insufficient available penetration for 1.5D complete threads")
     return CaptureBounds(
         cap_lateral_shift=cap_shift, cap_yaw=cap_motion.yaw,
+        cap_register_endpoint_offset=cap_motion.register_endpoint_offset,
+        cap_register_span_min=cap_motion.register_span_min,
+        cap_register_endpoint_motion=cap_motion.register_endpoint_motion,
+        cap_head_floor_x_margin=cap_motion.head_floor_x_margin,
+        cap_head_floor_y_margin=cap_motion.head_floor_y_margin,
         cap_floor_migration=cap_motion.floor_migration, cap_head_release=cap_motion.head_release,
         cap_roof_rise=cap_motion.roof_rise, cap_top_rise=cap_motion.top_rise, cap_tilt=cap_motion.rock,
         flange_lateral_shift=flange_float, flange_contact_margin=flange_margin,
@@ -554,7 +740,8 @@ def capture_bounds(
         register_bottom_clearance=register_bottom, register_engagement=register_engagement,
         flange_tilt=tilt, pin_tilt=pin_tilt, carrier_tilt=carrier_tilt,
         carrier_motion_tilt=motion_tilt, support_lift=support_lift, support_drop=support_drop,
-        cap_running_clearance=cap_clearance, screw_available_penetration=available_penetration,
+        cap_running_clearance=cap_clearance, cap_head_running_clearance=cap_motion.head_recess,
+        screw_available_penetration=available_penetration,
     )
 
 

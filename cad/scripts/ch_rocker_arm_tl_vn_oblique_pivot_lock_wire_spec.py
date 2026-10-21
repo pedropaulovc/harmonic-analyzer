@@ -5,8 +5,11 @@ screws, Z points toward cap top. Install unchanged at each Y row on each cap.
 The native centreline is a representative hand-formed route, not an elastic
 model or a locking-force calculation. The exterior entry legs flare within
 the counterbores, then narrow before the wire channel; their elevation
-separates them from the straight drilled legs. Verify tightening sense and
-tuck cut ends at installation; discard wire on opening the cartridge.
+separates them from the straight drilled legs. This is the 0/180 representative
+route, not authority for every received six-hole head clock. Accept the actual
+formed route only through real straight holes, pulling toward tightening, with
+the installed whole-route clearances; never loosen or over-torque a seated head
+to obtain its clock. Tuck cut ends; discard wire on opening the cartridge.
 """
 from __future__ import annotations
 
@@ -14,16 +17,20 @@ import math
 
 from ch_rocker_arm_tl_oblique_retention_hardware_spec import (
     WIRE_SKU as SKU, WIRE_SOURCE_URL as SOURCE_URL, WIRE_DIA,
-    SCREW_HEAD_DIA, SCREW_HEAD_DIA_MAX, SCREW_WIRE_HEIGHT,
+    SCREW_HEAD_DIA_MAX, SCREW_HEAD_ECCENTRICITY_MAX, SCREW_WIRE_HEIGHT,
     SCREW_WIRE_HEIGHT_MIN, SCREW_WIRE_HEIGHT_MAX,
 )
 from ch_rocker_arm_tl_oblique_retention_spec import CAP_BOLT_X_OFFSETS
 
 QUANTITY = 4
-CALLOUT = '.032 STAINLESS SAFETY WIRE; ONE CUT LENGTH PER X PAIR'
+CALLOUT = '.032 STAINLESS SAFETY WIRE'
 TWIST_RADIUS = 0.52
 BRIDGE_TURNS = 4
-OUTER_BEND_RADIUS = SCREW_HEAD_DIA / 2 + 1.2
+OUTER_BEND_RADIUS = (
+    SCREW_HEAD_DIA_MAX / 2 + SCREW_HEAD_ECCENTRICITY_MAX + WIRE_DIA / 2 + 0.35
+)
+ENTRY_SHOULDER_OFFSET = 0.20
+ENTRY_SHOULDER_RISE = 1.00
 # Leave a real approach length between the larger head loops and the twist.
 # Keeping the former fixed 8 mm half-span would put the returning drilled leg
 # within one wire diameter of the other strand at its bridge endpoint.
@@ -115,8 +122,8 @@ def installed_wire_segments():
     # brings Y back to the bridge radius before entering the narrow channel.
     left_points = [
         bridge_a[0][0],
-        (left+r+0.35,TWIST_RADIUS,WIRE_AXIS_Z+0.7),
-        (left+r-0.1,1.2,WIRE_AXIS_Z+0.7),
+        (left+r+ENTRY_SHOULDER_OFFSET,TWIST_RADIUS,WIRE_AXIS_Z+ENTRY_SHOULDER_RISE),
+        (left+r-0.1,1.2,WIRE_AXIS_Z+ENTRY_SHOULDER_RISE),
     ]
     left_points.extend(_radial(left,r,angle) for angle in (15,35,60,90,120,150,180))
     left_points.extend([_radial(left,r,0), bridge_b[0][0]])
@@ -136,8 +143,8 @@ def installed_wire_segments():
     ], trim=0.6)
     right_b_points = [
         bridge_b[-1][-1],
-        (right-r-0.35,-TWIST_RADIUS,WIRE_AXIS_Z+0.7),
-        (right-r+0.1,-1.2,WIRE_AXIS_Z+0.7),
+        (right-r-ENTRY_SHOULDER_OFFSET,-TWIST_RADIUS,WIRE_AXIS_Z+ENTRY_SHOULDER_RISE),
+        (right-r+0.1,-1.2,WIRE_AXIS_Z+ENTRY_SHOULDER_RISE),
     ]
     right_b_points.extend(_radial(right,r,angle,-TWIST_RADIUS)
                           for angle in (195,215,240,270,300,330,345))

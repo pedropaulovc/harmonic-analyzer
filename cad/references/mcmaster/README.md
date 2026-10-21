@@ -113,10 +113,16 @@ replica-gated and no copy is kept here:
 
 - [5972K41](https://www.mcmaster.com/5972K41/) (`ch-rocker-arm-tl-vn-oblique-bearing`,
   MHA-CH-06-TL-VN-52, four: a pair in each oblique-trammel jig pivot block) was
-  read live on October 17, 2026: steel ball bearing, sealed (Buna-N both
-  sides), trade no. 6200-2RS, ID 10 mm -0.008/0, OD 30 mm -0.009/0, width
-  9 mm -0.12/0, ABEC 1, C3 radial clearance 0.008-0.023 mm, DIN 625-1. The
-  vendor model was downloaded from the product page on October 17, 2026
+  read live on October 17, 2026 and rechecked in the live Product Detail table
+  on October 21, 2026: steel ball bearing, sealed (Buna-N), trade no. 6200-2RS,
+  ID 10 mm -0.008/0, OD 30 mm -0.009/0, width 9 mm -0.12/0, ABEC 1,
+  C3 radial clearance 0.008-0.023 mm, DIN 625-1. These are SKU-specific
+  supplier dimensions, not tolerances inferred from the ABEC label or CAD.
+  `_mcmaster_5972k41` owns the pure purchased size bands; the pin and block
+  fits consume its bore and OD deviations. The supplier's generic Width
+  does not separately specify race widths or bound internal axial play.
+  No whole-bearing captured-motion enclosure follows from that width.
+  The vendor model was downloaded from the product page on October 17, 2026
   (`5972K41_Steel Ball Bearing.SLDPRT`, SHA-256
   `c27c3a1b09e8ca34e3191b2c345dd0b963297e5af1eb90e7d106441043c89ca9`; its
   STEP, SHA-256
@@ -138,7 +144,19 @@ replica-gated and no copy is kept here:
   It also supplies `fixtures.trammel-6200-2rs`; the inventory records the
   sourcing ruling on per-bearing internal play and the rejected C0 upgrade
   (combined play, mounting fits and alignment are not bounded by it).
-  Receipt verification remains required.
+  The VN-52 purchased drawing owns OD 29.991–30.000 mm, width 8.88–9.00 mm
+  and the function-required intact full-circumference cylindrical OD land,
+  including its axial mid-plane, for the TL-22 pivot-block capture. Before
+  pressing, trace the actual bearing's identity to valid supplier dimensional
+  authority and physically inspect that land. Catalogue size authority can
+  establish those bands without redundant micrometer records of every
+  catalogue dimension; CAD alone cannot accept the delivered profile, and no
+  maximum supplied chamfer is asserted. Assembly C1 uses qualified VN-52
+  bearings and retains the ring-loading press actions, not repeated part
+  tolerances. Capture qualification still requires explicit receiving status
+  and evidence for the same actual support on both passes. Possession and
+  receiving qualification remain unconfirmed; the inventory is not marked
+  accepted by this catalogue recheck.
 - [91595A452](https://www.mcmaster.com/91595A452/) (`ch-rocker-arm-tl-vn-oblique-cl-dowel`,
   MHA-CH-06-TL-VN-53, one: the oblique trammel jig carrier's CL locator) was
   read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter

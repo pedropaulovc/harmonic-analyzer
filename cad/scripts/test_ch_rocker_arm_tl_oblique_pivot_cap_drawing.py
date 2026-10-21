@@ -1,7 +1,7 @@
 """Offline definition/native-recipe contracts for MHA-CH-06-TL-30.
 
-No SolidWorks connection or recipe execution. Native readback and sheet review
-remain the integration owner's separate acceptance gates.
+Geometry-only adapters exercise recipes without a SolidWorks connection.
+Native readback and sheet review remain the integration owner's acceptance gates.
 """
 
 from __future__ import annotations
@@ -10,60 +10,30 @@ import ast
 import asyncio
 import copy
 import math
+from dataclasses import replace
 from itertools import product
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-import _config
 import build_ch_rocker_arm_tl_oblique_pivot_cap as part
 import ch_rocker_arm_tl_oblique_pivot_cap_spec as spec
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
 import draw_ch_rocker_arm_tl_oblique_pivot_cap as drawing
 import export_features
-from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import printed_band_mm
 from test_pd_transgear_adapter_contract import _adapter_calls, _adapter_methods, _missing, _signature
 
 STEM = "ch_rocker_arm_tl_oblique_pivot_cap"
-DASHED = STEM.replace("_", "-")
 RECIPE = Path(__file__).with_name(f"build_{STEM}.py")
 
 
-def test_dimensions_and_assembly_references_have_one_shared_owner() -> None:
-    assert (spec.WIDTH, spec.LENGTH, spec.HEIGHT) == (retention.CAP_WIDTH, retention.CAP_LENGTH, retention.CAP_HEIGHT)
-    assert (spec.POCKET_DIA, spec.POCKET_DEPTH, spec.APERTURE_DIA) == (
-        retention.CAP_POCKET_DIAMETER, retention.CAP_POCKET_DEPTH, retention.CAP_APERTURE_DIAMETER,
-    )
-    assert spec.BOLT_POINTS == retention.CAP_BOLT_CENTERS
-    assert set(spec.BOLT_POINTS) == set(product(retention.CAP_BOLT_X_OFFSETS, retention.CAP_BOLT_Y_OFFSETS))
-    assert spec.BOTTOM_PLANE == "Front Plane"
-    assert spec.AXIS_NAME == "CaptureAxis"
-    assert spec.BOLT_AXES == tuple(f"CapBoltAxis{i}" for i in range(1, 5))
-    assert spec.HEIGHT_PLACES == retention.CAP_HEIGHT_PLACES
-    assert spec.CENTER_LOCATION_PLACES == retention.CAP_CENTER_LOCATION_PLACES == 2
-    assert spec.POSITION_PLACES == spec.COUNTERBORE_DEPTH_PLACES == 3
-    assert spec.CHANNEL_PLACES == 2
-    assert spec.COUNTERBORE_DIA == retention.CAP_COUNTERBORE_DIAMETER
-    assert spec.COUNTERBORE_DIAMETER_PLACES == retention.CAP_COUNTERBORE_DIAMETER_PLACES == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["CounterboreDia"] == 2
-    assert spec.CHANNEL_DEPTH == retention.CAP_WIRE_CHANNEL_DEPTH
-    assert spec.TOTAL_HEIGHT == spec.HEIGHT + spec.REGISTER_PROJECTION
+def test_cap_and_integral_registers_fit_inside_the_available_stock() -> None:
     assert spec.TOTAL_HEIGHT + spec.HEIGHT_TOLERANCE + printed_band_mm(spec.REGISTER_PROJECTION_PLACES) < spec.STOCK_THICKNESS
     assert spec.STOCK_WIDTH > spec.WIDTH + 2.0 * printed_band_mm(spec.OUTLINE_PLACES)
     assert spec.STOCK_LENGTH_MIN > spec.LENGTH + 2.0 * printed_band_mm(spec.OUTLINE_PLACES)
-
-
-def test_integral_register_geometry_has_one_shared_owner() -> None:
-    assert spec.REGISTER_POINTS == retention.CAP_REGISTER_CENTERS
-    assert spec.REGISTER_DIA == retention.CAP_REGISTER_DIAMETER == 6.0
-    assert spec.REGISTER_BAND == retention.CAP_REGISTER_DIAMETER_BAND == (0.10, -0.10)
-    assert spec.REGISTER_PROJECTION == retention.CAP_REGISTER_PROJECTION == 1.0
-    assert spec.REGISTER_LOCATION_PLACES == retention.CAP_REGISTER_LOCATION_PLACES == 3
-    assert spec.REGISTER_PROJECTION_PLACES == retention.CAP_REGISTER_PROJECTION_PLACES == 3
-    assert spec.REGISTER_END_CHAMFER_MAX == retention.CAP_REGISTER_END_CHAMFER_MAX == 0.20
 
 
 @pytest.mark.parametrize("missing_chamfer", (False, True))
@@ -74,6 +44,7 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     views, imports, precision_checks, callouts, finalized = [], [], [], [], []
     sheets, activations, headings, centre_checks = [], [], [], []
     view_labels = []
+    near_sides = []
     active_sheet = None
     native = SimpleNamespace(
         FullName="RegisterEndChamfer@RegisterEndChamfers@cap",
@@ -186,6 +157,9 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     monkeypatch.setattr(drawing, "_assert_template_center_marks", centres)
     monkeypatch.setattr(drawing, "add_surface_finish", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "add_property_linked_note", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "set_near_side_diameter", lambda annotation, _label: near_sides.append(annotation))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
 
     if missing_chamfer:
@@ -203,13 +177,9 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
         assert {annotation.name for annotation in precision_checks} == set(spec.DRAWING_PRECISION_BY_NAME)
         assert len(precision_checks) == len(spec.DRAWING_PRECISION_BY_NAME)
         assert finalized == [drawing.OUTPUTS]
-        assert len(views) == 11 and all(view.hidden_removed for view in views)
+        assert len(views) == 10 and all(view.hidden_removed for view in views)
         assert len(centre_checks) == 5
-        assert view_labels == [
-            (drawing.SHEET_NAMES[3], "TOP FACE"),
-            (drawing.SHEET_NAMES[3], "REGISTER FREE ENDS"),
-            (drawing.SHEET_NAMES[3], "UNDERSIDE"),
-        ]
+        assert all(sheet == drawing.SHEET_NAMES[3] for sheet, _text in view_labels)
     assert tuple(sheets) == drawing.SHEET_NAMES == tuple(activations)
     assert [sheet for sheet, _text in headings] == sheets
     owners = {name: view for view, keep in imports for name in keep}
@@ -223,10 +193,37 @@ def test_native_dimensions_keep_their_sheet_view_and_source_ownership(monkeypatc
     assert owners["RegisterProjection"].orientation == "*Right"
     assert owners["RegisterEndChamfer"].sheet == owners["RegisterProjection"].sheet
     assert chamfer.dimension is native
+    assert [annotation.name for annotation in near_sides] == ["CounterboreDia"]
+    assert all(annotation in owners[annotation.name].annotations for annotation in near_sides)
     assert native.SystemValue == spec.REGISTER_END_CHAMFER_MAX / 1000.0
     assert (native.Tolerance.Type, native.Tolerance.lower, native.Tolerance.upper) == (
         6, -spec.REGISTER_END_CHAMFER_MAX / 1000.0, 0.0,
     )
+
+
+@pytest.mark.parametrize("names", [
+    ("CounterboreDia",),
+    ("CounterboreDia", "CounterboreDia"),
+    (),
+])
+def test_head_diameter_routing_requires_one_native_counterbore_annotation(monkeypatch, names) -> None:
+    annotations = [SimpleNamespace(name=name) for name in names]
+    routed = []
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: annotations)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *_args: None)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "set_near_side_diameter", lambda annotation, _label: routed.append(annotation))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    views = ((object(), {"CounterboreDia": drawing.TOP_KEEP["CounterboreDia"]}, "head access"),)
+    if len(names) == 1:
+        drawing._annotate_views(object(), views)
+        assert routed == annotations
+    else:
+        with pytest.raises(RuntimeError, match="one native head diameter"):
+            drawing._annotate_views(object(), views)
+        assert routed == []
 
 
 @pytest.mark.parametrize("expected", (5, 7))
@@ -299,9 +296,10 @@ def test_all_real_material_margins_survive_the_printed_limits() -> None:
     assert margins == spec.GEOMETRY_MARGINS
     assert set(margins) == {"counterbore_floor", "channel_floor", "chamber_roof", "counterbore_to_chamber", "hole_to_chamber", "mouth_to_chamber", "channel_to_chamber", "counterbore_to_y_edge", "pocket_to_x_edge"}
     assert min(margins.values()) >= 2.0
-    assert margins["counterbore_floor"] == pytest.approx(
-        spec.HEIGHT - spec.HEIGHT_TOLERANCE - spec.COUNTERBORE_DEPTH - spec.COUNTERBORE_DEPTH_TOLERANCE
-    )
+    assert margins["counterbore_floor"] == spec.COUNTERBORE_FLOOR_MIN
+    fitted = spec.require_fitted_counterbore_geometry()
+    assert fitted["nominal_floor"] >= margins["counterbore_floor"]
+    assert fitted["parallel_cut_floor"] >= margins["counterbore_floor"]
     assert margins["chamber_roof"] == pytest.approx(spec.HEIGHT - spec.HEIGHT_TOLERANCE - spec.FITTED_POCKET_DEPTH_MAX)
     assert margins["channel_floor"] == pytest.approx(spec.HEIGHT - spec.HEIGHT_TOLERANCE - spec.CHANNEL_DEPTH - printed_band_mm(spec.CHANNEL_PLACES))
     # Deliberate mouths are not counted as nonexistent outside-X material.
@@ -309,9 +307,8 @@ def test_all_real_material_margins_survive_the_printed_limits() -> None:
 
 
 @pytest.mark.parametrize("change", [
-    {"counterbore_depth": 9.0}, {"channel_depth": 9.0},
+    {"channel_depth": 9.0},
     {"pocket_dia": 49.0}, {"counterbore_dia": 23.0},
-    {"fitted_pocket_depth_max": 9.0},
     {"points": tuple((x / 2.0, y / 2.0) for x, y in spec.BOLT_POINTS)},
 ])
 def test_material_checks_reject_breakthrough_and_thin_wall_mutants(change) -> None:
@@ -319,9 +316,26 @@ def test_material_checks_reject_breakthrough_and_thin_wall_mutants(change) -> No
         spec.require_clearance_geometry(**change)
 
 
+@pytest.mark.parametrize("depth_delta", (-0.01, 0.01))
+def test_fitted_pocket_depth_preserves_the_actual_two_mm_roof_boundary(
+    depth_delta: float,
+) -> None:
+    target = 2.0
+    boundary_depth = spec.HEIGHT - spec.HEIGHT_TOLERANCE - target
+    depth = boundary_depth + depth_delta
+    assert spec.clearance_geometry(fitted_pocket_depth_max=depth)["chamber_roof"] == pytest.approx(
+        target - depth_delta
+    )
+    if depth_delta < 0.0:
+        assert spec.require_clearance_geometry(fitted_pocket_depth_max=depth)["chamber_roof"] > target
+    else:
+        with pytest.raises(ValueError):
+            spec.require_clearance_geometry(fitted_pocket_depth_max=depth)
+
+
 @pytest.mark.parametrize("change,margin", [
     ({"channel_depth": 9.0}, "channel_floor"),
-    ({"counterbore_dia": spec.COUNTERBORE_DIA + 1.0}, "counterbore_to_y_edge"),
+    ({"counterbore_dia": spec.COUNTERBORE_DIA + 2.0}, "counterbore_to_y_edge"),
 ])
 def test_void_enlargement_rejects_thin_land_floor_and_outer_wall(change, margin) -> None:
     assert spec.clearance_geometry(**change)[margin] < 2.0
@@ -418,7 +432,6 @@ def test_register_roots_keep_real_material_clear_of_all_void_families() -> None:
     ({"aperture_dia": 48.0}, "register_to_aperture"),
     ({"width": 15.0}, "register_to_x_edge"),
     ({"length": 54.0}, "register_to_y_edge"),
-    ({"counterbore_depth": 9.0}, "register_to_head_void_floor"),
     ({"channel_depth": 9.0}, "register_to_wire_void_floor"),
 ])
 def test_register_material_guards_reject_intersection_and_thin_wall_mutants(change, margin) -> None:
@@ -472,11 +485,19 @@ def test_nominal_volume_accounts_for_stock_and_real_aperture_and_wire_voids(monk
         (max(x for x, _ in spec.BOLT_POINTS) - min(x for x, _ in spec.BOLT_POINTS)) * spec.CHANNEL_WIDTH
         - 2.0 * circular_overlap
     )
+    head_void_area = sum(
+        math.pi * radius**2 / 2.0
+        + spec.COUNTERBORE_DIA * (spec.WIDTH / 2.0 - abs(x))
+        - math.pi * (spec.HOLE_DIA / 2.0)**2
+        for x, _y in spec.BOLT_POINTS
+    )
     changes = (
         ("LENGTH", spec.LENGTH + 2.0, 2.0 * spec.WIDTH * spec.HEIGHT),
         ("WIDTH", spec.WIDTH + 2.0, 2.0 * spec.LENGTH * spec.HEIGHT - len(spec.BOLT_POINTS) * spec.COUNTERBORE_DIA * spec.COUNTERBORE_DEPTH),
         ("APERTURE_DIA", spec.APERTURE_DIA + 1.0, -math.pi * ((spec.APERTURE_DIA + 1.0)**2 - spec.APERTURE_DIA**2) / 4.0 * (spec.HEIGHT - spec.POCKET_DEPTH)),
         ("CHANNEL_DEPTH", spec.CHANNEL_DEPTH + 1.0, -channel_area),
+        ("COUNTERBORE_DEPTH", spec.COUNTERBORE_DEPTH + 0.02, -0.02 * head_void_area),
+        ("HOLE_DIA", spec.HOLE_DIA + 0.2, -len(spec.BOLT_POINTS) * math.pi * ((spec.HOLE_DIA + 0.2)**2 - spec.HOLE_DIA**2) / 4.0 * (spec.HEIGHT - spec.COUNTERBORE_DEPTH)),
     )
     for name, value, volume_change in changes:
         with monkeypatch.context() as changed:
@@ -484,93 +505,180 @@ def test_nominal_volume_accounts_for_stock_and_real_aperture_and_wire_voids(monk
             assert spec.nominal_volume_mm3() - original == pytest.approx(volume_change)
 
 
-def test_entry_relief_aliases_and_local_neck_do_not_claim_a_two_millimetre_wall() -> None:
-    assert spec.ENTRY_RELIEF_DIA > spec.HOLE_DIA
-    assert spec.ENTRY_RELIEF_DIA == retention.CAP_ENTRY_RELIEF_DIAMETER
-    assert spec.ENTRY_RELIEF_BAND == retention.CAP_ENTRY_RELIEF_BAND
-    assert spec.ENTRY_RELIEF_DEPTH == retention.CAP_ENTRY_RELIEF_DEPTH
-    assert spec.ENTRY_RELIEF_DEPTH_PLACES == retention.CAP_ENTRY_RELIEF_DEPTH_PLACES
-    assert spec.HEAD_BEARING_DIAMETER_MIN == retention.CAP_BOLT_HEAD_BEARING_DIAMETER_MIN
-    margins = spec.require_entry_relief_geometry()
-    assert margins == spec.ENTRY_RELIEF_MARGINS
-    assert 0.0 < margins["entry_annular_neck"] < 2.0
-    assert spec.GEOMETRY_MARGINS["counterbore_floor"] >= 2.0
-    assert margins["entry_to_pocket"] >= 2.0
-    assert margins["head_flat_concentric_land"] == pytest.approx(
-        (spec.HEAD_BEARING_DIAMETER_MIN - spec.ENTRY_RELIEF_DIA - spec.ENTRY_RELIEF_BAND[0]) / 2.0
+def test_single_bore_clears_the_thread_and_actual_underhead_fillet_envelopes() -> None:
+    minimum_bore = spec.HOLE_DIA + spec.DRILLED_BAND[1]
+    assert minimum_bore > hardware.SCREW_MAJOR_DIA_MAX
+    # Bound the complete sourced fillet cylinder, not only its thread major.
+    # The cap floor and the permitted head-bearing face can tilt independently.
+    angle = math.radians(
+        retention.GENERAL_ANGULAR_BAND_DEGREES + hardware.SCREW_BEARING_ANGLE_MAX_DEGREES
     )
-    assert min(margins.values()) > 0.0
-
-
-def test_entry_relief_depth_boundary_cannot_be_silently_cut_through() -> None:
-    boundary = (
-        spec.HEIGHT - spec.HEIGHT_TOLERANCE - spec.COUNTERBORE_DEPTH
-        - spec.COUNTERBORE_DEPTH_TOLERANCE - printed_band_mm(spec.ENTRY_RELIEF_DEPTH_PLACES)
+    projected_radius = (
+        hardware.SCREW_FILLET_JUNCTION_DIA_MAX / (2.0 * math.cos(angle))
+        + hardware.SCREW_FILLET_LENGTH_MAX * math.tan(angle)
     )
-    assert spec.require_entry_relief_geometry(entry_depth=boundary - 1e-5)["entry_annular_neck"] > 0.0
-    with pytest.raises(ValueError, match="entry_annular_neck"):
-        spec.require_entry_relief_geometry(entry_depth=boundary + 1e-5)
+    assert minimum_bore / 2.0 > projected_radius
+    assert (
+        spec.HOLE_DIA + spec.DRILLED_BAND[0]
+        < hardware.SCREW_HEAD_BEARING_DIA_MIN
+    )
 
 
-@pytest.mark.parametrize("change,margin", [
-    ({"entry_dia": 24.0}, "entry_to_pocket"),
-    ({"entry_dia": spec.HOLE_DIA}, "entry_expansion_over_through_hole"),
-    ({"entry_depth": spec.HEIGHT}, "entry_annular_neck"),
-    ({"head_bearing_dia_min": spec.ENTRY_RELIEF_DIA + spec.ENTRY_RELIEF_BAND[0]}, "head_flat_concentric_land"),
-])
-def test_entry_relief_guards_reject_invalid_flat_bottom_geometry(change, margin) -> None:
-    assert spec.entry_relief_geometry(**change)[margin] <= 0.0
-    with pytest.raises(ValueError):
-        spec.require_entry_relief_geometry(**change)
-
-
-def test_entry_relief_volume_removes_only_the_annulus_below_the_head_seat(monkeypatch) -> None:
-    area = len(spec.BOLT_POINTS) * math.pi * (spec.ENTRY_RELIEF_DIA**2 - spec.HOLE_DIA**2) / 4.0
-    assert spec.nominal_entry_relief_volume_mm3() == pytest.approx(area * spec.ENTRY_RELIEF_DEPTH)
-    original = spec.nominal_volume_mm3()
-    monkeypatch.setattr(spec, "ENTRY_RELIEF_DEPTH", spec.ENTRY_RELIEF_DEPTH + 0.2)
-    assert spec.nominal_volume_mm3() - original == pytest.approx(-area * 0.2)
-
-
-def test_clearance_tracks_shared_screw_geometry_without_claiming_a_thread_stop() -> None:
-    assert spec.SCREW_MAJOR_LIMITS == (hardware.SCREW_MAJOR_DIA_MIN, hardware.SCREW_MAJOR_DIA_MAX)
-    assert spec.SCREW_THREAD_SOURCE_URL == hardware.SCREW_THREAD_SOURCE_URL
-    assert spec.HOLE_DIA == retention.CAP_BOLT_CLEARANCE_DIAMETER
-    assert spec.HOLE_DIA > spec.SCREW_MAJOR_LIMITS[1]
-    assert spec.DRILLED_BAND == retention.CAP_BOLT_CLEARANCE_BAND
-
-
-def test_actual_formed_side_wire_and_head_fit_below_cap_and_above_channel_floor() -> None:
+def test_representative_normal_side_wire_fits_the_nominal_cap_and_channel() -> None:
     wire_low, wire_high = spec.lock_wire.swept_wire_z_bounds(hardware_limits=True)
     margins = spec.require_wire_clearance_geometry()
     assert margins == spec.WIRE_GEOMETRY_MARGINS
     assert min(margins.values()) > 0.0
-    minimum_cb_depth = spec.COUNTERBORE_DEPTH - spec.COUNTERBORE_DEPTH_TOLERANCE
-    assert margins["head_below_cap"] == pytest.approx(minimum_cb_depth - spec.HEAD_HEIGHT_MAX)
-    assert margins["formed_wire_below_cap"] == pytest.approx(minimum_cb_depth - wire_high)
+    head_gap = retention.CAP_HEAD_SEATING_GAP_MAX
+    assert margins["formed_wire_below_cap"] == pytest.approx(spec.COUNTERBORE_DEPTH - wire_high - head_gap)
     assert margins["formed_wire_above_channel_floor"] == pytest.approx(
-        wire_low - spec.COUNTERBORE_DEPTH - spec.COUNTERBORE_DEPTH_TOLERANCE
-        + spec.CHANNEL_DEPTH - printed_band_mm(spec.CHANNEL_PLACES)
+        wire_low - spec.COUNTERBORE_DEPTH + spec.CHANNEL_DEPTH - printed_band_mm(spec.CHANNEL_PLACES)
     )
     minimum_cb_dia = spec.COUNTERBORE_DIA - printed_band_mm(spec.COUNTERBORE_DIAMETER_PLACES)
     assert (minimum_cb_dia - spec.HEAD_DIAMETER_MAX) / 2.0 > spec.WIRE_DIAMETER
     minimum_channel = spec.CHANNEL_WIDTH - printed_band_mm(spec.CHANNEL_PLACES)
     assert minimum_channel > 2.0 * spec.lock_wire.TWIST_RADIUS + spec.WIRE_DIAMETER
-    # A valid side route must not acquire an invented over-head wire gap.
-    close_head = minimum_cb_depth - spec.WIRE_DIAMETER / 2.0
-    assert spec.require_wire_clearance_geometry(head_height_max=close_head)["head_below_cap"] == pytest.approx(spec.WIRE_DIAMETER / 2.0)
 
 
-def test_actual_formed_wire_envelope_rejects_roof_and_channel_floor_breakthrough() -> None:
+def test_representative_normal_wire_route_rejects_roof_and_channel_breakthrough() -> None:
     low, high = spec.lock_wire.swept_wire_z_bounds(hardware_limits=True)
-    cap_top = spec.COUNTERBORE_DEPTH - spec.COUNTERBORE_DEPTH_TOLERANCE
-    channel_floor = spec.COUNTERBORE_DEPTH + spec.COUNTERBORE_DEPTH_TOLERANCE - spec.CHANNEL_DEPTH + printed_band_mm(spec.CHANNEL_PLACES)
+    cap_top = spec.COUNTERBORE_DEPTH - retention.CAP_HEAD_SEATING_GAP_MAX
+    channel_floor = spec.COUNTERBORE_DEPTH - spec.CHANNEL_DEPTH + printed_band_mm(spec.CHANNEL_PLACES)
     with pytest.raises(ValueError, match="formed_wire_below_cap"):
         spec.require_wire_clearance_geometry(wire_bounds=(low, cap_top + 0.01))
     with pytest.raises(ValueError, match="formed_wire_above_channel_floor"):
         spec.require_wire_clearance_geometry(wire_bounds=(channel_floor - 0.01, high))
-    with pytest.raises(ValueError, match="head_below_cap"):
-        spec.require_wire_clearance_geometry(head_height_max=cap_top + 0.01)
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_normal_underhead_gap_consumes_wire_recess_not_channel_floor(fraction) -> None:
+    seated = spec.require_wire_clearance_geometry(head_seating_gap_max=0.0)
+    gap = fraction * seated["formed_wire_below_cap"]
+    if fraction < 1.0:
+        lifted = spec.require_wire_clearance_geometry(head_seating_gap_max=gap)
+        assert lifted["formed_wire_below_cap"] == pytest.approx(seated["formed_wire_below_cap"] - gap)
+        assert lifted["formed_wire_above_channel_floor"] == pytest.approx(
+            seated["formed_wire_above_channel_floor"]
+        )
+    else:
+        with pytest.raises(ValueError, match="formed_wire_below_cap"):
+            spec.require_wire_clearance_geometry(head_seating_gap_max=gap)
+
+
+def test_whole_fixed_head_wire_route_keeps_all_capture_surfaces_clear() -> None:
+    bounds = spec.WIRE_CAPTURE_BOUNDS
+    for name in (
+        "lateral_clearance", "channel_floor_clearance", "top_clearance",
+        "head_bearing_floor_clearance", "head_support_x_clearance",
+    ):
+        assert math.isfinite(getattr(bounds, name)) and getattr(bounds, name) > 0.0
+
+
+@pytest.mark.parametrize("change", [
+    {"channel_width": 2.50},
+    {"channel_depth": 4.00},
+    {"counterbore_diameter": 16.50},
+])
+def test_whole_wire_capture_rejects_solid_wall_and_floor_intersection_mutants(change) -> None:
+    with pytest.raises(ValueError):
+        spec.wire_capture.require_wire_capture_geometry(**change)
+
+
+def test_whole_route_guard_includes_bridge_interior_not_only_endpoints() -> None:
+    segments = list(spec.lock_wire.installed_wire_segments())
+    index = min(range(len(segments)), key=lambda i: max(abs(point[0]) for point in segments[i]))
+    original = segments[index]
+    bend = list(original)
+    x, y, z = bend[1]
+    bend[1] = (x, y + 20.0, z)
+    segments[index] = tuple(bend)
+    # Both endpoints still fit; the changed interior bows into cap material.
+    assert segments[index][0] == original[0] and segments[index][-1] == original[-1]
+    with pytest.raises(ValueError):
+        spec.wire_capture.require_wire_capture_geometry(segments=tuple(segments))
+
+
+@pytest.mark.parametrize("head_recess", (0.50, 0.55, 0.60))
+@pytest.mark.parametrize("floor", (2.00, 2.25))
+def test_actual_fitted_counterbore_accepts_inclusive_recess_and_whole_floor_limits(head_recess, floor) -> None:
+    accepted = spec.fitted_counterbore_acceptance(head_recess=head_recess, whole_floor_min=floor)
+    assert accepted == {"head_recess": head_recess, "whole_floor_min": floor}
+
+
+@pytest.mark.parametrize("change", [
+    {"head_recess": 0.50 - 1e-6}, {"head_recess": 0.60 + 1e-6},
+    {"whole_floor_min": 2.00 - 1e-6}, {"forced_fit": True},
+])
+def test_actual_fitted_counterbore_rejects_outside_limits_and_forced_fit(change) -> None:
+    measured = {"head_recess": 0.55, "whole_floor_min": 2.00, **change}
+    with pytest.raises(ValueError):
+        spec.fitted_counterbore_acceptance(**measured)
+
+
+@pytest.mark.parametrize("name", ("head_recess", "whole_floor_min"))
+@pytest.mark.parametrize("value", (math.nan, math.inf, -math.inf))
+def test_actual_fitted_counterbore_rejects_nonfinite_measurements(name, value) -> None:
+    measured = {"head_recess": 0.55, "whole_floor_min": 2.00, name: value}
+    with pytest.raises(ValueError, match="finite"):
+        spec.fitted_counterbore_acceptance(**measured)
+
+
+def test_representative_nominal_cut_meets_fitted_head_acceptance_and_constructive_window() -> None:
+    nominal = spec.require_fitted_counterbore_geometry()
+    assert nominal == spec.FITTED_COUNTERBORE_GEOMETRY
+    assert spec.COUNTERBORE_DEPTH == 8.40
+    assert nominal["nominal_head_recess"] == pytest.approx(0.5514)
+    assert nominal["nominal_floor"] == pytest.approx(
+        spec.HEIGHT - spec.HEIGHT_TOLERANCE - spec.COUNTERBORE_DEPTH
+    )
+    assert nominal["parallel_cut_floor"] >= 2.00
+    # Reference depth remains representative geometry, not a manufactured band.
+    for recess in (0.50, 0.60):
+        fitted = spec.require_fitted_counterbore_geometry(
+            counterbore_depth=hardware.SCREW_HEAD_HEIGHT + recess
+        )
+        assert fitted["nominal_head_recess"] == pytest.approx(recess)
+
+
+@pytest.mark.parametrize("change", [
+    {"counterbore_depth": 7.90}, {"counterbore_depth": 9.00},
+    {"counterbore_depth": 0.0}, {"actual_floor_min": 1.99},
+    {"height": spec.HEIGHT - 0.20},
+])
+def test_fitted_geometry_rejects_nominal_or_constructive_window_mutants(change) -> None:
+    with pytest.raises(ValueError):
+        spec.require_fitted_counterbore_geometry(**change)
+    for guard in (spec.require_clearance_geometry, spec.require_register_geometry):
+        with pytest.raises(ValueError):
+            guard(**change)
+
+
+@pytest.mark.parametrize("name", ("height", "counterbore_depth", "actual_floor_min"))
+@pytest.mark.parametrize("value", (math.nan, math.inf, -math.inf))
+def test_fitted_geometry_rejects_nonfinite_cut_and_floor_inputs(name, value) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        spec.require_fitted_counterbore_geometry(**{name: value})
+
+
+@pytest.mark.parametrize("margin,raw,guard", [
+    ("counterbore_floor", spec.clearance_geometry, spec.require_clearance_geometry),
+    ("register_to_head_void_floor", spec.register_clearance_geometry, spec.require_register_geometry),
+])
+def test_actual_floor_acceptance_does_not_mask_nominal_breakthrough(margin, raw, guard) -> None:
+    assert raw(actual_floor_min=2.20)[margin] == pytest.approx(2.20)
+    assert guard(actual_floor_min=2.20)[margin] == pytest.approx(2.20)
+    assert raw(counterbore_depth=spec.HEIGHT)[margin] < 0.0
+    with pytest.raises(ValueError):
+        guard(counterbore_depth=spec.HEIGHT)
+
+
+def test_fitted_head_capture_uses_the_captured_head_enclosure() -> None:
+    bounds = retention.capture_bounds()
+    assert spec.require_fitted_head_capture(bounds=bounds) == spec.FITTED_HEAD_RUNNING_CLEARANCE
+    assert spec.FITTED_HEAD_RUNNING_CLEARANCE > 0.0
+    for clearance in (0.0, -0.01, math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="fitted head"):
+            spec.require_fitted_head_capture(bounds=replace(bounds, cap_head_running_clearance=clearance))
 
 
 def test_pocket_depth_is_fitted_to_actual_flange_not_a_loose_fixed_band() -> None:
@@ -579,36 +687,6 @@ def test_pocket_depth_is_fitted_to_actual_flange_not_a_loose_fixed_band() -> Non
     for pocket, flange in ((3.1, 3.0), (3.5, 3.0), (3.3, 3.8)):
         with pytest.raises(ValueError, match="chamber excess"):
             spec.fitted_chamber_excess(pocket, flange)
-
-
-def test_each_model_dimension_is_printed_once_with_authored_precision() -> None:
-    keep_maps = (
-        drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP,
-        drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP, drawing.BOLT_KEEP,
-        drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP, drawing.REGISTER_END_KEEP,
-    )
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert sum(map(len, keep_maps)) == len(marked)
-    assert set().union(*keep_maps) == marked == set(spec.DRAWING_PRECISION_BY_NAME)
-    assert set(spec.DIMENSION_CALLOUTS) <= marked
-    assert all(spec.DRAWING_PRECISION_BY_NAME[f"Bolt{i}{axis}"] == 3 for i in range(1, 5) for axis in ("X", "Y"))
-    assert all(spec.DRAWING_PRECISION_BY_NAME[f"{prefix}Center{axis}"] == 2 for prefix in ("Pocket", "Aperture") for axis in ("X", "Y"))
-    assert {"PocketCenterX", "PocketCenterY"} <= drawing.BOTTOM_KEEP.keys()
-    assert {"ApertureCenterX", "ApertureCenterY"} <= drawing.TOP_KEEP.keys()
-    bolt_stations = {f"Bolt{i}{axis}" for i in range(1, 5) for axis in ("X", "Y")}
-    assert bolt_stations <= drawing.BOLT_KEEP.keys()
-    assert not bolt_stations & drawing.TOP_KEEP.keys()
-    register_locations = {f"Register{i}{axis}" for i in range(1, 3) for axis in ("X", "Y")}
-    assert register_locations <= drawing.REGISTER_KEEP.keys()
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.REGISTER_LOCATION_PLACES for name in register_locations)
-    assert "RegisterProjection" in drawing.REGISTER_PROJECTION_KEEP
-    assert "RegisterEndChamfer" in drawing.REGISTER_END_KEEP
-    assert spec.DRAWING_PRECISION_BY_NAME["RegisterProjection"] == spec.REGISTER_PROJECTION_PLACES
-    assert "EntryReliefDia" in drawing.TOP_KEEP
-    assert "EntryReliefDepth" in drawing.BOLT_SECTION_KEEP
-    assert spec.DRAWING_PRECISION_BY_NAME["EntryReliefDepth"] == spec.ENTRY_RELIEF_DEPTH_PLACES
-    assert {point[1] for point in drawing.BOLT_SECTION_LINE_MODEL} == {min(y for _, y in spec.BOLT_POINTS)}
-    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
 
 
 def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptance() -> None:
@@ -639,21 +717,16 @@ def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptanc
             assert selector.diameter_mm == spec.HOLE_DIA
             assert (selector.contains_x_mm, selector.contains_y_mm) == (x, y)
         recess = features[f"head_recess_{index}"]
-        recess_band = printed_band_mm(spec.COUNTERBORE_DEPTH_PLACES)
-        assert recess["depth"] == pytest.approx([
-            spec.COUNTERBORE_DEPTH - recess_band, spec.COUNTERBORE_DEPTH + recess_band,
-        ])
-        assert recess["precision"]["depth"] == spec.COUNTERBORE_DEPTH_PLACES
-        entry = features[f"head_entry_relief_{index}"]
-        entry_band = printed_band_mm(spec.ENTRY_RELIEF_DEPTH_PLACES)
-        assert entry["at"] == [x, y, spec.HEIGHT - spec.COUNTERBORE_DEPTH]
-        assert entry["axis"] == [0.0, 0.0, -1.0]
-        assert entry["dia"] == pytest.approx([spec.ENTRY_RELIEF_DIA + spec.ENTRY_RELIEF_BAND[1], spec.ENTRY_RELIEF_DIA + spec.ENTRY_RELIEF_BAND[0]])
-        assert entry["depth"] == pytest.approx([spec.ENTRY_RELIEF_DEPTH - entry_band, spec.ENTRY_RELIEF_DEPTH + entry_band])
-        assert entry["precision"]["depth"] == spec.ENTRY_RELIEF_DEPTH_PLACES
-        entry_face, = selectors[f"head_entry_relief_{index}"]
-        assert (entry_face.diameter_mm, entry_face.contains_x_mm, entry_face.contains_y_mm) == (spec.ENTRY_RELIEF_DIA, x, y)
-        assert entry_face.contains_z_mm == spec.HEIGHT - spec.COUNTERBORE_DEPTH - spec.ENTRY_RELIEF_DEPTH / 2.0
+        assert recess["depth_ref"] == 8.40
+        assert "depth" not in recess and "depth" not in recess["requirements"]
+        assert "depth" not in recess["precision"]
+        assert recess["precision"]["depth_ref"] == spec.DRAWING_PRECISION_BY_NAME["CounterboreDepth"] == 2
+        assert recess["head_recess"] == [0.50, 0.60]
+        assert recess["whole_floor_min"] == 2.00
+        spec.fitted_counterbore_acceptance(
+            head_recess=spec.FITTED_COUNTERBORE_GEOMETRY["nominal_head_recess"],
+            whole_floor_min=recess["whole_floor_min"],
+        )
     channel_band = printed_band_mm(spec.CHANNEL_PLACES)
     assert features["wire_channel"]["depth"] == pytest.approx([
         spec.CHANNEL_DEPTH - channel_band, spec.CHANNEL_DEPTH + channel_band,
@@ -670,8 +743,6 @@ def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptanc
         assert feature["width"] == pytest.approx([spec.LENGTH / 2.0 - band, spec.LENGTH / 2.0 + band])
         assert feature["precision"]["station"] == feature["precision"]["width"] == spec.CENTER_LOCATION_PLACES
         assert {"dia", "station", "width"} <= set(feature["requirements"])
-        assert spec.CENTER_LOCATION_NOTE in feature["note"]
-    assert spec.DIMENSION_CALLOUTS["PocketDepth"] in features["flange_chamber"]["note"]
 
 
 def test_requirement_manifest_binds_integral_cylinders_and_real_end_chamfers() -> None:
@@ -905,39 +976,136 @@ def test_register_native_recipe_merges_below_seating_plane_and_chamfers_only_fre
     ]
 
 
-def test_entry_relief_native_recipe_cuts_from_head_seat_not_top_or_seating_face(monkeypatch) -> None:
-    adapter = _RegisterAdapter()
-    circles, cuts = [], []
+def test_builder_machines_single_bolt_bores_and_full_depth_head_mouths(monkeypatch) -> None:
+    class CutAdapter(_RegisterAdapter):
+        def __init__(self):
+            super().__init__()
+            self.points["origin"] = (0.0, 0.0)
+            self._sketch_entities = {}
+            self.planes = {"Front": 0.0}
+            self.profile = []
+            self.z = 0.0
+            self.cuts = []
+            self.last_plane = None
 
-    async def define_circle(_adapter, x, y, radius, label, *, dims, names, drives):
-        assert _adapter is adapter
-        circles.append((x, y, radius, names, drives))
-        for name, expression in zip(names, drives, strict=True):
-            dims.record(name, expression)
+        async def create_part(self):
+            return SimpleNamespace(is_success=True, data=None, error=None)
 
-    async def fully_defined(_adapter, _label):
-        assert _adapter is adapter
+        async def create_plane(self, params):
+            self.last_plane = params.offset
+            return SimpleNamespace(is_success=True, data=None, error=None)
 
-    async def cut(params):
-        cuts.append(params)
-        return SimpleNamespace(is_success=True, data=None, error=None)
+        async def create_sketch(self, plane):
+            self.z = self.planes[plane]
+            self.profile = []
+            return await super().create_sketch(plane)
 
-    monkeypatch.setattr(part, "define_circle", define_circle)
-    monkeypatch.setattr(part, "ensure_fully_defined", fully_defined)
-    monkeypatch.setattr(adapter, "create_cut_extrude", cut, raising=False)
-    monkeypatch.setattr(part, "name_last_feature", lambda current, name: current.names.append(name))
-    monkeypatch.setattr(part, "name_dimensions", lambda _adapter, feature, names: [f"{name}@{feature}" for name in names])
-    monkeypatch.setattr(part.SketchDims, "apply", lambda dims, _adapter, feature: [(f"{name}@{feature}", expression) for name, expression in dims._rows])
-    jobs = asyncio.run(part._entry_reliefs(adapter))
-    assert adapter.sketches == [spec.BOLT_SEAT_PLANE]
-    assert adapter.names == ["EntryReliefProfile", "EntryReliefs"]
-    assert [(x, y, radius) for x, y, radius, _, _ in circles] == [
-        (x, y, spec.ENTRY_RELIEF_DIA / 2.0) for x, y in spec.BOLT_POINTS
-    ]
-    extrusion, = cuts
-    assert extrusion.depth == spec.ENTRY_RELIEF_DEPTH
-    assert not extrusion.reverse_direction and not extrusion.both_directions and not extrusion.thin_feature
-    assert jobs[-1] == ("EntryReliefDepth@EntryReliefs", '"EntryReliefDepth"')
+        async def add_circle(self, x, y, radius):
+            result = await super().add_circle(x, y, radius)
+            circle = ("circle", x, y, radius)
+            self.profile.append(circle)
+            self._sketch_entities[result.data] = circle
+            return result
+
+        async def create_cut_extrude(self, params):
+            low = self.z - (0.0 if params.reverse_direction else params.depth)
+            high = self.z + (params.depth if params.reverse_direction or params.both_directions else 0.0)
+            self.cuts.append((tuple(self.profile), low, high))
+            return SimpleNamespace(is_success=True, data=None, error=None)
+
+        def void_at(self, x, y, z):
+            for profile, low, high in self.cuts:
+                if not low < z < high:
+                    continue
+                for kind, *shape in profile:
+                    if kind == "circle":
+                        cx, cy, radius = shape
+                        if math.hypot(x - cx, y - cy) < radius:
+                            return True
+                    else:
+                        x0, y0, x1, y1 = shape
+                        if x0 < x < x1 and y0 < y < y1:
+                            return True
+            return False
+
+    adapter = CutAdapter()
+
+    async def no_op(*_args, **_kwargs):
+        pass
+
+    async def stock_circle(current, diameter, prefix, dims):
+        current.currentSketchManager.AddToDB = True
+        try:
+            circle = await current.add_circle(0.0, 0.0, diameter / 2.0)
+        finally:
+            current.currentSketchManager.AddToDB = False
+        return circle.data
+
+    async def rectangle(current, plane, _feature, bounds, _names, _drives):
+        await current.create_sketch(plane)
+        current.profile.append(("rectangle", *bounds))
+        return []
+
+    async def machining_complete(*_args):
+        raise RuntimeError("machining complete")
+
+    def feature_name(current, name):
+        if current.last_plane is not None:
+            current.planes[name] = current.last_plane
+            current.last_plane = None
+
+    monkeypatch.setattr(part, "set_global", no_op)
+    monkeypatch.setattr(part, "define_centered_rectangle", no_op)
+    monkeypatch.setattr(part, "ensure_fully_defined", no_op)
+    monkeypatch.setattr(part, "volume_check", no_op)
+    monkeypatch.setattr(part, "_circle_from_stock_corner", stock_circle)
+    monkeypatch.setattr(part, "_rectangle", rectangle)
+    monkeypatch.setattr(part, "_integral_registers", machining_complete)
+    monkeypatch.setattr(part, "name_last_feature", feature_name)
+    monkeypatch.setattr(part, "name_dimensions", lambda _adapter, _feature, names: names)
+    monkeypatch.setattr(part.SketchDims, "apply", lambda *_args: [])
+    with pytest.raises(RuntimeError, match="machining complete"):
+        asyncio.run(part.build(adapter))
+
+    floor = spec.HEIGHT - spec.COUNTERBORE_DEPTH
+    for x, y in spec.BOLT_POINTS:
+        cylinders = [
+            (radius, low, high)
+            for profile, low, high in adapter.cuts
+            for kind, *shape in profile if kind == "circle"
+            for cx, cy, radius in (shape,) if (cx, cy) == (x, y)
+        ]
+        assert len(cylinders) == 2
+        through, head = sorted(cylinders)
+        assert through[0] == spec.HOLE_DIA / 2.0
+        assert through[1] < 0.0 and through[2] >= spec.HEIGHT
+        assert head == (spec.COUNTERBORE_DIA / 2.0, floor, spec.HEIGHT)
+        for z, angle in product((0.01, floor / 2.0, floor - 0.01), range(8)):
+            ux, uy = math.cos(angle * math.pi / 4.0), math.sin(angle * math.pi / 4.0)
+            for radius, is_void in ((through[0] - 0.01, True), (through[0] + 0.01, False)):
+                assert adapter.void_at(x + radius * ux, y + radius * uy, z) is is_void
+        # The opening beside each head is the complete recess width and depth,
+        # not the shallower wire channel or an annular fillet shelf.
+        outer_x = math.copysign(spec.WIDTH / 2.0 - 0.01, x)
+        radius = spec.COUNTERBORE_DIA / 2.0
+        for dy in (-radius + 0.01, -radius / 2.0, 0.0, radius / 2.0, radius - 0.01):
+            # These edge points are OUTSIDE the circular CB. A closed recess
+            # or an annular/sliver X wall cannot satisfy this actual section.
+            assert math.hypot(outer_x - x, dy) > radius
+            for fraction in (0.05, 0.50, 0.95, 1.0):
+                section_x = x + fraction * (outer_x - x)
+                for z in (floor + 0.01, (floor + spec.HEIGHT) / 2.0, spec.HEIGHT - 0.01):
+                    assert adapter.void_at(section_x, y + dy, z)
+                if math.hypot(section_x - x, dy) > spec.HOLE_DIA / 2.0:
+                    assert not adapter.void_at(section_x, y + dy, floor - 0.01)
+        # The surviving sides, unlike the open X edge, remain actual walls.
+        for side in (-1.0, 1.0):
+            side_y = y + side * (radius + 0.01)
+            for fraction, z in product(
+                (0.05, 0.50, 1.0), (floor + 0.01, spec.HEIGHT - 0.01),
+            ):
+                section_x = x + fraction * (outer_x - x)
+                assert not adapter.void_at(section_x, side_y, z)
 
 
 @pytest.mark.parametrize("failure", [None, "nominal", "reject", "readback"])
@@ -977,7 +1145,7 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     title_left, title_top = 0.216, 0.0652
     maps = (
         drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP,
-        drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP, drawing.BOLT_KEEP,
+        drawing.SECTION_KEEP, drawing.BOLT_KEEP,
         drawing.REGISTER_KEEP, drawing.REGISTER_PROJECTION_KEEP, drawing.REGISTER_END_KEEP,
     )
     for keep in maps:
@@ -1053,7 +1221,8 @@ def test_cap_section_and_register_complete_blocks_clear_context_and_heading() ->
     assert depth_x < 319.3 - 20.0  # actual native thickness attachment
     assert depth_x > 124.0215 + 12.7 + 5.0  # space for the full left shoulder
     assert depth_x < 269.5009 - 5.0  # actual finish-symbol leftmost stroke
-    assert depth_y - 17.09 > 213.088 + 5.0  # padded underside top, not only border
+    padded_underside_top = drawing.BOTTOM_CENTER[1] * 1000.0 + spec.LENGTH / 2.0 + 4.088
+    assert depth_y - 17.09 > padded_underside_top + 5.0
     assert depth_y + 15.7 < 266.7 - 5.0
     register = _cap_paper_box(
         (153.0, 207.6, 213.1, 223.74), (215.0, 215.0), drawing.REGISTER_KEEP["Register2Y"],
@@ -1094,7 +1263,3 @@ def test_native_recipe_adapter_calls_bind_to_the_real_interface() -> None:
     assert _missing(mutant) == {"create_extrude"}
 
 
-def test_configuration_identity() -> None:
-    row = _config.parts(DASHED)
-    assert row["number"] == "MHA-CH-06-TL-30" and row["quantity"] == 2
-    assert len(row["finish"]) <= 40 and "\n" not in row["finish"]

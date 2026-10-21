@@ -10,9 +10,9 @@ in BOTH pass pairs. No top retainer is a permanent clamp.
 
 Frame: bore axis +Z, bottom running face Z=0, finished top Z=THICKNESS.
 Assembly bottom sits at actual carrier top plus its fitted running gap.
-The pivot-pin end projects above the carrier plate and workholding; the
-setup note requires actual installed toolholder/spindle clearance acceptance.
-No native outline supplies the absent installed tooling-envelope authority.
+Pin-end projection, both-retainer locking, fresh cotters and installed
+toolholder/spindle clearance acceptance are assembly facts: the jig
+assembly's caption and capture steps carry them, not this part sheet.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import _config
 
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _gtol_planar import PlanarFace
+from _printed_tolerance import drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OUTER_DIA = retention.TOP_WASHER_OD
@@ -37,9 +38,11 @@ CROSS_HOLE_FROM_SEAT = retention.PIN_CROSS_HOLE_FROM_SEAT
 CROSS_HOLE_DIA = retention.PIN_CROSS_HOLE_DIA
 CLEVIS_DIA = retention.PIN_CLEVIS_NOMINAL_DIAMETER
 RUNNING_GAP_MIN, RUNNING_GAP_MAX = retention.TOP_RUNNING_GAP
-DRILLED_BAND = (0.10, 0.0)
-PIN_PROJECTION_ABOVE_PLATE = retention.PIN_CARRIER_JOURNAL_LENGTH - CARRIER_THICKNESS
-PIN_PROJECTION_ABOVE_WORK = retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL
+# The bore prints DRILL with no band of its own: the title block's DRILLED
+# HOLES row is its whole tolerance, 10.20-10.30 (rule 3).
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)
+if DRILLED_BAND != (0.10, 0.0):
+    raise AssertionError("the DRILLED HOLES row no longer holds the 10.20-10.30 journal clearance")
 
 AXIS_NAME = "RetainerAxis"
 BOTTOM_PLANE = "Front Plane"
@@ -82,19 +85,13 @@ DRAWING_PRECISION_BY_NAME = {name: places for row in DRAWING_PRECISION.values() 
 DIMENSION_CALLOUTS = {
     "WasherBore": "DRILL THRU; CLEARS TL-23 JOURNAL",
     "FinishedThickness": (
-        "REF; FACE UNDERSIDE TO ACTUAL\n"
+        f"REF; FACE Ra {MACHINED_UM:.1f} UNDERSIDE TO ACTUAL\n"
         f"LOADED RUNNING GAP {RUNNING_GAP_MIN:.2f}-{RUNNING_GAP_MAX:.2f}\n"
         "ON MHA-CH-06-TL-21 CARRIER / TL-23 PIN;\n"
         "HOLD CLEVIS AGAINST UPPER CROSS-HOLE EDGE"
     ),
     "SupplyThickness": "SUPPLY; FINISH TO LOADED GAP",
 }
-SETUP_NOTE = (
-    f"PIN END {PIN_PROJECTION_ABOVE_PLATE:.1f} ABOVE CARRIER PLATE,\n"
-    f"ABOUT {PIN_PROJECTION_ABOVE_WORK:.1f} ABOVE WORK TOP (NOMINAL).\n"
-    "BOTH RETAINERS LOCKED FOR EITHER PASS; FRESH COTTERS.\n"
-    "ACCEPT ACTUAL INSTALLED TOOLHOLDER / SPINDLE CLEARANCE."
-)
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 # The washer may turn relative to the carrier under uplift; only its lower

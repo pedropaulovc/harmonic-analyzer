@@ -391,13 +391,22 @@ CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}
 # unlocated in Y).
 CALLOUT_PREFIXES = {"RiserY1": "2X ", "RiserY2": "2X "}
 
-# A source-model property, linked on the drawing and attached to each bore's
-# supported feature-schema note. Detailed shop setup belongs to the process.
+# A source-model property, linked by a leader to a representative pin-bore
+# rim on the drawing; it applies to all four bores' feature-schema notes.
+# Detailed shop setup belongs to the process.
+# The bore-axis tilt feeds the carrier underside's running clearance over the
+# MHA-CH-06-TL-30 capture cap (retention ``cap_clearance``), so the note names
+# that mate first (rule 4). The four bores are the one 4X Ø10.000 REAM
+# callout's, and the span is measured on the bore's straight land, clear of
+# both mouth chamfers (process row); the two limits are the retention proof's,
+# unchanged. Four rows of at most ~80 mm (Century Gothic at 3.5) keep the note
+# left of B1's extension line in its paper band (review 88c6d).
+CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
 PIN_AXIS_INSPECTION_NOTE = (
-    "4X PIN BORES A1/B1/A2/B2:\n"
-    "AXIS TO BOTTOM-FACE NORMAL:\n"
-    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX DEPARTURE OVER {PIN_AXIS_MEASUREMENT_SPAN:.2f},\n"
-    "ALL AZIMUTHS; CAP CLEARANCE."
+    f"{CAP_NUMBER} CAP CLEARANCE:\n"
+    f"4X Ø{PIN_HOLE_DIA:.3f} AXES NORMAL TO\n"
+    f"BOTTOM FACE WITHIN {PIN_AXIS_DEVIATION_MAX:.2f} OVER\n"
+    f"{PIN_AXIS_MEASUREMENT_SPAN:.2f} STRAIGHT LAND, ALL AZIMUTHS"
 )
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_SCALE = (1, 8)

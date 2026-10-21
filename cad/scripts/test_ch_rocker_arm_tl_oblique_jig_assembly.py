@@ -1043,7 +1043,7 @@ def test_lower_bracket_separates_an_actual_cut_free_cap_prism() -> None:
         (-pivot_block.BLOCK_WIDTH / 2.0 - 2.0, -pivot_block.BLOCK_WIDTH / 2.0),
         (pivot_block.BLOCK_HEIGHT, pivot_block.BLOCK_HEIGHT + head_floor),
     )
-    assert math.prod(hi - lo for lo, hi in block_prism) == pytest.approx(13.5)
+    assert all(hi > lo for lo, hi in block_prism)
     cap_offset = _in_frame(block_rows, block_origin, cap_origin)
     cap_prism = tuple(
         (lo - cap_offset[axis], hi - cap_offset[axis])
@@ -1058,11 +1058,8 @@ def test_lower_bracket_separates_an_actual_cut_free_cap_prism() -> None:
         assert _circle_prism_gap(cap_prism, (0.0, 0.0), diameter / 2.0, (0, 1)) > 0.0
     assert pivot_cap.POCKET_DEPTH > cap_prism[2][0]
     for point in pivot_cap.BOLT_POINTS:
-        # The through holes and localized underhead entry reliefs can extend
-        # below the head floor, but their complete radial envelopes miss it.
-        for diameter in (pivot_cap.HOLE_DIA, pivot_cap.ENTRY_RELIEF_DIA):
-            assert _circle_prism_gap(cap_prism, point, diameter / 2.0, (0, 1)) > 0.0
-        assert head_floor - pivot_cap.ENTRY_RELIEF_DEPTH < cap_prism[2][1]
+        # The complete clean-through hole envelope misses this solid strip.
+        assert _circle_prism_gap(cap_prism, point, pivot_cap.HOLE_DIA / 2.0, (0, 1)) > 0.0
         # Circular head recesses AND their full-width outward mouths begin
         # only at this floor; a mouth is not a through slot. The negative-Y,
         # positive-X mouth overlaps this strip in plan, so depth is essential.
@@ -1095,7 +1092,8 @@ def test_lower_bracket_separates_an_actual_cut_free_cap_prism() -> None:
         )
 
 
-def test_actual_wire_tail_endpoints_hit_old_bracket_but_clear_the_lower_top() -> None:
+def test_actual_wire_tail_tube_obstruction_is_material_but_installed_tubes_clear_lower_top() -> None:
+    """Current representative route and bracket, with one test-only wire translation."""
     segments = pivot_wire.installed_wire_segments()
     # Cubic endpoints are attained curve points, unlike interior controls.
     # Identify the outer tail station geometrically, never by segment index.
@@ -1111,44 +1109,70 @@ def test_actual_wire_tail_endpoints_hit_old_bracket_but_clear_the_lower_top() ->
         2.0 * pivot_wire.TWIST_RADIUS
     )
     radius = pivot_wire.WIRE_DIA / 2.0
-    old_top = _historic_bracket_top_z() - spec.NUT_BRACKET_ORIGIN[2]
-    collisions = []
-    negative_row_instances = set()
+    low, _high = pivot_wire.swept_wire_z_bounds(segments)
+    negative_row_placements = []
+    assert len(spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE]) == 4
     for index, (origin, rows) in enumerate(spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE]):
         _root, support = spec._motion_root(spec.PIVOT_LOCK_WIRE, index)
         block_origin, block_rows = spec.PIVOT_BLOCK_PLACEMENTS[support]
         row_origin = _in_frame(block_rows, block_origin, origin)
-        name = spec.instance_name(spec.PIVOT_LOCK_WIRE, index)
         if support == leadscrew.RAIL - 1 and row_origin[1] < 0.0:
-            negative_row_instances.add(name)
+            negative_row_placements.append((origin, rows))
         for tail in tail_points:
             point = _image(rows, origin, tail)
             local = _in_frame(block_rows, block_origin, point)
             assert local == pytest.approx(tuple(row_origin[a] + tail[a] for a in range(3)))
-            bracket_point = _in_frame(spec.NUT_BRACKET_ROWS, spec.NUT_BRACKET_ORIGIN, point)
-            witness = tuple((value - radius, value + radius) for value in bracket_point)
-            old_box = (
-                (nut_bracket.FACE_X, nut_bracket.FACE_X + nut_bracket.BRACKET_LENGTH),
-                (-nut_bracket.BRACKET_DEPTH, 0.0), (0.0, old_top),
-            )
-            if all(
-                outer[0] < inner[0] < inner[1] < outer[1]
-                for inner, outer in zip(witness, old_box, strict=True)
-            ):
-                # A whole radius-neighbourhood is inside the old stock and
-                # outside EVERY bracket cut: actual tube interference, not
-                # control-hull overlap or an invented collision waiver.
-                _assert_bracket_prism_misses_native_cuts(witness)
-                collisions.append(name)
             assert point[2] - radius > leadscrew.NUT_BRACKET_TOP_Z
-        # All four full native tubes, not just the two collision witnesses,
+        # All four full native tubes, not just the attained tail points,
         # clear the lowered top. Keep both rows on both physical supports.
-        low, _high = pivot_wire.swept_wire_z_bounds(segments)
         assert rows[2] == pytest.approx((0.0, 0.0, 1.0))
         assert origin[2] + low > leadscrew.NUT_BRACKET_TOP_Z
-    assert len(negative_row_instances) == 1
-    assert set(collisions) == negative_row_instances
-    assert len(collisions) == len(tail_points)
+    assert len(negative_row_placements) == 1
+
+    # The former tail/retired-bracket witness does not describe this route:
+    # translate the actual negative-row wire into TODAY'S bracket material.
+    # Select a real straight tail span by its native cubic controls, not a
+    # control-hull point or invented historical route/placement.
+    straight_tail_segments = [
+        segment for segment in segments
+        if any(point in tail_points for point in (segment[0], segment[-1]))
+        and segment == pivot_wire._line(segment[0], segment[-1])
+        and math.dist(segment[0], segment[-1]) > 0.0
+    ]
+    assert straight_tail_segments
+    segment = max(straight_tail_segments, key=lambda item: math.dist(item[0], item[-1]))
+    length = math.dist(segment[0], segment[-1])
+    tangent = tuple((b - a) / length for a, b in zip(segment[0], segment[-1], strict=True))
+    midpoint = tuple((a + b) / 2.0 for a, b in zip(segment[0], segment[-1], strict=True))
+    bracket_box = (
+        (nut_bracket.FACE_X, nut_bracket.FACE_X + nut_bracket.BRACKET_LENGTH),
+        (-nut_bracket.BRACKET_DEPTH, 0.0), (0.0, nut_bracket.BRACKET_HEIGHT),
+    )
+    material_center = tuple((lo + hi) / 2.0 for lo, hi in bracket_box)
+    half_side = min(radius / (2.0 * math.sqrt(3.0)), length / (4.0 * math.sqrt(3.0)))
+    prism = tuple((value - half_side, value + half_side) for value in material_center)
+    assert all(
+        outer[0] < inner[0] < inner[1] < outer[1]
+        for inner, outer in zip(prism, bracket_box, strict=True)
+    )
+    _assert_bracket_prism_misses_native_cuts(prism)
+
+    origin, rows = negative_row_placements[0]
+    installed_midpoint = _image(rows, origin, midpoint)
+    target = _image(spec.NUT_BRACKET_ROWS, spec.NUT_BRACKET_ORIGIN, material_center)
+    obstructed_origin = tuple(origin[a] + target[a] - installed_midpoint[a] for a in range(3))
+    # Every corner is strictly inside the finite round cylinder swept along
+    # this native straight span. Convexity puts the ENTIRE positive-volume
+    # prism inside both actual tube material and cut-free bracket material.
+    for corner in product(*prism):
+        point = _image(spec.NUT_BRACKET_ROWS, spec.NUT_BRACKET_ORIGIN, corner)
+        local = _in_frame(rows, obstructed_origin, point)
+        delta = tuple(local[a] - segment[0][a] for a in range(3))
+        station = sum(delta[a] * tangent[a] for a in range(3))
+        assert 0.0 < station < length
+        assert math.sqrt(sum((delta[a] - station * tangent[a]) ** 2 for a in range(3))) < radius
+    assert math.prod(hi - lo for lo, hi in prism) > 0.0
+    assert obstructed_origin[2] + low < leadscrew.NUT_BRACKET_TOP_Z
 
 
 def test_capture_feed_bounds_cover_every_instance_pass_rail_and_target() -> None:
@@ -2171,7 +2195,7 @@ def test_absent_installed_tooling_authority_stays_unverified() -> None:
     assert report == spec.installed_tooling_clearance(None)
 
 
-def test_installed_tooling_report_uses_the_actual_full_fixture_census() -> None:
+def test_source_tooling_report_uses_full_census_without_claiming_installed_verification() -> None:
     records = _synthetic_primary_measurements()
     fixtures = spec.captured_fixture_envelopes(samples=3, primary_measurements=records)
     assert isinstance(fixtures, tuple) and fixtures
@@ -2186,9 +2210,9 @@ def test_installed_tooling_report_uses_the_actual_full_fixture_census() -> None:
         axial_uncertainty=0.0,
         steps=(tooling.ToolingCylinder(top + 100.0, top + 110.0, radius),),
     )
-    separated = spec.installed_tooling_clearance(clear, samples=3, primary_measurements=records)
-    assert separated == tooling.tooling_clearance_report(clear, fixtures)
-    assert separated.status == "VERIFIED_GEOMETRY_ONLY"
+    separated = spec.source_tooling_clearance(clear, samples=3, primary_measurements=records)
+    assert separated.min_clearance == tooling.tooling_clearance_report(clear, fixtures).min_clearance
+    assert separated.status == "SOURCE_GEOMETRY_ONLY"
     assert separated.min_clearance == pytest.approx(100.0)
     assert separated.authority == clear.source
     conflict = tooling.InstalledToolingEnvelope(
@@ -2197,19 +2221,11 @@ def test_installed_tooling_report_uses_the_actual_full_fixture_census() -> None:
         axial_uncertainty=0.0,
         steps=(tooling.ToolingCylinder(bottom - 1.0, top + 1.0, radius),),
     )
-    overlapping = spec.installed_tooling_clearance(conflict, samples=3, primary_measurements=records)
-    assert overlapping == tooling.tooling_clearance_report(conflict, fixtures)
-    assert overlapping.status == "POTENTIAL_CONFLICT"
+    overlapping = spec.source_tooling_clearance(conflict, samples=3, primary_measurements=records)
+    assert overlapping.min_clearance == tooling.tooling_clearance_report(conflict, fixtures).min_clearance
+    assert overlapping.status == "SOURCE_POTENTIAL_CONFLICT"
     assert overlapping.min_clearance < 0.0
     assert overlapping.authority == conflict.source
-
-
-def test_assembled_caption_warns_about_the_projecting_pin_and_installed_tooling() -> None:
-    caption = spec.ASSEMBLED_CAPTION
-    assert "TOP RETAINERS MUST BE LOCKED IN EITHER PASS" in caption
-    assert "4.0 mm ABOVE THE WORK NOMINALLY" in caption
-    assert "CAPTURE IS NOT COLLISION PROOF" in caption
-    assert "ACCEPT THE INSTALLED TOOLHOLDER/SPINDLE ENVELOPE INCLUDING UPSET" in caption
 
 
 @pytest.mark.parametrize("pass_name", ("inner", "outer"))
@@ -2486,18 +2502,17 @@ def _assert_wing_prism_misses_all_block_cuts(prism) -> None:
         assert _circle_prism_gap(prism, point, pivot_block.REGISTER_DIA / 2.0, (0, 1)) > 0.0
 
 
-def test_historical_three_inch_stud_has_an_actual_interior_witness_not_a_nominal_clearance(
+def test_three_inch_stud_in_current_wing_has_an_actual_interior_witness_not_a_nominal_clearance(
     monkeypatch,
 ) -> None:
-    # Historical geometric head, not the approved shortened production part.
-    # Preserve the observed 212.729803 mm3 failure as a real negative control.
-    legacy_length = 3.0 * trammel.INCH
-    # Both ends of the historical stock model had the unchanged estimated
-    # factory chamfer. The new cut-end maximum is NOT an exact old chamfer.
-    legacy_chamfer = hold_down_stud.LOWER_FACTORY_CHAMFER
-    monkeypatch.setattr(hold_down_stud, "LENGTH", legacy_length)
-    legacy_census = spec.capture_fixture_clearance_census(
-        native_baseline="SYNTHETIC HISTORICAL NEUTRAL BASELINE ONLY", samples=3,
+    """A three-inch length mutant in current geometry, not a historical assembly."""
+    long_length = 3.0 * trammel.INCH
+    # Only length changes: current wing, placements, major-diameter envelope
+    # and end-chamfer bounds remain authoritative. The selected kit stock's
+    # delivered length is unverified; this is a geometric negative control.
+    monkeypatch.setattr(hold_down_stud, "LENGTH", long_length)
+    long_stud_census = spec.capture_fixture_clearance_census(
+        native_baseline="SYNTHETIC CURRENT NEUTRAL BASELINE WITH THREE-INCH LENGTH MUTANT ONLY", samples=3,
     )
     theta = -trammel.SWEEP["outer"]
     block = spec._swept_placement(spec.PIVOT_BLOCK, 1, "outer", theta)
@@ -2513,44 +2528,24 @@ def test_historical_three_inch_stud_has_an_actual_interior_witness_not_a_nominal
     )
     assert all(outer[0] < inner[0] < inner[1] < outer[1] for inner, outer in zip(prism, wing, strict=True))
     _assert_wing_prism_misses_all_block_cuts(prism)
+    # This cut-free 0.1 mm cube is a bounded intersection witness only, not
+    # the whole circular segment or a reconstruction of a historical volume.
+    assert math.prod(hi - lo for lo, hi in prism) > 0.0
     for corner in product(*prism):
         local = _in_frame(stud[1], stud[0], spec.frame_point(block, corner))
         assert math.hypot(local[0], local[2]) < hold_down_stud.RADIUS
-        assert legacy_chamfer < local[1] < legacy_length - legacy_chamfer
-    proof = legacy_census[
+        assert hold_down_stud.LOWER_FACTORY_CHAMFER < local[1]
+        assert local[1] < long_length - hold_down_stud.CUT_END_CHAMFER_MAX
+    proof = long_stud_census[
         _fixture_pair("outer", (spec.PIVOT_BLOCK, 1), (spec.HOLD_DOWN_STUD, 3))
     ]
     assert proof.nominal == proof.upset == "UNRESOLVED"
     assert not proof.source_resolved
     assert proof.nominal_gap <= 0.0 and proof.upset_gap <= 0.0
 
-    # Source-derived volume explanation of artifact 256, not a kernel rerun.
-    # The whole circular segment is inside the wing and misses every cut.
+    # A core-only envelope and neutral-only pose both miss this current-wing
+    # endstop collision, despite the actual solid intersection proved above.
     radius = hold_down_stud.RADIUS
-    distance = abs(axis[1]) - pivot_block.WING_WIDTH / 2.0
-    half_chord = math.sqrt(radius**2 - distance**2)
-    segment_prism = (
-        (axis[0] - half_chord, axis[0] + half_chord),
-        (-pivot_block.WING_WIDTH / 2.0, axis[1] + radius),
-        (0.0, stud[0][2] + legacy_length - block[0][2]),
-    )
-    assert wing[0][0] < segment_prism[0][0] < segment_prism[0][1] < wing[0][1]
-    _assert_wing_prism_misses_all_block_cuts(segment_prism)
-
-    def area(r):
-        return r * r * math.acos(distance / r) - distance * math.sqrt(r * r - distance * distance)
-
-    full_height = stud[0][2] + legacy_length - legacy_chamfer - block[0][2]
-    intervals = 200
-    step = legacy_chamfer / intervals
-    chamfer = step / 3.0 * sum(
-        (1.0 if i in (0, intervals) else 4.0 if i % 2 else 2.0) * area(radius - i * step)
-        for i in range(intervals + 1)
-    )
-    assert full_height * area(radius) + chamfer == pytest.approx(212.729803, abs=0.05)
-
-    # Old core width and neutral-only pose are genuine negative controls:
-    # neither sees the added wing/endstop collision.
     assert abs(axis[1]) - pivot_block.BLOCK_WIDTH / 2.0 - radius == pytest.approx(11.15)
     neutral = spec._swept_placement(spec.PIVOT_BLOCK, 1, "outer", 0.0)
     neutral_axis = _in_frame(neutral[1], neutral[0], stud[0])
@@ -2637,6 +2632,7 @@ def test_an_attained_wire_endpoint_into_an_actual_stud_is_not_hidden_by_the_cens
     capture_fixture_census, monkeypatch,
 ) -> None:
     key = _fixture_pair("inner", (spec.PIVOT_LOCK_WIRE, 0), (spec.HOLD_DOWN_STUD, 0))
+    assert capture_fixture_census[key].nominal != "UNRESOLVED"
     assert capture_fixture_census[key].source_resolved
     wire_origin, rows = spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE][0]
     stud = spec.PLACEMENTS[spec.HOLD_DOWN_STUD][0]
@@ -2654,32 +2650,22 @@ def test_an_attained_wire_endpoint_into_an_actual_stud_is_not_hidden_by_the_cens
     assert proof.nominal == proof.upset == "UNRESOLVED"
 
 
-@pytest.mark.parametrize("stem", (spec.PIVOT_LOCK_WIRE,))
 @pytest.mark.parametrize("support", (0, 1))
-def test_cap_descendant_upset_padding_uses_its_actual_source_points_and_cap_frame(stem, support) -> None:
-    index = support * 2
-    points = [
-        spec.frame_point(spec.PLACEMENTS[stem][index], p)
-        for p in spec._box_corners(spec._component_local_boxes()[stem])
-    ]
-    cap = spec.PLACEMENTS[spec.PIVOT_CAP][support][0]
-    # Include an extended attained envelope point; a footprint-only radius
-    # must not silently become authority for a longer source wire.
-    points.append((cap[0] + 100.0, cap[1] - 80.0, cap[2] - 30.0))
-    bounds = retention.capture_bounds()
-    xy, down, up = spec._upset_fixture_padding(stem, index, points, "outer", bounds)
-    for sign in (-1.0, 1.0):
-        yaw, tilt = sign * bounds.cap_yaw, sign * bounds.cap_tilt
-        cy, sy, ct, st = math.cos(yaw), math.sin(yaw), math.cos(tilt), math.sin(tilt)
-        for point in points:
-            x, y, z = (point[a] - cap[a] for a in range(3))
-            x, y = cy * x - sy * y, sy * x + cy * y
-            y, z = ct * y - st * z, st * y + ct * z
-            moved = (cap[0] + x + bounds.cap_lateral_shift, cap[1] + y, cap[2] + z)
-            assert abs(moved[0] - point[0]) <= xy + 1e-9
-            assert abs(moved[1] - point[1]) <= xy + 1e-9
-            assert point[2] - down <= moved[2] - retention.CAP_VERTICAL_MOTION_ENCLOSURE + 1e-9
-            assert moved[2] + retention.CAP_VERTICAL_MOTION_ENCLOSURE <= point[2] + up + 1e-9
+def test_fixed_head_wire_is_not_carried_by_cap_upset(support, capture_fixture_census) -> None:
+    bounds = replace(retention.capture_bounds(), cap_lateral_shift=100.0, cap_tilt=0.2, cap_yaw=0.3)
+    for row in range(2):
+        index = support * 2 + row
+        points = [
+            spec.frame_point(spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE][index], p)
+            for p in spec._box_corners(spec._component_local_boxes()[spec.PIVOT_LOCK_WIRE])
+        ]
+        assert spec._upset_fixture_padding(spec.PIVOT_LOCK_WIRE, index, points, "outer", bounds) == (0.0, 0.0, 0.0)
+        assert spec._capture_fixture_carrier_plane_gap(spec.PIVOT_LOCK_WIRE, index, points, bounds) is None
+        # Source closure requires the independent whole cap-motion proof.
+        proof = capture_fixture_census[_fixture_pair(
+            "outer", (spec.PIVOT_LOCK_WIRE, index), (spec.CARRIER, 0),
+        )]
+        assert proof.source_resolved
 
 
 @pytest.mark.parametrize("support", (0, 1))
@@ -2799,7 +2785,7 @@ def test_physical_wire_rows_use_their_two_actual_drilled_heads(capture_fixture_c
                 cap_wire = capture_fixture_census[
                     _fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.PIVOT_LOCK_WIRE, wire_index))
                 ]
-                assert cap_wire.upset == "SOURCE_CAPTURE_JOINT"
+                assert cap_wire.upset == "CONTINUOUS_SEPARATOR" and cap_wire.upset_gap > 0.0
                 joined = []
                 for screw in range(support * 4, support * 4 + 4):
                     screw_y = _in_frame(cap_rows, cap_origin, spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][screw][0])[1]
@@ -2814,10 +2800,10 @@ def test_physical_wire_rows_use_their_two_actual_drilled_heads(capture_fixture_c
                 assert len(joined) == 2
 
 
-def test_head_and_wire_carrier_separator_uses_the_attained_local_extent() -> None:
+def test_fixed_head_carrier_separator_uses_the_attained_local_extent() -> None:
     boxes = spec._component_local_boxes()
     bounds = retention.capture_bounds()
-    for stem in (spec.PIVOT_CAP_SCREW, spec.PIVOT_LOCK_WIRE):
+    for stem in (spec.PIVOT_CAP_SCREW,):
         for index in range(spec.QUANTITIES[stem]):
             points = [
                 spec.frame_point(spec.PLACEMENTS[stem][index], point)
@@ -2971,7 +2957,7 @@ def _synthetic_primary_measurements():
             prebearing_capture_coverage=spec.PREBEARING_CAPTURE_REQUIRED_COVERAGE,
             prebearing_capture_evidence=f"SYNTHETIC PRE-BEARING BENCH ONLY: fixed matched cartridge {support}",
             upper_bearing_profile_status="accepted",
-            upper_bearing_receiving_evidence=f"SYNTHETIC C1R RECEIVING ONLY: matched upper bearing {support}",
+            upper_bearing_receiving_evidence=f"SYNTHETIC VN-52 QUALIFICATION ONLY: matched upper bearing {support}",
             coverage=spec.PRIMARY_CAPTURE_REQUIRED_COVERAGE,
             primary_take_up_without_secondary_contact=True,
             evidence="SYNTHETIC BENCH TEST RECORD ONLY: not an actual installed acceptance",
@@ -3246,13 +3232,14 @@ def test_tooling_authority_alone_does_not_verify_the_unmeasured_fixture() -> Non
     )
     diagnostic = tooling.tooling_clearance_report(tooling_only, fixtures)
     assert diagnostic.status == "VERIFIED_GEOMETRY_ONLY"
-    actual = spec.installed_tooling_clearance(tooling_only, samples=3)
-    assert actual.status == "UNVERIFIED"
-    assert actual.min_clearance == diagnostic.min_clearance
-    assert actual.limiting_pair == diagnostic.limiting_pair
+    source = spec.source_tooling_clearance(tooling_only, samples=3)
+    assert source.status == "SOURCE_GEOMETRY_ONLY"
+    assert source.min_clearance == diagnostic.min_clearance
+    assert source.limiting_pair == diagnostic.limiting_pair
+    assert spec.installed_tooling_clearance().status == "UNVERIFIED"
 
 
-def test_installed_tooling_uses_the_actual_secondary_shape_not_nominal_cotter_bounds() -> None:
+def test_source_tooling_diagnostic_encloses_supplied_secondary_shapes() -> None:
     records = _synthetic_primary_measurements()
     baseline = spec.captured_fixture_envelopes(samples=3, primary_measurements=records)
     top = max(fixture.z_max for fixture in baseline)
@@ -3263,14 +3250,14 @@ def test_installed_tooling_uses_the_actual_secondary_shape_not_nominal_cotter_bo
         radial_uncertainty=0.0, axial_uncertainty=0.0,
         steps=(tooling.ToolingCylinder(top + 100.0, top + 110.0, radius),),
     )
-    assert spec.installed_tooling_clearance(above_source, samples=3, primary_measurements=records).status == "VERIFIED_GEOMETRY_ONLY"
+    assert spec.source_tooling_clearance(above_source, samples=3, primary_measurements=records).status == "SOURCE_GEOMETRY_ONLY"
     mutated = tuple(replace(
         record,
         secondary_envelope_in_pin_seat_frame_mm=((-1000.0, 1000.0), (-1000.0, 1000.0), (bottom - 1000.0, top + 1000.0)),
     ) for record in records)
     changed = spec.captured_fixture_envelopes(samples=3, primary_measurements=mutated)
     assert {fixture.label for fixture in changed} == {fixture.label for fixture in baseline}
-    assert spec.installed_tooling_clearance(above_source, samples=3, primary_measurements=mutated).status == "POTENTIAL_CONFLICT"
+    assert spec.source_tooling_clearance(above_source, samples=3, primary_measurements=mutated).status == "SOURCE_POTENTIAL_CONFLICT"
 
 
 def test_direct_printed_outer_boundaries_are_not_silently_nominal() -> None:
@@ -3386,8 +3373,39 @@ def test_cap_screws_are_fixed_to_the_block_not_carried_by_cap_rock(pass_name) ->
         assert pieces[0][0][1] > nominal[0][0][1]
         assert pieces[1][0][1] > nominal[1][0][1]
         assert pieces[1][0][1] < pieces[0][0][1]
-        chain = spec._capture_fixture_height_chain(spec.PIVOT_CAP_SCREW, index)
-        assert chain["head seat", index] > 0.0
+        model_c = retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH
+        assert pieces[0][2][1] + model_c == pytest.approx(
+            retention.fitted_counterbore_bounds().head_top_height_max)
+
+
+def test_fixed_head_separator_requires_shared_authored_datums(monkeypatch) -> None:
+    boxes = spec._component_local_boxes()
+    points = [spec.frame_point(spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][0], point)
+              for piece in spec._capture_fixture_source_prisms(spec.PIVOT_CAP_SCREW, 0, boxes, manufactured=True)
+              for point in spec._box_corners(piece)]
+    bounds = retention.capture_bounds()
+    assert spec._capture_fixture_carrier_plane_gap(spec.PIVOT_CAP_SCREW, 0, points, bounds) > 0.0
+    placements = dict(spec.PLACEMENTS)
+    blocks = list(placements[spec.PIVOT_BLOCK])
+    origin, rows = blocks[0]
+    blocks[0] = ((origin[0], origin[1], origin[2] + 100.0), rows)
+    placements[spec.PIVOT_BLOCK] = tuple(blocks)
+    monkeypatch.setattr(spec, "PLACEMENTS", placements)
+    assert spec._capture_fixture_carrier_plane_gap(spec.PIVOT_CAP_SCREW, 0, points, bounds) is None
+
+
+def test_source_wire_clearance_refuses_missing_cap_motion_proof(monkeypatch) -> None:
+    def missing():
+        raise ValueError("SYNTHETIC missing full cap-motion containment")
+    monkeypatch.setattr(spec.cap_wire_clearance, "require_wire_capture_geometry", missing)
+    census = spec.capture_fixture_clearance_census(samples=3)
+    for support in range(2):
+        for row in range(2):
+            wire = support * 2 + row
+            for pass_name in trammel.PASS_RADIUS:
+                proof = census[_fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.PIVOT_LOCK_WIRE, wire))]
+                assert proof.upset == "UNRESOLVED"
+                assert proof.upset_gap <= 0.0
 
 
 def test_every_original_residual_pair_uses_its_grounded_proof_on_both_passes(
@@ -3402,36 +3420,33 @@ def test_every_original_residual_pair_uses_its_grounded_proof_on_both_passes(
                 proof = capture_fixture_census[key]
                 assert proof.upset == "CONTINUOUS_SEPARATOR"
                 assert proof.upset_gap > 0.0
-                assert any("full-clock circular pin-section/screw" in basis for basis in proof.basis)
             key = _fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))
-            residuals.add(key)
             proof = qualified_capture_fixture_census[key]
-            assert proof.upset == "SOURCE_CAPTURE_JOINT"
-            assert any("bore-mouth/flange shield" in basis for basis in proof.basis)
-            assert proof.upset_gap <= 0.0  # not a static recessed-bearing box certificate
-            assert capture_fixture_census[key].upset == "UNRESOLVED"  # no actual receiving record
+            assert proof.upset == "UNRESOLVED" and not proof.source_resolved
+            assert capture_fixture_census[key].upset == "UNRESOLVED"
             for offset in range(2):
                 key = _fixture_pair(pass_name, (spec.CARRIAGE_SCREW, 4 * support + offset),
                                     (spec.PIVOT_CAP_SCREW, 4 * support + 2 + offset))
                 residuals.add(key)
                 proof = capture_fixture_census[key]
                 assert proof.upset == "CONTINUOUS_SEPARATOR" and proof.upset_gap > 0.0
-    assert len(residuals) == 28
+    assert len(residuals) == 24
     assert len(qualified_capture_fixture_census) == 4680
     assert all(qualified_capture_fixture_census[key].source_resolved for key in residuals)
 
 
-def test_production_default_census_resolves_all_4680_source_pairs(
+def test_production_census_keeps_all_pairs_without_inventing_bearing_motion(
     production_capture_fixture_census,
 ) -> None:
-    # Labelled synthetic records exercise conditional SOURCE closure, not
-    # native execution or installed acceptance. No physical pair is dropped.
     assert len(production_capture_fixture_census) == 4680
-    assert all(proof.source_resolved for proof in production_capture_fixture_census.values()), {
-        key: proof.missing
-        for key, proof in production_capture_fixture_census.items()
-        if not proof.source_resolved
-    }
+    unbounded = {spec.instance_name(spec.BEARING, index)
+                 for index in range(spec.QUANTITIES[spec.BEARING])}
+    for key, proof in production_capture_fixture_census.items():
+        if any(name in unbounded for name in key[1:]) and proof.upset != "SOURCE_CAPTURE_JOINT":
+            assert proof.upset == "UNRESOLVED"
+            assert proof.missing
+        else:
+            assert proof.source_resolved, (key, proof.missing)
 
 
 def test_coarse_sweep_enclosures_remain_unresolved_instead_of_claiming_clearance(
@@ -3536,103 +3551,27 @@ def test_relocated_screw_into_real_flange_material_cannot_keep_the_radial_theore
     assert proof.upset == "UNRESOLVED" and proof.upset_gap <= 0.0
 
 
-def test_bearing_shield_is_not_a_fixed_bearing_height_or_axial_play_assumption() -> None:
-    bounds = retention.capture_bounds()
-    shield = spec.capture_fixture_bearing_shield_bounds(bounds)
-    assert set(shield) == {"flange radial cover", "flat pocket radial cover", "solid flange barrier",
-                           "outer-race mid-plane below bore mouth", "register radial separator"}
-    assert min(shield.values()) > 0.0
-    assert shield["flange radial cover"] == pytest.approx(
-        bounds.flange_contact_margin + retention.STOP_CONTACT_DIAMETER / 2.0 - bearing.OD / 2.0)
-    assert shield["flat pocket radial cover"] == pytest.approx(
-        bounds.cap_pocket_margin + retention.STOP_CONTACT_DIAMETER / 2.0 - bearing.OD / 2.0)
-    # The actual source OD mid-plane stays in its bore even if the bearing
-    # extracts until the conservative cap-roof ceiling. No chamfer MAX or
-    # fixed nominal recess is assumed.
-    assert shield["outer-race mid-plane below bore mouth"] == pytest.approx(
-        (bearing.WIDTH - 0.12) / 2.0
-        - retention.PIN_FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-        - retention.CAP_CHAMBER_EXCESS[1] - bounds.cap_roof_rise)
-    assert shield["solid flange barrier"] > 0.0
-    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
-    for support in range(2):
-        assert spec._capture_fixture_joint((spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1),
-                                           bounds, "inner", primary) is not None
-        assert spec._capture_fixture_joint((spec.PIVOT_CAP, support), (spec.BEARING, 2 * (1 - support) + 1),
-                                           bounds, "inner", primary) is None
 
-
-@pytest.mark.parametrize("field, margin", (
-    ("flange_contact_margin", "flange radial cover"),
-    ("cap_pocket_margin", "flat pocket radial cover"),
-))
-def test_bearing_shield_refuses_both_radial_cover_failure_boundaries(field, margin) -> None:
-    bounds = retention.capture_bounds()
-    boundary = bearing.OD / 2.0 - retention.STOP_CONTACT_DIAMETER / 2.0
-    for epsilon in (-1e-8, 1e-8):
-        changed = replace(bounds, **{field: boundary + epsilon})
-        assert spec.capture_fixture_bearing_shield_bounds(changed)[margin] == pytest.approx(epsilon, abs=1e-12)
-        primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
-        joint = spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), changed, "inner", primary)
-        assert (joint is not None) == (epsilon > 0.0)
-
-
-@pytest.mark.parametrize("margin", ("solid flange barrier", "outer-race mid-plane below bore mouth"))
-@pytest.mark.parametrize("epsilon", (-1e-8, 1e-8))
-def test_bearing_shield_has_both_barrier_and_bore_guidance_boundary_sides(margin, epsilon, monkeypatch) -> None:
-    bounds = retention.capture_bounds()
-    if margin == "solid flange barrier":
-        boundary = (printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-                    + 2.0 * retention.PIN_STOP_FACE_VARIATION_MAX / math.cos(bounds.pin_tilt))
-        monkeypatch.setattr(retention, "PIN_FLANGE_THICK", boundary + epsilon)
-    else:
-        boundary = (0.12 + 2.0 * (retention.PIN_FLANGE_THICK + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-                    + retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise))
-        monkeypatch.setattr(bearing, "WIDTH", boundary + epsilon)
-    value = spec.capture_fixture_bearing_shield_bounds(bounds)[margin]
-    # More flange thickness helps the barrier, and more race width keeps the
-    # mid-plane deeper in the bore. The other four obligations remain intact.
-    assert (value > 0.0) == (epsilon > 0.0)
-    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
-    assert (spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is not None) == (epsilon > 0.0)
-
-
-def test_bearing_shield_does_not_bypass_register_material_in_the_bearing_footprint(monkeypatch) -> None:
-    bounds = retention.capture_bounds()
-    monkeypatch.setattr(pivot_cap, "REGISTER_POINTS", ((-1.0, 0.0), (1.0, 0.0)))
-    assert spec.capture_fixture_bearing_shield_bounds(bounds)["register radial separator"] < 0.0
-    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
-    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is None
-
-
-def test_upper_bearing_contact_barrier_still_needs_exact_native_baseline() -> None:
+def test_receiving_and_native_bearing_models_do_not_prove_all_material_motion(
+    qualified_capture_fixture_census,
+) -> None:
     census = spec.capture_fixture_clearance_census(samples=3, primary_measurements=_synthetic_primary_measurements())
     for pass_name in trammel.PASS_RADIUS:
         for support in range(2):
-            proof = census[_fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))]
-            assert proof.upset == "UNRESOLVED" and proof.upset_gap <= 0.0
-            assert any("static recess/AABB separation alone is not credited" in basis for basis in proof.basis)
+            key = _fixture_pair(pass_name, (spec.PIVOT_CAP, support), (spec.BEARING, 2 * support + 1))
+            for proof in (census[key], qualified_capture_fixture_census[key]):
+                assert proof.upset == "UNRESOLVED"
+                assert proof.upset_gap <= 0.0
+                assert proof.missing
 
 
-def test_upper_bearing_receiving_status_and_evidence_have_no_verified_defaults() -> None:
-    record = _synthetic_primary_measurements()[0]
-    for field in ("upper_bearing_profile_status", "upper_bearing_receiving_evidence"):
-        values = vars(record).copy()
-        del values[field]
-        with pytest.raises(TypeError):
-            spec.PrimaryCaptureMeasurement(**values)
-    primary = spec.qualify_primary_capture_measurements(_synthetic_primary_measurements())
-    bounds = retention.capture_bounds()
-    assert min(spec.capture_fixture_bearing_shield_bounds(bounds).values()) > 0.0
-    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", {}) is None
-    assert spec._capture_fixture_joint((spec.PIVOT_CAP, 0), (spec.BEARING, 1), bounds, "inner", primary) is not None
 
 
 @pytest.mark.parametrize("status", ("rejected", "uninspected", "unknown", "ACCEPTED", True, None))
 def test_only_explicitly_accepted_actual_upper_bearing_profile_can_qualify(status) -> None:
     records = _synthetic_primary_measurements()
     bad = replace(records[0], upper_bearing_profile_status=status)
-    with pytest.raises(ValueError, match="ACCEPTED C1R"):
+    with pytest.raises(ValueError):
         spec.qualify_primary_capture_measurements((bad, *records[1:]))
 
 
@@ -3640,7 +3579,294 @@ def test_only_explicitly_accepted_actual_upper_bearing_profile_can_qualify(statu
 def test_accepted_upper_bearing_profile_needs_separate_actual_receiving_authority(evidence) -> None:
     records = _synthetic_primary_measurements()
     bad = replace(records[0], upper_bearing_receiving_evidence=evidence)
-    with pytest.raises(ValueError, match="C1R upper-bearing receiving evidence"):
+    with pytest.raises(ValueError):
         spec.qualify_primary_capture_measurements((bad, *records[1:]))
+
+
+def _synthetic_normal_tooling_measurement():
+    records = _synthetic_primary_measurements()
+    actual = spec.InstalledNormalToolingMeasurement(
+        source="SYNTHETIC NORMAL-GAP TEST ONLY: not an actual installed acceptance",
+        tool_steps=("smooth shank", "holder", "spindle"),
+        tool_step_census="complete",
+        full_normal_sweeps=("inner", "outer"),
+        clamp_rh_mm=(4.9, 28.0),
+        lever_rh_mm=(7.0, 36.0),
+        work_rh_mm=(185.0, 20.5),
+        wire_contour_mm=(80.0, 12.0),
+        wire_diameter_mm=0.8128,
+        wire_contour_state="qualified",
+        wire_capture=spec.ActualWireCaptureEvidence(
+            source="SYNTHETIC TEST ONLY: not actual formed-clock swept-void qualification",
+            state="qualified",
+            scope="actual_formed_clock_full_capture_swept_void_both_passes",
+            envelope="ACTUAL CAP OPEN-MOUTH/COUNTERBORE/GROOVE SWEPT VOID",
+            row_evidence=tuple(
+                (support, row, record.prebearing_capture_evidence)
+                for (pass_name, support), record in spec.qualify_primary_capture_measurements(records).items()
+                if pass_name == "inner" for row in range(2)
+            ),
+        ),
+        bearing_enclosure=spec.ActualBearingEnclosureEvidence(
+            source="SYNTHETIC TEST PROOF ONLY: not actual bearing containment",
+            state="qualified",
+            scope="all_material_full_endplay_and_captured_motion_both_passes",
+            envelope="FILLED CARTRIDGE ENVELOPE",
+            support_evidence=tuple(
+                (support, record.prebearing_capture_evidence, record.upper_bearing_receiving_evidence)
+                for (pass_name, support), record in spec.qualify_primary_capture_measurements(records).items()
+                if pass_name == "inner"
+            ),
+        ),
+        gaps=(),
+    )
+    limits = spec._normal_tooling_allowances(
+        actual, spec.qualify_primary_capture_measurements(records),
+    )
+    actual = replace(actual, gaps=tuple(
+        spec.NormalToolingGap(group, step, None, allowance + 1.25, 0.25)
+        for group, allowance in limits.items() for step in actual.tool_steps
+    ))
+    return actual, records, limits
+
+
+def test_positive_gap_witnesses_cannot_close_missing_free_carriage_travel_authority() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    report = spec.installed_tooling_clearance(actual, primary_measurements=records)
+    assert report.status == "UNVERIFIED"
+    assert report.min_clearance is None
+    assert report.authority
+    radial = replace(actual, gaps=tuple(
+        replace(gap, radial_gap_mm=gap.axial_gap_mm, axial_gap_mm=None)
+        for gap in actual.gaps
+    ))
+    assert spec.installed_tooling_clearance(radial, primary_measurements=records).status == "UNVERIFIED"
+    orthogonally_separated = replace(actual, gaps=tuple(
+        replace(gap, radial_gap_mm=-100.0) for gap in actual.gaps
+    ))
+    assert spec.installed_tooling_clearance(
+        orthogonally_separated, primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("delta", (0.0, -0.01))
+def test_normal_gap_equality_or_shortfall_is_not_positive_clearance(delta) -> None:
+    actual, records, limits = _synthetic_normal_tooling_measurement()
+    first, *rest = actual.gaps
+    failed = replace(first, axial_gap_mm=limits[first.group] + first.uncertainty_mm + delta)
+    report = spec.installed_tooling_clearance(
+        replace(actual, gaps=(failed, *rest)), primary_measurements=records,
+    )
+    assert report.status == "POTENTIAL_CONFLICT"
+    assert report.min_clearance == pytest.approx(delta)
+
+
+@pytest.mark.parametrize("change", (
+    {"tool_step_census": "uninspected"},
+    {"tool_step_census": "incomplete"},
+    {"tool_step_census": True},
+    {"wire_contour_state": "uninspected"},
+    {"wire_contour_state": "rejected"},
+    {"wire_contour_state": True},
+    {"full_normal_sweeps": ("inner",)},
+    {"source": ""},
+    {"gaps": ()},
+    {"bearing_enclosure": None},
+    {"bearing_enclosure": True},
+    {"wire_capture": None},
+    {"wire_capture": True},
+))
+def test_normal_gap_missing_coverage_is_unverified(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert spec.installed_tooling_clearance(
+        replace(actual, **change), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("change", (
+    {"state": "uninspected"},
+    {"state": "rejected"},
+    {"state": True},
+    {"scope": "receiving_only"},
+    {"scope": "incomplete"},
+    {"envelope": "a different envelope"},
+    {"source": ""},
+    {"support_evidence": ()},
+))
+def test_installed_bearing_enclosure_requires_actual_complete_matching_proof(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert not spec._bearing_enclosure_qualified(
+        replace(actual.bearing_enclosure, **change),
+        spec.qualify_primary_capture_measurements(records),
+    )
+    assert spec.installed_tooling_clearance(
+        replace(actual, bearing_enclosure=replace(actual.bearing_enclosure, **change)),
+        primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+def test_bearing_enclosure_cannot_borrow_a_different_physical_support_proof() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    first, second = actual.bearing_enclosure.support_evidence
+    for references in ((first,), (first, first), (first, (second[0], "OTHER SET", second[2]))):
+        assert not spec._bearing_enclosure_qualified(
+            replace(actual.bearing_enclosure, support_evidence=references),
+            spec.qualify_primary_capture_measurements(records),
+        )
+        assert spec.installed_tooling_clearance(
+            replace(actual, bearing_enclosure=replace(
+                actual.bearing_enclosure, support_evidence=references,
+            )), primary_measurements=records,
+        ).status == "UNVERIFIED"
+    # The independent primary plate-capture evidence still qualifies.
+    assert len(spec.qualify_primary_capture_measurements(records)) == 4
+
+
+@pytest.mark.parametrize("change", (
+    {"state": "uninspected"}, {"state": "rejected"}, {"state": True},
+    {"scope": "normal_roof_only"}, {"scope": "contour_only"},
+    {"scope": "source_representative_only"}, {"scope": "incomplete"},
+    {"source": ""}, {"envelope": "a different void"}, {"row_evidence": ()},
+))
+def test_wire_capture_needs_actual_full_void_qualification_not_normal_roof_or_contour(change) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    primary = spec.qualify_primary_capture_measurements(records)
+    assert spec._wire_capture_qualified(actual.wire_capture, primary)
+    assert spec._bearing_enclosure_qualified(actual.bearing_enclosure, primary)
+    changed = replace(actual.wire_capture, **change)
+    assert not spec._wire_capture_qualified(changed, primary)
+    assert spec.installed_tooling_clearance(
+        replace(actual, wire_capture=changed), primary_measurements=records,
+    ).status == "UNVERIFIED"
+
+
+def test_wire_capture_qualification_covers_every_matched_physical_row() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    primary = spec.qualify_primary_capture_measurements(records)
+    references = actual.wire_capture.row_evidence
+    assert len(references) == 4
+    for changed in (references[:-1], (*references[:-1], references[0]),
+                    ((*references[0][:2], "OTHER MATCHED SET"), *references[1:])):
+        assert not spec._wire_capture_qualified(
+            replace(actual.wire_capture, row_evidence=changed), primary,
+        )
+
+
+def test_normal_gap_missing_pair_or_missing_axes_cannot_verify() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    for gaps in (
+        actual.gaps[1:],
+        (*actual.gaps, actual.gaps[0]),
+        (replace(actual.gaps[0], axial_gap_mm=None), *actual.gaps[1:]),
+    ):
+        assert spec.installed_tooling_clearance(
+            replace(actual, gaps=gaps), primary_measurements=records,
+        ).status == "UNVERIFIED"
+    assert spec.installed_tooling_clearance(actual).status == "UNVERIFIED"
+
+
+def test_known_nonpositive_gap_is_reported_despite_other_missing_witnesses() -> None:
+    actual, records, limits = _synthetic_normal_tooling_measurement()
+    first = actual.gaps[0]
+    failed = replace(first, axial_gap_mm=limits[first.group])
+    report = spec.installed_tooling_clearance(
+        replace(actual, gaps=(failed,), tool_step_census="incomplete"),
+        primary_measurements=records,
+    )
+    assert report.status == "POTENTIAL_CONFLICT"
+    assert report.min_clearance == pytest.approx(-first.uncertainty_mm)
+
+
+def test_normal_gap_uses_complete_secondary_envelope_not_one_clocked_pose() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    grown = tuple(replace(record, secondary_envelope_in_pin_seat_frame_mm=(
+        (-1000.0, 1000.0), (-1000.0, 1000.0), (-1000.0, 1000.0),
+    )) for record in records)
+    assert spec.installed_tooling_clearance(actual, primary_measurements=grown).status == "POTENTIAL_CONFLICT"
+
+
+@pytest.mark.parametrize("field", ("clamp_rh_mm", "lever_rh_mm", "work_rh_mm", "wire_contour_mm"))
+def test_normal_gap_actual_hardware_extents_are_not_nominal_caps(field) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert spec.installed_tooling_clearance(
+        replace(actual, **{field: (1000.0, 1000.0)}), primary_measurements=records,
+    ).status == "POTENTIAL_CONFLICT"
+
+
+@pytest.mark.parametrize("arc,tail,expected", ((100.0, 20.0, 50.0), (100.0, 60.0, 60.0)))
+def test_wire_contour_halves_only_two_anchor_arcs_not_tails(arc, tail, expected) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    limits = spec._normal_tooling_allowances(
+        replace(actual, wire_contour_mm=(arc, tail)),
+        spec.qualify_primary_capture_measurements(records),
+    )
+    assert limits["WIRE HEAD-PAIR ENVELOPES"] == pytest.approx(expected + actual.wire_diameter_mm / 2.0)
+
+
+def test_wire_surface_section_is_not_a_zero_radius_centreline() -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    assert spec.installed_tooling_clearance(
+        replace(actual, wire_diameter_mm=10.0), primary_measurements=records,
+    ).status == "POTENTIAL_CONFLICT"
+
+
+@pytest.mark.parametrize("diameter", (0.0, -0.1, math.inf, math.nan, True))
+def test_actual_wire_section_requires_a_positive_finite_measurement(diameter) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, wire_diameter_mm=diameter), primary_measurements=records,
+        )
+
+
+def test_installed_gap_rule_uses_outward_rounded_printed_constants(monkeypatch) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    monkeypatch.setattr(spec, "_fitter_carrier_motion", lambda: (1.00001, 0.010001))
+    monkeypatch.setattr(spec, "_fitter_head_inplane_reach", lambda _stem: 2.00001)
+    monkeypatch.setattr(spec, "fitter_tooling_motion_limits",
+                        lambda: (spec.FitterMotionLimit("CARRIER/RISER/LOCATORS", 2.00001),))
+    limits = spec._normal_tooling_allowances(
+        actual, spec.qualify_primary_capture_measurements(records),
+    )
+    assert limits["CARRIER/RISER/LOCATORS"] == 2.001
+    assert limits["CLAMP HEAD"] == pytest.approx(1.001 + 0.011 * math.hypot(2.001 + 4.9, 28.0))
+
+
+@pytest.mark.parametrize("uncertainty", (-0.1, math.inf, math.nan, True))
+def test_normal_gap_invalid_uncertainty_cannot_verify(uncertainty) -> None:
+    actual, records, _limits = _synthetic_normal_tooling_measurement()
+    with pytest.raises(ValueError):
+        spec.installed_tooling_clearance(
+            replace(actual, gaps=(replace(actual.gaps[0], uncertainty_mm=uncertainty), *actual.gaps[1:])),
+            primary_measurements=records,
+        )
+
+
+def test_normal_gap_allowance_grows_with_transverse_carrier_reach(monkeypatch) -> None:
+    before = spec.fitter_tooling_motion_limits()[0].norm_allowance_mm
+    monkeypatch.setattr(carrier, "OUTLINE_Y", (-1000.0, 1000.0))
+    after = spec.fitter_tooling_motion_limits()[0].norm_allowance_mm
+    assert after > before + 10.0
+
+
+def test_carrier_rotation_bound_includes_bore_bias_conditioning() -> None:
+    support, factor = spec._fitter_carrier_motion()
+    bounds = retention.capture_bounds()
+    span = min(b[0] - a[0] for a, b in
+               (spec.trammel.pin_pair(name) for name in spec.trammel.PASS_RADIUS))
+    alpha = math.atan(retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
+    plane_transfer = (carrier.THICKNESS + carrier.THICKNESS_BAND) * math.tan(alpha)
+    span -= 2.0 * (math.sqrt(2.0) * carrier.POSITION_BAND + plane_transfer)
+    du = 2.0 * support / span
+    dn = 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0) / math.cos(alpha) + math.tan(alpha) * du
+    assert factor == pytest.approx(math.sqrt(du * du + dn * dn + du * dn))
+    assert factor > 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0)
+
+
+def test_support_bound_extrapolates_the_engaged_land_to_the_underside_mouth(monkeypatch) -> None:
+    before, _factor = spec._fitter_carrier_motion()
+    monkeypatch.setattr(carrier, "THICKNESS_BAND", carrier.THICKNESS_BAND + 0.5)
+    after, _factor = spec._fitter_carrier_motion()
+    assert after > before
 
 

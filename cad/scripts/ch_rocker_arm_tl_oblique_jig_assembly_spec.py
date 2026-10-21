@@ -95,6 +95,7 @@ import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_cap_wire_clearance as cap_wire_clearance
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
@@ -443,8 +444,9 @@ PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
 # PM-30MV T-slot throat/foot depths are unmeasured reference estimates owned
 # by t_nut, not universal machine or delivered-kit tolerances. Procurement
 # remains the kit's 3 in stock; only its unused upper end is shortened.
-# The stud drawing owns the measured installed-stack acceptance after final
-# nut seating: clear the moving block wing and preserve every loaded thread.
+# Sheet 10's HD1-HD3 (HOLD_DOWN_STEPS) own the measured installed-stack
+# acceptance after final nut seating: clear the moving block wing and
+# preserve every loaded thread. The stud drawing cites HOLD_DOWN_REFERENCE.
 STUD_BOTTOM_Z = -(t_nut.THROAT_DEPTH + t_nut.FOOT_HEIGHT)
 STUD_DIA = base_bar.HOLD_DOWN_STUD_DIA  # 1/2-13
 STUD_LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM
@@ -1256,9 +1258,9 @@ ASSEMBLED_CAPTION = (
     "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. BOTH "
     "TOP RETAINERS MUST BE LOCKED IN EITHER PASS. PIN ENDS STAND "
     f"{retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} mm ABOVE THE WORK "
-    "NOMINALLY. CAPTURE IS NOT COLLISION PROOF: ACCEPT THE INSTALLED "
-    "TOOLHOLDER/SPINDLE ENVELOPE INCLUDING UPSET BEFORE USE. MACHINE "
-    "ORIGIN: SPINDLE AT TABLE TOP; +Y TOWARD COLUMN."
+    "NOMINALLY. ACCEPT THE INSTALLED TOOLHOLDER/SPINDLE ENVELOPE INCLUDING "
+    "UPSET PER SHEET 10 BEFORE USE. MACHINE ORIGIN: SPINDLE AT TABLE TOP; "
+    "+Y TOWARD COLUMN."
 )
 
 
@@ -1558,6 +1560,11 @@ _CL_HOLE = (
     f"Ø{carrier.CL_DOWEL_DIA:.0f} X 20 M6 DOWEL "
     f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
 )
+# The instruction steps cite sheet 10 (CAPTUREANDOPERATION: C6-C7, HD1-HD3) by
+# this number; the drawing asserts it, and the stud drawing (MHA-CH-06-TL-VN-58)
+# prints HOLD_DOWN_REFERENCE as its only measuring and acceptance pointer.
+OPERATION_SHEET_NUMBER = 10
+HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD3 (SHEET {OPERATION_SHEET_NUMBER})"
 ASSEMBLY_STEPS = (
     f"1. SCREW AN HGR15R RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, ENDS FLUSH: "
@@ -1574,16 +1581,14 @@ ASSEMBLY_STEPS = (
     f"REWORKED {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
     "PER BAR IN THE OUTER T-SLOTS, IN T-NUTS "
     f"{_item(T_NUT)} UNDER FINGER-TIGHT FLANGE NUTS {_item(FLANGE_NUT)}. "
-    "FOLLOW THE STUD REWORK DRAWING; KEEP ITS LOADED LOWER THREADS AND "
-    "INSERTION UNCHANGED. AFTER FINAL ALIGNMENT/NUT SEATING, COMPLETE "
-    "THAT DRAWING'S INSTALLED-FIT CHECK BEFORE CUTTING.",
+    f"REWORK AND ACCEPT EACH STUD PER HD1-HD3 (SHEET {OPERATION_SHEET_NUMBER}).",
     f"3. SLIDE A FACTORY-GREASED HGH15CA CARRIAGE {_item(CARRIAGE)} ON EACH RAIL.",
     # Review bought-r15: a pin pressed through two seated bearings loads the
     # upper one through its balls and drags the lower one off its shoulder,
     # so each press loads only the ring it fits.
     f"4. ASSEMBLE EACH PIN {_item(PIVOT_PIN)} AND BOTH BEARINGS {_item(BEARING)} "
-    "PER C1-C2 (SHEET 8). TRIAL-FIT CAPS FOR C2, THEN LEAVE THEM OFF FOR "
-    "FEED FIT-UP; DO NOT COMPLETE C3 YET.",
+    "PER C1-C2 (SHEET 8), WITH C2A (SHEET 9) BEFORE ANY PRESS. TRIAL-FIT CAPS "
+    "FOR C2A AND C2, THEN LEAVE THEM OFF FOR FEED FIT-UP; DO NOT COMPLETE C3 YET.",
     f"5. SCREW EACH BLOCK ON ITS CARRIAGE WITH 4 {_CARRIAGE_SCREW} "
     f"{_item(CARRIAGE_SCREW)}, BORE TOWARD THE SPINDLE.",
     # Review bought-r15: the DRO reads the table, not the carriage, so the
@@ -1623,8 +1628,8 @@ ASSEMBLY_STEPS = (
     # round it (7B threads it only to locate the nut for 7C's spotting).
     "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
     f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK.",
-    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
-    f"{_BLOCK_TORQUE}, THEN THE KP08 "
+    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS "
+    f"{_item(BLOCK_SCREW)} TO {_BLOCK_TORQUE}, THEN THE KP08 "
     "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
     f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
     # Owner ruling 2026-10-18 (rule 23, exception RV-03): the set screws are
@@ -1632,7 +1637,7 @@ ASSEMBLY_STEPS = (
     "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH "
     "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER. THEN FOLLOW F2 (SHEET 8).",
     "9. LOWER THE CARRIER A1/B1 (INNER PASS) ONTO BOTH PIN SEATS. FIT AND "
-    "LOCK BOTH TOP RETAINERS PER THE CAPTURE AND OPERATION SHEET.",
+    "LOCK BOTH TOP RETAINERS PER C4-C5D (SHEET 9).",
     "10. DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS (LOCATED ON "
     "MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH IN ONE SETUP SQUARE TO THE "
     "CARRIER TOP: "
@@ -1648,7 +1653,8 @@ ASSEMBLY_STEPS = (
     "ONLY NOW PRESS THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL "
     f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN THROUGH THE RISER UNTIL ITS "
     f"ROUND TIP IS {cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE "
-    "THE RISER; CHECK THE STRAP SEATS FLAT, LOCATES AND SLIDES ON AND OFF, AND "
+    f"THE RISER; CHECK THE {carrier.STRAP_NUMBER} STRAP SEATS FLAT, LOCATES "
+    "AND SLIDES ON AND OFF, AND "
     "THE TIP IS NOT ABOVE IT. "
     f"FACE THE HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-"
     f"{hub_pin.LOCATOR_SET_MAX:.2f} ABOVE THE RISER AND RECHAMFER IT "
@@ -1659,10 +1665,9 @@ ASSEMBLY_STEPS = (
     f"{_CLAMP_SCREW} {_item(CLAMP_SCREW)} GOES DOWN THROUGH THE WORKPIECE, "
     f"THE {carrier.STRAP_NUMBER} STRAP BLANK (NOT SUPPLIED), AND THE RISER "
     "INTO THE CARRIER'S CR TAP.",
-    "13. TO CHANGE PASS, ISOLATE THE SPINDLE, WITHDRAW THE TOOL, REMOVE BOTH "
-    "TOP RETAINERS, THEN LIFT THE CARRIER. ALIGN A2/B2 AND LOWER; REFIT AND "
-    "LOCK BOTH RETAINERS WITH NEW COTTERS BEFORE USE. THE STEP 6 READINGS "
-    f"STAND. SHIP ON A1/B1, BLOCK SCREWS {_item(BLOCK_SCREW)} AT {_BLOCK_TORQUE}.",
+    f"13. CHANGE PASS PER C6 (SHEET {OPERATION_SHEET_NUMBER}); THE STEP 6 "
+    f"READINGS STAND. SHIP ON A1/B1, BLOCK SCREWS {_item(BLOCK_SCREW)} AT "
+    f"{_BLOCK_TORQUE}.",
 )
 # The Tr8x2 nut does not back-drive: the lever feeds (roughing) only with the
 # nut bracket's block screws out; the handwheel feeds the finish pass.
@@ -1682,13 +1687,9 @@ ASSEMBLY_CHECKS = (
 )
 
 CARTRIDGE_STEPS = (
-    "C1R. BEFORE PRESSING EACH UPPER 6200, CHECK ACTUAL OD 29.991-30.000 "
-    "AND WIDTH 8.88-9.00. ITS INTACT OUTER RING MUST HAVE A FULL-CIRCUMFERENCE "
-    "CYLINDRICAL OD LAND AT THE AXIAL MID-PLANE BETWEEN END FACES. RECORD "
-    "THE INSPECTION RESULT AND RECEIVING EVIDENCE BY SUPPORT. "
-    "INSTALL ONLY BEARINGS THAT PASS; REPLACE FAILED BEARINGS AND INSPECT REPLACEMENTS. "
-    "CATALOGUE/MODEL SHAPE IS NOT INSPECTION.",
-    "C1. BEFORE FINAL PRESS ASSEMBLY, COMPLETE C1R. MEASURE EACH ACTUAL BLOCK SHOULDER/"
+    "C1. BEFORE FINAL PRESS ASSEMBLY, USE QUALIFIED MHA-CH-06-TL-VN-52 "
+    "BEARINGS; KEEP EACH ACTUAL UPPER BEARING'S IDENTITY/QUALIFICATION "
+    "WITH ITS SUPPORT. MEASURE EACH ACTUAL BLOCK SHOULDER/"
     "UPPER-BEARING FACE STACK AND FIT THE PIN'S LOWER BOSS HEIGHT FOR THE "
     "C2 GAPS; DO NOT PLAN POST-PRESS MACHINING. COMPLETE C2A ON "
     "TOPCAPTUREFIT WITH THE FINAL MACHINED PARTS BEFORE PRESSING ANY "
@@ -1721,23 +1722,26 @@ CARTRIDGE_STEPS = (
     "FACES; EACH SCREW MUST FREE-RUN "
     "BEFORE SEATING, WITHOUT FILLET INTERFERENCE OR BOTTOMING. TIGHTEN "
     f"CROSSWISE TO {retention.CAP_SEATING_TORQUE_NM:.2f} +/- "
-    f"{retention.CAP_SEATING_TORQUE_BAND_NM:.2f} N·m. THIS IS A SEATING "
-    "INSTRUCTION, NOT A MINIMUM PRELOAD OR BUMP-LOAD RATING.",
+    f"{retention.CAP_SEATING_TORQUE_BAND_NM:.2f} N·m.",
     "C3A. WITH CAPS SEATED, REPEAT C2. BEFORE WIRING, CHECK A SEPARATE "
     "0.05 MAX CAP/BLOCK GAP AROUND "
     "THE WHOLE MOUNTING-LAND PERIMETER AND 0.05 MAX UNDER EACH HEAD OVER "
     "ITS WHOLE ACCESSIBLE BEARING FOOTPRINT. FLAT FACES MUST SEAT; "
     "REGISTERS MUST NOT BOTTOM. DO NOT PULL A GAP SHUT WITH THE SCREWS: "
-    "RE-MACHINE OR REPLACE A FAILED PART. THESE TWO GAP ALLOWANCES ARE "
-    "INDEPENDENT AND ARE BOTH INCLUDED IN THE UPSET BOUND.",
-    "C3B. MEASURE FULL-THREAD INTERVAL [S0,S1] FROM THE SCREW UNDERHEAD, "
-    "[B0,B1] DOWN FROM BLOCK TOP, AND SEATED HEAD HEIGHT H ABOVE BLOCK. "
+    "RE-MACHINE OR REPLACE A FAILED PART.",
+    "C3B. ALONG THE ACTUAL THREAD AXIS, MEASURE FULL-THREAD INTERVAL "
+    "[S0,S1] FROM THE UNDERHEAD BEARING-PLANE INTERSECTION AND [B0,B1] "
+    "DOWN FROM BLOCK TOP; H IS THE SEATED UNDERHEAD INTERSECTION HEIGHT "
+    "ABOVE BLOCK TOP ALONG THAT SAME AXIS, NOT WORLD Z. "
     "ENGAGEMENT = MIN(B1,S1-H)-MAX(B0,S0-H), ALL IN MM; REQUIRE 11.91 MIN "
     "AT EVERY SCREW. CHAMFERS, RUNOUT AND TIP THREADS DO NOT COUNT.",
     f"C3C. LOCK EACH PAIR WITH NEW 0.032 STAINLESS WIRE {_item(PIVOT_LOCK_WIRE)} "
     "PULLING EACH HEAD TOWARD TIGHTENING. ROUTE SINGLE STRANDS THROUGH "
     "DRILLED HEADS; KEEP TWISTED PAIRS AND TURNED-IN TAILS IN THE CHANNELS. "
-    "THREADLOCKER IS NOT THE POSITIVE LOCK.",
+    f"NORMAL SEATED POSE: WHOLE ACTUAL WIRE/TAIL ROUTE {cap_wire_clearance.NORMAL_WIRE_RECESS_MIN:.2f} MIN "
+    "BELOW ACTUAL CAP ROOF, UNFORCED. NEVER LOOSEN OR OVER-TORQUE TO ALIGN "
+    "HEAD HOLES. ACTUAL CLOCK/FORM NEEDS FULL-CAPTURE SWEPT-VOID QUALIFICATION; "
+    "NORMAL RECESS ALONE DOES NOT QUALIFY IT. UNKNOWN IS UNVERIFIED.",
 )
 
 # Complete inspection ink belongs here; the drawing only places this callout.
@@ -1754,59 +1758,86 @@ TOP_CAPTURE_STEPS = (
     f"TILT AND CLOCKING, PASS A {retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} "
     "FEELER BETWEEN BRIDGE AND LOWEST PIN TIP: THE TIP MUST STAY ABOVE "
     "Z=0, INTO THE BLOCK, NOT PROTRUDE TOWARD THE CARRIAGE. VERIFY NO ACTUAL "
-    "CARRIAGE FEATURE BENEATH THE PIN PROJECTS ABOVE THAT PLANE. RECORD "
-    "MINIMUM RECESS WITH UNCERTAINTY AT EACH SUPPORT. DO NOT CREDIT "
-    "BEARING RESTRAINT. REJECT/REFIT AND REPEAT A FAILED TRIAL; DO NOT "
+    "CARRIAGE FEATURE BENEATH THE PIN PROJECTS ABOVE THAT PLANE. "
+    "REJECT/REFIT AND REPEAT A FAILED TRIAL; DO NOT "
     "ALTER JOURNAL OR BEARING-SEAT FITS TO RESCUE IT.",
     "C4. STOP/ISOLATE THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER. "
     "BEFORE FINAL ASSEMBLY, MEASURE THE RETAINER BORES, CARRIER SUPPORT "
     "LANDS AND CLEVIS FULL-DIAMETER SHANK INTERVALS; EXCLUDE END CHAMFERS. "
     "AT BOTH EXTREMES OF CLEVIS ENDPLAY, REQUIRE MEASURABLE FULL-SECTION "
     "SHANK OVERLAP BEYOND BOTH SIDES OF EACH RETAINER BORE AND SOLID CARRIER "
-    "BENEATH BOTH BEARING LANDS. RECORD THE MINIMUM OVERLAPS AFTER "
-    "MEASUREMENT UNCERTAINTY; TANGENCY OR CHAMFER-ONLY SUPPORT IS A FAIL.",
+    "BENEATH BOTH BEARING LANDS. TANGENCY OR CHAMFER-ONLY SUPPORT FAILS.",
     f"C4A. WITH THE CARRIER SEATED, FIT EACH RETAINER {_item(PIVOT_RETAINER)} "
     f"FROM ITS SUPPLY {retention.TOP_WASHER_SUPPLY_MIN_THICKNESS:.0f} MIN BLANK. "
     f"FACE IT TO GIVE {retention.TOP_RUNNING_GAP[0]:.2f}-"
     f"{retention.TOP_RUNNING_GAP[1]:.2f} CARRIER/TOP RETAINER RUNNING GAP "
     "AROUND THE WHOLE WASHER THROUGH THE FREE SWING, WITH THE ACTUAL CLEVIS "
     "HELD AGAINST THE UPPER EDGE OF THE PIN CROSS-HOLE, NOT CENTRED OR ON "
-    "THE LOWER EDGE. RECORD FINISHED THICKNESS AND MIN/MAX GAP. KEEP ONE "
-    "MATCHED SET AT EACH SUPPORT; THE SAME SET MUST QUALIFY BOTH HOLE PAIRS.",
+    "THE LOWER EDGE. KEEP ONE MATCHED SET AT EACH SUPPORT; THE SAME SET "
+    "MUST QUALIFY BOTH HOLE PAIRS.",
     f"C5. INSERT BOTH HEADED CLEVIS PINS {_item(PIVOT_CLEVIS_PIN)} AND FIT NEW "
-    f"SPLIT COTTERS {_item(PIVOT_COTTER)}. SPREAD BOTH LEGS TO LOCK POSITIVELY. "
-    "BOTH ENDS MUST BE RETAINED DURING THE FOLLOWING HAND CHECKS. HEADS AND "
-    "COTTERS RETAIN THE CLEVIS AXIALLY; DO NOT CREDIT THEM AS CARRIER "
-    "UPLIFT STOPS OR FORCE THEM AGAINST THE CARRIER.",
+    f"SPLIT COTTERS {_item(PIVOT_COTTER)}. SPREAD BOTH LEGS TO LOCK POSITIVELY; "
+    "DO NOT FORCE HEADS OR COTTERS AGAINST THE CARRIER. BOTH ENDS MUST BE "
+    "RETAINED DURING THE FOLLOWING HAND CHECKS.",
     "C5A. USE LIGHT HAND TAKE-UP ONLY, NO HAMMER, ADDED LEVER OR PROOF LOAD. "
     "ESTABLISH PRIMARY RETAINER/CLEVIS ENGAGEMENT, NOT SECONDARY CONTACT. "
-    "MEASURE THE CHANGE IN PIN PROJECTION WITH A BRIDGE INDICATOR ON "
-    "EXPOSED CARRIER FACE AND ITS PROBE ON THE FLAT PIN END, ALIGNED WITH "
-    "THE PIN AXIS. USE OPPOSED CARRIER CONTACTS OR AVERAGE OPPOSED READINGS "
-    "TO REMOVE ROCKING BIAS. INCLUDE GAUGE/ALIGNMENT UNCERTAINTY. MAXIMUM "
-    f"ACTUAL CARRIER-TO-PIN RELATIVE TRAVEL MUST BE "
-    f"{retention.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} OR LESS; BLOCK/CARRIAGE "
-    "MOVEMENT IS NOT THIS RELATIVE TRAVEL.",
+    "CARRIER-TO-PIN TRAVEL, READ ALONG THE PIN AXIS FROM THE EXPOSED CARRIER "
+    "FACE TO THE FLAT PIN END WITH CARRIER ROCK AVERAGED OUT, MUST BE "
+    f"{retention.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX; BLOCK/CARRIAGE "
+    "MOVEMENT IS NOT THIS TRAVEL.",
     f"C5B. AT PRIMARY TAKE-UP, PASS A "
     f"{retention.TOP_SECONDARY_CLEARANCE_MIN:.2f} FEELER BETWEEN THE CARRIER "
     "AND EVERY CLEVIS HEAD, EXPOSED SHANK END, COTTER EYE AND BOTH PRONGS/"
-    "ENDS. APPROACH FROM THE OPEN CARRIER ENDS; USE A LIGHT/MIRROR TO PLACE "
-    "THE FEELER AT THE CLOSEST POINT, NOT A FACE-ON VISUAL GUESS. RECORD "
-    "EACH MINIMUM CLEARANCE WITH UNCERTAINTY. IF SECONDARY HARDWARE TOUCHES "
+    "ENDS AT THEIR CLOSEST POINTS. IF SECONDARY HARDWARE TOUCHES "
     "BEFORE PRIMARY ENGAGEMENT, STOP: THAT IS NOT A VALID TAKE-UP POSITION.",
     "C5C. REPEAT C4-C5 AT BOTH SUPPORTS ON BOTH PASS HOLE PAIRS. MOVE THROUGH "
     "ALL REACHABLE CLEVIS/COTTER ENDPLAY AND CLOCKING WHILE TAKING UP LOCAL "
     "CARRIER ROCK, INCLUDING COUPLED POSITIONS, ONE-END LIFT AND HANDLE "
     "TILT BOTH WAYS ABOUT THE SUPPORT LINE. SWEEP BOTH PASSES BY HAND. "
-    "RECHECK THE TWO SHANK BRIDGES/UNDER-SUPPORTS THROUGH THIS MOTION. RECORD "
+    "RECHECK THE TWO SHANK BRIDGES/UNDER-SUPPORTS THROUGH THIS MOTION. MEASURE "
     "THE ACTUAL SECONDARY-HARDWARE XYZ ENVELOPE ABOUT EACH PIN AXIS/SEAT, "
-    "USING MEASURED CARRIER THICKNESS, FOR FIXTURE AND INSTALLED-TOOLING "
-    "CHECKS; NOMINAL COTTER GEOMETRY IS NOT A SUPPLIER MAXIMUM.",
+    "USING MEASURED CARRIER THICKNESS, FOR FIXTURE AND INSTALLED-TOOLING CHECKS.",
     "C5D. ANY EXCESS TRAVEL, INSUFFICIENT GAP/SUPPORT OR UNINSPECTED REGION "
     "FAILS. REFIT OR REPLACE THE CORRECT PARTS AND REPEAT BOTH-PAIR "
     "QUALIFICATION. DO NOT REFORM THE COTTER EYE, ARBITRARILY RE-BEND LEGS "
     "TO GAIN CLEARANCE, FORCE A SET TOGETHER OR ACCEPT NO GAP. REPLACE "
-    "REMOVED COTTERS AND KEEP THE QUALIFICATION RECORD WITH THE MATCHED SET.",
+    "REMOVED COTTERS. ACCEPT ONLY WITH GAUGE UNCERTAINTY INSIDE EACH LIMIT; "
+    "KEEP C2A-C5C READINGS WITH THE MATCHED SET.",
+)
+
+# The studs' measurements, fit limits and installed acceptance, migrated from
+# the stud drawing (hold_down_stud.measured_fit_bounds evaluates the same G, Q,
+# nut-span, lower-interval and insertion predicates). H is only measurable
+# with the blocks on their carriages over both passes.
+_STUD_CLEARANCE = f"{hold_down_stud.CLEARANCE_MIN:.1f}"
+_STUD_PITCH = (
+    f"{hold_down_stud.COMPLETE_PROJECTION_PITCHES:g} COMPLETE {hold_down_stud.THREAD} PITCH"
+)
+HOLD_DOWN_STEPS = (
+    f"HD1. BEFORE CUTTING THE {hold_down_stud.QUANTITY} STUDS "
+    f"{_item(HOLD_DOWN_STUD)}, MEASURE AT EACH STUD ON THE ACTUAL PARTS, MIN "
+    "AND MAX IN mm WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
+    "STUD LOWER END TO BAR UNDERSIDE AT THE ORIGINAL INSERTION; H, BAR TOP TO "
+    f"PIVOT BLOCK/WING UNDERSIDE {_item(PIVOT_BLOCK)}, LEAST OVER BOTH "
+    f"COMPLETE PASSES; N, SEATED FLANGE NUT {_item(FLANGE_NUT)} BEARING FACE "
+    "TO THE FAR END OF ITS COMPLETE THREADS, NOT BODY HEIGHT; W, WASHER "
+    "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
+    "THREAD, NOT THE CHAMFER. MARK THE LOWER FACTORY END, THE ORIGINAL "
+    "INSERTION AND THE ORIGINAL LOWER LOADED COMPLETE-THREAD INTERVAL.",
+    "HD2. WITH LMIN/LMAX THE STUD'S PRINTED FINISHED-LENGTH LIMITS, NOT STOCK "
+    "LENGTH, REQUIRE GMIN = BMIN + HMIN + DMIN - LMAX >= "
+    f"{_STUD_CLEARANCE} AND QMIN = LMIN - DMAX - BMAX - WMAX - NMAX - UMAX "
+    f">= {_STUD_PITCH}. THE NUT'S WHOLE COMPLETE-THREAD SPAN MUST STAY ON "
+    "COMPLETE STUD THREAD AND THE ORIGINAL LOWER LOADED INTERVAL MUST STAY "
+    "INTACT BELOW THE BAR. AN UNKNOWN MEASUREMENT OR A FAILED LIMIT REJECTS "
+    "THE SETUP: NO DEEPER INSERTION, NO CUT THROUGH ENGAGED THREADS.",
+    "HD3. SHORTEN ONLY THE UNUSED UPPER END TO THE STUD DRAWING; DEBURR, "
+    "GAUGE THE COMPLETE THREADS AND REMEASURE U. RESTORE THE ORIGINAL "
+    "INSERTION AND SEAT THE NUTS FULLY WITH NO WASHER; DO NOT FORCE OR BOTTOM "
+    "DEEPER. AFTER STEP 6 FINAL CLAMPING, HAND-SWEEP BOTH COMPLETE PASSES: "
+    f"EVERY STUD CLEARS EVERY MOVING BLOCK/WING BY {_STUD_CLEARANCE} MIN "
+    f"THROUGHOUT AND SHOWS {_STUD_PITCH} MIN BEYOND ITS SEATED NUT, THE NUT'S "
+    "WHOLE COMPLETE-THREAD SPAN ENGAGED. REJECT ANY INCOMPATIBLE SETUP.",
 )
 
 CAPTURE_STEPS = (
@@ -1815,30 +1846,27 @@ CAPTURE_STEPS = (
     "THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER; REMOVE BOTH COTTERS, "
     "CLEVIS PINS AND RETAINERS BEFORE LIFTING THE CARRIER. REFIT BOTH "
     "RETAINERS WITH NEW COTTERS AFTER LOWERING ON THE OTHER HOLE PAIR. "
-    "RECHECK C4 GAPS AND REPEAT C5 QUALIFICATION BEFORE CUTTING.",
+    "REPEAT C4-C5D QUALIFICATION BEFORE CUTTING.",
     "C7. SERVICE: REMOVE THE CAP/WIRE AND PRESS THE PIN UPWARD FROM BELOW. "
     "THE INTEGRAL FLANGE PREVENTS DOWNWARD EXTRACTION. DESTRUCTIVE REMOVAL "
-    "MAY LOAD THE BALLS: REPLACE THE PIN AND BOTH 6200 BEARINGS AS A SET; "
-    "DO NOT PROMISE BEARING REUSE. USE THE EXISTING PULLER CAVITY FOR A "
-    "REMAINING BEARING. RE-FIT ALL GAPS AND APPLY NEW WIRE/COTTERS.",
+    "MAY LOAD THE BALLS: REPLACE THE PIN AND BOTH 6200 BEARINGS AS A SET. "
+    "USE THE EXISTING PULLER CAVITY FOR A REMAINING BEARING. RE-FIT ALL GAPS "
+    "AND APPLY NEW WIRE/COTTERS.",
+    *HOLD_DOWN_STEPS,
 )
 CAPTURE_CHECKS = (
-    "ACCEPTANCE: POSITIVE GEOMETRIC CAPTURE IS NOT A BUMP-FORCE OR "
-    "STRENGTH CERTIFICATION. THE CALCULATED RIGID UPSET EXCLUDES ELASTIC "
-    "DEFLECTION, DAMAGE AND LOOSE/ABSENT LOCKS. DO NOT USE IT AS A LOAD RATING.",
-    "ACCEPTANCE: RECORD THE ACTUAL CUTTER STICKOUT, EVERY NON-CUTTING "
-    "TOOLHOLDER/SPINDLE STEP RADIUS AND MACHINE-Z LIMIT, AND MEASUREMENT/"
-    "RUNOUT UNCERTAINTIES. CHECK BOTH COMPLETE SWEEPS AND THE BOUNDED "
-    "UPSET WITH THESE INSTALLED DIMENSIONS; NOMINAL CAD CLEARANCE ALONE "
-    "DOES NOT ESTABLISH COLLISION SAFETY. NO INSTALLED ENVELOPE IS SUPPLIED.",
-    f"ACCEPTANCE: NEW WORK HEIGHT IS {PART_TOP_Z:.1f} ABOVE THE TABLE; "
-    f"PIN ENDS ARE NOMINALLY {PIN_TOP_Z:.1f}, "
-    f"{retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} ABOVE THE WORK. "
-    "INCLUDE THE ACTUAL RETAINERS, CLEVIS HEADS AND BENT COTTERS, NOT JUST "
-    "THE PIN END, IN THE INSTALLED ENVELOPE AND CHECK IT AFTER ANY TOOL CHANGE.",
-    "ACCEPTANCE: NO SKID IS FITTED. CARTRIDGE STOP FACES ARE NORMALLY CLEAR; "
-    "THEY LIMIT UPSET ONLY. THE EXISTING CARRIAGE/RAIL AND TABLE ANCHORS "
-    "REMAIN IN THE LOAD PATH AND REQUIRE THEIR OWN INSTALLED CONDITION CHECK.",
+    "TOOLING ACCEPTANCE UNVERIFIED: FREE CARRIAGE 2 TRAVEL IS NOT POSITIVELY "
+    "BOUNDED. NORMAL PASS SWEEPS DO NOT COVER ARBITRARY CAPTURED SLIDE.",
+    "KEEP THE STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER XY CHANGES. "
+    "ISOLATE THE SPINDLE. TOOL EXTENTS COVER THE ENTIRE USED Z RANGE, DEEPEST "
+    "CUT THROUGH RETRACTION. SHEET 2 FIXED-SUPPORT NUMBERS ARE SOURCE "
+    "DIAGNOSTICS, NOT INSTALLED ACCEPTANCE. RECHECK AFTER TOOL/DEPTH/SETUP CHANGES.",
+    f"REFERENCE TABLE HEIGHTS: WORK {PART_TOP_Z:.1f}; PIN ENDS {PIN_TOP_Z:.1f} "
+    f"({retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} ABOVE WORK), NOMINAL. "
+    "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
+    "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE SHEET 7 CHECKS "
+    f"AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN ±{ALIGNMENT_BAND:.2f}; "
+    "FREE SWEEP WITH BOTH CARRIAGES ON THEIR RAILS) AND HD3 AT EVERY STUD.",
 )
 
 # --- Assembly extent at the modelled pose (sheet layout reads it) -----------------
@@ -2332,12 +2360,12 @@ def _upset_fixture_padding(
     bounds: retention.CaptureBounds,
 ) -> tuple[float, float, float]:
     """Additional (XY, down, up) for the intact rigid captured mechanism."""
-    if stem == PIVOT_CAP_SCREW:
+    if stem in (PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
         # C3 seats these screws in the BLOCK's receiver threads. The cap can
         # move around their fixed shanks/heads, not carry them with its register
-        # float, yaw or rock. Direct tap-location/angular and purchased head
-        # errors remain in the manufactured prisms and head-seat height chain.
-        # This intact-rigid premise credits no thread pullout/bending strength.
+        # float, yaw or rock. Source wire stays at those fixed heads; arbitrary
+        # permitted flex needs separate contour/envelope authority. Direct
+        # head errors remain in source prisms, without connection-strength credit.
         return 0.0, 0.0, 0.0
     pin_face_angle = bounds.pin_tilt
     seat_height = (
@@ -2392,9 +2420,7 @@ def _upset_fixture_padding(
             + radius * math.sin(pin_face_angle) + height * (1.0 - math.cos(pin_face_angle))
         )
         return xy, vertical, vertical
-    if stem in (PIVOT_CAP, PIVOT_LOCK_WIRE):
-        # Both use the actual cap frame, including physical wire-row placements.
-        # A cap-footprint radius alone does not enclose an extended wire endpoint.
+    if stem == PIVOT_CAP:
         cap_origin = PLACEMENTS[PIVOT_CAP][root_index][0]
         radius = max(math.hypot(p[0] - cap_origin[0], p[1] - cap_origin[1]) for p in points)
         height = max(abs(p[2] - cap_origin[2]) for p in points)
@@ -2402,13 +2428,7 @@ def _upset_fixture_padding(
             bounds.cap_lateral_shift + 2.0 * radius * math.sin(bounds.cap_yaw / 2.0)
             + height * math.sin(bounds.cap_tilt) + radius * (1.0 - math.cos(bounds.cap_tilt))
         )
-        if stem == PIVOT_CAP:
-            return xy, retention.CAP_VERTICAL_MOTION_ENCLOSURE, bounds.cap_top_rise
-        vertical = (
-            retention.CAP_VERTICAL_MOTION_ENCLOSURE + radius * math.sin(bounds.cap_tilt)
-            + height * (1.0 - math.cos(bounds.cap_tilt))
-        )
-        return xy, vertical, vertical
+        return xy, retention.CAP_VERTICAL_MOTION_ENCLOSURE, bounds.cap_top_rise
     return 0.0, 0.0, 0.0
 
 
@@ -2528,11 +2548,6 @@ def capture_feed_clearance_bounds(
         (pivot_pin.FLANGE_DIA + pivot_pin.FLANGE_DIA_BAND[0]) / 2.0
         + bounds.cap_lateral_shift + bounds.flange_lateral_shift + pin_height * math.sin(bounds.pin_tilt)
     )
-    screw_radius = (
-        retention_hardware.SCREW_HEAD_DIA_MAX / 2.0 + retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
-        + printed_band_mm(retention.CAP_BOLT_LOCATION_PLACES)
-        + (pivot_block.BLOCK_HEIGHT + printed_band_mm(2)) * math.tan(gamma)
-    )
     direction_dot = sum(a * b for a, b in zip(rail_direction(1), rail_direction(2), strict=True))
     if direction_dot >= 0.0:
         raise ValueError("capture/feed continuous separator requires the authored opposing rails")
@@ -2588,22 +2603,29 @@ def capture_feed_clearance_bounds(
                         (box[2][0] - source - drop, box[2][1] + source + rise),
                     )
                 elif stem == PIVOT_CAP_SCREW:
-                    x, y = pivot_block.CAP_TAP_POINTS[index]
-                    box = (
-                        (x - screw_radius - bore_band, x + screw_radius + bore_band),
-                        (y - screw_radius - side_band, y + screw_radius + side_band),
-                        (box[2][0] - source, box[2][1] + source),
-                    )
+                    # Reuse complete fitted-C/3D head and low-shank extents;
+                    # the screw tap starts at block TOP. Its bore-axis datum
+                    # errors relative to this block frame remain independent.
+                    direct = [in_block_frame(frame_point(PLACEMENTS[stem][index], p))
+                              for piece in _capture_fixture_source_prisms(stem, index, boxes, manufactured=True)
+                              for p in _box_corners(piece)]
+                    box = tuple((min(p[a] for p in direct) - error,
+                                 max(p[a] for p in direct) + error)
+                                for a, error in enumerate((bore_band, side_band, 0.0)))
                 elif stem == PIVOT_LOCK_WIRE:
                     box = (
                         (box[0][0] - xy - outline_band - bore_band,
                          box[0][1] + xy + outline_band + bore_band),
                         (box[1][0] - xy - outline_band - side_band,
                          box[1][1] + xy + outline_band + side_band),
-                        (pivot_cap.HEIGHT - printed_band_mm(pivot_cap.HEIGHT_PLACES)
-                         - pivot_cap.COUNTERBORE_DEPTH - printed_band_mm(pivot_cap.COUNTERBORE_DEPTH_PLACES)
-                         + boxes[stem][2][0] - (pivot_wire.WIRE_AXIS_Z - retention_hardware.SCREW_WIRE_HEIGHT_MIN)
-                         - retention.CAP_VERTICAL_MOTION_ENCLOSURE, box[2][1] + source + rise),
+                        # Representative normal source route only: cap-forced
+                        # wire motion remains explicitly UNRESOLVED in census.
+                        (retention.fitted_counterbore_bounds().head_seat_min + boxes[stem][2][0]
+                         - (pivot_wire.WIRE_AXIS_Z - retention_hardware.SCREW_WIRE_HEIGHT_MIN)
+                         - retention_hardware.SCREW_HEAD_DIA_MAX / 2.0 * math.sin(gamma),
+                         retention.fitted_counterbore_bounds().head_seat_max + boxes[stem][2][1]
+                         + (retention_hardware.SCREW_WIRE_HEIGHT_MAX - pivot_wire.WIRE_AXIS_Z)
+                         + retention_hardware.SCREW_HEAD_DIA_MAX / 2.0 * math.sin(gamma)),
                     )
                 else:
                     box = (
@@ -2657,10 +2679,11 @@ class PrimaryCaptureMeasurement:
     Secondary gaps are to the carrier at the mechanically established
     PRIMARY retainer/clevis take-up. A cotter/head touching first is failure,
     not an extra uplift stop. There are no inferred or verified defaults.
-    C1R receiving status independently accepts the actual upper bearing's
-    published OD/width limits and intact, uninterrupted full-circumference
-    cylindrical OD land at its axial mid-plane. Its actual evidence authority
-    is reused for the same support on both passes, never inferred from CAD.
+    VN-52 qualification independently accepts the actual upper bearing
+    under its purchase drawing. Identity plus valid supplier dimensional
+    authority may establish its catalogue bands; its actual OD-land profile
+    still needs physical inspection. Reuse the same physical bearing's
+    evidence at that support on both passes, never infer acceptance from CAD.
     """
 
     pass_name: str
@@ -2689,7 +2712,7 @@ class PrimaryCaptureMeasurement:
 def qualify_primary_capture_measurements(
     records: tuple[PrimaryCaptureMeasurement, ...],
 ) -> dict[tuple[str, int], PrimaryCaptureMeasurement]:
-    """Accept only complete C1R receiving and quantified C2A/C4/C5 evidence.
+    """Accept complete actual VN-52 qualification and quantified C2A/C4/C5 evidence.
 
     This validates supplied evidence, not whether a measurement was performed.
     In particular it is NOT a native CAD build/import prerequisite and makes
@@ -2727,10 +2750,10 @@ def qualify_primary_capture_measurements(
         if not isinstance(record.prebearing_capture_evidence, str) or not record.prebearing_capture_evidence.strip():
             raise ValueError(f"primary capture {key} needs actual pre-bearing trial evidence")
         if record.upper_bearing_profile_status != "accepted":
-            raise ValueError(f"primary capture {key} needs ACCEPTED C1R actual upper-bearing OD/width and intact mid-plane OD-land inspection")
+            raise ValueError(f"primary capture {key} needs ACCEPTED VN-52 actual upper-bearing qualification")
         if (not isinstance(record.upper_bearing_receiving_evidence, str)
                 or not record.upper_bearing_receiving_evidence.strip()):
-            raise ValueError(f"primary capture {key} needs actual C1R upper-bearing receiving evidence, not catalogue/model shape")
+            raise ValueError(f"primary capture {key} needs actual VN-52 upper-bearing receiving evidence, not a model shape")
         if number(record.min_tip_recess_mm, "minimum pre-bearing tip recess") < retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:
             raise ValueError(f"primary capture {key} lacks minimum net pin-tip/carriage clearance")
         if number(record.fitted_retainer_thickness_mm, "finished retainer thickness") <= 0.0:
@@ -2776,7 +2799,7 @@ def qualify_primary_capture_measurements(
         receiving = {record.upper_bearing_receiving_evidence
                      for (_pass, s), record in accepted.items() if s == support}
         if len(receiving) != 1:
-            raise ValueError(f"support {support} must reuse the SAME physical C1R upper-bearing receiving inspection on BOTH passes")
+            raise ValueError(f"support {support} must reuse the SAME physical VN-52 upper-bearing qualification on BOTH passes")
     return accepted
 
 
@@ -2868,34 +2891,6 @@ def _capture_fixture_joint(
         return "capture_bounds: integral flange/solid block stop annulus; existing exact bearing-seat fits remain mandatory"
     if families == {PIVOT_CAP, PIVOT_PIN}:
         return "capture_bounds: flange/pocket and roof stop circle; positive pin/aperture and normal corner clearances"
-    if families == {PIVOT_CAP, BEARING}:
-        cap_index = i if a == PIVOT_CAP else j
-        bearing_index = i if a == BEARING else j
-        record = primary.get((pass_name, cap_index))
-        if (record is None or record.upper_bearing_profile_status != "accepted"
-                or not isinstance(record.upper_bearing_receiving_evidence, str)
-                or not record.upper_bearing_receiving_evidence.strip()):
-            return None
-        if bearing_index % len(BEARING_SEAT_Z) != len(BEARING_SEAT_Z) - 1:
-            return None
-        if (PLACEMENTS[PIVOT_CAP][cap_index] != PIVOT_CAP_PLACEMENTS[cap_index]
-                or PLACEMENTS[PIVOT_BLOCK][cap_index] != PIVOT_BLOCK_PLACEMENTS[cap_index]
-                or PLACEMENTS[PIVOT_PIN][cap_index] != (PIVOT_PIN_ORIGINS[cap_index], PIN_ROWS)
-                or PLACEMENTS[BEARING][bearing_index] != BEARING_PLACEMENTS[bearing_index]):
-            return None
-        shield = capture_fixture_bearing_shield_bounds(bounds)
-        if min(shield.values()) > 0.0:
-            return (
-                "bore-mouth/flange shield for this upper 6200: installed outer-race/bore contact guides free axial "
-                "extraction until its intact annular end face meets the full-coverage solid flange; actual purchased "
-                "outer-ring cylindrical OD land must include its axial mid-plane. Inner race meets the narrow boss; "
-                "balls/seals remain in the intact purchased bearing. Positive flange "
-                "thickness separates that stop from the flat cap roof; both registers remain radially outside. "
-                "No bearing friction, pullout force, fixed outer-ring height or invented internal axial-play limit. "
-                f"Supplied C1R actual upper-bearing receiving authority: {record.upper_bearing_receiving_evidence}. "
-                + "; ".join(f"{name}={value:.9g} mm" for name, value in shield.items())
-            )
-        return None
     if families == {PIVOT_BLOCK, PIVOT_CAP_SCREW}:
         return "unchanged exact cap-screw/block thread-major fit only; C3B actual complete-thread interval and seating remain mandatory"
     if families == {PIVOT_CAP, PIVOT_CAP_SCREW}:
@@ -2912,8 +2907,6 @@ def _capture_fixture_joint(
         return "C5 measured split-cotter fit in this clevis hole and both bent retaining legs; source form is conditional on installed inspection"
     if families == {PIVOT_PIN, PIVOT_COTTER}:
         return "C5 intact bent cotter is the clevis's axial keeper at the solid pin/cross-hole wall; keeper contact may limit endplay, never a journal exemption for external obstacles"
-    if families == {PIVOT_CAP, PIVOT_LOCK_WIRE}:
-        return "C3C this cap's two source-routed wire rows in its channels; intact paired-head route and actual turned-in tails required; wire/channel contact can stop rock sooner"
     if families == {PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE}:
         screw_index = i if a == PIVOT_CAP_SCREW else j
         wire_index = i if a == PIVOT_LOCK_WIRE else j
@@ -2928,8 +2921,8 @@ def _capture_fixture_source_prisms(
 ) -> tuple[Box3, ...]:
     """Finite native-source material primitives and their DIRECT extent bands.
 
-    This deliberately does not use the installed-tooling L1 sum of every
-    dimension. A hole size cannot enlarge an outside edge. Block edges use
+    This deliberately does not use a whole-fixture L1 sum of unrelated
+    dimensions. A hole size cannot enlarge an outside edge. Block edges use
     their one bearing-axis/datum chain; fitted C2/C4 faces replace reference
     boss/washer dimensions. Purchased limits not supplied by the sources stay
     conditional on actual material being contained by the stated envelopes.
@@ -3053,10 +3046,33 @@ def _capture_fixture_source_prisms(
              (-retention_hardware.SCREW_FILLET_LENGTH_MAX, retention_hardware.SCREW_HEAD_HEIGHT_MAX)),
             ((-body_r, body_r), (-body_r, body_r), (-retention_hardware.SCREW_LENGTH, 0.0)),
         )
+        if not manufactured:
+            return pieces
+        # The tap-entry XY is dimensioned on the BLOCK TOP, not its bottom.
+        # C is the actual screw-axis/bearing-plane intersection above that
+        # top. Functional fitted recess/floor authority replaces REF depth;
+        # all C variation is in these pieces, not another Z-chain allowance.
+        fitted = retention.fitted_counterbore_bounds()
+        model_c = retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH
+        gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+        beta = math.radians(retention_hardware.SCREW_BEARING_ANGLE_MAX_DEGREES)
+        head_r += retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
+        face = head_r * math.tan(beta)
+        head_lo = -retention_hardware.SCREW_FILLET_LENGTH_MAX - face
+        head_hi = retention_hardware.SCREW_HEAD_HEIGHT_MAX + face
         location = (printed_band_mm(retention.CAP_BOLT_LOCATION_PLACES)
-                    + retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
-                    + (pivot_block.BLOCK_HEIGHT + b2) * math.tan(math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)))
-        return tuple(grown(piece, (location, location, 0.0)) for piece in pieces) if manufactured else pieces
+                    + fitted.head_seat_max * math.tan(gamma))
+        head_xy = head_r + location + max(abs(head_lo), abs(head_hi)) * math.sin(gamma)
+        body_xy = body_r + location + retention_hardware.SCREW_LENGTH * math.sin(gamma)
+        return (
+            ((-head_xy, head_xy), (-head_xy, head_xy),
+             (fitted.head_seat_min + head_lo - head_r * math.sin(gamma) - model_c,
+              fitted.head_top_height_max - model_c)),
+            ((-body_xy, body_xy), (-body_xy, body_xy),
+             (fitted.head_seat_min - retention_hardware.SCREW_LENGTH
+              - body_r * math.sin(gamma) - model_c,
+              fitted.head_seat_max + body_r * math.sin(gamma) - model_c)),
+        )
     if stem == PILLOW_BLOCK:
         # Its 55-wide foot is below the moving wing; the high pedestal/boss
         # is only 28 wide. A filled 55 x 29 rectangle invents wing material
@@ -3081,7 +3097,8 @@ def _capture_fixture_source_prisms(
         PIVOT_RETAINER: (printed_band_mm(1) / 2.0, printed_band_mm(1) / 2.0, 0.0),
         PIVOT_LOCK_WIRE: (printed_band_mm(retention.CAP_BOLT_LOCATION_PLACES)
                           + retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
-                          + (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH + b2 + printed_band_mm(3))
+                          + (retention.fitted_counterbore_bounds().head_seat_max
+                             + retention_hardware.SCREW_WIRE_HEIGHT_MAX)
                           * math.tan(math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES))
                           + (retention_hardware.SCREW_HEAD_DIA_MAX - retention_hardware.SCREW_HEAD_DIA) / 2.0,) * 2
                          + (max(retention_hardware.SCREW_WIRE_HEIGHT_MAX - pivot_wire.WIRE_AXIS_Z,
@@ -3182,10 +3199,14 @@ def _capture_fixture_height_chain(stem: str, index: int) -> dict[tuple[str, int]
                 + retention.PIN_CROSS_HOLE_BAND[0] / 2.0
                 + (retention_hardware.CLEVIS_DIA_MAX - retention_hardware.CLEVIS_DIA_MIN) / 2.0
             )
-        if stem in (PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
-            chain[("cap height", support)] = printed_band_mm(pivot_cap.HEIGHT_PLACES)
-            chain[("head seat", index)] = (printed_band_mm(pivot_cap.COUNTERBORE_DEPTH_PLACES)
-                                           + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX)
+        if stem == PIVOT_LOCK_WIRE:
+            # Only the representative normal wire's fixed-head placement,
+            # not an authority for its free flex/feeding envelope.
+            fitted = retention.fitted_counterbore_bounds()
+            model_c = retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH
+            chain[("fitted head seat", index)] = max(
+                model_c - fitted.head_seat_min, fitted.head_seat_max - model_c,
+            )
         if stem == BEARING:
             chain[("bearing seat depth", index)] = printed_band_mm(3)
             if index % 2:
@@ -3259,27 +3280,35 @@ def capture_fixture_cotter_upset_counterexample() -> dict[str, float | Point3]:
 
 def _capture_fixture_carrier_plane_gap(
     stem: str, index: int, points: list[Point3], bounds: retention.CaptureBounds,
+    *, wire_proof: cap_wire_clearance.WireCaptureBounds | None = None,
 ) -> float | None:
-    """Extend the EXISTING coupled cap/lower-carrier plane separator.
+    """SOURCE-geometry coupled cap/lower-carrier plane separator only.
 
-    The head/wire has its actual extent, source bands and actual cap-frame
-    lever arm. Shared block top, pin seat, and carrier support stacks cancel
-    in this local comparison, rather than being padded independently twice.
+    Head extents use printed/purchased bands. Wire is ONLY the represented
+    0/180 fixed-head curve family accepted by wire_proof, not an actual formed
+    route certified by its normal roof recess. Shared block/pin/support datums
+    cancel locally. Installed actual wire requires separate swept-void proof.
     """
-    if stem not in (PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
+    if stem not in (PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE) or (stem == PIVOT_LOCK_WIRE and wire_proof is None):
         return None
     _root, support = _motion_root(stem, index)
+    reference = PIVOT_CAP_SCREW_PLACEMENTS if stem == PIVOT_CAP_SCREW else PIVOT_LOCK_WIRE_PLACEMENTS
+    if (PLACEMENTS[PIVOT_BLOCK][support] != PIVOT_BLOCK_PLACEMENTS[support]
+            or PLACEMENTS[PIVOT_CAP][support] != PIVOT_CAP_PLACEMENTS[support]
+            or PLACEMENTS[PIVOT_PIN][support] != (PIVOT_PIN_ORIGINS[support], PIN_ROWS)
+            or PLACEMENTS[stem][index] != reference[index]):
+        return None
     origin = PLACEMENTS[PIVOT_CAP][support][0]
     radius = max(math.hypot(p[0] - origin[0], p[1] - origin[1]) for p in points)
     top = max(p[2] - origin[2] for p in points)
-    top += (printed_band_mm(pivot_cap.HEIGHT_PLACES) + printed_band_mm(pivot_cap.COUNTERBORE_DEPTH_PLACES)
-            + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX)
+    if stem == PIVOT_LOCK_WIRE:
+        top += _capture_fixture_height_chain(stem, index)["fitted head seat", index]
+    # Manufactured points already include the fitted C interval and full
+    # finite tilted head. Their block/bar Z datums cancel locally.
     edge = printed_band_mm(pivot_cap.OUTLINE_PLACES) + printed_band_mm(pivot_cap.CENTER_LOCATION_PLACES)
     cap_radius = math.hypot(pivot_cap.WIDTH / 2.0 + edge, pivot_cap.LENGTH / 2.0 + edge) + bounds.flange_lateral_shift
-    rise = (retention.CAP_VERTICAL_MOTION_ENCLOSURE + radius * math.sin(bounds.cap_tilt)
-            + max(abs(p[2] - origin[2]) for p in points) * (1.0 - math.cos(bounds.cap_tilt)))
     return (bounds.cap_running_clearance + retention.CAP_HEIGHT + printed_band_mm(pivot_cap.HEIGHT_PLACES)
-            - top + bounds.cap_top_rise - rise + (cap_radius - radius) * math.tan(bounds.carrier_tilt))
+            - top + bounds.cap_top_rise + (cap_radius - radius) * math.tan(bounds.carrier_tilt))
 
 
 def _capture_fixture_pin_screw_radial_gap(
@@ -3325,52 +3354,6 @@ def _capture_fixture_pin_screw_radial_gap(
     return math.hypot(*(screw_origin[a] - pin_origin[a] for a in (0, 1))) - pin_radius - screw_radius
 
 
-def capture_fixture_bearing_shield_bounds(
-    bounds: retention.CaptureBounds | None = None,
-) -> dict[str, float]:
-    """Upper-bearing/cap contact barrier about actual block-top Z=0 (mm).
-
-    A bearing need NOT stay at its nominal recess during uplift. The existing
-    two full-stop-circle proofs already put the complete bore mouth below a
-    projected solid flange and a flat cap roof. Its actual outer-ring end-face
-    annulus (5972K41 outer_ring_section), not a fictitious solid bearing disk,
-    encounters that flange before exiting its cylindrical seat. The inner
-    ring meets the real narrow pin boss; retained balls/seals are not promoted
-    to a rigid union. Actual receiving/profile acceptance MUST establish that
-    the uninterrupted cylindrical outer-ring OD land includes its axial
-    mid-plane, as the native source does. No supplier chamfer maximum is
-    invented. Intact purchased-bearing/installed-fit acceptance remains
-    mandatory; this is neither bearing-disintegration nor strength proof.
-    """
-    bounds = retention.capture_bounds() if bounds is None else bounds
-    stop_r, bearing_r = retention.STOP_CONTACT_DIAMETER / 2.0, bearing.OD / 2.0
-    # Catalogue receiving width is 9 -0.12/0; authority is the published
-    # 6200 envelope in bearing_spec, not an invented internal endplay band.
-    bearing_width_min = bearing.WIDTH - 0.12
-    flange_min = retention.PIN_FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-    flange_max = retention.PIN_FLANGE_THICK + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
-    roof_high = flange_max + retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
-    pieces = _capture_fixture_source_prisms(PIVOT_CAP, 0, _component_local_boxes(), manufactured=True)[1:]
-    register_gap = min(
-        math.hypot(*(0.0 if lo <= 0.0 <= hi else min(abs(lo), abs(hi)) for lo, hi in piece[:2]))
-        - bearing_r - bounds.cap_lateral_shift
-        - max(abs(z) for z in piece[2]) * math.sin(bounds.cap_tilt)
-        - max(math.hypot(x, y) for x in piece[0] for y in piece[1]) * (1.0 - math.cos(bounds.cap_tilt))
-        for piece in pieces
-    )
-    # Clocking/yaw preserves radial norm, so no independent yaw travel is
-    # subtracted from the register's radial separator.
-    return {
-        "flange radial cover": bounds.flange_contact_margin + stop_r - bearing_r,
-        "flat pocket radial cover": bounds.cap_pocket_margin + stop_r - bearing_r,
-        "solid flange barrier": flange_min * math.cos(bounds.pin_tilt)
-                                - 2.0 * retention.PIN_STOP_FACE_VARIATION_MAX,
-        # Roof height overbounds the stopped ring's top. Its full-OD mid-plane
-        # witness remains below the bore mouth: this is witness depth, NOT a
-        # claimed minimum axial extent of the purchased cylindrical land.
-        "outer-race mid-plane below bore mouth": bearing_width_min / 2.0 - roof_high,
-        "register radial separator": register_gap,
-    }
 
 
 def _capture_fixture_upper_axial_shifts() -> tuple[float, float]:
@@ -3435,9 +3418,9 @@ def capture_fixture_clearance_census(
     upset envelopes. Named capture joints use capture_bounds instead; all
     remaining failed separators are explicitly UNRESOLVED.
     Cap screws are fixed to the block's engaged threads, not carried by cap
-    motion. An extracting upper bearing instead needs the bore-mouth/flange
-    shield, ACCEPTED actual C1R receiving record and exact native baseline;
-    its static recess is never upset proof.
+    motion. Generic purchased width and an OD land including its midplane do
+    not bound all internal bearing motion or extracted-ring tilt/translation.
+    External bearing upset pairs therefore remain UNRESOLVED here.
 
     This is conditional source geometry, not as-built acceptance. C2-C5 actual
     gaps, seated heads/registers, full threads, accepted TL-29 fit-up, actual
@@ -3459,6 +3442,16 @@ def capture_fixture_clearance_census(
     if len(captures) != 24 or set(trammel.PIN_TRAVEL) != set(trammel.PASS_RADIUS):
         raise ValueError("capture/fixture census requires 24 capture instances and both complete passes")
     bounds = retention.capture_bounds()
+    wire_proof, wire_failure = None, "source wire/head/cap placements differ from the qualified route"
+    if all(PLACEMENTS[stem] == reference for stem, reference in (
+        (PIVOT_BLOCK, PIVOT_BLOCK_PLACEMENTS), (PIVOT_CAP, PIVOT_CAP_PLACEMENTS),
+        (PIVOT_CAP_SCREW, PIVOT_CAP_SCREW_PLACEMENTS), (PIVOT_LOCK_WIRE, PIVOT_LOCK_WIRE_PLACEMENTS),
+    )):
+        try:
+            wire_proof = cap_wire_clearance.require_wire_capture_geometry()
+            wire_failure = None
+        except ValueError as exc:
+            wire_failure = str(exc)
     axes = (
         (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0),
         *tuple(axis for rail in RAILS for axis in rail_rows(rail)[:2]),
@@ -3697,20 +3690,21 @@ def capture_fixture_clearance_census(
                 if key in result:
                     continue
                 nominal_gap, upset_gap = separator(first, second, False), separator(first, second, True)
-                basis = ["conditional on actual purchased dimensions/installed wire-cotter envelopes being contained by these source primitives, and existing C1-C5/F1-F2 matched-fit acceptance; no as-built or strength certification"]
+                basis = ["FIXED-SUPPORT SOURCE DIAGNOSTIC: free second-carriage upset slide is not covered; conditional on purchased/formed shapes being contained by source primitives and C1-C5/F1-F2 fits; not actual installed or strength certification"]
                 if second[0] == CARRIER:
-                    plane_gap = _capture_fixture_carrier_plane_gap(*first, points_by_size[first, True], bounds)
+                    plane_gap = _capture_fixture_carrier_plane_gap(
+                        *first, points_by_size[first, True], bounds, wire_proof=wire_proof,
+                    )
                     if plane_gap is not None:
                         nominal_gap, upset_gap = max(nominal_gap, plane_gap), max(upset_gap, plane_gap)
                         if plane_gap > 0.0:
-                            basis.append("capture_bounds coupled lower-carrier plane, actual head/wire cap-frame extent and rock/yaw lever; shared support datums cancel")
+                            basis.append("capture_bounds coupled lower-carrier plane versus full fixed head/qualified-wire extent; shared support datums cancel, no cap transport")
                 families = {first[0], second[0]}
                 if families == {PIVOT_CAP, BEARING} and roots[first] == roots[second]:
                     bearing_item = first if first[0] == BEARING else second
                     if bearing_item[1] % len(BEARING_SEAT_Z) == len(BEARING_SEAT_Z) - 1:
-                        # A nominally recessed bearing box is NOT its uplift
-                        # envelope. Require the explicit bore-mouth shield
-                        # joint below, qualified by the exact native baseline.
+                        # A nominal recess/native bearing box does not bound
+                        # actual internal endplay or extracted-ring motion.
                         upset_gap = min(upset_gap, 0.0)
                         basis.append("upper bearing may extract axially: static recess/AABB separation alone is not credited during upset")
                 if families == {PIVOT_PIN, PIVOT_CAP_SCREW}:
@@ -3783,6 +3777,20 @@ def capture_fixture_clearance_census(
                 # native baseline or the older local feed separator.
                 if upper and external != "SOURCE_CAPTURE_JOINT" and any(item not in measured_boxes for item in upper):
                     external = "UNRESOLVED"
+                if BEARING in families and external != "SOURCE_CAPTURE_JOINT":
+                    external = "UNRESOLVED"
+                    upset_gap = min(upset_gap, 0.0)
+                    basis.append("actual all-material bearing motion is not bounded by supplier width/OD or nominal source rings")
+                if families == {PIVOT_CAP, PIVOT_LOCK_WIRE} and wire_proof is not None and roots[first] == roots[second]:
+                    nominal = external = "CONTINUOUS_SEPARATOR"
+                    nominal_gap = max(nominal_gap, wire_proof.surface_clearance)
+                    upset_gap = max(upset_gap, wire_proof.surface_clearance)
+                    basis.append("SOURCE ONLY: represented 0/180 fixed-head wire versus real cap cut union, every cap pose; actual clock/form requires separate swept-void evidence; no wire stop credit")
+                if (PIVOT_LOCK_WIRE in families and external != "SOURCE_CAPTURE_JOINT"
+                        and wire_proof is None):
+                    external = "UNRESOLVED"
+                    upset_gap = min(upset_gap, 0.0)
+                    basis.append(f"fixed-head wire cap-forced route proof unavailable: {wire_failure}")
                 missing = []
                 if nominal == "UNRESOLVED":
                     missing.append("nominal: passed whole-model baseline for this exact invariant/joint pair" if common or joint else
@@ -3797,16 +3805,14 @@ def capture_fixture_clearance_census(
                             "through ENTIRE free flange/rim capture motion including tilt; actual carriage under pin must have no above-plane obstacle. "
                             "Normal C2 free assembly or assumed pressed-bearing internal endplay is not that lower-tip proof."
                         )
-                    if families == {PIVOT_CAP, BEARING} and common:
+                    if BEARING in families:
                         missing.append(
-                            "need ACCEPTED C1R actual upper-bearing receiving record: OD 29.991-30.000 mm, "
-                            "width 8.88-9.00 mm, intact outer ring with uninterrupted full-circumference "
-                            "cylindrical OD land at its axial mid-plane; named physical-support evidence "
-                            "reused on both passes, plus positive bore-mouth/flange shield and exact native baseline. "
-                            "Catalogue/native profile or normal recess alone is not that inspection."
+                            "bearing: actual all-material full-internal-endplay and captured outer-ring "
+                            "motion enclosure is missing; receiving width/OD, a midplane land and a "
+                            "nominal CAD/native model do not establish it. Primary plate capture is separate."
                         )
                     if PIVOT_LOCK_WIRE in families:
-                        missing.append("wire: this physical installed cubic-control tube/turned-in-tail enclosure loses separation after the cap-frame rock/yaw bound; route/head contacts do not exempt external pairs")
+                        missing.append("wire: need fixed-head cap-forced-motion containment for this external pair; cap transport and wire/channel stop credit do not prove it")
                     if families & {PIVOT_CLEVIS_PIN, PIVOT_COTTER}:
                         missing.append("upper hardware: the UNION of full-clock source-piece bounds, known printed upper-stack bands and any supplied uncertainty-inclusive secondary XYZ box does not positively separate this external pair")
                         if any(item not in measured_boxes for item in upper):
@@ -3932,24 +3938,473 @@ def captured_fixture_envelopes(
     return tuple(envelopes)
 
 
-def installed_tooling_clearance(
+def source_tooling_clearance(
     envelope: tooling.InstalledToolingEnvelope | None = None, *, samples: int = SWEEP_SAMPLES,
     primary_measurements: tuple[PrimaryCaptureMeasurement, ...] | None = None,
 ) -> tooling.ToolingClearanceReport:
-    """Installed acceptance needs BOTH measured tooling and four C4/C5 records.
+    """Nominal-machine-frame CAD diagnostic, NOT installed acceptance.
 
-    With tooling alone the numeric source-prism diagnostic is retained, but
-    missing actual primary capture/secondary-shape authority is UNVERIFIED.
-    This optional bench boundary is never a mandatory native CAD import gate.
+    Actual tooling dimensions and C4/C5 local shapes do not establish the
+    source fixture's world-frame registration/orientation. Purchased bearings
+    here are nominal source models, not an all-material full-endplay/upset
+    enclosure. This function never returns an installed VERIFIED status.
     """
     if envelope is None:
         return tooling.tooling_clearance_report(None, ())
     report = tooling.tooling_clearance_report(
         envelope, captured_fixture_envelopes(samples, primary_measurements=primary_measurements),
     )
-    if primary_measurements is None:
-        return tooling.ToolingClearanceReport("UNVERIFIED", report.min_clearance, report.limiting_pair, report.authority)
-    return report
+    status = "SOURCE_GEOMETRY_ONLY" if report.min_clearance > 0.0 else "SOURCE_POTENTIAL_CONFLICT"
+    return tooling.ToolingClearanceReport(status, report.min_clearance, report.limiting_pair, report.authority)
+
+
+@dataclass(frozen=True)
+class FitterMotionLimit:
+    label: str
+    norm_allowance_mm: float
+
+
+def _fitter_bore_plane_transfer() -> float:
+    """Top-view bore centres to the underside support plane, printed bounds."""
+    return ((carrier.THICKNESS + carrier.THICKNESS_BAND)
+            * retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
+
+
+def _fitter_carrier_motion() -> tuple[float, float]:
+    """FIXED-SUPPORT source translation/rotation diagnostic, in any world frame.
+
+    This does NOT enclose the present free second carriage's along-rail motion.
+    Installed positive acceptance is on design hold until travel is bounded.
+    Both normal and final support points lie in the local captured enclosure;
+    twice its norm bounds their separation. For the actual fixed support-line
+    unit vector u, separation L is body-fixed, so ||du||=||d(L*u)||/L
+    <=2*S/Lmin exactly. For body-fixed UNIT bore vector v, ||dv||<=2*sin(gamma/2).
+    k=u.v is invariant: with h=sqrt(1-k*k), d((v-k*u)/h)=(dv-k*du)/h.
+    Thus orthogonalized-vector change <=dv/cos(alpha)+tan(alpha)*du;
+    the fixed manufactured bore bias cannot be replaced by a varying k.
+    The third basis-vector change is <= the first two changes' sum. For two
+    proper rotation matrices, operator norm = Frobenius norm/sqrt(2), giving
+    F <= sqrt(du^2+dn^2+du*dn). Thus any material point at radius rho from the
+    support midpoint moves <= S+rho*F. This includes yaw, one-end lift and
+    twist; common installation pitch/roll and unequal support heights cancel.
+    """
+    bounds = retention.capture_bounds()
+    alpha = math.atan(retention.CARRIER_AXIS_DEVIATION_MAX / retention.CARRIER_AXIS_MEASUREMENT_SPAN)
+    grip = retention.CARRIER_ENGAGEMENT_MIN
+    # The inspected straight land lies somewhere inside the actual thickness.
+    # Its nearer end is no farther than Tmax-grip from the underside mouth.
+    # Extrapolate its cylindrical fit to that mouth; do not pretend the
+    # chamfered mouth itself supplies the clearance/2 guide.
+    extension = max(0.0, carrier.THICKNESS + carrier.THICKNESS_BAND - grip)
+    mouth_offset = (extension * retention.CARRIER_DIAMETRAL_CLEARANCE_MAX
+                    / (grip * math.cos(alpha)))
+    fit_angle = math.atan(retention.CARRIER_DIAMETRAL_CLEARANCE_MAX / grip)
+    seat_radius = (retention.PIN_BOSS_DIAMETER + printed_band_mm(retention.PIN_BOSS_DIAMETER_PLACES)) / 2.0
+    seat = (retention.PIN_LOWER_GAP[1] + retention.PIN_FLANGE_THICK
+            + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+            + retention.PIN_UPPER_BOSS_HEIGHT + printed_band_mm(retention.PIN_UPPER_BOSS_PLACES)
+            + retention.TOP_PRIMARY_RELATIVE_TRAVEL_MAX
+            + seat_radius * math.tan(alpha + fit_angle))
+    lateral = (bounds.cap_lateral_shift + bounds.flange_lateral_shift
+               + seat * math.tan(bounds.pin_tilt)
+               + retention.CARRIER_DIAMETRAL_CLEARANCE_MAX / 2.0 + mouth_offset)
+    support = 2.0 * math.hypot(lateral, max(bounds.support_lift, bounds.support_drop))
+    span = min(b[0] - a[0] for a, b in
+               (trammel.pin_pair(name) for name in trammel.PASS_RADIUS))
+    span -= 2.0 * (math.sqrt(2.0) * carrier.POSITION_BAND + _fitter_bore_plane_transfer())
+    if span <= 2.0 * support:
+        raise ValueError("captured support displacement loses the source span bound")
+    du = 2.0 * support / span
+    dv = 2.0 * math.sin(bounds.carrier_motion_tilt / 2.0)
+    dn = dv / math.cos(alpha) + math.tan(alpha) * du
+    return support, math.sqrt(du * du + dn * dn + du * dn)
+
+
+def _fitter_carrier_radius(stems: tuple[str, ...]) -> float:
+    """Printed bands enlarge the 3D moment arm, not the observed normal gap."""
+    placement, local = _printed_fixture_allowances()
+    radius = 0.0
+    for _name, (stem, _index, points) in _component_records().items():
+        if stem not in stems:
+            continue
+        band = placement + local.get(stem, 0.0)
+        midpoint_band = math.sqrt(2.0) * carrier.POSITION_BAND + _fitter_bore_plane_transfer()
+        for pass_name in trammel.PASS_RADIUS:
+            a, b = trammel.pin_pair(pass_name)
+            mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+            for point in points:
+                x, y = _carrier_coordinates(point)
+                radius = max(radius, math.hypot(
+                    abs(x - mid[0]) + math.sqrt(2.0) * band + midpoint_band,
+                    abs(y - mid[1]) + math.sqrt(2.0) * band + midpoint_band,
+                    abs(point[2] - trammel.CARRIER_UNDERSIDE_Z) + band,
+                ))
+    return radius
+
+
+def _fitter_head_inplane_reach(stem: str) -> float:
+    placement, local = _printed_fixture_allowances()
+    return max(
+        math.dist(_carrier_coordinates(origin), ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0))
+        for origin, _rows in PLACEMENTS[stem]
+        for a, b in (trammel.pin_pair(name) for name in trammel.PASS_RADIUS)
+    ) + math.sqrt(2.0) * (placement + local[CARRIER] + carrier.POSITION_BAND) + _fitter_bore_plane_transfer()
+
+
+def _fitter_local_motion(stem: str) -> float:
+    """Twice the full local enclosure contains normal-to-upset displacement."""
+    bounds = retention.capture_bounds()
+    placement, local = _printed_fixture_allowances()
+    result = 0.0
+    for _name, (family, index, points) in _component_records().items():
+        if family != stem:
+            continue
+        if stem == PIVOT_RETAINER:
+            _low, high = capture_fixture_fitted_retainer_interval()
+            box = _component_local_boxes()[stem]
+            points = [frame_point(PLACEMENTS[stem][index], p)
+                      for p in _box_corners((box[0], box[1], (0.0, high)))]
+        band = placement + local.get(stem, 0.0)
+        expanded = [(p[0] + x, p[1] + y, p[2] + z)
+                    for p in points for x in (-band, band)
+                    for y in (-band, band) for z in (-band, band)]
+        extra = (_capture_fixture_retainer_motion(None)
+                 if stem == PIVOT_RETAINER else (0.0, 0.0, 0.0))
+        for pass_name in trammel.PASS_RADIUS:
+            xy, down, up = _upset_fixture_padding(stem, index, expanded, pass_name, bounds)
+            result = max(result, 2.0 * math.hypot(
+                xy + extra[0], max(abs(down) + extra[1], abs(up) + extra[2]),
+            ))
+    return result
+
+
+def fitter_tooling_motion_limits() -> tuple[FitterMotionLimit, ...]:
+    """Source-derived displacement norms, not source world-coordinate limits."""
+    support, factor = _fitter_carrier_motion()
+    return (
+        FitterMotionLimit("CARRIER/RISER/LOCATORS", support + factor * _fitter_carrier_radius(
+            (CARRIER, RISER, HUB_PIN, CL_DOWEL, RISER_SCREW))),
+        FitterMotionLimit("LEVER STOCK", support + factor * _fitter_carrier_radius((FEED_LEVER,))),
+        FitterMotionLimit("FILLED CARTRIDGE ENVELOPE", max(
+            _fitter_local_motion(stem) for stem in (PIVOT_PIN, PIVOT_CAP, PIVOT_RETAINER))),
+    )
+
+
+@dataclass(frozen=True)
+class NormalToolingGap:
+    """Global extrema of WHOLE group over BOTH normal sweeps.
+
+    r is distance to the actual registered spindle axis; z increases toward
+    spindle. Step extents include full revolution and the ENTIRE used spindle-Z
+    range from deepest cut through retraction, not just one tool position.
+    radial_gap=min(rGroup)-max(rStep); axial_gap=max(min(zStep)-max(zGroup),
+    min(zGroup)-max(zStep)). Neither is conditioned on the other footprint.
+    Gauge the convex envelope itself (bridge holes/steps), not just its parts.
+    Fill each cartridge/head-pair/component assembly's convex envelope; take
+    global extrema over their union, not a bridge between distinct supports.
+    uncertainty_mm bounds the MAX uncertainty/runout of the reported axes.
+    """
+    group: str
+    tool_step: str
+    radial_gap_mm: float | None
+    axial_gap_mm: float | None
+    uncertainty_mm: float
+
+
+@dataclass(frozen=True)
+class ActualBearingEnclosureEvidence:
+    """Identified actual proof, not a replacement manufacturing dimension.
+
+    Scope covers ALL material of BOTH physical cartridges' bearings over
+    full internal race/endplay states AND captured outer-ring translation/
+    tilt, for both passes, inside the named upset filled convex outside hull.
+    The same hull's NORMAL full-sweep gaps are the installed matrix witness.
+    Source identifies the actual-profile analytical/physical proof and its
+    intact-fixture assumptions, not a catalogue width/as-received caliper.
+    Each support reference is (index, C2A evidence, VN-52 receiving evidence)
+    copied from the matched primary records. No default is source-verified.
+    """
+    source: str
+    state: Literal["qualified", "rejected", "uninspected"]
+    scope: Literal["all_material_full_endplay_and_captured_motion_both_passes",
+                   "receiving_only", "incomplete", "uninspected"]
+    envelope: Literal["FILLED CARTRIDGE ENVELOPE"]
+    support_evidence: tuple[tuple[int, str, str], ...]
+
+
+def _bearing_enclosure_qualified(
+    actual: ActualBearingEnclosureEvidence | None,
+    primary: dict[tuple[str, int], PrimaryCaptureMeasurement],
+) -> bool:
+    if (not isinstance(actual, ActualBearingEnclosureEvidence)
+            or actual.state != "qualified"
+            or actual.scope != "all_material_full_endplay_and_captured_motion_both_passes"
+            or actual.envelope != "FILLED CARTRIDGE ENVELOPE"
+            or not isinstance(actual.source, str) or not actual.source.strip()
+            or not isinstance(actual.support_evidence, tuple)
+            or any(not isinstance(item, tuple) or len(item) != 3
+                   or isinstance(item[0], bool) or not isinstance(item[0], int)
+                   or any(not isinstance(value, str) or not value.strip() for value in item[1:])
+                   for item in actual.support_evidence)):
+        return False
+    expected = {(support, record.prebearing_capture_evidence, record.upper_bearing_receiving_evidence)
+                for (_pass, support), record in primary.items()}
+    return set(actual.support_evidence) == expected and len(actual.support_evidence) == len(expected)
+
+@dataclass(frozen=True)
+class ActualWireCaptureEvidence:
+    """Identified actual formed-wire qualification, not a proposed bench test.
+
+    Covers every actual strand/loop/tail and actual drilled-head clock against
+    the real cap mouth/counterbore/groove void at ALL coupled captured cap poses,
+    both passes, with matched C3 seating/fitted floors. A normal roof recess,
+    contour length or representative 0/180 source route alone is insufficient.
+    Each row reference is (support, physical wire row, matched C2A evidence).
+    """
+    source: str
+    state: Literal["qualified", "rejected", "uninspected"]
+    scope: Literal["actual_formed_clock_full_capture_swept_void_both_passes",
+                   "normal_roof_only", "contour_only", "source_representative_only",
+                   "incomplete", "uninspected"]
+    envelope: Literal["ACTUAL CAP OPEN-MOUTH/COUNTERBORE/GROOVE SWEPT VOID"]
+    row_evidence: tuple[tuple[int, int, str], ...]
+
+
+def _wire_capture_qualified(
+    actual: ActualWireCaptureEvidence | None,
+    primary: dict[tuple[str, int], PrimaryCaptureMeasurement],
+) -> bool:
+    if (not isinstance(actual, ActualWireCaptureEvidence)
+            or actual.state != "qualified"
+            or actual.scope != "actual_formed_clock_full_capture_swept_void_both_passes"
+            or actual.envelope != "ACTUAL CAP OPEN-MOUTH/COUNTERBORE/GROOVE SWEPT VOID"
+            or not isinstance(actual.source, str) or not actual.source.strip()
+            or not isinstance(actual.row_evidence, tuple)
+            or any(not isinstance(item, tuple) or len(item) != 3
+                   or any(isinstance(value, bool) or not isinstance(value, int) for value in item[:2])
+                   or not isinstance(item[2], str) or not item[2].strip()
+                   for item in actual.row_evidence)):
+        return False
+    expected = {(support, row, record.prebearing_capture_evidence)
+                for (_pass, support), record in primary.items() for row in range(2)}
+    return set(actual.row_evidence) == expected and len(actual.row_evidence) == len(expected)
+
+
+
+@dataclass(frozen=True)
+class InstalledNormalToolingMeasurement:
+    """Actual BOTH-pass extrema over the entire used spindle-Z range; no defaults.
+
+    Head R/H are in CARRIER coordinates about the normal through its TOP tap:
+    R includes washer float, head eccentricity, tilt projection and allowed
+    clocking; H is the largest absolute normal distance from its underside.
+    Work R is the MAX of reaches about BOTH active bore-pair TOP-face midpoints,
+    accessible before fitting/loading; source adds the underside-plane pad.
+    H is greatest absolute normal distance from carrier underside, all stock.
+    Wire L/T bound every free head-to-head arc/free-end path INCLUDING
+    permitted feeding, about the fixed filled head-pair outside envelope.
+    Secondary gaps are from the PIN-SEAT POINT, not one clocked part.
+    """
+    source: str
+    tool_steps: tuple[str, ...]
+    tool_step_census: Literal["complete", "incomplete", "uninspected"]
+    full_normal_sweeps: tuple[str, ...]
+    clamp_rh_mm: tuple[float, float]
+    lever_rh_mm: tuple[float, float]
+    work_rh_mm: tuple[float, float]
+    wire_contour_mm: tuple[float, float]
+    wire_diameter_mm: float
+    wire_contour_state: Literal["qualified", "rejected", "uninspected"]
+    wire_capture: ActualWireCaptureEvidence | None
+    bearing_enclosure: ActualBearingEnclosureEvidence | None
+    gaps: tuple[NormalToolingGap, ...]
+
+
+def _fitter_print_limit(value: float) -> float:
+    """Use the drawing's outward-rounded constants in its executable rule."""
+    return math.ceil(value * 1000.0) / 1000.0
+
+
+def _normal_tooling_allowances(
+    actual: InstalledNormalToolingMeasurement,
+    primary: dict[tuple[str, int], PrimaryCaptureMeasurement],
+) -> dict[str, float]:
+    support, factor = map(_fitter_print_limit, _fitter_carrier_motion())
+    limits = {row.label: _fitter_print_limit(row.norm_allowance_mm)
+              for row in fitter_tooling_motion_limits()}
+    for label, stem, pair in (
+        ("CLAMP HEAD", CLAMP_SCREW, actual.clamp_rh_mm),
+        ("LEVER HEADS/LOCK PAIRS", LEVER_SCREW, actual.lever_rh_mm),
+    ):
+        radius, height = pair
+        reach = _fitter_print_limit(_fitter_head_inplane_reach(stem))
+        limits[label] = support + factor * math.hypot(reach + radius, height)
+    work_r, work_h = actual.work_rh_mm
+    limits["WORK/BLANK STACK"] = support + factor * math.hypot(
+        work_r + _fitter_print_limit(_fitter_bore_plane_transfer()), work_h,
+    )
+    for index in range(len(RAILS)):
+        sphere = max(math.hypot(*(max(abs(lo), abs(hi)) for lo, hi in
+                                 record.secondary_envelope_in_pin_seat_frame_mm))
+                     for (_pass, support_index), record in primary.items() if support_index == index)
+        limits[f"SECONDARY SEAT POINT {index + 1}"] = support + sphere
+    arc, tail = actual.wire_contour_mm
+    limits["WIRE HEAD-PAIR ENVELOPES"] = max(arc / 2.0, tail) + actual.wire_diameter_mm / 2.0
+    limits["OTHER FIXTURE ITEMS"] = 0.0
+    return limits
+
+
+def installed_tooling_clearance(
+    actual: InstalledNormalToolingMeasurement | None = None, *,
+    primary_measurements: tuple[PrimaryCaptureMeasurement, ...] | None = None,
+) -> tooling.ToolingClearanceReport:
+    """Refuse installed positive certification while free-carriage travel is unbounded."""
+    unknown = tooling.ToolingClearanceReport("UNVERIFIED", None, None, None)
+    if actual is None or primary_measurements is None:
+        return unknown
+    if not isinstance(actual, InstalledNormalToolingMeasurement):
+        raise ValueError("installed tooling acceptance requires actual normal-gap measurements")
+    if not isinstance(actual.source, str) or not actual.source.strip():
+        return unknown
+    coverage_complete = (
+        actual.tool_step_census == "complete"
+        and isinstance(actual.full_normal_sweeps, tuple)
+        and set(actual.full_normal_sweeps) == set(trammel.PASS_RADIUS)
+        and len(actual.full_normal_sweeps) == len(trammel.PASS_RADIUS)
+        and actual.wire_contour_state == "qualified"
+    )
+    if (not isinstance(actual.tool_steps, tuple) or not actual.tool_steps
+            or any(not isinstance(step, str) or not step.strip() for step in actual.tool_steps)
+            or len(set(actual.tool_steps)) != len(actual.tool_steps)):
+        return unknown
+    for pair in (actual.clamp_rh_mm, actual.lever_rh_mm, actual.work_rh_mm, actual.wire_contour_mm):
+        if (not isinstance(pair, tuple) or len(pair) != 2
+                or any(isinstance(value, bool) or not isinstance(value, (int, float))
+                       or not math.isfinite(value) or value < 0.0 for value in pair)):
+            raise ValueError("actual head/stock R/H and feeding-safe wire L/T must be finite nonnegative pairs")
+    if (isinstance(actual.wire_diameter_mm, bool)
+            or not isinstance(actual.wire_diameter_mm, (int, float))
+            or not math.isfinite(actual.wire_diameter_mm) or actual.wire_diameter_mm <= 0.0):
+        raise ValueError("actual maximum individual-strand diameter must be finite and positive")
+    primary = qualify_primary_capture_measurements(primary_measurements)
+    coverage_complete = coverage_complete and _bearing_enclosure_qualified(actual.bearing_enclosure, primary)
+    coverage_complete = coverage_complete and _wire_capture_qualified(actual.wire_capture, primary)
+    limits = _normal_tooling_allowances(actual, primary)
+    expected = {(group, step) for group in limits for step in actual.tool_steps}
+    if (not isinstance(actual.gaps, tuple)
+            or any(not isinstance(gap, NormalToolingGap) for gap in actual.gaps)):
+        return unknown
+    coverage_complete = (
+        coverage_complete and {(gap.group, gap.tool_step) for gap in actual.gaps} == expected
+        and len(actual.gaps) == len(expected)
+    )
+    minimum, limiting = math.inf, None
+    for gap in actual.gaps:
+        if (gap.group, gap.tool_step) not in expected:
+            coverage_complete = False
+            continue
+        values = [value for value in (gap.radial_gap_mm, gap.axial_gap_mm) if value is not None]
+        if not values:
+            coverage_complete = False
+            continue
+        if (any(isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) for value in values)
+                or isinstance(gap.uncertainty_mm, bool)
+                or not isinstance(gap.uncertainty_mm, (int, float))
+                or not math.isfinite(gap.uncertainty_mm) or gap.uncertainty_mm < 0.0):
+            raise ValueError("normal gaps and their nonnegative uncertainty must be finite")
+        clearance = max(values) - gap.uncertainty_mm - limits[gap.group]
+        if clearance < minimum:
+            minimum, limiting = clearance, (gap.group, actual.tool_steps.index(gap.tool_step))
+    if minimum > 0.0 and not coverage_complete:
+        return unknown
+    if minimum > 0.0:
+        # Explicit temporary design hold: the correctly derived fixed-support
+        # norm omits carriage 2's free rail motion. No input record can turn
+        # that missing source premise into an installed positive certificate.
+        return tooling.ToolingClearanceReport(
+            "UNVERIFIED", None, None,
+            f"{actual.source}: free second-carriage travel is not yet bounded",
+        )
+    return tooling.ToolingClearanceReport("POTENTIAL_CONFLICT", minimum, limiting, actual.source)
+
+
+def fitter_tooling_table_lines() -> tuple[str, ...]:
+    """Fixed-support diagnostic only while actual captured travel is unbounded."""
+    def upper(value: float) -> str:
+        return f"{_fitter_print_limit(value):.3f}"
+
+    support, factor = _fitter_carrier_motion()
+    lines = [
+        "TOOLING ACCEPTANCE UNVERIFIED: FREE CARRIAGE 2 TRAVEL IS NOT POSITIVELY "
+        "LIMITED. DO NOT ACCEPT FROM NORMAL-PASS SWEEP GAPS.",
+        "FIXED-SUPPORT SOURCE DIAGNOSTIC ONLY: GAP > N + UNCERTAINTY, mm",
+        "SPINDLE ISOLATED: MEASURE MINIMUM GAPS TO EACH NON-CUTTING STEP "
+        "OVER THE ENTIRE USED SPINDLE-Z RANGE, DEEPEST CUT THROUGH RETRACTION. "
+        "FILL EACH CARTRIDGE/HEAD-PAIR/COMPONENT ASSEMBLY'S "
+        "CONVEX ENVELOPE, BRIDGING HOLES/STEPS, NOT ONLY CURRENT OVERLAP. "
+        "GLOBAL BOTH-SWEEP EXTREMA; FULL-TURN STEP EXTENTS: "
+        "RADIAL GAP=MIN GROUP R-MAX STEP R; AXIAL GAP=MAX(MIN STEP Z-"
+        "MAX GROUP Z,MIN GROUP Z-MAX STEP Z), R FROM ACTUAL SPINDLE AXIS.",
+        "FOLLOWING N VALUES ASSUME FIXED SUPPORTS; THEY DO NOT ENCLOSE FREE "
+        "SECOND-CARRIAGE SLIDE. PRIMARY C2A-C5D QUALIFICATION STILL APPLIES.",
+    ]
+    lines.extend(f"{row.label}: N={upper(row.norm_allowance_mm)}"
+                 for row in fitter_tooling_motion_limits())
+    lines.append(
+        "CARTRIDGE: FILLED CONVEX OUTSIDE BLOCK/PIN/CAP/RETAINER ENVELOPE; "
+        "BRIDGE HOLES/STEPS. BEARINGS REQUIRE IDENTIFIED ACTUAL ALL-MATERIAL "
+        "FULL-ENDPLAY/FULL-CAPTURE CONTAINMENT PROOF IN THAT ENVELOPE, "
+        "BOTH SUPPORTS/PASSES. C1 DIMENSIONS ALONE ARE NOT THAT PROOF; "
+        "ABSENT EVIDENCE IS UNVERIFIED, NOT INSTALLED ACCEPTANCE."
+    )
+    lines.append(
+        f"AT STEP 12, CALIPER {_item(CLAMP_SCREW)} AND {_item(LEVER_SCREW)}/"
+        f"{_item(LEVER_LOCK_WASHER)} IN CARRIER COORDINATES: R=MAX IN-PLANE "
+        "REACH ABOUT NORMAL THROUGH TAP AT CARRIER TOP (INCLUDE WASHER FLOAT, HEAD "
+        "OFFSET/TILT AND ALLOWED CLOCKING); H=MAX NORMAL DISTANCE ABOVE/"
+        "BELOW CARRIER UNDERSIDE. BOUND H FROM STACK LENGTHS BEFORE FITTING."
+    )
+    for stem, label in ((CLAMP_SCREW, "CLAMP HEAD"), (LEVER_SCREW, "LEVER HEADS/LOCK PAIRS")):
+        lines.append(f"{label}: N={upper(support)}+{upper(factor)}*"
+                     f"SQRT(({upper(_fitter_head_inplane_reach(stem))}+R)^2+H^2)")
+    lines.extend((
+        "WORK/BLANK STACK: R=MAX OF REACHES ABOUT BOTH ACTIVE BORE-PAIR "
+        "TOP-FACE MIDPOINTS, BOTH PASSES (LOCATE WITH STRAIGHTEDGE WHILE "
+        "BORES ACCESSIBLE BEFORE STEP 9). H=MAX NORMAL DISTANCE FROM CARRIER UNDERSIDE, ALL "
+        "WORK/BLANKS INCLUDED; USE ACTUAL STACK LENGTHS. KEEP THE WORK "
+        "RIGIDLY CLAMPED TO THE CARRIER; CLAMP SLIP IS NOT CERTIFIED.",
+        f"WORK/BLANK STACK: N={upper(support)}+{upper(factor)}*"
+        f"SQRT((R+{upper(_fitter_bore_plane_transfer())})^2+H^2). "
+        "CHECK EVERY NON-CUTTING STEP; FLUTE CONTACT DOES NOT WAIVE THIS ROW.",
+        "SECONDARY, EACH SUPPORT: GAUGE THE NORMAL GAP FROM THE PIN-SEAT "
+        "POINT, NOT ONE CLOCKED CLEVIS/COTTER. BEFORE STEP 9, A GAP TO "
+        "THE WHOLE FILLED EXPOSED JOURNAL/SEAT ENVELOPE IS A CONSERVATIVE "
+        "PROXY IF THE CENTRE IS HIDDEN. AT C5C USE THE COMPLETE COUPLED "
+        "CLOCK/ENDPLAY ENVELOPE: X/Y=MAX ABS LOCAL X/Y; "
+        "H=MAX ABS LOW/HIGH FROM PIN SEAT.",
+        f"SECONDARY SEAT POINT: N={upper(support)}+SQRT(X^2+Y^2+H^2)",
+        "C3C WIRES: GAUGE NORMAL GAP FROM EACH FILLED FIXED HEAD-PAIR "
+        "OUTSIDE ENVELOPE, NOT FROM THE AS-FORMED WIRE. L/T FOLLOW EACH "
+        "INDIVIDUAL STRAND CENTRELINE: L BOUNDS EACH FREE ARC SECURED "
+        "AT TWO HEADS; T EACH FREE-END PATH FROM ITS SECURED HEAD. INCLUDE "
+        "EVERY LOOP/TAIL AND ALL PERMITTED FEEDING/SLIDING. CUT BRANCH "
+        "LENGTHS BEFORE TWISTING AND TRIMMED TAILS MAY BE USED ONLY IF "
+        "THEY BOUND THAT FEEDING; OTHERWISE USE WHOLE CUT LENGTH FOR "
+        "EACH UNCERTAIN L/T. KEEP THE C3C NORMAL ROUTE/CLEARANCE CHECK.",
+        "ACTUAL C3C CLOCK/FORM REQUIRES IDENTIFIED FULL-CAPTURE SWEPT-VOID "
+        "QUALIFICATION FOR EVERY WIRE ROW AGAINST ITS REAL CAP CUT UNION. "
+        "NORMAL ROOF RECESS, CONTOUR LENGTH OR REPRESENTATIVE 0/180 SOURCE "
+        "MODEL ALONE IS NOT THAT PROOF; ABSENT EVIDENCE IS UNVERIFIED.",
+        "D=MAX ACTUAL SINGLE-WIRE DIA BEFORE FORMING. "
+        "WIRE HEAD-PAIR ENVELOPES: N=MAX(L/2,T)+D/2. UNKNOWN CONTOUR/ANCHOR "
+        "COVERAGE FAILS; INTACT SECURED WIRE, NO ELASTIC STRETCH OR "
+        "CONNECTION FAILURE. CAP FLOAT DOES NOT CARRY FIXED HEADS.",
+        "OTHER FIXTURE ITEMS: N=0; EACH MUST CLEAR EVERY STEP. ALL READINGS INCLUDE "
+        "MAX UNCERTAINTY/RUNOUT OF THE REPORTED AXES; EQUALITY, MISSING DATA "
+        "OR INCOMPLETE COVERAGE CANNOT PASS. FIXED-SUPPORT SOURCE N ONLY.",
+    ))
+    return tuple(lines)
 
 
 # --- Native sweep (verify.py ``pass-sweep-interference-free``) ⚙ ----------------
