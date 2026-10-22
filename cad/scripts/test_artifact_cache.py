@@ -82,8 +82,11 @@ def _get_bytes(backend, key):
 @pytest.fixture(autouse=True)
 def private_archive_environment(tmp_path, monkeypatch):
     # Every test, including actual-SDK socket-free tests, stays off host caches.
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "user"))
+    # Some fixtures make all of tmp_path their synthetic repo; keep the profile
+    # in a per-test sibling tree so the real non-overlap guard remains enabled.
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path.parent / "archive-users" / tmp_path.name))
     monkeypatch.delenv("HARMONIC_ARCHIVE_CACHE_ROOT", raising=False)
+    monkeypatch.setattr(cache.tempfile, "tempdir", str(tmp_path))
 
 
 @pytest.fixture
@@ -2033,7 +2036,7 @@ def test_concurrent_local_publications_use_unique_temps_and_converge(
 
     def simultaneous(*args):
         result = lookup(*args)
-        assert result is None
+        assert result == (None, "miss")
         barrier.wait(timeout=10)
         return result
 
@@ -2046,7 +2049,7 @@ def test_concurrent_local_publications_use_unique_temps_and_converge(
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
         results = list(pool.map(lambda _index: _get_bytes(backend, key), range(2)))
     assert results == [payload, payload]
-    assert len(publications) == len(set(publications)) == 2
+    assert len(publications) == len(set(publications)) == 1
     [path] = (root / "objects").iterdir()
     assert path.name == hashlib.sha256(payload).hexdigest()
     assert path.read_bytes() == payload
@@ -2070,7 +2073,7 @@ def test_scoped_lru_skips_leases_and_never_deletes_unknown_or_outside_files(
     outside.write_bytes(b"native")
     orphan = root / "objects" / f".{'0' * 64}.{'1' * 32}.tmp"
     orphan.write_bytes(b"interrupted local publication")
-    with cache._archive_lock(root / "locks" / paths[0].name):
+    with cache._archive_lock(cache._archive_object_lock(root, paths[0].name)):
         payload = b"C" * 32
         digest = hashlib.sha256(payload).hexdigest()
         cache._save_archive(root, digest, len(payload), io.BytesIO(payload))
@@ -2094,7 +2097,7 @@ def test_local_reuse_updates_explicit_lru_time(archive_store):
 
 
 def test_object_lease_is_cross_process_and_released_on_process_exit(archive_store):
-    lock = archive_store.root / "locks" / ("a" * 64)
+    lock = cache._archive_object_lock(archive_store.root, "a" * 64)
     code = (
         "import sys; sys.path.insert(0, sys.argv[1]); import _artifact_cache as c; "
         "from pathlib import Path; "
@@ -2127,7 +2130,7 @@ def test_cache_root_rejects_unapproved_or_workspace_paths(
         monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", "relative/archive-cache")
     else:
         monkeypatch.setattr(cache, "REPO_ROOT", root.parent)
-    with pytest.raises(RuntimeError, match="(unapproved|unsafe) local archive cache"):
+    with pytest.raises(cache._LocalArchiveRefused, match="(unapproved|unsafe) local archive cache"):
         cache._archive_cache_root()
 
 
@@ -2144,17 +2147,22 @@ def test_local_cache_rejects_aliases_without_touching_their_target(
     (outside / "keep").write_bytes(b"unrelated")
     objects = archive_store.root / "objects"
     objects.rmdir()
-    try:
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(objects), str(outside)],
+            check=True, capture_output=True, text=True,
+        )
+    else:
         objects.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        objects.mkdir()
-        pytest.skip("symlink creation requires privilege")
     try:
-        with pytest.raises(RuntimeError, match="unsafe local archive cache"):
+        with pytest.raises(cache._LocalArchiveRefused, match="unsafe local archive cache"):
             cache._archive_cache_root()
         assert (outside / "keep").read_bytes() == b"unrelated"
     finally:
-        objects.unlink()
+        if objects.is_symlink():
+            objects.unlink()
+        else:
+            objects.rmdir()
 
 
 def test_real_sdk_parallel_readinto_and_bounded_prefix_local_hit(sdk_wire):
@@ -2230,7 +2238,7 @@ def test_local_store_io_failure_does_not_consume_the_verified_download(
     key, payload = "d" * 64, b"verified result archive" * 8
     _put_bytes(backend, key, payload)
 
-    def full_disk(_root, _digest, _size, archive):
+    def full_disk(_root, _digest, _size, archive, *, replace_corrupt=False):
         archive.read(10)
         raise OSError("disk full")
 
@@ -2268,7 +2276,7 @@ def test_capacity_admission_skips_persistence_instead_of_evicting_live_objects(
     first = b"A" * 32
     digest = hashlib.sha256(first).hexdigest()
     cache._save_archive(root, digest, len(first), io.BytesIO(first))
-    with cache._archive_lock(root / "locks" / digest):
+    with cache._archive_lock(cache._archive_object_lock(root, digest)):
         second = b"B" * 32
         other = hashlib.sha256(second).hexdigest()
         cache._save_archive(root, other, len(second), io.BytesIO(second))
@@ -2337,6 +2345,614 @@ def test_local_root_io_failure_does_not_turn_a_remote_hit_into_a_miss(
 
     monkeypatch.setattr(cache, "_archive_cache_root", inaccessible)
     assert _get_bytes(backend, "c" * 64) == payload
+
+
+@pytest.mark.parametrize("via_restore", [False, True])
+def test_unapproved_optional_root_preserves_remote_hit(
+    archive_store, fake, archive_tree, real_unpack, monkeypatch, tmp_path, via_restore
+):
+    backend = archive_store.backend
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"canonical remote result")
+    payload = _packed([native])
+    key = "a" * 64
+    _put_bytes(backend, key, payload)
+    monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", str(tmp_path / "unapproved"))
+    if via_restore:
+        monkeypatch.setattr(cache, "_BACKEND", backend)
+        monkeypatch.setattr(cache, "_unpack", real_unpack)
+        native.write_bytes(b"loser")
+        assert cache.restore(key, [native], "part:leaf")
+        assert native.read_bytes() == b"canonical remote result"
+        assert _events(tmp_path)[-1]["event"] == "restore_hit"
+    else:
+        assert _get_bytes(backend, key) == payload
+    assert not (tmp_path / "unapproved").exists()
+
+
+@pytest.mark.parametrize("entry", ["objects", "object", "temp", "locks", "store", "shard"])
+def test_real_directory_aliases_never_discard_remote_bytes_or_write_targets(
+    archive_store, tmp_path, entry
+):
+    root, backend = archive_store.root, archive_store.backend
+    payload = b"canonical archive behind unsafe optional store" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    target = tmp_path / "alias-target"
+    target.mkdir()
+    sentinel = target / "keep"
+    sentinel.write_bytes(b"untouched")
+    paths = {
+        "objects": root / "objects",
+        "object": root / "objects" / digest,
+        "temp": root / "objects" / f".{digest}.{'1' * 32}.tmp",
+        "locks": root / "locks",
+        "store": root / "locks" / "store",
+        "shard": cache._archive_object_lock(root, digest),
+    }
+    alias = paths[entry]
+    if alias.exists():
+        alias.rmdir()
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+            check=True, capture_output=True, text=True,
+        )
+    else:
+        alias.symlink_to(target, target_is_directory=True)
+    try:
+        _put_bytes(backend, "b" * 64, payload)
+        assert _get_bytes(backend, "b" * 64) == payload
+        assert _get_bytes(backend, "b" * 64) == payload
+        assert list(target.iterdir()) == [sentinel]
+        assert sentinel.read_bytes() == b"untouched"
+        assert alias.exists()
+        if entry == "temp":
+            assert (root / "objects" / digest).read_bytes() == payload
+    finally:
+        if alias.is_symlink():
+            alias.unlink()
+        else:
+            alias.rmdir()
+
+
+@pytest.mark.parametrize("lease_kind", ["store", "object"])
+def test_busy_optional_leases_skip_promptly_and_preserve_remote_result(
+    archive_store, lease_kind, exported_cache_spans
+):
+    root, backend = archive_store.root, archive_store.backend
+    payload = b"verified remote archive" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    _put_bytes(backend, "c" * 64, payload)
+    _tracer, exporter = exported_cache_spans()
+    lock = root / "locks" / "store" if lease_kind == "store" else cache._archive_object_lock(root, digest)
+    code = (
+        "import sys; sys.path.insert(0, sys.argv[1]); import _artifact_cache as c; "
+        "from pathlib import Path; "
+        "lease = c._archive_lock(Path(sys.argv[2])); "
+        "print(lease.__enter__(), flush=True); sys.stdin.read(); lease.__exit__(None,None,None)"
+    )
+    child = subprocess.Popen(
+        [sys.executable, "-c", code, str(Path(cache.__file__).parent), str(lock)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    ready = threading.Event()
+    ready_lines = []
+    def read_ready():
+        ready_lines.append(child.stdout.readline().strip())
+        ready.set()
+    reader = threading.Thread(target=read_ready, daemon=True)
+    reader.start()
+    try:
+        assert ready.wait(timeout=15), "private lease holder did not become ready"
+        assert ready_lines == ["True"]
+        started = time.monotonic()
+        with cache._archive_lock(lock) as acquired:
+            assert not acquired
+        assert time.monotonic() - started < 2
+        started = time.monotonic()
+        assert _get_bytes(backend, "c" * 64) == payload
+        assert time.monotonic() - started < 2
+        assert not (root / "objects" / digest).exists()
+    finally:
+        try:
+            child.communicate("", timeout=15)
+        except subprocess.TimeoutExpired:
+            child.kill()  # Only this test's private Popen child.
+            child.communicate(timeout=15)
+            raise
+        finally:
+            reader.join(timeout=1)
+    assert child.returncode == 0
+    [persist] = [
+        span for span in exporter.get_finished_spans()
+        if span.name == "cache.local_store" and span.attributes["operation"] == "persist"
+    ]
+    assert persist.attributes["local_outcome"] == "persist_skipped_busy"
+
+
+@pytest.mark.parametrize("refusal", [False, True])
+def test_verified_local_copy_survives_failed_lru_touch(
+    archive_store, monkeypatch, refusal
+):
+    backend = archive_store.backend
+    payload = b"verified warm result" * 8
+    _put_bytes(backend, "d" * 64, payload)
+    assert _get_bytes(backend, "d" * 64) == payload
+    def fail_touch(*args, **kwargs):
+        if refusal:
+            raise cache._LocalArchiveRefused("touch refused")
+        raise OSError("sharing violation")
+    monkeypatch.setattr(cache.os, "utime", fail_touch)
+    assert _get_bytes(backend, "d" * 64) == payload
+    assert [call[0] for call in archive_store.service.calls].count("readinto") == 1
+
+
+def test_oversized_local_object_is_rejected_before_private_allocation_or_copy(
+    archive_store, monkeypatch
+):
+    root = archive_store.root
+    payload = b"expected archive"
+    digest = hashlib.sha256(payload).hexdigest()
+    (root / "objects" / digest).write_bytes(payload * 100)
+    def forbidden(*args, **kwargs):
+        pytest.fail("oversized shared object allocated or copied private bytes")
+    monkeypatch.setattr(cache.tempfile, "TemporaryFile", forbidden)
+    monkeypatch.setattr(cache, "_archive_copy", forbidden)
+    assert cache._local_archive(root, digest, len(payload)) == (None, "corrupt")
+
+
+@pytest.mark.parametrize("mutation", ["grow", "truncate", "same-size-corrupt"])
+def test_local_object_changed_after_real_fstat_is_bounded_and_rejected(
+    archive_store, monkeypatch, mutation
+):
+    root = archive_store.root
+    payload = b"expected archive" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    path = root / "objects" / digest
+    path.write_bytes(payload)
+    copy = cache._archive_copy
+    observed = []
+    def mutate_then_copy(source, destination, expected_size, *, hash_content=True):
+        assert os.fstat(source.fileno()).st_size == len(payload)
+        with path.open("r+b") as writer:
+            if mutation == "grow":
+                writer.seek(0, 2)
+                writer.write(b"x" * 10000)
+            elif mutation == "truncate":
+                writer.truncate(1)
+            else:
+                writer.write(b"x" * len(payload))
+        result = copy(source, destination, expected_size, hash_content=hash_content)
+        observed.append((source.tell(), destination.tell(), result))
+        return result
+    monkeypatch.setattr(cache, "_archive_copy", mutate_then_copy)
+    assert cache._local_archive(root, digest, len(payload)) == (None, "corrupt")
+    [(read_bytes, written_bytes, (_digest, actual_size))] = observed
+    assert read_bytes <= len(payload) + 1
+    assert written_bytes <= len(payload)
+    if mutation == "grow":
+        assert actual_size == len(payload) + 1
+
+
+@pytest.mark.parametrize("operation", ["_archive_cache_root", "_local_archive", "_save_archive"])
+@pytest.mark.parametrize("typed", [False, True])
+def test_only_typed_optional_refusals_are_degraded(
+    archive_store, monkeypatch, operation, typed, exported_cache_spans
+):
+    backend = archive_store.backend
+    payload = b"verified remote result" * 8
+    _put_bytes(backend, "e" * 64, payload)
+    _tracer, exporter = exported_cache_spans()
+    failure = cache._LocalArchiveRefused("test refusal") if typed else RuntimeError("helper bug")
+    if typed:
+        assert failure.reason
+    def fail(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr(cache, operation, fail)
+    if typed:
+        assert _get_bytes(backend, "e" * 64) == payload
+        refused = [
+            span for span in exporter.get_finished_spans()
+            if span.name == "cache.local_store"
+            and span.attributes.get("local_reason") == failure.reason
+        ]
+        assert refused
+    else:
+        with pytest.raises(RuntimeError, match="helper bug") as raised:
+            backend.get("e" * 64)
+        assert raised.value is failure
+
+
+def test_duplicate_save_skips_eviction_copy_hash_and_rewrite(archive_store, monkeypatch, tmp_path):
+    root = archive_store.root
+    payload = b"verified private source" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    with cache.tempfile.TemporaryFile(dir=tmp_path) as source:
+        source.write(payload)
+        source.seek(0)
+        assert cache._save_archive(root, digest, len(payload), source) == "persisted"
+        path = root / "objects" / digest
+        os.utime(path, (1, 1))
+        before = path.stat()
+        def forbidden(*args, **kwargs):
+            pytest.fail("duplicate save must not evict, copy, hash, or publish")
+        monkeypatch.setattr(cache, "_evict_archives", forbidden)
+        monkeypatch.setattr(cache, "_archive_copy", forbidden)
+        monkeypatch.setattr(cache.hashlib, "sha256", forbidden)
+        monkeypatch.setattr(cache.os, "replace", forbidden)
+        assert cache._save_archive(root, digest, len(payload), source) == "already_present"
+        after = path.stat()
+        assert (after.st_ino, after.st_mtime_ns) == (before.st_ino, before.st_mtime_ns)
+        assert path.read_bytes() == payload
+
+
+def test_persist_copies_verified_private_source_without_second_hash(archive_store, monkeypatch, tmp_path):
+    root = archive_store.root
+    payload = b"verified bytes" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    copy = cache._archive_copy
+    modes = []
+    def observed(source, destination, expected_size, *, hash_content=True):
+        modes.append(hash_content)
+        return copy(source, destination, expected_size, hash_content=hash_content)
+    monkeypatch.setattr(cache, "_archive_copy", observed)
+    with cache.tempfile.TemporaryFile(dir=tmp_path) as source:
+        source.write(payload)
+        assert cache._save_archive(root, digest, len(payload), source) == "persisted"
+    assert modes == [False]
+    assert (root / "objects" / digest).read_bytes() == payload
+
+
+def test_object_lock_shards_are_bounded_and_stable_across_eviction(archive_store, monkeypatch):
+    root = archive_store.root
+    identities = {}
+    for index in range(1024):
+        digest = f"{index % 256:02x}{index:062x}"
+        lock = cache._archive_object_lock(root, digest)
+        assert lock == root / "locks" / f"object-{digest[:2]}"
+        with cache._archive_lock(lock) as acquired:
+            assert acquired
+        identities.setdefault(lock, lock.stat().st_ino)
+        assert lock.stat().st_ino == identities[lock]
+    assert len(identities) == 256
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", 0)
+    assert cache._evict_archives(root)
+    assert {path: path.stat().st_ino for path in identities} == identities
+    assert len(list((root / "locks").iterdir())) == 256
+
+
+@pytest.mark.parametrize("warm", [False, True])
+def test_real_sdk_network_metrics_exclude_local_copy_and_persistence(
+    sdk_wire, exported_cache_spans, warm
+):
+    backend, adapter = sdk_wire.backend, sdk_wire.adapter
+    adapter.payload = b"actual ranged archive bytes-" * (512 * 1024)
+    size = len(adapter.payload)
+    key = "f" * 64
+    if warm:
+        assert _get_bytes(backend, key) == adapter.payload
+        adapter.requests.clear()
+    _tracer, exporter = exported_cache_spans()
+    assert _get_bytes(backend, key) == adapter.payload
+    spans = exporter.get_finished_spans()
+    [summary] = [span for span in spans if span.name == "cache.archive"]
+    network = min(size, cache._ARCHIVE_CACHE_MIN) if warm else size
+    assert summary.attributes["archive_bytes"] == size
+    assert summary.attributes["network_bytes"] == network
+    assert summary.attributes["network_bytes_known"] is True
+    assert summary.attributes["probe_bytes"] == min(size, cache._ARCHIVE_CACHE_MIN)
+    assert summary.attributes["reused_bytes"] == size - network
+    assert summary.attributes["local_lookup_outcome"] == ("hit" if warm else "miss")
+    assert summary.attributes["local_outcome"] == ("hit" if warm else "persisted")
+    downloads = [span for span in spans if span.name == "cache.download"]
+    assert downloads
+    assert sum(span.attributes["network_bytes"] for span in downloads) == network
+    assert sum(span.attributes["bytes"] for span in downloads) == network
+    local = [span for span in spans if span.name == "cache.local_store"]
+    assert {"root", "lookup"} <= {span.attributes["operation"] for span in local}
+    persistence = [span for span in local if span.attributes["operation"] == "persist"]
+    if warm:
+        assert not persistence
+        assert len(adapter.requests) == 1
+    else:
+        [persist] = persistence
+        assert persist.attributes["local_outcome"] == "persisted"
+        assert persist.end_time > persist.start_time
+        for download in downloads:
+            assert download.end_time <= persist.start_time
+
+
+@pytest.mark.parametrize("outcome", ["persisted", "already_present", "persist_skipped_capacity", "oversize"])
+def test_persistence_outcomes_are_reported_without_consuming_download(
+    archive_store, exported_cache_spans, monkeypatch, outcome
+):
+    root, backend = archive_store.root, archive_store.backend
+    payload = b"canonical persistence outcome" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    if outcome == "already_present":
+        assert cache._save_archive(root, digest, len(payload), io.BytesIO(payload)) == "persisted"
+        lookup = cache._local_archive
+        def simultaneous_miss(*args):
+            # The existing object represents another writer winning after lookup.
+            private, found = lookup(*args)
+            assert found == "hit"
+            private.close()
+            return None, "miss"
+        monkeypatch.setattr(cache, "_local_archive", simultaneous_miss)
+    elif outcome == "oversize":
+        monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", len(payload) - 1)
+    elif outcome == "persist_skipped_capacity":
+        monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", len(payload))
+        nonce = 0
+        while True:
+            occupied = nonce.to_bytes(8, "little") + b"x" * (len(payload) - 8)
+            other = hashlib.sha256(occupied).hexdigest()
+            if other[:2] != digest[:2]:
+                break
+            nonce += 1
+        assert cache._save_archive(root, other, len(occupied), io.BytesIO(occupied)) == "persisted"
+    _put_bytes(backend, "a" * 64, payload)
+    _tracer, exporter = exported_cache_spans()
+    def fetch():
+        assert _get_bytes(backend, "a" * 64) == payload
+    if outcome == "persist_skipped_capacity":
+        with cache._archive_lock(cache._archive_object_lock(root, other)) as acquired:
+            assert acquired
+            fetch()
+    else:
+        fetch()
+    persistence = [
+        span for span in exporter.get_finished_spans()
+        if span.name == "cache.local_store" and span.attributes["operation"] == "persist"
+    ]
+    if outcome == "oversize":
+        assert not persistence
+    else:
+        [persist] = persistence
+        assert persist.attributes["local_outcome"] == outcome
+        assert persist.end_time > persist.start_time
+    [summary] = [span for span in exporter.get_finished_spans() if span.name == "cache.archive"]
+    assert summary.attributes["local_outcome"] == outcome
+    if outcome == "oversize":
+        assert summary.attributes["local_lookup_outcome"] == "oversize"
+    if outcome == "persist_skipped_capacity":
+        [eviction] = [
+            span for span in exporter.get_finished_spans()
+            if span.name == "cache.local_eviction"
+        ]
+        assert eviction.attributes["busy_entries"] == 1
+        assert eviction.attributes["skipped_entries"] >= eviction.attributes["busy_entries"]
+        assert eviction.attributes["capacity_available"] is False
+        assert eviction.attributes["evicted_bytes"] == 0
+    if outcome in {"persisted", "persist_skipped_capacity"}:
+        [eviction] = [
+            span for span in exporter.get_finished_spans()
+            if span.name == "cache.local_eviction"
+        ]
+        assert eviction.attributes["reason"] == "admission"
+
+
+def test_restore_uses_fetch_wrapper_not_archive_sized_download(
+    archive_store, fake, archive_tree, monkeypatch, exported_cache_spans
+):
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"canonical native result")
+    payload = _packed([native])
+    backend = archive_store.backend
+    _put_bytes(backend, "b" * 64, payload)
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    _tracer, exporter = exported_cache_spans()
+    assert cache.restore("b" * 64, [native], "part:leaf")
+    [fetch] = [span for span in exporter.get_finished_spans() if span.name == "cache.fetch"]
+    assert fetch.attributes["archive_bytes"] == len(payload)
+    assert "bytes" not in fetch.attributes
+
+
+def test_corrupt_remote_body_remains_fatal_with_optional_root_refused(
+    archive_store, monkeypatch, tmp_path
+):
+    backend, service = archive_store.backend, archive_store.service
+    payload = b"canonical remote integrity" * 8
+    key = "c" * 64
+    _put_bytes(backend, key, payload)
+    # Keep the response identity but change the actual remote bytes.
+    service.committed[backend._name(key)] = [("damaged", b"x" * len(payload))]
+    monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", str(tmp_path / "unapproved"))
+    with pytest.raises(RuntimeError, match="integrity mismatch"):
+        backend.get(key)
+
+
+def test_private_source_size_change_is_not_optional_store_failure(archive_store, tmp_path):
+    payload = b"verified private bytes" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    with (tmp_path / "private-source").open("w+b") as source:
+        source.write(payload[:-1])
+        with pytest.raises(RuntimeError):
+            cache._save_archive(archive_store.root, digest, len(payload), source)
+    assert not (archive_store.root / "objects" / digest).exists()
+
+
+def test_warm_hit_never_runs_eviction(archive_store, monkeypatch):
+    backend = archive_store.backend
+    payload = b"canonical warm bytes" * 8
+    _put_bytes(backend, "d" * 64, payload)
+    assert _get_bytes(backend, "d" * 64) == payload
+    def forbidden(*args, **kwargs):
+        pytest.fail("verified local hit must not perform post-hit eviction")
+    monkeypatch.setattr(cache, "_evict_archives", forbidden)
+    assert _get_bytes(backend, "d" * 64) == payload
+
+
+def test_corrupt_lookup_explicitly_requests_replacement(
+    archive_store, monkeypatch, exported_cache_spans
+):
+    root, backend = archive_store.root, archive_store.backend
+    payload = b"canonical replacement bytes" * 8
+    digest = hashlib.sha256(payload).hexdigest()
+    (root / "objects" / digest).write_bytes(b"x" * len(payload))
+    os.utime(root / "objects" / digest, (1, 1))
+    _put_bytes(backend, "e" * 64, payload)
+    save = cache._save_archive
+    replacements = []
+    def observed(root, digest, size, archive, *, replace_corrupt=False):
+        replacements.append(replace_corrupt)
+        return save(root, digest, size, archive, replace_corrupt=replace_corrupt)
+    monkeypatch.setattr(cache, "_save_archive", observed)
+    _tracer, exporter = exported_cache_spans()
+    assert _get_bytes(backend, "e" * 64) == payload
+    assert replacements == [True]
+    assert (root / "objects" / digest).read_bytes() == payload
+    assert (root / "objects" / digest).stat().st_mtime > 1
+    [eviction] = [
+        span for span in exporter.get_finished_spans()
+        if span.name == "cache.local_eviction"
+    ]
+    assert eviction.attributes["reason"] == "corrupt_replacement"
+    body_reads = [call[0] for call in archive_store.service.calls].count("readinto")
+    assert body_reads == 1
+    assert _get_bytes(backend, "e" * 64) == payload
+    assert replacements == [True]
+    assert [call[0] for call in archive_store.service.calls].count("readinto") == body_reads
+
+
+@pytest.mark.parametrize("hash_content", [False, True])
+def test_archive_copy_uses_real_files_and_bounds_growth(tmp_path, hash_content):
+    expected = b"expected bytes" * 8
+    with (tmp_path / "source").open("w+b") as source:
+        source.write(expected)
+        source.flush()
+        assert os.fstat(source.fileno()).st_size == len(expected)
+        # Simulate growth after the caller's size gate, without fake fstat.
+        source.write(b"x" * 10000)
+        source.flush()
+        with (tmp_path / "destination").open("w+b") as destination:
+            digest, size = cache._archive_copy(
+                source, destination, len(expected), hash_content=hash_content,
+            )
+            assert size == len(expected) + 1
+            assert source.tell() <= len(expected) + 1
+            assert destination.tell() <= len(expected)
+            destination.seek(0)
+            assert destination.read() == expected
+            if not hash_content:
+                assert digest is None
+
+
+def test_eviction_skips_nonregular_digest_and_temp_entries(archive_store, monkeypatch):
+    root = archive_store.root
+    directories = [
+        root / "objects" / ("a" * 64),
+        root / "objects" / f".{'b' * 64}.{'c' * 32}.tmp",
+    ]
+    for path in directories:
+        path.mkdir()
+        (path / "keep").write_bytes(b"untouched")
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", 0)
+    assert cache._evict_archives(root)
+    for path in directories:
+        assert (path / "keep").read_bytes() == b"untouched"
+
+
+@pytest.mark.parametrize("error", ["auth", "precondition", "runtime"])
+def test_remote_body_errors_propagate_even_when_optional_store_is_refused(
+    archive_store, monkeypatch, tmp_path, error, exported_cache_spans
+):
+    from azure.core.exceptions import ClientAuthenticationError, ResourceModifiedError
+
+    backend, service = archive_store.backend, archive_store.service
+    payload = b"canonical remote archive" * 8
+    key = "f" * 64
+    _put_bytes(backend, key, payload)
+    failure = {
+        "auth": ClientAuthenticationError("body denied"),
+        "precondition": ResourceModifiedError("body changed"),
+        "runtime": RuntimeError("body helper failed"),
+    }[error]
+    client = service.get_blob_client(backend._name(key))
+    download = client.download_blob
+    def broken_download(**kwargs):
+        response = download(**kwargs)
+        def fail_body(stream):
+            stream.write(payload[:10])
+            raise failure
+        response.readinto = fail_body
+        return response
+    monkeypatch.setattr(client, "download_blob", broken_download)
+    monkeypatch.setattr(service, "get_blob_client", lambda _name: client)
+    monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", str(tmp_path / "unapproved"))
+    _tracer, exporter = exported_cache_spans()
+    with pytest.raises(type(failure)) as raised:
+        backend.get(key)
+    assert raised.value is failure
+    assert not list((archive_store.root / "objects").iterdir())
+    spans = exporter.get_finished_spans()
+    [summary] = [span for span in spans if span.name == "cache.archive"]
+    assert summary.attributes["network_bytes_known"] is False
+    assert summary.attributes["network_bytes"] == min(len(payload), cache._ARCHIVE_CACHE_MIN)
+    assert summary.attributes["archive_bytes"] == len(payload)
+    assert summary.attributes["reused_bytes"] == 0
+    body = [
+        span for span in spans
+        if span.name == "cache.download"
+        and span.attributes.get("network_bytes_known") is False
+    ]
+    assert len(body) == 1
+
+
+@pytest.mark.parametrize("operation", ["_archive_cache_root", "_local_archive", "_save_archive"])
+@pytest.mark.parametrize("error", ["missing", "auth", "precondition"])
+def test_azure_errors_from_optional_helpers_are_not_network_misses(
+    archive_store, monkeypatch, operation, error
+):
+    from azure.core.exceptions import (
+        ClientAuthenticationError, ResourceModifiedError, ResourceNotFoundError,
+    )
+
+    backend = archive_store.backend
+    payload = b"canonical remote archive" * 8
+    key = "a" * 64
+    _put_bytes(backend, key, payload)
+    failure = {
+        "missing": ResourceNotFoundError("local helper missing"),
+        "auth": ClientAuthenticationError("local helper denied"),
+        "precondition": ResourceModifiedError("local helper changed"),
+    }[error]
+    def fail(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr(cache, operation, fail)
+    with pytest.raises(type(failure)) as raised:
+        backend.get(key)
+    assert raised.value is failure
+
+
+def test_network_mid_body_not_found_remains_a_miss(archive_store, monkeypatch):
+    from azure.core.exceptions import ResourceNotFoundError
+
+    backend, service = archive_store.backend, archive_store.service
+    payload = b"canonical remote archive" * 8
+    key = "b" * 64
+    _put_bytes(backend, key, payload)
+    client = service.get_blob_client(backend._name(key))
+    download = client.download_blob
+    files = []
+    temporary = cache.tempfile.TemporaryFile
+    def tracked_file(*args, **kwargs):
+        private = temporary(*args, **kwargs)
+        files.append(private)
+        return private
+    def interrupted(**kwargs):
+        response = download(**kwargs)
+        def vanished(stream):
+            stream.write(payload[:10])
+            raise ResourceNotFoundError("blob disappeared during body")
+        response.readinto = vanished
+        return response
+    monkeypatch.setattr(cache.tempfile, "TemporaryFile", tracked_file)
+    monkeypatch.setattr(client, "download_blob", interrupted)
+    monkeypatch.setattr(service, "get_blob_client", lambda _name: client)
+    assert backend.get(key) is None
+    assert files and all(private.closed for private in files)
+    assert not list((archive_store.root / "objects").iterdir())
 
 
 if __name__ == "__main__":

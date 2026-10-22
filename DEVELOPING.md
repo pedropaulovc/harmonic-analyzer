@@ -1724,16 +1724,30 @@ SHA-256, total length and ETag establish the current canonical identity. For
 archives larger than 8 MiB and no larger than the local store cap, a matching
 `objects/<sha256>` file can supply the remaining bytes. A warm local hit still
 pays for that first network prefix; it is not a zero-network restore.
-`cache.archive` reports `probe_bytes` and `reused_bytes` to distinguish that cost
-from the remaining body avoided.
+`cache.archive` reports `archive_bytes`, `network_bytes`, `probe_bytes`,
+`reused_bytes` and local outcomes. `cache.download` spans time the probe and
+remaining network body separately; their `bytes`/`network_bytes` count network
+payload, not the whole archive on a local hit. Failed transfers whose partial
+body count is unknown are marked `network_bytes_known=false`. The enclosing
+`cache.fetch` reports archive bytes and total fetch work; local-store operations
+and verification have separate timing spans.
 
-Local objects are leaf-writable, so every reuse copies and hashes the complete
-object into a **private handle**. Unpacking reads that same handle, not a
-reopened shared path. Corrupted objects are not served. On a local miss, the SDK
-continues the original response with ETag-pinned parallel ranges; the completed
-private file must pass the same integrity checks. There is no recipe-to-ETag
-mapping: a same-key refresh is resolved from the current response metadata,
-not from previously cached recipe bytes.
+Local objects are leaf-writable. Before copying, the reader checks that the
+opened regular file has the authoritative expected length. Every reuse then
+copies and hashes the complete object into a **process-owned temporary file**,
+reading at most one byte past the expected length to detect growth. Unpacking
+reads that same handle, not a reopened shared path. Corrupted objects are not
+served, and a failed LRU timestamp touch cannot discard a verified copy.
+On a local miss, the SDK continues the original response with ETag-pinned
+parallel ranges; the completed temporary file must pass the same integrity
+checks. There is no recipe-to-ETag mapping: a same-key refresh is resolved from
+the current response metadata, not from previously cached recipe bytes.
+
+“Process-owned” is not a security boundary against other processes running as
+the same Windows principal, which can already modify `cad/out`. Likewise, the
+path guards refuse observed aliases and misconfiguration; they do not isolate
+the filesystem namespace from a hostile process with store-owner privileges.
+Store ACLs must keep namespace replacement within the trusted seat principal.
 
 `HARMONIC_ARCHIVE_CACHE_ROOT` selects only these allowlisted locations:
 
@@ -1742,23 +1756,39 @@ not from previously cached recipe bytes.
   supplied by the worker/job runner.
 
 An override must be exactly one of those roots, outside `REPO_ROOT`, with no
-workspace overlap. Relative paths, aliases and UNC paths are refused. Without
+workspace overlap. Relative paths, aliases and UNC paths are refused for
+**local-store access**, not for an otherwise valid remote restore. Without
 either `LOCALAPPDATA` or an explicit approved root, local reuse is disabled;
-file-backed remote transfers still work. Filesystem I/O failures in the optional
-local store skip local reuse or persistence rather than discarding a verified
-remote download. This does not bypass root-validation guards, hide Azure/auth
-errors, or weaken archive integrity and forced-refresh publication requirements.
+file-backed remote transfers still work. Typed local-store refusals and local
+filesystem I/O failures skip only the affected optional work. Diagnostics expose
+the reason through `cache.local_store` outcomes; a verified remote result is
+retained. Busy locks, corrupt objects and capacity skips are distinguishable
+from a normal local miss. Azure/auth errors, remote integrity failures and
+unrelated programming errors are not swallowed by this local-store policy;
+forced-refresh publication requirements remain unchanged.
 
 The new local store has a **16 GiB archive capacity**, separate from Azure
 retention. It reserves room before writing a publication temp and uses explicit
 mtime updates for LRU order. A host-local lock coordinates capacity admission
 and eviction; cross-process object leases prevent eviction of active readers.
+Each lock acquisition waits at most **50 ms** before skipping optional work.
 If unleased objects cannot make enough room, persistence is skipped. Archives
 larger than the cap are transferred without being retained locally.
 
-Eviction removes only hash-named objects and recognized interrupted-publication
-temps inside this new store. Lease files are retained to avoid split locks.
-Concurrent writers use unique temps and publish verified objects atomically.
+Eviction runs on capacity admission, not on warm hits. It removes only regular
+hash-named objects and recognized interrupted-publication temps inside this new
+store, skipping aliased and nonregular entries without touching their targets.
+Object leases use a fixed set of **256 shards** plus the store lock; stable
+lease files are never unlinked, avoiding split-lock inode races.
+A lease on one digest can conservatively skip another digest in the same shard.
+Lookup and persistence report busy outcomes; eviction reports these skips as
+`busy_entries`, separately from its aggregate `skipped_entries`, so contention
+is distinguishable from a cold store.
+Its `reason` distinguishes normal `admission` from `corrupt_replacement`.
+Concurrent writers use unique temps and publish atomically. A writer finding an
+already-present same-address object skips redundant persistence and eviction;
+the next reader still verifies that object's bytes. Persistence copies the
+already-verified process-owned download without a redundant second hash.
 No source, native output, other cache directory or remote blob is deleted by
 this local capacity policy.
 
