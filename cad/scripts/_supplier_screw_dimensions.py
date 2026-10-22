@@ -325,6 +325,113 @@ def _attachment_correspondence(
     return census
 
 
+def _point_attachment_diagnostics(adapter: Any, *, feature: str) -> list[dict[str, Any]]:
+    """Failure-only, read-only context census for every dimension on this sheet."""
+    def read_value(read: Callable[[], Any]) -> Any:
+        try:
+            value = read()
+            json.dumps(value, allow_nan=False)
+            return value
+        except Exception as error:
+            return {"error_type": type(error).__name__, "message": str(error)}
+
+    def same(left: Any, right: Any) -> Any:
+        return None if left is None or right is None else read_value(
+            lambda: int(adapter.swApp.IsSame(left, right))
+        )
+
+    rows = []
+    for raw_view in iter_views(adapter):
+        view = _early_bound(_bind(raw_view, "IView"), "IView")
+        row: dict[str, Any] = {"view": read_value(lambda: view_name(adapter, view))}
+        rows.append(row)
+        try:
+            model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+            row["view_configuration"] = str(view.ReferencedConfiguration)
+            row["source_path"] = str(model.GetPathName())
+            manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+            row["source_active_configuration"] = str(
+                _early_bound(manager.ActiveConfiguration, "IConfiguration").Name
+            )
+            source_feature = _early_bound(
+                _bind(_early_bound(model, "IPartDoc").FeatureByName(feature), "IFeature"),
+                "IFeature",
+            )
+            sketch = _early_bound(
+                _bind(source_feature.GetSpecificFeature2(), "ISketch"), "ISketch"
+            )
+            mapped_sketch = _early_bound(
+                _bind(view.GetCorresponding(sketch), "ISketch"), "ISketch"
+            )
+            points = [
+                _early_bound(_bind(raw, "ISketchPoint"), "ISketchPoint")
+                for raw in tuple(sketch.GetSketchPoints2() or ())
+            ]
+
+            def point_state(point):
+                if point is None:
+                    return {"present": False}
+                state = {
+                    "present": True,
+                    "xyz": read_value(lambda: [float(point.X), float(point.Y), float(point.Z)]),
+                    "id": read_value(lambda: list(point.GetID())),
+                }
+                try:
+                    owner = _early_bound(_bind(point.GetSketch(), "ISketch"), "ISketch")
+                    state["owner_source_is_same"] = same(owner, sketch)
+                    state["owner_mapped_is_same"] = same(owner, mapped_sketch)
+                    state["owner_model_to_sketch"] = read_value(
+                        lambda: list(_early_bound(owner.ModelToSketchTransform, "IMathTransform").ArrayData)
+                    )
+                except Exception as error:
+                    state["owner_error"] = str(error)
+                return state
+
+            mapped_points = []
+            row["points"] = []
+            for point in points:
+                point_row = {"source": point_state(point)}
+                row["points"].append(point_row)
+                try:
+                    mapped = _early_bound(
+                        _bind(view.GetCorresponding(point), "ISketchPoint"), "ISketchPoint"
+                    )
+                    point_row["mapped"] = point_state(mapped)
+                except Exception as error:
+                    mapped = None
+                    point_row["mapping_error"] = str(error)
+                mapped_points.append(mapped)
+            row["dimensions"] = []
+            for raw_annotation in tuple(view.GetAnnotations() or ()):
+                annotation = _early_bound(_bind(raw_annotation, "IAnnotation"), "IAnnotation")
+                if int(annotation.GetType()) != 4:  # swDisplayDimension
+                    continue
+                dimension_row: dict[str, Any] = {}
+                row["dimensions"].append(dimension_row)
+                try:
+                    display = _early_bound(
+                        _bind(annotation.GetSpecificAnnotation(), "IDisplayDimension"),
+                        "IDisplayDimension",
+                    )
+                    dimension_row["name"] = str(_early_bound(display.GetDimension2(0), "IDimension").FullName)
+                    types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+                    dimension_row["types"] = types
+                    dimension_row["points"] = []
+                    for raw, kind in zip(annotation.GetAttachedEntities3() or (), types, strict=True):
+                        if kind != 11:
+                            continue
+                        point = _early_bound(_bind(raw, "ISketchPoint"), "ISketchPoint")
+                        state = point_state(point)
+                        state["source_is_same"] = [same(point, source) for source in points]
+                        state["mapped_is_same"] = [same(point, mapped) for mapped in mapped_points]
+                        dimension_row["points"].append(state)
+                except Exception as error:
+                    dimension_row["read_error"] = str(error)
+        except Exception as error:
+            row["read_error"] = str(error)
+    return rows
+
+
 def _assert_source(
     adapter: Any, view: Any, display: Any, *, name: str, feature: str
 ) -> None:
@@ -461,6 +568,12 @@ def _assert_source(
             "error_type": type(exc).__name__,
             "message": str(exc),
         }
+        try:
+            context["sheet_point_context"] = _point_attachment_diagnostics(
+                adapter, feature=feature
+            )
+        except Exception as diagnostic_error:
+            context["sheet_point_context_error"] = str(diagnostic_error)
         _telemetry.info(
             f"supplier_source_attachment_failure {name}@{feature}: "
             + json.dumps(context, sort_keys=True, allow_nan=False)
