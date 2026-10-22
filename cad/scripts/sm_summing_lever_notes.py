@@ -12,29 +12,26 @@ offline drawing test.
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import LINEAR_BAND, SCREW_THREAD
-from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
+from magnifying_bracket_joint_layout import (
+    LINEAR_BAND,
+    SCREW_THREAD,
+)
+from sm_summing_lever_spec import COEFFICIENT_T, HOLE_SPEC
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
-# Every cast contour is sized on the views (machinist review 2026-10-16: the
-# sheet may not defer to a pattern the package does not include): the plate,
-# the summation web's side radius, each rib's arc, end station and thickness,
-# the boss, the spring-anchor pad under the hole row, and the trunnion
-# envelope, length and knife-edge radius.
+# Every cast contour is sized on the views: the uniform coefficient plate,
+# the counter web's side radius, the common positive rib profile, the boss,
+# and the trunnion envelope, length and knife-edge radius. The title block
+# controls inside-corner R1 MAX; modeled rib blends remain native controls.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"PlateWidth", "PlateLength"},
-    "CoefficientsPlate": {"PlateThickness"},
-    "SpringPadProfile": {"SpringPadWidth", "SpringSeatThickness"},
+    "PlateProfile": {"PlateWidth", "PlateThickness"},
+    "CoefficientsPlate": {"PlateLength"},
     "CylinderReference": {"CylinderDia"},
     "SummationAnchorProfile": {"AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
     "SummationPlateProfile": {"SummationArcRadius"},
     "SummationPlate": {"WebThickness"},
-    "EdgeRibFrontProfile": {
-        "EdgeRibFrontArcR",
-        "EdgeRibFrontEndTopX",
-        "EdgeRibFrontEndStep",
-    },
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach"},
     "EdgeRibFront": {"EdgeRibThickness"},
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
@@ -50,7 +47,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Model-owned text the part writes onto its own dimensions (prefix compartment).
 # The summation web's two sides share one radius; both trunnions one length,
-# one knife-edge radius and one hexagon (Detail D shows the +Z one), whose two
+# one knife-edge radius and one hexagon (Detail D shows the -Z one), whose two
 # upper flanks each make the one flank-to-side angle.  A radial prefix
 # replaces the native R, so a radius prefix carries its own; the width's
 # opening parenthesis marks it a reference (its suffix closes it).
@@ -69,8 +66,8 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 
 # The pivot cylinder's diameter is sized in the plan, across the band its
 # two lines draw (machinist review r10: in the end views the R15.24 rib
-# outline hides it, so the old Ø25.40 leader landed on a rib slant).  The
-# plates join the cylinder at its mid-plane, so no silhouette shows there: a
+# outline hides it, so the old Ø25.40 leader landed on a rib slant).
+# Both plates merge with the cylinder, so no silhouette sizes it there: a
 # hidden Top-plane reference line spans the diameter at this world Z, between
 # the mid rib and the +Z end rib, where the dimension prints.  The line lies
 # under the dimension line, which prints 2.8 sheet mm below its text (farm r11
@@ -80,7 +77,6 @@ CYLINDER_REFERENCE_Z = 45.6
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-02"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
-BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 
 # Drawing-side callout text keyed on the parametric dimension name: each tight
 # band names its mate and function (drawing-guidelines rule 4), and the rib
@@ -99,98 +95,66 @@ BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 # hole pattern, each tight station naming the mate and that the pattern
 # locates it (rule 7: flagged where it applies; machinist review r14 could
 # not tell from MATCHES whether the screws locate or only clamp).  The two
-# left of VIEW F have room for one line only.  The spring-anchor pad is on
-# the underside, which no view shows full length, so its width says it runs
-# the plate's length.  The ridge-to-side pair and the flank-to-side angle
-# hold the knife edge for the trunnion's worst-case free rock in the knife
-# mount's bore (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code
-# review C09); each names that seat, as the vertex height does (machinist
-# review 20261018: the pair and the angle read as bare bands beside the
-# height's reason).  Detail D's room sets their length: the +X ridge band
-# two lines under its value, right of its extension lines; the -X one two
-# short lines, left of its span; the angle one short line, its arc under
-# the ridge pair's line.
+# left of VIEW F have room for one line only. The ridge-to-side pair and the
+# flank-to-side angle hold the knife edge for the trunnion's worst-case free
+# rock in the knife mount's bore
+# (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code review C09).
+# Each names that seat, as the vertex height does. Detail D carries the whole
+# knife envelope, its ridge round and datum A together at 10:1.
 # Both stubs are one prism, so their side faces share two planes
-# (``build_sm_summing_lever._hex_knife``), which ties the -Z ridge to datum A
-# within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  The model
+# (``build_sm_summing_lever._hex_knife``), which ties the +Z ridge to datum A
+# on the -Z ridge within
+# ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``. The model
 # carries that; the print carries the owner's C09 wording, KNIFE EDGE
 # SYMMETRIC TO SIDES, BOTH STUBS, split across the pair, and no coplanarity
 # requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"
 # stated a requirement with no limit).  Lines of at most
-# RIDGE_CALLOUT_MAX_CHARS keep the +X block under the border and left of
-# view G (stack r4: six short lines on the -X one rose over the border).
+# RIDGE_CALLOUT_MAX_CHARS keep each ridge block outside its dimension span.
+# Back reverses the model sides: the longer BOTH STUBS block is on sheet
+# left, so its unchanged wording wraps across three short callout lines.
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "EdgeRibFrontEndTopX": "ALL RIBS",
+    "RibReach": "ALL POSITIVE RIBS",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
-    "RidgeFromRight": f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
+    "RidgeFromRight": f"KNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
+    # Both locations start on real faces, not the asymmetric plate's midplane:
+    # View G measures boss top from coefficient top; the web shares that top.
+    "WebThickness": "TOP FACE FLUSH WITH\nCOEFFICIENT TOP",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
     "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
-    # The -Z rib and its bounded tap-drill depth both take the ordinary
-    # title-block .XX band (magnifying_bracket_joint_layout).
-    "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
-    # VIEW F's 7.00 runs from the plate top to the pad's underside: it names
-    # both (machinist review r12 found no pad depth, reading it as the plan's
-    # rib depth).
-    "SpringSeatThickness": "PLATE AND PAD",
-    # The rib end's top corner is the slant's at RIB_PLATE_REACH: clipped
-    # there, not run to a point, so the -Z receiver rib keeps its wall round
-    # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_STEP).  It
-    # is located from the plate's top face, the face the receiver row height
-    # uses (machinist review r10: from the mid-plane the origin was in air).
-    # No tap-wall words: the taps sit inboard of the step, under the slant,
-    # and r11 read them as walled by the step's 0.44 band.  The step is
-    # derived from the slant and the plate (no knob), so it prints as a
-    # reference (REFERENCE_DIMENSIONS; machinist review 20261018 read a
-    # bare 0.44 band as a tight step to hold).
-    "EdgeRibFrontEndStep": "END RIBS ABOVE\nPLATE TOP FACE",
-    # The plan's 152.40 is the body's end-face span, not the part's overall:
+    # The plan's 152.4 is the body's end-face span, not the part's overall:
     # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
     # as the overall; drawing-guidelines: nothing reads like an overall that
     # is not one).  Short lines: the block stands 14 mm from the border.
     "PlateLength": "BODY\nEND FACES",
 }
-# Dimensions the sheet parenthesizes as reference (drawing-guidelines:
-# reference dimensions in parentheses are welcome): linear, no Ø glyph.
-REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
-# Leads the 2-56 receiver callout: the rib now contains the drill with an
-# ordinary bounded .XX depth band. The lower limit clears the unchanged screw
-# and two-pitch tap lead; the upper limit keeps its point inside the rib.
-# Section H-H shows the transition to thinner plate beyond the point, not a
-# bottom wall. The spring-anchor pad does not back these inboard receivers.
-# Keep both physical functions visible; this is not an accepted exception.
-BRACKET_TAP_CALLOUT_PROCESS = (
-    "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
-    f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
-)
+# The two blind taps fasten the magnifying bracket. Their native callout owns
+# the pilot and full-thread depths; no additional cavity or wall limit prints.
+BRACKET_TAP_CALLOUT_PROCESS = f"FASTENS {BRACKET_NUMBER}\n"
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
 BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"
-# Leads the 20X 6-32 callout: the thread runs the padded thickness (the back
-# view's 7.00), not the bare plate's 5.08 (machinist review r5 read it as
-# the plate's, 1.1D).
-SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU PLATE AND PAD\n"
+# The 20X 6-32 threads run through the uniform coefficient plate.
+SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 
 # --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
-# The 20 channel-spring anchors thread through the pad: its worst-case
-# thickness at the title block's .XX band, less 1.5 incomplete threads, is
-# the full thread a 6-32 engages, and it must reach 1.5D, so the print states
-# no shortfall.
+# The plate's worst-case thickness at the title block's .XX band, less 1.5
+# incomplete threads, must retain at least 1.5D of full #6-32 thread.
 if HOLE_SPEC.size != "#6-32":
     raise AssertionError(
         f"spring-anchor engagement assumes #6-32, not {HOLE_SPEC.size}"
     )
 SPRING_TAP_MAJOR_DIA = 0.138 * 25.4
 SPRING_TAP_PITCH = 25.4 / 32.0
-SPRING_TAP_ENGAGEMENT_MIN = SPRING_SEAT_T - LINEAR_BAND - 1.5 * SPRING_TAP_PITCH
+SPRING_TAP_ENGAGEMENT_MIN = COEFFICIENT_T - LINEAR_BAND - 1.5 * SPRING_TAP_PITCH
 if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     raise AssertionError(
         f"20X {HOLE_SPEC.size} keeps {SPRING_TAP_ENGAGEMENT_MIN:.3f} of full "
@@ -198,10 +162,14 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# Sheet 2 looks from +X/-Y/-Z: the existing pictorial shows the coefficient
+# backing from below and the receiver end, instead of repeating the top view.
+RECEIVER_ISOMETRIC_OCTANT = (1, -1, -1)
+RECEIVER_ISOMETRIC_VIEW_NOTE = "UNDERSIDE ISOMETRIC VIEW SCALE 1:4"
 # Sheet 2's view looks at the -Z end face (the bracket receiver): sheet 1's
 # plan carries a lettered viewing arrow onto that face, and the view is
 # named by the letter (machinist review r10 read "BACK VIEW" as looking from
-# below).  A, B are datums; C the section; D, E the details.  The view is
+# below). A and B are datums; D is the complete knife detail. The view is
 # SolidWorks' Back view, +Y up; projected from the plan's arrow it would keep
 # the plan's X (boss left) with +Y towards the plan, so it is the projection
 # turned half a turn and says so (machinist review bdc033f13: boss on the

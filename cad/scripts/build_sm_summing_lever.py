@@ -19,9 +19,9 @@ user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
 
 Seven features (the six .cs features + the hex knife edge):
 
-1. Coefficients plate  -- Top-plane rectangle on the +X (channel-spring) arm,
-   carrying the 20 spring holes; mid-plane extrude centred on the pivot (local
-   y 0). Machine-y registration (M6.4 plate-top-at-998) is set at placement.
+1. Coefficients plate  -- uniform 7 mm positive-X slab with its top held at
+   local Y+2.54; the downward addition leaves spring and knife registration
+   unchanged. The negative-X counter web stays 5.08 mm centered on Y0.
 2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
    extrude along the long edge (the pivot/rock axis = local Z).
 3. Hex knife edges     -- ONE vertex-up hexagonal prism through the pivot,
@@ -29,8 +29,8 @@ Seven features (the six .cs features + the hex knife edge):
    leaves PROTRUDE beyond the body (one per side), so each knife edge rests
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
-4. Edge ribs (x2)      -- Front-plane line/line/semicircle wrapping the cylinder
-   at the plate ends, blind-extruded at a start offset.
+4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R1 profile at the
+   plate ends, blind-extruded at a start offset.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
 6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
@@ -47,10 +47,10 @@ positions (so the 20 channel springs need no change) and the summation
 anchor lands where the counter-spring boss-hook attaches (local x -76 ->
 machine -91 ~ the M6.4 hook at -90.5).
 
-Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py): the
-prismatic/polygon profiles via point-ref anchors + driving dims; each arc via
-its neighbours' fixed endpoints plus a radial dim. Organic-arc volumes are not
-analytically gated -- rely on the mass-properties report + ch30 renders.
+Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py).
+The common rib profile has native tangent constraints, defining dimensions,
+face/profile readback and exact incremental-volume gates. Bounded internal
+root fillets are selected explicitly and cannot grow into the spring-nut lane.
 
 Dimensions: cad/DIMENSIONS.md ch. 18 (legacy KCL values + M6.4 registration;
 low/med confidence).
@@ -73,6 +73,7 @@ from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
+from _named_views import name_octant_views
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import IN
@@ -99,6 +100,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_POINT_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     THREAD_DEPTH_BAND,
+    RECEIVER_PILOT_WALL_MIN,
     RIB_DEPTH as RECEIVER_RIB_T,
 )
 from _drawing_marks import (
@@ -111,7 +113,11 @@ from _drawing_tolerances import (
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _drawing_precision import _named_dimension, set_dimension_display_precision
+from _drawing_precision import (
+    _named_dimension,
+    apply_drawing_precision,
+    set_dimension_display_precision,
+)
 from _fit_deviations import deviations
 from _drawing_prefix import set_dimension_prefix
 from _part_pmi import author_part_pmi
@@ -123,12 +129,19 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    RECEIVER_ISOMETRIC_OCTANT,
+    RECEIVER_ISOMETRIC_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
+    COEFFICIENT_BOTTOM_Y,
+    COEFFICIENT_T,
+    COEFFICIENT_TOP_Y,
+    COUNTER_WEB_T,
     CHANNEL_PITCH,
     CHANNEL_Z0,
     COUNTER_HOLE_SPEC,
+    DRAWING_PRECISION,
     HOLE_COUNT,
     HOLE_SPEC,
     HOLE_X,
@@ -139,10 +152,15 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R_TOL_TYPE,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
-    SPRING_PAD_W,
-    SPRING_SEAT_T,
+    RIB_BLEND_R,
+    RIB_BLEND_R_BAND,
+    RIB_BLEND_R_TOL_TYPE,
+    RIB_REACH,
+    RIB_WRAP_R,
     SURFACE_FINISHES,
 )
+from sm_summing_lever_profile import LOWER, UPPER, edge_rib_added_area_mm2
+from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_margin
 
 PART_NAME = "sm-summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
@@ -155,7 +173,7 @@ SX = -1.0
 # --- SummingLever.cs constants (inches -> mm) ------------------------------
 PLATE_W = 1.75 * IN  # coefficients plate width (along the arm, X)   44.45
 PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
-PLATE_T = 0.2 * IN  # plate thickness                                5.08
+# Coefficient thickness and fixed top are imported separately from counter web.
 CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
 RIB_T = 0.2 * IN  # edge / middle rib thickness                     5.08
 RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
@@ -165,14 +183,8 @@ ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 # ANCHOR_H (19.05, the boss height and the counter anchor's engagement) is the
 # pure spec's -- build_sm_vn_boss_hook trims the purchased shank to it.
 
-# The 20 channel-spring anchors THREAD into the part-owned native tap pattern.
-# The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
-# placed at the knife line y=979.7 it spans 977.16..982.24, so the top registers
-# at machine 982.24 (the whole summing chain dropped 10.3 with the top-frame
-# rederive). The channel springs + magnifying bracket meet it
-# (build_channel_*: PLATE_TOP_Y/PLATE_EYE_Y; build_mg_magnifying_bracket:
-# FLANGE_Y). Consumed at PLACEMENT (the part is pivot-centred), not by any
-# extrude here.
+# The coefficient plate's fixed local top registers at machine Y982.24.
+# Thickness grows downward, never through a changed installation transform.
 PLATE_TOP_Y = 982.24
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
@@ -203,63 +215,30 @@ KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
-ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
+ARC_R = RIB_WRAP_R
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 # Only the -Z edge rib is the magnifier bracket's receiver: its inward
 # extension gives the #2-56 drill an ordinary depth band without moving the
 # entry face. The independent +Z rib retains RIB_T.
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.00
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 67.20; outer -Z face fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
-# Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
-# hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
-# rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
-# channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
-# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-68.00),
-# so that rib would refill it. Every rib's +X end therefore stops inboard of the
-# hole column by the spring coil radius (~3.25) + margin so every hole stays
-# open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
-# spring-hole field.
-RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the hole column
-if RIB_PLATE_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
-    raise AssertionError("a rib's +X vertex reaches the spring-hole column")
-# The edge ribs keep SummingLever.cs's slant -- from the arc top towards the
-# plate's free corner (PLATE_W, 0) -- and are CLIPPED by a vertical end face at
-# RIB_PLATE_REACH rather than pulled in to a point there. The -Z rib is the
-# magnifying bracket's receiver (magnifying_bracket_joint_layout): its outer
-# #2-56 tap at x 29.7 keeps the full-height slant around its thread (wall
-# 3.69 nominal), where a point at 35.75 would leave only the 5.08 plate (1.45).
-# The end face stands EDGE_RIB_END_STEP (0.44) proud of each plate face, and
-# the print locates its top corner from the plate's top face, a real surface
-# (machinist review r10: from the pivot mid-plane the origin is in mid-air).
-# The step is derived, not a new knob: the rib's corner stays where the
-# slant puts it, so re-dimensioning it moves no geometry.
-EDGE_RIB_END_HALF_H = ARC_R * (1.0 - RIB_PLATE_REACH / PLATE_W)  # 2.98
-EDGE_RIB_END_STEP = EDGE_RIB_END_HALF_H - PLATE_T / 2.0  # 0.44
-if not math.isclose(EDGE_RIB_END_STEP, 0.44, abs_tol=0.005):
-    raise AssertionError(
-        f"edge-rib end step {EDGE_RIB_END_STEP:.4f} is not the built 0.44"
-    )
+# In X, all ribs stop at 35.75 before the unchanged spring-hole column and
+# worst jam-nut footprint at 36.45. The 9.00 receiver already overlaps the
+# first spring station in Z; clearance is NOT an axial-separation claim.
+# The shared positive-X branch meets both plate faces with R1 tangent
+# transitions, with no separate pad, ledge or vertical tip face.
+if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
+    raise AssertionError("a rib's +X end reaches the spring-hole column")
 
 # Receiver-coordinate marks (``_receiver_coordinate_dimensions``): short
 # construction lines whose ends carry the bracket-tap coordinates.  The edge
-# mark lies on the free edge below its top corner (the plate is PLATE_T deep
-# there); each tap mark lies on its row inside the tap drill.
+# mark lies on the free edge below its fixed top corner; each tap mark lies
+# on its row inside the tap drill.
 RECEIVER_EDGE_MARK = 1.0
 RECEIVER_TAP_MARK = 0.5
-if not RECEIVER_EDGE_MARK < PLATE_T or not RECEIVER_TAP_MARK < TAP_DRILL_DIA / 2.0:
+if not RECEIVER_EDGE_MARK < COEFFICIENT_T or not RECEIVER_TAP_MARK < TAP_DRILL_DIA / 2.0:
     raise AssertionError("receiver coordinate marks must stay on printed ink")
-
-
-def edge_rib_half_height(x: float) -> float:
-    """Half-height |y| of an edge rib's Front-plane profile at local +X ``x``.
-
-    The profile the edge-rib sketch draws: the slant towards (PLATE_W, 0),
-    defined from the arc top (x = 0) to the end face (x = RIB_PLATE_REACH).
-    """
-    if not 0.0 <= x <= RIB_PLATE_REACH:
-        raise ValueError(f"x={x} is outside the edge rib (0..{RIB_PLATE_REACH})")
-    return ARC_R * (1.0 - x / PLATE_W)
 
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
@@ -311,10 +290,75 @@ async def _three_point_arc(
     return check(f"add_arc {label}", arc), (cx, cy), radius
 
 
+def _assert_coefficient_slab(adapter) -> None:
+    """Fixed real seats and persistent extrusion dimensions after rebuild."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = _early_bound(model.FeatureByName("CoefficientsPlate"), "IFeature")
+    heights = []
+    for raw in feature.GetFaces() or ():
+        surface = _early_bound(_early_bound(raw, "IFace2").GetSurface(), "ISurface")
+        if not surface.IsPlane():
+            continue
+        values = tuple(float(value) for value in surface.PlaneParams)
+        if abs(abs(values[1]) - 1.0) < 1e-8:
+            heights.append(values[4] * 1000.0)
+    for expected in (COEFFICIENT_TOP_Y, COEFFICIENT_BOTTOM_Y):
+        if not any(math.isclose(actual, expected, abs_tol=1e-5) for actual in heights):
+            raise RuntimeError(f"CoefficientsPlate: missing seat Y{expected}; found {heights}")
+    for owner, name, expected in (
+        ("PlateProfile", "PlateThickness", COEFFICIENT_T),
+        ("PlateProfile", "PlateTopY", COEFFICIENT_TOP_Y),
+        ("CoefficientsPlate", "PlateLength", PLATE_L),
+    ):
+        owned = _early_bound(model.FeatureByName(owner), "IFeature")
+        raw = owned.Parameter(name)
+        if raw is None or not math.isclose(
+            float(_early_bound(raw, "IDimension").SystemValue) * 1000.0,
+            expected, abs_tol=1e-6,
+        ):
+            raise RuntimeError(f"{owner}: native {name} did not persist")
+    _telemetry.success(
+        f"uniform coefficient slab: native Y{COEFFICIENT_BOTTOM_Y}..{COEFFICIENT_TOP_Y}, "
+        f"thickness {COEFFICIENT_T}"
+    )
+
+
+def _assert_boss_face_graph(adapter) -> None:
+    """Real Y faces tie the boss and counterweb to the coefficient top.
+
+    The plate is not symmetric about Y0. Its actual top is the common web
+    top; the boss top stands ANCHOR_H/2 above Y0, not above the plate centre.
+    This proves the flush caption without inventing a midplane datum.
+    """
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    for owner, expected in (
+        ("SummationAnchor", (-ANCHOR_H / 2.0, ANCHOR_H / 2.0)),
+        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y)),
+        ("CoefficientsPlate", (COEFFICIENT_BOTTOM_Y, COEFFICIENT_TOP_Y)),
+    ):
+        raw_feature = model.FeatureByName(owner)
+        if raw_feature is None:
+            raise RuntimeError(f"{owner}: missing native face-graph owner")
+        heights = []
+        for raw in _early_bound(raw_feature, "IFeature").GetFaces() or ():
+            surface = _early_bound(_early_bound(raw, "IFace2").GetSurface(), "ISurface")
+            if surface.IsPlane():
+                values = tuple(float(value) for value in surface.PlaneParams)
+                if abs(abs(values[1]) - 1.0) < 1e-8:
+                    heights.append(values[4] * 1000.0)
+        if not all(
+            any(math.isclose(actual, level, abs_tol=1e-5) for actual in heights)
+            for level in expected
+        ):
+            raise RuntimeError(f"{owner}: native Y faces {heights} do not contain {expected}")
+    _telemetry.success(
+        "boss face graph: boss top above coefficient top by "
+        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; counterweb top flush"
+    )
+
+
 async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 1: Top-plane plate on the +X arm (x in [0, w]); mid-plane extrude
-    (PLATE_T total, centred on the pivot at local y 0) so the whole casting stays
-    coplanar with the cylinder and ribs.
+    """Feature 1: uniform coefficient slab from Y-4.46 to fixed Y+2.54.
 
     The HOLE_COUNT spring holes are ONE seed cut at station j=0 + a native
     FeatureLinearPattern5 marching the remaining stations at CHANNEL_PITCH.
@@ -335,28 +379,27 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
     plate = SketchDims()
-    check("create_sketch plate", await adapter.create_sketch("Top"))
-    # +X arm: x in [0, PLATE_W], length along sketch Y (= world Z) in [-L/2, L/2].
-    # NOT origin-centred (x runs 0..PLATE_W), so define_rectilinear_chain rather
-    # than define_centered_rectangle. Emission order (rectilinear): the per-segment
-    # distance dims skipping the last of each direction -- width (line0, horizontal
-    # PLATE_W) then length (line1, vertical PLATE_L) -- THEN the anchor dims for the
-    # corner (0, -L/2): x=0 drops, z (=-L/2) is one unsigned vertical distance.
+    check("create_sketch plate", await adapter.create_sketch("Front"))
+    # The actual +X end's vertical line owns the 7 mm native dimension, so
+    # VIEW F can import real top/bottom witnesses rather than an extrusion
+    # depth whose automatic attachment may sit behind the pivot body.
     rect = [
-        (0.0, -PLATE_L / 2.0),
-        (PLATE_W, -PLATE_L / 2.0),
-        (PLATE_W, PLATE_L / 2.0),
-        (0.0, PLATE_L / 2.0),
+        (0.0, COEFFICIENT_TOP_Y),
+        (PLATE_W, COEFFICIENT_TOP_Y),
+        (PLATE_W, COEFFICIENT_BOTTOM_Y),
+        (0.0, COEFFICIENT_BOTTOM_Y),
     ]
+    set_sketch_direct_db(adapter, True)
     outline = await add_line_chain(adapter, rect)
+    set_sketch_direct_db(adapter, False)
     await define_rectilinear_chain(
         adapter,
         outline,
         rect,
         label="plate",
         dims=plate,
-        names=["PlateWidth", "PlateLength", "PlateAnchorZ"],
-        drives=['"PlateW"', '"PlateL"', '"PlateL" / 2'],
+        names=["PlateWidth", "PlateThickness", "PlateTopY"],
+        drives=['"PlateW"', '"CoefficientT"', '"CoefficientTopY"'],
     )
     await ensure_fully_defined(adapter, "coefficients plate sketch")
     check("exit_sketch plate", await adapter.exit_sketch())
@@ -365,68 +408,15 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     check(
         "extrude coefficients plate",
         await adapter.create_extrusion(
-            ExtrusionParameters(depth=PLATE_T, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "CoefficientsPlate")
-    # The mid-plane extrude's one depth is the whole thickness, printed in
-    # the drawing's section C-C at the title block's .XX band.
-    [plate_thickness] = name_dimensions(
-        adapter, "CoefficientsPlate", ["PlateThickness"]
-    )
-    drive_jobs.append((plate_thickness, '"PlateT"'))
-    # The plate is a plain rectangular prism, so an exact analytic volume gate
-    # anchors the hole-field tripwires below (the WHOLE part has no analytic
-    # gate -- organic arcs -- but this first feature does).
-    v_plate = PLATE_W * PLATE_L * PLATE_T
-    await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
-
-    # Spring-anchor pad (sm_summing_lever_spec.SPRING_SEAT_T): a Front-plane
-    # rectangle from the plate TOP at the free edge down to the pad underside,
-    # extruded the plate's full length, so its two dimensions are the tap's
-    # own length and the pad's width, both visible edge-on in the end views.
-    # It overlaps the plate above its underside; only the 1.92 below adds.
-    # Cut BEFORE the spring holes so the through taps run the whole 7.00.
-    pad = SketchDims()
-    check("create_sketch spring pad", await adapter.create_sketch("Front"))
-    pad_top = PLATE_T / 2.0
-    pad_bottom = pad_top - SPRING_SEAT_T
-    pad_inner = SX * -(PLATE_W - SPRING_PAD_W)
-    pad_outer = SX * -PLATE_W
-    pad_points = [
-        (pad_outer, pad_top),
-        (pad_inner, pad_top),
-        (pad_inner, pad_bottom),
-        (pad_outer, pad_bottom),
-    ]
-    pad_outline = await add_line_chain(adapter, pad_points)
-    await define_rectilinear_chain(
-        adapter,
-        pad_outline,
-        pad_points,
-        label="spring pad",
-        dims=pad,
-        names=[
-            "SpringPadWidth",
-            "SpringSeatThickness",
-            "SpringPadEdgeX",
-            "SpringPadTopY",
-        ],
-        drives=['"SpringPadW"', '"SpringSeatT"', '"PlateW"', '"PlateT" / 2'],
-    )
-    await ensure_fully_defined(adapter, "spring pad sketch")
-    check("exit_sketch spring pad", await adapter.exit_sketch())
-    name_last_feature(adapter, "SpringPadProfile")
-    drive_jobs += pad.apply(adapter, "SpringPadProfile")
-    check(
-        "extrude spring pad",
-        await adapter.create_extrusion(
             ExtrusionParameters(depth=PLATE_L, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "SpringPad")
-    v_plate += SPRING_PAD_W * (SPRING_SEAT_T - PLATE_T) * PLATE_L
-    await volume_check(adapter, "spring pad", v_plate, 1e-3 * v_plate)
+    name_last_feature(adapter, "CoefficientsPlate")
+    [length] = name_dimensions(adapter, "CoefficientsPlate", ["PlateLength"])
+    drive_jobs.append((length, '"PlateL"'))
+    _assert_coefficient_slab(adapter)
+    v_plate = PLATE_W * PLATE_L * COEFFICIENT_T
+    await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
 
     # Spring-hole field: ONE seed hole at station j=HOLE_COUNT-1 + a native
     # linear pattern marching the remaining stations down world -Z at
@@ -445,7 +435,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     seed_result = wizard_holes(
         adapter,
         HOLE_SPEC,
-        [[HOLE_X, PLATE_T / 2.0, HOLE_Z[-1]]],
+        [[HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z[-1]]],
         (0.0, 1.0, 0.0),
         f"spring hole seed (station j={HOLE_COUNT - 1}, {HOLE_SPEC.size})",
         name="SpringHoleSeed",
@@ -462,13 +452,13 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
     drive_jobs += seed_result.placement_drive_jobs
     seed_cut = seed_result.name
-    v_hole = math.pi * (seed_dia / 2.0) ** 2 * SPRING_SEAT_T
+    v_hole = math.pi * (seed_dia / 2.0) ** 2 * COEFFICIENT_T
     await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
     check(
         "linear pattern spring holes",
         await adapter.linear_pattern_feature(
             LinearPatternParameters(
-                direction_point=[PLATE_W, PLATE_T / 2.0, 0.0],
+                direction_point=[PLATE_W, COEFFICIENT_TOP_Y, 0.0],
                 direction_vector=[0.0, 0.0, -1.0],
                 features=[seed_cut],
                 count=HOLE_COUNT,
@@ -741,28 +731,6 @@ def _knife_ridge_max_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
-def edge_rib_added_area_mm2() -> float:
-    """Net rib section outside the already-built cylinder, plate and pad.
-
-    The circle lies wholly inside the clipped rib profile. The positive-X
-    plate overlaps its central stripe; the pad fills the lower rib tip.
-    Neither the spring-hole column nor the knife prism removes this area.
-    This is evaluated before the summation web is added.
-    """
-    reach, radius, half_plate = RIB_PLATE_REACH, CYL_R, PLATE_T / 2.0
-    gross = math.pi * ARC_R**2 / 2.0 + 2.0 * ARC_R * reach - ARC_R * reach**2 / PLATE_W
-    circle_plate_overlap = (
-        half_plate * math.sqrt(radius**2 - half_plate**2)
-        + radius**2 * math.asin(half_plate / radius)
-    )
-    pad_start = PLATE_W - SPRING_PAD_W
-    pad_overlap = (
-        (ARC_R - half_plate) * (reach - pad_start)
-        - ARC_R * (reach**2 - pad_start**2) / (2.0 * PLATE_W)
-    )
-    return gross - math.pi * radius**2 - PLATE_T * reach + circle_plate_overlap - pad_overlap
-
-
 def _assert_edge_rib_end_planes(adapter) -> None:
     """Read the inner caps and depths; outer caps may merge with earlier faces."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
@@ -806,106 +774,169 @@ def _assert_edge_rib_end_planes(adapter) -> None:
                 f"{name}: native end planes {planes} mm do not establish {(inner, outer)} mm"
             )
         _telemetry.success(
-            f"{name}: native depth {depth_mm} mm; end planes {sorted(planes)} mm; "
-            f"outer boundary {outer} mm"
+            f"{name}: native depth {depth_mm:.2f} mm; end planes {sorted(planes)} mm; "
+            f"inner cap {inner:.2f} mm; outer boundary {outer:.2f} mm"
         )
+
+
+async def _rib_profile_sketch(
+    adapter, stem: str, drive_jobs: list[tuple[str, str]], *, middle: bool = False
+) -> None:
+    """One G1 positive-X profile; the middle's negative-X tangents are unchanged.
+
+    Native tangencies, radii and end-point dimensions derive the flank
+    stations. Rounded design-report coordinates are never independent knobs.
+    The closing line lies wholly inside the coefficient plate, so it creates
+    no vertical rib-tip face in the merged solid.
+    """
+    rib = SketchDims()
+    check(f"{stem} sketch", await adapter.create_sketch("Front"))
+
+    async def line(a, b, label):
+        return check(
+            f"{stem} {label}", await adapter.add_line(a[0], a[1], b[0], b[1])
+        )
+
+    async def arc(center, a, b, label):
+        return check(
+            f"{stem} {label}",
+            await adapter.add_arc(
+                center[0], center[1], a[0], a[1], b[0], b[1]
+            ),
+        )
+
+    set_sketch_direct_db(adapter, True)
+    upper_blend = await arc(
+        UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R1 blend"
+    )
+    end = await line(UPPER.end_xy, LOWER.end_xy, "buried closing line")
+    lower_blend = await arc(
+        LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R1 blend"
+    )
+    upper_flank = await line(UPPER.wrap_xy, UPPER.flank_xy, "upper tangent flank")
+    lower_flank = await line(LOWER.flank_xy, LOWER.wrap_xy, "lower tangent flank")
+    negative_top = negative_bottom = None
+    if middle:
+        tangent_x = ARC_R**2 / TIP_X
+        tangent_y = ARC_R * math.sqrt(1.0 - ARC_R**2 / TIP_X**2)
+        top, bottom = (tangent_x, tangent_y), (tangent_x, -tangent_y)
+        wrap = await arc((0.0, 0.0), UPPER.wrap_xy, top, "upper wrap")
+        negative_top = await line(top, (TIP_X, 0.0), "counter upper tangent")
+        negative_bottom = await line((TIP_X, 0.0), bottom, "counter lower tangent")
+        lower_wrap = await arc((0.0, 0.0), bottom, LOWER.wrap_xy, "lower wrap")
+    else:
+        wrap = await arc((0.0, 0.0), UPPER.wrap_xy, LOWER.wrap_xy, "pivot wrap")
+        lower_wrap = wrap
+    set_sketch_direct_db(adapter, False)
+
+    check(
+        f"{stem} wrap origin",
+        await adapter.add_sketch_constraint(f"{wrap}.center", "origin", "coincident"),
+    )
+    check(
+        f"{stem} wrap radius",
+        await adapter.add_sketch_dimension(wrap, None, "radial", ARC_R),
+    )
+    rib.record(f"{stem}ArcR", '"ArcR"')
+    if middle:
+        check(
+            f"{stem} common wrap circle",
+            await adapter.add_sketch_constraint(wrap, lower_wrap, "coradial"),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{end}.start", *UPPER.end_xy, f"{stem} actual upper end"
+    )
+    rib.record("RibReach" if stem == "EdgeRibFront" else f"{stem}Reach", '"RibReach"')
+    rib.record(f"{stem}TopY", '"CoefficientTopY"')
+    check(
+        f"{stem} closing line vertical",
+        await adapter.add_sketch_constraint(end, None, "vertical"),
+    )
+    await dimension_between(
+        adapter, f"{end}.start", f"{end}.end", "vertical_distance",
+        COEFFICIENT_T, f"{stem} plate thickness",
+    )
+    rib.record(f"{stem}PlateThickness", '"CoefficientT"')
+    for blend, endpoint, suffix in (
+        (upper_blend, f"{end}.start", "Upper"),
+        (lower_blend, f"{end}.end", "Lower"),
+    ):
+        check(
+            f"{stem} {suffix} blend radius",
+            await adapter.add_sketch_dimension(blend, None, "radial", RIB_BLEND_R),
+        )
+        rib.record(f"{stem}{suffix}BlendR", '"RibBlendR"')
+        check(
+            f"{stem} {suffix} blend flat tangency",
+            await adapter.add_sketch_constraint(
+                f"{blend}.center", endpoint, "vertical_points"
+            ),
+        )
+    pairs = [
+        (upper_blend, upper_flank), (upper_flank, wrap),
+        (lower_blend, lower_flank), (lower_flank, lower_wrap),
+    ]
+    if middle:
+        pairs += [(wrap, negative_top), (lower_wrap, negative_bottom)]
+        await anchor_point_to_origin(
+            adapter, f"{negative_top}.end", TIP_X, 0.0, f"{stem} counter tip"
+        )
+        rib.record(f"{stem}CounterReach", '"SumH"')
+    for index, (first, second) in enumerate(pairs):
+        check(
+            f"{stem} tangent {index}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
+    await ensure_fully_defined(adapter, f"{stem} common tangent profile")
+    check(f"{stem} exit sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{stem}Profile")
+    drive_jobs += rib.apply(adapter, f"{stem}Profile")
+
+
+def _assert_native_rib_profile(adapter, stem: str) -> None:
+    """Prove both real flanks and both R1 blend surfaces, not only the sketch."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    raw = model.FeatureByName(stem)
+    if raw is None:
+        raise RuntimeError(f"{stem}: missing native profile feature")
+    found_flanks: set[int] = set()
+    found_blends: set[int] = set()
+    for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        if surface.IsPlane():
+            values = tuple(float(value) for value in surface.PlaneParams)
+            normal, point = values[:3], values[3:]
+            for index, branch in enumerate((UPPER, LOWER)):
+                expected = (*branch.normal_xy, 0.0)
+                aligned = abs(sum(a * b for a, b in zip(normal, expected, strict=True)))
+                offset = sum(a * b for a, b in zip(expected, point, strict=True)) * 1000.0
+                if aligned > 1.0 - 1e-8 and abs(offset - ARC_R) < 1e-5:
+                    found_flanks.add(index)
+        elif surface.IsCylinder():
+            values = tuple(float(value) for value in surface.CylinderParams)
+            if len(values) != 7 or abs(abs(values[5]) - 1.0) > 1e-8:
+                continue
+            for index, branch in enumerate((UPPER, LOWER)):
+                if (
+                    math.dist(tuple(value * 1000.0 for value in values[:2]), branch.center_xy) < 1e-5
+                    and abs(values[6] * 1000.0 - RIB_BLEND_R) < 1e-5
+                ):
+                    found_blends.add(index)
+    if found_flanks != {0, 1} or found_blends != {0, 1}:
+        raise RuntimeError(
+            f"{stem}: native tangent profile lost flanks {found_flanks} "
+            f"or bounded blends {found_blends}"
+        )
+    _telemetry.success(f"{stem}: both native tangent flanks and R1 profile blends")
 
 
 async def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
-    """Feature 4: Front-plane rib -- two slant lines, a vertical end face and a
-    semicircle (radius ARC_R, centred at the origin) wrapping the cylinder,
-    blind-extruded at the +-RIB_OFFSET start offset along Z (the -Z receiver
-    rib RECEIVER_RIB_T deep from +-RECEIVER_RIB_OFFSET).
-
-    Vertices (A, C on the arc; B, D the end face at RIB_PLATE_REACH, short of
-    the spring-hole column the -Z rib's span crosses, +-EDGE_RIB_END_HALF_H on
-    the slant towards (PLATE_W, 0); P on the end face at the plate's top face):
-    the arc centre is the origin (the two y-symmetric ends + the cylinder-side
-    interior point force it there), so it defines off a coincident-to-origin
-    centre + a radial dim, with A/C pinned on the y-axis.  D takes two distance
-    dims from the origin; P, on the vertical P-D, its height from the origin;
-    B its reach from the origin and its EDGE_RIB_END_STEP over P, which also
-    makes B-P vertical (a vertical relation on top would over-define).  The
-    end face is two collinear segments so the printed step runs from P, the
-    corner where the face meets the plate top -- below P the face lies inside
-    the plate and the spring pad, so the solid is the one-segment face's."""
+    """The common tangent profile, with independently preserved axial depths."""
     v_before = await _measured_volume(adapter, f"before {stem}")
-    rib = SketchDims()
-    check(f"create_sketch {name}", await adapter.create_sketch("Front"))
-    end_x = SX * -RIB_PLATE_REACH
-    a, c = (0.0, ARC_R), (0.0, -ARC_R)
-    b, d = (end_x, EDGE_RIB_END_HALF_H), (end_x, -EDGE_RIB_END_HALF_H)
-    p = (end_x, PLATE_T / 2.0)
-    interior = (SX * ARC_R, 0.0)  # cylinder-side point the arc passes through
-    set_sketch_direct_db(adapter, True)
-    line_ab = check(f"{name} line A-B", await adapter.add_line(*a, *b))
-    line_bp = check(f"{name} end step B-P", await adapter.add_line(*b, *p))
-    line_pd = check(f"{name} end face P-D", await adapter.add_line(*p, *d))
-    line_dc = check(f"{name} line D-C", await adapter.add_line(*d, *c))
-    arc, _, _ = await _three_point_arc(adapter, c, a, interior, f"{name} arc")
-    set_sketch_direct_db(adapter, False)
-    check(
-        f"{name} arc centre -> origin",
-        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
-    )
-    # Six display dims, recorded in creation order: the arc radius (-> "ArcR");
-    # D's horizontal then vertical distance from the origin (at +RIB_PLATE_REACH
-    # since SX=-1, unsigned magnitudes -> "RibReach", "RibEndH"); P's height
-    # (-> "PlateT" / 2); B's reach (-> "RibReach") and its step over P.
-    check(
-        f"{name} arc radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", ARC_R),
-    )
-    rib.record(f"{stem}ArcR", '"ArcR"')
-    check(
-        f"{name} arc start on y-axis",
-        await adapter.add_sketch_constraint(
-            f"{arc}.start", "origin", "vertical_points"
-        ),
-    )
-    check(
-        f"{name} arc end on y-axis",
-        await adapter.add_sketch_constraint(f"{arc}.end", "origin", "vertical_points"),
-    )
-    bottom = f"{line_dc}.start"
-    plate_top = f"{line_pd}.start"
-    top = f"{line_ab}.end"
-    await anchor_point_to_origin(adapter, bottom, *d, f"{name} end bottom")
-    rib.record(f"{stem}EndBottomX", '"RibReach"')
-    rib.record(f"{stem}EndBottomY", '"RibEndH"')
-    check(
-        f"{name} end face P-D vertical",
-        await adapter.add_sketch_constraint(line_pd, None, "vertical"),
-    )
-    await dimension_between(
-        adapter, plate_top, "origin", "vertical_distance", p[1], f"{name} plate top"
-    )
-    rib.record(f"{stem}EndPlateTopY", '"PlateT" / 2')
-    await dimension_between(
-        adapter,
-        top,
-        "origin",
-        "horizontal_distance",
-        RIB_PLATE_REACH,
-        f"{name} end reach",
-    )
-    rib.record(f"{stem}EndTopX", '"RibReach"')
-    await dimension_between(
-        adapter,
-        plate_top,
-        top,
-        "vertical_distance",
-        EDGE_RIB_END_STEP,
-        f"{name} end step over plate top",
-    )
-    rib.record(f"{stem}EndStep", '"RibEndH" - "PlateT" / 2')
-    _ = line_bp
-    await ensure_fully_defined(adapter, f"{name} sketch")
-    check(f"exit_sketch {name}", await adapter.exit_sketch())
-    name_last_feature(adapter, f"{stem}Profile")
-    drive_jobs += rib.apply(adapter, f"{stem}Profile")
+    await _rib_profile_sketch(adapter, stem, drive_jobs)
     if flip:
         extrude_at_offset(adapter, RECEIVER_RIB_T, RECEIVER_RIB_OFFSET, flip=True)
     else:
@@ -921,6 +952,7 @@ async def _edge_rib(
         # (_receiver_model_bands); only the +Z rib takes a plain name here.
         [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
         drive_jobs.append((thickness, '"RibT"'))
+    _assert_native_rib_profile(adapter, stem)
 
 
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1007,12 +1039,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     check(
         "extrude summation plate",
         await adapter.create_extrusion(
-            ExtrusionParameters(depth=PLATE_T, both_directions=True)
+            ExtrusionParameters(depth=COUNTER_WEB_T, both_directions=True)
         ),
     )
     name_last_feature(adapter, "SummationPlate")
     [web] = name_dimensions(adapter, "SummationPlate", ["WebThickness"])
-    drive_jobs.append((web, '"PlateT"'))
+    drive_jobs.append((web, '"CounterWebT"'))
 
 
 async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1054,80 +1086,10 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 7: Front-plane elongated diamond spanning the lever. Two tangent
-    lines run from each end vertex (left = +X plate edge, right = -X summation
-    tip) to two coradial arcs that wrap the cylinder -- the C# tangent / coradial
-    construction, pinned to scale by the end-vertex anchors, the arc centre at
-    the origin, and the arc radius."""
+    """Shared positive branches; unchanged negative counter-arm tangent profile."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    sd = SketchDims()
-    check("create_sketch middle rib", await adapter.create_sketch("Front"))
-    left = (SX * -RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
-    right = (TIP_X, 0.0)  # -X summation-tip vertex
-    r = ARC_R
-    # Tangent points from each end vertex to the radius-r circle at the origin.
-    tx_l, ty_l = (r * r) / left[0], r * math.sqrt(1.0 - (r * r) / (left[0] ** 2))
-    tx_r, ty_r = (r * r) / right[0], r * math.sqrt(1.0 - (r * r) / (right[0] ** 2))
-    tl_up, tr_up = (tx_l, ty_l), (tx_r, ty_r)
-    tl_dn, tr_dn = (tx_l, -ty_l), (tx_r, -ty_r)
-
-    set_sketch_direct_db(adapter, True)
-    line1 = check("middle rib line1", await adapter.add_line(*left, *tl_up))
-    arc1, _, _ = await _three_point_arc(
-        adapter, tl_up, tr_up, (0.0, r), "middle rib upper"
-    )
-    line2 = check("middle rib line2", await adapter.add_line(*tr_up, *right))
-    line3 = check("middle rib line3", await adapter.add_line(*right, *tr_dn))
-    arc2, _, _ = await _three_point_arc(
-        adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower"
-    )
-    line4 = check("middle rib line4", await adapter.add_line(*tl_dn, *left))
-    set_sketch_direct_db(adapter, False)
-
-    for seg_a, seg_b, lbl in (
-        (line1, arc1, "line1-arc1"),
-        (arc1, line2, "arc1-line2"),
-        (line3, arc2, "line3-arc2"),
-        (arc2, line4, "arc2-line4"),
-    ):
-        check(
-            f"middle rib tangent {lbl}",
-            await adapter.add_sketch_constraint(seg_a, seg_b, "tangent"),
-        )
-    # coradial forces arc2 to share arc1's centre AND radius (one circle); each
-    # tangent line runs from a fixed end-vertex to that fixed circle, so the four
-    # tangent points are pinned without an explicit symmetric relation (which,
-    # over the already-symmetric coordinates, would over-define).
-    check(
-        "middle rib coradial",
-        await adapter.add_sketch_constraint(arc1, arc2, "coradial"),
-    )
-    check(
-        "middle rib arc centre -> origin",
-        await adapter.add_sketch_constraint(f"{arc1}.center", "origin", "coincident"),
-    )
-    # Three display dims in creation order: the shared arc radius (-> "ArcR"),
-    # then each end-vertex anchor (both on the x-axis -> one horizontal dim each).
-    # left is at +RIB_PLATE_REACH (SX=-1), right at TIP_X<0 -- both unsigned
-    # magnitudes positive, so "RibReach" and "SumH" (|TIP_X|).
-    check(
-        "middle rib arc radius",
-        await adapter.add_sketch_dimension(arc1, None, "radial", r),
-    )
-    sd.record("MidRibArcR", '"ArcR"')
-    await anchor_point_to_origin(
-        adapter, f"{line1}.start", *left, "middle rib left vertex"
-    )
-    sd.record("MidRibLeftX", '"RibReach"')
-    await anchor_point_to_origin(
-        adapter, f"{line2}.end", *right, "middle rib right vertex"
-    )
-    sd.record("MidRibRightX", '"SumH"')
-    await ensure_fully_defined(adapter, "middle rib sketch")
-    check("exit_sketch middle rib", await adapter.exit_sketch())
-    name_last_feature(adapter, "MiddleRibProfile")
-    drive_jobs += sd.apply(adapter, "MiddleRibProfile")
+    await _rib_profile_sketch(adapter, "MiddleRib", drive_jobs, middle=True)
     check(
         "extrude middle rib",
         await adapter.create_extrusion(
@@ -1137,6 +1099,337 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     name_last_feature(adapter, "MiddleRib")
     [thickness] = name_dimensions(adapter, "MiddleRib", ["MiddleRibThickness"])
     drive_jobs.append((thickness, '"RibT"'))
+    _assert_native_rib_profile(adapter, "MiddleRib")
+
+
+def _assert_receiver_profile_walls(adapter) -> None:
+    """Cross-check the native pilot profile and its printed tolerance budget.
+
+    Native trimmed-face distances establish the nominal pilot clearance.
+    The independent budget includes the printed pilot band and drill wander;
+    it does not bound the finished thread cavity. Native pilot-volume/end-plane
+    gates remain separate. Later concave roots only add material.
+    """
+    from magnifying_bracket_joint_layout import (
+        receiver_pilot_step_wall_budget,
+    )
+
+    raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EdgeRibBack")
+    feature = _early_bound(raw, "IFeature")
+    sides = []
+    for raw_face in feature.GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        if surface.IsPlane():
+            normal = tuple(float(value) for value in surface.PlaneParams[:3])
+            if abs(normal[2]) > 1e-8:
+                continue
+        sides.append(face)
+    if not sides:
+        raise RuntimeError("receiver: no native longitudinal profile faces")
+    radius = TAP_DRILL_DIA / 2.0
+    z = -PLATE_L / 2.0 + RECEIVER_RIB_T / 2.0
+    for x, y, _ in LEVER_HOLE_POINTS:
+        distances = []
+        for face in sides:
+            result = face.GetClosestPointOn(x / 1000.0, y / 1000.0, z / 1000.0)
+            if result is None or len(result) != 5 or not all(
+                math.isfinite(float(value)) for value in result
+            ):
+                raise RuntimeError("receiver: invalid native trimmed-face closest point")
+            point = tuple(float(value) * 1000.0 for value in result[:3])
+            distances.append(math.dist((x, y, z), point) - radius)
+        native_clearance = min(distances)
+        expected = receiver_wall_margin(x, y, radius)
+        if not math.isclose(native_clearance, expected, abs_tol=1e-4):
+            raise RuntimeError(
+                f"receiver X{x}: native pilot-profile clearance {native_clearance:.6f} "
+                f"!= signed profile {expected:.6f}"
+            )
+        if native_clearance < RECEIVER_PILOT_WALL_MIN:
+            raise RuntimeError(
+                f"receiver X{x}: native pilot-profile clearance {native_clearance:.6f} "
+                f"below {RECEIVER_PILOT_WALL_MIN:g} mm"
+            )
+        _telemetry.success(
+            f"receiver X{x}: native pilot-profile clearance {native_clearance:.6f} mm "
+            f"outside nominal pilot radius {radius:.6f} mm"
+        )
+    for budget in receiver_pilot_wall_budget():
+        if not math.isfinite(budget.minimum_mm) or budget.minimum_mm < RECEIVER_PILOT_WALL_MIN:
+            raise RuntimeError(
+                f"receiver X{budget.x_mm}: printed-pilot longitudinal wall "
+                f"{budget.minimum_mm:.6f} below {RECEIVER_PILOT_WALL_MIN}; "
+                f"witness {budget.minimum_witness}"
+            )
+        _telemetry.success(
+            f"receiver X{budget.x_mm}: printed-pilot longitudinal wall "
+            f"{budget.minimum_mm:.6f} mm (upper {budget.upper_mm:.6f}, "
+            f"lower {budget.lower_mm:.6f}); drill allowance and wander included"
+        )
+    step_wall = receiver_pilot_step_wall_budget()
+    if not math.isfinite(step_wall) or step_wall < RECEIVER_PILOT_WALL_MIN:
+        raise RuntimeError(
+            f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
+            f"below {RECEIVER_PILOT_WALL_MIN:g} mm"
+        )
+    _telemetry.success(
+        f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
+        f">= {RECEIVER_PILOT_WALL_MIN:g} mm; RibDepth {RECEIVER_RIB_T:.2f} mm; pilot only"
+    )
+
+
+def coefficient_underside_root_geometry() -> tuple[
+    float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
+]:
+    """Nominal lower junction, tangent R1 cylinder and two inboard edge runs.
+
+    The fillet circle is externally tangent to the pivot cylinder and tangent
+    to the plate underside. Its centre is R below the underside, at distance
+    CylR + R from the pivot axis. Cap-root corner patches get a one-radius
+    neighbourhood in the native audit; neither outside body end is selected.
+    """
+    bottom, radius = COEFFICIENT_BOTTOM_Y, RIB_BLEND_R
+    runs = (
+        (-RECEIVER_RIB_OFFSET, -RIB_T / 2.0),
+        (RIB_T / 2.0, RIB_OFFSET),
+    )
+    if (
+        not all(math.isfinite(value) for value in (bottom, radius, CYL_R, PLATE_L))
+        or not -CYL_R < bottom < 0.0
+        or radius <= 0.0
+        or any(
+            not all(math.isfinite(value) for value in (start, end))
+            or not -PLATE_L / 2.0 < start - radius < end + radius < PLATE_L / 2.0
+            or end - start <= 4.0 * radius
+            for start, end in runs
+        )
+    ):
+        raise ValueError("lower plate/cylinder blend violates inboard tangent-run premises")
+    edge_x = math.sqrt(CYL_R**2 - bottom**2)
+    center_y = bottom - radius
+    center_x = math.sqrt((CYL_R + radius)**2 - center_y**2)
+    tangent = (
+        center_x * CYL_R / (CYL_R + radius),
+        center_y * CYL_R / (CYL_R + radius),
+    )
+    return edge_x, (center_x, center_y), tangent, runs
+
+
+def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]:
+    """Explicit reentrant roots only; never the outside receiver/knife caps.
+
+    The bound is a conservative r² prism around the selected edge lengths,
+    including cylindrical curvature and end-corner interactions. It bounds
+    actual ADDED native material, not the unfilleted body's bounding box.
+    """
+    end_caps = (-RECEIVER_RIB_OFFSET, RIB_OFFSET)
+    middle_caps = (-RIB_T / 2.0, RIB_T / 2.0)
+    plate_picks = [
+        [25.0, y, z]
+        for z in (*end_caps, *middle_caps)
+        for y in (COEFFICIENT_TOP_Y, COEFFICIENT_BOTTOM_Y)
+    ]
+    cylinder_picks = [[-CYL_R, 0.0, z] for z in end_caps]
+    cylinder_picks += [
+        [0.0, sign * CYL_R, z] for z in middle_caps for sign in (-1.0, 1.0)
+    ]
+    counter_picks = [
+        [-30.0, sign * COUNTER_WEB_T / 2.0, z]
+        for z in middle_caps for sign in (-1.0, 1.0)
+    ]
+    edge_x, _, _, longitudinal_runs = coefficient_underside_root_geometry()
+    longitudinal_picks = [
+        [edge_x, COEFFICIENT_BOTTOM_Y, (start + end) / 2.0]
+        for start, end in longitudinal_runs
+    ]
+    return (
+        ("RibCylinderRootFillets", cylinder_picks, 4.0 * math.tau * CYL_R),
+        ("RibCounterRootFillets", counter_picks, 4.0 * SUM_H),
+        ("RibRootFillets", plate_picks, 8.0 * RIB_REACH),
+        # Keep the established cap-root operations and their bounds unchanged.
+        # Mid-run longitudinal edges survive those rounds; the last operation
+        # joins their corner patches without tangent propagation.
+        (
+            "CoefficientUndersideRootFillets",
+            longitudinal_picks,
+            sum(end - start for start, end in longitudinal_runs) + 4.0 * RIB_BLEND_R,
+        ),
+    )
+
+
+def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
+    """Read only new fillet surfaces: bounded reach, entry and radius."""
+    raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(name)
+    feature = _early_bound(raw, "IFeature")
+    count = 0
+    underside = name == "CoefficientUndersideRootFillets"
+    if underside:
+        _, center, tangent, runs = coefficient_underside_root_geometry()
+        # A finite one-radius cap-corner neighbourhood surrounds the exact
+        # straight-run tangent section. This is not an allowance for the old
+        # families, whose reach/entry/radius bounds below remain unchanged.
+        lower_bounds = (tangent[0] - RIB_BLEND_R, tangent[1] - RIB_BLEND_R)
+        upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
+        covered_runs = set()
+        from magnifying_bracket_joint_layout import (
+            DRILLED_DIAMETER_PLUS, DRILL_WANDER_MAX, LINEAR_BAND, POSITION_BAND,
+        )
+
+        pilot_radius = (
+            (max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS) / 2.0
+            + DRILL_WANDER_MAX
+        )
+        # This X-disjointness proof covers the finite pilot, with ordinary
+        # free-edge motion and the actual-axis position band. No wall credit
+        # is taken for the material added by the concave blend.
+        receiver_inner_x = (
+            min(point[0] for point in LEVER_HOLE_POINTS)
+            - LINEAR_BAND - POSITION_BAND - pilot_radius
+        )
+        if (
+            upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
+            or upper_bounds[1] >= COEFFICIENT_TOP_Y
+        ):
+            raise RuntimeError(f"{name}: lower-junction envelope reaches a retained interface")
+    for raw_face in feature.GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        radius = None
+        if surface.IsCylinder():
+            radius = float(surface.CylinderParams[6]) * 1000.0
+        elif surface.IsTorus():
+            radius = float(surface.TorusParams[7]) * 1000.0
+        # A transition patch can be nonanalytic. It must pass the same exact
+        # bounds, but cannot stand in for a proved cylindrical/toroidal R1.
+        # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
+        # this actual trimmed fillet face gives exact directional extrema,
+        # without confusing its envelope with the plate's X44.45 free edge.
+        sheet_raw = face.CreateSheetBody()
+        if sheet_raw is None:
+            raise RuntimeError(f"{name}: cannot extract native root face for exact bounds")
+        sheet = _early_bound(sheet_raw, "IBody2")
+        extrema = []
+        directions = [
+            ((1.0, 0.0, 0.0), 0), ((0.0, 0.0, -1.0), 2), ((0.0, 0.0, 1.0), 2),
+        ]
+        if underside:
+            directions += [
+                ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
+            ]
+        for direction, axis in directions:
+            result = sheet.GetExtremePoint(direction[0], direction[1], direction[2])
+            if result is None or len(result) != 4 or not result[0] or not all(
+                math.isfinite(float(value)) for value in result[1:]
+            ):
+                raise RuntimeError(f"{name}: invalid exact native root extreme {result}")
+            extrema.append(float(result[axis + 1]) * 1000.0)
+        x_max, z_min, z_max = extrema[:3]
+        if x_max > RIB_REACH + 1e-5:
+            raise RuntimeError(
+                f"{name}: R{RIB_BLEND_R} root face grows beyond X{RIB_REACH}: {extrema}"
+            )
+        if z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
+            raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
+        if underside:
+            x_min, y_min, y_max = extrema[3:]
+            if (
+                x_min < lower_bounds[0] - 1e-5 or x_max > upper_bounds[0] + 1e-5
+                or y_min < lower_bounds[1] - 1e-5 or y_max > upper_bounds[1] + 1e-5
+                or not any(
+                    start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
+                    for start, end in runs
+                )
+            ):
+                raise RuntimeError(f"{name}: native face escapes the lower-junction envelope: {extrema}")
+            if surface.IsCylinder() and z_max - z_min > 4.0 * RIB_BLEND_R:
+                parameters = tuple(float(value) for value in surface.CylinderParams)
+                if (
+                    len(parameters) != 7 or not all(math.isfinite(value) for value in parameters)
+                    or not math.isclose(parameters[0] * 1000.0, center[0], abs_tol=1e-5)
+                    or not math.isclose(parameters[1] * 1000.0, center[1], abs_tol=1e-5)
+                    or abs(parameters[3]) > 1e-6 or abs(parameters[4]) > 1e-6
+                    or not math.isclose(abs(parameters[5]), 1.0, abs_tol=1e-6)
+                ):
+                    raise RuntimeError(f"{name}: native cylinder is not the lower tangent blend: {parameters}")
+                for index, (start, end) in enumerate(runs):
+                    if z_min <= start + 2.0 * RIB_BLEND_R and z_max >= end - 2.0 * RIB_BLEND_R:
+                        covered_runs.add(index)
+        if radius is not None:
+            if not math.isfinite(radius) or not math.isclose(
+                radius, RIB_BLEND_R, abs_tol=1e-5
+            ):
+                raise RuntimeError(
+                    f"{name}: native root radius {radius} is not R{RIB_BLEND_R}"
+                )
+            count += 1
+    if count < minimum_faces:
+        raise RuntimeError(
+            f"{name}: only {count} native R{RIB_BLEND_R} root surfaces "
+            f"for {minimum_faces} selected reentrant roots"
+        )
+    if underside and covered_runs != set(range(len(runs))):
+        raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
+
+
+async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Bounded R1 roots with no tangent propagation or geometry fallback."""
+    for name, picks, edge_length_bound in rib_root_edge_families():
+        before = await _measured_volume(adapter, f"before {name}")
+        check(
+            f"{name}: selected concave roots R{RIB_BLEND_R}, reach {RIB_REACH}",
+            await adapter.add_fillet(RIB_BLEND_R, picks, propagate=False),
+        )
+        name_last_feature(adapter, name)
+        dimension_name = "RibRootRadius" if name == "RibRootFillets" else f"{name}Radius"
+        [radius] = name_dimensions(adapter, name, [dimension_name])
+        drive_jobs.append((radius, '"RibBlendR"'))
+        after = await _measured_volume(adapter, f"after {name}")
+        addition = after - before
+        upper_bound = 2.0 * RIB_BLEND_R**2 * edge_length_bound
+        if not 0.0 < addition <= upper_bound:
+            raise RuntimeError(
+                f"{name}: native concave roots added {addition:.6f} mm^3, "
+                f"outside (0, {upper_bound:.6f}]; no redesign/fallback allowed"
+            )
+        _assert_root_feature_bounds(adapter, name, len(picks))
+        _telemetry.success(
+            f"{name}: bounded native R1 roots added {addition:.6f} mm^3"
+        )
+
+
+def _rib_radius_max_limits(adapter) -> None:
+    """Band every modeled rib blend under the title-block R1 MAX ceiling.
+
+    Profile blends, perpendicular rib-side roots and the changed longitudinal
+    coefficient underside remain native controls without a duplicate drawing
+    callout. Unchanged body junctions are not given a modeled-fillet claim.
+    """
+    owners = [
+        (f"{stem}Profile", f"{stem}{side}BlendR")
+        for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib")
+        for side in ("Upper", "Lower")
+    ]
+    owners += [
+        (name, "RibRootRadius" if name == "RibRootFillets" else f"{name}Radius")
+        for name, _, _ in rib_root_edge_families()
+    ]
+    lower, upper = deviations(RIB_BLEND_R_BAND)
+    for feature, name in owners:
+        _, dimension = _named_dimension(adapter, feature, name)
+        if not math.isclose(float(dimension.SystemValue) * 1000.0, RIB_BLEND_R, abs_tol=1e-6):
+            raise RuntimeError(f"{name}@{feature}: native blend radius changed")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = RIB_BLEND_R_TOL_TYPE
+        if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+            raise RuntimeError(f"{name}@{feature}: R1 MAX limits refused")
+        if (
+            int(tolerance.Type) != RIB_BLEND_R_TOL_TYPE
+            or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
+            or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
+        ):
+            raise RuntimeError(f"{name}@{feature}: R1 MAX limits did not persist")
+        set_dimension_display_precision(adapter, feature, name, 1)
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1148,7 +1441,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
     Authored LAST, after every rib: the middle rib's -X vertex lands on this
     station, and a rib extruded after the cut would refill it (the same trap
-    the +X hole column hit -- see RIB_PLATE_REACH). Ordering it here also
+    the +X hole column hit -- see RIB_REACH). Ordering it here also
     makes the gate below exact: inside the boss footprint the plate and rib
     material sits WITHIN the boss's own +-ANCHOR_H/2 Y span, so the cut removes
     boss height and nothing else.
@@ -1443,8 +1736,8 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     knife.record("HexHeightHalf", '"HexH" / 2')
     _driven_hex_width(adapter, width)
     knife.record("HexWidth")
-    # Text up-right of the +X shoulder, in the wedge opposite the solid's
-    # corner: the drawing keeps it there (DETAIL_KEEP), outside the hexagon.
+    # In the Front-plane model, put text up-right of the +X shoulder in
+    # the exterior wedge. Back-derived Detail D mirrors this upper-left.
     await add_angular_reference_dimension(
         adapter,
         flank,
@@ -1573,6 +1866,7 @@ def _hex_width_reference(adapter) -> None:
 
 def _drawing_dimension_contract(adapter) -> None:
     """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The knife-edge controls the free-rock check assumes (code review C09):
     # the ridge from each side face and the flank-to-side angle carry their
     # own tolerances; the vertex height three places, the title block's .XXX.
@@ -1598,9 +1892,7 @@ def _drawing_dimension_contract(adapter) -> None:
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
-    """Native coordinate dimensions from the real free edge and top face (the
-    spring pad hangs below the plate at the free edge, so its old lower-face
-    corner is no longer an edge).
+    """Native coordinates from the real free edge and fixed plate top.
 
     Each dimension runs from the free edge's top corner, a model vertex, to
     a tap centre.  Both are ends of short construction marks that lie on ink
@@ -1614,7 +1906,7 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
 
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()
-    corner = (PLATE_W, PLATE_T / 2.0)
+    corner = (PLATE_W, COEFFICIENT_TOP_Y)
     edge_end = (PLATE_W, corner[1] - RECEIVER_EDGE_MARK)
     set_sketch_direct_db(adapter, True)
     edge_mark = check(
@@ -1736,19 +2028,18 @@ async def build(adapter) -> dict[str, str]:
     # an auto "D3@Sketch5"). Every length carries an explicit ``mm`` unit: this is
     # an INCH document and the equation manager evaluates BARE numbers in document
     # units, so an unsuffixed "152.4" would read as 152.4 inches and blow the part
-    # up 25.4x. Derived globals (ArcR, RibReach, RibEndH) reference others as
-    # equation strings so a primitive edit propagates. PlateT/RibT/AnchorH
-    # are extrude depths/offsets -- feature params, not sketch dims, so nothing
-    # drives them, but they stay editable knobs (matches the exemplars).
+    # up 25.4x. Derived globals reference defining dimensions so a primitive
+    # edit propagates through tangent constraints and feature depth equations.
     # HexDepth drives the knife prism's length and the stub reference.
     await set_global(adapter, "PlateW", f"{PLATE_W}mm")
     await set_global(adapter, "PlateL", f"{PLATE_L}mm")
-    await set_global(adapter, "PlateT", f"{PLATE_T}mm")
+    await set_global(adapter, "CounterWebT", f"{COUNTER_WEB_T}mm")
+    await set_global(adapter, "CoefficientT", f"{COEFFICIENT_T}mm")
+    await set_global(adapter, "CoefficientTopY", f"{COEFFICIENT_TOP_Y}mm")
     await set_global(adapter, "CylR", f"{CYL_R}mm")
     await set_global(adapter, "RibT", f"{RIB_T}mm")
     await set_global(adapter, "ReceiverRibT", f"{RECEIVER_RIB_T}mm")
-    await set_global(adapter, "SpringSeatT", f"{SPRING_SEAT_T}mm")
-    await set_global(adapter, "SpringPadW", f"{SPRING_PAD_W}mm")
+    await set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
@@ -1769,8 +2060,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
-    # EDGE_RIB_END_HALF_H: the edge-rib slant's height at the end face.
-    await set_global(adapter, "RibEndH", '"ArcR" * (1 - "RibReach" / "PlateW")')
+    await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
 
     # Per-sketch SketchDims record each dim in the helper's emission order; their
     # drive equations are collected here and applied in one deferred batch at the
@@ -1795,9 +2085,11 @@ async def build(adapter) -> dict[str, str]:
         stem="EdgeRibBack",
         drive_jobs=drive_jobs,
     )
+    _assert_receiver_profile_walls(adapter)
     await _summation_plate(adapter, drive_jobs)
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
+    await _rib_root_fillets(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
@@ -1807,8 +2099,8 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the neutrality re-check is the proof.
-    # No analytic volume gate exists for this part (organic arcs), so capture the
-    # as-built volume and assert it is unchanged after driving.
+    # Component increments have analytic gates; the complete organic solid
+    # including native corner patches uses measured as-built neutrality.
     await force_rebuild(adapter)
     _mass = await adapter.get_mass_properties()
     if not _mass.is_success:
@@ -1821,6 +2113,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
     _assert_knife_sides_coplanar(adapter)
+    _assert_coefficient_slab(adapter)
+    _assert_boss_face_graph(adapter)
+    for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib"):
+        _assert_native_rib_profile(adapter, stem)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no
@@ -1847,6 +2143,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     _drawing_dimension_contract(adapter)
     _knife_ridge_max_limit(adapter)
+    _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
@@ -1857,6 +2154,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Receiver Isometric View Note": RECEIVER_ISOMETRIC_VIEW_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -1865,6 +2163,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     _assert_edge_rib_end_planes(adapter)
+    for name, picks, _ in rib_root_edge_families():
+        _assert_root_feature_bounds(adapter, name, len(picks))
+    name_octant_views(
+        adapter,
+        octants={"REAR-BOTTOM-RIGHT": RECEIVER_ISOMETRIC_OCTANT},
+        label=PART_NAME,
+    )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -1876,6 +2181,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
         ),
     )
     return artefacts

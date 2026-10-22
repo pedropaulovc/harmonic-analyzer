@@ -27,7 +27,10 @@ MM_PER_IN = 25.4
 # --- Nominal geometry (SummingLever.cs, inches -> mm; DIMENSIONS.md ch. 18). ---
 PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
 PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
-PLATE_T = 0.2 * MM_PER_IN  # 5.08 plate thickness
+COUNTER_WEB_T = 0.2 * MM_PER_IN  # 5.08 negative-X web, centered on Y0
+COEFFICIENT_T = 7.0  # uniform positive-X plate; thickened downward only
+COEFFICIENT_TOP_Y = 0.1 * MM_PER_IN  # fixed +2.54 seat, independent of web depth
+COEFFICIENT_BOTTOM_Y = COEFFICIENT_TOP_Y - COEFFICIENT_T  # -4.46 nut seats
 CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
@@ -83,15 +86,15 @@ KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
 # Between the stubs: both are one prism through the body
 # (``build_sm_summing_lever._hex_knife``, read back by
 # ``_assert_knife_sides_coplanar``), so each side face of one stub lies in the
-# same plane as the other's, and the print says so ("SIDES IN ONE PLANE").
-# Each ridge then stands RIDGE_FROM_SIDE +/-RIDGE_FROM_SIDE_TOL from the SAME
-# side plane, which puts the two ridges within KNIFE_STUB_RIDGE_OFFSET_MAX of
-# each other.  This bound rests on the shared planes: with each stub's sides
-# free, the symmetry would tie each ridge only to its own stub, and nothing
-# would tie the -Z ridge to datum A.  The two ridges rest on the knife mounts
-# at the stubs' mid-lengths, KNIFE_RIDGE_CONTACT_SPAN apart, so that offset
-# skews the knife axis and spreads the 20 spring holes' hook arms by up to
-# KNIFE_HOOK_ARM_SPREAD_MAX over the column.
+# same plane as the other's. The print retains the C09 symmetry-to-sides
+# wording for both stubs, not a separate coplanarity requirement.
+# Each ridge stands RIDGE_FROM_SIDE +/-RIDGE_FROM_SIDE_TOL from the SAME
+# side plane, putting the ridges within KNIFE_STUB_RIDGE_OFFSET_MAX of each
+# other. This bound rests on the shared model planes: with independent
+# stub sides, symmetry alone would not tie the +Z ridge to datum A on -Z.
+# The ridges rest on the knife mounts at the stubs' mid-lengths,
+# KNIFE_RIDGE_CONTACT_SPAN apart; their relative offset skews the knife axis
+# and spreads the spring hook arms by up to KNIFE_HOOK_ARM_SPREAD_MAX.
 KNIFE_STUB_RIDGE_OFFSET_MAX = 2.0 * RIDGE_FROM_SIDE_TOL  # 0.10
 KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 174.117 stub mid to stub mid
 
@@ -134,16 +137,15 @@ CHANNEL_PITCH = 7.0565
 # _interference_contracts, so an import would put the gear-train and channel
 # config into every assembly's closure. test_sm_summing_lever_drawing pins it.
 HOLE_Z_OFFSET = -3.52825
-# The 5.08 plate leaves a #6-32 only 1.1D of full thread, so a continuous pad
-# along the hole row's underside (owner ruling 2026-10-16, option B; the
-# user's ask timed out and the recommended option was auto-selected) gives
-# each tap 1.5D at the title block's .XX band
-# (``sm_summing_lever_notes`` proves it).  SPRING_SEAT_T is the tap's whole
-# length: plate top to pad underside, where each MHA-CH-14 jam nut seats.
-# The pad runs the plate's full length and in from its free +X edge past the
-# nut's O.D.
-SPRING_SEAT_T = 7.0
-SPRING_PAD_W = 10.0
+# The whole coefficient plate now supplies the spring tap's 1.5D engagement
+# at the title block's ordinary .XX band. Its top and underside remain the
+# existing spring-eye and jam-nut seats; there is no separate pad or step.
+# All three positive-X rib branches use one tangent wrap/flank/root profile.
+RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
+RIB_REACH = HOLE_X - 4.1  # 35.75; clear of the worst nut footprint at X36.45
+RIB_BLEND_R = 1.0  # modeled at the R1.0 MAX internal blend limit
+RIB_BLEND_R_BAND = (0.0, -RIB_BLEND_R)  # (upper, lower), R1.0 MAX
+RIB_BLEND_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 
 # The sm-vn-counter-spring lower anchor (McMaster 9490T1, part ``sm-vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
@@ -166,6 +168,12 @@ KNIFE_HOOK_ARM_SPREAD_MAX = (
     * (HOLE_Z_LAST - HOLE_Z_FIRST)
     / KNIFE_RIDGE_CONTACT_SPAN
 )
+
+# Noncritical body-end length uses the ordinary .X ±0.8 mm title-block band.
+# Author its places on the part; the drawing must import them unchanged.
+# This changes no nominal geometry or entry-relative receiver depth/location.
+DRAWING_PRECISION = {"CoefficientsPlate": {"PlateLength": 1}}
+
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
 # ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --

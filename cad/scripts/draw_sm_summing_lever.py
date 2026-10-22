@@ -10,18 +10,14 @@ bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
 taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
-print controls thread identity and position, never a seat bore.  Sheet 1
-shows a 1:2 front profile (the boss, web and the rib outline every rib
-shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
-1:2 top plan (plate, ribs, cylinder, summation web, trunnion length, the
-anchor taps and their pattern control, and the VIEW F arrow onto the -Z
-end), a 1:1 partial section C-C of the plate's thickness, a 4:1 section H-H
-cut in the front profile along the outer receiver tap through the -Z end
-rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
-two bracket receiver taps and the spring-anchor pad under the plate they sit
-in, so the end rib's slant over each tap reads, and the tap row's centreline
-through the hex centre.  Sheet 1
-runs at 1:2.
+print controls thread identity and position, never a seat bore. Sheet 1
+shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
+Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
+view, and a shaded underside isometric. VIEW F carries the blind bracket
+receivers, the uniform coefficient plate's visible free-end thickness and
+the receiver row's centreline through the hex centre.
+The ordinary views and native receiver drill/thread-depth callout retain
+the manufacturing definition without auxiliary sections.
 
 Run with SolidWorks open::
 
@@ -53,11 +49,12 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
     set_basic_dimension,
     set_dimension_callouts,
-    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
@@ -73,21 +70,19 @@ from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _section_axis import position_section_caption
 from _surface_finish import MACHINED, MACHINED_UM, surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     LEVER_HOLE_POINTS,
-    RIB_DEPTH,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
@@ -100,14 +95,19 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
-    REFERENCE_DIMENSIONS,
     SPRING_TAP_CALLOUT_PROCESS,
+    RECEIVER_ISOMETRIC_OCTANT,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
     CHANNEL_PITCH,
+    COEFFICIENT_BOTTOM_Y,
+    COEFFICIENT_T,
+    COEFFICIENT_TOP_Y,
     COUNTER_HOLE_SPEC,
+    COUNTER_WEB_T,
+    DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
@@ -122,8 +122,8 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R_TOL_TYPE,
     KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
-    PLATE_T,
     PLATE_W,
+    RIB_REACH,
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
@@ -159,132 +159,32 @@ _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 FRONT_CENTER = (0.225, 0.235)
 TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
 ISO_CENTER = (0.350, 0.225)
-# 40 mm below the sheet's top band, so the view and its callouts centre in
-# the field above the title block (machinist review r10: at 0.190 they
-# bunched along the top edge over an empty lower two-thirds).
-BACK_CENTER = (0.225, 0.150)
+# R7's receiver callout entered the title block (top Y66 mm), while its
+# left-hand stations entered D. Translate the complete 1:1 field +35/+50 mm:
+# the native view outline becomes X264.3..405.7, Y129.2..170.8 mm.
+BACK_CENTER = (0.335, 0.150)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
-# Detail D: the trunnion envelope at 4:1, in the open field left of the front
-# profile.  The fence (6 model mm) holds the hexagon (5.13 half-height, 3.5
-# sheet mm to spare) and none of the rib or web outline (the R15.24 rib arc,
-# 7.6 sheet mm out).  Centred on the axis, the hexagon prints at
-# DETAIL_CENTER, its fence 24 mm round it: at 7.5 model mm (30 sheet mm) the
-# flank angle's text, which must stand outside the fence, pushed its arc up
-# into the ridge pair's line (stack r4 render).  The centre stands low enough
-# that the ridge pair's line clears that arc and the callout over it stays
-# under the border, and far enough right that the vertex height's four lines
-# fit between the border and the fence.  The label hangs below the width's
-# dimension line, clear of section C-C's caption.  D, not A: A is the datum
-# letter (machinist review r5: one letter named both).
+# One complete 10:1 knife detail in sheet 2's open left field. A 6 mm model
+# fence holds the entire envelope and ridge round without the pivot rib.
+# It is cut from VIEW F so no extra parent view or cross-sheet move is needed.
 DETAIL_LETTER = "D"
-DETAIL_CENTER = (0.079, 0.208)
-DETAIL_SCALE = (4.0, 1.0)
+DETAIL_CENTER = (0.115, 0.150)
+DETAIL_SCALE = (10.0, 1.0)
 DETAIL_RADIUS_MM = 6.0
-DETAIL_LABEL_XY = (0.079, 0.176)
-# The parent circle's letter, below the rib arc, tied to the 6 mm fence by
-# the leader style's leader: machinist review r6 read the bare fence, the
-# letter outside the rib arc, as an unsized feature.  The letter's top
-# prints ~0.2235, its leader dropping ~9 mm from the fence across the arc,
-# between the rib-arc and cylinder leaders.
-DETAIL_LETTER_OFFSET = (0.0, -0.016)
+DETAIL_LABEL_XY = (0.115, 0.071)
+# R11's left-facing D shoulder crossed ReceiverX0 at (365,180) mm.
+# Target (400,170), right of its text and below its Y173 mm underline,
+# keeping the shoulder-to-circle route below that dimension.
+# SetLabelPosition leaves the source circle and datum A unchanged.
+DETAIL_LETTER_OFFSET = (0.085, 0.020)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
-# Detail E: the knife-edge vertex at 10:1, cut from Detail D, carrying datum
-# A and the ridge round's R0.1 MAX (code review C09: D's top now holds the
-# ridge-to-side dimensions, which a leader from the round would cross).  The
-# fence, 1.5 model mm round the theoretical sharp (6 mm in D), holds the
-# round and both flanks; at 10:1 it prints 15 mm round RIDGE_DETAIL_CENTER in
-# the free field under section C-C, the label below it.
-RIDGE_DETAIL_LETTER = "E"
-RIDGE_DETAIL_CENTER = (0.070, 0.075)
-RIDGE_DETAIL_SCALE = (10.0, 1.0)
-RIDGE_DETAIL_RADIUS_MM = 1.5
-RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
-# E's letter up-right of the vertex in D, outside E's fence, between the +X
-# ridge-to-side dimension's extension lines and under its dimension line
-# (the vertex height's upper extension line runs left from the vertex).
-RIDGE_DETAIL_LETTER_OFFSET = (0.009, 0.0045)
-
-# Section C-C: the plate's own thickness.  Every end view shows the end ribs
-# over the plate and the spring-anchor pad below its free edge, so no view
-# shows the 5.08 edge-on; a partial cut across the plate alone, between two
-# spring taps (mid-pitch, clear of both), shows it at 1:1 under Detail D's
-# label.  The cut runs in the plan from just outboard of the cylinder
-# (R12.70) past the free edge; the value stands beyond the cut's inboard end,
-# the caption above.  The cut looks up the sheet (machinist review r7: looking
-# down it, the pad printed at the section's left, mirrored from the plan), so
-# its arrows and letters stand 14..20 mm over it: the cut sits five pitches
-# down the column from its old station, at sheet y ~0.139, its letters at
-# ~0.153..0.159, under the -Z end rib (0.168) and over the mid rib's 5.08
-# (its text 0.1355..0.139 right of the free edge, 4.8 mm right of the cut's
-# arrow); its outboard end runs 8.5 mm past the free
-# edge so that letter (x 0.259..0.265) clears the hole column's centre marks.
-PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 1.5) * CHANNEL_PITCH
-PLATE_SECTION_X = (14.0, PLATE_W + 8.5)
-PLATE_SECTION_SCALE = (1, 1)
-PLATE_SECTION_CENTER = (0.075, 0.130)
-PLATE_SECTION_CAPTION_XY = (0.075, 0.150)
-# Model mm in the cutting plane: the anchor landed on PLATE_SECTION_CENTER
-# (the plate's mid-plane midway along the cut), and the value's text, 6 mm
-# past the cut's inboard end on that mid-plane.
-_PLATE_SECTION_ANCHOR_MM = (sum(PLATE_SECTION_X) / 2.0, 0.0, PLATE_SECTION_Z)
-PLATE_SECTION_TEXT_MM = {"PlateThickness": (PLATE_SECTION_X[0] - 6.0, 0.0, PLATE_SECTION_Z)}
-
-# Section H-H: the outer bracket receiver tap (x 29.7, 14.75 from the free
-# edge) cut along its axis, so the thread reads inside the -Z end rib's full
-# height with the solid plate beyond the drill point (machinist review r16
-# read the taps as centred in section C-C's bare 5.08 plate).  The cut is
-# taken in VIEW G, the end profile, where the line crosses only the rib and
-# plate: in the plan its arrows would cross VIEW F's arrow or the 20X frame's
-# leader, and in VIEW F its letters would sit on the 14.75/28.45 extension
-# lines.  The line runs from 11 mm under the mid-plane (3 mm below the rib)
-# to 16 mm over it and looks +X (arrows pointing right, letters right of the
-# line), so the upper letter stands over the 0.44 step's extension lines
-# (sheet y 0.2363) and under 35.75's dimension line (0.2484), the lower one
-# in open field; looking -X, both would print on the boss.  The removed
-# section, cut face only at 4:1 (machinist review r17: at 1:1 the blind
-# drill barely read), is cropped by a circle round the end rib and
-# TAP_SECTION_PLATE_BEYOND of plate past the rib, a break line where the
-# plate is cut off, in the free field under the plan's boss-axis 76.20
-# (0.092) between Detail E (x 0.086) and that dimension's extension line
-# (x 0.197), its caption below it over the bottom border (0.012).  Its
-# content spans about x 0.121..0.169 and y 0.044..0.084.  GetDetailCircleInfo2
-# answers the crop's unprinted profile with a label point on the sheet
-# (farm r17b/r17c, as draw_fr_nameplate's section A-A), which the layout
-# audit reports as an outside-border, unmatched detail circle.
-TAP_SECTION_LETTER = "H"
-TAP_SECTION_HOLE = max(LEVER_HOLE_POINTS, key=lambda point: point[0])
-TAP_SECTION_LINE_Y = (-11.0, 16.0)
-TAP_SECTION_SCALE = (4, 1)
-TAP_SECTION_PLATE_BEYOND = 4.0
-_TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
-# Centre the crop relative to the receiver depth, not the superseded rib.
-# Its radius leaves the plate faces 0.20 beyond the break while retaining
-# both full-height rib end corners. These are view extents, not part sizes.
-_TAP_SECTION_ANCHOR_MM = (
-    TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + RIB_DEPTH / 2.0 + 1.1
-)
-TAP_SECTION_CROP_RADIUS = math.hypot(
-    _TAP_SECTION_FAR_Z + 0.20 - _TAP_SECTION_ANCHOR_MM[2], PLATE_T / 2.0
-)
-TAP_SECTION_CENTER = (0.140, 0.064)
-TAP_SECTION_CAPTION_XY = (0.145, 0.037)
-# A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
-# overrunning both faces (model z, y), draw_fr_nameplate's SECTION_BREAK.
-_TAP_BREAK_OVERRUN = 0.8
-TAP_SECTION_BREAK = (
-    (_TAP_SECTION_FAR_Z, PLATE_T / 2.0 + _TAP_BREAK_OVERRUN),
-    (_TAP_SECTION_FAR_Z, 0.8),
-    (_TAP_SECTION_FAR_Z + 0.6, 0.3),
-    (_TAP_SECTION_FAR_Z - 0.6, -0.3),
-    (_TAP_SECTION_FAR_Z, -0.8),
-    (_TAP_SECTION_FAR_Z, -PLATE_T / 2.0 - _TAP_BREAK_OVERRUN),
-)
-# SolidWorks prints a section's cosmetic thread dashed, as a hidden thread
-# (machinist review r17, rule 9); draw_pn_pen_v_block's precedent imports
-# H-H's thread and moves it onto a visible thin continuous layer of its own.
-TAP_THREAD_LAYER = "TAP-THREAD-SECTION"
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+# Match the builder's native nominal checks (1e-6 mm), not manufacturing
+# deviations or settled-state equality. Equation-driven SI readbacks need not
+# equal the requested decimal after SolidWorks' document-unit round trip.
+_NATIVE_NOMINAL_TOL_M = 1e-9
 
 # The -Z end rib's ordinary depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
@@ -307,13 +207,10 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
 def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     """The one visible line of the +Z end face crossing model ``x_mm``.
 
-    In the plan the +Z end (bottom of the view) shows a single line at
-    z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
-    end edge out to the rib's vertical end face at RIB_PLATE_REACH (35.75,
-    0.44 proud of the plate there); the plate's end edge shows only beyond it.
-    The end rib's inboard flange edge sits 5.08 mm up the sheet and the rib's
-    underside edge (y < 0) is hidden, so exactly one visible +y line at that z
-    spans the requested x; anything else is a changed model and fails loud.
+    The plan shows the common positive rib's outer top edge up to its
+    tangent blend into the coefficient plate. Beyond the blend the actual
+    plate-top edge is visible. Inboard flange and underside edges cannot
+    substitute for this outer end face.
     """
     z_mm = PLATE_L / 2.0
     matches = [
@@ -332,35 +229,103 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     return matches[0]
 
 
-def _knife_detail(adapter: Any, front: Any) -> Any:
-    """A native 4:1 detail of the trunnion end in the front profile."""
+def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
+    """Locate the boss from two actual Y faces, not the plate midplane.
+
+    The +Y boss rim is edge-on in VIEW G; its native circle still identifies
+    the real end face Y=ANCHOR_H/2. The other pick is the coefficient top's
+    straight +Z end edge, beyond the rib reach, at Y=COEFFICIENT_TOP_Y.
+    The builder independently proves the counterweb's actual top is flush
+    with that plate top. Together with the imported boss height and web
+    thickness, this closes the face graph without a construction datum.
+    """
+    label = "boss upper face above coefficient top"
+    edges = scan_view_edges(front, label="VIEW G face locations")
+    boss = edges.circle_at(
+        (TIP_X, ANCHOR_H / 2.0, 0.0), ANCHOR_R,
+        axis=(0.0, 1.0, 0.0), label="boss upper-face rim",
+    )
+    plate_point = (
+        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0,
+    )
+    plate = edges.exact_line_through(plate_point, label="coefficient top end edge")
+    points_mm = (
+        (TIP_X, ANCHOR_H / 2.0, ANCHOR_R),
+        plate_point,
+    )
+    expected_mm = ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y
+    if expected_mm <= 0.0 or not math.isclose(
+        COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y, abs_tol=1e-9,
+    ):
+        raise RuntimeError(f"{label}: source face graph is not upper/flush")
+
+    def project_faces() -> list[tuple[float, float]]:
+        points = model_points_in_view(
+            adapter, front,
+            [tuple(value / 1000.0 for value in point) for point in points_mm],
+            label=label,
+        )
+        scale = tuple(_early_bound(front, "IView").ScaleRatio)
+        if len(scale) != 2 or any(
+            type(value) not in (int, float) or not math.isfinite(value) or value <= 0.0
+            for value in scale
+        ):
+            raise RuntimeError(f"{label}: invalid native view scale {scale!r}")
+        projected_rise = points[0][1] - points[1][1]
+        if not math.isclose(
+            projected_rise, expected_mm / 1000.0 * scale[0] / scale[1],
+            rel_tol=0.0, abs_tol=1e-8,
+        ):
+            raise RuntimeError(
+                f"{label}: VIEW G does not project the actual boss top above the plate top"
+            )
+        return points
+
+    boss_xy, plate_xy = project_faces()
+    dimension = add_edge_dimension(
+        adapter, front, p0=boss_xy, p1=plate_xy,
+        text_xy=BOSS_FACE_LOCATION_XY, label=label, orientation="vertical",
+        entities=(boss.edge, plate.edge),
+    )
+
+    def check_faces() -> None:
+        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+            raise RuntimeError(f"{label}: cannot activate its native owner sheet")
+        project_faces()
+        measured = assert_dimension_measures(
+            adapter, dimension, expected_mm=expected_mm, label=label,
+            entities=(boss.edge, plate.edge),
+        )
+        display = _early_bound(dimension, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+        places = display.GetPrimaryPrecision2()
+        if places == -2:  # swPrecisionFollowsDocumentSetting
+            extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+            # Same linear-document precision readback as draw_ch_pivot_bracket.
+            places = extension.GetUserPreferenceInteger(24, 206)
+        if places != 2 or tolerance.Type != 0:  # ordinary .XX, no explicit band
+            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
+        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XX")
+
+    check_faces()
+    return check_faces
+
+
+def _knife_detail(adapter: Any, back: Any) -> Any:
+    """The complete native 10:1 knife envelope and ridge-round detail."""
     return _detail_view(
         adapter,
-        front,
-        centre_mm=(0.0, 0.0, 0.0),
-        radius_m=DETAIL_RADIUS_MM * _S / 1000.0,
+        back,
+        centre_mm=(0.0, 0.0, -PLATE_L / 2.0 - HEX_DEPTH),
+        radius_m=DETAIL_RADIUS_MM / 1000.0,
         at_xy=DETAIL_CENTER,
         scale=DETAIL_SCALE,
         letter=DETAIL_LETTER,
         label_xy=DETAIL_LABEL_XY,
         letter_offset=DETAIL_LETTER_OFFSET,
         label="knife detail",
-    )
-
-
-def _ridge_detail(adapter: Any, detail: Any) -> Any:
-    """A native 10:1 detail of Detail D's knife-edge vertex (Detail E)."""
-    return _detail_view(
-        adapter,
-        detail,
-        centre_mm=(0.0, HEX_H / 2.0, PLATE_L / 2.0 + HEX_DEPTH),
-        radius_m=RIDGE_DETAIL_RADIUS_MM * DETAIL_SCALE[0] / 1000.0,
-        at_xy=RIDGE_DETAIL_CENTER,
-        scale=RIDGE_DETAIL_SCALE,
-        letter=RIDGE_DETAIL_LETTER,
-        label_xy=RIDGE_DETAIL_LABEL_XY,
-        letter_offset=RIDGE_DETAIL_LETTER_OFFSET,
-        label="ridge detail",
     )
 
 
@@ -608,7 +573,7 @@ def _add_view_arrow(
 
 
 def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove Detail E's KnifeRidgeRadius prints the part's R MAX: radial,
+    """Prove Detail D's KnifeRidgeRadius prints the part's R MAX: radial,
     measuring KNIFE_RIDGE_R, the native swTolMAX the part set
     (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
     found = [
@@ -631,38 +596,37 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
             f"KnifeRidgeRadius lost its native MAX type: {int(tolerance.Type)}"
         )
     if not math.isclose(
-        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9
+        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0,
+        rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
     ):
         raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-# Datum A's box over the vertex in Detail E, inside E's 15 mm fence: the
-# request is the box's foot, the box 7 mm tall (at 0.008 its top sat on the
-# fence, r14).
-RIDGE_DATUM_RISE = 0.006
+# Datum A's box stands above the actual ridge round in Detail D.
+RIDGE_DATUM_RISE = 0.001
 
 
-def _ridge_datum(adapter: Any, ridge_detail: Any) -> Any:
-    """Datum A on the knife-edge ridge itself, seen end-on in Detail E: the
-    tag stands on the R0.1 round's arc at the vertex.  In the plan, A hung
+def _ridge_datum(adapter: Any, detail: Any) -> Any:
+    """Datum A on the knife-edge ridge itself, seen end-on in Detail D: the
+    tag stands on the R0.1 round's arc at the vertex. In the plan, A hung
     on the -Z ridge's tangent line down the stub's middle, which machinist
     review r9 read as a flat face, leaving no basic from A to the 20 holes;
     end-on it can only be the ridge line, the knife-edge pivot axis that the
     39.85 basic and the web arcs' "AXIS A" both name."""
-    z_mm = PLATE_L / 2.0 + HEX_DEPTH
+    z_mm = -PLATE_L / 2.0 - HEX_DEPTH
     half = math.radians(RIDGE_ANGLE_DEG) / 2.0
     centre_y = HEX_H / 2.0 - KNIFE_RIDGE_R / math.sin(half)
-    edges = scan_view_edges(ridge_detail, label="ridge detail datum")
+    edges = scan_view_edges(detail, label="knife detail datum")
     ridge_round = edges.circle_at(
         (0.0, centre_y, z_mm),
         KNIFE_RIDGE_R,
         axis=(0.0, 0.0, 1.0),
-        label="+Z knife-edge ridge round",
+        label="-Z knife-edge ridge round",
     )
     crest, vertex = model_points_in_view(
         adapter,
-        ridge_detail,
+        detail,
         [
             _metres((0.0, centre_y + KNIFE_RIDGE_R, z_mm)),
             _metres((0.0, HEX_H / 2.0, z_mm)),
@@ -672,30 +636,36 @@ def _ridge_datum(adapter: Any, ridge_detail: Any) -> Any:
     )
     return add_datum_feature(
         adapter,
-        ridge_detail,
+        detail,
         edge_entity=ridge_round.edge,
         leader_attach_xy=crest,
         symbol_xy=(vertex[0], vertex[1] + RIDGE_DATUM_RISE),
         datum="A",
         label="knife-edge pivot axis",
+        position_tolerance_m=0.003,
     )
 
 
-# The ridge centreline runs the +Z stub's length and 2 model mm past its
-# outboard face: 1 sheet mm, ending 1.5 mm above 44.45's dimension line.
+# The plan's theoretical-sharp reference belongs to the -Z stub tagged A in
+# Detail D. Its overrun extends 2 model mm past that stub's outboard face.
 RIDGE_AXIS_OVERRUN_MM = 2.0
 
 
 def _ridge_centerline(adapter: Any, top: Any) -> Any:
-    """An owned centreline on the +Z knife ridge's theoretical sharp in the
-    plan (draw_sm_knife_mount._add_section_axes's idiom): the round leaves
-    no edge on the ridge itself, and rule 16 dimensions to the sharp."""
+    """Theoretical-sharp centreline on datum A's -Z knife ridge in the plan.
+
+    Both stubs share this nominal axis, but only the -Z ridge carries A.
+    The round leaves no sharp edge; rule 16 dimensions to the sharp.
+    """
     return _owned_centerline(
         adapter,
         top,
         tuple(
             (0.0, HEX_H / 2.0, z)
-            for z in (PLATE_L / 2.0, PLATE_L / 2.0 + HEX_DEPTH + RIDGE_AXIS_OVERRUN_MM)
+            for z in (
+                -PLATE_L / 2.0,
+                -PLATE_L / 2.0 - HEX_DEPTH - RIDGE_AXIS_OVERRUN_MM,
+            )
         ),
         label="ridge centreline",
     )
@@ -769,125 +739,194 @@ def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
 
-def _plate_section(adapter: Any, top: Any) -> Callable[[], None]:
-    """Section C-C across the plate (PLATE_SECTION_* above): cut face only,
-    looking up the sheet so the free edge and its pad print on the right as
-    in the plan, turned +Y up and landed on PLATE_SECTION_CENTER
-    (draw_pd_platen's ``_orient_section``/``_centre_section``), carrying the
-    plate thickness."""
-    line = model_points_in_view(
-        adapter,
-        top,
-        [_metres((x, PLATE_T / 2.0, PLATE_SECTION_Z)) for x in PLATE_SECTION_X],
-        label="section C-C line",
-        names=("inboard", "outboard"),
-    )
-    section = create_section_view(
-        adapter,
-        top,
-        line_start=line[0],
-        line_end=line[1],
-        view_xy=PLATE_SECTION_CENTER,
-        section_label="C",
-        scale=PLATE_SECTION_SCALE,
-        partial=True,
-        label="plate thickness section",
-    )
-    native = _early_bound(section, "IView")
-    cut = _early_bound(native.GetSection(), "IDrSection")
-    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
-    # dedicated bool getter may be truth-tested.
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="section C-C cut face only")
-    if not cut.GetDisplayOnlySurfaceCut():
-        raise RuntimeError("section C-C retained geometry beyond the cutting plane")
-    _hidden_lines_removed_without_greyed_pass(native)
-    anchor = _metres(_PLATE_SECTION_ANCHOR_MM)
-    above = _metres(
-        (_PLATE_SECTION_ANCHOR_MM[0], 1.0, _PLATE_SECTION_ANCHOR_MM[2])
-    )
-    free_edge = _metres((PLATE_W, 0.0, PLATE_SECTION_Z))
-
-    def turn_up(stage: str) -> None:
-        for attempt in range(3):
-            origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
-            up = model_point_in_view(adapter, native, above, label="C-C +Y")
-            dx, dy = up[0] - origin[0], up[1] - origin[1]
-            if dy > 0.0 and abs(dx) <= 1e-7:
-                return
-            native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
-            rebuild_drawing(
-                adapter, label=f"section C-C turned ({stage}), pass {attempt}"
-            )
-        raise RuntimeError(f"section C-C does not run +Y up: ({dx:g}, {dy:g})")
-
-    def free_edge_dx() -> float:
-        origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
-        edge = model_point_in_view(adapter, native, free_edge, label="C-C free edge")
-        return edge[0] - origin[0]
-
-    turn_up("as cut")
-    if free_edge_dx() < 0.0:
-        reversed_cut = not bool(cut.GetReversedCutDirection())
-        cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="section C-C looks up the sheet")
-        if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("section C-C cut direction did not persist")
-        turn_up("reversed")
-    if not free_edge_dx() > 0.0:
-        raise RuntimeError("section C-C still prints the free edge on the left")
-    for attempt in range(4):
-        native.UpdateViewDisplayGeometry()
-        projected = model_point_in_view(
-            adapter, native, anchor, label=f"C-C centre, pass {attempt}"
-        )
-        if math.dist(projected, PLATE_SECTION_CENTER) <= 1e-4:
-            break
-        position = tuple(float(value) for value in native.Position)
-        moved = [
-            position[axis] + PLATE_SECTION_CENTER[axis] - projected[axis]
-            for axis in (0, 1)
-        ]
-        if not native.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to re-centre section C-C")
-        rebuild_drawing(adapter, label=f"section C-C re-centred, pass {attempt}")
-    else:
+def _set_witness_gap(display: Any, index: int, gap: float, *, label: str) -> None:
+    """A local native gap, never a document-wide setting or a hidden witness."""
+    if display.SetWitnessLineGap(index, False, gap) is not True:
+        raise RuntimeError(f"{label}: native witness gap {index} was refused")
+    ok, use_doc, actual = display.GetWitnessLineGap(index, False, 0.0)
+    if (
+        ok is not True or use_doc is not False
+        or type(actual) not in (int, float) or not math.isfinite(actual)
+        or not math.isclose(actual, gap, rel_tol=0.0, abs_tol=1e-8)
+    ):
         raise RuntimeError(
-            f"section C-C centre stands at {projected}, not {PLATE_SECTION_CENTER}"
+            f"{label}: native witness gap {index} did not persist; "
+            f"expected=(True, False, {gap!r}), actual={(ok, use_doc, actual)!r}"
         )
-    keep = {
-        name: model_point_in_view(
-            adapter, native, _metres(point), label=f"C-C {name} text"
-        )
-        for name, point in PLATE_SECTION_TEXT_MM.items()
-    }
-    annotations = curate_view_dimensions(
-        adapter,
-        native,
-        keep=keep,
-        view_label="section C-C",
-        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
-    )
-    position_section_caption(
-        adapter, native, PLATE_SECTION_CAPTION_XY, label="plate section C-C"
-    )
-    return _style_plate_thickness_witnesses(adapter, native, annotations)
 
 
-def _style_plate_thickness_witnesses(
+def _clear_plate_width_witnesses(
+    adapter: Any, top: Any, annotations: list[Any],
+) -> None:
+    """Start width witnesses beyond the visible body end, not at middle Z.
+
+    The dimension still owns its original model endpoints. Only the local
+    blank part of each extension changes; both visible tails remain below
+    the actual projected +Z end. No sheet-coordinate substitute for that end.
+    """
+    matches = [
+        raw for raw in annotations
+        if dimension_name(adapter, raw) == "PlateWidth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("expected one native PlateWidth in the top plan")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    middle, end, far_end = model_points_in_view(
+        adapter, top,
+        [
+            _metres((0.0, COEFFICIENT_TOP_Y, 0.0)),
+            _metres((0.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
+            _metres((PLATE_W, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
+        ],
+        label="plate width witness origins",
+        names=("middle", "end", "far end"),
+    )
+    if (
+        not all(math.isfinite(value) for point in (middle, end, far_end) for value in point)
+        or middle[1] <= end[1] or abs(end[1] - far_end[1]) > 1e-8
+    ):
+        raise RuntimeError(
+            "PlateWidth: unexpected projected body-end direction; "
+            f"middle_m={middle!r}, end_m={end!r}, far_end_m={far_end!r}"
+        )
+    gap = middle[1] - end[1] + 0.001
+    for index in (0, 1):
+        _set_witness_gap(display, index, gap, label="PlateWidth")
+    rebuild_drawing(adapter, label="clear plan width witnesses")
+    segments = dimension_segments(annotation)
+    for point in (end, far_end):
+        witnesses = [
+            stroke for stroke in segments
+            if all(abs(vertex[0] - point[0]) <= 1e-8 for vertex in stroke)
+            and abs(stroke[1][1] - stroke[0][1]) > 1e-8
+        ]
+        if len(witnesses) != 1:
+            raise RuntimeError(
+                "PlateWidth: expected one visible witness at each width end; "
+                f"expected_x_m={point[0]!r}, expected_high_m={point[1] - 0.001!r}, "
+                f"matched_witnesses_m={witnesses!r}, native_segments_m={segments!r}"
+            )
+        low, high = sorted(vertex[1] for vertex in witnesses[0])
+        if abs(high - (point[1] - 0.001)) > 1e-8 or high - low <= 0.0035:
+            raise RuntimeError(
+                "PlateWidth: witness did not start beyond its projected end; "
+                f"projected_end_m={point!r}, expected_high_m={point[1] - 0.001!r}, "
+                f"minimum_visible_length_m=0.0035, actual_low_high_m={(low, high)!r}, "
+                f"native_segments_m={segments!r}"
+            )
+
+
+def _clear_ridge_witnesses(
+    adapter: Any, detail: Any, annotations: list[Any],
+) -> None:
+    """Leave A's actual ridge attachment alone; start both witnesses above it."""
+    vertex = model_point_in_view(
+        adapter, detail,
+        _metres((0.0, HEX_H / 2.0, -PLATE_L / 2.0 - HEX_DEPTH)),
+        label="knife ridge witness origin",
+    )
+    wanted = {"RidgeFromLeft", "RidgeFromRight"}
+    found = {}
+    for raw in annotations:
+        name = dimension_name(adapter, raw)
+        if name not in wanted:
+            continue
+        if name in found:
+            raise RuntimeError(f"knife detail: duplicate {name}")
+        annotation = _early_bound(raw, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        # Both model dimensions start at height.end, the theoretical ridge
+        # sharp, before their respective shoulder endpoint (not screen order).
+        _set_witness_gap(display, 0, RIDGE_WITNESS_GAP, label=name)
+        found[name] = annotation
+    if found.keys() != wanted:
+        raise RuntimeError("knife detail: missing ridge-to-side dimension")
+    rebuild_drawing(adapter, label="clear ridge witnesses above datum A")
+    for name, annotation in found.items():
+        segments = dimension_segments(annotation)
+        witnesses = [
+            stroke for stroke in segments
+            if all(abs(point[0] - vertex[0]) <= 1e-8 for point in stroke)
+            and abs(stroke[1][1] - stroke[0][1]) > 1e-8
+        ]
+        if len(witnesses) != 1:
+            raise RuntimeError(
+                f"{name}: expected one visible ridge-side witness; "
+                f"projected_vertex_m={vertex!r}, "
+                f"expected_low_m={vertex[1] + RIDGE_WITNESS_GAP!r}, "
+                f"matched_witnesses_m={witnesses!r}, native_segments_m={segments!r}"
+            )
+        low, high = sorted(point[1] for point in witnesses[0])
+        if (
+            abs(low - (vertex[1] + RIDGE_WITNESS_GAP)) > 1e-8
+            or high - low <= 0.0035
+        ):
+            raise RuntimeError(
+                f"{name}: native witness did not clear datum A; "
+                f"projected_vertex_m={vertex!r}, "
+                f"expected_low_m={vertex[1] + RIDGE_WITNESS_GAP!r}, "
+                f"minimum_visible_length_m=0.0035, actual_low_high_m={(low, high)!r}, "
+                f"native_segments_m={segments!r}"
+            )
+
+
+def _place_flank_text(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the model-owned exterior angle arc; move its whole block off it.
+
+    Use the trammel-point recipe's native angular shelf pattern. Merely
+    translating the two-row text on the arc leaves its qualifier struck.
+    """
+    name = "FlankToSide"
+    matches = [raw for raw in annotations if dimension_name(adapter, raw) == name]
+    if len(matches) != 1:
+        raise RuntimeError("knife detail needs one native FlankToSide")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.OffsetText = False
+    if display.OffsetText is not False:
+        raise RuntimeError("FlankToSide: inherited text offset could not be reset")
+    arc_xy = DETAIL_KEEP[name]
+    if annotation.SetPosition2(*arc_xy, 0.0) is not True:
+        raise RuntimeError("FlankToSide: native exterior arc placement was refused")
+    position = annotation.GetPosition()
+    if not position or math.dist(tuple(position[:2]), arc_xy) > 1e-5:
+        raise RuntimeError("FlankToSide: native exterior arc placement did not persist")
+    offset_dimension_text(adapter, [annotation], {name: FLANK_TEXT_XY})
+    position = annotation.GetPosition()
+    if (
+        display.OffsetText is not True or not position
+        or math.dist(tuple(position[:2]), FLANK_TEXT_XY) > 1e-5
+    ):
+        raise RuntimeError("FlankToSide: complete angular text did not stay on its shelf")
+
+
+def _plate_thickness_check(
     adapter: Any, view: Any, annotations: list[Any],
 ) -> Callable[[], None]:
-    """Keep the imported thickness, but start both witnesses outside the bare cut.
+    """Preserve the imported free-end sketch thickness in VIEW F.
 
-    The extrusion dimension originates at the free edge, beyond the merged pad.
-    Prove that origin before changing its native gaps; the final callback reads
-    fresh projected geometry and actual ink, not merely the persisted settings.
+    The Front-plane slab profile authors this dimension on its X=PLATE_W
+    vertical edge. Native witness origins, not a coincident seven-millimetre
+    value, must still tie it to the visible top and bottom free-end edges.
+    No synthetic witness move or value, tolerance, precision or gap edit.
+
+    R6 captured two face-level witnesses plus a horizontal text leader joined
+    to the split vertical dimension line. Classify those roles by projected
+    face levels and connectivity, not the total horizontal stroke count.
+    Any geometry refusal logs the complete small native rows and projection
+    frame; diagnostic read failures never supply substitute geometry.
     """
-    label = "section C-C PlateThickness"
-    gap_m, slop = 0.001, 1e-8
-    if len(annotations) != 1:
+    label = "VIEW F PlateThickness"
+    slop = 1e-8
+    matches = [
+        raw for raw in annotations
+        if dimension_name(adapter, raw) == "PlateThickness"
+    ]
+    if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one imported thickness annotation")
-    annotation = _early_bound(annotations[0], "IAnnotation")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    view = _early_bound(view, "IView")
 
     def finite(value: Any) -> bool:
         return type(value) in (int, float) and math.isfinite(value)
@@ -898,14 +937,21 @@ def _style_plate_thickness_witnesses(
 
     def model_state() -> tuple[Any, Any, str, float, tuple[int, float, float]]:
         drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
-            raise RuntimeError(f"{label}: could not activate its geometry sheet")
+        if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
+            raise RuntimeError(f"{label}: could not activate its receiver sheet")
+        count = view.GetAnnotationCount()
+        owned = view.GetAnnotations()
+        if (
+            type(count) is not int or count < 1
+            or not isinstance(owned, (tuple, list)) or len(owned) != count
+        ):
+            raise RuntimeError(f"{label}: invalid native view annotation inventory")
         kind, owner_type = annotation.GetType(), annotation.OwnerType
         if (
             type(kind) is not int or kind != 4
             or type(owner_type) is not int or owner_type != 0
             or annotation.IsDangling() is not False
-            or sum(same(raw, annotation) for raw in (view.GetAnnotations() or ())) != 1
+            or sum(same(raw, annotation) for raw in owned) != 1
         ):
             raise RuntimeError(f"{label}: imported thickness is detached from its view")
         raw_display = annotation.GetSpecificAnnotation()
@@ -917,66 +963,193 @@ def _style_plate_thickness_witnesses(
             raise RuntimeError(f"{label}: missing native model dimension")
         dimension = _early_bound(raw_dimension, "IDimension")
         name, value = dimension.FullName, dimension.SystemValue
+        # FullName is Name@Feature@Model; the model title need not use SLDPRT.
         if (
             type(name) is not str
-            or name.split("@")[:2] != ["PlateThickness", "CoefficientsPlate"]
+            or name.split("@")[:2] != ["PlateThickness", "PlateProfile"]
             or not finite(value)
-            or abs(value - PLATE_T / 1000.0) > 1e-12
+            or not math.isclose(
+                value, COEFFICIENT_T / 1000.0,
+                rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
+            )
         ):
-            raise RuntimeError(f"{label}: wrong model identity or thickness")
+            raise RuntimeError(
+                f"{label}: wrong model identity or thickness; "
+                f"FullName={name!r} ({type(name).__name__}), "
+                "expected first two @ fields ['PlateThickness', 'PlateProfile']; "
+                f"SystemValue={value!r} ({type(value).__name__}) m, "
+                f"expected {COEFFICIENT_T / 1000.0!r} m "
+                f"(abs_tol={_NATIVE_NOMINAL_TOL_M!r} m)"
+            )
         raw_tolerance = dimension.Tolerance
         if raw_tolerance is None:
             raise RuntimeError(f"{label}: missing native model band")
         tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
         band = (tolerance.Type, tolerance.GetMinValue(), tolerance.GetMaxValue())
         if type(band[0]) is not int or not all(finite(v) for v in band[1:]):
-            raise RuntimeError(f"{label}: invalid native model band")
+            raise RuntimeError(
+                f"{label}: invalid native model band for FullName={name!r}; "
+                f"(Type, GetMinValue[m], GetMaxValue[m])={band!r}, "
+                f"types={tuple(type(value).__name__ for value in band)!r}"
+            )
         return display, dimension, name, value, band
 
-    def geometry() -> tuple[tuple[float, float], tuple[float, float], float]:
-        points = [
-            model_point_in_view(
-                adapter, view, _metres((x, y, PLATE_SECTION_Z)),
-                label=f"{label} {edge} {face}",
+    def geometry_failure(display: Any, failure: Exception, **context: Any) -> RuntimeError:
+        """Capture independently: one unreadable row must not hide the others."""
+        def observe(reader: Callable[[], Any]) -> Any:
+            try:
+                result = reader()
+                return tuple(result) if isinstance(result, (list, tuple)) else result
+            except Exception as exc:
+                return {"error_type": type(exc).__name__, "error": str(exc)}
+
+        def display_record(reader: Callable[[], Any]) -> dict[str, Any]:
+            try:
+                raw = reader()
+                if raw is None:
+                    return {"missing": True}
+                data = _early_bound(raw, "IDisplayData")
+            except Exception as exc:
+                return {"error_type": type(exc).__name__, "error": str(exc)}
+            record = {}
+            for key, counter, getter in (
+                ("lines", "GetLineCount", "GetLineAtIndex2"),
+                ("arrows", "GetArrowHeadCount", "GetArrowHeadAtIndex2"),
+                ("text_positions", "GetTextCount", "GetTextPositionAtIndex"),
+            ):
+                count = observe(lambda: getattr(data, counter)())
+                entry = {"count": count, "rows": []}
+                if type(count) is int and count >= 0:
+                    # A single thickness callout has only a few rows. Bound a
+                    # corrupt census without silently presenting it as complete.
+                    entry["rows"] = [
+                        observe(lambda index=index: getattr(data, getter)(index))
+                        for index in range(min(count, 128))
+                    ]
+                    entry["omitted"] = max(0, count - 128)
+                record[key] = entry
+            return record
+
+        def transform_data() -> Any:
+            raw = view.ModelToViewTransform
+            return None if raw is None else _early_bound(raw, "IMathTransform").ArrayData
+
+        def model_record() -> dict[str, Any]:
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            record = {
+                "FullName": observe(lambda: native.FullName),
+                "SystemValue_m": observe(lambda: native.SystemValue),
+            }
+            tolerance = observe(lambda: _early_bound(native.Tolerance, "IDimensionTolerance"))
+            if isinstance(tolerance, dict):
+                record["tolerance"] = tolerance
+            else:
+                record["tolerance"] = {
+                    "Type": observe(lambda: tolerance.Type),
+                    "min_m": observe(lambda: tolerance.GetMinValue()),
+                    "max_m": observe(lambda: tolerance.GetMaxValue()),
+                }
+            return record
+
+        z_mm = -PLATE_L / 2.0
+        model_points = {
+            "bottom": _metres((PLATE_W, COEFFICIENT_BOTTOM_Y, z_mm)),
+            "top": _metres((PLATE_W, COEFFICIENT_TOP_Y, z_mm)),
+            "inboard": _metres((PLATE_W - 1.0, COEFFICIENT_BOTTOM_Y, z_mm)),
+        }
+        evidence = {
+            "annotation_position_m": observe(lambda: annotation.GetPosition()),
+            "requested_annotation_position_m": BACK_KEEP["PlateThickness"],
+            "view_position_m": observe(lambda: view.Position),
+            "model_to_view_transform": observe(transform_data),
+            "native_model": observe(model_record),
+            "native_gap_replies": [
+                observe(lambda index=index: display.GetWitnessLineGap(index, False, 0.0))
+                for index in (0, 1)
+            ],
+            # Keep both native providers distinct; neither substitutes for the
+            # dimension display used by dimension_segments and the ink proof.
+            "dimension_display": display_record(lambda: display.GetDisplayData()),
+            "annotation_display": display_record(lambda: annotation.GetDisplayData()),
+            "dimension_segments_m": observe(lambda: dimension_segments(annotation)),
+            "expected_model_points_m": model_points,
+            "expected_projected_points_m": {
+                face: observe(lambda point=point, face=face: model_point_in_view(
+                    adapter, view, point, label=f"{label} diagnostic {face}",
+                ))
+                for face, point in model_points.items()
+            },
+            "guard_requirements": {
+                "coordinate_tolerance_m": slop,
+                "top_minus_bottom_m": (0.0, COEFFICIENT_T / 1000.0),
+                "inboard_minus_bottom_m": (0.001, 0.0),
+                "witness_rule": "exactly one horizontal per projected bottom/top face",
+                "gap_index_face_order": ("bottom", "top"),
+                "origin_rule": "right_x = projected_free_end_x - effective_native_gap_m",
+                "arrow_rule": "common x strictly inside both horizontal witnesses",
+                "text_leader_rule": "horizontal endpoint joins the arrow-axis dimension line",
+            },
+            **context,
+        }
+        _telemetry.error(
+            f"{label}: native geometry refusal", failure=str(failure), geometry=evidence,
+        )
+        # The task log is the only surviving r5 artifact. Preserve the same
+        # unrounded evidence there even when structured logs are unavailable.
+        return RuntimeError(f"{failure}; native_geometry={evidence!r}")
+
+    def geometry() -> tuple[tuple[float, float], tuple[float, float]]:
+        z_mm = -PLATE_L / 2.0
+        edges = scan_view_edges(view, label="coefficient plate free end")
+        points = []
+        for face, y_mm in (
+            ("bottom", COEFFICIENT_BOTTOM_Y), ("top", COEFFICIENT_TOP_Y),
+        ):
+            free_end = (PLATE_W, y_mm, z_mm)
+            edge = edges.exact_line_through(
+                (PLATE_W - 0.5, y_mm, z_mm), label=f"coefficient {face} edge",
             )
-            for edge, x in (("bare cut", PLATE_SECTION_X[0]), ("free edge", PLATE_W))
-            for face, y in (("bottom", -PLATE_T / 2.0), ("top", PLATE_T / 2.0))
-        ]
-        if any(len(point) != 2 or not all(finite(v) for v in point) for point in points):
+            if (
+                min(math.dist(point, free_end) for point in edge.line) > 1e-6
+                or any(
+                    abs(point[1] - y_mm) > 1e-6 or abs(point[2] - z_mm) > 1e-6
+                    for point in edge.line
+                )
+            ):
+                raise RuntimeError(f"{label}: {face} edge does not reach the actual free end")
+            points.append(model_point_in_view(
+                adapter, view, _metres(free_end), label=f"{label} {face}",
+            ))
+        inset = model_point_in_view(
+            adapter, view, _metres((PLATE_W - 1.0, COEFFICIENT_BOTTOM_Y, z_mm)),
+            label=f"{label} inboard",
+        )
+        if any(
+            len(point) != 2 or not all(finite(v) for v in point)
+            for point in (*points, inset)
+        ):
             raise RuntimeError(f"{label}: nonfinite projected plate geometry")
-        bottom, top, free_bottom, free_top = points
-        span = free_bottom[0] - bottom[0]
+        bottom, top = points
         if (
-            span <= 0.0
-            or abs(span - (PLATE_W - PLATE_SECTION_X[0]) / 1000.0) > slop
-            or abs(top[0] - bottom[0]) > slop
-            or abs(top[1] - bottom[1] - PLATE_T / 1000.0) > slop
-            or any(
-                abs(free[0] - cut[0] - span) > slop
-                or abs(free[1] - cut[1]) > slop
-                for cut, free in ((bottom, free_bottom), (top, free_top))
-            )
+            abs(top[0] - bottom[0]) > slop
+            or abs(top[1] - bottom[1] - COEFFICIENT_T / 1000.0) > slop
+            or abs(inset[0] - bottom[0] - 0.001) > slop
+            or abs(inset[1] - bottom[1]) > slop
         ):
             raise RuntimeError(f"{label}: unexpected projected plate direction or scale")
-        return bottom, top, span
+        return bottom, top
 
-    def gaps(display: Any, *, local: bool) -> tuple[float, float]:
-        values = []
+    def native_ink(display: Any) -> tuple[Any, ...]:
+        faces = geometry()
+        gaps = []
         for index in (0, 1):
             ok, use_doc, value = display.GetWitnessLineGap(index, False, 0.0)
             if (
                 ok is not True or type(use_doc) is not bool
-                or (local and use_doc is not False)
                 or not finite(value) or value < 0.0
             ):
                 raise RuntimeError(f"{label}: invalid native witness gap {index}")
-            values.append(value)
-        return tuple(values)
-
-    def ink(
-        display: Any, faces: tuple[tuple[float, float], tuple[float, float]],
-        starts: tuple[float, float],
-    ) -> tuple[tuple[tuple[float, float], ...], tuple[float, ...]]:
+            gaps.append((use_doc, value))
         raw_data = display.GetDisplayData()
         if raw_data is None:
             raise RuntimeError(f"{label}: missing native display data")
@@ -1002,361 +1175,172 @@ def _style_plate_thickness_witnesses(
             if abs(stroke[1][1] - stroke[0][1]) <= slop
             and abs(stroke[1][0] - stroke[0][0]) > slop
         ]
-        if len(horizontal) != 2 or abs(tips[0][0] - tips[1][0]) > slop:
-            raise RuntimeError(f"{label}: expected two horizontal native witnesses")
-        tails = []
-        for face, tip, start in zip(faces, tips, starts):
-            matches = [
+        if abs(tips[0][0] - tips[1][0]) > slop:
+            raise RuntimeError(f"{label}: native arrows do not share a dimension line")
+        tails, witnesses = [], []
+        for face, tip, (_use_doc, gap) in zip(faces, tips, gaps):
+            candidates = [
                 stroke for stroke in horizontal
                 if all(abs(point[1] - face[1]) <= slop for point in stroke)
             ]
-            if len(matches) != 1:
-                raise RuntimeError(f"{label}: witness does not follow its plate face level")
-            left, right = sorted(point[0] for point in matches[0])
+            if len(candidates) != 1:
+                raise RuntimeError(f"{label}: expected one native witness at each plate face level")
+            witness = candidates[0]
+            witnesses.append(witness)
+            left, right = sorted(point[0] for point in witness)
             if (
                 abs(tip[1] - face[1]) > slop
-                or abs(right - start) > slop
-                or not left < tip[0] < face[0] - gap_m
-                or tip[0] > right + slop
+                or abs(right - (face[0] - gap)) > slop
+                or not left < tip[0] < right
             ):
                 raise RuntimeError(f"{label}: unexpected native witness endpoint or arrow")
             tails.append(left)
-        # Any extra horizontal continuation through the pad, or a skewed
-        # stroke, is unexpected ink, not a shortened visible witness pair.
+        dimension_lines = [stroke for stroke in segments if stroke not in horizontal]
         if any(
-            stroke not in horizontal
-            and any(abs(point[0] - tips[0][0]) > slop for point in stroke)
-            for stroke in segments
+            any(abs(point[0] - tips[0][0]) > slop for point in stroke)
+            for stroke in dimension_lines
         ):
             raise RuntimeError(f"{label}: unexpected native dimension-line ink")
-        return tuple(tips), tuple(tails)
+        # Text outside the arrows can add an underline/leader. It is not a
+        # witness: its horizontal run joins an endpoint of the native vertical
+        # dimension line, away from the two measured face levels.
+        for stroke in horizontal:
+            if stroke in witnesses:
+                continue
+            if not any(
+                abs(point[0] - tips[0][0]) <= slop
+                and any(
+                    math.dist(point, endpoint) <= slop
+                    for line in dimension_lines for endpoint in line
+                )
+                for point in stroke
+            ):
+                raise RuntimeError(f"{label}: unexpected native text-leader ink")
+        return tuple(gaps), tuple(tips), tuple(tails)
+
+    def ink(display: Any) -> tuple[Any, ...]:
+        try:
+            return native_ink(display)
+        except Exception as exc:
+            raise geometry_failure(display, exc) from exc
 
     display, dimension, name, value, band = model_state()
-    bottom, top, span = geometry()
-    original_gaps = gaps(display, local=False)
-    if any(abs(old - gap_m) > slop for old in original_gaps):
-        raise RuntimeError(f"{label}: unexpected original native witness gaps")
-    # Both actual witness starts must still derive from the model's free
-    # edge, not a seam or another origin that happens to have the same value.
-    tips, tails = ink(
-        display, (bottom, top),
-        tuple(face[0] + span - old for face, old in zip((bottom, top), original_gaps)),
-    )
-    expected_gaps = tuple(old + span for old in original_gaps)
-    for index, gap in enumerate(expected_gaps):
-        if display.SetWitnessLineGap(index, False, gap) is not True:
-            raise RuntimeError(f"{label}: native witness gap {index} was refused")
+    original_ink = ink(display)
 
-    def check_witnesses() -> None:
+    def check_thickness() -> None:
         current, owner, current_name, current_value, current_band = model_state()
+        same_display, same_dimension = same(current, display), same(owner, dimension)
+        # Nominal precision applies only when admitting the imported value.
+        # This snapshot must remain identical after layout/rebuild, including
+        # any sub-budget value or manufacturing-band change.
         if (
-            not same(current, display) or not same(owner, dimension)
+            not same_display or not same_dimension
             or (current_name, current_value, current_band) != (name, value, band)
         ):
-            raise RuntimeError(f"{label}: native model identity, value or band changed")
-        actual_gaps = gaps(current, local=True)
-        if any(abs(actual - expected) > slop for actual, expected in zip(actual_gaps, expected_gaps)):
-            raise RuntimeError(f"{label}: native witness gaps did not persist")
-        low, high, _span = geometry()
-        actual_tips, actual_tails = ink(
-            current, (low, high), (low[0] - gap_m, high[0] - gap_m),
-        )
+            raise RuntimeError(
+                f"{label}: native model identity, value or band changed; "
+                f"same_display={same_display}, same_dimension={same_dimension}; "
+                "(FullName, SystemValue[m], band[Type, min_m, max_m]) "
+                f"expected={(name, value, band)!r}, "
+                f"observed={(current_name, current_value, current_band)!r}"
+            )
+        actual_gaps, actual_tips, actual_tails = ink(current)
+        gaps, tips, tails = original_ink
         if (
-            any(math.dist(actual, expected) > slop for actual, expected in zip(actual_tips, tips))
-            or any(abs(actual - expected) > slop for actual, expected in zip(actual_tails, tails))
+            actual_gaps != gaps
+            or any(math.dist(a, b) > slop for a, b in zip(actual_tips, tips))
+            or any(abs(a - b) > slop for a, b in zip(actual_tails, tails))
         ):
-            raise RuntimeError(f"{label}: native arrow tips or witness tails moved")
+            raise geometry_failure(
+                current,
+                RuntimeError(f"{label}: native witness gaps, arrow tips or tails moved"),
+                original_ink=original_ink,
+                regenerated_ink=(actual_gaps, actual_tips, actual_tails),
+            )
 
-    # Read both native settings back before rebuilding, then prove the rebuilt
-    # ink. The same proof runs after finalize_drawing's last regeneration.
-    actual_gaps = gaps(display, local=True)
-    if any(abs(actual - expected) > slop for actual, expected in zip(actual_gaps, expected_gaps)):
-        raise RuntimeError(f"{label}: native witness gaps did not persist")
-    rebuild_drawing(adapter, label="section C-C bare-cut witness gaps")
-    check_witnesses()
-    return check_witnesses
+    return check_thickness
 
 
-def _sheet_to_view_sketch(
-    adapter: Any, view: Any, sheet_points: list[tuple[float, float]]
-) -> list[tuple[float, ...]]:
-    """Sheet points in ``view``'s own sketch (its ModelToSketchTransform),
-    for fences and lines sketched into a view."""
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in sheet_points:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
-            "IMathPoint",
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    return points
-
-
-def _thin_visible_layer(adapter: Any) -> None:
-    """Create (once) TAP_THREAD_LAYER, black thin continuous, and read its
-    state back: section H-H's cosmetic thread and its break line print on
-    it."""
-    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
-    layer = manager.GetLayer(TAP_THREAD_LAYER)
-    if layer is None:
-        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
-        if (
-            int(manager.AddLayer(TAP_THREAD_LAYER, "section H-H tap thread", 0, 0, 0))
-            != 1
-        ):
-            raise RuntimeError(f"failed to add layer {TAP_THREAD_LAYER}")
-        layer = manager.GetLayer(TAP_THREAD_LAYER)
-    layer = _early_bound(layer, "ILayer")
-    layer.Visible = True
-    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
-        raise RuntimeError(
-            f"layer {TAP_THREAD_LAYER} reads visible={layer.Visible!r}, style "
-            f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
-        )
-
-
-def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
-    """Import section H-H's cosmetic thread and print it thin and solid.
-
-    draw_pn_pen_v_block's ``_section_thread_on_visible_layer``: the layer is
-    created thin continuous (``ILayerMgr::AddLayer``), its state and every
-    thread annotation's layer read back.
-    """
-    threads = import_cosmetic_threads(adapter, section)
-    if threads[1] < 1:
-        raise RuntimeError("section H-H has no native cosmetic-thread instance")
-    _thin_visible_layer(adapter)
-    moved = 0
-    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
-            continue
-        annotation.Layer = TAP_THREAD_LAYER
-        if str(annotation.Layer or "") != TAP_THREAD_LAYER:
-            raise RuntimeError(f"a cosmetic thread refused layer {TAP_THREAD_LAYER}")
-        moved += 1
-    if moved < 1:
-        raise RuntimeError("section H-H lists no cosmetic-thread annotation to layer")
-    rebuild_drawing(adapter, label=f"cosmetic threads to {TAP_THREAD_LAYER}")
-    _telemetry.info(
-        f"section H-H cosmetic threads: seeds/instances={threads!r}, {moved} on "
-        f"{TAP_THREAD_LAYER}"
+def _dimension_ownership_check(
+    adapter: Any, views: Iterable[tuple[str, str, Any, Iterable[str]]],
+) -> Callable[[], None]:
+    """Keep every marked dimension on exactly its assigned manufacturing view."""
+    owners = {
+        name: feature for feature, names in DIMENSIONS_BY_FEATURE.items() for name in names
+    }
+    assignments = tuple(
+        (sheet, label, raw, frozenset(wanted)) for sheet, label, raw, wanted in views
     )
 
-
-def _tap_section(adapter: Any, front: Any) -> Any:
-    """Section H-H along the outer receiver tap (TAP_SECTION_* above), cut in
-    VIEW G: cut face only, looking +X, turned +Y up, cropped to the end rib
-    and the plate beyond (draw_fr_nameplate's ``_crop_section``), its centre
-    landed on TAP_SECTION_CENTER, a break line where the plate is cut off,
-    and its cosmetic thread on a thin continuous layer."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    x_mm, _, end_z = TAP_SECTION_HOLE
-    line = model_points_in_view(
-        adapter,
-        front,
-        [_metres((x_mm, y, end_z)) for y in TAP_SECTION_LINE_Y],
-        label="section H-H line",
-        names=("below", "above"),
-    )
-    section = create_section_view(
-        adapter,
-        front,
-        line_start=line[0],
-        line_end=line[1],
-        view_xy=TAP_SECTION_CENTER,
-        section_label=TAP_SECTION_LETTER,
-        scale=TAP_SECTION_SCALE,
-        partial=True,
-        label="receiver tap section",
-    )
-    native = _early_bound(section, "IView")
-    cut = _early_bound(native.GetSection(), "IDrSection")
-    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
-    # dedicated bool getter may be truth-tested.
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="section H-H cut face only")
-    if not cut.GetDisplayOnlySurfaceCut():
-        raise RuntimeError("section H-H retained geometry beyond the cutting plane")
-
-    def arrows_point_right() -> bool:
-        # GetArrowInfo: each arrow's start (on the line) then its tip, in
-        # sheet space; the tips point the direction of sight.
-        info = [float(value) for value in (cut.GetArrowInfo() or ())]
-        if len(info) != 12:
-            raise RuntimeError(f"section H-H arrow info has {len(info)} values")
-        return all(
-            info[i + 3] - info[i] > 0.0 and abs(info[i + 4] - info[i + 1]) <= 1e-6
-            for i in (0, 6)
-        )
-
-    if not arrows_point_right():
-        reversed_cut = not bool(cut.GetReversedCutDirection())
-        cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="section H-H looks +X")
-        if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("section H-H cut direction did not persist")
-        if not arrows_point_right():
-            raise RuntimeError("section H-H arrows do not point right")
-    _telemetry.info(
-        f"section H-H arrows {tuple(cut.GetArrowInfo() or ())!r}, "
-        f"letters {tuple(cut.GetTextInfo() or ())!r}"
-    )
-    _hidden_lines_removed_without_greyed_pass(native)
-    anchor = _metres(_TAP_SECTION_ANCHOR_MM)
-    above = _metres((_TAP_SECTION_ANCHOR_MM[0], 1.0, _TAP_SECTION_ANCHOR_MM[2]))
-    for attempt in range(3):
-        origin = model_point_in_view(adapter, native, anchor, label="H-H anchor")
-        up = model_point_in_view(adapter, native, above, label="H-H +Y")
-        dx, dy = up[0] - origin[0], up[1] - origin[1]
-        if dy > 0.0 and abs(dx) <= 1e-7:
-            break
-        native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
-        rebuild_drawing(adapter, label=f"section H-H turned, pass {attempt}")
-    else:
-        raise RuntimeError(f"section H-H does not run +Y up: ({dx:g}, {dy:g})")
-
-    # Crop2(jagged, no outline, intensity) round a circle fence in the
-    # section's own sketch, its centre and a rim point projected from the cut
-    # plane; it returns swCropViewErrors_e, 1 NoError.
-    rebuild_drawing(adapter, label="section H-H before crop")
-    fence = model_points_in_view(
-        adapter,
-        native,
-        [
-            anchor,
-            _metres(
-                (
-                    x_mm,
-                    TAP_SECTION_CROP_RADIUS,
-                    _TAP_SECTION_ANCHOR_MM[2],
+    def check_ownership() -> None:
+        ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+        active_sheet = None
+        for sheet, label, raw_view, wanted in assignments:
+            if sheet != active_sheet:
+                if ddoc.ActivateSheet(sheet) is not True:
+                    raise RuntimeError(f"{label}: cannot activate native owner sheet {sheet!r}")
+                active_sheet = sheet
+            view = _early_bound(raw_view, "IView")
+            count = view.GetAnnotationCount()
+            raw_annotations = view.GetAnnotations()
+            if (
+                type(count) is not int or count < 0
+                or (raw_annotations is None and count != 0)
+                or (raw_annotations is not None and (
+                    not isinstance(raw_annotations, (tuple, list))
+                    or len(raw_annotations) != count
+                ))
+            ):
+                raise RuntimeError(f"{label}: invalid native annotation census")
+            found = []
+            for raw in raw_annotations or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                kind = annotation.GetType()
+                if type(kind) is not int:
+                    raise RuntimeError(f"{label}: unreadable native annotation type")
+                if kind != 4:  # swDisplayDimension
+                    continue
+                display = _early_bound(
+                    annotation.GetSpecificAnnotation(), "IDisplayDimension",
                 )
-            ),
-        ],
-        label="section H-H crop circle",
-        names=("centre", "rim"),
-    )
-    if not ddoc.ActivateView(view_name(adapter, native)):
-        raise RuntimeError("failed to activate section H-H for its crop")
-    draw.ClearSelection2(True)
-    before = tuple(float(value) for value in native.GetOutline())
-    centre, rim = _sheet_to_view_sketch(adapter, native, fence)
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        circle = sketch_manager.CreateCircle(*centre, *rim)
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-    if circle is None:
-        raise RuntimeError("failed to create the section H-H crop circle")
-    if not _early_bound(circle, "ISketchSegment").Select4(False, None):
-        raise RuntimeError("failed to select the section H-H crop circle")
-    status = int(native.Crop2(False, True, 0))
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="section H-H crop")
-    native.UpdateViewDisplayGeometry()
-    outline = tuple(float(value) for value in native.GetOutline())
-    _telemetry.info(
-        f"section H-H Crop2 status {status}: outline {before!r} -> {outline!r}, "
-        f"crop circle {fence!r}"
-    )
-    # The outline carries a margin past the fence (draw_fr_nameplate r3: a
-    # 68.8 mm fence read back 88.0 mm); the proof is the shrink.
-    width = 2.0 * math.dist(fence[0], fence[1])
-    if (
-        status != 1
-        or not bool(native.IsCropped())
-        or outline[2] - outline[0] > width + 0.025
-        or outline[2] - outline[0] > 0.25 * (before[2] - before[0])
-    ):
-        raise RuntimeError(
-            f"section H-H did not crop to {width * 1000.0:.1f} mm: status {status}, "
-            f"outline {before!r} -> {outline!r}"
-        )
-
-    for attempt in range(4):
-        native.UpdateViewDisplayGeometry()
-        projected = model_point_in_view(
-            adapter, native, anchor, label=f"H-H centre, pass {attempt}"
-        )
-        if math.dist(projected, TAP_SECTION_CENTER) <= 1e-4:
-            break
-        position = tuple(float(value) for value in native.Position)
-        moved = [
-            position[axis] + TAP_SECTION_CENTER[axis] - projected[axis]
-            for axis in (0, 1)
-        ]
-        if not native.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to re-centre section H-H")
-        rebuild_drawing(adapter, label=f"section H-H re-centred, pass {attempt}")
-    else:
-        raise RuntimeError(
-            f"section H-H centre stands at {projected}, not {TAP_SECTION_CENTER}"
-        )
-
-    # The break line, thin, in the section's own sketch; AddToDB keeps sketch
-    # inference from snapping its short segments onto the cut face's edges.
-    # On the black thin layer: a layer-less view-sketch line prints grey
-    # (machinist review 20261018 read the break as a construction line).
-    _thin_visible_layer(adapter)
-    break_points = model_points_in_view(
-        adapter,
-        native,
-        [_metres((x_mm, y, z)) for z, y in TAP_SECTION_BREAK],
-        label="section H-H break line",
-    )
-    if not ddoc.ActivateView(view_name(adapter, native)):
-        raise RuntimeError("failed to activate section H-H for its break line")
-    draw.ClearSelection2(True)
-    points = _sheet_to_view_sketch(adapter, native, break_points)
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        for index in range(len(points) - 1):
-            created = sketch_manager.CreateLine(*points[index], *points[index + 1])
-            if created is None:
-                raise RuntimeError(f"section H-H break line segment {index} failed")
-            segment = _early_bound(created, "ISketchSegment")
-            segment.Layer = TAP_THREAD_LAYER
-            if str(segment.Layer or "") != TAP_THREAD_LAYER:
+                raw_dimension = display.GetDimension2(0)
+                if raw_dimension is None:
+                    if display.IsHoleCallout() is True:
+                        continue
+                    raise RuntimeError(f"{label}: non-callout dimension has no model owner")
+                dimension = _early_bound(raw_dimension, "IDimension")
+                full_name = dimension.FullName
+                if not isinstance(full_name, str) or not full_name:
+                    raise RuntimeError(f"{label}: model dimension has no native name")
+                parts = full_name.split("@")
+                name = parts[0]
+                if name not in owners:
+                    continue
+                if (
+                    len(parts) < 2 or parts[1] != owners[name]
+                    or type(annotation.OwnerType) is not int or annotation.OwnerType != 0
+                    or type(annotation.Visible) is not int or annotation.Visible != 1
+                    or annotation.IsDangling() is not False
+                ):
+                    raise RuntimeError(f"{label}: {full_name} lost its native feature/view ownership")
+                found.append(name)
+            if sorted(found) != sorted(wanted):
                 raise RuntimeError(
-                    f"section H-H break line segment {index} refused layer "
-                    f"{TAP_THREAD_LAYER}"
+                    f"{label}: marked-dimension ownership mismatch: "
+                    f"expected {sorted(wanted)}, found {sorted(found)}"
                 )
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="section H-H break line")
-    _section_thread_on_visible_layer(adapter, native)
-    position_section_caption(
-        adapter, native, TAP_SECTION_CAPTION_XY, label="receiver tap section H-H"
-    )
-    return native
+
+    return check_ownership
 
 
 _SW_HIDDEN = 2  # swDisplayMode_e.swHIDDEN: hidden lines removed
 
 
 def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
-    """Set a sheet-1 ``view`` hidden-lines-removed, never showing hidden lines.
+    """Set HLR directly before annotating, without the label-generating grey pass.
 
-    set_hidden_lines_removed passes through hidden-lines-visible to force a
-    regen.  That pass is where the bracket taps' "#2-56 Tapped Hole" label,
-    their threads hidden behind the plate in every sheet-1 view, grew on some
-    builds only (#1591, farm 2026-10-17): on the plan right after its pass
-    (ba33167e's stage log), on section C-C (493638fa), on neither in
-    2fa756e1 and 802e4117 -- the one note the sweep's count varied by.  Each
-    caller sets the view straight after creating it, before anything is
-    attached, so the regen is not needed.  Farm seats place all six sheet-1
-    views in HLR already (5a58480d), where the set is a no-op; that build,
-    on the seat behind both 9-label builds, swept 8 and its PDF is
-    pixel-identical to r18b's, which still had the pass.
+    #1591 observed view-dependent automatic receiver labels after the shared
+    hidden-line regeneration. These newly placed views need no such pass.
     """
     bound = _early_bound(view, "IView")
     placed = int(bound.GetDisplayMode2())
@@ -1373,9 +1357,8 @@ def _remove_redundant_thread_notes(adapter: Any) -> None:
     """Inventory, delete and read back the actual automatic thread labels.
 
     Like draw_fr_top_frame, do not make their incidental count specification:
-    #1591 already recorded view-dependent labels.  PR1709's failed leaf had
-    four H-H cosmetic threads on TAP_THREAD_LAYER but no H-H label (7 total,
-    not 8).  The three authored native callouts, not these notes, define holes.
+    #1591 recorded view-dependent labels. The three authored native callouts,
+    not automatic notes, define the holes.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     draw = adapter.currentModel
@@ -1482,7 +1465,7 @@ def _mounting_rims(edges: ViewEdges) -> list[Any]:
 
 
 # VIEW F's controlled ReceiverY0 locates the bracket row from the plate top.
-# The plate is extruded mid-plane on the pivot, and both tap centres lie at
+# The coefficient top stays fixed above the pivot; both tap centres remain
 # y=0. An owned centreline runs through the taps and hex centre, extending
 # past the free-edge station and hex flats. The separate (2.54) reference
 # repeated ReceiverY0's span and was struck by ReceiverX1's extension line.
@@ -1505,92 +1488,50 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
     )
 
 
-# Front profile at 1:2 (2026-10-15 baseline render): the pivot axis prints at
-# (0.2352, 0.2352), the boss spans x 0.1925..0.2021, the end rib's R15.24 arc
-# 7.6 mm round the axis, the web bar y 0.2338..0.2363 from the boss to that
-# arc, the plate tip x 0.2535..0.2575.  Every rib shares the +Z end rib's
-# outline, so its dimensions sit here once: the 35.75 reach above the view,
-# the rib end's step over the plate top right of the plate tip, the rib arc
-# taking a leader from below left of the detail letter, the boss height left
-# of the boss, and the web thickness standing above the web.  The cylinder
-# is sized in the plan (TOP_KEEP): here the rib outline hides it.
-# A radial leader runs along the line from the arc's centre to the end of its
-# text block's BOTTOM line (farm r5: the R15.24 leader went to "AT BOSS
-# AXIS"'s right end, through the detail letter).  The rib arc's four lines
-# stand under the view, left of the 20X frame, their bottom line's right end
-# at (0.2112, 0.2019): 234 deg round the axis, inside the arc's visible
-# span (it meets the lower slant at ~244 deg).  That bottom line stands 1.75
-# mm over the plan's R138.85 centre (0.1737, 0.2001), where that radius's
-# line starts, and 4.3 mm right of it (machinist review r6: over it, the line
-# read as a leader off this shelf); the top line stands under 19.05's lower
-# arrow.
+# VIEW G carries the shared positive rib profile and its derived reach.
+# The title block owns the R1 MAX ceiling. The web's flush caption stands
+# entirely above the boss's upper witness; 19.05 has no centering caption.
 FRONT_KEEP = {
-    "AnchorHeight": (0.183, 0.235),
-    "WebThickness": (0.215, 0.247),
+    "AnchorHeight": (0.145, 0.235),
+    "WebThickness": (0.168, 0.258),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
-    "EdgeRibFrontEndTopX": (0.2443, 0.254),
-    # Right of the plate tip, its three lines under the value (machinist
-    # review r8: from what, and why the end stands proud of the plate; r10:
-    # from the plate top face, not the mid-plane).  The keep centres the 21
-    # mm block: at 0.246 its bottom line sat on the lower extension line, the
-    # shelf underlining it and the upper arrow in its text (farm r12); at
-    # 0.253 the shelf runs over the upper arrow and the top line stands under
-    # the border.
-    "EdgeRibFrontEndStep": (0.284, 0.253),
+    "RibReach": (0.2443, 0.254),
 }
-# Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
-# x 0.0628/0.0952, its vertices at y 0.1875/0.2285, its upper shoulders at y
-# 0.2183, the fence 0.024 round it.  SolidWorks centres a dimension's whole
-# text block (value and callout lines, 5.5 mm a line) on its keep, and a
-# linear dimension's line underlines the block's bottom line, 2.8 mm under
-# the keep for one line (stack r4: a seven-line block keyed at 0.258 rose
-# 9.7 mm over the border and dropped its line onto E's fence).
-# The reference width stands right of its span, under the fence and above
-# the boss diameter's four lines (top 0.1784), its line ~0.1817.  The vertex
-# height stands left of the fence, its block level with the centre between
-# the border and the fence, its three callout lines below the value; its
-# extension lines cross only the side faces' extensions.  Code review C09
-# (owner ruling T1): the ridge-to-side pair shares one dimension line at
-# 0.2455 over the vertex, each text outside its own span, each with two
-# callout lines under its value (keeps 5.5 mm higher for the same line):
-# the +X one right of its extension lines and left of view G, its top line
-# under the border; the -X one between the border and the -X extension
-# line.  The flank-to-side angle, its seat line under its value, stands
-# up-right of the +X shoulder, in the wedge opposite the solid's corner
-# (inside the hexagon, machinist reviews r7/r8 read its text as a feature),
-# its text outside the fence and its arc (~24 mm round the shoulder) topping
-# out under the ridge pair's line; nothing else stands in that wedge (stack
-# r4: the vertex height's line and text crossed the angle's text and
-# extension).
+# The native 6.985 mm face span uses the ordinary document .XX precision:
+# its text is above the profile and right of RibReach's complete callout.
+BOSS_FACE_LOCATION_XY = (0.284, 0.250)
+# Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
+# The ridge pair shares one line above the crop, with each whole callout
+# outside its own model-side span. Back reverses X: RidgeFromLeft prints
+# right, RidgeFromRight left, and the +X flank's exterior wedge is left.
+# Keep that native angle arc; its complete text moves to a separate shelf.
+# R0.1 MAX stands right of the X155.4 mm witness, with a shallow arrow
+# clear of A. Only the two ridge-side witnesses get a local gap above A.
 DETAIL_KEEP = {
-    "HexWidth": (0.125, 0.1845),
+    "HexWidth": (0.203, 0.083),
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
-    "RidgeFromLeft": (0.0378, 0.2538),
-    "RidgeFromRight": (0.1355, 0.2538),
-    "FlankToSide": (0.1164, 0.2309),
+    "RidgeFromLeft": (0.201, 0.2483),
+    "RidgeFromRight": (0.044, 0.25105),
+    "FlankToSide": (0.058, 0.184),
+    "KnifeRidgeRadius": (0.181, 0.219),
 }
-# Detail E: the round's R MAX up-right of the vertex, its text right of E's
-# fence and of datum A's box (RIDGE_DATUM_RISE), its leader ~30 deg up the
-# +X flank's side, ~8 mm right of the box's foot.
-RIDGE_DETAIL_KEEP = {
-    "KnifeRidgeRadius": (0.098, 0.091),
-}
+# Keep the native arc seed; place its text below the detail boundary and
+# height dimension so neither line crosses the text. The leader approaches
+# the lower arc endpoint from below; verify regenerated native ink.
+FLANK_TEXT_XY = (0.051, 0.081)
+RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
-    # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
-    # from the end up past every hole, boxing the column's right side (the
-    # 20X callout's leader had to cross one). The line prints 2.8 mm under
-    # the keep, at 0.0785: 2.9 mm under datum B's box, 2.3 mm over the 39.85
-    # text (whose line, with 76.20's, dropped to 0.0695 for that), and the
-    # text sits right of the span, clear of B.
+    # The model width is authored at the plan's middle Z. Its native
+    # witnesses therefore start at Y130 mm, not at the end face: R7 crossed
+    # the spring callout and diameter. _clear_plate_width_witnesses starts
+    # both 1 mm beyond the actual projected +Z end, preserving visible tails.
+    # Keep the existing bottom dimension line and full width value.
     "PlateWidth": (0.266, 0.0813),
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
     # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
     # 9 characters) end 2.9 mm inside the border.
     "PlateLength": (0.405, TOP_CENTER[1]),
-    # -Z receiver rib (Top prints model +Z down): beside it, its witness lines
-    # 17 mm from the free edge (x 0.2542; at 0.325 they ran 70 mm across the
-    # field, machinist review r17), the line 5 mm right of section C-C's
-    # outboard letter (x 0.259..0.265, top 0.161) and its text above the span.
+    # Receiver rib's inward depth, beside the -Z end of the plan.
     "RibDepth": (0.270, 0.1745),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
@@ -1622,15 +1563,7 @@ TOP_KEEP = {
     # stands 3.8 mm left of the finish symbol's text; the text stands above
     # the boss Z location's datum-B extension line (y 0.0919).
     "EdgeRibThickness": (0.2095, 0.1035),
-    # Outside the part, right of the free edge (machinist review b4df34ad9
-    # r2/r3: inside the web, between the R138.85, the boss and the cylinder,
-    # it read as crowded), as the -Z receiver rib's depth does: its extension lines run
-    # from the rib's end across the hole column (one hole sits on the rib's
-    # mid-plane, its rim 0.5 mm inside them) to the line 8 mm past the free
-    # edge (x 0.2576), and the text stands right of the line, 6.2 mm over the
-    # rib's upper face as the receiver depth's does: 4.8 mm right of section C-C's
-    # outboard arrow (x 0.2617, tail y 0.139) and 4 mm over the 20X callout's
-    # first line, whose left end moved to 0.277 for its extension lines.
+    # Ordinary mid-rib thickness beside its end, clear of the spring callout.
     "MiddleRibThickness": (0.2655, 0.1374),
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
@@ -1641,37 +1574,20 @@ TOP_KEEP = {
     # text and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }
-# Sheet 2, back view at 1:1 (model X reversed: the plate's free edge prints at
-# sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.150, the plate top at
-# y 0.1525, the spring pad from the free edge to x 0.170 down to y 0.1455,
-# the cylinder's circle x 0.1917..0.2171, y 0.1373..0.1627).
-# The receiver stations stand above the view: 14.75 nearer, its text left of
-# the free edge, 28.45 above it, its text and the pattern's mate right of the
-# span (a horizontal dimension stacks a callout below the value above its
-# line).  Left of the free edge the padded tap length stands inboard, and the
-# row height outboard, its text above and left of the length's upper arrow
-# (at x 0.147 that arrow ran through it, farm r5); the pad's width hangs
-# below and left of both, outside its extension lines.  The length's line
-# stays at x 0.153 (its keep's x is its line's: at 0.135, farm r13, its
-# upper arrow's tail crossed the row height's shoulder), its text on a
-# shoulder left of it, the shoulder under its lowest line and the block
-# centred over it, so its PLATE AND PAD (x 0.123..0.153) sits on the
-# shoulder and the 7.00 above it, clear of the row height's lower arrow tail
-# (x 0.143, down to y 0.1436).  The pad width's block and the view's label
-# drop 7 and 9 mm (into empty sheet) to leave the PLATE AND PAD room above
-# the 10.00 (at 5 mm, farm r13b, the two blocks stood 3.18 apart, under the
-# audit's 3.48 text separation).
+# VIEW F at 1:1, model X reversed. All stations, thickness and caption ride
+# with the view; their ink clears D's native X192.6 mm outer extent.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.153, 0.133),
-    "SpringPadWidth": (0.130, 0.116),
-    "ReceiverX0": (0.220, 0.1815),
-    # Each tight station names the bracket (machinist review r5): the 14.75's
-    # two lines stand over the row height's one, which prints above its value.
-    "ReceiverX1": (0.130, 0.1745),
-    "ReceiverY0": (0.143, 0.1585),
+    "PlateThickness": (BACK_CENTER[0] - 0.072, BACK_CENTER[1] - 0.017),
+    "ReceiverX0": (BACK_CENTER[0] - 0.005, BACK_CENTER[1] + 0.0315),
+    "ReceiverX1": (BACK_CENTER[0] - 0.095, BACK_CENTER[1] + 0.0245),
+    "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
-# The back view's label, under the pad's width.  The point is its top left.
-BACK_VIEW_NOTE_XY = (0.110, 0.100)
+# Keep the native blind-tap callout below the receiver; its only added row
+# identifies the bracket these holes fasten.
+MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
+# Keep the caption below the complete receiver callout; native regeneration
+# must check its clearance after any wording change.
+BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.066)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
@@ -1702,9 +1618,8 @@ VIEW_G_ARROW = (
     (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
     _VIEW_G_TIP,
 )
-# VIEW G's label, under the end profile, right of Detail D's letter and
-# leader (x 0.2452), 1 cm over the 20X frame's leader.  The point is its top
-# left.
+# VIEW G's label stands under the end profile, right of Detail D's identifier
+# and above the spring-pattern frame's leader. The point is its upper-left.
 FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 
 
@@ -1785,6 +1700,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
         ),
         required=(
             "Number",
@@ -1794,6 +1710,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Receiver Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1838,33 +1755,22 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
-    # The trunnion width and vertex height live in a reference sketch the
-    # part saves hidden (no single hexagon dimension is either).  The detail
-    # is cut and dimensioned while the part shows it; the front view shows it
-    # too, because the detail's items select through it.
-    with part_sketches_shown(
-        adapter,
-        source_model,
-        KNIFE_SKETCHES,
-        label="knife envelope",
-        base_view=front,
-    ):
-        detail = _knife_detail(adapter, front)
-        _hidden_lines_removed_without_greyed_pass(detail)
-        detail_annotations = curate_hidden_dimensions(
-            adapter,
-            detail,
-            keep=DETAIL_KEEP,
-            view_label="knife detail",
-            dimensions_by_feature=DIMENSIONS_BY_FEATURE,
-        )
+    assert_imported_precision(
+        adapter, top_annotations, DRAWING_PRECISION["CoefficientsPlate"],
+    )
     _attach_radial_leaders(
-        adapter, front_annotations, ("EdgeRibFrontArcR",), label="front"
+        adapter, front_annotations, ("EdgeRibFrontArcR",),
+        label="front",
     )
     _attach_radial_leaders(
         adapter, top_annotations, ("SummationArcRadius",), label="top"
     )
     _shorten_radii(adapter, top_annotations, ("SummationArcRadius",), label="top")
+    _apply_callouts(
+        adapter, [*front_annotations, *top_annotations], label="lever geometry",
+    )
+    check_boss_faces = _boss_face_location_check(adapter, front)
+    _clear_plate_width_witnesses(adapter, top, top_annotations)
     # The boss's Ø19.05 takes one arrow on its near rim, no line through the
     # centre: there it crossed the anchor tap callout's leader, which runs
     # through the tap's centre (machinist review r13, rule 14).
@@ -1874,32 +1780,6 @@ async def build(adapter: Any) -> dict[str, str]:
         if dimension_name(adapter, annotation) == "AnchorOuterDia"
     ]
     set_near_side_diameter(boss_dia, "boss diameter")
-    ridge_detail = _ridge_detail(adapter, detail)
-    _hidden_lines_removed_without_greyed_pass(ridge_detail)
-    ridge_annotations = curate_hidden_dimensions(
-        adapter,
-        ridge_detail,
-        keep=RIDGE_DETAIL_KEEP,
-        view_label="ridge detail",
-        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
-    )
-    _attach_radial_leaders(
-        adapter, ridge_annotations, ("KnifeRidgeRadius",), label="ridge detail"
-    )
-    _assert_knife_ridge_radius(adapter, ridge_annotations)
-    _ridge_datum(adapter, ridge_detail)
-    _apply_callouts(
-        adapter,
-        [*front_annotations, *top_annotations, *detail_annotations],
-        label="lever geometry",
-    )
-    # Derived values print in parentheses: linear, so the singular helper
-    # (the plural forces a Ø glyph).
-    for name in sorted(REFERENCE_DIMENSIONS):
-        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one front {name} to mark as reference")
-        set_reference_dimension(adapter, matches[0], label=f"front {name}")
 
     # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
     # a point on the hole rim (not its centre) so SolidWorks catches the
@@ -1917,8 +1797,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
 
-    # Datum A is the knife-edge pivot ridge, tagged on its round in Detail E
-    # (_ridge_datum).  One sweep of the plan's visible edges serves every
+    # Datum A is the common knife-edge pivot ridge, tagged in Detail D on sheet 2.
+    # One sweep of the plan's visible edges serves every
     # named pick below.  The ridge is the hexagon's top vertex line, y =
     # HEX_H/2 (vertex-up sketch centred on the pivot axis,
     # build_sm_summing_lever._hex_knife), rounded at R0.1 MAX: the plan shows
@@ -1971,14 +1851,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="-Z knife-edge ridge finish",
         char_height=0.0025,
     )
-    # X location of the anchor tap from the knife-edge pivot axis (the +Z
-    # trunnion ridge, the finish's): a plain title-block dimension, both
-    # endpoints named -- the ridge's theoretical sharp (rule 16), an owned
-    # centreline down the +Z stub, and the tap's rim on the boss top (centre
-    # (TIP_X, ANCHOR_H/2, 0), the hole wizard's placement in
-    # build_sm_summing_lever._counter_anchor_tap).  The mid rib's apex shares
-    # this station (its 76.20 in the front profile).
-    ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
+    # X location of the anchor tap from datum A's -Z knife-edge pivot ridge:
+    # a plain title-block dimension. The owned centreline depicts its
+    # theoretical sharp (rule 16); nominally the +Z ridge shares that axis,
+    # but the opposite manufactured ridge is not the datum feature. Both
+    # this dimension and the spring row's BASIC X use the same -Z reference.
+    # The other endpoint is the tap rim on the boss top, centre
+    # (TIP_X, ANCHOR_H/2, 0), placed by _counter_anchor_tap. The mid rib's
+    # apex shares the anchor tap's X station.
+    ridge_dim_edge = _top_xy(0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     ridge_axis = _ridge_centerline(adapter, top)
     anchor_rim = top_edges.circle_at(
@@ -2074,13 +1955,13 @@ async def build(adapter: Any) -> dict[str, str]:
             f"anchor boss Z callout did not persist: {boss_z_display.GetText(4)!r}"
         )
     seed_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
+        (HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z_LAST),
         HOLE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="spring-hole seed rim",
     )
     second_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST - CHANNEL_PITCH),
+        (HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z_LAST - CHANNEL_PITCH),
         HOLE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="spring-hole second rim",
@@ -2112,11 +1993,11 @@ async def build(adapter: Any) -> dict[str, str]:
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
     # The start Z (12.75) spans 6.4 mm of sheet (0.0919..0.0983); text between
     # the arrows would sit on its own line (3.35 there stood on 7.06's extension
-    # line and 152.40's), so it hangs above the span.  Each of these vertical
+    # line and the body-span line), so it hangs above the span. Each of these vertical
     # dimensions draws its line at its text's right end (farm r1 2026-10-16:
     # the 19X 7.06 text 0.275..0.2958 with its line there), so the 12.75 text
     # starts 4 mm right of that line -- at 0.292 its shoulder crossed it -- and
-    # stays left of the 152.40 line (0.396).
+    # stays left of the 152.4 body-span line (0.396).
     start_z = add_edge_dimension(
         adapter,
         top,
@@ -2166,23 +2047,11 @@ async def build(adapter: Any) -> dict[str, str]:
             f"spring-hole pitch count {pitch_prefix!r} did not persist: "
             f"{pitch_display.GetText(1)!r}"
         )
-    # The 20X callout hangs on hole 7 (three below the middle), text in the
-    # open field right of the column: with 44.45 below the plate end,
-    # 0.100..0.185 there holds nothing but section C-C's free-edge arrow,
-    # whose letter prints at x 0.259..0.265, y 0.136..0.143 (farm r3: the
-    # leader off the middle hole, y 0.1336, ran 6.2 mm through the letter,
-    # then at y 0.129..0.1355). Hole 7 (y 0.1230) keeps the leader clear
-    # under it; the text centres on x 0.310 so the process line's 67 mm
-    # (from x 0.277) clears that letter and the mid rib's 5.08 extension
-    # lines, which end at x 0.267 (TOP_KEEP).  Every callout on
-    # the end hole had to leave it downward and so crossed the plate-end
-    # extension lines of 152.40 and the start-Z dimension -- steepening the
-    # leader only traded that for text-on-line and arrow-near-text against
-    # the 39.85 arrowhead and the start-Z overshoot (runs
-    # 20260928T130915425Z, ...131249806Z, ...131507773Z).
+    # The 20X callout hangs on hole 7, with its complete process line in the
+    # open field right of the column and clear of the mid-rib witnesses.
     callout_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2 - 3) * CHANNEL_PITCH
     callout_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, callout_hole_z),
+        (HOLE_X, COEFFICIENT_TOP_Y, callout_hole_z),
         HOLE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="spring-hole callout rim",
@@ -2204,7 +2073,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # quadrant: a hit-test at its left quadrant landed the arrow on the
     # rib's end corner 1 mm left of the hole (machinist review r9).
     seed_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, HOLE_Z_FIRST),
+        (HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z_FIRST),
         HOLE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="spring-hole seed rim",
@@ -2223,8 +2092,6 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
-    check_plate_thickness = _plate_section(adapter, top)
-    _tap_section(adapter, front)
     _add_view_arrow(adapter, top, BACK_VIEW_LETTER, VIEW_F_ARROW)
     _add_view_arrow(adapter, top, FRONT_VIEW_LETTER, VIEW_G_ARROW)
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
@@ -2236,16 +2103,43 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate bracket receiver sheet")
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
     receiver_iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
+        adapter, str(SOURCE), octant_view_name(*RECEIVER_ISOMETRIC_OCTANT),
+        *ISO_CENTER, scale=(1, 4),
     )
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
+    # The reference envelope is hidden in the saved part. Show it only while
+    # creating/curating D; its native items select through their existing parent.
+    with part_sketches_shown(
+        adapter,
+        source_model,
+        KNIFE_SKETCHES,
+        label="knife envelope",
+        base_view=back,
+    ):
+        detail = _knife_detail(adapter, back)
+        _hidden_lines_removed_without_greyed_pass(detail)
+        detail_annotations = curate_hidden_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="knife detail",
+            dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+        )
+    _attach_radial_leaders(
+        adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail",
+    )
+    _assert_knife_ridge_radius(adapter, detail_annotations)
+    _ridge_datum(adapter, detail)
+    _apply_callouts(adapter, detail_annotations, label="knife detail")
+    _clear_ridge_witnesses(adapter, detail, detail_annotations)
+    _place_flank_text(adapter, detail_annotations)
     back_edges = scan_view_edges(back, label="bracket receiver face")
     mounting_rims = _mounting_rims(back_edges)
-    # Right of the view, where the 2026-10-09 render seated it.
+    # Below VIEW F, clear of the receiver stations and the detail's width.
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
-        callout_xy=(0.292, 0.115), label="two blind bracket mounting taps",
+        callout_xy=MOUNTING_CALLOUT_XY, label="two blind bracket mounting taps",
         process=BRACKET_TAP_CALLOUT_PROCESS,
     )
     _dress_bracket_depth_callout(mounting_callout)
@@ -2256,15 +2150,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="bracket receiver",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    check_plate_thickness = _plate_thickness_check(adapter, back, back_annotations)
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
     _receiver_axis_centerline(adapter, back)
-    # The view label below the pad's width, left of the view and the receiver
-    # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
-    # 2026-10-16, leader-through-text).
+    # Keep the removed-view identity below the actual end profile.
     add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
-    # The repeated isometric's label, where sheet 1 puts its own (machinist
-    # review r12: unlabelled on this sheet).
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
+    # The existing sheet-2 pictorial now shows the continuous backing from
+    # below, through the part's persisted and natively read-back octant view.
+    add_property_linked_note(adapter, "Receiver Isometric View Note", 0.322, 0.205)
     check_thread_annotations = _finished_thread_annotation_check(
         adapter,
         (
@@ -2275,6 +2168,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _remove_redundant_thread_notes(adapter)
     check_thread_annotations()
+    check_dimension_ownership = _dimension_ownership_check(
+        adapter,
+        (
+            (SHEET_NAMES[0], "VIEW G", front, FRONT_KEEP),
+            (SHEET_NAMES[0], "top", top, TOP_KEEP),
+            (SHEET_NAMES[0], "geometry isometric", iso, ()),
+            (SHEET_NAMES[1], "knife detail D", detail, DETAIL_KEEP),
+            (SHEET_NAMES[1], "VIEW F", back, BACK_KEEP),
+            (SHEET_NAMES[1], "receiver isometric", receiver_iso, ()),
+        ),
+    )
+    check_dimension_ownership()
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -2285,7 +2191,10 @@ async def build(adapter: Any) -> dict[str, str]:
         # This recipe deletes and proves its actual note inventory, as top-frame
         # does; the shared exact-count guard remains unchanged for other recipes.
         # Recheck after the final rebuild, before either drawing or PDF is saved.
-        settled_checks=(check_thread_annotations, check_plate_thickness),
+        settled_checks=(
+            check_thread_annotations, check_plate_thickness, check_dimension_ownership,
+            check_boss_faces,
+        ),
     )
 
 

@@ -1,9 +1,10 @@
 """Two fillister screws seat MHA-MG-01 on MHA-SM-03's front face.
 
-Pure joint data: no assembly or COM imports enter either part recipe. Machine
-seat coordinates are pinned to the live summing installation by the offline
-contract and the magnifier assembly. Photo stations: ch30 page002_img01 front
-view and ch20 page001_img01, top-right close-up.
+Pure joint geometry depends on the shared sm_summing_lever_spec geometry;
+no assembly or COM imports enter either part recipe. Machine seat coordinates
+are pinned to the live summing installation by the offline contract and the
+magnifier assembly. Photo stations: ch30 page002_img01 front view and
+ch20 page001_img01, top-right close-up.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+import sm_summing_lever_spec as lever
 
 SCREW_SKU = "91794A078"
 SCREW_THREAD = "#2-56"
@@ -63,24 +65,22 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
 FLANGE_THICKNESS_BAND = 0.13
 
-# The full-thread band preserves the unchanged screw/grip stack. The receiver
-# rib was extended inward on 2026-10-20 (auto-selected after the illustrated
-# owner choice timed out), without moving its entry face or either hole axis.
-# Its 8.20 depth lets the cylindrical drill take the ordinary title-block
-# .XX band, including two pitches of tap lead and the drill point/wander.
-# This is a geometry repair, not an exception allowing a tight wall-saving
-# drill band. The opposite end rib remains 5.08 deep.
+# The owner approved the inward-only 9.00 receiver rib on 2026-10-20.
+# Entry face, both axes and the opposite 5.08 rib stay fixed. Native
+# full-thread metadata preserves the screw/grip stack.
 PLATE_THICKNESS_BAND = 0.05
 COUNTERBORE_DEPTH_BAND = 0.05
-THREAD_DEPTH_BAND = 0.05
+THREAD_DEPTH_BAND = 0.05  # native metadata only; the drawing prints 4.95 MIN
 LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
 # A bounded ordinary band is still necessary: an unlimited MIN depth could
-# run the drill beyond any finite rib into the unbacked 5.08 plate.
+# run the drill beyond any finite rib into the unbacked coefficient plate.
 DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
-RIB_DEPTH = 8.2
+RIB_DEPTH = 9.00
 POSITION_BAND = 0.05
 DRILLED_DIAMETER_PLUS = 0.10
 RIB_DEPTH_BAND = LINEAR_BAND  # the title block's: the rib takes no native band
+# Engineering floor for the printed pilot, not the finished thread cavity.
+RECEIVER_PILOT_WALL_MIN = 2.0
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = 0.25
@@ -115,9 +115,9 @@ TAP_LEAD_MARGIN_MIN = (
     DRILL_DEPTH_MIN - THREAD_DEPTH - THREAD_DEPTH_BAND - 2.0 * SCREW_PITCH
 )
 DRILL_POINT_RIB_MARGIN = RIB_DEPTH - DRILL_DEPTH - DRILL_POINT_DEPTH
-# Lateral drift of the drill at its deepest reach (fr_top_frame_spec's 0.3
-# deg realistic wander, restated so the joint stays a pure leaf module): the
-# rib walls round the tap are judged with it.
+# Lateral pilot drift at its deepest reach (fr_top_frame_spec's 0.3 deg
+# realistic wander, kept local to avoid adding that spec to the shared pure
+# geometry dependency).
 DRILL_WANDER_DEG = 0.3
 DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX
@@ -138,14 +138,87 @@ COUNTERBORE_HEIGHT_WALL_MIN = (
     - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
 )
 
+
+def receiver_step_wall_margin(
+    rib_depth_min: float,
+    floor_from_axis_min: float,
+    cylinder_depth_max: float,
+    radius_max: float,
+    point_height_ratio: float,
+    wander_max: float,
+) -> float:
+    """Finite pilot cylinder/cone to the sharp inward rib-to-plate step.
+
+    Work in an axial/radial section through the nearest plate face. The
+    excluded quadrant starts at (rib_depth_min, floor_from_axis_min); treating
+    it as infinite in X can only REMOVE material from the real rib/plate
+    union. Ignoring the concave R1 root similarly gives a lower wall bound.
+    The full cylinder's nearest point is its last shoulder. On the finite
+    cone, radial contraction u spans [0, radius_max] and advances axially by
+    k*u, where k is the point height/radius. Projection of the sharp corner
+    onto that finite segment gives the clamped minimum below.
+
+    The premises require the full cylinder behind the step and inside the
+    plate face; fail closed rather than applying this section proof after
+    either premise changes. Subtracting the entire deepest wander once is a
+    conservative Euclidean perturbation bound, not a second axial allowance.
+    """
+    values = (
+        rib_depth_min, floor_from_axis_min, cylinder_depth_max, radius_max,
+        point_height_ratio, wander_max,
+    )
+    if (
+        not all(math.isfinite(value) for value in values)
+        or not rib_depth_min >= cylinder_depth_max >= 0.0
+        or not floor_from_axis_min >= radius_max >= 0.0
+        or point_height_ratio < 0.0
+        or wander_max < 0.0
+    ):
+        raise ValueError("receiver step-wall geometry violates finite-pilot premises")
+    a = rib_depth_min - cylinder_depth_max
+    b = floor_from_axis_min - radius_max
+    k = point_height_ratio
+    u = min(radius_max, max(0.0, (k * a - b) / (1.0 + k * k)))
+    return math.hypot(a - k * u, b + u) - wander_max
+
+
+def receiver_pilot_step_wall_budget() -> float:
+    """Printed pilot step wall, including diameter allowance and drill wander.
+
+    The row is dimensioned from the ACTUAL top face: its top-position shift
+    cancels, while thickness and row-location bands remain independent.
+    Charge either plate face, the shortest printed rib, deepest printed drill
+    and pilot rounded to .XX (1.78, not native 1.778), plus the drill allowance.
+    Include the larger native pilot if rounding would otherwise shrink it.
+    """
+    radius = (
+        max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    wander = math.tan(math.radians(DRILL_WANDER_DEG)) * (
+        DRILL_DEPTH_MAX + radius * DRILL_POINT_H
+    )
+    return min(
+        receiver_step_wall_margin(
+            RIB_DEPTH - RIB_DEPTH_BAND,
+            min(
+                lever.COEFFICIENT_TOP_Y - y - POSITION_BAND,
+                lever.COEFFICIENT_T - LINEAR_BAND
+                - (lever.COEFFICIENT_TOP_Y - y) - POSITION_BAND,
+            ),
+            DRILL_DEPTH_MAX, radius, DRILL_POINT_H, wander,
+        )
+        for _x, y, _z in LEVER_HOLE_POINTS
+    )
+
+
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError("magnifying bracket screw loses 1.5D full engagement")
 if SCREW_TIP_GAP_MIN <= 0.0:
     raise AssertionError("magnifying bracket screw bottoms in its full-thread seat")
 if THREAD_RIB_MARGIN_MIN < 0.0:
-    raise AssertionError("magnifying bracket full thread runs beyond the front rib")
+    raise AssertionError("magnifying bracket modeled full thread runs beyond the front rib")
 if TAP_LEAD_MARGIN_MIN < 0.0:
-    raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead")
+    raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead design allowance")
 if DRILL_POINT_RIB_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill breaks out of the front rib")
 if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
@@ -154,3 +227,10 @@ if min(
     GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
 ) < 1.5:
     raise AssertionError("magnifying bracket joint loses a drawing-guidelines.md rule 17 (walls and webs) wall")
+
+RECEIVER_PILOT_STEP_WALL_MIN = receiver_pilot_step_wall_budget()
+if RECEIVER_PILOT_STEP_WALL_MIN < RECEIVER_PILOT_WALL_MIN:
+    raise AssertionError(
+        f"magnifying bracket receiver pilot step wall {RECEIVER_PILOT_STEP_WALL_MIN:.6f} mm "
+        f"is below the {RECEIVER_PILOT_WALL_MIN:g} mm pilot floor"
+    )

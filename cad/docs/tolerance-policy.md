@@ -539,6 +539,26 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 ## Open items the budget exposed
 
+- **Summing-lever conventional blind receivers: proof limits.** By explicit
+  owner decision, the two **2-56 UNC 2B** taps fasten **MHA-MG-01**, with
+  native **2X Ø1.78 DRILL 6.50** and **4.95 MIN** full thread. The drill
+  retains **+0.10/0 mm** diameter and ordinary **±0.51 mm** depth bands.
+  The **9.00 mm** receiver and fixed-top **7.00 mm** slab are unchanged.
+  There is no additional finished-cavity envelope or printed wall acceptance.
+  `receiver_pilot_step_wall_budget` / `RECEIVER_PILOT_STEP_WALL_MIN` retain
+  the independent **≥2 mm pilot-only** sharp-step design floor (about
+  **2.103443 mm**, with printed pilot limits and one 0.3° wander charge).
+  `sm_summing_lever_profile.receiver_pilot_wall_budget` /
+  `ReceiverPilotWallBudget` bound longitudinal walls against
+  `RECEIVER_PILOT_WALL_MIN` using only the printed pilot radius and drill
+  wander, with the full ordinary top/thickness bands and correlated
+  actual-top-referenced receiver position. Native trimmed-face clearance
+  separately uses **TAP_DRILL_DIA/2**. Pilot volume, end-plane, band and point
+  containment checks, drill-lead reserve, usable engagement and screw-tip-gap
+  guards remain. Native **4.95 ±0.05 mm** full-thread metadata serves the
+  screw stack, not a maximum cutting reach. Pilot/cosmetic-thread geometry
+  does not prove all finished-hole wall thicknesses.
+
 - **Stock spring selection and static balance** (#747). The custom springs have
   been replaced by catalog force curves: twenty hook-ended **9432K31** channel
   springs (0.175127 N/mm, 1.77929 N initial tension) and one double-loop
@@ -567,13 +587,38 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   guide friction. Verify assembly fit and measured force curves before closing
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
-  Lower anchors are **9489T111 #6-32**, supplied nuts omitted and shank trimmed
-  to 6.668 mm, which stops the cut end 1.588 mm (1/16 in) above the coefficient
-  plate's underside and leaves 3.493 mm of thread engaged, and
-  **9490T1 #10-24**, shank trimmed to 19.05 mm. Both thread directly into the
-  summing lever; there are no nuts at the plate or boss. Existing upper lever
-  holes are retained, with no upper pins. The gooseneck head is Ø12 mm to retain
-  the counter's double loop.
+  Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
+  trimmed to **18.6 mm** (**31.3 mm** overall to eye crown), each locked by
+  an **MHA-CH-14 jam nut** on the coefficient plate underside. The neck seats
+  on the fixed plate top; one turn maximum back-out is retained for preload
+  trim, then the nut is tightened while holding eye clocking. The uniform
+  **7.00 mm** coefficient plate spans local **Y=−4.46..+2.54 mm**; it is
+  thickened downward, not recentered. This retains the world top **982.24 mm**,
+  nut seat **975.24 mm**, all twenty stations and the **Ø0.15 RFS** pattern.
+  Worst-case anchor sizing retains two full turns beyond the jam nut through
+  the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
+  boss-through trim and top jam nut; neither counter anchor nor boss pose
+  changes. Existing upper lever holes are retained, with no upper pins.
+  View G's actual-edge boss-top/coefficient-top location is
+  **9.525−2.54 = 6.985 mm**, printed **6.99** under the ordinary `.XX` band.
+  The **19.05 mm** boss and **5.08 mm** web remain centered on Y=0; the web
+  top is flush with the coefficient top. Neither feature is referenced to
+  the asymmetric slab midplane. The existing sheet-2 isometric shows the
+  underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**, keeping six views.
+  The gooseneck head remains Ø12 mm to retain the counter's double loop.
+  Option A's historical source-union estimate at the prior **8.20 mm** receiver
+  depth is **+6.769 cm³**, approximately **49–53 g**,
+  only at illustrative density 7.2–7.85 g/cm³; its signed-change centroid is
+  **(22.744, −3.517, −0.0777) mm**, not the final part CG. The corresponding
+  level-pose gravity moment is **10.87–11.85 N·mm**, excluding out-of-plane
+  root-blend changes and the subsequently approved **0.80 mm** inward-only
+  receiver extension to **9.00 mm**. These are not current-depth mass/CG
+  acceptance values (derivation and limits in [machining DFM](machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface)).
+  Added +X gravity reduces required counter tension: the installed margin
+  that matters is force above the measured initial-tension floor, not catalog
+  maximum-minus-force or full catalog span. The default static balance/error
+  budget omits lever gravity. Native mass/CG, underside and operating-pose
+  swept-clearance checks, and measured installed balance remain outstanding.
   Assembly seating uses the native supplier surfaces, not the ideal-circle
   offsets used to initialize the model. Supplier and replica probes found the
   same 3.7–4.4 µm departure from the nominal round-wire envelope at the counter

@@ -76,7 +76,7 @@ CH_LEVER_EYE = (_CL.LEVER_SPRING_X, 0.0, 0.0)
 # puts the stock eye centre this far above the plate's top face.
 SUM_LEVER_EYE = (
     _SL.HOLE_X + ANCHOR_9489T111.eye_centre_mm[0],
-    _SL.PLATE_T / 2.0
+    _SL.COEFFICIENT_TOP_Y
     - ANCHOR_9489T111.thread_start_y_mm
     + ANCHOR_9489T111.eye_centre_mm[1],
     _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],

@@ -19,7 +19,7 @@ nut, its deburr at the adverse corner of its band, backed out the whole
 budget.
 
 The tap is engaged over its whole length at every pose (``THREAD_ENGAGEMENT_MM``
-is the plate plus its underside spring pad): backing out only lifts the neck
+is the uniform coefficient-plate thickness): backing out only lifts the neck
 off the plate top, it no longer trades engagement for eye lift.
 
 The fitter holds the eye at its clocking while the nut is tightened, so the
@@ -38,14 +38,14 @@ from stock_anchor_geom import ANCHOR_9489T111, trim
 
 _PITCH = ANCHOR_9489T111.thread_pitch_mm
 
-# The tap is engaged over its whole length (plate plus underside pad) at
-# every calibration pose.
-THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.SPRING_SEAT_T
-# That length is the lever's 7.00, printed at two places, so the title
-# block's .XX band moves the pad underside the jam nut seats on (code review
-# C10: sized at the nominal pad, the thickest in-band pad left 1.09 of full
-# thread past the nut, under the 1.5875 floor).  The trim is sized at the
-# thickest pad; the cut end hangs deepest under the thinnest.
+# The tap is engaged over the whole coefficient-plate thickness at every
+# calibration pose.
+THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.COEFFICIENT_T
+# The lever's 7.00 prints under the title block's .XX band, so its underside
+# moves the jam-nut seat (code review C10: sizing at nominal thickness left
+# only 1.09 of full thread past the nut at the thickest limit, under the
+# 1.5875 floor). The trim is sized at the thickest plate; the cut end hangs
+# deepest under the thinnest.
 SEAT_BAND_MM = printed_band_mm(2)
 SEAT_T_MAX_MM = THREAD_ENGAGEMENT_MM + SEAT_BAND_MM
 SEAT_T_MIN_MM = THREAD_ENGAGEMENT_MM - SEAT_BAND_MM
@@ -78,7 +78,7 @@ FULL_THREADS_PAST_NUT = 2
 # title block's 0.03 in the tolerance itself carries: size to the wider.
 LENGTH_BAND_WORST_MM = max(FINISHED_OVERALL_TOLERANCE_MM, printed_band_mm(1))
 # Cut end below the thread start (= plate top when seated), nominal part,
-# seated: the thickest pad, thickest nut, two full turns and the ruled
+# seated: the thickest plate, thickest nut, two full turns and the ruled
 # margin, the deburr, then the back-out budget and the band the shortest
 # in-band part may give up.
 _END_BELOW_THREAD_START_MM = (
@@ -106,13 +106,13 @@ SHANK_LENGTH_MM = round(
 )
 TRIM = trim(ANCHOR_9489T111, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = round(ANCHOR_9489T111.eye_od_mm / 2 - TRIM.shank_end_y_mm, 6)
-# The modelled, seated cut end below the nominal pad's underside.
+# The modelled, seated cut end below the nominal plate underside.
 PROTRUSION_MM = (
     SHANK_LENGTH_MM - ANCHOR_9489T111.unthreaded_shank_length_mm - THREAD_ENGAGEMENT_MM
 )
-# Deepest the cut end can hang below the pad underside: the longest part,
-# seated under the thinnest in-band pad.  The band's upper half stops at the
-# uncut 9489T111 shank, the longest part the stock can give.  The
+# Deepest the cut end can hang below the plate underside: the longest part,
+# seated under the thinnest in-band plate. The band's upper half stops at the
+# uncut 9489T111 shank, the longest part the stock can give. The
 # under-plate envelope (lever ribs, magnifier bracket flange) is checked
 # against this and the nut.
 PROTRUSION_MAX_MM = (
@@ -127,8 +127,8 @@ def full_threads_past_nut_mm(
 ) -> float:
     """Full-form thread below the thickest in-band nut for a part ``band_mm``
     off nominal (negative = short), backed out ``backed_out_mm`` from the
-    seated neck, through a pad ``seat_t_mm`` thick (default: the thickest
-    in-band pad)."""
+    seated neck, through a plate ``seat_t_mm`` thick (default: the thickest
+    in-band plate)."""
     end_below_thread_start = (
         SHANK_LENGTH_MM
         + band_mm
@@ -151,7 +151,7 @@ if (
     < PAST_NUT_FLOOR_MM + PAST_NUT_MARGIN_MM - 1e-9
 ):
     raise ValueError("the shortest in-band anchor loses its threads past the nut")
-# The cut shank must come out of the purchased 9489T111: the lever's padded
+# The cut shank must come out of the purchased 9489T111: the coefficient-plate
 # tap length sets how much of it the anchor needs.
 if SHANK_LENGTH_MM >= ANCHOR_9489T111.shank_length_mm:
     raise ValueError("the anchor's cut shank no longer fits the 9489T111 stock")

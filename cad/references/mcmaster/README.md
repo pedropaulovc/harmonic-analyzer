@@ -516,13 +516,19 @@ Live catalog verification on October 16, 2026:
   thru holes, and the flange prints 3.175 at the title block's .XXX ±0.13.
   Grip 3.175 (3.045 minimum) leaves 4.7625 mm engagement nominal, 3.305 mm
   worst case (above 1.5D, 3.2766 mm), with a 0.0075 mm minimum screw-tip gap
-  in the 4.95 ±0.05 full thread. Brass was rejected: the 90114A brass
+  in the native 4.95 ±0.05 full-thread model (printed **4.95 MIN**, not an
+  upper cutting/thread-extent limit). Brass was rejected: the 90114A brass
   fillister family has no #2-56 × 5/16, and a 3/8 brass screw through a
   3/16 flange kept only a 1.04 shank-shear margin (66.05 MPa against
   68.9 MPa allowable, 0.6 × 50 ksi / 3). The heads were already 18-8
   stainless on main. `diagnostics.diag_build_91794A078` reuses the native
   fillister family recipe; its derived slot, dome, thread/runout and
   vendor-frame mapping are family assumptions, not verified vendor geometry.
+  By explicit owner decision, the receiver uses conventional blind **2-56
+  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø1.78 DRILL 6.50**
+  and **4.95 MIN** full thread. There is no additional finished-cavity
+  envelope or printed wall-acceptance requirement. The pilot and engagement
+  proofs below do not establish all physical thread-cut wall thicknesses.
 
 Live catalog verification on October 8, 2026:
 
@@ -544,12 +550,26 @@ Live catalog verification on October 8, 2026:
   Its worst-case engagement was 3.2975 mm, above 1.5D (3.2766 mm); maximum
   reach 4.825 mm stays below the 4.90 mm minimum full-thread depth. (Superseded
   by 91794A078 above, October 16, 2026.)
-  The current 5.00 mm maximum full-thread envelope stays within the 7.69 mm
-  minimum receiver rib depth. Only the -Z entry rib, `EdgeRibBack`, was extended
-  inward to 8.20 deep; `EdgeRibFront` remains 5.08. The 6.50 ±0.51 cylindrical
-  drill now takes an ordinary-width bounded band. Its point and conservative
-  wander charge remain inside the rib with 0.076133 mm minimum axial containment,
-  not a bottom-wall thickness. The minimum 0.122 mm
+  Current native **4.95 ±0.05 mm** cosmetic-thread metadata is retained for
+  the screw stack, not used as a manufacturing maximum. Printed **4.95 MIN**
+  specifies usable full thread without an additional maximum cutting reach.
+  Only the -Z entry rib, `EdgeRibBack`, extends inward to the owner-approved
+  **9.00 mm** depth (inner cap -67.20, unchanged entry -76.20);
+  `EdgeRibFront` remains 5.08. `RibDepth` keeps two decimals and the ordinary
+  ±0.51 band. The 6.50 ±0.51 cylindrical drill and native full-thread
+  metadata are unchanged. The retained native-pilot point and conservative
+  wander charge remain inside the rib with 0.876133 mm minimum axial
+  containment, not a bottom-wall thickness. The separate worst printed
+  **pilot-only** sharp-step budget uses Ø1.78 +0.10/0 and charges the whole
+  deepest wander: about **2.103443 mm** at 9.00, versus only 1.653 mm at the
+  superseded 8.20 depth. `receiver_pilot_step_wall_budget` /
+  `RECEIVER_PILOT_STEP_WALL_MIN` enforce the independent ≥2 mm pilot design
+  floor. `sm_summing_lever_profile.receiver_pilot_wall_budget` /
+  `ReceiverPilotWallBudget` bound longitudinal pilot walls against
+  `RECEIVER_PILOT_WALL_MIN` using the printed pilot radius plus drill wander.
+  Native trimmed-face comparison separately subtracts **TAP_DRILL_DIA/2**.
+  The native model contains pilot and cosmetic threads, not exact physical
+  thread-cutting geometry. The minimum 0.122 mm
   head-to-counterbore radial float exceeds the 0.10 mm maximum station
   pitch mismatch at the printed ±0.05 position bands. The minimum end wall
   is 2.00 mm from the real end-face station datum, without double-counting

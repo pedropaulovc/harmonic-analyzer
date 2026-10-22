@@ -139,6 +139,16 @@ from _buildgraph import (  # noqa: E402
     stamps_title_block_properties,
 )
 
+from machinist_review_config import (  # noqa: E402
+    ReviewProfile,
+    registered_review_profile,
+    validate_review_profile,
+)
+
+# Freeze both stages once, before prewarming the cache or executing any leaf.
+# The same resolved values key remote verdicts, local freshness and CLI argv.
+_MACHINIST_REVIEW_PROFILE = registered_review_profile()
+
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
@@ -152,10 +162,6 @@ from _drawing_registry import (  # noqa: E402
 from _machinist_review_mode import (  # noqa: E402
     MachinistReviewMode,
     mode_for_drawing,
-)
-from machinist_review_config import (  # noqa: E402
-    ReviewProfile,
-    registered_review_profile,
 )
 from _refresh_tier import (  # noqa: E402  (FULL / PARTS / EXPLODE tier choice)
     ExplodePlan,
@@ -3294,14 +3300,10 @@ def _machinist_review_stamp(stem: str) -> Path:
 
 
 def _machinist_review_profile() -> ReviewProfile:
-    return registered_review_profile(
-        os.environ.get("HARMONIC_MACHINIST_REVIEWER", "claude")
-    )
+    return _MACHINIST_REVIEW_PROFILE
 
 
-def _machinist_review_cache_key(
-    stem: str, profile: ReviewProfile, label: str | None = None
-) -> str:
+def _machinist_review_digest(profile: ReviewProfile):
     # The config module is a real review input. Its contextual digest records
     # both its actual source and the frozen effective profile, keeping normal
     # cache-key provenance instead of adding a virtual file or a post-hoc salt.
@@ -3314,7 +3316,15 @@ def _machinist_review_cache_key(
             return hashlib.sha256(f"{source}\0{effective}".encode()).hexdigest()
         return source
 
-    return _cache.cache_key(_machinist_review_file_deps(stem), digest, label)
+    return digest
+
+
+def _machinist_review_cache_key(
+    stem: str, profile: ReviewProfile, label: str | None = None
+) -> str:
+    return _cache.cache_key(
+        _machinist_review_file_deps(stem), _machinist_review_digest(profile), label
+    )
 
 
 def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
@@ -3326,8 +3336,8 @@ def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
         "--report-dir", str(_machinist_review_dir(stem)),
         "--reviewer", profile.backend, "--model", profile.model,
         "--effort", profile.effort,
-        "--judge-reviewer", profile.backend, "--judge-model", profile.model,
-        "--judge-effort", profile.effort,
+        "--judge-reviewer", profile.judge_backend, "--judge-model", profile.judge_model,
+        "--judge-effort", profile.judge_effort,
     ]
 
 
@@ -3380,11 +3390,9 @@ def _cached_machinist_review_action(
     reports: no transcripts or source snapshots are pruned from the payload.
     Provider/runner errors never publish and never leave a freshness stamp.
     """
-    if not isinstance(profile, ReviewProfile):
-        raise ValueError("registered machinist review requires a resolved ReviewProfile")
     # Validate direct action callers too, before removing stamps or probing.
     # Do not reselect defaults: this snapshot also owns the task's freshness.
-    registered_review_profile(profile.backend)
+    validate_review_profile(profile)
     label = f"check:machinist_review:{stem}"
     directory = _machinist_review_dir(stem)
     stamp = _machinist_review_stamp(stem)
@@ -3697,6 +3705,8 @@ def task_check():
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
+        SCRIPTS_DIR / "test_sm_summing_lever_profile.py",
+        SCRIPTS_DIR / "test_sm_summing_lever_adapter_contract.py",
         # Cross-sheet ownership checks whose filenames intentionally do not match
         # the one-file-per-drawing discovery pattern above.
         SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
@@ -4811,7 +4821,12 @@ def _cache_status(statusargs):
     for label, deps in _cache_rows():
         if filters and not any(f in label.lower() for f in filters):
             continue
-        key, inputs = _cache.key_inputs(deps, ContentChecker._digest)
+        digest = (
+            _machinist_review_digest(_machinist_review_profile())
+            if label.startswith("check:machinist_review:")
+            else ContentChecker._digest
+        )
+        key, inputs = _cache.key_inputs(deps, digest)
         present = _cache.probe(key)  # True / False / None (disabled|unreachable)
         if present is True:
             mark, hits = "HIT ", hits + 1

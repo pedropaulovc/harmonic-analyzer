@@ -21,28 +21,6 @@ Markdown are named `<stem>.aggregate.{json,md}`; per-run JSON and retained attem
 evidence remain alongside them. A cache hit evaluates the same verdict without
 calling a model.
 
-Set `HARMONIC_MACHINIST_REVIEWER=claude|codex` in the submitter's environment
-**before launching the build** to select both the blind reviewers and their judge.
-Unset selects Claude; each backend uses the standalone CLI's existing model/effort
-defaults (Claude: `claude-opus-5-5` / `medium`; Codex: `gpt-6-astra` / `low`).
-For example, in PowerShell:
-
-```powershell
-$env:HARMONIC_MACHINIST_REVIEWER = "codex"
-uv run --frozen python build.py --verbosity warning
-```
-
-Other values, including an empty value, fail at review-task generation before
-cache probing or report/stamp changes. The graph freezes the effective backend,
-model and effort for task freshness, cache identity and explicit CLI arguments
-for both roles. Changing that profile invalidates freshness and selects a separate
-cache entry; reverting can reuse only that profile's verdict. Cache provenance
-retains the real `machinist_review_config.py` source path: its contextual digest
-combines the file's content digest with canonical effective-profile JSON.
-No native CAD recipe imports that configuration. This variable applies only to
-registered review leaves; standalone `machinist_review.py` keeps its independent
-reviewer/judge flags and defaults.
-
 Draw scripts default to `MachinistReviewMode.OFF`: no review task exists, so
 `build` and `release` spend no model tokens on the sheet. To opt in, import
 `MachinistReviewMode` from `_machinist_review_mode` and declare
@@ -54,10 +32,77 @@ provider/runner errors are never cached or freshness-stamped. An explicitly forc
 refresh that produces no cacheable verdict fails even in LEARN mode, without
 caching the error. Review keys hash the PDF, package exceptions, review code/import
 closure, the selected kind's reviewer/severity prompts, shared reviewer/judge
-prompts/schemas and shared drawing guidelines, not the registry, enforcement
-declaration, or recipe-skipped infrastructure such as telemetry. Build leaves
-always pass `--force`, so bypassed PDF-diff implementation, identity-pairing inputs,
-and the precheck prompt/schema do not invalidate their review cache.
+prompts/schemas, shared drawing guidelines and the effective reviewer and judge
+selections below, not the registry, enforcement declaration, or recipe-skipped
+infrastructure such as telemetry. Build leaves always pass `--force`, so bypassed
+PDF-diff implementation, identity-pairing inputs, and the precheck prompt/schema
+do not invalidate their review cache.
+
+### Selecting the build-gate reviewer and judge
+
+Build-gate reviews default to **Claude / `claude-opus-5-5` / `medium`** for both
+stages. Set these process environment variables **before starting the build**:
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `HARMONIC_MACHINIST_REVIEWER` | Blind-review CLI (`claude` or `codex`) | `claude` |
+| `HARMONIC_MACHINIST_MODEL` | Blind-review model ID | Selected reviewer's default |
+| `HARMONIC_MACHINIST_EFFORT` | Blind-review reasoning effort | Selected reviewer's default |
+| `HARMONIC_MACHINIST_JUDGE_REVIEWER` | Judge CLI (`claude` or `codex`) | Selected blind-review CLI |
+| `HARMONIC_MACHINIST_JUDGE_MODEL` | Judge model ID | Selected judge's default |
+| `HARMONIC_MACHINIST_JUDGE_EFFORT` | Judge reasoning effort | Selected judge's default |
+
+The judge inherits the selected blind-review backend unless
+`HARMONIC_MACHINIST_JUDGE_REVIEWER` explicitly overrides it. Each stage then
+resolves its model and effort independently from that stage's backend; review
+model/effort overrides do not override the judge's model/effort. Codex defaults to
+`gpt-6-astra` / `low`; Claude defaults to `claude-opus-5-5` / `medium`. For
+**Codex / `gpt-6-astra` / `high` for both stages**, run in PowerShell:
+
+```powershell
+$env:HARMONIC_MACHINIST_REVIEWER = 'codex'
+$env:HARMONIC_MACHINIST_MODEL = 'gpt-6-astra'
+$env:HARMONIC_MACHINIST_EFFORT = 'high'
+$env:HARMONIC_MACHINIST_JUDGE_REVIEWER = 'codex'
+$env:HARMONIC_MACHINIST_JUDGE_MODEL = 'gpt-6-astra'
+$env:HARMONIC_MACHINIST_JUDGE_EFFORT = 'high'
+
+# One gate (its drawing dependency is still built if needed):
+uv run --frozen python -m doit check:machinist_review:sm_summing_lever
+
+# Or the complete farm build, from a clean, pushed worktree:
+./scripts/farm-run.ps1 -Worktree (Get-Location).Path `
+    -PoolHome C:/src/solidworks-pool -Targets build -LeafTimeout 90 `
+    -DisplayName 'Summing lever - Codex high review' -Tag summing-lever-codex-high
+```
+
+`farm-run.ps1` preserves these inherited process variables when it invokes `uv`
+from the private snapshot; the reviews execute on that submitter, not on the
+SolidWorks workers. Set them in the shell/process that launches the script
+(including the supervised launch process), not in a different terminal after
+launch. No tracked config edit, `HARMONIC_CACHE_SALT`, or forced cache refresh is
+needed. The standalone `cad/scripts/machinist_review.py` continues to use its
+explicit `--reviewer/--model/--effort` and `--judge-reviewer/--judge-model/--judge-effort`
+options, not these build-gate environment variables.
+
+The graph resolves and freezes all six effective values once, before cache
+prewarming or leaf execution, and supplies all six explicitly to the review CLI.
+Unknown providers, unsupported provider efforts, and empty or malformed model IDs
+fail graph loading rather than silently defaulting or changing provider. Claude
+efforts are `low`, `medium`, `high`, `xhigh`, `max`; Codex efforts are `none`,
+`minimal`, `low`, `medium`, `high`, `xhigh`, `max`. Model IDs remain explicit provider model IDs:
+availability and model-specific effort support are checked by the selected CLI,
+not by an offline model catalogue in the build graph. Quota/auth/provider errors
+never switch provider and never cache a verdict.
+
+Changing any effective selection invalidates that review's remote verdict key
+and local doit freshness, including when returning to an earlier selection after
+a successful run with another profile. Explicit default-equivalent values use
+the same key as unset defaults. Selection is folded into the review-only SHA-256
+contextual digest of the real `machinist_review_config.py` source dependency,
+preserving ordinary cache provenance; it creates no runtime config file and does
+not affect part, assembly, drawing or other CAD keys/freshness. Unset the six
+variables above to restore defaults on the next build process.
 
 ## Holistic review telemetry
 

@@ -352,7 +352,7 @@ _COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
 _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     ANCHOR_9489T111.thread_major_dia_mm,
     blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC),
-    sm_summing_lever_spec.SPRING_SEAT_T,
+    sm_summing_lever_spec.COEFFICIENT_T,
 )
 # MHA-SM-VN-52 #10-24 cut hex bolt (92314A253) in each knife mount's #25 tap
 # drill over its 8.9173 nominal reach: 46.70 cut length less the 36.50 grip

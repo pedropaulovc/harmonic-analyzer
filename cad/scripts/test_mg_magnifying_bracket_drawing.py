@@ -2263,14 +2263,13 @@ def test_mounting_face_arm_root_fillets_clear_the_summing_lever() -> None:
     lever plate's free +X end stops short of the stub, and no lever feature
     reaches past that plate edge.  Machine frame from the joint layout (the
     bracket and the lever both unrotated)."""
-    import build_sm_summing_lever as lever_build
     import magnifying_bracket_joint_layout as joint
     import sm_summing_lever_spec as lever
 
     spec = mg_magnifying_bracket_spec
     # The lever's +X extreme is its plate's free end: the ribs, the pivot
     # cylinder and the hex all stop short of it (the summation arm is -X).
-    assert max(lever_build.RIB_PLATE_REACH, lever.CYL_R, lever.HEX_W / 2.0) < lever.PLATE_W
+    assert max(lever.RIB_REACH, lever.CYL_R, lever.HEX_W / 2.0) < lever.PLATE_W
     lever_end_x = joint.LEVER_ORIGIN_X + lever.PLATE_W
     assert lever_end_x == pytest.approx(29.45)
     rear = [point for point, _length in part.ARM_ROOT_EDGES if point[2] == part.FLANGE_Z[1]]
