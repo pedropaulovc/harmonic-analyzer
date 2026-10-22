@@ -1593,12 +1593,14 @@ receive their normal origin controls; all retain exact final-frame readback and
 the complete sketch's fully-defined guard. Head angles use a native angular
 dimension between the two actual construction rays, with the text point mapped
 from their owning sketch plane, and require exact driving-angle readback.
-Purchased pin end-rim center-condition failures remain failures. Their existing
-failure path records the actual setter result, both condition readbacks, native
-dimension type/value and attachment types independently; unavailable readers are
-not measured empty inventories, and optional diagnostics cannot replace that
-guard's original exception. This instrumentation is not a native pin fix or
-proof that an edge-on rim supports a center arc condition.
+Y-axis dowel lengths use native linear end-rim measurements with `None` arc
+conditions; they do not invoke an arc-center setter on an edge-on linear pick.
+Both exact end-rim attachments, the complete source length, native type and
+bandless reference remain checked after layout. X-axis spring pins retain their
+separate arc-center mode. A refused center setter still fails; its existing
+failure path records the actual result, condition readbacks, type/value and
+attachment types independently. Unavailable readers are not measured empty
+inventories, and these diagnostics do not establish a spring-pin native fix.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping
