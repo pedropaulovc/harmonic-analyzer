@@ -4454,6 +4454,47 @@ def test_capture_measured_locator_outline_keeps_bounded_field_and_caption_cleara
     settled[-1]()
 
 
+@pytest.mark.parametrize("caption_state", ("valid", "wrong-text", "duplicate", "missing"))
+def test_capture_locator_caption_binds_materialized_raw_text_before_exact_proof(
+    native_property_package, monkeypatch, caption_state,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
+    caption = next(
+        note for note in locator.notes if note.GetText().startswith("ASSEMBLED PLAN ")
+    )
+    if caption_state == "wrong-text":
+        caption.text = "ASSEMBLED PLAN 1:8"
+    # GetNotes can return an untyped dispatch whose zero-argument GetText was
+    # materialized as a string; binding INote exposes the actual method.
+    raw_caption = SimpleNamespace(GetText=caption.GetText(), native_note=caption)
+    original_early_bound = drawing._early_bound
+
+    def early_bound(value, interface):
+        if value is raw_caption:
+            assert interface == "INote"
+            return value.native_note
+        return original_early_bound(value, interface)
+
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    owned = tuple(raw_caption if note is caption else note for note in locator.notes)
+    if caption_state == "duplicate":
+        owned += (raw_caption,)
+    elif caption_state == "missing":
+        owned = tuple(note for note in owned if note is not raw_caption)
+    monkeypatch.setattr(locator, "GetNotes", lambda: owned)
+    assert isinstance(raw_caption.GetText, str)
+    assert callable(drawing._early_bound(raw_caption, "INote").GetText)
+    if caption_state == "valid":
+        settled[-1]()
+    else:
+        with pytest.raises(
+            RuntimeError, match="locator lost its independently fitted scale caption",
+        ):
+            settled[-1]()
+
+
 @pytest.mark.parametrize("oversized", ("width", "height"))
 def test_capture_fixed_locator_fit_keeps_strict_measured_field_bounds(
     native_property_package, oversized,

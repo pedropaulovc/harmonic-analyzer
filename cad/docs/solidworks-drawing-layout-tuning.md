@@ -272,6 +272,9 @@ the generated tree flags. Match every hidden owner to one exact view leaf using
 the existing part-file/source-parent proof; reject unknown, duplicate or
 unreadable identities. Ordinary-view visibility and the exact installed-set
 comparison remain unchanged. Do not guess root names or reapply hiding.
+Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText`;
+raw dispatch can materialize that zero-argument member as a string. Keep the
+exact caption text and uniqueness checks rather than guessing callable forms.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture

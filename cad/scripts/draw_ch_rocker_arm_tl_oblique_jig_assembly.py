@@ -3103,7 +3103,7 @@ def _assert_capture_sheet(
     notes = []
     locator_captions = [note for note in (views[1].GetNotes() or ())
                         if str(_early_bound(note, "INote").GetText() or "").startswith("ASSEMBLED PLAN")]
-    if len(locator_captions) != 1 or str(locator_captions[0].GetText()) != f"ASSEMBLED PLAN {_scale_text(scales[1])}":
+    if len(locator_captions) != 1 or str(_early_bound(locator_captions[0], "INote").GetText()) != f"ASSEMBLED PLAN {_scale_text(scales[1])}":
         raise RuntimeError("jig capture: locator lost its independently fitted scale caption")
     notes.append((locator_captions[0], _capture_note_bounds(locator_captions[0]), "locator caption"))
     leaders = []
