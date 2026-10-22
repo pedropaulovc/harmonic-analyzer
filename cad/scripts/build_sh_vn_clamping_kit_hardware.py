@@ -132,9 +132,6 @@ MEMBER_NOTE_PROPERTIES = {
     f"{configuration} Manufacturing Notes": spec.DRAWING_NOTES
     for configuration, spec in MEMBER_SPECS.items()
 }
-MEMBER_NOTE_PROPERTIES[f"{HOLD_DOWN_STUD_CONFIGURATION} Manufacturing Notes"] = (
-    "REWORKED STUD; SEE REWORK."
-)
 MEMBER_NOTE_PROPERTIES.update({
     f"{HOLD_DOWN_STUD_CONFIGURATION} Rework {name}": value
     for name, value in STUD_REWORK_PROPERTIES.items()

@@ -3754,6 +3754,7 @@ class _KitFlagNativeNote:
 @pytest.fixture
 def kit_installation_native(monkeypatch):
     """Keep recipe validation real; replace only the native COM boundary."""
+    import build_sh_vn_clamping_kit_hardware as producer
     import draw_sh_vn_clamping_kit_hardware as kit
     import _drawing_attachment as attachment
     from _drawing_edges import ViewEdge, ViewEdges
@@ -3778,6 +3779,7 @@ def kit_installation_native(monkeypatch):
             key=key,
             title=title,
             spec=spec,
+            source_properties=dict(producer.MEMBER_NOTE_PROPERTIES),
             cells=cells,
             active=prior_view,
             sheet="KitSheet",
@@ -4318,7 +4320,7 @@ def _kit_flag_finish_builder_notes(state):
     member = f"{state.key} {state.title}"
     state.legend = _Note(
         f"{member}: {state.kit.property_link(f'{state.configuration} Manufacturing Notes')}",
-        f"{member}: {state.spec.DRAWING_NOTES}",
+        f"{member}: {state.source_properties[f'{state.configuration} Manufacturing Notes']}",
         state.cells[0][2][0],
         0.105,
     )
@@ -4420,37 +4422,55 @@ def test_kit_installation_keys_attach_to_unique_native_features_and_settle(
     )
 
 
-@pytest.mark.parametrize(
-    ("configuration", "requirement"),
-    (
-        (
-            "HoldDownStud",
-            "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT.",
-        ),
-        (
-            "TNut",
-            "FOOT UNDER THE SLOT UNDERCUT; VERIFY THE FIT IN THE TABLE SLOT ON RECEIPT.",
-        ),
-        ("FlangeNut", "FLANGE FACE DOWN ON THE BASE BAR."),
-    ),
-)
-def test_kit_installation_labels_preserve_the_exact_existing_requirement(
-    kit_installation_native, configuration, requirement
+@pytest.mark.parametrize("source_drift", (False, True), ids=("current", "stale-property"))
+def test_stud_installation_legend_consumes_the_builder_stamped_property(
+    kit_installation_native, monkeypatch, source_drift,
 ):
-    state = kit_installation_native(configuration)
-    assert state.kit.VARIANTS == (
-        ("HoldDownStud", "[1] HOLD-DOWN STUD"),
-        ("TNut", "[2] T-NUT"),
-        ("FlangeNut", "[3] FLANGE NUT"),
+    import _drawing_marks
+    import build_sh_vn_clamping_kit_hardware as producer
+    from _test_stubbed_build import offline_adapter, stub_seat
+
+    property_name = "HoldDownStud Manufacturing Notes"
+    if source_drift:
+        monkeypatch.setattr(
+            producer, "MEMBER_NOTE_PROPERTIES",
+            {**producer.MEMBER_NOTE_PROPERTIES, property_name: "UNRELATED SOURCE NOTE"},
+        )
+    seat = stub_seat(
+        monkeypatch, producer, keep=("build", "apply_drawing_properties"),
     )
-    assert state.spec.DRAWING_NOTES == requirement
+    stamped = {}
+    monkeypatch.setattr(
+        _drawing_marks, "apply_custom_properties",
+        lambda _adapter, properties: stamped.update(properties),
+    )
+    seat.save_member_part.return_value = {"part": "offline"}
+    assert asyncio.run(producer.build(offline_adapter())) == {"part": "offline"}
+
+    state = kit_installation_native("HoldDownStud")
+    state.source_properties = stamped
     settled = state.kit._installation_flag(
-        state.adapter, configuration, state.cells, state.views
+        state.adapter, state.configuration, state.cells, state.views,
     )
     _kit_flag_finish_builder_notes(state)
-    assert state.legend.GetText() == f"{state.key} {state.title}: {requirement}"
+    if source_drift:
+        with pytest.raises(RuntimeError, match="unchanged linked legend"):
+            settled()
+        return
     settled()
-    assert state.spec.DRAWING_NOTES == requirement
+
+    installation = stamped[property_name]
+    assert len(installation.splitlines()) == 1
+    for requirement in (
+        "THREAD NOT MODELLED", "BOTTOMS IN THE T-NUT", "FLUSH WITH ITS FOOT", "REWORK",
+    ):
+        assert requirement in installation
+    member_properties = {
+        call.args[2]: call.args[4] for call in seat.apply_member_properties.call_args_list
+    }
+    assert member_properties["HoldDownStud"]["Manufacturing Notes"] == installation
+    assert stamped["HoldDownStud Rework Stock Note"] == state.spec.STOCK_NOTE
+    assert stamped["HoldDownStud Rework Lower End Note"] == state.spec.LOWER_END_NOTE
 
 
 @pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
@@ -4800,12 +4820,13 @@ def test_kit_installation_legend_normalizes_crlf_without_rewriting_requirements(
     wrapped_requirement = original_requirement.replace("; ", ";\n", 1)
     source_contract = SimpleNamespace(
         RADIUS=state.spec.RADIUS,
-        END_CHAMFER=state.spec.END_CHAMFER,
+        LOWER_FACTORY_CHAMFER=state.spec.LOWER_FACTORY_CHAMFER,
         LENGTH=state.spec.LENGTH,
         DRAWING_NOTES=wrapped_requirement,
     )
     monkeypatch.setattr(state.kit, "stud", source_contract)
     state.spec = source_contract
+    state.source_properties[f"{state.configuration} Manufacturing Notes"] = wrapped_requirement
     settled = state.kit._installation_flag(
         state.adapter, state.configuration, state.cells, state.views
     )

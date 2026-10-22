@@ -112,7 +112,12 @@ DIMENSION_CALLOUTS = {
 }
 STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; PM {SKU} KIT"
 LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
-DRAWING_NOTES = "\n".join((STOCK_NOTE, LOWER_END_NOTE))
+# The kit reference sheet owns this one-line installation legend. The separate
+# REWORK sheet reads STOCK_NOTE and LOWER_END_NOTE through their own properties.
+DRAWING_NOTES = (
+    "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT; "
+    "CUT UPPER END PER REWORK."
+)
 
 # REWORK carries the native fabrication controls and their title-block band.
 # MHA-CH-06-TL-00, steps HD1-HD3 on sheet 10, qualifies the actual installed

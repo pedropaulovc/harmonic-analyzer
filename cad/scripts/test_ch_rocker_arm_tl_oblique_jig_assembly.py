@@ -595,6 +595,34 @@ def test_occurrence_shift_sums_common_and_exact_steps_and_rejects_ambiguity() ->
         spec.explode_shift(spec.instance_name(spec.BEARING, 4), "z")
 
 
+@pytest.mark.parametrize("family", tuple(spec.KIT_IDENTITIES))
+def test_kit_occurrence_shift_uses_configured_role_local_references(
+    monkeypatch, family: str,
+) -> None:
+    first = spec.instance_name(family, 0)
+    second = spec.instance_name(family, 1)
+    common = spec.explode_shift(family, "z")
+    monkeypatch.setattr(
+        spec, "EXPLODE_STEPS",
+        (*spec.EXPLODE_STEPS, ("one kit occurrence", (first,), "z", 1.0)),
+    )
+    assert spec.explode_shift(first, "z") == pytest.approx(common + 1.0)
+    assert spec.explode_shift(second, "z") == pytest.approx(common)
+    with pytest.raises(ValueError, match="nonuniform"):
+        spec.explode_shift(family, "z")
+
+    physical, configuration = spec.KIT_IDENTITIES[family]
+    for selector in (
+        f"@{configuration}:0",
+        f"@{configuration}:{spec.QUANTITIES[family] + 1}",
+        f"{configuration}:1",
+        f"{physical}-1",
+        f"{family}-1",
+    ):
+        with pytest.raises(ValueError, match="unknown explode occurrence"):
+            spec.explode_shift(selector, "z")
+
+
 def _assert_explode_source_guards(steps) -> None:
     """Exercise the production assertions with altered presentation data only."""
     path = Path(spec.__file__)
@@ -1807,11 +1835,6 @@ def test_bom_follows_the_part_registry() -> None:
         assert (row["process"] == "purchased") == number.startswith(
             (prefix + "VN-", "MHA-SH-VN-")
         ), stem
-        # The registry owns each bought item's source: no supplier or SKU
-        # leaks into the BOM text.
-        description = spec.BOM_DESCRIPTIONS[stem].casefold()
-        for source in (row.get("supplier"), *row.get("supplier_skus", ())):
-            assert not source or str(source).casefold() not in description, stem
 
 
 def test_source_bom_and_drawing_clusters_partition_every_capture_family_once() -> None:

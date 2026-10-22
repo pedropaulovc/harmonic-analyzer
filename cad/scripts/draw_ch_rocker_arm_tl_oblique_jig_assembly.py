@@ -390,12 +390,13 @@ BOM_ROW_HEIGHT = 0.0055
 BOM_SHEET_CLEARANCE = 0.003  # visible air at the border and title block
 BOM_ANCHOR = (0.018, 0.260)
 REGION_GAP = 0.006  # between a view's room and the text beside it
-# The BOM's reference owns its whole right column.
+# The reference fits the right column with its native top aligned to the BOM,
+# leaving the lower blank area for the measured configured-kit key.
 REFERENCE_REGION = (
     BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values()) + REGION_GAP,
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
     SHEET_INNER_BORDER[2],
-    SHEET_INNER_BORDER[3],
+    BOM_ANCHOR[1],
 )
 
 # Sheets 3-6: one cluster's exploded isometric each, its balloon ring inside
@@ -921,8 +922,8 @@ def _activate_sheet(adapter: Any, name: str) -> Any:
 
 def _add_note_block(
     adapter: Any, sheet_name: str, text: str, xy: tuple[float, float], *, label: str
-) -> None:
-    """A sheet-owned note: activate the sheet so no view owns it."""
+) -> Any:
+    """Return a readback-validated native note owned by the activated sheet."""
     _activate_sheet(adapter, sheet_name)
     note = add_note(adapter, text, *xy)
     if note is None:
@@ -931,6 +932,7 @@ def _add_note_block(
     printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
     if printed != text:
         raise RuntimeError(f"jig {label} printed as {printed!r}")
+    return note
 
 
 def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
@@ -2054,6 +2056,8 @@ def _place_reference_view(
         x0, y0, x1, y1 = _view_outline(view, label=label)
         if x1 - x0 <= region[2] - region[0] and y1 - y0 <= region[3] - region[1]:
             break
+    if sheet_name == BOM_SHEET:
+        center = (center[0], region[3] - BOM_SHEET_CLEARANCE - (y1 - y0) / 2.0)
     _center_view_outline(adapter, view, center, label=label)
     _assert_view_on_sheet(view, bounds=region, label=label)
     return view
@@ -2971,10 +2975,11 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
     scales = [scale, locator_scale]
     crop_profiles = [locator_profile]
     for index, letter in enumerate(("A", "B"), start=2):
+        section_scale = (1, 2) if letter == "A" else (1, 1)
         points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
         view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
                             view_xy=_region_center(CAPTURE_VIEW_REGIONS[index]), section_label=letter,
-                            scale=(1, 1), partial=True, label=f"jig capture section {letter}"), "IView")
+                            scale=section_scale, partial=True, label=f"jig capture section {letter}"), "IView")
         # Child occurrence flags do not reliably inherit; isolate it explicitly.
         isolate_drawing_view_components(adapter, view, visible_stems=installed, label=f"jig capture section {letter}")
         if str(view.ReferencedConfiguration) != ASSEMBLY_VIEW_CONFIGURATION or bool(view.IsExploded()):
@@ -2989,9 +2994,9 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
             anchor = tuple(v / 1000.0 for v in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
             radius = 0.014
         centre = model_point_in_view(adapter, view, anchor, label=f"jig capture crop {letter}")
-        profile = _crop_capture_view(adapter, view, centre, radius, label=f"jig capture section {letter}")
+        profile = _crop_capture_view(adapter, view, centre, radius * section_scale[0] / section_scale[1], label=f"jig capture section {letter}")
         set_hidden_lines_removed(adapter, view)
-        scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], ((1, 1),), crop_profile=profile, label=f"jig capture section {letter}"))
+        scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], (section_scale,), crop_profile=profile, label=f"jig capture section {letter}"))
         position_section_caption(adapter, view, CAPTURE_SECTION_CAPTIONS[index - 2], label=f"jig capture {letter}")
         views.append(view)
         crop_profiles.append(profile)

@@ -819,6 +819,55 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
     assert step.read_bytes() == content
 
 
+def test_pivot_cap_fit_and_whole_floor_requirements_round_trip_as_sourced_notes(tmp_path: Path) -> None:
+    import ch_rocker_arm_tl_oblique_pivot_cap_spec as cap
+    from _printed_tolerance import printed_band_mm
+
+    stem = "ch_rocker_arm_tl_oblique_pivot_cap"
+    step = _step(tmp_path, stem)
+    manifest = _load(exporter.write_manifest(stem, step, revision="v40"))
+    loaded = Features.model_validate(manifest)
+    head_note = "\n".join(cap.DIMENSION_CALLOUTS[key] for key in ("CounterboreDia", "CounterboreDepth"))
+    head_sources = (
+        "DIMENSION_CALLOUTS", "SCREW_SKU", "HEAD_RECESS_MIN", "HEAD_RECESS_MAX",
+        "COUNTERBORE_FLOOR_MIN", "fitted_counterbore_acceptance",
+    )
+    for index in range(1, len(cap.BOLT_POINTS) + 1):
+        recess = loaded.features[f"head_recess_{index}"]
+        # Required text preserves actual fit and whole-floor/mouth limits;
+        # the representative model cut must not become an acceptance band.
+        assert recess.requirements == ["dia", "note"]
+        assert recess.note == head_note
+        assert recess.depth_ref == cap.COUNTERBORE_DEPTH
+        assert "depth" not in recess.model_fields_set
+        for source in head_sources:
+            assert set(exporter._cite(cap, source)) <= set(recess.cite["note"])
+    channel = loaded.features["wire_channel"]
+    assert channel.requirements == ["width", "depth", "note"]
+    assert channel.note == "\n".join(cap.DIMENSION_CALLOUTS[key] for key in ("WireWidth", "WireDepth"))
+    band = printed_band_mm(cap.CHANNEL_PLACES)
+    assert channel.depth == pytest.approx([cap.CHANNEL_DEPTH - band, cap.CHANNEL_DEPTH + band])
+    assert set(exporter._cite(cap, "DIMENSION_CALLOUTS")) <= set(channel.cite["note"])
+
+
+@pytest.mark.parametrize("callout", ("CounterboreDia", "CounterboreDepth", "WireWidth", "WireDepth"))
+def test_pivot_cap_required_notes_follow_changed_printed_callouts(monkeypatch, callout: str) -> None:
+    import ch_rocker_arm_tl_oblique_pivot_cap_spec as cap
+
+    marker = f"\nChanged printed authority: {callout}"
+    monkeypatch.setitem(cap.DIMENSION_CALLOUTS, callout, cap.DIMENSION_CALLOUTS[callout] + marker)
+    stem = "ch_rocker_arm_tl_oblique_pivot_cap"
+    _fresh_draw(monkeypatch, stem)
+    features = exporter.requirement_manifest(stem)["features"]
+    names = (
+        [f"head_recess_{index}" for index in range(1, len(cap.BOLT_POINTS) + 1)]
+        if callout.startswith("Counterbore") else ["wire_channel"]
+    )
+    for name in names:
+        assert "note" in features[name]["requirements"]
+        assert marker in features[name]["note"]
+
+
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
     # One native face per strap side (P01, P02); STEP splits each periodic
     # torus into two ADVANCED_FACEs, so the manifest lists each label twice.

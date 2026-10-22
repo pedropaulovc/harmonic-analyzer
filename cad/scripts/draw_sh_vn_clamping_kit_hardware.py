@@ -768,7 +768,7 @@ def _note_text_box(
 def _installation_flag(
     adapter: Any, configuration: str, cells: tuple, views: list[Any]
 ) -> Callable[[], None]:
-    """Key the existing property-linked requirement to its physical feature."""
+    """Key the source-owned installation legend to its physical feature."""
     spec = {
         "HoldDownStud": stud,
         "TNut": tnut,

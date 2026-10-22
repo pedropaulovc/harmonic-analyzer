@@ -216,7 +216,7 @@ owner after moves/rebuilds: `Crop2` consumes the profile, so enumerating
 `IView.GetSketch` is not authoritative. The retained segment must remain
 accessible; do not invent a crop-feature getter or fallback if it does not.
 Set assembled views' final scales before authoring their crops (locator 1:4,
-sections 1:1); do not walk a scale ladder after `Crop2`. Refresh native display
+A-A 1:2, B-B 1:1); do not walk a scale ladder after `Crop2`. Refresh native display
 geometry after HLR/scale changes before measuring the outline. `GetOutline` is
 a padded view extent, not an exact crop circle box. The locator's 54 x 43 mm
 field accommodates its measured 43.884 x 41.516 mm native extent; its caption

@@ -1050,12 +1050,18 @@ def explode_shift(component_or_family: str, axis: str) -> float:
 
     A family has no common shift on an axis whose occurrences separate; callers
     projecting real geometry must use ``instance_name(stem, index)`` instead.
+    Kit occurrences use their persisted role-local references, never the shared
+    part file's native instance suffixes.
     """
     if component_or_family in QUANTITIES:
         family = component_or_family
         names = tuple(instance_name(family, index) for index in range(QUANTITIES[family]))
     else:
-        family, _separator, _suffix = component_or_family.rpartition("-")
+        identity = KIT_COMPONENT_REFERENCES.get(component_or_family)
+        if identity is not None:
+            family = component_family(*identity)
+        else:
+            family, _separator, _suffix = component_or_family.rpartition("-")
         if family not in QUANTITIES or component_or_family not in (
             instance_name(family, index) for index in range(QUANTITIES[family])
         ):
@@ -1661,8 +1667,9 @@ _CL_HOLE = (
     f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
 )
 # The instruction steps cite sheet 10 (CAPTUREANDOPERATION: C6-C8, HD1-HD3) by
-# this number; the drawing asserts it, and the stud drawing (MHA-CH-06-TL-VN-58)
-# prints HOLD_DOWN_REFERENCE as its only measuring and acceptance pointer.
+# this number; the drawing asserts it. The shared MHA-SH-VN-57 REWORK sheet
+# for HoldDownStud prints HOLD_DOWN_REFERENCE as its only measuring and
+# acceptance pointer.
 OPERATION_SHEET_NUMBER = 10
 HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD3 (SHEET {OPERATION_SHEET_NUMBER})"
 # Initial A1/B1, first A2/B2, A2/B2 after the carrier-off realignment, then

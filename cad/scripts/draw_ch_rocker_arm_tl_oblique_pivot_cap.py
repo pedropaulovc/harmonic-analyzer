@@ -188,23 +188,21 @@ for _index, (_x, _y) in enumerate(part_spec.BOLT_POINTS, 1):
         precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["BoltHoleDia"], "station": part_spec.POSITION_PLACES, "width": part_spec.POSITION_PLACES},
     )
     requirement(
-        f"head_recess_{_index}", kind="counterbore", faces=(CylinderFace(part_spec.COUNTERBORE_DIA, contains_x_mm=_x, contains_y_mm=_y),), requirements=("dia", "head_recess", "whole_floor_min", "note"),
-        # Actual fitted-head recess and whole-floor acceptance control this
-        # feature. The representative machining depth has no +/- authority.
+        f"head_recess_{_index}", kind="counterbore", faces=(CylinderFace(part_spec.COUNTERBORE_DIA, contains_x_mm=_x, contains_y_mm=_y),), requirements=("dia", "note"),
+        # The consumer's required note carries actual fitted-head and whole-floor
+        # acceptance; depth_ref remains geometry, never a machining depth band.
         fields={
             "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
             "dia": (limits(part_spec.COUNTERBORE_DIA, part_spec.COUNTERBORE_DIAMETER_PLACES), ("COUNTERBORE_DIA",)),
             "dia_nominal": (part_spec.COUNTERBORE_DIA, ("COUNTERBORE_DIA",)),
             "depth_ref": (part_spec.COUNTERBORE_DEPTH, ("COUNTERBORE_DEPTH",)),
-            "head_recess": ([part_spec.HEAD_RECESS_MIN, part_spec.HEAD_RECESS_MAX], ("HEAD_RECESS_MIN", "HEAD_RECESS_MAX", "fitted_counterbore_acceptance")),
-            "whole_floor_min": (part_spec.COUNTERBORE_FLOOR_MIN, ("COUNTERBORE_FLOOR_MIN", "fitted_counterbore_acceptance")),
-            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["CounterboreDia"], part_spec.DIMENSION_CALLOUTS["CounterboreDepth"])), ("DIMENSION_CALLOUTS", "SCREW_SKU", "HEAD_RECESS_MIN", "HEAD_RECESS_MAX", "COUNTERBORE_FLOOR_MIN")),
+            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["CounterboreDia"], part_spec.DIMENSION_CALLOUTS["CounterboreDepth"])), ("DIMENSION_CALLOUTS", "SCREW_SKU", "HEAD_RECESS_MIN", "HEAD_RECESS_MAX", "COUNTERBORE_FLOOR_MIN", "fitted_counterbore_acceptance")),
         },
         precision={"dia": part_spec.COUNTERBORE_DIAMETER_PLACES, "depth_ref": part_spec.DRAWING_PRECISION_BY_NAME["CounterboreDepth"]},
     )
 requirement(
-    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "depth_over_whole_floor", "note"),
-    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "depth_over_whole_floor": (True, ("DIMENSION_CALLOUTS",)), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS",))},
+    "wire_channel", kind="pocket", faces=(PlanarFace((0.0, 1.0, 0.0), min(y for _, y in part_spec.BOLT_POINTS) - part_spec.CHANNEL_WIDTH / 2.0),), requirements=("width", "depth", "note"),
+    fields={"width": (limits(part_spec.CHANNEL_WIDTH, part_spec.CHANNEL_PLACES), ("CHANNEL_WIDTH",)), "width_nominal": (part_spec.CHANNEL_WIDTH, ("CHANNEL_WIDTH",)), "depth": (limits(part_spec.CHANNEL_DEPTH, part_spec.CHANNEL_PLACES), ("CHANNEL_DEPTH",)), "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["WireWidth"], part_spec.DIMENSION_CALLOUTS["WireDepth"])), ("DIMENSION_CALLOUTS",))},
     precision={"width": part_spec.CHANNEL_PLACES, "depth": part_spec.CHANNEL_PLACES},
 )
 

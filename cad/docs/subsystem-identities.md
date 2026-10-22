@@ -157,12 +157,12 @@ nut/leadscrew axis Z = 40.4 mm, side-hole positions, 3/4 × 2 in stock and
 leadline remain unchanged. No cap relief or capture-hardware change is part
 of this repair.
 
-TL-VN-58 keeps its existing identity and Precision Matthews
+The `HoldDownStud` configuration of **MHA-SH-VN-57** retains Precision Matthews
 52PCCK-9/16-14mm procurement: **four 1/2-13 × 3 in STOCK studs**, not a
 57.2 mm vendor SKU. Rework only each unused upper free end to **57.2 mm
 finished length, ordinary .X ±0.8 mm**, and restore the cut-end chamfer
-(1.0 mm maximum). Its native model and manufacturing sheet describe the
-finished reworked part, not a purchased-identification-only envelope.
+(1.0 mm maximum). Its native configuration and the shared drawing's **REWORK**
+sheet describe the finished reworked stud, not a purchased-identification-only envelope.
 The lower factory end, loaded lower thread interval and insertion remain
 unchanged, as do all anchors, stations, slots, footprints, clamp spans,
 T-nut/flange-nut positions, both full pass sweeps and the +12.5 mm work height.

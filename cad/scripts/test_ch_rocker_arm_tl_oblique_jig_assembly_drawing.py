@@ -1007,10 +1007,6 @@ def test_every_bom_row_carries_one_balloon() -> None:
         anchor.instance is None and anchor.point_mm is None
         for anchor in walked.values()
     )
-    for family in spec.KIT_IDENTITIES:
-        anchor = drawing.BALLOON_ANCHORS[family]
-        assert anchor.instance == spec.instance_name(family, 0)
-        assert anchor.point_mm is None
     # Review r5: balloon 1 lands on the bar's operator-side long edge, part
     # frame, mid-span between the spindle end and the far hold-down slot.
     bar = drawing.BALLOON_ANCHORS[spec.BASE_BAR]
@@ -1372,6 +1368,15 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
         drawing,
         keep=("_place_package", "validate_bom_number_property"),
     )
+    sheet = SimpleNamespace(properties=[0, 0, 1.0, 1.0])
+
+    def set_scale(numerator, denominator, _positions, _text):
+        sheet.properties[2:4] = [numerator, denominator]
+        return True
+
+    sheet.SetScale = set_scale
+    sheet.GetProperties2 = lambda: tuple(sheet.properties)
+    seat._activate_sheet.return_value = sheet
     reference = SimpleNamespace(ReferencedConfiguration="Default Simplified")
     seat._place_reference_view.return_value = reference
     seat.insert_bom_table.return_value = table
@@ -1380,13 +1385,27 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     )
     seat._place_assembled_sheet.return_value = lambda: None
     seat._place_kit_bom_note.return_value = lambda: None
+    seat._place_pin_tip_inspection.return_value = lambda: None
+    seat._place_notes_reference_views.return_value = {
+        name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
+    }
+    capture_views = tuple(object() for _ in range(4))
+    capture_scales = ((1, 4), (1, 4), (1, 2), (1, 1))
+    capture_profiles = tuple(object() for _ in range(3))
+    seat._place_capture_sheet.return_value = (
+        capture_views, capture_scales, (), capture_profiles,
+    )
     seat._place_cluster_view.side_effect = lambda _adapter, cluster: (
         object(),
         drawing.SHEET_SCALES[cluster.sheet],
     )
     seat._balloon_cluster.side_effect = (
         lambda _adapter, _view, cluster, _items, _bom_name: [
-            SimpleNamespace(stem=stem) for stem in cluster.stems
+            SimpleNamespace(stem=stem)
+            for stem in (
+                (*cluster.stems, spec.BEARING)
+                if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET else cluster.stems
+            )
         ]
     )
     monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "offline BOM")
@@ -1663,20 +1682,24 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
         notes=[],
         width=0.145,
         move="applied",
+        active=None,
     )
     state.reference = SimpleNamespace(
         ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
         GetOutline=lambda: state.outline,
     )
 
-    def add_block(_adapter, sheet, text, xy, *, label):
-        assert sheet == drawing.BOM_SHEET
-        note = _KitBomNote(text, xy, width=state.width, move=state.move)
+    def add_native_note(_adapter, text, x, y):
+        assert state.active == drawing.BOM_SHEET
+        note = _KitBomNote(text, (x, y), width=state.width, move=state.move)
         state.notes.append(note)
         return note
 
-    monkeypatch.setattr(drawing, "_add_note_block", add_block)
-    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "add_note", add_native_note)
+    monkeypatch.setattr(
+        drawing, "_activate_sheet",
+        lambda _adapter, sheet: setattr(state, "active", sheet),
+    )
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     return state
 
@@ -2096,11 +2119,17 @@ class _CaptureNativeView(SimpleNamespace):
     def __setattr__(self, name, value):
         if name == "ScaleRatio" and getattr(self, "cropped", False):
             self.post_crop_scale_writes.append(tuple(value))
+        if name == "ReferencedConfiguration":
+            suffix = " Simplified" if value.endswith(" Simplified") else ""
+            for leaf in getattr(self, "components", ()):
+                component = leaf.Component
+                member = _component_references.member_configuration(component.ReferencedConfiguration)
+                component.ReferencedConfiguration = member + suffix
         super().__setattr__(name, value)
 
 
 @pytest.fixture
-def native_property_package(monkeypatch):
+def native_property_package(monkeypatch, native_bom_bindings):
     """Double the COM boundary, not recipe view placement or property linking.
 
     The real place_view, configuration policy, iter_views and finalizer operate
@@ -2203,8 +2232,12 @@ def native_property_package(monkeypatch):
         leaves = []
         for stem, count in spec.QUANTITIES.items():
             for occurrence in range(count):
-                component = SimpleNamespace(Name2=spec.instance_name(stem, occurrence),
-                                            GetPathName=lambda stem=stem: f"{stem}.SLDPRT")
+                component = _native_component(stem, occurrence, simplified=False)
+                physical, member = spec.COMPONENT_IDENTITIES[stem]
+                component.Name2 = (
+                    f"{physical}-{501 + len(leaves) * 17}" if member
+                    else spec.instance_name(stem, occurrence)
+                )
                 leaves.append(SimpleNamespace(
                     Name=component.Name2, Component=component, Visible=True,
                     GetChildren=lambda: (),
@@ -2327,6 +2360,7 @@ def native_property_package(monkeypatch):
     doc.CreateDrawViewFromModelView3 = create_view
     doc.ClearSelection2 = lambda _all: doc.selected.clear()
     doc.EditRebuild3 = lambda: True
+    doc.GraphicsRedraw2 = lambda: None
     doc.EditSheet = lambda: doc.paper_edits.append(doc.active)
 
     def activate_view(name):
@@ -2586,12 +2620,8 @@ def native_property_package(monkeypatch):
     def insert_bom(*_args, **_kwargs):
         doc.bom_inserted = True
         doc.events.append(("bom", None, True))
-        return object()
+        return _Table(spec.BOM_ORDER)
     monkeypatch.setattr(drawing, "insert_bom_table", insert_bom)
-    monkeypatch.setattr(
-        drawing, "_validate_bom",
-        lambda *_args: tuple(drawing.BOM_ITEM_NUMBERS.items()),
-    )
     monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "JigBOM")
 
     def balloons(_adapter, view, cluster, _items, _bom):
@@ -2622,6 +2652,9 @@ def native_property_package(monkeypatch):
 
     def note(_adapter, text, x, y, *, height=None):
         doc.notes.append((doc.active, text, (x, y)))
+        if doc.active == drawing.BOM_SHEET and text.startswith("PURCHASED KIT IDENTITY:"):
+            doc.kit_note = _KitBomNote(text, (x, y), width=0.145, move="applied")
+            return doc.kit_note
         if doc.active_view is None:
             return SimpleNamespace(GetText=lambda: text)
         result = native_note(text, doc.active_view)
@@ -2657,6 +2690,11 @@ def test_every_physical_sheet_links_to_its_actual_live_model_view(
     package = native_property_package
     scales, _settled = drawing._place_package(package.adapter)
     assert tuple(scales) == tuple(package.doc.sheets) == drawing.SHEET_NAMES
+    bom_reference, = package.doc.sheets[drawing.BOM_SHEET].views
+    kit_extent = drawing._kit_bom_note_extent(package.doc.kit_note)
+    assert _inside_sheet(kit_extent)
+    assert kit_extent[1] - drawing.TITLE_BLOCK[3] >= drawing.REGION_GAP
+    assert bom_reference.GetOutline()[1] - kit_extent[3] >= drawing.REGION_GAP
     with pytest.raises(package.save_boundary):
         asyncio.run(drawing.finalize_drawing(
             package.adapter,
@@ -2843,7 +2881,7 @@ def test_c2a_is_authored_at_fitted_scale_before_real_finalizer_repins_it(
             pdf_title="C2A scale lifecycle", scale=drawing.SHEET_SCALE,
             expected_sheet_names=drawing.SHEET_NAMES,
             sheet_layouts=drawing.SHEET_LAYOUTS, sheet_scales=scales,
-            settled_checks=(settled[2],),
+            settled_checks=(settled[-2],),
         ))
     assert sheet.properties[2:4] == [1.0, denominator]
     assert package.doc.sketch_lines == before
@@ -2878,7 +2916,8 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     ]
     assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == tuple(bolt.ScaleRatio) == (1, 1)
+    assert tuple(main.ScaleRatio) == (1, 2)
+    assert tuple(bolt.ScaleRatio) == (1, 1)
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
     installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
     for index, view in enumerate(sheet.views):
@@ -2937,6 +2976,48 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     settled[-1]()
 
 
+def test_capture_section_a_half_scale_precedes_crop_without_shrinking_model_fence(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    _exploded, _locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    profile = package.doc.crop_circles[1]
+    assert tuple(main.ScaleRatio) == main.crop_scale == (1, 2)
+    assert main.post_crop_scale_writes == []
+    assert profile.GetRadius() == pytest.approx(0.039)
+    assert main.crop[1] == pytest.approx(0.039)
+    inverse = profile.GetSketch().ModelToSketchTransform.Inverse()
+    centre = inverse.apply(profile.centre)
+    rim = inverse.apply((profile.centre[0] + profile.GetRadius(), *profile.centre[1:]))
+    assert math.dist(centre, rim) == pytest.approx(0.0195)
+    assert drawing.CAPTURE_VIEW_REGIONS[2] == (0.278, 0.119, 0.364, 0.211)
+    assert tuple(bolt.ScaleRatio) == bolt.crop_scale == (1, 1)
+    assert bolt.crop[1] == pytest.approx(0.014)
+    drawing._assert_capture_crop(package.adapter, main, 2, profile)
+
+
+def test_capture_section_a_still_refuses_the_observed_oversized_native_extent(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    main = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[2]
+    # 4e7's real 1:1 extent must still be refused if native returns it at 1:2;
+    # changing the authored scale never licenses an inferred or relaxed box.
+    main.GetOutline = lambda: (
+        0.27083100196371956, 0.24606200349283217,
+        0.3737219227586998, 0.3340379981999397,
+    )
+    with pytest.raises(RuntimeError, match="width 102[.]9 mm > 86[.]0 mm"):
+        drawing._fit_capture_view(
+            package.adapter, main, drawing.CAPTURE_VIEW_REGIONS[2], ((1, 2),),
+            crop_profile=package.doc.crop_circles[1], label="jig capture section A",
+        )
+    assert tuple(main.ScaleRatio) == (1, 2)
+    assert main.post_crop_scale_writes == []
+
+
 def test_capture_sections_use_actual_distinct_longitudinal_and_bolt_planes() -> None:
     def distance_to_plane(point, letter):
         a, b = drawing.capture_cut_points(letter)
@@ -2978,7 +3059,8 @@ def test_capture_exploded_fit_does_not_shrink_assembled_reading_scales(native_pr
     exploded, locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
     assert tuple(exploded.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET] == (1.0, 8.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == tuple(bolt.ScaleRatio) == (1, 1)
+    assert tuple(main.ScaleRatio) == (1, 2)
+    assert tuple(bolt.ScaleRatio) == (1, 1)
     settled[-1]()
 
 
@@ -3453,7 +3535,8 @@ def test_capture_settled_proof_refuses_native_drift(native_property_package, def
     if defect == "extra-view":
         sheet.views.append(locator)
     elif defect == "scale":
-        main.ScaleRatio = (1, 2)
+        numerator, denominator = main.ScaleRatio
+        main.ScaleRatio = (numerator, denominator * 2)
     elif defect == "configuration":
         main.ReferencedConfiguration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     elif defect == "exploded":
@@ -3607,6 +3690,7 @@ def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale
     (1, ((1, 4), (1, 5), (1, 6)), True, "cropped view requires one pre-authored scale"),
     (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
     (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
+    (2, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
     (1, ((1, 4),), False, "cropped view lost its selected native profile"),
 ))
 def test_capture_cropped_fit_refuses_rescaling_or_a_lost_selected_profile(

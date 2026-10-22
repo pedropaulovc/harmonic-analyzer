@@ -1002,7 +1002,6 @@ def test_rework_sheet_does_not_duplicate_fixture_qualification() -> None:
         assert "Stud Measurement Instructions" not in name
         assert "Stud Fit Limits" not in name
         assert "Stud Rework Acceptance" not in name
-    assert part.MEMBER_NOTE_PROPERTIES[f"{CONFIGURATION} Manufacturing Notes"] == "REWORKED STUD; SEE REWORK."
 
 
 @pytest.mark.parametrize("drift", [None, "configuration", "source", "scale", "activation"])

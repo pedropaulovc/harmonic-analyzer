@@ -689,20 +689,14 @@ def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptanc
         assert "depth" not in recess and "depth" not in recess["requirements"]
         assert "depth" not in recess["precision"]
         assert recess["precision"]["depth_ref"] == spec.DRAWING_PRECISION_BY_NAME["CounterboreDepth"] == 2
-        assert recess["head_recess"] == [0.50, 0.60]
-        assert recess["whole_floor_min"] == 2.00
-        spec.fitted_counterbore_acceptance(
-            head_recess=spec.FITTED_COUNTERBORE_GEOMETRY["nominal_head_recess"],
-            whole_floor_min=recess["whole_floor_min"],
-        )
+        assert set(recess["requirements"]) == {"dia", "note"}
     channel_band = printed_band_mm(spec.CHANNEL_PLACES)
     channel = features["wire_channel"]
-    assert set(channel["requirements"]) == {"width", "depth", "depth_over_whole_floor", "note"}
+    assert set(channel["requirements"]) == {"width", "depth", "note"}
     assert "normal_installed_wire_recess_min" not in channel
     assert channel["width"] == pytest.approx([
         spec.CHANNEL_WIDTH - channel_band, spec.CHANNEL_WIDTH + channel_band,
     ])
-    assert channel["depth_over_whole_floor"] is True
     assert features["wire_channel"]["depth"] == pytest.approx([
         spec.CHANNEL_DEPTH - channel_band, spec.CHANNEL_DEPTH + channel_band,
     ])
