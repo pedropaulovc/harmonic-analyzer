@@ -448,6 +448,11 @@ def test_callable_then_saved_roundtrip_uses_only_fresh_contexts(saved_washer):
     assert {entry["source_native_identity"] for entry in receipt["dimensions"]} == expected_identities
     assert receipt["source_resident_before_open"] is True
     assert receipt["source_save_flag"] is False
+    source_rows = {entry["label"]: entry for entry in receipt["source_dimensions"]}
+    assert source_rows.keys() == case.arguments["bands"].keys()
+    for label, entry in source_rows.items():
+        assert entry["system_value"] == case.source_natives[label].SystemValue
+        assert entry["units"] == case.source_displays[label].GetUnits()
 
 
 def test_unloaded_authoring_source_is_reacquired_from_drawing_autoload(saved_washer):
@@ -839,9 +844,18 @@ def test_saved_reader_validates_actual_source_presentation_independently(saved_w
     case.source_displays[source.THICKNESS].units = 3
     assert _display(case, source.THICKNESS).units == 0
     case.invalidate()
-    with pytest.raises(RuntimeError, match="model supplier units/precision/reference ink changed"):
+    with pytest.raises(RuntimeError, match="model supplier units/precision/reference ink changed") as caught:
         case.proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    source_row = next(item for item in receipt["source_dimensions"]
+                      if item["label"] == source.THICKNESS)
+    selection_name = _display(case, source.THICKNESS).selection_name
+    drawing_row = next(item for item in receipt["dimensions"]
+                       if item["selection_name"] == selection_name)
+    assert source_row["units"] == 3
+    assert drawing_row["units"] == 0
 
 
 def test_saved_source_dimension_lookup_requires_actual_named_feature(saved_washer):
@@ -867,6 +881,36 @@ def test_receipt_reads_fraction_getters_instead_of_echoing_authored_values(saved
     assert entry["round_to_fraction"] is True
     assert entry["source_native_identity"] == 1
     _assert_closed_unchanged(case)
+
+
+def test_success_receipt_repr_serializes_diagnostic_only_decimal_denominator(saved_washer):
+    """A serialization double, not a claim that COM returns this Python object."""
+    case = saved_washer
+    display = _display(case, source.THICKNESS)
+
+    class DiagnosticOnlyDenominator:
+        def __repr__(self):
+            return "<diagnostic-only non-JSON decimal denominator>"
+
+    observation = DiagnosticOnlyDenominator()
+    display.fraction_value = observation
+    before_value = display.native.SystemValue
+    before_tolerance = display.native.Tolerance
+    case.invalidate()
+    assert case.proof.saved_check(case.adapter, case.path) is None
+    _assert_closed_unchanged(case)
+    assert display.GetFractionValue() is observation
+    assert display.GetFractionBase() == 1
+    assert display.native.SystemValue == before_value
+    assert display.native.Tolerance is before_tolerance
+    assert len(case.messages) == 1
+    receipt = json.loads(case.messages[0].split(": ", 1)[1])
+    drawing_row = next(item for item in receipt["dimensions"]
+                       if item["selection_name"] == display.selection_name)
+    source_row = next(item for item in receipt["source_dimensions"]
+                      if item["label"] == source.THICKNESS)
+    assert drawing_row["fraction_value"] == repr(observation)
+    assert source_row["fraction_value"] == 0
 
 
 def test_saved_selection_names_and_drawing_owned_full_names_can_change(saved_washer):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -528,4 +529,43 @@ def test_import_rejects_successful_unit_setter_that_does_not_persist(washer_impo
     ]
     assert _presentation_snapshot(case) == before
     assert not pair.source_calls
+    _assert_source_unchanged(case)
+
+
+@pytest.mark.parametrize("corruption", ("source-units", "source-precision"))
+def test_source_refusal_note_reports_actual_source_and_import_fields(
+    washer_import, corruption,
+):
+    pair = washer_import
+    case = pair.imported
+    if corruption == "source-units":
+        pair.source_state.unit = 0 if case.specification.unit_code == 3 else 3
+    else:
+        pair.source_state.precisions = (7, *pair.source_state.precisions[1:])
+    source_before = deepcopy(vars(pair.source_state)), dict(pair.source_text)
+    imported_before = _presentation_snapshot(case)
+    with pytest.raises(RuntimeError, match="model supplier units/precision/reference ink changed") as caught:
+        pair.persist()
+    prefix = "supplier washer source/import readback: "
+    notes = [note for note in caught.value.__notes__ if note.startswith(prefix)]
+    assert len(notes) == 1
+    readback = json.loads(notes[0][len(prefix):])
+    assert readback["source"]["units"] == pair.source_state.unit
+    assert readback["source"]["precision"] == pair.source_state.precisions[0]
+    assert readback["source"]["use_document_units"] is False
+    assert readback["imported"]["units"] == -1
+    assert readback["imported"]["fraction_base"] == -1
+    assert readback["imported"]["fraction_value"] == -1
+    assert readback["imported"]["precision"] == case.specification.precision
+    assert readback["imported"]["use_document_units"] is True
+    # Deliberately absent optional getters stay errors, not fabricated values.
+    for display_readback in (readback["source"], readback["imported"]):
+        assert "read_error" in display_readback["selection_name"]
+        assert display_readback["system_value"] == case.original_si
+    assert "annotation_read_error" in readback["source"]
+    assert not case.calls
+    assert not pair.source_calls
+    assert not pair.identity_calls
+    assert (vars(pair.source_state), pair.source_text) == source_before
+    assert _presentation_snapshot(case) == imported_before
     _assert_source_unchanged(case)

@@ -75,10 +75,17 @@ def _persist_imported_units(
     if feature is None:
         raise RuntimeError(f"{label}: imported supplier source feature is missing")
     source, native = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
-    _assert_supplier_washer_presentation(
-        source, label=label, units=units, precision=precision,
-        expected_mm=expected_mm, callout=callout,
-    )
+    try:
+        _assert_supplier_washer_presentation(
+            source, label=label, units=units, precision=precision,
+            expected_mm=expected_mm, callout=callout,
+        )
+    except Exception as error:
+        error.add_note("supplier washer source/import readback: " + json.dumps(
+            {"source": _saved_display_readback(source), "imported": _saved_display_readback(display)},
+            sort_keys=True, default=repr,
+        ))
+        raise
     identity = adapter.swApp.IsSame(display.GetDimension2(0), native)
     if type(identity) is not int or identity != 1:
         raise RuntimeError(f"{label}: imported supplier dimension is not its native source")
@@ -482,6 +489,9 @@ def _supplier_washer_proof(
                     source_display, source_native = _named_dimensions(
                         saved_adapter, feature_name, {source_name}, feature=feature,
                     )[source_name]
+                    source_row = _saved_display_readback(source_display)
+                    source_row["label"] = label
+                    receipt.setdefault("source_dimensions", []).append(source_row)
                     _assert_supplier_washer_presentation(
                         source_display, label=label, units=units, precision=precision[label],
                         expected_mm=expected_mm, callout=callout,
@@ -574,7 +584,9 @@ def _supplier_washer_proof(
                         receipt, sort_keys=True, default=repr,
                     ))
                     raise error
-        _telemetry.info("supplier washer saved native proof: " + json.dumps(receipt, sort_keys=True))
+        _telemetry.info("supplier washer saved native proof: " + json.dumps(
+            receipt, sort_keys=True, default=repr,
+        ))
 
     return SupplierWasherProof(settled_check, saved_check)
 
