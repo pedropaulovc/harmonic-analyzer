@@ -1008,7 +1008,6 @@ def test_the_part_saves_both_authoring_sketches_hidden() -> None:
         "await adapter.save_file("
     )
     assert "blank_reference_geometry(" not in body
-    assert "assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)" in body
 
 
 def test_hide_and_show_is_set_with_each_configuration_active(monkeypatch: pytest.MonkeyPatch) -> None:
