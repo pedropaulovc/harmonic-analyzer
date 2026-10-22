@@ -221,76 +221,6 @@ async def test_supplier_angle_refuses_failed_or_non_driving_native_controls(witn
     assert adapter.selected == []
 
 
-def _refused_pin(monkeypatch, *, attachment_types=(1, 1), reader_interrupt=False, log_interrupt=False):
-    import _supplier_pin_drawing as pins
-
-    events = []
-    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(pins, "model_points_in_view", lambda _adapter, _view, points, **_kw: [
-        (0.1 + x, 0.1 + y) for x, y, _z in points
-    ])
-    annotation = SimpleNamespace(GetAttachedEntityTypes=lambda: attachment_types)
-
-    def read_arc(index):
-        if reader_interrupt and index == 1:
-            raise SystemExit("diagnostic reader stopped")
-        return 0
-
-    native = SimpleNamespace(
-        SetArcEndCondition=lambda _index, _condition: -4,
-        GetArcEndCondition=read_arc, SystemValue=0.0047625,
-    )
-    display = SimpleNamespace(
-        Type2=2, GetDimension2=lambda _index: native,
-        GetAnnotation=lambda: annotation,
-    )
-    monkeypatch.setattr(pins, "add_edge_dimension", lambda *_args, **_kwargs: display)
-
-    def log(_message, **fields):
-        events.append(fields)
-        if log_interrupt:
-            raise KeyboardInterrupt("optional observer failed")
-
-    monkeypatch.setattr(pins._telemetry, "info", log)
-    circles = [SimpleNamespace(circle=(station, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0), edge=object())
-               for station in (-2.38125, 2.38125)]
-    view = SimpleNamespace(GetOutline=lambda: (0.09, 0.09, 0.11, 0.12))
-    source = SimpleNamespace(sku="spring-pin", length_mm=4.7625)
-    with pytest.raises(RuntimeError, match="cannot center native end-rim endpoint 1"):
-        pins._supplier_length(None, view, circles, source, axis=0,
-                              stations=(-2.38125, 2.38125), endpoint_mode="arc_center")
-    return events[0]
-
-
-def test_pin_refusal_reports_actual_native_status_without_accepting_the_dimension(monkeypatch):
-    fields = _refused_pin(monkeypatch)
-    assert fields["setter_return"] == -4
-    assert fields["arc_end_condition_1"] == 0
-    assert fields["arc_end_condition_2"] == 0
-    assert fields["display_dimension_type"] == 2
-    assert fields["attached_entity_types"] == (1, 1)
-    assert fields["native_value_m"] == 0.0047625
-
-
-@pytest.mark.parametrize("attachment_types,state", [(None, "UNAVAILABLE_NULL"), ((), "OBSERVED")])
-def test_pin_null_attachment_inventory_is_not_reported_as_measured_empty(monkeypatch, attachment_types, state):
-    fields = _refused_pin(monkeypatch, attachment_types=attachment_types)
-    assert fields["attached_entity_types"] == attachment_types
-    assert fields["attached_entity_types_state"] == state
-
-
-def test_pin_reader_interrupt_does_not_skip_independent_fields_or_replace_original_failure(monkeypatch):
-    fields = _refused_pin(monkeypatch, reader_interrupt=True)
-    assert fields["arc_end_condition_1_state"] == "UNAVAILABLE"
-    assert fields["arc_end_condition_1_error_type"] == "SystemExit"
-    assert fields["arc_end_condition_2_state"] == "OBSERVED"
-    assert fields["attached_entity_types_state"] == "OBSERVED"
-
-
-def test_pin_logging_interrupt_does_not_replace_original_failure(monkeypatch):
-    _refused_pin(monkeypatch, log_interrupt=True)
-
-
 def _nut_carrier(monkeypatch, *, defect=None):
     import _supplier_nut_drawing as nuts
 
@@ -426,5 +356,5 @@ def test_pin_presentation_refusal_names_first_actual_field_without_reading_later
     })
     with pytest.raises(RuntimeError, match=rf"native source value/presentation changed \({field}:"):
         pins.assert_supplier_pin_model_reference(
-            None, model, Display(), pins.DIAMETER_FEATURE, source,
+            None, model, Display(), pins.DIAMETER_FEATURE, source, view=None,
         )

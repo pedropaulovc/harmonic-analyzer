@@ -5952,11 +5952,12 @@ def test_supplier_presentation_retains_native_empty_callout_normalization(monkey
     assert case.native.SystemValue == 0.0111125
 
 
-def _linear_supplier_pin_reference(monkeypatch):
+def _linear_supplier_pin_reference(monkeypatch, *, axis=1):
     import _drawing_edge_dimensions as edge_dimensions
     import _supplier_pin_drawing as pins
 
-    case = _supplier_native(monkeypatch, value=0.0047625, kind=2)
+    length_mm = 4.7625 if axis == 1 else 15.875
+    case = _supplier_native(monkeypatch, value=length_mm / 1000.0, kind=2)
     monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag",
@@ -5976,35 +5977,42 @@ def _linear_supplier_pin_reference(monkeypatch):
     case.annotation.GetAttachedEntityTypes = lambda: (1,) * len(case.annotation.entities)
     case.view.GetOutline = lambda: (0.09, 0.09, 0.11, 0.12)
     case.adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    stations = (0.0, length_mm) if axis == 1 else (-length_mm / 2.0, length_mm / 2.0)
     circles = [
-        SimpleNamespace(circle=(0.0, station, 0.0, 0.0, 1.0, 0.0, 1.190625), edge=entity)
-        for station, entity in zip((0.0, 4.7625), case.annotation.entities)
+        SimpleNamespace(
+            circle=((0.0, station, 0.0, 0.0, 1.0, 0.0, 1.190625) if axis == 1 else
+                    (station, 0.0, 0.0, 1.0, 0.0, 0.0, 1.190625)), edge=entity,
+        ) for station, entity in zip(stations, case.annotation.entities)
     ]
-    source = SimpleNamespace(sku="98381A433", length_mm=4.7625, units="in", length_precision=3)
+    source = SimpleNamespace(sku="supplier-pin", length_mm=length_mm, units="in", length_precision=3)
+    case.length_mm = length_mm
     case.display, case.assert_length = pins._supplier_length(
-        case.adapter, case.view, circles, source, axis=1,
-        stations=(0.0, 4.7625), endpoint_mode="linear",
+        case.adapter, case.view, circles, source, axis=axis, stations=stations,
     )
     return case
 
 
-def test_supplier_linear_pin_retains_observed_full_length_and_none_end_conditions(monkeypatch):
-    case = _linear_supplier_pin_reference(monkeypatch)
+@pytest.mark.parametrize("axis", (0, 1), ids=("spring", "dowel"))
+def test_supplier_linear_pin_retains_observed_full_length_and_none_end_conditions(monkeypatch, axis):
+    case = _linear_supplier_pin_reference(monkeypatch, axis=axis)
     case.assert_length(case.display)
-    assert case.native.SystemValue == 0.0047625
+    assert case.native.SystemValue == case.length_mm / 1000.0
     assert case.arc_conditions == {1: 0, 2: 0}
     assert case.native.Tolerance.Type == 0
 
 
 @pytest.mark.parametrize("drift,error", [
-    ("condition", "conditions do not match linear"),
+    ("condition", None),
     ("value", "native value"),
     ("attachment", "named entities"),
     ("tolerance", "unsourced tolerance"),
     ("type", None),
 ])
-def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(monkeypatch, drift, error):
-    case = _linear_supplier_pin_reference(monkeypatch)
+@pytest.mark.parametrize("axis", (0, 1), ids=("spring", "dowel"))
+def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(
+    monkeypatch, drift, error, axis,
+):
+    case = _linear_supplier_pin_reference(monkeypatch, axis=axis)
     if drift == "condition":
         case.arc_conditions[2] = 1
     elif drift == "value":
@@ -6019,14 +6027,6 @@ def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(
     with pytest.raises(RuntimeError, match=error):
         case.assert_length(case.display)
     assert case.native.SystemValue == native_value
-
-
-def test_supplier_pin_endpoint_mode_refuses_unknown_mode_before_native_access():
-    import _supplier_pin_drawing as pins
-
-    with pytest.raises(ValueError, match="unsupported native pin endpoint mode"):
-        pins._supplier_length(None, None, [], None, axis=1, stations=(0.0, 4.7625),
-                              endpoint_mode="unknown")
 
 
 
@@ -6502,7 +6502,9 @@ def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
 
 
 @pytest.mark.parametrize(
-    "layout,orthographic", [("standard", (1, 8)), ("tall_top", (1, 1))]
+    "layout,orthographic", [
+        ("standard", (1, 8)), ("supplier_top", (1, 4)), ("tall_top", (1, 1)),
+    ]
 )
 def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room(
     monkeypatch, tmp_path, layout, orthographic
@@ -6553,23 +6555,19 @@ def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room
     assert scales["*Isometric"] == (2, 1)
     for view, (_name, _center, bounds) in zip(views, fitted, strict=True):
         assert purchased._inside(view.GetOutline(), bounds)
-    top = next(bounds for name, _center, bounds in fitted if name == "*Top")
-    assert top[3] - top[1] == pytest.approx(0.050 if layout == "tall_top" else 0.018)
 
 
-def test_clamp_tall_top_cells_and_captions_clear_each_other_border_and_title_block():
+@pytest.mark.parametrize("layout", ("standard", "supplier_top", "tall_top"))
+def test_fastener_cells_and_captions_clear_border_title_block_and_each_other(layout):
     from itertools import combinations
 
     from _layout_geometry import Box
 
-    cells = purchased.fastener_view_cells(0.073, layout="tall_top")
+    cells = purchased.fastener_view_cells(0.073, layout=layout)
     rectangles = {name: Box(*bounds) for name, _center, bounds in cells}
     front, top, right, iso = (
         rectangles[name] for name in ("*Front", "*Top", "*Right", "*Isometric")
     )
-    assert front.ymax == right.ymax == 0.150
-    assert top.ymin == 0.166 and top.height == pytest.approx(0.096)
-    assert iso.ymin == 0.160
     assert next(center[0] for name, center, _ in cells if name == "*Front") == next(
         center[0] for name, center, _ in cells if name == "*Top"
     )

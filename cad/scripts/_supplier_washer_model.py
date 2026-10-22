@@ -185,16 +185,109 @@ def assert_supplier_washer_source_attachment(
         adapter, feature_name, {dimension_name}, feature=feature
     )[dimension_name]
     native = _early_bound(display.GetDimension2(0), "IDimension")
-    full_name = str(native.FullName or "")
-    owner = native.GetFeatureOwner()
-    if (
-        full_name.split("@")[:2] != [dimension_name, feature_name]
-        or str(source_native.FullName).split("@")[:2] != [dimension_name, feature_name]
-        or owner is None
-        or int(adapter.swApp.IsSame(owner, feature)) != 1
-        or int(display.Type2) != int(source_display.Type2)
-    ):
-        raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+    try:
+        full_name = str(native.FullName or "")
+        owner = native.GetFeatureOwner()
+        if (
+            full_name.split("@")[:2] != [dimension_name, feature_name]
+            or str(source_native.FullName).split("@")[:2] != [dimension_name, feature_name]
+            or owner is None
+            or int(adapter.swApp.IsSame(owner, feature)) != 1
+            or int(display.Type2) != int(source_display.Type2)
+        ):
+            raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+    except Exception:
+        # Failure-only, bounded native observations. No formatting, tolerance,
+        # source or selection changes; no observation licenses acceptance.
+        try:
+            fields = {"label": label, "expected_dimension": dimension_name,
+                      "expected_feature": feature_name, "view_present": view is not None}
+
+            def observe(name: str, reader: Any) -> Any:
+                try:
+                    value = reader()
+                    fields[f"{name}_state"] = "UNAVAILABLE_NULL" if value is None else "OBSERVED"
+                    if value is None or isinstance(value, (str, bool, int, float)):
+                        fields[name] = value
+                    elif isinstance(value, (tuple, list)) and all(
+                        isinstance(item, (str, bool, int, float)) for item in value
+                    ):
+                        fields[name] = tuple(value)
+                    else:
+                        fields[f"{name}_python_type"] = type(value).__name__
+                    return value
+                except Exception as secondary:
+                    fields[f"{name}_state"] = "UNAVAILABLE"
+                    fields[f"{name}_error_type"] = type(secondary).__name__
+                    return None
+
+            actual_owner = observe("owner_handle", lambda: native.GetFeatureOwner())
+            mapped_feature = observe("mapped_feature_handle", lambda: None if view is None else
+                                     _early_bound(view, "IView").GetCorresponding(feature))
+            for name, reader in (
+                ("native_full_name", lambda: str(native.FullName)),
+                ("source_full_name", lambda: str(source_native.FullName)),
+                ("native_type", lambda: int(display.Type2)),
+                ("source_type", lambda: int(source_display.Type2)),
+                ("native_value_m", lambda: float(native.SystemValue)),
+                ("source_value_m", lambda: float(source_native.SystemValue)),
+                ("owner_same_source", lambda: None if actual_owner is None else
+                 int(adapter.swApp.IsSame(actual_owner, feature))),
+                ("owner_same_view_feature", lambda: None
+                 if actual_owner is None or mapped_feature is None else
+                 int(adapter.swApp.IsSame(actual_owner, mapped_feature))),
+                ("source_feature_type", lambda: feature.GetTypeName2()),
+                ("owner_name", lambda: None if actual_owner is None else
+                 str(_early_bound(actual_owner, "IFeature").Name)),
+                ("owner_type", lambda: None if actual_owner is None else
+                 str(_early_bound(actual_owner, "IFeature").GetTypeName2())),
+                ("source_path", lambda: _early_bound(model, "IModelDoc2").GetPathName()),
+                ("view_source_same", lambda: None if view is None else
+                 int(adapter.swApp.IsSame(view.ReferencedDocument, model))),
+                ("attached_types", lambda: _early_bound(
+                    display.GetAnnotation(), "IAnnotation").GetAttachedEntityTypes()),
+                ("source_attached_types", lambda: _early_bound(
+                    source_display.GetAnnotation(), "IAnnotation").GetAttachedEntityTypes()),
+                ("dangling", lambda: _early_bound(display.GetAnnotation(), "IAnnotation").IsDangling()),
+                ("visible", lambda: int(_early_bound(display.GetAnnotation(), "IAnnotation").Visible)),
+            ):
+                observe(name, reader)
+            segments = observe("source_segments", lambda: sketch.GetSketchSegments())
+            attached = observe("attached_entities", lambda: _early_bound(
+                display.GetAnnotation(), "IAnnotation").GetAttachedEntities3())
+            if segments is not None:
+                fields["source_segment_count"] = len(segments)
+                observe("source_segment_types", lambda: tuple(
+                    int(_early_bound(segment, "ISketchSegment").GetType()) for segment in segments))
+                if label == THICKNESS and len(segments) == 1:
+                    line = observe("source_line", lambda: _early_bound(segments[0], "ISketchLine"))
+                    candidates = observe("source_candidates", lambda: (
+                        line.GetStartPoint2(), line.GetEndPoint2()))
+                else:
+                    candidates = tuple(segments)
+                    observe("source_radii_m", lambda: tuple(
+                        float(_early_bound(segment, "ISketchArc").GetRadius())
+                        for segment in segments))
+                if candidates is not None:
+                    fields["source_candidate_count"] = len(candidates)
+                    interface = "ISketchPoint" if label == THICKNESS else "ISketchSegment"
+                    mapped = observe("mapped_candidates", lambda: None if view is None else tuple(
+                        _early_bound(view, "IView").GetCorresponding(entity) for entity in candidates))
+                    if mapped is not None:
+                        fields["mapped_candidate_present"] = tuple(entity is not None for entity in mapped)
+                    if attached is not None:
+                        fields["attachment_count"] = len(attached)
+                        for namespace, expected in (("source", candidates), ("view", mapped)):
+                            if expected is not None:
+                                observe(f"attachment_same_{namespace}_row_major", lambda expected=expected: tuple(
+                                    -1 if actual is None or entity is None else int(adapter.swApp.IsSame(
+                                        _early_bound(_bind(actual, interface), interface),
+                                        _early_bound(_bind(entity, interface), interface),
+                                    )) for actual in attached for entity in expected))
+            _telemetry.info("supplier washer model-witness ownership failed", **fields)
+        except Exception:
+            pass
+        raise
     segments = [_early_bound(segment, "ISketchSegment")
                 for segment in sketch.GetSketchSegments() or ()]
     if len(segments) != (1 if label == THICKNESS else 2) or any(
