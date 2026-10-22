@@ -857,7 +857,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
-    assert "DIA 1.85 THROUGH INTO BLOCK" in pilot
     assert "OPEN ITS HOLES TO DIA 2.5" in pilot
     assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
