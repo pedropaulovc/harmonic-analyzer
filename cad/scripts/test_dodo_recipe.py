@@ -252,14 +252,9 @@ _DRAWING_OWN_ROW_READERS = {
     # their producer. The caller argument checks below cover these entrypoints.
     "_part_configuration_exports.py",
     "_purchased_part_variants.py",
-    # source.stem is checked against the registered native source before any
-    # supplier diagram metadata is read; artifact labels never select the row.
+    # Supplier stock diagrams bind source = spec.source before their registry
+    # read; the binding and callers' own registered SPEC are checked below.
     "_supplier_spring_drawing.py",
-    # These sheets read SPEC.source.stem, the same native source identity dodo
-    # uses for own-row dependency expansion; both identities are checked below.
-    "draw_sh_vn_chain_link.py",
-    "draw_sh_vn_music_wire.py",
-    "draw_sh_vn_thumb_screw.py",
 }
 # Registry-reading helper -> index of its part-name or drawing-spec argument.
 _OWN_ROW_HELPERS = {
@@ -305,7 +300,14 @@ def _helper_name_arguments(tree: ast.AST) -> tuple[tuple[str, str], ...]:
             continue
         index = _OWN_ROW_HELPERS[name]
         args = [*node.args[index : index + 1]]
-        keyword = "spec" if name == "build_supplier_spring_drawing" else "part_name"
+        keyword = (
+            "spec" if name == "build_supplier_spring_drawing"
+            else "stem" if name in {
+                "member_configurations", "configuration_export_paths",
+                "part_configuration_outputs", "validate_member_exports",
+            }
+            else "part_name"
+        )
         args += [kw.value for kw in node.keywords if kw.arg == keyword]
         assert len(args) == 1, f"{name}: missing or ambiguous part-name argument"
         found.extend((name, ast.unparse(arg)) for arg in args)
@@ -371,18 +373,28 @@ def _registered_source_row(tree: ast.Module) -> str | None:
         ("apply_member_properties", 1),
         ("assert_member_properties", 1),
         ("save_simplified_part", 1),
+        ("member_configurations", 0),
+        ("export_member_configurations", 1),
+        ("configuration_export_paths", 0),
+        ("part_configuration_outputs", 0),
+        ("validate_member_exports", 0),
     ),
 )
 @pytest.mark.parametrize("selected", ("PART_NAME", "foreign_part", None))
+@pytest.mark.parametrize("keyword_call", (False, True))
 def test_configured_member_row_calls_reject_foreign_or_missing_part_inputs(
-    monkeypatch, tmp_path, name, index, selected
+    monkeypatch, tmp_path, name, index, selected, keyword_call
 ):
     import _buildgraph as bg
 
     script = tmp_path / "build_sh_vn_chain_link.py"
     arguments = ["adapter"] * index
     if selected is not None:
-        arguments.append(selected)
+        keyword = "stem" if name in {
+            "member_configurations", "configuration_export_paths",
+            "part_configuration_outputs", "validate_member_exports",
+        } else "part_name"
+        arguments.append(f"{keyword}={selected}" if keyword_call else selected)
     script.write_text(
         'import _config\nPART_NAME = "sh-vn-chain-link"\n'
         '_config.parts(PART_NAME)\n'
@@ -405,12 +417,17 @@ def test_configured_member_row_calls_reject_foreign_or_missing_part_inputs(
 @pytest.mark.parametrize("registered", ("fixture", "foreign", None))
 @pytest.mark.parametrize("selector", ("SPEC.source.stem", "foreign_source.stem"))
 @pytest.mark.parametrize("aliased_read", (False, True))
+@pytest.mark.parametrize(
+    "filename",
+    ("draw_fixture.py", "draw_sh_vn_chain_link.py",
+     "draw_sh_vn_music_wire.py", "draw_sh_vn_thumb_screw.py"),
+)
 def test_drawing_source_rows_require_the_selected_registered_native(
-    monkeypatch, tmp_path, registered, selector, aliased_read
+    monkeypatch, tmp_path, registered, selector, aliased_read, filename
 ):
     import _buildgraph as bg
 
-    script = tmp_path / "draw_fixture.py"
+    script = tmp_path / filename
     binding = "" if registered is None else f"SPEC = DRAWINGS_BY_NAME[{registered!r}]\n"
     extra_read = (
         "import _config as cfg\ncfg.parts(foreign_source.stem)\n"
@@ -430,6 +447,126 @@ def test_drawing_source_rows_require_the_selected_registered_native(
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
     if registered == "fixture" and selector == "SPEC.source.stem" and not aliased_read:
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+    else:
+        with pytest.raises(AssertionError):
+            test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize(
+    "filename",
+    ("draw_sh_vn_chain_link.py", "draw_sh_vn_music_wire.py", "draw_sh_vn_thumb_screw.py"),
+)
+@pytest.mark.parametrize(
+    "call",
+    ("apply_drawing_properties(adapter, foreign_part)",
+     "configuration_export_paths(stem=foreign_part)"),
+)
+def test_registered_drawing_readers_reject_foreign_helper_calls(
+    monkeypatch, tmp_path, filename, call
+):
+    import _buildgraph as bg
+
+    script = tmp_path / filename
+    script.write_text(
+        "from _drawing_registry import DRAWINGS_BY_NAME\nimport _config\n"
+        "SPEC = DRAWINGS_BY_NAME['fixture']\n"
+        "_config.parts(SPEC.source.stem)\n" + call + "\n",
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    with pytest.raises(AssertionError):
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize("registered", ("fixture", "foreign"))
+@pytest.mark.parametrize("selected", ("SPEC", "foreign_spec"))
+@pytest.mark.parametrize("keyword_call", (False, True))
+def test_supplier_drawing_call_requires_own_registered_spec(
+    monkeypatch, tmp_path, registered, selected, keyword_call
+):
+    import _buildgraph as bg
+
+    script = tmp_path / "draw_fixture.py"
+    argument = f"spec={selected}" if keyword_call else selected
+    script.write_text(
+        "from _drawing_registry import DRAWINGS_BY_NAME\n"
+        f"SPEC = DRAWINGS_BY_NAME[{registered!r}]\n"
+        f"build_supplier_spring_drawing(adapter, {argument})\n",
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    if registered == "fixture" and selected == "SPEC":
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+    else:
+        with pytest.raises(AssertionError):
+            test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize("selected", ("part_name", "foreign_part"))
+@pytest.mark.parametrize("extra_call", (False, True))
+def test_simplified_part_wrapper_requires_exact_passthrough(
+    monkeypatch, tmp_path, selected, extra_call
+):
+    import _buildgraph as bg
+
+    script = tmp_path / "draw_fixture.py"
+    script.write_text("", encoding="utf-8")
+    wrapper = tmp_path / "_simplified_part.py"
+    wrapper.write_text(
+        "async def save_simplified_part(adapter, part_name):\n"
+        f"    await save_part_and_images(adapter, {selected})\n"
+        + ("save_part_and_images(adapter, foreign_part)\n" if extra_call else ""),
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: (wrapper,))
+    if selected == "part_name" and not extra_call:
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+    else:
+        with pytest.raises(AssertionError):
+            test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize("binding", ("spec.source", "foreign_spec.source"))
+@pytest.mark.parametrize("rebind", (False, True))
+def test_supplier_row_reader_requires_unmodified_source_binding(
+    monkeypatch, tmp_path, binding, rebind
+):
+    import _buildgraph as bg
+
+    script = tmp_path / "draw_fixture.py"
+    script.write_text("", encoding="utf-8")
+    supplier = tmp_path / "_supplier_spring_drawing.py"
+    supplier.write_text(
+        "import _config\n"
+        "async def build_supplier_spring_drawing(adapter, spec):\n"
+        f"    source = {binding}\n"
+        + ("    source = foreign_spec.source\n" if rebind else "")
+        + "    return _config.parts(source.stem)\n",
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: (supplier,))
+    if binding == "spec.source" and not rebind:
         test_drawing_closures_read_no_foreign_dynamic_part_row()
     else:
         with pytest.raises(AssertionError):
@@ -457,10 +594,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
         supplier_calls = tuple(
             call for call in calls if call[0] == "build_supplier_spring_drawing"
         )
-        sheet_reader = (
-            source.name in _DRAWING_OWN_ROW_READERS and source.name.startswith("draw_")
-        )
-        if sheet_reader or supplier_calls:
+        if supplier_calls:
             # A SPEC-shaped expression is safe only if it selects this script's
             # own registered drawing, not another drawing's native source.
             assert source in drawing_names, (source.name, supplier_calls)
@@ -479,7 +613,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 for node in ast.walk(tree)
             ) == 1, source.name
             assert {arg for _name, arg in supplier_calls} <= {"SPEC"}, supplier_calls
-        if sheet_reader or source.name == "_supplier_spring_drawing.py":
+        if source.name == "_supplier_spring_drawing.py":
             reads = [
                 node for node in ast.walk(tree)
                 if isinstance(node, ast.Call)
@@ -490,8 +624,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 ast.unparse(node.args[0]) if node.args else "<whole registry>"
                 for node in reads
             }
-            expected = "SPEC.source.stem" if sheet_reader else "source.stem"
-            assert arguments == {expected}, (source.name, arguments)
+            assert arguments == {"source.stem"}, (source.name, arguments)
         if source.name == "_supplier_spring_drawing.py":
             # source is only an alias for the caller's spec, never a foreign row.
             supplier = next(
@@ -517,8 +650,6 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
                 and node.id in {"source", "spec"}
             ] == ["source"], source.name
-        if source.name in _DRAWING_OWN_ROW_READERS:
-            return tokens, supplier_calls, None  # checked/forwarded identities only
         if source.name == "_simplified_part.py":
             # This wrapper forwards the caller's part_name. Keep its exact
             # boundary checked; save_simplified_part callers still go through
@@ -533,6 +664,8 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 ("save_part_and_images", "part_name"),
             )
             return tokens, (), None
+        if source.name in _DRAWING_OWN_ROW_READERS:
+            return tokens, supplier_calls, None  # checked/forwarded identities only
         return tokens, calls, _module_part_name(tree)
 
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
@@ -557,9 +690,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             supplier_calls = tuple(
                 call for call in calls if call[0] == "build_supplier_spring_drawing"
             )
-            if supplier_calls or (
-                source.name in _DRAWING_OWN_ROW_READERS and source.name.startswith("draw_")
-            ):
+            if supplier_calls:
                 assert source == script, (stem, source.name, supplier_calls)
             calls = tuple(
                 call for call in calls if call[0] != "build_supplier_spring_drawing"
