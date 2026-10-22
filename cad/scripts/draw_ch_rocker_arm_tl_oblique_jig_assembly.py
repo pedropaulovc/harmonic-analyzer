@@ -2552,6 +2552,7 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                  spec.trammel.CARRIER_TOP_Z)
         return _capture_local_point(spec.CARRIER, world)
     top = washer.THICKNESS
+    hole_top = pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0
     bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
     cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
     roof = _capture_local_point(spec.PIVOT_CAP, (
@@ -2579,8 +2580,9 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                        f"C4A CARRIER / RETAINER\n{band(r.TOP_RUNNING_GAP)}", (0.365, 0.157)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
                        f"C5A FLAT PIN END\nAXIAL TAKE-UP {r.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX", (0.305, 0.216)),
-        CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0),
-                       "C4A UPPER CROSS-HOLE EDGE\nHOLD CLEVIS UP FOR FIT", (0.224, 0.216)),
+        CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
+                       "C4A UPPER CROSS-HOLE EDGE\nHOLD CLEVIS UP FOR FIT", (0.224, 0.216),
+                       pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),
         CaptureReading(2, spec.PIVOT_CLEVIS_PIN,
                        (-spec.clevis_pin.CLEVIS_HEAD_HEIGHT, 0.0,
                         -spec.clevis_pin.CLEVIS_HEAD_DIA / 2.0),

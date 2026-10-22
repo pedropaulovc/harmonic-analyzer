@@ -247,6 +247,11 @@ At the two C4 bore mouths, the retainer top corner and loaded clevis meet.
 Acquire the natively proved vertical bore edge at midheight, then retain the
 original top-corner closest-point, attachment and settled leader-landing
 checks. The acquisition point is not a changed inspection station or a retry.
+The loaded clevis also coincides with the upper cross-hole boundary. Point its
+label to the text-side corner of that same boundary at the unchanged upper-hole
+height, acquiring the pin's outer journal wall above the hole and below the
+tip chamfer. Require that pin-owned edge to pass through the corner, then keep
+the native attachment and settled landing proofs; do not hide components.
 
 The C5B plan note identifies the cotter eye/prong regions and points to the
 manual motion/feeler inspection; it is not a static clearance dimension.

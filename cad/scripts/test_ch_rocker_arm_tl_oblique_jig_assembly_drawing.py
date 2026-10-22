@@ -2571,6 +2571,26 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     # mid-height acquisition point but stops below the top
                     # corner: the unchanged strict criterion must refuse it.
                     endpoints = ((x, y, 0.0), (x, y, 0.75 * top))
+            elif reading.stem == spec.PIVOT_PIN and reading.text.startswith("C4A UPPER CROSS-HOLE"):
+                # A-A cuts the pin's upper cross-hole boundary as one line
+                # from the text-side journal wall to the far wall
+                # (jig-retention 1772 worker 15, 58e34c: (-5, 0, 59.5) to
+                # (+5, 0, 59.5) pin mm) and exposes the outer journal wall
+                # rising from that corner to the lead chamfer. The corner is
+                # the C4A criterion; the row's mid-wall point is only where
+                # the coordinate pick acquires the wall.
+                x, y, hole_top = reading.local_mm
+                chamfer = spec.pivot_pin.OVERALL_LENGTH - spec.pivot_pin.LEAD_CHAMFER
+                edges.append(native_edge(
+                    component, reading.stem, reading.index,
+                    ((x, y, hole_top), (-x, y, hole_top)),
+                ))
+                endpoints = ((x, y, hole_top), (x, y, chamfer))
+                if doc.capture_edge_defect == "short-cross-hole-wall":
+                    # The pin's own wall still runs through the mid-wall
+                    # acquisition point but starts above the corner: the
+                    # unchanged strict criterion must refuse it.
+                    endpoints = ((x, y, hole_top + 0.25 * (chamfer - hole_top)), (x, y, chamfer))
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -2610,6 +2630,17 @@ def native_property_package(monkeypatch, native_bom_bindings):
             edges.append(native_edge(
                 component, spec.PIVOT_CLEVIS_PIN, 0,
                 ((0.0, 0.0, -radius), (hardware.CLEVIS_LENGTH, 0.0, -radius)),
+            ))
+            # Loaded up through the pin's cross hole, the source geometry puts
+            # its upper section line (clevis z = +R) at the pin's upper hole
+            # boundary height, so it also runs through the C4A corner. Native
+            # observed only the wrong CLEVIS owner at the row's old midpoint
+            # (0, 0, hole top) (jig-retention 1772 worker 5, 650a9308; the
+            # selected clevis curve was not logged). The fixture models that
+            # adverse choice at the corner; it is not native-proven there.
+            edges.append(native_edge(
+                component, spec.PIVOT_CLEVIS_PIN, 0,
+                ((0.0, 0.0, radius), (hardware.CLEVIS_LENGTH, 0.0, radius)),
             ))
         return tuple(edges)
 
@@ -3547,9 +3578,10 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
     package.doc.raw_picks = raw_picks
     _scales, settled = drawing._place_package(package.adapter)
     readings = drawing.capture_readings()
-    # Only the two C4 MOUTH rows separate acquisition from criterion.
+    # Only the two C4 MOUTH rows and the C4A UPPER CROSS-HOLE row separate
+    # acquisition from criterion.
     assert [reading.pick_local_mm is not None for reading in readings] == [
-        reading.text.startswith("C4 MOUTH") for reading in readings
+        reading.text.startswith(("C4 MOUTH", "C4A UPPER CROSS-HOLE")) for reading in readings
     ]
     mouth = [(index, reading) for index, reading in enumerate(readings)
              if reading.text.startswith("C4 MOUTH")]
@@ -3686,6 +3718,182 @@ def test_capture_c4_mouth_wall_through_the_pick_but_short_of_its_corner_is_refus
         spec.pivot_retainer.THICKNESS / 4000.0, abs=1e-12,
     )
     assert not any(note.text.startswith("C4 MOUTH") for note in package.doc.attached_notes)
+    assert not package.doc.bom_inserted
+
+
+def _c4a_cross_hole_row(readings):
+    return next((index, reading) for index, reading in enumerate(readings)
+                if reading.text.startswith("C4A UPPER CROSS-HOLE"))
+
+
+@pytest.mark.parametrize("raw_picks", (False, True))
+def test_capture_c4a_cross_hole_acquires_the_pin_wall_above_and_lands_on_the_hole_corner(
+    native_property_package, raw_picks,
+) -> None:
+    """The C4A UPPER CROSS-HOLE row picks the pin's exposed outer journal wall
+    midway between the hole top and the lead chamfer, where it is the only
+    segment, and still identifies, attaches and lands at the unchanged
+    hole-top height: the text-side corner of the upper hole boundary
+    (jig-retention 1772 worker 15, 58e34c). By the source geometry the loaded
+    clevis shank's top section line is coincident there too; native proved
+    only a wrong CLEVIS owner at the row's old midpoint (worker 5, 650a9308).
+    """
+    package = native_property_package
+    package.doc.raw_picks = raw_picks
+    _scales, settled = drawing._place_package(package.adapter)
+    index, reading = _c4a_cross_hole_row(drawing.capture_readings())
+    pin = spec.pivot_pin
+    hole_top = pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0
+    chamfer = pin.OVERALL_LENGTH - pin.LEAD_CHAMFER
+    assert reading.stem == spec.PIVOT_PIN
+    # The reading's height is the hole top as before; only the leader's end
+    # moved along that boundary to its text-side corner.
+    assert reading.local_mm == (-pin.FIT_DIA / 2.0, 0.0, hole_top)
+    assert reading.pick_local_mm == (-pin.FIT_DIA / 2.0, 0.0, (hole_top + chamfer) / 2.0)
+    assert hole_top < reading.pick_local_mm[2] < chamfer
+    root = package.source_root.Name2
+    pin_owner = f"{root}/{spec.instance_name(spec.PIVOT_PIN, 0)}"
+    clevis = f"{root}/{spec.instance_name(spec.PIVOT_CLEVIS_PIN, 0)}"
+    note = package.doc.attached_notes[index]
+    assert note.text == reading.text
+    view = note.view
+    criterion = drawing._capture_world_point(reading)
+    acquisition = drawing._capture_world_point(reading, local_mm=reading.pick_local_mm)
+    paper_criterion = view.ModelToViewTransform.apply(criterion)[:2]
+    paper_acquisition = view.ModelToViewTransform.apply(acquisition)[:2]
+    ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+    assert math.dist(paper_acquisition, paper_criterion) == pytest.approx(
+        ratio * (chamfer - hole_top) / 2000.0, abs=1e-12,
+    )
+    # The zoom aperture and the coordinate pick see the acquisition only.
+    pick_xy, zoom_centre, candidates = package.doc.coordinate_picks[index]
+    assert pick_xy == pytest.approx(paper_acquisition, abs=1e-12)
+    assert zoom_centre == pytest.approx(paper_acquisition, abs=1e-12)
+    # Above the hole, the pin's own outer wall is the one segment at the pick.
+    touching = [edge for distance, _interior, edge in candidates if distance <= 1e-8]
+    assert [edge.owner.Name2 for edge in touching] == [pin_owner]
+    wall, = touching
+    assert note.entity is wall
+    corner, top = wall.endpoints
+    assert corner == pytest.approx(tuple(v / 1000.0 for v in reading.local_mm), abs=1e-15)
+    assert top == pytest.approx((-pin.FIT_DIA / 2000.0, 0.0, chamfer / 1000.0), abs=1e-15)
+    # The corner is the text-side end of the pin's own full upper hole
+    # boundary, a separate candidate lying along the criterion's height.
+    boundary, = [
+        edge for _distance, _interior, edge in candidates
+        if edge.owner.Name2 == pin_owner and edge is not wall
+        and all(abs(point[2] - criterion[2]) < 1e-12 for point in edge.world_endpoints)
+    ]
+    near, far = boundary.endpoints
+    assert near == pytest.approx(corner, abs=1e-15)
+    assert far == pytest.approx((pin.FIT_DIA / 2000.0, 0.0, hole_top / 1000.0), abs=1e-15)
+    # The clevis top line is a real separate candidate: it runs through the
+    # corner in model space, half the exposed wall below the pick.
+    upper, = [
+        edge for _distance, _interior, edge in candidates
+        if edge.owner.Name2 == clevis
+        and all(abs(point[2] - criterion[2]) < 1e-12 for point in edge.world_endpoints)
+    ]
+    a, b = upper.world_endpoints
+    axis = tuple(b[i] - a[i] for i in range(3))
+    along = sum((criterion[i] - a[i]) * axis[i] for i in range(3)) / sum(v * v for v in axis)
+    assert 0.0 < along < 1.0
+    assert math.dist(criterion, tuple(a[i] + along * axis[i] for i in range(3))) < 1e-12
+    clevis_distance, = [d for d, _interior, edge in candidates if edge is upper]
+    assert clevis_distance == pytest.approx(ratio * (chamfer - hole_top) / 2000.0, abs=1e-12)
+    # Identification, attachment and landing stay at the hole-top corner.
+    owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
+    assert owner.Name2 == pin_owner
+    assert note.world == pytest.approx(criterion, abs=1e-12)
+    landing = note.annotation.GetLeaderPointsAtIndex(0)[-3:-1]
+    assert landing == pytest.approx(paper_criterion, abs=1e-12)
+    assert math.dist(landing, paper_acquisition) > 1e-4
+    # The strict closest point proves the acquired wall passes through the
+    # corner; that this modelled wall also ends there is not what it proves.
+    assert math.dist(wall.GetClosestPointOn(*corner)[:3], corner) < 1e-12
+    assert wall.GetClosestPointOn(*(v / 1000.0 for v in reading.pick_local_mm))[3] == pytest.approx(0.5)
+    settled[-1]()
+
+
+def test_capture_c4a_cross_hole_corner_pick_selects_the_coincident_clevis_top_line(
+    native_property_package, monkeypatch,
+) -> None:
+    """Picking at the criterion itself lands on the upper hole boundary's
+    text-side corner, where the source geometry puts the loaded clevis shank's
+    top section line, coincident and running through. Native resolved the
+    row's old midpoint pick to the CLEVIS owner (jig-retention 1772 worker 5,
+    650a9308, after both C4 MOUTH repairs and every preceding row landed; the
+    clevis curve itself was not logged); the fixture models that adverse
+    choice at the corner, and the unchanged strict owner proof refuses it
+    before any C4A note or BOM, so the mid-wall acquisition is necessary.
+    """
+    package = native_property_package
+    readings = tuple(
+        dataclasses.replace(reading, pick_local_mm=None)
+        if reading.text.startswith("C4A UPPER CROSS-HOLE") else reading
+        for reading in drawing.capture_readings()
+    )
+    monkeypatch.setattr(drawing, "capture_readings", lambda: readings)
+    with pytest.raises(RuntimeError, match=r"jig capture C4A UPPER CROSS-HOLE.*did not select .* own edge"):
+        drawing._place_package(package.adapter)
+    index, reading = _c4a_cross_hole_row(readings)
+    assert len(package.doc.coordinate_picks) == index + 1
+    pick_xy, zoom_centre, candidates = package.doc.coordinate_picks[index]
+    slots, types = package.doc.pick_slots[index]
+    picked = slots[types.index(1)]
+    view = slots[types.index(12)]
+    corner = view.ModelToViewTransform.apply(drawing._capture_world_point(reading))[:2]
+    assert pick_xy == pytest.approx(corner, abs=1e-12)
+    assert zoom_centre == pytest.approx(corner, abs=1e-12)
+    root = package.source_root.Name2
+    pin_owner = f"{root}/{spec.instance_name(spec.PIVOT_PIN, 0)}"
+    clevis = f"{root}/{spec.instance_name(spec.PIVOT_CLEVIS_PIN, 0)}"
+    # The pin's wall and its hole boundary both end at the corner; only the
+    # clevis line runs through it.
+    touching = sorted(
+        (edge.owner.Name2, interior)
+        for distance, interior, edge in candidates if distance <= 1e-8
+    )
+    assert touching == sorted(((pin_owner, False), (pin_owner, False), (clevis, True)))
+    assert picked.owner.Name2 == clevis
+    # The coincidence is physical: the corner lies inside the clevis top line.
+    a, b = picked.world_endpoints
+    axis = tuple(b[i] - a[i] for i in range(3))
+    point = drawing._capture_world_point(reading)
+    along = sum((point[i] - a[i]) * axis[i] for i in range(3)) / sum(v * v for v in axis)
+    assert 0.0 < along < 1.0
+    assert math.dist(point, tuple(a[i] + along * axis[i] for i in range(3))) < 1e-12
+    # Both C4 MOUTH repairs landed first; this row and the BOM are refused.
+    assert sum(note.text.startswith("C4 MOUTH") for note in package.doc.attached_notes) == 2
+    assert not any(note.text.startswith("C4A UPPER CROSS-HOLE") for note in package.doc.attached_notes)
+    assert not package.doc.bom_inserted
+
+
+def test_capture_c4a_cross_hole_wall_through_the_pick_but_starting_above_its_corner_is_refused(
+    native_property_package,
+) -> None:
+    """The pin's own wall acquired mid-wall does not identify the reading
+    unless it passes through the hole-top corner: the unchanged strict
+    closest point refuses it before any C4A note or BOM.
+    """
+    package = native_property_package
+    package.doc.capture_edge_defect = "short-cross-hole-wall"
+    with pytest.raises(RuntimeError, match=r"jig capture C4A UPPER CROSS-HOLE.*does not pass through its section point"):
+        drawing._place_package(package.adapter)
+    index, reading = _c4a_cross_hole_row(drawing.capture_readings())
+    slots, types = package.doc.pick_slots[index]
+    picked = slots[types.index(1)]
+    root = package.source_root.Name2
+    assert picked.owner.Name2 == f"{root}/{spec.instance_name(spec.PIVOT_PIN, 0)}"
+    local_pick = tuple(v / 1000.0 for v in reading.pick_local_mm)
+    assert picked.GetClosestPointOn(*local_pick)[:3] == pytest.approx(local_pick, abs=1e-15)
+    pin = spec.pivot_pin
+    exposed = pin.OVERALL_LENGTH - pin.LEAD_CHAMFER - reading.local_mm[2]
+    local = tuple(v / 1000.0 for v in reading.local_mm)
+    assert math.dist(picked.GetClosestPointOn(*local)[:3], local) == pytest.approx(
+        0.25 * exposed / 1000.0, abs=1e-12,
+    )
+    assert not any(note.text.startswith("C4A UPPER CROSS-HOLE") for note in package.doc.attached_notes)
     assert not package.doc.bom_inserted
 
 
