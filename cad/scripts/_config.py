@@ -52,7 +52,14 @@ def _doc(name: str) -> dict[str, Any]:
             entries: dict[str, Any] = {}
             for p in sorted(split_dir.glob("*.yaml")):
                 if p.name != "_defaults.yaml":
-                    entries.update(_load(p))
+                    # Own-row cache keys omit every other part's file.
+                    part = _load(p)
+                    if set(part) != {p.stem}:
+                        raise ValueError(
+                            f"{p} must define exactly the part {p.stem!r}, "
+                            f"found {sorted(part)}"
+                        )
+                    entries.update(part)
             return {**defaults, "parts": entries}
         if name == "tolerances":
             # The cache key narrows fit('<g>') to tolerances/<g>.yaml, so a

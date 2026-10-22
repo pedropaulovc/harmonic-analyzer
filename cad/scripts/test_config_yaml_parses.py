@@ -120,3 +120,56 @@ def test_tolerance_files_cannot_define_a_group_their_cache_key_omits(
             _config._doc("tolerances")
     finally:
         _config._doc.cache_clear()
+
+
+def test_part_document_aggregation_preserves_filename_owned_rows() -> None:
+    import _config
+
+    defaults = yaml.safe_load(
+        (CONFIG_DIR / "parts" / "_defaults.yaml").read_text(encoding="utf-8")
+    )
+    rows = {
+        key: value
+        for path in (CONFIG_DIR / "parts").glob("*.yaml")
+        if path.stem != "_defaults"
+        for key, value in yaml.safe_load(path.read_text(encoding="utf-8")).items()
+    }
+    assert _config._doc("parts") == {**defaults, "parts": rows}
+    assert set(_config.parts()) == set(rows)
+
+
+@pytest.mark.parametrize("also_define_own_row", [False, True])
+def test_part_files_cannot_override_a_row_their_cache_key_omits(
+    monkeypatch, tmp_path, also_define_own_row
+) -> None:
+    """A later foreign file cannot change a consumed row outside its keyed file."""
+    import _config
+
+    stem = "sh-vn-chain-link"
+    parts = tmp_path / "parts"
+    parts.mkdir()
+    (parts / "_defaults.yaml").write_text("defaults: {revision: A}\n", encoding="utf-8")
+    original = (CONFIG_DIR / "parts" / f"{stem}.yaml").read_text(encoding="utf-8")
+    (parts / f"{stem}.yaml").write_text(original, encoding="utf-8")
+    override = yaml.safe_load(original)
+    row = override[stem]
+    original_quantities = dict(row["configuration_quantities"])
+    row["configuration_quantities"][row["default_configuration"]] += 1
+    row["quantity"] = sum(row["configuration_quantities"].values())
+    if also_define_own_row:
+        override["zz-override"] = {"quantity": 1}
+    monkeypatch.setattr(_config, "CONFIG_DIR", tmp_path)
+    _config._parts_registry.cache_clear()
+    _config._doc.cache_clear()
+    try:
+        assert _config.parts(stem)["configuration_quantities"] == original_quantities
+        (parts / "zz-override.yaml").write_text(
+            yaml.safe_dump(override, sort_keys=False), encoding="utf-8"
+        )
+        _config._parts_registry.cache_clear()
+        _config._doc.cache_clear()
+        with pytest.raises(ValueError, match="must define exactly the part 'zz-override'"):
+            _config.parts(stem)
+    finally:
+        _config._parts_registry.cache_clear()
+        _config._doc.cache_clear()

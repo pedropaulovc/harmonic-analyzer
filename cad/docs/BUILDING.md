@@ -148,6 +148,9 @@ not another released member identity.
 Configured purchased drawings read their registry metadata from the native source
 part identity, not the drawing's output label. Their cache dependencies therefore
 remain scoped to that source part's row.
+The split registry loader requires each non-default `parts/<stem>.yaml` to define
+exactly its filename-matching row; a foreign or additional row is rejected instead
+of silently overriding metadata outside that drawing's cache dependencies.
 Changing either member-inventory field invalidates that drawing's local freshness
 digest and remote cache key, even with its native execution identity unchanged;
 unrelated purchased drawings retain their keys. Keep these reads module-qualified

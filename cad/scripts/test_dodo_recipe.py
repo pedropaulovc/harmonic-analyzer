@@ -256,12 +256,12 @@ _DRAWING_OWN_ROW_READERS = {
     # supplier diagram metadata is read; artifact labels never select the row.
     "_supplier_spring_drawing.py",
     # These sheets read SPEC.source.stem, the same native source identity dodo
-    # uses for own-row dependency expansion, never artifact_stem.
+    # uses for own-row dependency expansion; both identities are checked below.
     "draw_sh_vn_chain_link.py",
     "draw_sh_vn_music_wire.py",
     "draw_sh_vn_thumb_screw.py",
 }
-# Registry-reading helper -> index of its part-name argument.
+# Registry-reading helper -> index of its part-name or drawing-spec argument.
 _OWN_ROW_HELPERS = {
     "part_properties": 0,
     "save_part_and_images": 1,
@@ -274,6 +274,7 @@ _OWN_ROW_HELPERS = {
     "assert_member_properties": 1,
     "save_member_part": 1,
     "export_member_configurations": 1,
+    "build_supplier_spring_drawing": 1,
 }
 
 
@@ -301,7 +302,8 @@ def _helper_name_arguments(tree: ast.AST) -> tuple[tuple[str, str], ...]:
             continue
         index = _OWN_ROW_HELPERS[name]
         args = [*node.args[index : index + 1]]
-        args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
+        keyword = "spec" if name == "build_supplier_spring_drawing" else "part_name"
+        args += [kw.value for kw in node.keywords if kw.arg == keyword]
         assert len(args) == 1, f"{name}: missing or ambiguous part-name argument"
         found.extend((name, ast.unparse(arg)) for arg in args)
     return tuple(found)
@@ -435,6 +437,9 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 
     dodo = _load_dodo()
+    drawing_names = {
+        spec.script.resolve(): stem for stem, spec in dodo.DRAWINGS_BY_NAME.items()
+    }
 
     @cache
     def source_facts(source: Path):
@@ -444,9 +449,73 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             tokens = bg._config_tokens_in_source(source)
         except bg._UnknownConfigUse:
             return None  # the whole-config fallback narrows nothing
-        if source.name in _DRAWING_OWN_ROW_READERS:
-            return tokens, (), None  # forwards its caller's name
         tree = ast.parse(source.read_text(encoding="utf-8"))
+        calls = _helper_name_arguments(tree)
+        supplier_calls = tuple(
+            call for call in calls if call[0] == "build_supplier_spring_drawing"
+        )
+        sheet_reader = (
+            source.name in _DRAWING_OWN_ROW_READERS and source.name.startswith("draw_")
+        )
+        if sheet_reader or supplier_calls:
+            # A SPEC-shaped expression is safe only if it selects this script's
+            # own registered drawing, not another drawing's native source.
+            assert source in drawing_names, (source.name, supplier_calls)
+            selectors = [
+                ast.unparse(node.value)
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "SPEC" for t in node.targets)
+            ]
+            assert selectors == [f"DRAWINGS_BY_NAME[{drawing_names[source]!r}]"], (
+                source.name, selectors
+            )
+            assert sum(
+                isinstance(node, ast.Name) and node.id == "SPEC"
+                and isinstance(node.ctx, ast.Store)
+                for node in ast.walk(tree)
+            ) == 1, source.name
+            assert {arg for _name, arg in supplier_calls} <= {"SPEC"}, supplier_calls
+        if sheet_reader or source.name == "_supplier_spring_drawing.py":
+            reads = [
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute) and node.func.attr == "parts"
+                and bg._literal_first_arg(node) is None
+            ]
+            arguments = {
+                ast.unparse(node.args[0]) if node.args else "<whole registry>"
+                for node in reads
+            }
+            expected = "SPEC.source.stem" if sheet_reader else "source.stem"
+            assert arguments == {expected}, (source.name, arguments)
+        if source.name == "_supplier_spring_drawing.py":
+            # source is only an alias for the caller's spec, never a foreign row.
+            supplier = next(
+                node for node in tree.body
+                if isinstance(node, ast.AsyncFunctionDef)
+                and node.name == "build_supplier_spring_drawing"
+            )
+            assert supplier.args.args[1].arg == "spec"
+            local_nodes = tuple(ast.walk(supplier))
+            assert all(read in local_nodes for read in reads), source.name
+            binding = next(
+                node for node in supplier.body
+                if isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "source" for t in node.targets)
+            )
+            assert isinstance(binding.value, ast.Attribute)
+            assert binding.value.attr == "source"
+            assert isinstance(binding.value.value, ast.Name)
+            assert binding.value.value.id == "spec"
+            assert [
+                node.id
+                for node in local_nodes
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                and node.id in {"source", "spec"}
+            ] == ["source"], source.name
+        if source.name in _DRAWING_OWN_ROW_READERS:
+            return tokens, supplier_calls, None  # checked/forwarded identities only
         if source.name == "_simplified_part.py":
             # This wrapper forwards the caller's part_name. Keep its exact
             # boundary checked; save_simplified_part callers still go through
@@ -461,7 +530,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 ("save_part_and_images", "part_name"),
             )
             return tokens, (), None
-        return tokens, _helper_name_arguments(tree), _module_part_name(tree)
+        return tokens, calls, _module_part_name(tree)
 
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
@@ -482,6 +551,16 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                     f"drawing:{stem} reaches a new dynamic registry read in "
                     f"{source.name}; review it against _expand_parts_token"
                 )
+            supplier_calls = tuple(
+                call for call in calls if call[0] == "build_supplier_spring_drawing"
+            )
+            if supplier_calls or (
+                source.name in _DRAWING_OWN_ROW_READERS and source.name.startswith("draw_")
+            ):
+                assert source == script, (stem, source.name, supplier_calls)
+            calls = tuple(
+                call for call in calls if call[0] != "build_supplier_spring_drawing"
+            )
             if not calls:
                 continue
             assert source.name == own_build, (stem, source.name, calls)
