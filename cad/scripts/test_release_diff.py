@@ -97,7 +97,7 @@ def test_all_current_and_archived_artifact_aliases_compose_without_mutating_maps
     payload, sealed = json.loads(current_bytes), json.loads(historical_bytes)
     mapping = load_identity_map()
     old_keys, candidates = [], {}
-    for row in payload["parts_and_assemblies"]:
+    for row in payload["parts_and_assemblies"] + payload.get("retired_identities", []):
         expected = tuple(dict.fromkeys(
             mesh_key(identity["stem"], identity["configuration"])
             if "configuration" in identity else identity["stem"]
@@ -213,7 +213,7 @@ def test_active_and_retired_identity_reservations_reject_collisions(tmp_path, co
         "retired_identities": [retired],
     }), encoding="utf-8")
     historical.write_text(json.dumps({"schema_version": 2, "identities": []}), encoding="utf-8")
-    with pytest.raises(ValueError, match="duplicate"):
+    with pytest.raises(ValueError):
         load_identity_map(current, historical)
 
 

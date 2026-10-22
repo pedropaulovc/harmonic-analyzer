@@ -1056,7 +1056,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "5ff2388a0b31e40967480137cb9e23a7b26db5c00a153d09e9505e86f2ea879e",
+  "currentRegistryMapSha256": "42ae643bfda6f95452d868690b7972c1ebdb7c56a6fabf050b31eb37675f4c81",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-nut-bracket",
