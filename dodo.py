@@ -3186,6 +3186,8 @@ def _paste_sheet_probe_file_deps() -> list[str]:
     script = (SCRIPTS_DIR / "paste_sheet_probe.py").resolve()
     return sorted({
         str(script),
+        str((SCRIPTS_DIR / "_drawing_sheets.py").resolve()),
+        str((SCRIPTS_DIR / "diagnostics" / "_owned_native_session.py").resolve()),
         *_helper_deps(script),
         *_drawing_file_deps("ha_harmonic_analyzer_assembly"),
     })
