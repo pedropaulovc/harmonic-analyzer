@@ -713,8 +713,8 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
         # 1:3 plan view, machine x to the sheet's right.
         return [(0.300 + point[0] / 3.0, 0.180 - point[2] / 3.0) for point in points]
 
-    def pick(_adapter, view, *, label, target_mm, stations):
-        picks[label] = (view, target_mm, stations)
+    def pick(_adapter, view, *, label, stem, target_mm, y_mm, stations_m):
+        picks[label] = (view, stem, target_mm, y_mm, stations_m)
         return f"edge {label}"
 
     def add(_adapter, view, **kwargs):
@@ -732,26 +732,32 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
 
     assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
 
-    count = len(drawing.NAMEPLATE_INSET_PICK_Z_M)
-    assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == count
-    assert len(stations["points"]) == len(stations["names"]) == 2 * count + 2
+    assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == len(
+        drawing.NAMEPLATE_INSET_PICK_Z_M
+    )
+    assert len(stations["points"]) == len(stations["names"]) == 4
     plate_x = drawing.NAMEPLATE_MOUNT_POS[0]
     deck_x = plate_x + drawing.NAMEPLATE_END_INSET
-    for label, target, offset in (
-        ("nameplate lower edge", plate_x, 0),
-        ("deck end", deck_x, count),
+    y_mm = drawing.NAMEPLATE_MOUNT_POS[1]
+    for label, stem, target in (
+        ("nameplate lower edge", "fr-nameplate", plate_x),
+        ("deck end", "fr-harmonic-base", deck_x),
     ):
-        view, target_mm, rows = picks[label]
-        assert view == "B-B"
-        assert target_mm == pytest.approx(target)
-        assert [z for z, _ in rows] == list(drawing.NAMEPLATE_INSET_PICK_Z_M)
-        for (z, sheet_xy), point in zip(rows, stations["points"][offset:]):
-            assert point == pytest.approx((target / 1000.0, point[1], z))
-            assert sheet_xy == pytest.approx((0.300 + target / 3000.0, 0.180 - z / 3.0))
+        assert picks[label] == (
+            "B-B",
+            stem,
+            pytest.approx(target),
+            pytest.approx(y_mm),
+            drawing.NAMEPLATE_INSET_PICK_Z_M,
+        )
     assert added["view"] == "B-B"
     # The dimension spans exactly the read-back edges; the value check stays.
     assert added["entities"] == ("edge nameplate lower edge", "edge deck end")
     first_z = drawing.NAMEPLATE_INSET_PICK_Z_M[0]
+    assert stations["points"][:2] == [
+        pytest.approx((plate_x / 1000.0, y_mm / 1000.0, first_z)),
+        pytest.approx((deck_x / 1000.0, y_mm / 1000.0, first_z)),
+    ]
     assert added["p0"] == pytest.approx(
         (0.300 + plate_x / 3000.0, 0.180 - first_z / 3.0)
     )
@@ -764,8 +770,8 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     text_z = drawing.NAMEPLATE_INSET_TEXT_Z_M
     assert text_z * 1000.0 > drawing.BOTTOM_WIDTH / 2.0
     assert stations["points"][-2:] == [
-        pytest.approx((plate_x / 1000.0, stations["points"][0][1], text_z)),
-        pytest.approx((deck_x / 1000.0, stations["points"][0][1], text_z)),
+        pytest.approx((plate_x / 1000.0, y_mm / 1000.0, text_z)),
+        pytest.approx((deck_x / 1000.0, y_mm / 1000.0, text_z)),
     ]
     assert added["text_xy"] == pytest.approx(
         (
@@ -776,93 +782,219 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
 
 
-def _scripted_inset_picks(monkeypatch, readings):
+def _scripted_inset_edges(monkeypatch, candidates, readback):
+    """Script the model's candidate edges and the selection read-back."""
     logged = []
-    picked = []
+    selected = []
+    events = []
 
-    def read(_adapter, _view, sheet_xy):
-        picked.append(tuple(sheet_xy))
-        return readings[len(picked) - 1]
+    def find(_adapter, _view, *, stem, target_mm, y_mm):
+        return list(candidates)
 
-    monkeypatch.setattr(drawing, "_read_inset_pick", read)
+    def select(_adapter, view, kind, xy, *, label, entity=None):
+        selected.append((view, kind, xy, label, entity))
+        return entity
+
+    monkeypatch.setattr(drawing, "_inset_edge_candidates", find)
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(drawing, "_read_selected_inset_edge", lambda _adapter: readback)
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
-    return logged, picked
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    return logged, selected, events
 
 
-INSET_STATIONS = ((0.025, (0.1, 0.2)), (0.020, (0.1, 0.21)), (0.030, (0.1, 0.19)))
+INSET_STATIONS = (0.025, 0.020, 0.030)
 
 
-def test_an_inset_pick_off_target_moves_along_z_and_logs_both_readings(
+def test_a_segmented_inset_edge_resolves_at_the_first_unambiguous_station(
     monkeypatch,
 ) -> None:
-    logged, picked = _scripted_inset_picks(
+    # Station z 25 lies on two segments' shared end; z 20 on exactly one.
+    candidates = [
+        ("segment south", "fr-nameplate-1", (-0.040, 0.025)),
+        ("segment north", "fr-nameplate-1", (0.025, 0.040)),
+    ]
+    logged, selected, events = _scripted_inset_edges(
         monkeypatch,
-        [
-            ("near line", "fr-frame-1/fr-nameplate-1", (161.666, 161.666)),
-            ("target", "fr-frame-1/fr-nameplate-1", (163.01, 162.99)),
-        ],
+        candidates,
+        ("selected south", "fr-frame-1/fr-nameplate-1", (163.01, 162.99)),
     )
     edge = drawing._pick_inset_edge(
-        None, "B-B", label="plate", target_mm=163.0, stations=INSET_STATIONS
+        None,
+        "B-B",
+        label="plate",
+        stem="fr-nameplate",
+        target_mm=163.0,
+        y_mm=52.3,
+        stations_m=INSET_STATIONS,
     )
-    assert edge == "target"
-    assert picked == [(0.1, 0.2), (0.1, 0.21)]
-    assert len(logged) == 2
-    assert "z 25 mm" in logged[0] and "machine x 161.666/161.666 mm" in logged[0]
-    assert logged[0].endswith("-> miss")
-    assert "z 20 mm" in logged[1] and "machine x 163.010/162.990 mm" in logged[1]
-    assert logged[1].endswith("-> hit")
+    assert edge == "selected south"
+    assert selected == [("B-B", "EDGE", None, "plate", "segment south")]
+    assert len(logged) == 1
+    assert "fr-nameplate-1 z 20 mm" in logged[0]
+    assert "machine x 163.010/162.990 mm" in logged[0]
+    assert logged[0].endswith("-> hit")
+    assert events == [
+        (
+            "drawing.inset_edge",
+            {
+                "label": "plate",
+                "instance": "fr-nameplate-1",
+                "owner": "fr-frame-1/fr-nameplate-1",
+                "station_z_mm": 20.0,
+                "candidates": 2,
+                "machine_x_mm": (163.01, 162.99),
+                "hit": True,
+            },
+        )
+    ]
 
 
-def test_inset_picks_that_never_reach_the_target_fail_naming_every_reading(
+def test_inset_edges_spanning_no_station_alone_fail_naming_every_candidate(
     monkeypatch,
 ) -> None:
-    logged, _ = _scripted_inset_picks(
-        monkeypatch,
-        [
-            ("near line", "fr-frame-1/fr-harmonic-base-1", (168.334, 168.334)),
-            (None, "selection type 5", None),
-            # One end on target is not enough: the edge must lie along z there.
-            ("slant", "fr-frame-1/fr-harmonic-base-1", (167.0, 170.0)),
-        ],
-    )
+    candidates = [
+        ("a", "fr-harmonic-base-1", (0.0, 0.010)),
+        ("b", "fr-harmonic-base-1", (0.015, 0.040)),
+        ("c", "fr-harmonic-base-1", (0.015, 0.040)),
+    ]
+    logged, selected, _events = _scripted_inset_edges(monkeypatch, candidates, None)
     with pytest.raises(RuntimeError) as failure:
         drawing._pick_inset_edge(
-            None, "B-B", label="deck end", target_mm=167.0, stations=INSET_STATIONS
+            None,
+            "B-B",
+            label="deck end",
+            stem="fr-harmonic-base",
+            target_mm=167.0,
+            y_mm=52.3,
+            stations_m=INSET_STATIONS,
         )
     message = str(failure.value)
-    assert "no pick lies at machine x 167 mm" in message
-    assert "machine x 168.334/168.334 mm" in message
-    assert "selection type 5" in message
-    assert "machine x 167.000/170.000 mm" in message
-    assert len(logged) == 3 and all(line.endswith("-> miss") for line in logged)
+    assert "exactly one fr-harmonic-base edge at machine x 167 mm, y 52.3 mm" in message
+    assert "fr-harmonic-base-1 z 0..10 mm" in message
+    assert "fr-harmonic-base-1 z 15..40 mm" in message
+    assert selected == [] and logged == []
 
 
-class _InsetPickDraw:
-    """A drawing whose zoomed coordinate pick returns one scripted object."""
+def test_an_inset_edge_read_back_off_target_fails_the_sheet(monkeypatch) -> None:
+    logged, selected, events = _scripted_inset_edges(
+        monkeypatch,
+        [("edge", "fr-harmonic-base-1", (-0.040, 0.040))],
+        ("edge", "fr-frame-1/fr-harmonic-base-1", (168.334, 168.334)),
+    )
+    with pytest.raises(RuntimeError, match="reads .*168.334/168.334 mm, not machine x 167 mm"):
+        drawing._pick_inset_edge(
+            None,
+            "B-B",
+            label="deck end",
+            stem="fr-harmonic-base",
+            target_mm=167.0,
+            y_mm=52.3,
+            stations_m=INSET_STATIONS,
+        )
+    assert len(selected) == 1 and logged[0].endswith("-> miss")
+    assert events[0][1]["hit"] is False
+
+
+def _inset_model_adapter(monkeypatch, components):
+    """An adapter whose section view references an assembly of ``components``."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
+    model = SimpleNamespace(GetComponents=lambda _top: list(components))
+    view = SimpleNamespace(ReferencedDocument=model)
+
+    def attempt(call, default=None):
+        try:
+            return call()
+        except Exception:
+            return default
+
+    return SimpleNamespace(_attempt=attempt), view
+
+
+def _line(key):
+    return SimpleNamespace(key=key, GetCurve=lambda: SimpleNamespace(IsLine=lambda: True))
+
+
+def _inset_component(stem, name, values, edges, *, suppressed=False):
+    component = _Full(values)
+    component.Name2 = name
+    component.GetPathName = lambda: f"C:/out/{stem}.SLDPRT"
+    component.IsSuppressed = lambda: suppressed
+    body = SimpleNamespace(GetEdges=lambda: list(edges))
+    component.GetBodies3 = lambda _kind: ([body], None)
+    return component
+
+
+def test_inset_edge_candidates_are_the_stems_lines_on_the_target_x_and_y(
+    monkeypatch,
+) -> None:
+    # Component-local x 0.150 m, moved +13 mm along machine x: 163 mm; the
+    # plate's lower edges at y 52.3 mm on both faces, one split in two.
+    shift = (1, 0, 0, 0, 1, 0, 0, 0, 1, 0.013, 0.0, 0.0, 1.0, 0, 0, 0)
+    on_target = _line((0.150, 0.0523, -0.040, 0.150, 0.0523, 0.040))
+    south_half = _line((0.150, 0.0523, -0.040, 0.150, 0.0523, 0.0))
+    top_face = _line((0.150, 0.0553, -0.040, 0.150, 0.0553, 0.040))
+    slant = _line((0.150, 0.0523, -0.040, 0.153, 0.0523, 0.040))
+    arc = SimpleNamespace(
+        key=(0.150, 0.0523, 0.0, 0.150, 0.0523, 0.040),
+        GetCurve=lambda: SimpleNamespace(IsLine=lambda: False),
+    )
+    unreadable = SimpleNamespace(
+        key=None, GetCurve=lambda: SimpleNamespace(IsLine=lambda: True)
+    )
+    plate = _inset_component(
+        "fr-nameplate",
+        "fr-nameplate-1",
+        shift,
+        [top_face, on_target, slant, arc, unreadable, south_half],
+    )
+    base = _inset_component(
+        "fr-harmonic-base",
+        "fr-harmonic-base-1",
+        shift,
+        [_line((0.150, 0.0523, -0.040, 0.150, 0.0523, 0.040))],
+    )
+    ghost = _inset_component(
+        "fr-nameplate", "fr-nameplate-2", shift, [on_target], suppressed=True
+    )
+    adapter, view = _inset_model_adapter(monkeypatch, [base, plate, ghost])
+
+    found = drawing._inset_edge_candidates(
+        adapter, view, stem="fr-nameplate", target_mm=163.0, y_mm=52.3
+    )
+
+    assert [(edge, name) for edge, name, _z in found] == [
+        (on_target, "fr-nameplate-1"),
+        (south_half, "fr-nameplate-1"),
+    ]
+    assert found[0][2] == pytest.approx((-0.040, 0.040))
+    assert found[1][2] == pytest.approx((-0.040, 0.0))
+    assert plate.reads == 1 and base.reads == 0 and ghost.reads == 0
+
+
+def test_a_shown_inset_component_without_a_body_fails(monkeypatch) -> None:
+    plate = _inset_component("fr-nameplate", "fr-nameplate-1", None, [])
+    plate.GetBodies3 = lambda _kind: (None, None)
+    adapter, view = _inset_model_adapter(monkeypatch, [plate])
+    with pytest.raises(RuntimeError, match="'fr-nameplate-1' resolves no solid body"):
+        drawing._inset_edge_candidates(
+            adapter, view, stem="fr-nameplate", target_mm=163.0, y_mm=52.3
+        )
+
+
+class _InsetSelection:
+    """A drawing whose selection manager holds one scripted object."""
 
     def __init__(self, picked, kind) -> None:
         self.picked, self.kind = picked, kind
         self.calls = []
-        self.Extension = self
         self.SelectionManager = self
-
-    def ActivateView(self, name):  # noqa: N802
-        self.calls.append(("activate", name))
-        return True
 
     def ClearSelection2(self, _all):  # noqa: N802
         self.calls.append(("clear",))
-
-    def ViewZoomTo2(self, *box):  # noqa: N802
-        self.calls.append(("zoom", box))
-
-    def ViewZoomtofit2(self):  # noqa: N802
-        self.calls.append(("fit",))
-
-    def SelectByID2(self, name, kind, x, y, *_rest):  # noqa: N802
-        self.calls.append(("select", kind, x, y))
-        return self.picked is not None
 
     def GetSelectedObjectCount2(self, _mark):  # noqa: N802
         return 2  # the view, then the edge
@@ -876,11 +1008,10 @@ class _InsetPickDraw:
         return self.picked
 
 
-def _inset_pick_adapter(monkeypatch, picked, kind=1):
+def _inset_selection_adapter(monkeypatch, picked, kind=1):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
     monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
-    draw = _InsetPickDraw(picked, kind)
+    draw = _InsetSelection(picked, kind)
 
     def attempt(call, default=None):
         try:
@@ -891,43 +1022,31 @@ def _inset_pick_adapter(monkeypatch, picked, kind=1):
     return SimpleNamespace(currentModel=draw, _attempt=attempt), draw
 
 
-def test_an_inset_pick_reads_back_its_edge_in_machine_x(monkeypatch) -> None:
+def test_a_selected_inset_edge_reads_back_in_machine_x(monkeypatch) -> None:
     # Component-local x 0.150 m, moved +13 mm along machine x: 163 mm.
     plate = _Full((1, 0, 0, 0, 1, 0, 0, 0, 1, 0.013, 0.0, 0.0, 1.0, 0, 0, 0))
     plate.Name2 = "fr-frame-1/fr-nameplate-1"
     edge = SimpleNamespace(
         key=(0.150, 0.0523, 0.010, 0.150, 0.0523, 0.040), GetComponent=lambda: plate
     )
-    adapter, draw = _inset_pick_adapter(monkeypatch, edge)
+    adapter, draw = _inset_selection_adapter(monkeypatch, edge)
 
-    picked, owner, xs = drawing._read_inset_pick(adapter, "B-B", (0.1, 0.2))
+    picked, owner, xs = drawing._read_selected_inset_edge(adapter)
 
     assert picked is edge and owner == "fr-frame-1/fr-nameplate-1"
     assert xs == pytest.approx((163.0, 163.0))
-    half = drawing._HIT_ZOOM_HALF
-    # Zoomed onto the station for the pick, back to fit before the read-back.
-    assert draw.calls[:5] == [
-        ("activate", "B-B"),
-        ("clear",),
-        ("zoom", (0.1 - half, 0.2 - half, 0.0, 0.1 + half, 0.2 + half, 0.0)),
-        ("select", "EDGE", 0.1, 0.2),
-        ("fit",),
-    ]
+    assert draw.calls == [("clear",)]
 
 
-def test_an_inset_pick_that_is_not_a_component_edge_reads_no_x(monkeypatch) -> None:
+def test_a_selection_that_is_not_a_component_edge_reads_no_x(monkeypatch) -> None:
     orphan = SimpleNamespace(key=(0.0,) * 6, GetComponent=lambda: None)
     for picked, kind, reason in (
-        (None, 1, "no edge"),
+        (None, 1, "selection type 1"),
         ("silhouette", 11, "selection type 11"),
         (orphan, 1, "edge without a component"),
     ):
-        adapter, _ = _inset_pick_adapter(monkeypatch, picked, kind)
-        assert drawing._read_inset_pick(adapter, "B-B", (0.1, 0.2)) == (
-            None,
-            reason,
-            None,
-        )
+        adapter, _ = _inset_selection_adapter(monkeypatch, picked, kind)
+        assert drawing._read_selected_inset_edge(adapter) == (None, reason, None)
 
 
 def test_height_dimensions_stand_clear_of_the_cutting_plane_letters() -> None:
