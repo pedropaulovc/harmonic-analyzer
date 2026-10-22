@@ -13,6 +13,7 @@ import build_ch_rocker_arm as rocker_part
 import build_ch_rocker_strap as part
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 import ch_rocker_strap_notes as notes
 import ch_rocker_strap_spec as spec
@@ -43,20 +44,20 @@ def test_outline_is_the_finished_rocker_strap() -> None:
     # Same frame and the same vertices as MHA-CH-06's strap profile.
     assert spec.HOLE_DIA == rocker.HUB_DIA
     assert spec.PIVOT_MID_Y == rocker_interface.PIVOT_MID_Y
-    assert spec.ROD_TIP_X == rocker.ROD_TIP_X
-    assert spec.BOT_END_X == rocker.BOT_END_X
+    assert spec.ROD_TIP_X == rocker_outline.ROD_TIP_X
+    assert spec.BOT_END_X == rocker_outline.BOT_END_X
     assert spec.BOT_END_Y == pytest.approx(
         rocker_interface.CENTER_Y
-        - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2)
+        - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker_outline.BOT_END_X**2)
     )
     assert spec.ROD_TIP_Y < spec.TOP_END_Y
     # The tip land runs along the top arc's radius.
     tip_radius = math.hypot(spec.ROD_TIP_X, spec.ROD_TIP_Y - spec.CENTER_Y)
-    assert tip_radius == pytest.approx(rocker.R_TOP + rocker.TIP_FACE)
+    assert tip_radius == pytest.approx(rocker_outline.R_TOP + rocker_outline.TIP_FACE)
     assert spec.strap_area() == pytest.approx(rocker_part._strap_area(), rel=1e-9)
     assert part.V_STRAP == pytest.approx(
         (spec.strap_area() - math.pi * (spec.HOLE_DIA / 2.0) ** 2)
-        * rocker.ARM_THICKNESS
+        * rocker_outline.ARM_THICKNESS
     )
     # The hub hole's walls (rule 17), each edge at the worst end of its band
     # against the H7 hole's top limit: both edges are held from the hole, so
@@ -101,7 +102,7 @@ def test_every_band_is_native_and_names_its_mate() -> None:
         ("StrapProfile", "BottomBelowPivot"): "*deviations(BOTTOM_EDGE_BAND)",
     }
     assert spec.ARM_THICKNESS_BAND == rocker.ARM_THICKNESS_BAND == (0.025, -0.025)
-    assert spec.TOP_EDGE_BAND == rocker.TOP_EDGE_BAND
+    assert spec.TOP_EDGE_BAND == rocker_outline.TOP_EDGE_BAND
     # The bottom edge's band mirrors the top's: the finished part's lower
     # profile zone, wholly in material.
     assert spec.BOTTOM_EDGE_BAND == (0.0, -0.5)

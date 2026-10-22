@@ -33,6 +33,7 @@ _PURE_PREFIXES = (
 )
 _PURE_MODULES = frozenset(
     {"stock_form_cutter", "_gear", "_tolerances", "_printed_tolerance",
+     "_printed_angular_tolerance", "_printed_drilled_tolerance",
      "_fit_bands", "_chain", "_config"}
 )
 _SEAT_PARAMETERS = frozenset({"adapter", "model", "view", "doc", "drawing_model", "display"})

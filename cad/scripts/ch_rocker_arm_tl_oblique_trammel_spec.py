@@ -15,7 +15,7 @@ This module is the one pure calculator: it derives every value marked ⚙ on
 the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
 
 * the strap's edge radii and the hub-to-top-edge aim, read from
-  ``ch_rocker_arm_spec`` (R800/R816; ``TOP_EDGE_ABOVE_PIVOT`` (the strap's
+  ``ch_rocker_arm_outline_spec`` (R800/R816; ``TOP_EDGE_ABOVE_PIVOT`` (the strap's
   ``PIVOT_MID_Y``) plus the mid-point of ``TOP_EDGE_BAND`` = 8.25);
 * the two cutters, both on hand in inventory ``tools.endmills-lms-6784``:
   the 3/8 in four-flute end mill for the part and the 9/16 in one for the
@@ -95,7 +95,7 @@ import math
 from dataclasses import dataclass
 
 from _printed_tolerance import printed_band_mm
-import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker
 import _rocker_interface as rocker_interface
 
 INCH = 25.4

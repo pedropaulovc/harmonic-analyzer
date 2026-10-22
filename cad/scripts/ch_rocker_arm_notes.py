@@ -14,13 +14,13 @@ import math
 
 from _printed_tolerance import printed_band_mm
 from ch_pivot_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
+from ch_rocker_arm_outline_spec import R_TOP
 from ch_rocker_arm_spec import (
     HUB_COAXIALITY_DIA,
     HUB_DIA,
     HUB_ROOT_RADIUS_MAX,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
-    R_TOP,
 )
 from ch_rod_pivot_pin_spec import BUDGET as ROD_JOINT_BUDGET
 
@@ -162,7 +162,7 @@ STRAP_FIT_CALLOUT = (
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
 # line breaks print as one run).
 HUB_LENGTH_CALLOUT = "SETS ARM PITCH:\n20X STACK ON\nMHA-CH-05"
-# The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
+# The amplitude bar's foot rides the top edge (ch_rocker_arm_outline_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
 TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"
 # The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-10 pin runs

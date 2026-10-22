@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 import _bore_axis
+import _configuration_visibility
 import _part_save
 import _rebuild
 import _visibility
@@ -312,14 +313,18 @@ def test_every_configuration_is_checked_with_itself_active(
     )
     adapter = SimpleNamespace(currentModel=model)
     with pytest.raises(RuntimeError, match=r"\[T006\].*axis 'Axis1'") as caught:
-        _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+        _configuration_visibility.assert_reference_geometry_hidden_in_every_configuration(
+            adapter, "cone"
+        )
     assert "[T012]" not in str(caught.value)
     assert model.shows == ["T006", "T012", "T120"]
     assert model.active == "T120"
 
     model.shown["T006"] = []
     model.shows.clear()
-    _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    _configuration_visibility.assert_reference_geometry_hidden_in_every_configuration(
+        adapter, "cone"
+    )
     assert model.active == "T120"
 
 
@@ -380,8 +385,15 @@ def test_blank_sketch_feature_fails_when_the_blank_does_not_take() -> None:
         _visibility.blank_sketch_feature(model, sketch, "hole")
 
 
-def test_both_hole_wizard_helpers_hide_their_placement_sketch() -> None:
-    tree = ast.parse((SCRIPTS / "_holes.py").read_text(encoding="utf-8"))
+@pytest.mark.parametrize(
+    ("module", "helper"),
+    [
+        ("_holes", "wizard_holes"),
+        ("_cylindrical_holes", "wizard_hole_on_cylinder"),
+    ],
+)
+def test_both_hole_wizard_helpers_hide_their_placement_sketch(module, helper) -> None:
+    tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
     callers = {
         node.name
         for node in ast.walk(tree)
@@ -390,7 +402,7 @@ def test_both_hole_wizard_helpers_hide_their_placement_sketch() -> None:
         if isinstance(call, ast.Call)
         and getattr(call.func, "id", None) == "blank_sketch_feature"
     }
-    assert {"wizard_holes", "wizard_hole_on_cylinder"} <= callers
+    assert helper in callers
 
 
 def test_every_standalone_save_path_runs_the_check() -> None:

@@ -110,23 +110,25 @@ from sm_summing_lever_spec import (
     DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
-    HEX_H,
-    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_FIRST,
     HOLE_Z_LAST,
-    KNIFE_RIDGE_R,
-    KNIFE_RIDGE_R_TOL_TYPE,
-    KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_W,
     RIB_REACH,
-    RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
+)
+from sm_knife_contact import (
+    HEX_H,
+    HEX_W,
+    KNIFE_RIDGE_R,
+    KNIFE_RIDGE_R_TOL_TYPE,
+    KNIFE_RIDGE_TANGENT_XY,
+    RIDGE_ANGLE_DEG,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.

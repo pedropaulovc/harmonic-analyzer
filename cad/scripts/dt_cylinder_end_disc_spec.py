@@ -11,7 +11,8 @@ a north disc.
 
 from __future__ import annotations
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from dt_cylinder_end_disc_clearance import clearance_budget
 
 WASHER_OD = 55.0

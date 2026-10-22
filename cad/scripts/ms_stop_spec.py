@@ -16,7 +16,8 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from _mcmaster_90114a124 import (
     LENGTH as PLATE_SCREW_LENGTH,
     MAJOR_DIA as PLATE_SCREW_MAJOR_DIA,

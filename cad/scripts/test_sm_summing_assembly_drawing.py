@@ -108,7 +108,9 @@ def test_explode_moves_only_contracted_families_with_split_stations() -> None:
 def test_station_slide_clears_the_hex_trunnion() -> None:
     slide = {station: d for _, _, station, axis, d in explode.EXPLODE_STEPS if station}
     assert slide["front"] > 0.0 > slide["back"]
-    mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
+    from sm_knife_mount_interface import SUPPORT_Z_THICK
+
+    mount_inner_face = builder.HEX_Z_MID - SUPPORT_Z_THICK / 2.0
     for distance in slide.values():
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
 

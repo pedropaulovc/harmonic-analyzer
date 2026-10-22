@@ -37,7 +37,8 @@ parenthesised reference (``REFERENCE_DIMENSIONS``).
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, NUMBER_DRILL_MM, THREAD_MAJOR_MM
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from pn_pen_rod_spec import STUD_ENGAGEMENT, STUD_TAP_SPEC, STUD_THREAD
 from _mg_wheel_rim_geometry import PEN_WIRE_DIA
 import pn_vn_pen_adjust_nut_spec as jam_nut

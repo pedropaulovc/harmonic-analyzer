@@ -10,8 +10,10 @@ import pytest
 import _config
 import build_sm_knife_mount as part
 import draw_sm_knife_mount as drawing
+import sm_knife_mount_interface as mount_interface
 import sm_knife_mount_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -118,9 +120,9 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert "PinHoleDepth" not in drawing.TOP_KEEP
     (start, end) = drawing.SECTION_LINE_MODEL_MM
     assert start[2] == end[2] == 0.0
-    assert start[0] < -sm_knife_mount_spec.BLK_HALF_X
-    assert end[0] > sm_knife_mount_spec.BLK_HALF_X
-    assert start[0] < -sm_knife_mount_spec.PIN_HOLE_X < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
+    assert start[0] < -mount_interface.BLK_HALF_X
+    assert end[0] > mount_interface.BLK_HALF_X
+    assert start[0] < -mount_interface.PIN_HOLE_X < 0.0 < mount_interface.PIN_HOLE_X < end[0]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_section_view(") == 1
     assert "_look_section_along_minus_z(adapter, section)" in source
@@ -130,7 +132,7 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     # The depth text stands right of the cut block, level with the hole.
     x, y = drawing.SECTION_KEEP["PinHoleDepth"]
     scale = drawing.SHEET_SCALE[0] / 1000.0
-    assert x > drawing.SECTION_CENTER[0] + sm_knife_mount_spec.BLK_HALF_X * scale
+    assert x > drawing.SECTION_CENTER[0] + mount_interface.BLK_HALF_X * scale
     top_y = drawing._section_y(sm_knife_mount_spec.BLK_TOP)
     floor_y = drawing._section_y(
         sm_knife_mount_spec.BLK_TOP - sm_knife_mount_spec.PIN_HOLE_DEPTH
@@ -144,7 +146,7 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
     # wholly right of the block's +X face, and the shoulder's near end stands
     # below the hole centre so the leader climbs to the hole rim.
     x, y = drawing.TOP_KEEP["PinHoleDia"]
-    face_x = drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
+    face_x = drawing._sheet_x(mount_interface.BLK_HALF_X)
     shoulder_x, shoulder_y = drawing.PIN_CALLOUT_SHOULDER_START
     assert shoulder_x > face_x
     shoulder_start_x = (
@@ -400,7 +402,7 @@ def test_dowel_frame_leader_lands_apart_from_the_dowel_diameter_leader() -> None
     assert math.dist(run_elbow, run_frame_elbow) < 0.0003
     assert run_frame_top - frame_top == pytest.approx(0.005)
     elbow = (frame_left - 0.00635, frame_top - drawing.PIN_FRAME_SIZE[1] / 2.0)
-    centre = (drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X), drawing.TOP_CENTER[1])
+    centre = (drawing._sheet_x(mount_interface.PIN_HOLE_X), drawing.TOP_CENTER[1])
     rim = sm_knife_mount_spec.PIN_HOLE_DIA / 2.0 * drawing.SHEET_SCALE[0] / 1000.0
     assert math.dist(centre, run_dia_tip) == pytest.approx(rim, abs=0.0002)
     angle = math.radians(drawing.PIN_FRAME_RIM_DEG)
@@ -429,7 +431,7 @@ def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
     # is drawn as one arrow on the near rim.
     height_x, _ = drawing.FRONT_KEEP["BlockHeight"]
     x, y = drawing.FRONT_KEEP["BoreDia"]
-    face_x = drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    face_x = drawing._sheet_x(-mount_interface.BLK_HALF_X)
     assert x - drawing.BORE_DIA_TEXT_HALF_WIDTH > height_x + 0.005
     assert x + drawing.BORE_DIA_TEXT_HALF_WIDTH < face_x - 0.005
     # Above the bore centre, so the leader descends to the upper-left rim.
@@ -451,9 +453,8 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     # only (the marks carry the exact values); assert they track the build's
     # actual (assembly-derived) geometry to <0.05 mm so they cannot drift.
     assert sm_knife_mount_spec.R_BORE == part.R_BORE
-    assert sm_knife_mount_spec.SUPPORT_Z_THICK == part.SUPPORT_Z_THICK
     # The block's width is the spec's alone: the build imports it.
-    assert sm_knife_mount_spec.BLK_HALF_X == part.BLK_HALF_X == 12.7
+    assert mount_interface.BLK_HALF_X == part.BLK_HALF_X == 12.7
     assert abs(sm_knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.005
     assert abs(sm_knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
     assert abs(sm_knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
@@ -468,9 +469,9 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
     # Dowel holes: one each side of the tap at +/-7.632 (the printed BASIC
     # span 15.264), printed places and the volume the build's gate expects.
-    assert sm_knife_mount_spec.PIN_HOLE_X == 7.632
-    assert sm_knife_mount_spec.PIN_HOLE_XS == (-7.632, 7.632)
-    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 15.264
+    assert mount_interface.PIN_HOLE_X == 7.632
+    assert mount_interface.PIN_HOLE_XS == (-7.632, 7.632)
+    assert mount_interface.PIN_HOLE_SPAN == 15.264
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
         "BlockWidth": 1,
         "BlockHeight": 1,
@@ -601,8 +602,8 @@ def test_native_gdt_and_bore_geometry() -> None:
     # before B attaches).  R5: the below-frame quantity moved B's tag 5.6 mm
     # off its place, so no frame takes ``quantity=`` any more.
     assert drawing.PIN_FRAME_QUANTITY == sm_knife_mount_spec.PIN_HOLE_PAIR_CALLOUT
-    assert drawing.PIN_FRAME_QUANTITY == f"{sm_knife_mount_spec.PIN_HOLE_COUNT}X"
-    assert sm_knife_mount_spec.PIN_HOLE_COUNT == 2
+    assert drawing.PIN_FRAME_QUANTITY == f"{mount_interface.PIN_HOLE_COUNT}X"
+    assert mount_interface.PIN_HOLE_COUNT == 2
     assert drawing._GTOL_TEXT_CALLOUT_ABOVE == 3  # swGTolTextCalloutAbove
     assert "quantity=PIN_FRAME_QUANTITY" not in source
     assert not any(
@@ -641,7 +642,7 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert drawing.PIN_FRAME_QUANTITY_TOP_CLEARANCE >= TEXT_SEPARATION_HEIGHTS * 0.0035
     assert drawing.PIN_FRAME_QUANTITY_SECTION_CLEARANCE == pytest.approx(0.0165)
     section_end_x = drawing._sheet_x(
-        sm_knife_mount_spec.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
+        mount_interface.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
     )
     assert drawing.PIN_FRAME_XY[0] - section_end_x == pytest.approx(0.0026)
     # B keeps its proven tag placement: 5 mm of stem under the frame's
@@ -670,8 +671,8 @@ def test_native_gdt_and_bore_geometry() -> None:
     ("label", "basic"),
     (
         ("knife-bore centre from top seat", part.BORE_CENTRE_DEPTH),
-        ("dowel hole span", sm_knife_mount_spec.PIN_HOLE_SPAN),
-        ("dowel hole from tap axis", sm_knife_mount_spec.PIN_HOLE_X),
+        ("dowel hole span", mount_interface.PIN_HOLE_SPAN),
+        ("dowel hole from tap axis", mount_interface.PIN_HOLE_X),
     ),
 )
 def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float) -> None:
@@ -719,7 +720,7 @@ def test_part_stamps_make_critical_properties() -> None:
 def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
     import math
 
-    from sm_summing_lever_spec import HEX_H, HEX_W
+    from sm_knife_contact import HEX_H, HEX_W
 
     assert part.R_BORE == 6.0
     assert abs(part.BLK_BOT - (-14.75)) < 1e-9
@@ -766,7 +767,7 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
 
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN > HANGER_REACH_MAX
     bare_deepest_thread = (
-        sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH + sm_knife_mount_spec._XX
+        sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH + printed_band_mm(2)
     )
     shallowest_drill = (
         sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH
@@ -814,7 +815,8 @@ def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point
     # accepted.
     # The point, dimensioned 118° on the callout, takes the title block's
     # angular +/-1: its sharpest, 117°, stands tallest.
-    from _printed_tolerance import angular_band_deg, drilled_oversize_mm
+    from _printed_angular_tolerance import angular_band_deg
+    from _printed_drilled_tolerance import drilled_oversize_mm
 
     spec = sm_knife_mount_spec
     assert spec.STUD_TAP_DRILL == "#25"
@@ -972,20 +974,20 @@ def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
     # BASIC span over the top view (clear of the dowel frame's leader under
     # it, and of the span's arrows); the row 7.0 .X from the front face, left
     # of the view.
-    assert sm_knife_mount_spec.PIN_HOLE_SIDE_DISTANCE == pytest.approx(
-        sm_knife_mount_spec.BLK_HALF_X - sm_knife_mount_spec.PIN_HOLE_X
+    assert mount_interface.PIN_HOLE_SIDE_DISTANCE == pytest.approx(
+        mount_interface.BLK_HALF_X - mount_interface.PIN_HOLE_X
     )
-    assert sm_knife_mount_spec.HOLE_ROW_FACE_DISTANCE == pytest.approx(
-        sm_knife_mount_spec.SUPPORT_Z_THICK / 2.0
+    assert mount_interface.HOLE_ROW_FACE_DISTANCE == pytest.approx(
+        mount_interface.SUPPORT_Z_THICK / 2.0
     )
     top_view_top = drawing.TOP_CENTER[1] + drawing.TOP_HALF_Z
     side_x, side_y = drawing.PIN_SIDE_TEXT_XY
     assert side_y > top_view_top
     assert side_y >= drawing.PIN_SPAN_TEXT_XY[1] + 0.006
-    assert drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X) < side_x
-    assert side_x < drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
+    assert drawing._sheet_x(mount_interface.PIN_HOLE_X) < side_x
+    assert side_x < drawing._sheet_x(mount_interface.BLK_HALF_X)
     row_x, _ = drawing.ROW_FACE_TEXT_XY
-    assert row_x < drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    assert row_x < drawing._sheet_x(-mount_interface.BLK_HALF_X)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in ("dowel hole from side face", "hole row from front face"):
         assert f'_set_sheet_precision(side, label="{label}")' in source or (
@@ -1000,11 +1002,11 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
     # 7.632 from the -X dowel axis; its boxed value parks left of that axis,
     # over the section's top seat.
-    assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(
-        sm_knife_mount_spec.PIN_HOLE_SPAN / 2.0
+    assert mount_interface.PIN_HOLE_X == pytest.approx(
+        mount_interface.PIN_HOLE_SPAN / 2.0
     )
     section_top = drawing._section_y(sm_knife_mount_spec.BLK_TOP)
-    pin_x = drawing._section_x(-sm_knife_mount_spec.PIN_HOLE_X)
+    pin_x = drawing._section_x(-mount_interface.PIN_HOLE_X)
     text_x, text_y = drawing.TAP_STATION_TEXT_XY
     assert pin_x < text_x < drawing._section_x(0.0)
     assert text_y > section_top

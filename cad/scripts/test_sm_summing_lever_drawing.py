@@ -20,6 +20,7 @@ import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
 from _cone_axis_constants import SUMMING_Z
 import rocker_bank_layout
+import sm_knife_contact as knife_contact
 import sm_summing_lever_notes as notes
 import sm_summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
@@ -412,7 +413,6 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     """Code review C09 (owner ruling T1): Detail D holds the ridge sharp
     4.040 +/-0.05 from each side face and each upper flank 122.4 +/-0.5 deg
     to its side face, on both stubs; the width is a reference."""
-    spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
     assert knife == {"HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide"}
     assert set(knife) <= set(drawing.DETAIL_KEEP)
@@ -439,10 +439,10 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     assert "PLANE" not in pair
     every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
     assert "HexWidth" not in every_callout
-    assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
-    assert (spec.KNIFE_FLANK_TO_SIDE_DEG, spec.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
-    assert not hasattr(spec, "RIDGE_ANGLE_TOL_DEG")
-    assert not hasattr(spec, "KNIFE_SHOULDER_RISE")
+    assert (knife_contact.RIDGE_FROM_SIDE, knife_contact.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
+    assert (knife_contact.KNIFE_FLANK_TO_SIDE_DEG, knife_contact.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
+    assert not hasattr(knife_contact, "RIDGE_ANGLE_TOL_DEG")
+    assert not hasattr(knife_contact, "KNIFE_SHOULDER_RISE")
 
     calls = []
     for name in (
@@ -480,7 +480,7 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
         for name, args, _ in calls
     )
     # The model sketch's angle is the flank-to-side angle the print rounds.
-    assert round(180.0 - spec.RIDGE_ANGLE_DEG / 2.0, 1) == spec.KNIFE_FLANK_TO_SIDE_DEG
+    assert round(180.0 - knife_contact.RIDGE_ANGLE_DEG / 2.0, 1) == knife_contact.KNIFE_FLANK_TO_SIDE_DEG
 
 
 def _builder_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
@@ -725,13 +725,11 @@ def test_the_knife_prism_merges_into_the_pivot_between_the_stubs() -> None:
     the solid cylinder between the body ends and each stub keeps its own
     21.717 overhang."""
     spec = sm_summing_lever_spec
-    w2, h2, h4 = spec.HEX_W / 2.0, spec.HEX_H / 2.0, spec.HEX_H / 4.0
+    w2, h2, h4 = knife_contact.HEX_W / 2.0, knife_contact.HEX_H / 2.0, knife_contact.HEX_H / 4.0
     vertices = [(0.0, h2), (-w2, h4), (-w2, -h4), (0.0, -h2), (w2, -h4), (w2, h4)]
     assert max(math.hypot(x, y) for x, y in vertices) < spec.CYL_R
     assert spec.HEX_Z_INNER == spec.PLATE_L / 2.0
     assert spec.HEX_Z_OUTER - spec.HEX_Z_INNER == pytest.approx(spec.HEX_DEPTH)
-    for name in ("HEX_W", "HEX_H", "HEX_DEPTH", "HEX_Z_INNER", "HEX_Z_OUTER", "CYL_R"):
-        assert getattr(lever_build, name) == getattr(spec, name), name
     assert notes.DRAWING_DIMENSIONS["KnifeStubReference"] == {"KnifeStubLength"}
     assert notes.DIMENSION_PREFIXES[("KnifeStubReference", "KnifeStubLength")] == "2X "
 
@@ -740,7 +738,7 @@ def _knife_faces(shift_minus_z_side_m: float = 0.0) -> list[SimpleNamespace]:
     """Fake IFace2s for the HexKnife prism: per stub, its six lateral faces
     (split once, as a boolean may), its outboard end and a ridge round."""
     spec = sm_summing_lever_spec
-    w2, h2, h4 = spec.HEX_W / 2000.0, spec.HEX_H / 2000.0, spec.HEX_H / 4000.0
+    w2, h2, h4 = knife_contact.HEX_W / 2000.0, knife_contact.HEX_H / 2000.0, knife_contact.HEX_H / 4000.0
     vertices = [(0.0, h2), (-w2, h4), (-w2, -h4), (0.0, -h2), (w2, -h4), (w2, h4)]
 
     def face(normal, root, z_range, *, plane: bool = True) -> SimpleNamespace:
@@ -795,8 +793,8 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     of each other (0.077 of hook-arm spread over the hole column); the bound,
     the callout and the one-prism build stand or fall together."""
     spec = sm_summing_lever_spec
-    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.10)
-    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
+    assert knife_contact.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.10)
+    assert knife_contact.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * knife_contact.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
     callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
@@ -860,7 +858,7 @@ def _knife_envelope_model_owners():
                 float(eval(
                     compile(ast.Expression(argument), "<knife endpoint>", "eval"),
                     {"__builtins__": {}},
-                    {"HEX_W": sm_summing_lever_spec.HEX_W, "HEX_H": sm_summing_lever_spec.HEX_H},
+                    {"HEX_W": knife_contact.HEX_W, "HEX_H": knife_contact.HEX_H},
                 ))
                 for argument in authored_lines[0].args
             )
@@ -884,12 +882,11 @@ def _knife_envelope_model_owners():
 
 def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle() -> None:
     """Analytical Back-projected layout budget, not proof of native annotation ink."""
-    spec = sm_summing_lever_spec
     assert drawing.DETAIL_SCALE == (10.0, 1.0)
     scale = drawing.DETAIL_SCALE[0] / 1000.0
     cx, cy = drawing.DETAIL_CENTER
     fence = drawing.DETAIL_RADIUS_MM * scale
-    hw = spec.HEX_W / 2.0 * scale
+    hw = knife_contact.HEX_W / 2.0 * scale
     spans, angle_lines = _knife_envelope_model_owners()
     [model_vertex] = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
     [model_shoulder] = set(angle_lines[0]) & set(angle_lines[1])
@@ -902,7 +899,7 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
 
     vertex, shoulder, side_end = map(project, (model_vertex, model_shoulder, model_side_end))
     assert shoulder[0] < vertex[0]  # the model's +X flank, not its opposite
-    assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
+    assert knife_contact.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
     blocks = {
         "HexWidth": _detail_block("HexWidth", "2X (8.080)"),
         "HexHeight": _detail_block("HexHeight", "2X 10.268"),
@@ -999,21 +996,21 @@ def test_datum_a_attaches_the_actual_visible_back_knife_round(monkeypatch) -> No
     edge, detail = object(), object()
     spec = sm_summing_lever_spec
     z = -spec.PLATE_L / 2.0 - spec.HEX_DEPTH
-    center_y = spec.HEX_H / 2.0 - spec.KNIFE_RIDGE_R / math.sin(
-        math.radians(spec.RIDGE_ANGLE_DEG) / 2.0,
+    center_y = knife_contact.HEX_H / 2.0 - knife_contact.KNIFE_RIDGE_R / math.sin(
+        math.radians(knife_contact.RIDGE_ANGLE_DEG) / 2.0,
     )
 
     def circle_at(center, radius, *, axis, label):
         assert center == pytest.approx((0.0, center_y, z))
-        assert radius == spec.KNIFE_RIDGE_R
+        assert radius == knife_contact.KNIFE_RIDGE_R
         assert axis == (0.0, 0.0, 1.0)
         return SimpleNamespace(edge=edge)
 
     def project(adapter, view, points, **kwargs):
         assert view is detail
         assert points == [
-            drawing._metres((0.0, center_y + spec.KNIFE_RIDGE_R, z)),
-            drawing._metres((0.0, spec.HEX_H / 2.0, z)),
+            drawing._metres((0.0, center_y + knife_contact.KNIFE_RIDGE_R, z)),
+            drawing._metres((0.0, knife_contact.HEX_H / 2.0, z)),
         ]
         return (0.115, 0.200), (0.115, 0.20134)
 

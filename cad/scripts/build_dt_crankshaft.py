@@ -49,7 +49,8 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_pinion_spec import (

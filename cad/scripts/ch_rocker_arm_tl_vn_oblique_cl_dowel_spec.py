@@ -43,6 +43,7 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -145,7 +146,7 @@ PRESS_ENGAGEMENT_MIN = min(
 )
 CYLINDER_ENGAGEMENT_MIN = TIP_SET_MIN - DOME_H
 STRAP_TOP_CLEARANCE_MIN = (
-    rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1] - TIP_SET_MAX
+    rocker_outline.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1] - TIP_SET_MAX
 )
 # Lower-end projection at the catalogue pin length and finished-plate limits.
 # The pivot-block top plane is a conservative ceiling for the feed hardware

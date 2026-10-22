@@ -236,8 +236,8 @@ from fr_frame_attachment_spec import (
 )
 from _fit_deviations import deviations
 from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
-import sm_knife_mount_spec as KNIFE_MOUNT
-from _printed_tolerance import angular_band_deg
+import sm_knife_mount_interface as KNIFE_MOUNT
+from _printed_angular_tolerance import angular_band_deg
 from ch_vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
 from _mcmaster_90280a837 import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 PIN_LENGTH = 45.0
 # CUSTOM 1:48 self-holding taper (0.9375 on diameter over the 45 mm length),

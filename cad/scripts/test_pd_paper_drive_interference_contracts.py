@@ -14,7 +14,7 @@ import math
 import pytest
 
 import _chain
-import _holes
+import _cylindrical_holes
 import _interference_contracts
 import pd_latch_hook_bracket_screw_spec as bracket_screw
 import pd_latch_hook_geometry as hook
@@ -149,9 +149,9 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     # its ends inside the cup's O.D.: the journal takes the diametral chord,
     # the cup the rest of the tube.
     tube_d, tube_id = cup_pin.PIN_DIA, cup_pin.PIN_DIA - 2.0 * cup_pin.WALL_T
-    in_journal = _holes.cross_hole_volume_mm3(
+    in_journal = _cylindrical_holes.cross_hole_volume_mm3(
         tube_d, shaft.JOURNAL_DIA
-    ) - _holes.cross_hole_volume_mm3(tube_id, shaft.JOURNAL_DIA)
+    ) - _cylindrical_holes.cross_hole_volume_mm3(tube_id, shaft.JOURNAL_DIA)
     tube = math.pi * (tube_d**2 - tube_id**2) / 4.0 * cup_pin.PIN_LEN
     assert shaft.JOURNAL_DIA < cup_pin.PIN_LEN < cup.OD
     assert cup.BORE_DIA == shaft.JOURNAL_DIA

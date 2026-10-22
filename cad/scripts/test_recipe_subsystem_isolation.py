@@ -245,7 +245,7 @@ def test_platen_rack_isolation(part_closures, contract: Contract) -> None:
         Contract(
             selectors=("build_dt_*",),
             anchors=("build_dt_pinion_arbor",),
-            forbidden=("ch_rocker_arm_spec",),
+            forbidden=("ch_rocker_arm_spec", "ch_rocker_arm_outline_spec"),
         )
     ],
     ids=["rocker-rod"],

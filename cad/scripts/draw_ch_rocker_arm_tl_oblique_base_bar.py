@@ -54,7 +54,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
-from _printed_tolerance import drilled_oversize_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
     BAR_WIDTH,

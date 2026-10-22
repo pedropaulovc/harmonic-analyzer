@@ -146,18 +146,22 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
-    KNIFE_FLANK_TO_SIDE_TOL_DEG,
-    KNIFE_RIDGE_R,
-    KNIFE_RIDGE_R_BAND,
-    KNIFE_RIDGE_R_TOL_TYPE,
-    RIDGE_ANGLE_DEG,
-    RIDGE_FROM_SIDE_TOL,
     RIB_BLEND_R,
     RIB_BLEND_R_BAND,
     RIB_BLEND_R_TOL_TYPE,
     RIB_REACH,
     RIB_WRAP_R,
     SURFACE_FINISHES,
+)
+from sm_knife_contact import (
+    HEX_H,
+    HEX_W,
+    KNIFE_FLANK_TO_SIDE_TOL_DEG,
+    KNIFE_RIDGE_R,
+    KNIFE_RIDGE_R_BAND,
+    KNIFE_RIDGE_R_TOL_TYPE,
+    RIDGE_ANGLE_DEG,
+    RIDGE_FROM_SIDE_TOL,
 )
 from sm_summing_lever_profile import LOWER, UPPER, edge_rib_added_area_mm2
 from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_margin
@@ -199,8 +203,6 @@ PLATE_TOP_Y = 982.24
 # body from -HEX_Z_OUTER to +HEX_Z_OUTER.  Every vertex lies inside the
 # solid pivot cylinder (circumradius HEX_H/2 < CYL_R), so between the body
 # ends the prism merges into it and the solid is the two stubs' alone.
-HEX_W = 8.080  # across-flats width (X); = sm_summing_lever_spec.HEX_W
-HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
 HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
 HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
@@ -523,7 +525,7 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     One sketch and one extrude, so each side face, flank and lower face of
     the +Z stub lies in the same plane as its -Z twin by construction (code
     review C09): the symmetry Detail D prints for each stub then holds the two
-    ridges to each other (``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``).
+    ridges to each other (``sm_knife_contact.KNIFE_STUB_RIDGE_OFFSET_MAX``).
     ``_assert_knife_sides_coplanar`` reads that back."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 

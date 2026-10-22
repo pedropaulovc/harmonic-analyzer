@@ -18,6 +18,7 @@ import pytest
 
 import _config
 import magnifying_bracket_joint_layout as joint
+import sm_knife_contact as knife_contact
 import sm_summing_lever_profile as profile
 import sm_summing_lever_spec as spec
 
@@ -78,7 +79,7 @@ def test_receiver_deepens_only_inward_without_moving_installed_interfaces() -> N
     assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 152.4, 12.7))
     assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.52825))
     assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-67.1, 7.0565))
-    assert (spec.HEX_W, spec.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
+    assert (knife_contact.HEX_W, knife_contact.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
     assert (spec.TIP_X, spec.ANCHOR_H) == pytest.approx((-76.2, 19.05))
     assert joint.LEVER_HOLE_POINTS == ((16.0, 0.0, -76.2), (29.7, 0.0, -76.2))
     assert (joint.RIB_DEPTH, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (9.0, 6.5, 4.95)

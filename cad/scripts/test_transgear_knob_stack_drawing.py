@@ -18,7 +18,8 @@ import pd_transgear_drive_collar_spec as collar
 import pd_transgear_knob_shaft_spec as shaft
 import _sprocket_seat_geometry as removable
 import pd_transgear_thumbnut_spec as nut
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
 PITCH = INCH / 32.0
@@ -61,7 +62,7 @@ def _reloaded_nut(monkeypatch, included_angle_band: float):
     # the same title-block helper and must keep the real row when reloaded.
     with pytest.MonkeyPatch.context() as local:
         local.setattr(
-            "_printed_tolerance.angular_band_deg", lambda: included_angle_band
+            "_printed_angular_tolerance.angular_band_deg", lambda: included_angle_band
         )
         fresh_spec = importlib.util.spec_from_file_location(
             "_thumbnut_perturbed", nut.__file__
