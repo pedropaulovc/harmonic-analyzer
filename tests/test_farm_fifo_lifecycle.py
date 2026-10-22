@@ -36,6 +36,7 @@ INHERITED_BUILD_ID = "20261010T190000.000000Z-" + "a" * 32
 FARM_RUN = "launcher-run-is-not-the-build-id"
 WAIT_S = 5
 SIGINT_STARTUP_GUARD_S = 60
+PUBLISHER_AGENT_IDENTITY = "a" * 64
 
 
 def _deadline(seconds=60):
@@ -1166,6 +1167,14 @@ class _LeafControl:
 
     def __init__(self, requests):
         self.requests = requests
+        self.workspace = requests.parent / "workspace"
+        self.pool = requests.parent / "pool"
+        self.publications = []
+        self.publisher_result = {
+            "configured": True,
+            "commit": "c" * 40,
+            "agent_identity_sha256": PUBLISHER_AGENT_IDENTITY,
+        }
         self.request = _farm.LeafRequest(
             farm_protocol_version=7,
             commit="c" * 40,
@@ -1216,7 +1225,11 @@ class _LeafControl:
             f"submit:{self.key.build_id}:{self.key.workflow_id}".encode()
         ).hexdigest()
         self.updates.append((name, arg, options))
-        records = [json.loads(path.read_text("utf-8")) for path in self.requests.iterdir()]
+        reservation_name = hashlib.sha256(self.workflow_id.encode("utf-8")).hexdigest()[:32] + ".json"
+        assert {path.name for path in self.requests.iterdir()} == {
+            "preparation", reservation_name,
+        }
+        records = [json.loads((self.requests / reservation_name).read_text("utf-8"))]
         assert records == [{
             "task": self.request.task, "workflow_id": self.workflow_id,
             "build_id": self.request.build_id, "farm_run": FARM_RUN,
@@ -1247,6 +1260,20 @@ class _LeafControl:
         raise AssertionError("consumer cancelled accepted remote work")
 
     def assert_dispatch_safety(self, *, attached=False):
+        assert len(self.publications) == 1, "fixture bypassed or repeated preparation publication"
+        receipts = list((self.requests / "preparation").glob("*.json"))
+        assert len(receipts) == 1
+        assert json.loads(receipts[0].read_text("utf-8")) == {
+            "identity": {
+                "build_id": self.request.build_id,
+                "workspace": str(self.workspace.resolve()),
+                "pool_home": str(self.pool.resolve()),
+                "commit": self.request.commit,
+                "agent_identity_sha256": PUBLISHER_AGENT_IDENTITY,
+            },
+            "state": "succeeded",
+            "error": None,
+        }
         assert len(self.updates) == 1, "reconciliation resubmitted accepted work"
         assert len(self.starts) == 1, "consumer restarted a workflow"
         expected = [(_farm.WORKFLOW_BUILD_FIFO_ID, {})]
@@ -1274,7 +1301,30 @@ class _LeafClient(_Client):
 
 @pytest.fixture
 def leaf_control(_guarded_process, monkeypatch):
+    """Keep readiness/receipt validation real; fake only the private body bridge."""
     fake = _LeafControl(_guarded_process[0])
+    fake.workspace.mkdir()
+    fake.pool.mkdir()
+    monkeypatch.setattr(_farm, "REPO_ROOT", fake.workspace)
+    monkeypatch.setattr(build, "_pool_home", lambda: fake.pool)
+    monkeypatch.setenv("HARMONIC_FARM_COMMIT", fake.request.commit)
+    monkeypatch.setenv("HARMONIC_FARM_AGENT_IDENTITY", PUBLISHER_AGENT_IDENTITY)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps({
+        "capability": "preparation-publish-v1", "configured": True,
+        "account": "testpreparation", "configuration_error": False,
+        "operation_timeout_s": 900.0, "process_margin_s": 10.0,
+    }))
+
+    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s):
+        assert pool == fake.pool
+        assert workspace == fake.workspace
+        assert commit == fake.request.commit
+        assert 0 < operation_deadline - time.monotonic() <= 900.0
+        assert process_margin_s == 10.0
+        fake.publications.append((pool, workspace, commit, operation_deadline, process_margin_s))
+        return fake.publisher_result.copy()
+
+    monkeypatch.setattr(build, "_pool_preparation", publish)
     monkeypatch.setattr(_farm, "_connect_client", fake.connect)
     return fake
 
@@ -1454,3 +1504,38 @@ def test_reserved_leaf_query_cancellation_propagates_without_read_retry(leaf_con
 
     assert len(fake.queries) == 2
     fake.assert_dispatch_safety()
+
+
+def test_leaf_lifecycle_fixture_keeps_readiness_refusal_before_coordinator(
+    leaf_control, monkeypatch
+):
+    fake = leaf_control
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps({
+        "capability": "preparation-publish-v1", "configured": False,
+        "account": None, "configuration_error": False,
+    }))
+
+    with pytest.raises(RuntimeError, match="preparation publisher is not configured"):
+        asyncio.run(_farm._dispatch(fake.request, fake.workflow_id))
+
+    assert fake.starts == []
+    assert fake.publications == []
+    assert fake.updates == []
+    assert list(fake.requests.iterdir()) == []
+
+
+def test_leaf_lifecycle_fixture_validates_publication_before_reserving(leaf_control):
+    fake = leaf_control
+    fake.publisher_result["commit"] = "d" * 40
+
+    with pytest.raises(RuntimeError, match="does not match the admitted"):
+        asyncio.run(_farm._dispatch(fake.request, fake.workflow_id))
+
+    assert len(fake.starts) == 1
+    assert len(fake.publications) == 1
+    assert fake.updates == []
+    assert fake.queries == []
+    assert fake.result_reads == 0
+    receipts = list((fake.requests / "preparation").glob("*.json"))
+    assert len(receipts) == 1
+    assert json.loads(receipts[0].read_text("utf-8"))["state"] == "failed"

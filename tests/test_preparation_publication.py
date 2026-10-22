@@ -45,6 +45,7 @@ def boundary(tmp_path, monkeypatch):
     monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps({
         "capability": "preparation-publish-v1", "configured": True,
         "account": "testpreparation", "configuration_error": False,
+        "operation_timeout_s": 900.0, "process_margin_s": 10.0,
     }))
     monkeypatch.setenv("HARMONIC_FARM_COMMIT", COMMIT)
     monkeypatch.setenv("HARMONIC_FARM_AGENT_IDENTITY", AGENT)
@@ -62,13 +63,13 @@ def boundary(tmp_path, monkeypatch):
     monkeypatch.setattr(_farm._telemetry, "event", lambda *_a, **_k: None)
     monkeypatch.setattr(_farm._telemetry, "warn", lambda *_a, **_k: None)
     state = SimpleNamespace(
-        workspace=workspace.resolve(), pool=pool.resolve(), events=[], cli_calls=[],
-        requests=[], publication_hook=None, returncode=0, stdout=None,
+        workspace=workspace.resolve(), pool=pool.resolve(), events=[], publication_calls=[],
+        requests=[], publication_hook=None, publication_result=None, publication_error=None,
         coordinator_hook=None, coordinator_error=None, interrupts=[],
         heartbeat=threading.Event(),
         close_reasons=[],
         requests_directory=requests_directory,
-        cli_options=[], spans={},
+        publication_options=[], spans={},
         result=_farm.LeafResult("succeeded", 0, "fake-worker", 1, True, None, None, None),
     )
 
@@ -88,22 +89,28 @@ def boundary(tmp_path, monkeypatch):
     monkeypatch.setattr(_farm, "load_config", forbidden)
     monkeypatch.setattr(_farm._thread, "interrupt_main", lambda: state.interrupts.append(True))
 
-    def pool_farm(selected_pool, *args, **options):
+    def pool_preparation(
+        selected_pool, workspace, *, commit, operation_deadline, process_margin_s,
+    ):
         state.events.append("publish")
-        state.cli_calls.append((selected_pool, args))
-        state.cli_options.append(options)
+        state.publication_calls.append((selected_pool, workspace))
+        state.publication_options.append({
+            "commit": commit, "operation_deadline": operation_deadline,
+            "process_margin_s": process_margin_s,
+        })
         if state.publication_hook is not None:
             state.publication_hook()
-        payload = state.stdout
-        if payload is None:
-            payload = json.dumps({
-                "configured": True,
-                "commit": _farm.os.environ["HARMONIC_FARM_COMMIT"],
-                "agent_identity_sha256": _farm.os.environ["HARMONIC_FARM_AGENT_IDENTITY"],
-            })
-        return subprocess.CompletedProcess(args, state.returncode, stdout=payload)
+        if state.publication_error is not None:
+            raise state.publication_error
+        if state.publication_result is not None:
+            return state.publication_result
+        return {
+            "configured": True, "commit": commit,
+            "agent_identity_sha256": _farm.os.environ["HARMONIC_FARM_AGENT_IDENTITY"],
+        }
 
-    monkeypatch.setattr(build, "_pool_farm", pool_farm)
+    monkeypatch.setattr(build, "_pool_preparation", pool_preparation)
+    monkeypatch.setattr(build, "_pool_farm", forbidden)
 
     class Client:
         def get_workflow_handle(self, _workflow_id, **_options):
@@ -199,18 +206,25 @@ def cached_part(boundary, monkeypatch):
     return dodo
 
 
+@pytest.mark.parametrize("readiness", [
+    "null",
+    json.dumps({"capability": None, "probe_error": "optional preparation import failed"}),
+    json.dumps({
+        "capability": "preparation-publish-v1", "configured": True,
+        "account": "testpreparation", "configuration_error": False,
+    }),
+])
 def test_cache_only_build_registers_but_never_publishes_or_dispatches(
-    boundary, cached_part, monkeypatch
+    boundary, cached_part, monkeypatch, readiness
 ):
     monkeypatch.setattr(cached_part, "_probe_cache", lambda *_args: "hit")
-    # An otherwise admitted older PoolHome need not expose preparation on hits.
-    boundary.returncode = 2
-    boundary.stdout = ""
-    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", "null")
+    # Neither optional probe failures nor missing publication budgets affect hits.
+    boundary.publication_error = build.FarmPreflightError("publisher must not run")
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", readiness)
     with _farm.producer_build("Cache-only publication regression") as ownership:
         cached_part._cached_part_action("pen_rod", Path("unused.py"))
         ownership.finish(True)
-    assert boundary.cli_calls == []
+    assert boundary.publication_calls == []
     assert boundary.requests == []
     assert boundary.events == [
         "record_build", "connect", "coordinator", "register_build", "close_build"
@@ -226,12 +240,16 @@ def test_first_cache_miss_publishes_admitted_source_after_parent_registration(
     with _farm.producer_build("First publication regression") as ownership:
         cached_part._cached_part_action("pen_rod", Path("unused.py"))
         ownership.finish(True)
-    assert boundary.cli_calls == [(boundary.pool, (
-        "preparation", "publish", "--workspace", str(boundary.workspace),
-        "--commit", COMMIT, "--json",
-    ))]
-    assert boundary.cli_options == [{"timeout_s": 900}]
+    assert boundary.publication_calls == [(boundary.pool, boundary.workspace)]
+    options = boundary.publication_options[0]
+    assert options["commit"] == COMMIT
+    assert options["process_margin_s"] == 10.0
+    assert options["operation_deadline"] == (
+        boundary.spans["farm.preparation"][0]["operation_deadline_monotonic"]
+    )
     timing = boundary.spans["farm.preparation"][0]
+    assert timing["operation_timeout_s"] == 900.0
+    assert timing["process_margin_s"] == 10.0
     assert timing["lock_wait_ms"] >= 0
     assert timing["publication_ms"] >= 0
     assert timing["publication_state"] == "succeeded"
@@ -264,9 +282,8 @@ def test_publication_failure_closes_parent_as_failed_without_a_reservation(
     boundary, cached_part, monkeypatch
 ):
     monkeypatch.setattr(cached_part, "_probe_cache", lambda *_args: "miss")
-    boundary.returncode = 2
-    boundary.stdout = '{"ok": false, "error": {"code": "corruption", "message": "bad graph"}}'
-    with pytest.raises(RuntimeError, match="bad graph"):
+    boundary.publication_error = build.FarmPreflightError("preparation descriptor is corrupt")
+    with pytest.raises(RuntimeError, match="preparation descriptor is corrupt"):
         with _farm.producer_build("Failed publication regression"):
             cached_part._cached_part_action("pen_rod", Path("unused.py"))
     assert boundary.events[-1] == "close_build"
@@ -279,7 +296,7 @@ def test_repeated_native_and_check_leaves_share_one_publication(boundary):
     assert _farm.run_leaf(TASK, KEY) is boundary.result
     assert _farm.run_leaf("check:math", None) is boundary.result
     assert _farm.run_leaf(TASK, KEY) is boundary.result
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert [request.task for request in boundary.requests] == [TASK, "check:math", TASK]
 
 
@@ -306,12 +323,12 @@ def test_concurrent_first_leaves_wait_for_one_publication_before_any_dispatch(bo
         try:
             assert publishing.wait(WAIT_S)
             assert both_coordinated.wait(WAIT_S)
-            assert len(boundary.cli_calls) == 1
+            assert len(boundary.publication_calls) == 1
             assert boundary.requests == []
         finally:
             release.set()
         assert [future.result(WAIT_S) for future in futures] == [boundary.result] * 2
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert len(boundary.requests) == 2
 
 
@@ -334,7 +351,7 @@ def test_identity_transition_publishes_once_for_each_exact_key(
         _farm.run_leaf(TASK, KEY)
         _farm.run_leaf(TASK, KEY)
     _farm.run_leaf(TASK, KEY)
-    assert len(boundary.cli_calls) == 2
+    assert len(boundary.publication_calls) == 2
     assert len(boundary.requests) == 4
 
 
@@ -342,12 +359,13 @@ def test_workspace_alias_uses_canonical_root_and_same_singleflight_key(boundary,
     _farm.run_leaf(TASK, KEY)
     monkeypatch.setattr(_farm, "REPO_ROOT", boundary.workspace / "unused" / "..")
     _farm.run_leaf(TASK, KEY)
-    assert len(boundary.cli_calls) == 1
-    assert boundary.cli_calls[0][1][3] == str(boundary.workspace)
+    assert boundary.publication_calls == [(boundary.pool, boundary.workspace)]
 
 
-@pytest.mark.parametrize("failure", [PermissionError("publisher authorization denied"),
-                                    RuntimeError("preparation descriptor is corrupt")])
+@pytest.mark.parametrize("failure", [
+    build.FarmPreflightError("publisher authorization denied"),
+    build.FarmPreflightError("preparation descriptor is corrupt"),
+])
 def test_publication_failure_is_shared_and_prevents_every_leaf_dispatch(boundary, failure):
     def refuse():
         raise failure
@@ -360,14 +378,14 @@ def test_publication_failure_is_shared_and_prevents_every_leaf_dispatch(boundary
         errors.append(caught.value)
     assert str(errors[0]) == str(errors[1])
     assert errors[0] is not errors[1]
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert boundary.requests == []
     assert "record_request" not in boundary.events
 
 
 def test_concurrent_publication_failure_is_not_retried_or_demoted_to_a_miss(boundary):
     publishing, release = threading.Event(), threading.Event()
-    failure = PermissionError("publisher authorization denied")
+    failure = build.FarmPreflightError("publisher authorization denied")
 
     def refuse():
         publishing.set()
@@ -388,44 +406,34 @@ def test_concurrent_publication_failure_is_not_retried_or_demoted_to_a_miss(boun
             errors.append(caught.value)
         assert str(errors[0]) == str(errors[1])
         assert errors[0] is not errors[1]
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert boundary.requests == []
 
 
-@pytest.mark.parametrize("stdout", [
-    "not JSON", "[]", "{}",
-    json.dumps({"configured": False, "commit": COMMIT, "agent_identity_sha256": AGENT}),
-    json.dumps({"configured": True, "commit": "e" * 40, "agent_identity_sha256": AGENT}),
-    json.dumps({"configured": True, "commit": COMMIT, "agent_identity_sha256": "f" * 64}),
+@pytest.mark.parametrize("published", [
+    "not a result object", [], {},
+    {"configured": False, "commit": COMMIT, "agent_identity_sha256": AGENT},
+    {"configured": True, "commit": "e" * 40, "agent_identity_sha256": AGENT},
+    {"configured": True, "commit": COMMIT, "agent_identity_sha256": "f" * 64},
 ])
-def test_invalid_or_foreign_publisher_success_fails_closed(boundary, stdout):
-    boundary.stdout = stdout
+def test_invalid_or_foreign_publisher_success_fails_closed(boundary, published):
+    boundary.publication_result = published
     with pytest.raises(RuntimeError, match="preparation publication"):
         _farm.run_leaf(TASK, KEY)
     assert boundary.requests == []
     assert "record_request" not in boundary.events
 
 
-def test_publisher_cli_error_preserves_auth_or_corruption_diagnostic(boundary):
-    boundary.returncode = 2
-    boundary.stdout = json.dumps({
-        "ok": False, "error": {"code": "authorization", "message": "create denied"},
-    })
-    with pytest.raises(RuntimeError, match=r"publication failed \(exit 2\).*create denied"):
-        _farm.run_leaf(TASK, KEY)
-    assert boundary.requests == []
-
-
-def test_old_pool_cli_failure_names_selected_revision_and_required_capability(boundary):
-    # argparse diagnostics are inherited on stderr, leaving stdout empty.
-    boundary.returncode = 2
-    boundary.stdout = ""
+@pytest.mark.parametrize("diagnostic", [
+    "preparation publication failed [azure]",
+    "preparation publication returned an invalid private receipt",
+])
+def test_private_bridge_failure_preserves_its_safe_diagnostic(boundary, diagnostic):
+    boundary.publication_error = build.FarmPreflightError(diagnostic)
     with pytest.raises(RuntimeError) as caught:
         _farm.run_leaf(TASK, KEY)
-    message = str(caught.value)
-    assert f"PoolHome {boundary.pool}" in message
-    assert "selected pool revision must support `preparation publish`" in message
-    assert "see pool CLI stderr above" in message
+    assert diagnostic in str(caught.value)
+    assert len(boundary.publication_calls) == 1
     assert boundary.requests == []
     assert "record_request" not in boundary.events
 
@@ -443,7 +451,7 @@ def test_publication_refuses_unadmitted_source_or_agent_identity(
     monkeypatch.setenv(variable, value)
     with pytest.raises(RuntimeError, match=f"requires admitted {variable}"):
         _farm.run_leaf(TASK, KEY)
-    assert boundary.cli_calls == []
+    assert boundary.publication_calls == []
     assert boundary.requests == []
 
 
@@ -453,7 +461,7 @@ def test_foreign_request_commit_cannot_prepare_a_different_admitted_source(bound
     )
     with pytest.raises(RuntimeError, match="does not match the admitted commit"):
         asyncio.run(_farm._dispatch(request, "foreign-request"))
-    assert boundary.cli_calls == []
+    assert boundary.publication_calls == []
     assert boundary.requests == []
 
 
@@ -461,7 +469,7 @@ def test_invalid_coordinator_still_fails_before_preparation(boundary):
     boundary.coordinator_error = RuntimeError("coordinator protocol refused")
     with pytest.raises(RuntimeError, match="coordinator protocol refused"):
         _farm.run_leaf(TASK, KEY)
-    assert boundary.cli_calls == []
+    assert boundary.publication_calls == []
     assert boundary.requests == []
 
 
@@ -504,6 +512,59 @@ def test_unready_publisher_refuses_first_miss_before_any_connection(
     assert str(boundary.pool) in str(caught.value)
     assert boundary.events == []
     assert not (boundary.requests_directory / "preparation").exists()
+
+
+@pytest.mark.parametrize("problem", [
+    "probe_error", "operation_timeout_s", "process_margin_s",
+])
+def test_optional_readiness_failure_refuses_first_real_miss_before_network(
+    boundary, cached_part, monkeypatch, problem
+):
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    if problem == "probe_error":
+        readiness["probe_error"] = "optional preparation import failed"
+    else:
+        readiness.pop(problem)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    monkeypatch.setattr(cached_part, "_probe_cache", lambda *_args: "miss")
+    with pytest.raises(RuntimeError, match="readiness"):
+        cached_part._cached_part_action("pen_rod", Path("unused.py"))
+    assert boundary.events == []
+    assert boundary.publication_calls == []
+    assert boundary.requests == []
+    assert not (boundary.requests_directory / "preparation").exists()
+
+
+@pytest.mark.parametrize("field", ["operation_timeout_s", "process_margin_s"])
+@pytest.mark.parametrize("value", [
+    None, True, False, 0, -1, float("nan"), float("inf"), float("-inf"),
+    "900", [], {}, 10 ** 400,
+])
+def test_readiness_rejects_invalid_declared_publication_budgets(
+    boundary, monkeypatch, field, value
+):
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness[field] = value
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    with pytest.raises(RuntimeError, match=f"invalid publisher {field} readiness"):
+        _farm.run_leaf(TASK, KEY)
+    assert boundary.events == []
+    assert not (boundary.requests_directory / "preparation").exists()
+
+
+@pytest.mark.parametrize("operation_timeout_s, process_margin_s", [(23, 4), (23.5, 4.25)])
+def test_readiness_returns_the_declared_budgets_as_floats(
+    boundary, monkeypatch, operation_timeout_s, process_margin_s
+):
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(
+        operation_timeout_s=operation_timeout_s, process_margin_s=process_margin_s,
+    )
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    budgets = _farm._require_preparation_readiness()
+    assert budgets == (operation_timeout_s, process_margin_s)
+    assert all(type(value) is float for value in budgets)
+    assert boundary.events == []
 
 
 @pytest.mark.parametrize("initial", [None, ""])
@@ -552,6 +613,146 @@ def test_attended_registration_failure_also_cleans_owned_requests(
     assert boundary.requests_directory.is_dir()
 
 
+@pytest.fixture
+def requests_cleanup_failure(boundary, monkeypatch):
+    """Fail only a captured owned object's cleanup; always remove its real root."""
+    monkeypatch.delenv("HARMONIC_FARM_REQUESTS")
+    state = SimpleNamespace(
+        owned=None, root=None, real_cleanup=None, calls=[], warnings=[], environment=None,
+    )
+    monkeypatch.setattr(
+        _farm._telemetry, "warn",
+        lambda message, **attributes: state.warnings.append((message, attributes)),
+    )
+
+    def arm(ownership):
+        owned = ownership._owned_requests
+        assert owned is not None
+        state.owned = owned
+        state.root = Path(owned.name)
+        state.real_cleanup = owned.cleanup
+        (state.root / "retained-receipt.json").write_text("{}", encoding="utf-8")
+
+        def refuse_cleanup():
+            state.calls.append(state.root)
+            state.environment = (
+                _farm.os.environ.get("HARMONIC_FARM_BUILD_ID"),
+                _farm.os.environ.get("HARMONIC_FARM_REQUESTS"),
+            )
+            raise PermissionError("synthetic cleanup detail")
+
+        monkeypatch.setattr(owned, "cleanup", refuse_cleanup)
+
+    state.arm = arm
+    try:
+        yield state
+    finally:
+        if state.real_cleanup is not None:
+            state.real_cleanup()
+
+
+def _assert_requests_cleanup_report(
+    ownership, state, *, primary=None, cleanup_attempted=True,
+):
+    assert ownership._owned_requests is state.owned
+    assert state.root.is_dir()
+    assert (state.root / "retained-receipt.json").is_file()
+    assert _farm.os.environ["HARMONIC_FARM_BUILD_ID"] == BUILD
+    assert "HARMONIC_FARM_REQUESTS" not in _farm.os.environ
+    assert state.calls == ([state.root] if cleanup_attempted else [])
+    if cleanup_attempted:
+        assert state.environment == (BUILD, None), "cleanup preceded environment restoration"
+    assert len(state.warnings) == 1
+    message, attributes = state.warnings[0]
+    assert str(state.root) in message
+    assert attributes == {"build_id": ownership.build_id}
+    assert "synthetic cleanup detail" not in message
+    if cleanup_attempted:
+        assert "PermissionError" in message
+        assert "possible residue" in message
+    else:
+        assert "publisher cleanup is unconfirmed" in message
+    if primary is not None:
+        assert primary.__notes__ == [message]
+        assert "synthetic cleanup detail" not in str(primary)
+
+
+def test_body_primary_survives_owned_requests_cleanup_failure(
+    boundary, requests_cleanup_failure,
+):
+    ownership = _farm.producer_build("Body primary cleanup regression")
+    primary = RuntimeError("original build failure")
+    with pytest.raises(RuntimeError) as caught:
+        with ownership:
+            requests_cleanup_failure.arm(ownership)
+            raise primary
+    assert caught.value is primary
+    assert boundary.close_reasons == ["failed"]
+    _assert_requests_cleanup_report(ownership, requests_cleanup_failure, primary=primary)
+
+
+def test_registration_primary_survives_owned_requests_cleanup_failure(
+    boundary, requests_cleanup_failure,
+):
+    ownership = _farm.producer_build("Registration primary cleanup regression")
+    boundary.coordinator_error = RuntimeError("original registration failure")
+    boundary.coordinator_hook = lambda: requests_cleanup_failure.arm(ownership)
+    with pytest.raises(_farm.BuildOwnershipError, match="original registration failure") as caught:
+        with ownership:
+            pytest.fail("producer entered after registration failure")
+    assert caught.value.__cause__ is boundary.coordinator_error
+    _assert_requests_cleanup_report(
+        ownership, requests_cleanup_failure, primary=caught.value,
+    )
+
+
+def test_failed_finish_keeps_nonzero_outcome_and_reports_owned_requests_residue(
+    boundary, requests_cleanup_failure,
+):
+    ownership = _farm.producer_build("Nonzero outcome cleanup regression")
+
+    def finish_failed_build():
+        with ownership:
+            requests_cleanup_failure.arm(ownership)
+            ownership.finish(False)
+            return 7
+
+    assert finish_failed_build() == 7
+    assert boundary.close_reasons == ["failed"]
+    _assert_requests_cleanup_report(ownership, requests_cleanup_failure)
+
+
+def test_successful_finish_refuses_unconfirmed_owned_requests_cleanup(
+    boundary, requests_cleanup_failure,
+):
+    ownership = _farm.producer_build("Successful outcome cleanup regression")
+    with pytest.raises(_farm.BuildOwnershipError, match="possible residue") as caught:
+        with ownership:
+            requests_cleanup_failure.arm(ownership)
+            ownership.finish(True)
+    assert caught.value.__cause__ is None
+    assert "synthetic cleanup detail" not in str(caught.value)
+    assert boundary.close_reasons == ["finished"]
+    _assert_requests_cleanup_report(ownership, requests_cleanup_failure)
+
+
+def test_unconfirmed_publisher_primary_retains_owned_requests_without_cleanup(
+    boundary, requests_cleanup_failure,
+):
+    ownership = _farm.producer_build("Unconfirmed publisher cleanup regression")
+    primary = build.PoolProcessCleanupError("owned publisher cleanup remains unconfirmed")
+    assert primary.cleanup_confirmed is False
+    with pytest.raises(build.PoolProcessCleanupError) as caught:
+        with ownership:
+            requests_cleanup_failure.arm(ownership)
+            raise primary
+    assert caught.value is primary
+    assert boundary.close_reasons == ["failed"]
+    _assert_requests_cleanup_report(
+        ownership, requests_cleanup_failure, primary=primary, cleanup_attempted=False,
+    )
+
+
 @pytest.mark.parametrize("damage", ["invalid JSON", "identity", "unfinished"])
 def test_corrupt_or_interrupted_receipt_never_launches_a_second_publisher(boundary, damage):
     _farm.run_leaf(TASK, KEY)
@@ -569,32 +770,173 @@ def test_corrupt_or_interrupted_receipt_never_launches_a_second_publisher(bounda
     for _ in range(2):
         with pytest.raises(RuntimeError, match="publication (receipt|was interrupted)"):
             _farm.run_leaf(TASK, KEY)
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert len(boundary.requests) == 1
 
 
-def test_build_shared_lock_has_a_finite_wait_without_publishing(boundary, monkeypatch):
+def test_receipt_setup_consumes_work_budget_without_launch_or_fresh_retry(
+    boundary, monkeypatch, publication_request, publication_clock,
+):
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(operation_timeout_s=1.0, process_margin_s=3.0)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    real_atomic_json = _farm._atomic_json
+    writes = []
+
+    def delayed_marker(path, payload):
+        writes.append(payload["state"])
+        real_atomic_json(path, payload)
+        if payload["state"] == "publishing":
+            publication_clock.now += 2.0
+
+    monkeypatch.setattr(_farm, "_atomic_json", delayed_marker)
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="operation deadline exhausted before publisher launch"):
+            _farm._ensure_preparation_published(publication_request)
+    assert writes == ["publishing", "failed"]
+    assert boundary.publication_calls == []
+    assert boundary.requests == []
+    path = next((boundary.requests_directory / "preparation").glob("*.json"))
+    assert json.loads(path.read_text(encoding="utf-8"))["state"] == "failed"
+
+
+@pytest.fixture
+def publication_request():
+    return _farm.LeafRequest(
+        _farm.FARM_PROTOCOL_VERSION, COMMIT, TASK, KEY, None, "offline@test", BUILD,
+    )
+
+
+@pytest.fixture
+def publication_clock(monkeypatch):
+    clock = SimpleNamespace(now=1000.0)
+    # Do not replace the process-wide time module used by pytest or FileLock.
+    monkeypatch.setattr(_farm, "time", SimpleNamespace(monotonic=lambda: clock.now))
+    return clock
+
+
+def test_lock_wait_consumes_the_original_declared_publication_budget(
+    boundary, monkeypatch, publication_request, publication_clock,
+):
     from filelock import FileLock
 
-    _farm.run_leaf(TASK, KEY)
-    path = next((boundary.requests_directory / "preparation").glob("*.lock"), None)
-    # Windows may delete an unlocked FileLock file; its identity remains the
-    # receipt basename even when the lock file itself no longer exists.
-    if path is None:
-        path = next((boundary.requests_directory / "preparation").glob("*.json")).with_suffix(".lock")
-    monkeypatch.setattr(_farm, "_PREPARATION_LOCK_TIMEOUT_S", 0)
-    with FileLock(str(path)):
-        with pytest.raises(RuntimeError, match="lock timed out after 0s"):
-            _farm.run_leaf(TASK, KEY)
-    assert len(boundary.cli_calls) == 1
-    assert len(boundary.requests) == 1
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(operation_timeout_s=7.5, process_margin_s=1.25)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    real_acquire = FileLock.acquire
+    waits = []
+
+    def delayed_acquire(lock, *, timeout):
+        waits.append(timeout)
+        publication_clock.now += 2.0
+        return real_acquire(lock, timeout=0)
+
+    monkeypatch.setattr(FileLock, "acquire", delayed_acquire)
+    _farm._ensure_preparation_published(publication_request)
+    assert waits == [1.0]
+    assert boundary.publication_calls == [(boundary.pool, boundary.workspace)]
+    assert boundary.publication_options == [{
+        "commit": COMMIT, "operation_deadline": 1007.5, "process_margin_s": 1.25,
+    }]
+    timing = boundary.spans["farm.preparation"][0]
+    assert timing["operation_timeout_s"] == 7.5
+    assert timing["process_margin_s"] == 1.25
+    assert timing["lock_wait_ms"] == 2000
+
+
+@pytest.mark.parametrize("shared_state", ["succeeded", "failed", "publishing", "missing"])
+def test_process_margin_observes_shared_outcomes_but_never_starts_publication(
+    boundary, monkeypatch, publication_request, publication_clock, shared_state,
+):
+    from filelock import FileLock
+
+    _farm._ensure_preparation_published(publication_request)
+    path = next((boundary.requests_directory / "preparation").glob("*.json"))
+    if shared_state == "missing":
+        path.unlink()
+    else:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+        receipt["state"] = shared_state
+        receipt["error"] = "shared publisher failure" if shared_state == "failed" else None
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(operation_timeout_s=1.0, process_margin_s=3.0)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    real_acquire = FileLock.acquire
+    holder = FileLock(str(path.with_suffix(".lock")))
+    holder.acquire()
+    waits = []
+
+    def acquire_after_work_deadline(lock, *, timeout):
+        waits.append(timeout)
+        if holder.is_locked:
+            publication_clock.now += timeout
+            if len(waits) == 2:
+                holder.release()
+        return real_acquire(lock, timeout=0)
+
+    monkeypatch.setattr(FileLock, "acquire", acquire_after_work_deadline)
+    try:
+        if shared_state == "succeeded":
+            _farm._ensure_preparation_published(publication_request)
+        else:
+            diagnostic = {
+                "failed": "shared publisher failure",
+                "publishing": "was interrupted",
+                "missing": "operation deadline exhausted before publisher launch",
+            }[shared_state]
+            with pytest.raises(RuntimeError, match=diagnostic):
+                _farm._ensure_preparation_published(publication_request)
+        assert publication_clock.now == 1002.0
+        assert waits == [1.0, 1.0]
+        if shared_state == "missing":
+            assert json.loads(path.read_text(encoding="utf-8"))["state"] == "failed"
+            # A new caller gets a new observation window, never a retry of the
+            # publication whose one work budget was already exhausted.
+            with pytest.raises(RuntimeError, match="operation deadline exhausted"):
+                _farm._ensure_preparation_published(publication_request)
+    finally:
+        holder.release()
+    assert len(boundary.publication_calls) == 1
+    assert boundary.requests == []
+
+
+def test_build_shared_lock_uses_responsive_slices_and_one_observation_deadline(
+    boundary, monkeypatch, publication_request, publication_clock,
+):
+    from filelock import FileLock
+
+    _farm._ensure_preparation_published(publication_request)
+    path = next((boundary.requests_directory / "preparation").glob("*.json"))
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(operation_timeout_s=2.5, process_margin_s=0.75)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    real_acquire = FileLock.acquire
+    holder = FileLock(str(path.with_suffix(".lock")))
+    holder.acquire()
+    waits = []
+
+    def contended_acquire(lock, *, timeout):
+        waits.append(timeout)
+        publication_clock.now += timeout
+        return real_acquire(lock, timeout=0)
+
+    monkeypatch.setattr(FileLock, "acquire", contended_acquire)
+    try:
+        with pytest.raises(RuntimeError, match="lock timed out after 2.5s work and 0.75s"):
+            _farm._ensure_preparation_published(publication_request)
+    finally:
+        holder.release()
+    assert waits == [1.0, 1.0, 1.0, 0.25]
+    assert publication_clock.now == 1003.25
+    assert len(boundary.publication_calls) == 1
+    assert boundary.requests == []
 
 
 _SHARED_PUBLICATION_CHILD = textwrap.dedent(
     """
     import json
     import os
-    import subprocess
     import sys
     from contextlib import nullcontext
     from pathlib import Path
@@ -609,7 +951,6 @@ _SHARED_PUBLICATION_CHILD = textwrap.dedent(
     build._pool_home = lambda: Path(sys.argv[3])
     mode = sys.argv[4]
     calls = Path(sys.argv[5])
-    _farm._PREPARATION_LOCK_TIMEOUT_S = 10
     _farm._telemetry.span = lambda *a, **k: nullcontext(
         SimpleNamespace(set_attribute=lambda *a: None)
     )
@@ -623,7 +964,7 @@ _SHARED_PUBLICATION_CHILD = textwrap.dedent(
     _farm._connect_client = forbidden
     _farm._thread.interrupt_main = forbidden
 
-    def publish(pool, *args, **kwargs):
+    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s):
         with calls.open("a", encoding="utf-8") as stream:
             stream.write(str(os.getpid()) + "\\n")
         print("publishing", flush=True)
@@ -631,14 +972,13 @@ _SHARED_PUBLICATION_CHILD = textwrap.dedent(
         if mode == "crash":
             os._exit(23)
         if mode == "failure":
-            raise PermissionError("publisher authorization denied")
-        return subprocess.CompletedProcess(args, 0, stdout=json.dumps({
-            "configured": True,
-            "commit": os.environ["HARMONIC_FARM_COMMIT"],
+            raise build.FarmPreflightError("publisher authorization denied")
+        return {
+            "configured": True, "commit": commit,
             "agent_identity_sha256": os.environ["HARMONIC_FARM_AGENT_IDENTITY"],
-        }))
+        }
 
-    build._pool_farm = publish
+    build._pool_preparation = publish
     request = _farm.LeafRequest(
         _farm.FARM_PROTOCOL_VERSION, os.environ["HARMONIC_FARM_COMMIT"],
         "part:pen_rod", "d" * 64, None, "guarded@test",
@@ -757,7 +1097,7 @@ def test_confirmed_publisher_timeout_is_a_shared_terminal_failure(boundary):
             _farm.run_leaf(TASK, KEY)
         errors.append(str(caught.value))
     assert errors[0] == errors[1]
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert boundary.requests == []
     receipt = json.loads(next(
         (boundary.requests_directory / "preparation").glob("*.json")
@@ -783,5 +1123,5 @@ def test_unconfirmed_publisher_cleanup_keeps_the_nonterminal_fail_closed_marker(
     with pytest.raises(RuntimeError, match="was interrupted"):
         _farm.run_leaf(TASK, KEY)
     assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
-    assert len(boundary.cli_calls) == 1
+    assert len(boundary.publication_calls) == 1
     assert boundary.requests == []

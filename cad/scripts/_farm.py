@@ -4,7 +4,7 @@ The constants and frozen wire types below mirror
 ``solidworks-pool/agent/contract.py`` field-for-field; ``FARM_PROTOCOL_VERSION``
 mirrors ``agent/protocol.py`` and guards drift between the two repos (a mismatch
 fails admission on the farm). This module must never import the pool package.
-Preparation publication uses the build wrapper's selected-pool CLI bridge only
+Preparation publication uses the build wrapper's owned private-body bridge only
 when a cache-missing leaf is about to submit; local/cache-only work never loads
 the pool runtime or exports a graph.
 
@@ -22,6 +22,7 @@ import asyncio
 import getpass
 import hashlib
 import json
+import math
 import os
 import socket
 import subprocess
@@ -560,8 +561,10 @@ class _ProducerBuild:
         try:
             self._previous_requests = os.environ.get("HARMONIC_FARM_REQUESTS")
             if not self._previous_requests:
+                # Cleanup is explicit: uncertain publisher termination must
+                # retain its receipts instead of a GC finalizer deleting them.
                 self._owned_requests = tempfile.TemporaryDirectory(
-                    prefix="harmonic-farm-requests-"
+                    prefix="harmonic-farm-requests-", delete=False,
                 )
                 os.environ["HARMONIC_FARM_REQUESTS"] = self._owned_requests.name
             _record_build(self.build_id)
@@ -583,7 +586,7 @@ class _ProducerBuild:
             self._stop.set()
             if self._thread.ident is not None:
                 self._thread.join()
-            self._restore_env()
+            self._restore_env(primary_error=exc)
             raise
 
     def finish(self, success: bool) -> None:
@@ -604,24 +607,52 @@ class _ProducerBuild:
         self._stop.set()
         try:
             self._thread.join()
-        finally:
-            self._restore_env()
-        if exc is None or isinstance(exc, KeyboardInterrupt):
-            self.check()
+            if exc is None or isinstance(exc, KeyboardInterrupt):
+                self.check()
+        except BaseException as lifecycle_error:
+            self._restore_env(primary_error=lifecycle_error)
+            raise
+        else:
+            self._restore_env(primary_error=exc)
         return False
 
-    def _restore_env(self) -> None:
+    def _restore_env(self, *, primary_error: BaseException | None = None) -> None:
         if self._previous_id is None:
             os.environ.pop("HARMONIC_FARM_BUILD_ID", None)
         else:
             os.environ["HARMONIC_FARM_BUILD_ID"] = self._previous_id
-        if self._owned_requests is not None:
-            if self._previous_requests is None:
-                os.environ.pop("HARMONIC_FARM_REQUESTS", None)
+        owned = self._owned_requests
+        if owned is None:
+            return
+        if self._previous_requests is None:
+            os.environ.pop("HARMONIC_FARM_REQUESTS", None)
+        else:
+            os.environ["HARMONIC_FARM_REQUESTS"] = self._previous_requests
+        if primary_error is not None and getattr(primary_error, "cleanup_confirmed", True) is False:
+            message = (
+                "Farm requests retained because publisher cleanup is unconfirmed; "
+                f"owned directory: {owned.name}"
+            )
+        else:
+            try:
+                owned.cleanup()
+            except Exception as cleanup_error:
+                message = (
+                    "Farm requests cleanup could not be confirmed; possible residue "
+                    f"at {owned.name} ({type(cleanup_error).__name__})"
+                )
             else:
-                os.environ["HARMONIC_FARM_REQUESTS"] = self._previous_requests
-            self._owned_requests.cleanup()
-            self._owned_requests = None
+                self._owned_requests = None
+                return
+        if primary_error is not None:
+            primary_error.add_note(message)
+        try:
+            _telemetry.warn(message, build_id=self.build_id)
+        except Exception:
+            # A secondary diagnostic must not replace the primary build fault.
+            pass
+        if primary_error is None and self._reason == "finished":
+            raise BuildOwnershipError(message) from None
 
     def _fail(self, exc: BaseException) -> None:
         if self._failure is None:
@@ -921,11 +952,9 @@ def _display_name(label: str | None = None) -> str:
 
 
 _PREPARATION_CAPABILITY = "preparation-publish-v1"
-_PREPARATION_PUBLISH_TIMEOUT_S = 15 * 60
-_PREPARATION_LOCK_TIMEOUT_S = _PREPARATION_PUBLISH_TIMEOUT_S + 10
 
 
-def _require_preparation_readiness() -> None:
+def _require_preparation_readiness() -> tuple[float, float]:
     """Refuse an unavailable publisher only when a real remote leaf is needed."""
     from build import _pool_home
 
@@ -936,6 +965,11 @@ def _require_preparation_readiness() -> None:
         )
     except (ValueError, RecursionError):
         readiness = None
+    if isinstance(readiness, dict) and readiness.get("probe_error") is not None:
+        raise RuntimeError(
+            f"PoolHome {pool} preparation publisher readiness probe failed; "
+            "repair the selected pool environment before remote dispatch"
+        )
     if (
         not isinstance(readiness, dict)
         or readiness.get("capability") != _PREPARATION_CAPABILITY
@@ -962,40 +996,35 @@ def _require_preparation_readiness() -> None:
         )
     if not isinstance(readiness.get("account"), str) or not readiness["account"].strip():
         raise RuntimeError(f"PoolHome {pool} returned invalid publisher account readiness")
+    budgets = []
+    for name in ("operation_timeout_s", "process_margin_s"):
+        value = readiness.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RuntimeError(f"PoolHome {pool} returned invalid publisher {name} readiness")
+        try:
+            budget = float(value)
+        except OverflowError:
+            raise RuntimeError(
+                f"PoolHome {pool} returned invalid publisher {name} readiness"
+            ) from None
+        if not math.isfinite(budget) or budget <= 0:
+            raise RuntimeError(f"PoolHome {pool} returned invalid publisher {name} readiness")
+        budgets.append(budget)
+    return budgets[0], budgets[1]
 
 
 def _publish_preparation(
-    pool: Path, workspace: Path, commit: str, agent_identity: str
+    pool: Path, workspace: Path, commit: str, agent_identity: str, *,
+    operation_deadline: float, process_margin_s: float,
 ) -> None:
-    # Use the existing operational bridge, which selects the pool's own locked
-    # environment. The CLI imports agent.preparation.publish_for_submission;
-    # this producer does not duplicate its storage or graph-publisher protocol.
-    from build import _pool_farm
+    # The existing owned ProcessTree is the sole supervisor. Its selected-pool
+    # private body shares this operation's original deadline, not a fresh budget.
+    from build import _pool_preparation
 
-    result = _pool_farm(
-        pool,
-        "preparation",
-        "publish",
-        "--workspace",
-        str(workspace),
-        "--commit",
-        commit,
-        "--json",
-        timeout_s=_PREPARATION_PUBLISH_TIMEOUT_S,
+    published = _pool_preparation(
+        pool, workspace, commit=commit, operation_deadline=operation_deadline,
+        process_margin_s=process_margin_s,
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"farm preparation publication failed (exit {result.returncode}) "
-            f"for PoolHome {pool}; the selected pool revision must support "
-            f"`preparation publish`: "
-            f"{result.stdout.strip() or 'see pool CLI stderr above'}"
-        )
-    try:
-        published = json.loads(result.stdout)
-    except (TypeError, ValueError):
-        raise RuntimeError(
-            "farm preparation publication returned an invalid response"
-        ) from None
     if (
         not isinstance(published, dict)
         or published.get("configured") is not True
@@ -1016,6 +1045,11 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
     fails closed; a later process must not launch a second publisher.
     """
     from build import PoolProcessCleanupError, _pool_home
+
+    operation_timeout_s, process_margin_s = _require_preparation_readiness()
+    started = time.monotonic()
+    operation_deadline = started + operation_timeout_s
+    observation_deadline = operation_deadline + process_margin_s
 
     commit = request.commit
     agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY", "")
@@ -1054,89 +1088,116 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
     path = receipts / f"{digest}.json"
     from filelock import FileLock, Timeout
 
-    started = time.monotonic()
     with _telemetry.span(
         "farm.preparation", service=_telemetry.BUILD_INFRA_SERVICE,
         build_id=request.build_id, commit=commit,
     ) as sp:
+        sp.set_attribute("operation_timeout_s", operation_timeout_s)
+        sp.set_attribute("process_margin_s", process_margin_s)
+        sp.set_attribute("operation_deadline_monotonic", operation_deadline)
+        lock = FileLock(str(path.with_suffix(".lock")))
+        while True:
+            remaining = observation_deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    f"farm preparation publication lock timed out after "
+                    f"{operation_timeout_s:g}s work and {process_margin_s:g}s "
+                    f"process margin for build {request.build_id} at PoolHome {pool}"
+                )
+            try:
+                # Short Windows waits keep Ctrl-C responsive. The margin is
+                # only for observing an existing owner's terminal outcome.
+                lock.acquire(timeout=min(1.0, remaining))
+            except Timeout:
+                continue
+            break
         try:
-            with FileLock(str(path.with_suffix(".lock")), timeout=_PREPARATION_LOCK_TIMEOUT_S):
-                sp.set_attribute("lock_wait_ms", int((time.monotonic() - started) * 1000))
+            sp.set_attribute("lock_wait_ms", int((time.monotonic() - started) * 1000))
+            try:
+                text = path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                receipt = None
+            else:
                 try:
-                    text = path.read_text(encoding="utf-8")
-                except FileNotFoundError:
-                    receipt = None
+                    receipt = json.loads(text)
+                except (ValueError, RecursionError) as exc:
+                    raise RuntimeError(
+                        f"farm preparation publication receipt is corrupt: {path}"
+                    ) from exc
+                if (
+                    not isinstance(receipt, dict)
+                    or receipt.get("identity") != identity
+                    or receipt.get("state") not in {"publishing", "succeeded", "failed"}
+                    or (
+                        receipt["state"] == "failed"
+                        and (
+                            not isinstance(receipt.get("error"), str)
+                            or not receipt["error"]
+                        )
+                    )
+                ):
+                    raise RuntimeError(
+                        f"farm preparation publication receipt is invalid: {path}"
+                    )
+            if receipt is not None:
+                sp.set_attribute("publication_state", receipt["state"])
+                if receipt["state"] == "succeeded":
+                    return
+                if receipt["state"] == "publishing":
+                    error = (
+                        "farm preparation publication was interrupted or owned "
+                        f"process cleanup is unconfirmed for build {request.build_id}; "
+                        "verify publisher cleanup before restarting the build"
+                    )
                 else:
-                    try:
-                        receipt = json.loads(text)
-                    except (ValueError, RecursionError) as exc:
-                        raise RuntimeError(
-                            f"farm preparation publication receipt is corrupt: {path}"
-                        ) from exc
-                    if (
-                        not isinstance(receipt, dict)
-                        or receipt.get("identity") != identity
-                        or receipt.get("state") not in {"publishing", "succeeded", "failed"}
-                        or (
-                            receipt["state"] == "failed"
-                            and (
-                                not isinstance(receipt.get("error"), str)
-                                or not receipt["error"]
-                            )
-                        )
-                    ):
-                        raise RuntimeError(
-                            f"farm preparation publication receipt is invalid: {path}"
-                        )
-                if receipt is not None:
-                    sp.set_attribute("publication_state", receipt["state"])
-                    if receipt["state"] == "succeeded":
-                        return
-                    if receipt["state"] == "publishing":
-                        error = (
-                            "farm preparation publication was interrupted or owned "
-                            f"process cleanup is unconfirmed for build {request.build_id}; "
-                            "verify publisher cleanup before restarting the build"
-                        )
-                    else:
-                        error = receipt["error"]
-                    raise RuntimeError(error)
+                    error = receipt["error"]
+                raise RuntimeError(error)
+            publication_started = time.monotonic()
+            try:
+                if publication_started >= operation_deadline:
+                    raise RuntimeError(
+                        "preparation publication operation deadline exhausted "
+                        "before publisher launch"
+                    )
                 _atomic_json(path, {
                     "identity": identity, "state": "publishing", "error": None,
                 })
-                publication_started = time.monotonic()
-                try:
-                    _publish_preparation(pool, workspace, commit, agent_identity)
-                except PoolProcessCleanupError:
-                    # The owned publisher may still be writing. Keep the
-                    # nonterminal marker; every observer must fail closed.
-                    sp.set_attribute("publication_state", "cleanup_unconfirmed")
-                    raise
-                except Exception as exc:
-                    error = (
-                        f"farm preparation publication failed for build "
-                        f"{request.build_id}: {exc}"
+                if time.monotonic() >= operation_deadline:
+                    raise RuntimeError(
+                        "preparation publication operation deadline exhausted "
+                        "before publisher launch"
                     )
-                    _atomic_json(path, {
-                        "identity": identity, "state": "failed", "error": error,
-                    })
-                    sp.set_attribute("publication_state", "failed")
-                    raise RuntimeError(error) from exc
-                finally:
-                    sp.set_attribute(
-                        "publication_ms",
-                        int((time.monotonic() - publication_started) * 1000),
-                    )
+                _publish_preparation(
+                    pool, workspace, commit, agent_identity,
+                    operation_deadline=operation_deadline,
+                    process_margin_s=process_margin_s,
+                )
+            except PoolProcessCleanupError:
+                # The owned publisher may still be writing. Keep the
+                # nonterminal marker; every observer must fail closed.
+                sp.set_attribute("publication_state", "cleanup_unconfirmed")
+                raise
+            except Exception as exc:
+                error = (
+                    f"farm preparation publication failed for build "
+                    f"{request.build_id}: {exc}"
+                )
                 _atomic_json(path, {
-                    "identity": identity, "state": "succeeded", "error": None,
+                    "identity": identity, "state": "failed", "error": error,
                 })
-                sp.set_attribute("publication_state", "succeeded")
-        except Timeout as exc:
-            raise RuntimeError(
-                f"farm preparation publication lock timed out after "
-                f"{_PREPARATION_LOCK_TIMEOUT_S}s for build {request.build_id} "
-                f"at PoolHome {pool}"
-            ) from exc
+                sp.set_attribute("publication_state", "failed")
+                raise RuntimeError(error) from exc
+            finally:
+                sp.set_attribute(
+                    "publication_ms",
+                    int((time.monotonic() - publication_started) * 1000),
+                )
+            _atomic_json(path, {
+                "identity": identity, "state": "succeeded", "error": None,
+            })
+            sp.set_attribute("publication_state", "succeeded")
+        finally:
+            lock.release()
 
 
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:

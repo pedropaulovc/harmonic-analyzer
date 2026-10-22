@@ -677,10 +677,11 @@ matching full agent identity deployed to the fleet. Remote misses require its
 preparation publisher/readiness API and `agent/process_tree.py`; there is no new
 producer package pin, adjacent-checkout fallback or automatic deployment. The
 existing admission subprocess reads readiness from that exact PoolHome. Missing
-preparation capability or configuration does not itself reject cache-hit-only
-work, but the first real remote miss refuses it clearly before that leaf connects
-or reserves capacity. Existing fleet admission and producer registration still
-apply to cache-hit-only builds.
+preparation capability/configuration or a failure of this optional probe does
+not itself reject cache-hit-only work. Probe failures carry only a sanitized
+exception type, not configuration/error text. The first real remote miss refuses
+unready preparation before that leaf connects or reserves capacity. Mandatory
+identity, fleet admission and producer registration still apply to every build.
 
 The first actual remote miss publishes the source/graph preparation once for the
 build, before leaf dispatch. A cache-hit-only build does not publish or eagerly
@@ -694,27 +695,41 @@ Spawned action processes coordinate through a `FileLock` and atomic receipts in
 agent identities plus canonical repository and PoolHome roots. A successful
 receipt is reused across processes; a failed publication is shared without a
 fresh publisher retry in the same build. The receipt enters `publishing` before
-the CLI starts, so a crashed owner cannot be mistaken for a safe retry. The nested
-directory does not add preparation records to the launcher's root-level workflow
-request inventory.
+the private body starts, so a crashed owner cannot be mistaken for a safe retry.
+The nested directory does not add preparation records to the launcher's
+root-level workflow request inventory.
 
-The publisher has a **900-second** deadline, one **five-second** owned-tree cleanup
-budget, and a **910-second** lock-wait bound. These are publisher bounds, not a
-deadline on the supervised build, a leaf-budget change or a change to FIFO grace.
-Every bridge return requires confirmation that its created process tree stopped,
-including normal zero/nonzero exits whose descendants may still hold stdout.
-Windows creates the helper suspended, assigns its Job Object before resuming it,
-and confirms the job is empty; POSIX confirms the owned root and process group.
-No process-name kill or pre-existing SOLIDWORKS seat is involved. Unconfirmed
-cleanup raises `PoolProcessCleanupError` and leaves the receipt nonterminal rather
-than publishing a shared failure while a possible writer remains.
+Readiness declares one **900-second operation deadline** and a **10-second
+supervision margin**. The original absolute deadline starts before receipt-lock
+waiting and uv/Popen setup; later phases cannot acquire another 900 seconds.
+Process and receipt-lock waits use responsive slices of at most one second.
+The margin is only for terminal-receipt observation and cleanup, not new
+publication work. Owned-tree cleanup gets one deadline
+`min(now + 5, operation_deadline + 10)` shared by termination and reaping.
+These bounds do not change native-leaf budgets, FIFO grace or build lifetime.
+
+HA loads the selected pool's pure private-body argv/receipt helpers and invokes
+that body through its existing, sole `ProcessTree`; it does not invoke the
+supervising public CLI/API underneath another job or process group. Stdout and
+stderr remain inherited stage diagnostics; the bounded, parent-owned receipt
+is separate and decoded by the selected pool's protocol authority. Every result
+requires confirmation that the created tree stopped, even after a normal root
+exit. Windows creates the root suspended and assigns its Job Object before
+resuming it; POSIX confirms the owned root and process group. An uncertain
+adoption kills only the stored root handle before terminating/reaping its owned
+tree. No process-name kill or pre-existing SOLIDWORKS seat is involved.
+Unconfirmed cleanup raises `PoolProcessCleanupError`, retains owned result
+storage, and leaves the shared receipt nonterminal.
 
 The launcher's requests root remains launcher-owned. An attended direct build
 without an inherited requests root owns a temporary root for its producer/action
-worker lifetime and removes only that root afterward. Preserve diagnostics for a
-failed or interrupted publication; do not edit/delete its receipt or lock to retry
-inside the same build. Establish that its owned publisher stopped before recovery
-through a fresh build identity.
+worker lifetime and removes only that root afterward. If owned-tree termination
+is unconfirmed, the root and receipts are retained. Other cleanup failures report
+the owned residue without replacing an existing build failure; an otherwise
+successful build still fails if its cleanup cannot be confirmed. Preserve these
+diagnostics and do not edit/delete a receipt or lock to retry inside the same
+build. Establish that the owned publisher stopped before recovery through a
+fresh build identity.
 
 ### Interpreting selective execution measurements
 
