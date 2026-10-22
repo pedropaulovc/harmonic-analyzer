@@ -522,8 +522,18 @@ def test_import_rejects_successful_unit_setter_that_does_not_persist(washer_impo
 
     object.__setattr__(case.display, "SetUnits2", no_op)
     before = _presentation_snapshot(case)
-    with pytest.raises(RuntimeError, match="native supplier presentation differs"):
+    with pytest.raises(RuntimeError, match="native supplier presentation differs") as caught:
         pair.persist()
+    prefix = "supplier washer source/import readback: "
+    notes = [note for note in caught.value.__notes__ if note.startswith(prefix)]
+    assert len(notes) == 1
+    readback = json.loads(notes[0][len(prefix):])
+    assert readback["source"]["units"] == case.specification.unit_code
+    assert readback["source"]["use_document_units"] is False
+    assert readback["imported"]["units"] == -1
+    assert readback["imported"]["fraction_base"] == -1
+    assert readback["imported"]["fraction_value"] == -1
+    assert readback["imported"]["use_document_units"] is True
     assert case.calls == [
         ("SetUnits2", False, case.specification.unit_code, 1, 0, False, 0),
     ]

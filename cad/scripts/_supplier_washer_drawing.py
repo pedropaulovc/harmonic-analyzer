@@ -80,31 +80,31 @@ def _persist_imported_units(
             source, label=label, units=units, precision=precision,
             expected_mm=expected_mm, callout=callout,
         )
+        identity = adapter.swApp.IsSame(display.GetDimension2(0), native)
+        if type(identity) is not int or identity != 1:
+            raise RuntimeError(f"{label}: imported supplier dimension is not its native source")
+        # Import selects drawing-document units even when the source display has
+        # explicit units. SDK GetUnits/GetFractionBase then return -1, not the
+        # supplier settings. FractDenom is meaningful only for fractional inches;
+        # transfer the source getter unchanged rather than inventing a denominator.
+        # HalfAway=0 is the source author's documented decimal-rounding choice.
+        status = display.SetUnits2(
+            False, source.GetUnits(), source.GetFractionBase(),
+            source.GetFractionValue(), source.GetRoundToFraction(), 0,
+        )
+        if type(status) is not int or status != 0:
+            raise RuntimeError(f"{label}: imported supplier units were rejected ({status!r})")
+        assert_supplier_reference_dimension(
+            adapter, display, label=label, units=units, precision=precision,
+            expected_mm=expected_mm, presentation="length" if label == THICKNESS else "diameter",
+            callout=callout,
+        )
     except Exception as error:
         error.add_note("supplier washer source/import readback: " + json.dumps(
             {"source": _saved_display_readback(source), "imported": _saved_display_readback(display)},
             sort_keys=True, default=repr,
         ))
         raise
-    identity = adapter.swApp.IsSame(display.GetDimension2(0), native)
-    if type(identity) is not int or identity != 1:
-        raise RuntimeError(f"{label}: imported supplier dimension is not its native source")
-    # Import selects drawing-document units even when the source display has
-    # explicit units. SDK GetUnits/GetFractionBase then return -1, not the
-    # supplier settings. FractDenom is meaningful only for fractional inches;
-    # transfer the source getter unchanged rather than inventing a denominator.
-    # HalfAway=0 is the source author's documented decimal-rounding choice.
-    status = display.SetUnits2(
-        False, source.GetUnits(), source.GetFractionBase(),
-        source.GetFractionValue(), source.GetRoundToFraction(), 0,
-    )
-    if type(status) is not int or status != 0:
-        raise RuntimeError(f"{label}: imported supplier units were rejected ({status!r})")
-    assert_supplier_reference_dimension(
-        adapter, display, label=label, units=units, precision=precision,
-        expected_mm=expected_mm, presentation="length" if label == THICKNESS else "diameter",
-        callout=callout,
-    )
 
 
 def _rim(
