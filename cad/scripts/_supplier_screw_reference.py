@@ -63,6 +63,15 @@ def _construction(adapter: Any, entity: str) -> None:
 async def _anchor(
     adapter: Any, dimensions: SketchDims, entity: str, start: tuple[float, float], name: str
 ) -> None:
+    line = _early_bound(adapter._sketch_entities[entity], "ISketchLine")
+    raw = line.GetStartPoint2()
+    if raw is None:
+        raise RuntimeError(f"{entity}: supplier reference endpoint is missing")
+    point = _early_bound(raw, "ISketchPoint")
+    # A start can weld directly to an anchored carrier; a welded end can also
+    # fix the start through this line's orientation and size. Do not re-anchor.
+    if int(point.Status) == 3:  # swConstrainedStatus_e.swFullyConstrained
+        return
     await anchor_point_to_origin(adapter, f"{entity}.start", *start, name)
     for coordinate, axis in zip(start, ("X", "Y"), strict=True):
         if abs(coordinate) >= 1e-9:
@@ -139,9 +148,11 @@ async def _angle(
     )
     await dimension_between(adapter, f"{ray}.start", f"{ray}.end", "distance", 1.0, name)
     dimensions.record(f"{name}RayLength")
+    # The angular adapter selects its first ray and the shared vertex. Selecting
+    # the already horizontal baseline can create a driven 180-degree dimension.
     check(
         f"dimension {name} supplier angle",
-        await adapter.add_sketch_dimension(baseline, ray, "angular", degrees),
+        await adapter.add_sketch_dimension(ray, baseline, "angular", degrees),
     )
     _assert_line_frame(adapter, baseline, start, (start[0] + 1.0, start[1]))
     _assert_line_frame(

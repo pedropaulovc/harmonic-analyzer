@@ -58,6 +58,12 @@ cannot ask for what the authors were told to leave out.
   carrier. Source bands remain model-owned. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
+  Angular carriers dimension the angled ray before the horizontal baseline.
+  Exact AddToDB endpoints may share an already anchored native point: omit a
+  start-origin anchor only when that point reports `swFullyConstrained` (3),
+  and record only dimensions actually authored. Final-frame, fully-defined
+  sketch and exact native-value guards remain mandatory; purchased solids and
+  supplier stock dimensions are unchanged.
   Source ownership requires native `IDimension` identity both with the source
   parameter and with a dimension enumerated from the intended model feature;
   matching names or values alone cannot prove membership. `IFeature` wrapper

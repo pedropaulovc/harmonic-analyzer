@@ -6831,6 +6831,666 @@ def test_supplier_chord_rejects_same_length_in_wrong_final_frame(
         reference._assert_line_frame(adapter, "chord", (0.0, 0.0), (6.35, 0.0))
 
 
+@pytest.fixture
+def supplier_reference_model(monkeypatch):
+    """Small native model for chords, merged endpoints and the probed angle branch.
+
+    Keep the public authorer, frame/state guards, feature/dimension traversal,
+    renaming, Parameter readback, drawing marks and hidden-state checks real.
+    Only angular dimensions use the real adapter implementation: its native
+    AddDimension fake inspects the selected geometry, and SetSystemValue3 can
+    silently refuse a driven dimension just as the native probe did.
+    """
+    import math
+
+    from solidworks_mcp.adapters import pywin32_adapter
+    from solidworks_mcp.adapters.solidworks.sketch import _add_sketch_dimension_impl
+
+    monkeypatch.setattr(pywin32_adapter, "null_callout", lambda: None)
+
+    class Point:
+        def __init__(self, model, x, y, status):
+            self.model = model
+            self.X, self.Y, self.Z = x / 1000.0, y / 1000.0, 0.0
+            self.Status = status
+            self.axes = {"X", "Y"} if status == 3 else set()
+
+        def Select2(self, append, _mark):
+            if not append:
+                self.model.selection.clear()
+            self.model.selection.append(self)
+            return True
+
+    class Line:
+        ConstructionGeometry = False
+
+        def __init__(self, first, last):
+            self.first, self.last = first, last
+            self.oriented = False
+            self.sized = False
+
+        def GetStartPoint2(self):
+            return self.first
+
+        def GetEndPoint2(self):
+            return self.last
+
+        def solve(self):
+            if self.oriented and self.sized and (
+                self.first.Status == 3 or self.last.Status == 3
+            ):
+                for point in (self.first, self.last):
+                    point.Status = 3
+                    point.axes.update(("X", "Y"))
+
+    class Dimension:
+        def __init__(self, feature, value, ray=None, driven=False):
+            self.feature = feature
+            self.Name = f"D{len(feature.dimensions) + 1}"
+            self._value = value
+            self.ray = ray
+            self.Type = 3 if ray is not None else 2
+            self.DrivenState = 1 if driven else 2
+            self.setter_statuses = []
+
+        @property
+        def FullName(self):
+            return f"{self.Name}@{self.feature.Name}@stock.SLDPRT"
+
+        @property
+        def SystemValue(self):
+            return self._value
+
+        def SetSystemValue3(self, value, _configuration, _names):
+            if self.DrivenState == 1:
+                status = 3  # swSetValue_DrivenDimension: no value/geometry change.
+            else:
+                self._value = value
+                first, last = self.ray.first, self.ray.last
+                length = math.hypot(last.X - first.X, last.Y - first.Y)
+                last.X = first.X + length * math.cos(value)
+                last.Y = first.Y + length * math.sin(value)
+                self.ray.oriented = True
+                self.ray.solve()
+                status = 0  # swSetValue_Successful
+            self.setter_statuses.append(status)
+            return status
+
+    class Feature:
+        def __init__(self, adapter, plane):
+            self.adapter, self.plane = adapter, plane
+            self.Name = f"Sketch{len(adapter.features) + 1}"
+            self.Visible = 2
+            self.lines, self.dimensions = [], []
+            self.points = {}
+            self.dimension_walks = 0
+
+        def GetNextFeature(self):
+            index = self.adapter.features.index(self) + 1
+            return next(iter(self.adapter.features[index:]), None)
+
+        def GetFirstSubFeature(self):
+            return None
+
+        def GetFirstDisplayDimension(self):
+            self.dimension_walks += 1
+            return next(iter(self.dimensions), None)
+
+        def GetNextDisplayDimension(self, display):
+            index = self.dimensions.index(display) + 1
+            return next(iter(self.dimensions[index:]), None)
+
+    class Model:
+        def __init__(self, adapter):
+            self.adapter = adapter
+            self.selection, self.parameter_reads = [], []
+            self.Extension = SimpleNamespace(
+                AddDimension=self.add_angular_dimension,
+                SelectByID2=self.select_sketch,
+            )
+
+        def FeatureByName(self, name):
+            return next((f for f in self.adapter.features if f.Name == name), None)
+
+        def FeatureByPositionReverse(self, position):
+            features = self.adapter.features
+            return features[-position - 1] if position < len(features) else None
+
+        def Parameter(self, name):
+            self.parameter_reads.append(name)
+            leaf, owner = name.split("@")
+            feature = self.FeatureByName(owner)
+            return next(
+                (d.GetDimension2(0) for d in feature.dimensions if d.GetDimension2(0).Name == leaf),
+                None,
+            )
+
+        def ClearSelection2(self, _all):
+            self.selection.clear()
+
+        def select_sketch(self, name, kind, *_args):
+            assert kind == "SKETCH"
+            feature = self.FeatureByName(name)
+            self.selection = [feature] if feature is not None else []
+            return feature is not None
+
+        def BlankSketch(self):
+            (feature,) = self.selection
+            feature.Visible = 1
+
+        def add_angular_dimension(self, *_placement):
+            ray, vertex = self.selection
+            assert vertex is ray.first
+            dx, dy = ray.last.X - vertex.X, ray.last.Y - vertex.Y
+            # The native API selects one segment plus the shared vertex, not
+            # the tuple of registry names. A horizontal selected segment takes
+            # the silent driven-pi branch; the inclined ray measures its angle.
+            driven = abs(dy) < 1e-12
+            native = Dimension(
+                self.adapter.active,
+                math.pi if driven else math.atan2(dy, dx),
+                ray=ray,
+                driven=driven,
+            )
+            self.adapter.angular = native
+            return self.adapter.add_native_dimension(native)
+
+    class Adapter:
+        constants = {
+            "swSmartDimensionDirectionRight": 1,
+            "swSmartDimensionDirectionUp": 2,
+            "swSmartDimensionDirectionLeft": 3,
+            "swSmartDimensionDirectionDown": 4,
+        }
+
+        def __init__(
+            self, *, point_statuses=None, baseline_first=False, defect=None, final_status=3
+        ):
+            self.features, self._sketch_entities = [], {}
+            self.currentModel = Model(self)
+            self.currentSketchManager = SimpleNamespace(AddToDB=False)
+            self.point_statuses = point_statuses or {}
+            self.baseline_first, self.defect = baseline_first, defect
+            self.final_status = final_status
+            self.origin_requests, self.over_defining = [], []
+            self.definition_states, self.exited = [], []
+            self.angular = self.angular_result = None
+
+        @staticmethod
+        def result(data=None):
+            return SimpleNamespace(is_success=True, data=data, error=None)
+
+        @staticmethod
+        def _attempt(operation, default=None):
+            return operation()
+
+        def _handle_com_operation(self, _name, operation):
+            return self.result(operation())
+
+        def _register_sketch_entity(self, kind, obj):
+            name = f"{kind}_{len(self._sketch_entities)}"
+            self._sketch_entities[name] = obj
+            return name
+
+        def add_native_dimension(self, native):
+            display = SimpleNamespace(
+                GetDimension2=lambda _index: native, MarkedForDrawing=False
+            )
+            self.active.dimensions.append(display)
+            return display
+
+        async def create_sketch(self, plane):
+            self.active = Feature(self, plane)
+            self.features.append(self.active)
+            return self.result(self.active.Name)
+
+        def point(self, x, y):
+            if (x, y) not in self.active.points:
+                status = self.point_statuses.get((self.active.plane, (x, y)), 2)
+                self.active.points[x, y] = Point(self.currentModel, x, y, status)
+            return self.active.points[x, y]
+
+        async def add_line(self, x1, y1, x2, y2):
+            assert self.currentSketchManager.AddToDB is True
+            line = Line(self.point(x1, y1), self.point(x2, y2))
+            self.active.lines.append(line)
+            return self.result(self._register_sketch_entity("Chord", line))
+
+        def endpoint(self, ref):
+            entity, endpoint = ref.split(".")
+            line = self._sketch_entities[entity]
+            return line, line.first if endpoint == "start" else line.last
+
+        def anchor(self, ref, axes, kind):
+            line, point = self.endpoint(ref)
+            self.origin_requests.append((line, point, kind))
+            if point.Status == 3 and kind in ("horizontal_points", "vertical_points"):
+                # The nut probe demonstrated redundant alignment relations,
+                # not duplicate origin coincidences or distance dimensions.
+                self.over_defining.append((ref, kind))
+                point.Status = 4
+                return
+            point.axes.update(axes)
+            if point.axes == {"X", "Y"}:
+                point.Status = 3
+                for candidate in self.active.lines:
+                    candidate.solve()
+
+        async def add_sketch_constraint(self, first, second, kind):
+            if second == "origin":
+                self.anchor(
+                    first,
+                    {"coincident": ("X", "Y"), "horizontal_points": ("Y",), "vertical_points": ("X",)}[kind],
+                    kind,
+                )
+            elif kind == "coincident":
+                assert self.endpoint(first)[1] is self.endpoint(second)[1]
+            else:
+                assert second is None and kind in ("horizontal", "vertical")
+                line = self._sketch_entities[first]
+                line.oriented = True
+                line.solve()
+            return self.result()
+
+        def _shared_segment_vertex(self, first, second):
+            assert first.first is second.first
+            vertex = first.first
+            return (vertex.X, vertex.Y, vertex.Z), vertex, vertex
+
+        def _angular_dimension_placement(self, first, second):
+            vertex, _, _ = self._shared_segment_vertex(first, second)
+            return vertex[0] + 0.005, vertex[1] + 0.005, 0.0, self.constants["swSmartDimensionDirectionUp"]
+
+        def _select_sketch_entity(self, entity, append):
+            if not append:
+                self.currentModel.selection.clear()
+            self.currentModel.selection.append(entity)
+            return True
+
+        async def add_sketch_dimension(self, first, second, kind, value):
+            if kind == "angular":
+                # Replay the pre-fix operand order at the adapter boundary;
+                # neither the authorer nor any strict guard is stubbed.
+                if self.baseline_first:
+                    first, second = second, first
+                result = _add_sketch_dimension_impl(self, first, second, kind, value)
+                self.angular_result = result
+                ray = (
+                    self.angular.ray if self.angular.DrivenState == 2 else
+                    next(line for line in self.active.lines if not line.oriented)
+                )
+                if self.final_status != 3:
+                    ray.last.Status = self.final_status
+                if self.defect == "shifted":
+                    for point in self.active.points.values():
+                        point.X += 0.001
+                elif self.defect == "flipped":
+                    ray.last.X = 2 * ray.first.X - ray.last.X
+                    ray.last.Y = 2 * ray.first.Y - ray.last.Y
+                return result
+            line, point = self.endpoint(first)
+            if second == "origin":
+                measured = abs(point.X if kind == "horizontal_distance" else point.Y)
+                self.anchor(first, ("X",) if kind == "horizontal_distance" else ("Y",), kind)
+            else:
+                other_line, other = self.endpoint(second)
+                assert other_line is line
+                dx, dy = other.X - point.X, other.Y - point.Y
+                measured = {
+                    "horizontal_distance": abs(dx),
+                    "vertical_distance": abs(dy),
+                    "distance": math.hypot(dx, dy),
+                }[kind]
+                line.sized = True
+                line.solve()
+            # Native linear values come from geometry, not the requested value.
+            display = self.add_native_dimension(Dimension(self.active, measured))
+            return self.result(self._register_sketch_entity("Dimension", display))
+
+        async def check_sketch_fully_defined(self):
+            statuses = {point.Status for point in self.active.points.values()}
+            state = (
+                "over_defined" if self.over_defining or 4 in statuses else
+                "fully_defined" if statuses == {3} else
+                "under_defined" if statuses <= {2, 3} else "unknown"
+            )
+            self.definition_states.append(state)
+            return self.result({"definition_state": state})
+
+        async def get_over_defining_relations(self):
+            return self.result(self.over_defining)
+
+        async def exit_sketch(self):
+            self.exited.append(self.active)
+            if self.defect == "extra_dimension":
+                self.add_native_dimension(Dimension(self.active, 0.001))
+            elif self.defect == "missing_dimension":
+                self.active.dimensions.pop()
+            elif self.defect == "native_value":
+                self.angular._value += math.radians(1.0)
+            return self.result()
+
+    return Adapter
+
+
+def _assert_supplier_reference_native_outputs(adapter, rows, planes, expected_names):
+    import math
+
+    from _supplier_screw_reference_names import FEATURE_BY_PLANE
+
+    assert adapter.currentSketchManager.AddToDB is False
+    assert [feature.Name for feature in adapter.features] == list(expected_names)
+    queries = []
+    for feature in adapter.features:
+        native = [display.GetDimension2(0) for display in feature.dimensions]
+        assert [dimension.Name for dimension in native] == expected_names[feature.Name]
+        source = {
+            name: (value, orientation)
+            for name, value, orientation in rows
+            if FEATURE_BY_PLANE[planes.get(name, "Front")] == feature.Name
+        }
+        queries.extend(f"{name}@{feature.Name}" for name in source)
+        for dimension in native:
+            if dimension.Name in source:
+                value, orientation = source[dimension.Name]
+                expected = math.radians(value) if orientation == "angle" else abs(value) / 1000.0
+                assert dimension.SystemValue == pytest.approx(expected, abs=1e-12)
+        assert {
+            display.GetDimension2(0).Name
+            for display in feature.dimensions
+            if display.MarkedForDrawing
+        } == set(source)
+        assert feature.Visible == 1
+        assert all(line.ConstructionGeometry for line in feature.lines)
+    # Only the public exact-value guard should have made these named lookups.
+    assert adapter.currentModel.parameter_reads == queries
+
+
+def test_supplier_angle_public_path_keeps_native_count_names_and_values(
+    supplier_reference_model,
+):
+    import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser
+    import _supplier_screw_reference as reference
+
+    adapter = supplier_reference_model()
+    asyncio.run(reference.add_supplier_reference_sketch(
+        adapter, riser.SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=riser.SUPPLIER_REFERENCE_STARTS, planes=riser.SUPPLIER_REFERENCE_PLANES,
+    ))
+    _assert_supplier_reference_native_outputs(
+        adapter, riser.SUPPLIER_REFERENCE_DIMENSIONS, riser.SUPPLIER_REFERENCE_PLANES,
+        {
+            "SupplierReference": [
+                "SupplierLength", "SupplierLengthStartX",
+                "SupplierHeadHeight", "SupplierHeadHeightStartX",
+                "SupplierThreadDiameter", "SupplierThreadDiameterStartX", "SupplierThreadDiameterStartY",
+                "SupplierHeadAngleBaselineLength", "SupplierHeadAngleStartY",
+                "SupplierHeadAngleRayLength", "SupplierHeadAngle",
+            ],
+            "SupplierTopReference": ["SupplierHeadDiameter", "SupplierHeadDiameterStartX"],
+        },
+    )
+    baseline, ray = adapter.features[0].lines[-2:]
+    assert baseline.first is ray.first
+    assert adapter.angular.ray is ray
+    assert adapter.angular.Type == 3
+    assert adapter.angular.DrivenState == 2
+    assert adapter.angular.setter_statuses == [0]
+    assert adapter.angular_result.is_success
+    assert adapter.definition_states == ["fully_defined", "fully_defined"]
+    assert any(kind == "vertical_points" for _, _, kind in adapter.origin_requests)
+
+
+def test_supplier_angle_baseline_first_silent_driven_success_refuses(
+    supplier_reference_model,
+):
+    import math
+
+    import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser
+    import _supplier_screw_reference as reference
+
+    adapter = supplier_reference_model(baseline_first=True)
+    with pytest.raises(RuntimeError, match="sketch not fully defined.*under_defined"):
+        asyncio.run(reference.add_supplier_reference_sketch(
+            adapter, riser.SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=riser.SUPPLIER_REFERENCE_STARTS, planes=riser.SUPPLIER_REFERENCE_PLANES,
+        ))
+    baseline, ray = adapter.features[0].lines[-2:]
+    assert baseline.first is ray.first
+    assert adapter.angular.ray is baseline
+    assert adapter.angular_result.is_success  # The adapter must NOT fail loudly.
+    assert adapter.angular.DrivenState == 1
+    assert adapter.angular.SystemValue == math.pi
+    assert adapter.angular.setter_statuses == [3]
+    assert ray.last.Status == 2
+    assert adapter.definition_states == ["under_defined"]
+    assert not adapter.exited
+    assert adapter.features[0].dimension_walks == 0
+    assert adapter.currentModel.parameter_reads == []
+
+
+@pytest.mark.parametrize(
+    "defect,error",
+    [
+        ("extra_dimension", "recorded 4 dims but the feature has 5"),
+        ("missing_dimension", "recorded 4 dims but the feature has 3"),
+        ("native_value", "supplier reference value changed during constraint solving"),
+        ("shifted", "final-frame coordinates"),
+        ("flipped", "final-frame coordinates"),
+    ],
+)
+def test_supplier_angle_public_path_refuses_native_corruption(
+    supplier_reference_model, defect, error
+):
+    import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser
+    import _supplier_screw_reference as reference
+
+    row = next(row for row in riser.SUPPLIER_REFERENCE_DIMENSIONS if row[2] == "angle")
+    adapter = supplier_reference_model(defect=defect)
+    with pytest.raises(RuntimeError, match=error):
+        asyncio.run(reference.add_supplier_reference_sketch(
+            adapter, (row,), starts={row[0]: riser.SUPPLIER_REFERENCE_STARTS[row[0]]},
+        ))
+    feature = adapter.features[0]
+    if defect in ("shifted", "flipped"):
+        assert adapter.definition_states == []
+        assert not adapter.exited
+        assert feature.dimension_walks == 0
+    else:
+        assert adapter.definition_states == ["fully_defined"]
+        assert adapter.exited == [feature]
+        assert feature.dimension_walks == 1
+    if defect == "native_value":
+        assert [display.GetDimension2(0).Name for display in feature.dimensions] == [
+            "SupplierHeadAngleBaselineLength", "SupplierHeadAngleStartY",
+            "SupplierHeadAngleRayLength", "SupplierHeadAngle",
+        ]
+        assert adapter.currentModel.parameter_reads == ["SupplierHeadAngle@SupplierReference"]
+    else:
+        assert adapter.currentModel.parameter_reads == []
+    assert feature.Visible != 1
+    assert not any(display.MarkedForDrawing for display in feature.dimensions)
+
+
+@pytest.mark.parametrize("status", (1, 2, 4, 5, 6, 7))
+def test_supplier_angle_public_path_refuses_nonfull_native_states(
+    supplier_reference_model, status
+):
+    import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser
+    import _supplier_screw_reference as reference
+
+    row = next(row for row in riser.SUPPLIER_REFERENCE_DIMENSIONS if row[2] == "angle")
+    adapter = supplier_reference_model(final_status=status)
+    error = "sketch OVER-defined" if status == 4 else "sketch not fully defined"
+    with pytest.raises(RuntimeError, match=error):
+        asyncio.run(reference.add_supplier_reference_sketch(
+            adapter, (row,), starts={row[0]: riser.SUPPLIER_REFERENCE_STARTS[row[0]]},
+        ))
+    assert adapter.angular_result.is_success
+    assert adapter.angular.ray.last.Status == status
+    assert not adapter.exited
+    assert adapter.features[0].dimension_walks == 0
+    assert adapter.currentModel.parameter_reads == []
+
+
+@pytest.mark.parametrize("shared", ("start", "end"))
+def test_supplier_linear_public_path_preserves_shared_native_points(
+    supplier_reference_model, shared
+):
+    import _mcmaster_90114a124 as fillister
+    import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as nut
+    import _supplier_screw_reference as reference
+
+    spec = fillister if shared == "start" else nut
+    adapter = supplier_reference_model()
+    asyncio.run(reference.add_supplier_reference_sketch(
+        adapter, spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=spec.SUPPLIER_REFERENCE_STARTS, planes=spec.SUPPLIER_REFERENCE_PLANES,
+    ))
+    if shared == "start":
+        expected_names = {
+            "SupplierReference": [
+                "SupplierLength", "SupplierHeadHeight", "SupplierThreadDiameter",
+                "SupplierThreadDiameterStartX", "SupplierThreadDiameterStartY",
+            ],
+            "SupplierTopReference": ["SupplierHeadDiameter", "SupplierHeadDiameterStartX"],
+        }
+        carrier, dependent = adapter.features[0].lines[:2]
+        pairs = [(carrier.first, dependent.first, dependent)]
+    else:
+        expected_names = {
+            "SupplierReference": [
+                "SupplierSpigotLength", "SupplierSpigotLengthStartX", "SupplierSpigotLengthStartY",
+                "SupplierFlangeThickness", "SupplierFlangeThicknessStartX",
+                "SupplierBodyLength", "SupplierBodyLengthStartX", "SupplierBodyLengthStartY",
+                "SupplierBodyDiameter", "SupplierFlangeDiameter",
+            ],
+            "SupplierTopReference": [
+                "SupplierHolePitchDiameter", "SupplierHolePitchDiameterStartX",
+                "SupplierMountingHoleDiameter", "SupplierMountingHoleDiameterStartX",
+                "SupplierMountingHoleDiameterStartY",
+            ],
+        }
+        spigot, flange, _, body_diameter, flange_diameter = adapter.features[0].lines
+        pairs = [
+            (spigot.last, body_diameter.last, body_diameter),
+            (flange.first, flange_diameter.last, flange_diameter),
+        ]
+    for carrier_point, dependent_point, dependent in pairs:
+        assert carrier_point is dependent_point  # Native identity, not equality.
+        assert dependent.first.Status == dependent.last.Status == 3
+        assert not any(line is dependent for line, _, _ in adapter.origin_requests)
+    _assert_supplier_reference_native_outputs(
+        adapter, spec.SUPPLIER_REFERENCE_DIMENSIONS, spec.SUPPLIER_REFERENCE_PLANES,
+        expected_names,
+    )
+    assert not adapter.over_defining
+
+
+@pytest.mark.parametrize("shared", ("start", "end"))
+def test_supplier_linear_legacy_anchor_path_matches_observed_native_outcomes(
+    monkeypatch, supplier_reference_model, shared
+):
+    import _mcmaster_90114a124 as fillister
+    import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as nut
+    import _supplier_screw_reference as reference
+
+    async def unconditionally_anchor(adapter, recorded, entity, start, name):
+        # Replay the old authoring path, not a fake guard failure.
+        await reference.anchor_point_to_origin(adapter, f"{entity}.start", *start, name)
+        for coordinate, axis in zip(start, ("X", "Y"), strict=True):
+            if abs(coordinate) >= 1e-9:
+                recorded.record(f"{name}Start{axis}")
+
+    monkeypatch.setattr(reference, "_anchor", unconditionally_anchor)
+    spec = fillister if shared == "start" else nut
+    adapter = supplier_reference_model()
+    if shared == "start":
+        # The old shared-origin path passed natively for this fillister. A
+        # duplicate coincidence must not invent an over-definition failure.
+        asyncio.run(reference.add_supplier_reference_sketch(
+            adapter, spec.SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=spec.SUPPLIER_REFERENCE_STARTS, planes=spec.SUPPLIER_REFERENCE_PLANES,
+        ))
+        carrier, dependent = adapter.features[0].lines[:2]
+        assert carrier.first is dependent.first
+        assert any(
+            line is dependent and kind == "coincident"
+            for line, _, kind in adapter.origin_requests
+        )
+        _assert_supplier_reference_native_outputs(
+            adapter, spec.SUPPLIER_REFERENCE_DIMENSIONS, spec.SUPPLIER_REFERENCE_PLANES,
+            {
+                "SupplierReference": [
+                    "SupplierLength", "SupplierHeadHeight", "SupplierThreadDiameter",
+                    "SupplierThreadDiameterStartX", "SupplierThreadDiameterStartY",
+                ],
+                "SupplierTopReference": ["SupplierHeadDiameter", "SupplierHeadDiameterStartX"],
+            },
+        )
+        assert not adapter.over_defining
+        return
+    # Only the nut's redundant point-alignment relations have native evidence
+    # of over-definition; extra distance dimensions are not declared fatal.
+    with pytest.raises(RuntimeError, match="sketch OVER-defined"):
+        asyncio.run(reference.add_supplier_reference_sketch(
+            adapter, spec.SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=spec.SUPPLIER_REFERENCE_STARTS, planes=spec.SUPPLIER_REFERENCE_PLANES,
+        ))
+    assert adapter.over_defining
+    assert {kind for _, kind in adapter.over_defining} <= {
+        "horizontal_points", "vertical_points",
+    }
+    assert adapter.definition_states == ["over_defined"]
+    assert not adapter.exited
+    assert adapter.currentModel.parameter_reads == []
+
+
+@pytest.mark.parametrize("status", (1, 2, 3, 4, 5, 6, 7))
+@pytest.mark.parametrize(
+    "spec_name,name",
+    [
+        ("_mcmaster_90114a124", "SupplierLength"),
+        ("ch_rocker_arm_tl_vn_oblique_riser_screw_spec", "SupplierLength"),
+        ("ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec", "SupplierSpigotLength"),
+    ],
+)
+def test_supplier_linear_public_path_native_point_status_controls_anchors(
+    supplier_reference_model, status, spec_name, name
+):
+    import importlib
+
+    import _supplier_screw_reference as reference
+
+    spec = importlib.import_module(spec_name)
+    row = next(row for row in spec.SUPPLIER_REFERENCE_DIMENSIONS if row[0] == name)
+    start = spec.SUPPLIER_REFERENCE_STARTS.get(name, (0.0, 0.0))
+    plane = spec.SUPPLIER_REFERENCE_PLANES.get(name, "Front")
+    # These are pre-anchor native status snapshots, not a claim that a real
+    # no-solution/autosolve-off sketch recovers merely by adding an anchor.
+    adapter = supplier_reference_model(point_statuses={(plane, start): status})
+    asyncio.run(reference.add_supplier_reference_sketch(
+        adapter, (row,), starts={name: start}, planes={name: plane},
+    ))
+    axes = [] if status == 3 else [
+        axis for coordinate, axis in zip(start, ("X", "Y"), strict=True)
+        if abs(coordinate) >= 1e-9
+    ]
+    _assert_supplier_reference_native_outputs(
+        adapter, (row,), {name: plane},
+        {reference.FEATURE_BY_PLANE[plane]: [name, *[f"{name}Start{axis}" for axis in axes]]},
+    )
+    kinds = [kind for _, _, kind in adapter.origin_requests]
+    if status == 3:
+        assert kinds == []
+    elif start == (0.0, 0.0):
+        assert kinds == ["coincident"]
+    elif start[1] == 0.0:
+        assert kinds == ["horizontal_points", "horizontal_distance"]
+    else:
+        assert kinds == ["horizontal_distance", "vertical_distance"]
+
+
 def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(
     monkeypatch,
 ):
