@@ -32,10 +32,15 @@ from unittest.mock import patch
 DRIVER_PATH = Path(__file__).parent / "diagnostics/probe_mg_saved_thread_control.py"
 HELPER_PATH = Path(__file__).parent / "diagnostics/_owned_native_session.py"
 FIXTURE_PATH = Path(__file__).parent / "fixtures/mg_saved_thread_control_8863_native.json"
+SOURCE_FIXTURE_PATH = Path(__file__).parent / "fixtures/mg_saved_thread_control_a189_native.json"
 
 
 def recorded_diagnostic(case):
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))["diagnostics"][case]
+
+
+def recorded_source():
+    return json.loads(SOURCE_FIXTURE_PATH.read_text(encoding="utf-8"))
 DEFAULT = object()
 
 
@@ -298,12 +303,16 @@ class SourceFeature(NativeObject):
 class SourceDefinition:
     def __init__(self, scene, cosmetic=False):
         self.scene, self.cosmetic = scene, cosmetic
-        values = recorded_diagnostic("b0")["reads"]
+        values = recorded_diagnostic("sm_positive" if scene.is_sm else "b0")["reads"]
         self.values = {key.removeprefix("source."): value for key, value in values.items()
                        if key.startswith("source.") and isinstance(value, (str, int, float))}
         if cosmetic:
             self.values = {"ApplyThread": 1, "BlindDepth": 0.0, "Diameter": 0.00635,
                            "DiameterType": 0, "EndCondition": 1}
+            if scene.is_sm:
+                # Synthetic child metadata: actual SM child values await the
+                # authorized census, unlike its recorded Wizard/display data.
+                self.values.update(ApplyThread=0, BlindDepth=0.00495, DiameterType=2, EndCondition=0)
 
     def __getattr__(self, name):
         if name in self.values:
@@ -475,6 +484,7 @@ class SourceLineEdge(SourceEdge):
 class SourceScene:
     def __init__(self, document, mode):
         self.document = document
+        self.is_sm = "sm-summing-lever" in document.path
         self.phase = "before"
         self.accessed = False
         self.access_calls = self.release_calls = self.edge_reads = 0
@@ -485,7 +495,8 @@ class SourceScene:
         self.domain = (True, 0.0, math.tau, True, True)
         self.body = NativeObject()
         self.edge_body = self.body
-        self.wizard = SourceFeature(self, "LeverTap", "HoleWzd", SourceDefinition(self))
+        self.wizard = SourceFeature(self, "BracketMountingTaps" if self.is_sm else "LeverTap",
+                                    "HoleWzd", SourceDefinition(self))
         self.cosmetic = SourceFeature(self, "ActualCosmetic", "CosmeticThread", SourceDefinition(self, True))
         self.later = SourceFeature(self, "LaterCut", "Cut")
         self.wizard.next = self.later
@@ -531,6 +542,8 @@ class Application:
         self.source_mode = "wizard_only"
         self.scenes = []
         self.prepare_scene = lambda _scene: None
+        self.sm_source_mode = "cosmetic"
+        self.prepare_sm_scene = lambda _scene: None
         self.attach_error = None
         self.identity_override = None
         self.open_calls = []
@@ -601,9 +614,10 @@ class Application:
         doc = Document(path, kind, readonly=readonly)
         doc.app = self
         if kind == 1:
-            doc.scene = SourceScene(doc, self.source_mode)
+            is_sm = "sm-summing-lever" in path
+            doc.scene = SourceScene(doc, self.sm_source_mode if is_sm else self.source_mode)
             self.scenes.append(doc.scene)
-            self.prepare_scene(doc.scene)
+            (self.prepare_sm_scene if is_sm else self.prepare_scene)(doc.scene)
         if kind == 3:
             doc.part = next(item for item in self.documents if item.kind == 1)
         self.documents.append(doc)
@@ -1287,15 +1301,30 @@ class OwnedControlSmoke(unittest.TestCase):
                 self.assertEqual(env.app.close_calls, [])
 
     def test_cleanup_cursor_requires_native_self_and_distinct_identity(self):
+        # Keep the fault at its original post-diagnostic boundary. The passive
+        # SM census now legitimately encounters it before collection completes;
+        # cleanup must still refuse the same untrustworthy document identities.
         for result in (0, -1, 7, None, True, "1"):
             with self.subTest(result=result), Environment().installed() as env:
                 env.after_diagnostic = lambda: setattr(env.app, "identity_override", lambda _left, _right: result)
                 code, report, captures = env.run_driver()
                 self.assertEqual(code, 1)
-                self.assertTrue(report["cases"][0]["collection_completed"])
+                self.assertFalse(report["cases"][0]["collection_completed"])
+                self.assertEqual(report["cases"][0]["source_metadata"]["state"], "UNAVAILABLE")
+                self.assertTrue(report["cases"][0]["source_metadata"]["errors"])
+                source_error = report["cases"][0]["source_metadata"]["errors"][0]
+                self.assertEqual(source_error["type"], "RuntimeError")
+                self.assertIn("identity", source_error["message"])
+                for key in ("operation", "type", "message"):
+                    self.assertEqual(report["primary_failure"][key], source_error[key])
+                self.assertTrue(captures[0]["primary_traceback"]["available"])
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                self.assertTrue(all(Path(call[0]).stem == "sm-summing-lever" for call in env.app.open_calls))
+                self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
                 self.assertFalse(report["cases"][0]["inventories"]["before_close_0"]["enumerated"])
                 self.assertEqual(env.app.close_calls, [])
                 self.assertEqual(len(env.app.documents), 2)
+                self.assertEqual(len(captures[0]["cases"][0]["closures"]), 2)
                 self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
         with Environment().installed() as env:
             env.after_diagnostic = lambda: setattr(
@@ -1303,10 +1332,23 @@ class OwnedControlSmoke(unittest.TestCase):
             )
             code, report, captures = env.run_driver()
             self.assertEqual(code, 1)
-            self.assertTrue(report["cases"][0]["collection_completed"])
+            self.assertFalse(report["cases"][0]["collection_completed"])
+            self.assertEqual(report["cases"][0]["source_metadata"]["state"], "UNAVAILABLE")
+            self.assertTrue(report["cases"][0]["source_metadata"]["errors"])
+            source_error = report["cases"][0]["source_metadata"]["errors"][0]
+            self.assertEqual(source_error["type"], "RuntimeError")
+            self.assertIn("identity", source_error["message"])
+            for key in ("operation", "type", "message"):
+                self.assertEqual(report["primary_failure"][key], source_error[key])
+            self.assertTrue(captures[0]["primary_traceback"]["available"])
+            self.assertEqual(report["cases"][1]["status"], "not_started")
+            self.assertTrue(all(Path(call[0]).stem == "sm-summing-lever" for call in env.app.open_calls))
+            self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
             self.assertFalse(report["cases"][0]["inventories"]["before_close_0"]["enumerated"])
             self.assertTrue(any(row.get("raw") == -1 and ".identity.previous[" in row["operation"] for row in report["cases"][0]["identity_comparisons"]))
             self.assertEqual(env.app.close_calls, [])
+            self.assertEqual(len(env.app.documents), 2)
+            self.assertEqual(len(captures[0]["cases"][0]["closures"]), 2)
             self.assertTrue(all(row["status"] == "stranded_owned" for row in captures[0]["cases"][0]["closures"]))
 
     def test_cleanup_cursor_drift_cardinality_cycles_and_duplicates_never_close(self):
@@ -2296,6 +2338,349 @@ class S1SafetyRepairs(unittest.TestCase):
                 self.assertEqual(len(env.app.close_calls), index * 2)
                 self.assertEqual(len(env.app.documents), 1)
                 self.assertEqual(env.diagnostic_calls, index)
+
+
+def install_recorded_tree_aliases(scene):
+    """Actual folder/scalar values in a synthetic lifecycle, not a native S1 result."""
+    packet = recorded_source()
+    rows = packet["features"]
+    indices = (1, 2, 3, 4, 11, 14, 16)
+    nodes = {index: SourceFeature(scene, rows[index]["name"], rows[index]["type"]) for index in indices}
+    cursor = scene.later
+    for node in nodes.values():
+        cursor.next = node
+        cursor = node
+    ambient = SourceFeature(scene, rows[12]["name"], rows[12]["type"])
+    directional = SourceFeature(scene, rows[13]["name"], rows[13]["type"])
+    nodes[11].child, ambient.next = ambient, directional
+    ambient.owner = directional.owner = nodes[11]
+    scene.wizard.definition.values = dict(rows[30]["scalars"])
+    scene.cosmetic.Name = rows[33]["name"]
+    scene.cosmetic.definition.values = dict(rows[33]["scalars"])
+    alias = bytes(packet["feature_reference_reads"]["before.feature[2].reference.bytes"])
+    original_get, original_resolve = scene.GetPersistReference3, scene.GetObjectByPersistReference3
+    scene.GetPersistReference3 = lambda entity: alias if entity in nodes.values() else original_get(entity)
+    scene.GetObjectByPersistReference3 = lambda reference: (nodes[1], 0) if bytes(reference) == alias else original_resolve(reference)
+    return nodes, alias
+
+
+class RecordedSourceIdentityBoundaries(unittest.TestCase):
+    @staticmethod
+    def observation(packet, comparison):
+        operation = comparison["operation"].removeprefix("s1.")
+        status = packet["persistent_statuses"].get(operation.removesuffix(".resolved_identity") + ".status")
+        feature = None
+        if operation.startswith("before.feature["):
+            feature = packet["features"][int(operation.split("[", 1)[1].split("]", 1)[0])]
+        return status, feature
+
+    def test_all_recorded_identity_results_drive_the_actual_admission_guard(self):
+        packet = recorded_source()
+        with Environment().installed() as env:
+            admitted = []
+            for comparison in packet["persistent_comparisons"]:
+                status, feature = self.observation(packet, comparison)
+                # The recorded IsSame call was reached after the non-NULL
+                # resolution guard. No resolved type/name was captured.
+                admitted.append(env.driver.require_reference_identity(status, True, comparison["raw"], feature))
+            self.assertEqual(admitted.count(False), 6)
+            self.assertEqual(admitted.count(True), 237)
+            for edge in packet["physical_edges"]:
+                self.assertIs(edge["operations_complete"], True)
+                self.assertIs(edge["owned_body_proven"], True)
+            self.assertNotIn("selected_edge", packet)
+
+    def test_every_recorded_core_probe_rejects_unknown_or_negative_identity(self):
+        packet = recorded_source()
+        with Environment().installed() as env:
+            for comparison in packet["persistent_comparisons"]:
+                status, feature = self.observation(packet, comparison)
+                if feature is not None and env.driver.descriptive_tree_container(feature):
+                    continue
+                for changed_status, present, raw in (
+                    (status, True, 0), (status, True, None), (status, True, True),
+                    (status, True, -1), (None, True, 1), (False, True, 1),
+                    (1, True, 1), (0, False, 1), (0, None, 1),
+                ):
+                    with self.subTest(operation=comparison["operation"], status=changed_status, present=present, raw=raw):
+                        with self.assertRaises(RuntimeError):
+                            env.driver.require_reference_identity(changed_status, present, raw, feature)
+                status_key = comparison["operation"].removeprefix("s1.").removesuffix(".resolved_identity") + ".status"
+                observed_status = packet["persistent_statuses"].pop(status_key)
+                try:
+                    missing_status, actual_feature = self.observation(packet, comparison)
+                    with self.assertRaises(RuntimeError):
+                        env.driver.require_reference_identity(missing_status, True, comparison["raw"], actual_feature)
+                finally:
+                    packet["persistent_statuses"][status_key] = observed_status
+            # A selected Edge never receives a feature-container exception.
+            with self.assertRaises(RuntimeError):
+                env.driver.require_reference_identity(0, True, 0)
+
+    def test_actual_six_exceptions_are_exact_and_structurally_conditional(self):
+        packet = recorded_source()
+        with Environment().installed() as env:
+            for comparison in packet["persistent_comparisons"]:
+                if comparison["raw"] != 0:
+                    continue
+                status, original = self.observation(packet, comparison)
+                self.assertFalse(env.driver.require_reference_identity(status, True, 0, original))
+                for field, value in (
+                    ("type", "NewFolder"), ("type", "SolidBodyFolder"), ("type", "SurfaceBodyFolder"),
+                    ("type", "FavoriteFolder"), ("type", "RefPlane"), ("type", "HoleWzd"),
+                    ("type", "CosmeticThread"), ("name", None), ("name", ""),
+                    ("parent_inventory_index", 0), ("non_root_occurrence", True),
+                    ("rolled_back", None), ("definition_state", "UNAVAILABLE"),
+                    ("definition_state", "PRESENT"), ("face_state", "PRESENT"), ("owner_state", "PRESENT"),
+                ):
+                    with self.subTest(index=original["index"], field=field, value=value):
+                        changed = dict(original, **{field: value})
+                        with self.assertRaises(RuntimeError):
+                            env.driver.require_reference_identity(status, True, 0, changed)
+                for field in ("name", "type", "parent_inventory_index", "rolled_back", "definition_state", "face_state", "owner_state"):
+                    changed = dict(original)
+                    del changed[field]
+                    with self.assertRaises(RuntimeError):
+                        env.driver.require_reference_identity(status, True, 0, changed)
+
+    def test_recorded_first_parent_tree_requires_complete_names_types_and_relationships(self):
+        # Thin native projection contains first-parent relations; full live
+        # duplicate traversal relationships are exercised separately below.
+        packet = recorded_source()
+        rows = packet["features"]
+        links = [{"index": row["index"], "parent_inventory_index": row["parent_inventory_index"]} for row in rows]
+        with Environment().installed() as env:
+            baseline = env.driver.structural_tree(rows, links)
+            self.assertEqual(len(baseline["paths"]), 39)
+            for field, value in (("name", None), ("type", ""), ("index", True),
+                                 ("parent_inventory_index", 33), ("parent_inventory_index", False)):
+                changed = [dict(row) for row in rows]
+                changed[33][field] = value
+                with self.subTest(field=field, value=value), self.assertRaises(RuntimeError):
+                    env.driver.structural_tree(changed, links)
+            with self.assertRaises(RuntimeError):
+                env.driver.structural_tree(rows, links[:-1])
+            renamed = [dict(row) for row in rows]
+            renamed[2]["name"] = "Changed History"
+            self.assertNotEqual(env.driver.structural_tree(renamed, links), baseline)
+
+    def test_actual_aliases_stay_descriptive_in_all_three_synthetic_phases(self):
+        with Environment().installed() as env:
+            env.app.source_mode = "cosmetic"
+            env.app.prepare_scene = install_recorded_tree_aliases
+            code, report, _ = env.run_driver()
+            source = report["cases"][1]["s1"]
+            self.assertEqual(code, 0)
+            self.assertTrue(source["clean_comparison"])
+            self.assertEqual((source["access_calls"], source["release_calls"]), (1, 1))
+            for phase in ("before", "accessed", "after"):
+                snapshot = source["phases"][phase]
+                self.assertTrue(snapshot["complete"])
+                self.assertTrue(snapshot["tree_complete"])
+                self.assertTrue(snapshot["core_identity_complete"])
+                descriptive = [row for row in snapshot["features"] if row["identity_role"] == "DESCRIPTIVE_TREE"]
+                self.assertEqual(len(descriptive), 6)
+                for row in descriptive:
+                    proof = source["reference_observations"][f"{phase}.feature[{row['index']}].reference"]
+                    self.assertEqual((proof["status"], proof["native_same"], proof["state"]), (0, 0, "DIFFERENT"))
+                    self.assertFalse(proof["required"])
+                    self.assertFalse(proof["native_identity_claim"])
+                    self.assertEqual(proof["bytes"], recorded_source()["feature_reference_reads"]["before.feature[2].reference.bytes"])
+                self.assertTrue(any(len(alias["feature_indices"]) == 7 for alias in snapshot["reference_aliases"]))
+            self.assertTrue(source["tree_structure_unchanged"])
+            self.assertTrue(source["accessed_tree_structure_unchanged"])
+            self.assertEqual(len(source["feature_identity_after"]), source["phases"]["before"]["core_feature_count"])
+            descriptive_owners = [row for row in source["feature_identity_after"] if row["owner_identity_role"] != "NATIVE"]
+            self.assertEqual(len(descriptive_owners), 2)
+            for row in descriptive_owners:
+                self.assertIsNone(row["owner_unchanged"])
+                self.assertTrue(row["owner_relation_unchanged"])
+            self.assertEqual(env.app.documents, [])
+
+    def test_optional_pid_failure_is_local_but_core_unknown_type_or_tree_failure_blocks(self):
+        for mode in ("optional_pid", "core_pid", "unknown_type", "physical_folder", "tree_type", "definition_error", "model_owner"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                env.app.source_mode = "cosmetic"
+                def prepare(scene):
+                    nodes, alias = install_recorded_tree_aliases(scene)
+                    if mode == "optional_pid":
+                        original = scene.GetPersistReference3
+                        def get_reference(entity):
+                            if entity is nodes[2]:
+                                raise RuntimeError("optional native PID reader unavailable")
+                            return original(entity)
+                        scene.GetPersistReference3 = get_reference
+                    elif mode == "core_pid":
+                        original = scene.GetPersistReference3
+                        scene.GetPersistReference3 = lambda entity: alias if entity is scene.wizard else original(entity)
+                    elif mode in ("unknown_type", "physical_folder"):
+                        nodes[2].kind = "NewFolder" if mode == "unknown_type" else "SolidBodyFolder"
+                    elif mode == "tree_type":
+                        nodes[2].type_error = RuntimeError("mandatory tree reader unavailable")
+                    elif mode == "model_owner":
+                        scene.cosmetic.owner = nodes[11]
+                    else:
+                        nodes[2].definition_error = RuntimeError("not observed unsupported")
+                env.app.prepare_scene = prepare
+                code, report, _ = env.run_driver()
+                source = report["cases"][1]["s1"]
+                if mode == "optional_pid":
+                    self.assertEqual(code, 0)
+                    self.assertTrue(source["clean_comparison"])
+                    optional_errors = [row for row in source["reference_observations"].values() if "error" in row]
+                    self.assertEqual(len(optional_errors), 3)
+                    self.assertTrue(all(row["state"] == "UNAVAILABLE" and not row["required"] for row in optional_errors))
+                    self.assertTrue(all(row["error"]["traceback_frames"] for row in optional_errors))
+                    self.assertTrue(all(row["resolved_type_state"] == "UNAVAILABLE_NOT_READ" for row in optional_errors))
+                    self.assertFalse(source["errors"])
+                else:
+                    self.assertEqual(code, 1)
+                    self.assertFalse(source["phases"]["before"]["complete"])
+                    self.assertEqual(source["access_calls"], 0)
+                    self.assertFalse(source["display_generation_permitted"])
+                self.assertEqual(env.app.documents, [])
+
+    def test_changed_descriptive_structure_after_release_stops_display_without_native_identity_claim(self):
+        for mode in ("rename", "remove", "reparent", "reader_failure", "accessed_rename"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                env.app.source_mode = "cosmetic"
+                def prepare(scene):
+                    nodes, _alias = install_recorded_tree_aliases(scene)
+                    original_name = nodes[2].Name
+                    if mode == "accessed_rename":
+                        original_access = scene.cosmetic.definition.AccessSelections
+                        def access(part, component):
+                            value = original_access(part, component)
+                            nodes[2].Name = "Temporarily changed History"
+                            return value
+                        scene.cosmetic.definition.AccessSelections = access
+                    def change():
+                        if mode == "accessed_rename":
+                            nodes[2].Name = original_name
+                            return
+                        if mode == "rename":
+                            nodes[2].Name = "Changed History"
+                        elif mode == "remove":
+                            nodes[1].next = nodes[3]
+                        elif mode == "reparent":
+                            nodes[1].next = nodes[3]
+                            nodes[1].child, nodes[2].next = nodes[2], None
+                        else:
+                            nodes[2].type_error = RuntimeError("after tree reader unavailable")
+                    scene.on_release = change
+                env.app.prepare_scene = prepare
+                code, report, _ = env.run_driver()
+                source = report["cases"][1]["s1"]
+                self.assertEqual(code, 1)
+                self.assertEqual((source["access_calls"], source["release_calls"]), (1, 1))
+                if mode == "accessed_rename":
+                    self.assertTrue(source["tree_structure_unchanged"])
+                    self.assertFalse(source["accessed_tree_structure_unchanged"])
+                else:
+                    self.assertFalse(source["tree_structure_unchanged"])
+                self.assertFalse(source["display_generation_permitted"])
+                self.assertEqual(env.diagnostic_calls, 2)
+
+
+class PassiveSmScalarBoundaries(unittest.TestCase):
+    def test_same_scalar_interfaces_preserve_each_owned_child_without_selection_or_geometry_reads(self):
+        with Environment().installed() as env:
+            def prepare(scene):
+                def forbidden(*_args):
+                    raise AssertionError("passive SM census must not request geometry or selection access")
+                second = SourceFeature(scene, "SecondSyntheticChild", "CosmeticThread", SourceDefinition(scene, True))
+                second.owner, scene.cosmetic.next = scene.wizard, second
+                second.definition.values["BlindDepth"] = 0.003
+                for feature in (scene.wizard, scene.cosmetic, second, scene.later):
+                    feature.GetFaces = forbidden
+                for child in (scene.cosmetic, second):
+                    child.definition.AccessSelections = child.definition.ReleaseSelectionAccess = forbidden
+                scene.document.GetBodies2 = forbidden
+                scene.edge.GetCurve = forbidden
+            env.app.prepare_sm_scene = prepare
+            code, report, _ = env.run_driver()
+            census = report["cases"][0]["source_metadata"]
+            self.assertEqual(code, 0)
+            self.assertEqual(census["state"], "OBSERVED")
+            self.assertEqual(census["cosmetic_child_count"], 2)
+            self.assertEqual(census["wizard"]["scalars"]["ThreadEndCondition"], 0)
+            self.assertEqual(census["wizard"]["scalars"]["ThreadDepth"], 0.00495)
+            self.assertEqual([child["scalars"]["BlindDepth"] for child in census["cosmetic_children"]], [0.00495, 0.003])
+            self.assertEqual(census["enum_namespaces"], report["cases"][1]["s1"]["enum_namespaces"])
+            self.assertEqual(census["causal_conclusion"], "NOT_ESTABLISHED")
+            scene = env.app.scenes[0]
+            self.assertEqual((scene.access_calls, scene.release_calls, scene.edge_reads), (0, 0, 0))
+            self.assertFalse(scene.document.dirty)
+
+    def test_missing_or_failed_sm_child_evidence_never_becomes_zero_or_admits_s1(self):
+        for mode in ("null_definition", "definition_error", "scalar_error", "null_scalar",
+                     "wrong_owner", "owner_error", "unclassified_owner", "duplicate_wizard", "tree_error", "core_pid"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def prepare(scene):
+                    if mode == "null_definition":
+                        scene.cosmetic.definition = None
+                    elif mode == "definition_error":
+                        scene.cosmetic.definition_error = RuntimeError("child definition unavailable")
+                    elif mode in ("scalar_error", "null_scalar"):
+                        scene.cosmetic.definition.values["BlindDepth"] = RuntimeError("child depth unavailable") if mode == "scalar_error" else None
+                    elif mode == "wrong_owner":
+                        scene.cosmetic.owner = scene.later
+                    elif mode == "owner_error":
+                        scene.cosmetic.owner_error = RuntimeError("native owner unavailable")
+                    elif mode == "unclassified_owner":
+                        scene.wizard.child = None
+                        scene.later.next = scene.cosmetic
+                        scene.cosmetic.owner_error = RuntimeError("unclassified top-level cosmetic owner unavailable")
+                    elif mode == "duplicate_wizard":
+                        scene.later.next = SourceFeature(scene, "BracketMountingTaps", "HoleWzd", SourceDefinition(scene))
+                    elif mode == "tree_error":
+                        scene.later.type_error = RuntimeError("tree type unavailable")
+                    else:
+                        scene.resolve_override = lambda _entity: scene.later
+                env.app.prepare_sm_scene = prepare
+                code, report, _ = env.run_driver()
+                census = report["cases"][0]["source_metadata"]
+                self.assertEqual(code, 1)
+                self.assertEqual(census["state"], "UNAVAILABLE")
+                self.assertNotIn("cosmetic_child_count", census)
+                self.assertTrue(census["errors"])
+                if mode in ("wrong_owner", "owner_error", "unclassified_owner"):
+                    child = census["cosmetic_children"][0]
+                    self.assertEqual(child["scalars"]["BlindDepth"], 0.00495)
+                    self.assertEqual(child["wizard_owner_state"], "DIFFERENT" if mode == "wrong_owner" else "UNAVAILABLE")
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                self.assertEqual(env.diagnostic_calls, 1)
+                self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
+
+    def test_native_owner_association_not_arbitrary_tree_pairing_selects_passive_children(self):
+        with Environment().installed() as env:
+            def prepare(scene):
+                # A native-owned feature may also be enumerated at top level.
+                scene.wizard.child = None
+                scene.later.next = scene.cosmetic
+                unrelated = SourceFeature(scene, "UnrelatedSyntheticCosmetic", "CosmeticThread", None)
+                unrelated.owner = scene.later
+                scene.cosmetic.next = unrelated
+            env.app.prepare_sm_scene = prepare
+            code, report, _ = env.run_driver()
+            census = report["cases"][0]["source_metadata"]
+            self.assertEqual(code, 0)
+            self.assertEqual(census["state"], "OBSERVED")
+            self.assertEqual(census["cosmetic_child_count"], 1)
+            self.assertEqual(census["cosmetic_children"][0]["wizard_owner_state"], "SAME")
+            self.assertEqual(census["cosmetic_children"][0]["parent_inventory_index"], None)
+            self.assertEqual(env.app.scenes[0].edge_reads, 0)
+
+    def test_complete_native_tree_with_no_child_reports_observed_absence_not_failure(self):
+        with Environment().installed() as env:
+            env.app.sm_source_mode = "wizard_only"
+            code, report, _ = env.run_driver()
+            census = report["cases"][0]["source_metadata"]
+            self.assertEqual(code, 0)
+            self.assertEqual(census["state"], "OBSERVED")
+            self.assertEqual(census["cosmetic_child_count"], 0)
+            self.assertEqual(census["cosmetic_children"], [])
+            self.assertFalse(census["errors"])
 
 
 if __name__ == "__main__":

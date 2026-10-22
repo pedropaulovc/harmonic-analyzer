@@ -6,6 +6,12 @@ native ownership/reference proof and a zero baseline, at most one real cosmetic
 definition is accessed and released without modification. No settings, saves,
 reference replacement, rebuild experiment, or other intervention is reachable.
 The existing diagnostic retains its single display-generation boundary.
+SM also reads same-interface Wizard and native-owned cosmetic-child scalars,
+without selection access. Six explicitly approved non-geometric UI container
+types have descriptive-only PID quality, never native identity exemptions for
+the model: the complete live tree and every core PID/IsSame proof remain required.
+Raw virtual PID failures/aliases stay visible, and no virtual token is reused
+as authority after rollback. This local policy is not an SDK PID guarantee.
 Hard termination and existing outer telemetry can defeat reporting/cleanup.
 """
 
@@ -143,22 +149,239 @@ S1 = {
         "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both.",
     },
 }
+# Exact observed UI-node roles, not a universal SDK persistent-ID exemption.
+DESCRIPTIVE_TREE_TYPES = frozenset({
+    "HistoryFolder", "SelectionSetFolder", "SensorFolder",
+    "EnvFolder", "InkMarkupFolder", "MaterialFolder",
+})
 CONTRACT = {
-    "schema": 3,
+    "schema": 4,
     "protocol": {
         "order": "SM readonly positive, then one S1 disposable-copy access/read/release",
         "selected_edge": "Only a unique real CosmeticThread definition; Wizard alone is UNAVAILABLE",
         "cleanup": "SM clean-only; S1 known-dirty copies only, complete owned inventory and UserControl=True before each close",
         "admission": "SM requires extracted positive primitive rows; every open requires exact integer zero errors/warnings",
         "copy_paths": "Strict unaliased cad/out children under trusted ROOT, checked before creation/open and ownership certification",
-        "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward and no source read failures",
+        "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward, unchanged before/accessed/after descriptive tree and no source read failures",
         "geometry": "Every physical edge requires successful native domain/evaluation operations independently of circle classification",
         "failure": "Retain escaping access-body BaseException and original traceback before the single finally release",
+        "tree_metadata": "Only six approved UI container types have descriptive PID quality; complete live tree and all core native identity remain mandatory",
+        "tree_metadata_types": sorted(DESCRIPTIVE_TREE_TYPES),
+        "tree_metadata_scope": "Only complete top-level nodes with known Boolean rollback and native NULL definition/faces/owner; all other types and modeling/geometric owners stay strict; raw aliases are not identity",
+        "sm_scalars": "Passive readonly BracketMountingTaps and owned cosmetic-child scalar census; same interfaces/enums as S1, no selection access or causal claim",
         "limitations": "No historical in-memory part hash, flank identity, global telemetry, or hard-crash cleanup guarantee",
     },
     "cases": [SM_POSITIVE, S1],
 }
 MISSING = object()
+
+WIZARD_PROPERTIES = {
+    "CosmeticThreadType": int, "ThreadEndCondition": int, "ThreadClass": str,
+    "Type": int, "FastenerSize": str, "EndCondition": int, "HoleDepth": float,
+    "ThreadDepth": float, "TapDrillDepth": float, "ThruTapDrillDepth": float,
+    "ThreadDiameter": float, "TapDrillDiameter": float, "ThruTapDrillDiameter": float,
+}
+COSMETIC_PROPERTIES = {
+    "ApplyThread": int, "BlindDepth": float, "Diameter": float,
+    "DiameterType": int, "EndCondition": int,
+}
+DEFINITION_INTERFACES = {"HoleWzd": "IWizardHoleFeatureData2", "CosmeticThread": "ICosmeticThreadFeatureData"}
+THREAD_ENUM_NAMESPACES = {
+    "ICosmeticThreadFeatureData": {
+        "ApplyThread": "swCosmeticThreadType_e", "EndCondition": "swCosmeticEndConditions_e",
+        "DiameterType": "swCosmeticThreadDiameterType_e",
+    },
+    "IWizardHoleFeatureData2": {
+        "CosmeticThreadType": "swWzdHoleCosmeticThreadTypes_e",
+        "ThreadEndCondition": "swWzdHoleThreadEndCondition_e", "EndCondition": "swEndConditions_e",
+    },
+}
+
+
+def native_scalar(value, expected):
+    require(type(value) is expected or (expected is float and type(value) is int),
+            "native scalar has unexpected type")
+    require(expected is not float or math.isfinite(value), "native scalar is not finite")
+    return value
+
+
+def definition_scalars(definition, interface, read, label):
+    properties = WIZARD_PROPERTIES if interface == "IWizardHoleFeatureData2" else COSMETIC_PROPERTIES
+    values = {}
+    for name, expected in properties.items():
+        value = read(f"{label}.{name}", lambda name=name, expected=expected:
+                     native_scalar(getattr(definition, name), expected))
+        if value is not MISSING:
+            values[name] = value
+    return values
+
+
+def descriptive_tree_container(row):
+    return (
+        row.get("type") in DESCRIPTIVE_TREE_TYPES
+        and type(row.get("name")) is str and bool(row["name"])
+        and "parent_inventory_index" in row and row["parent_inventory_index"] is None
+        and type(row.get("rolled_back")) is bool
+        and row.get("non_root_occurrence", False) is False
+        and row.get("definition_state") == "NULL_UNSUPPORTED"
+        and row.get("face_state") == "NULL" and row.get("owner_state") == "NULL"
+    )
+
+
+def require_reference_identity(status, resolved_present, native_same, feature=None):
+    """Only an eligible UI container has optional PID quality; core never does."""
+    proven = type(status) is int and status == 0 and resolved_present is True and type(native_same) is int and native_same == 1
+    if feature is None or not descriptive_tree_container(feature):
+        require(proven, "persistent identity unavailable or differs")
+    return proven
+
+
+def feature_tree(part, bind, same, read, label):
+    """Bounded native traversal shared by S1 and the scalar-only SM census."""
+    items, occurrences = [], []
+    def walk(raw, parent=None, ancestors=()):
+        chain = []
+        while raw is not None and raw is not MISSING:
+            require(len(ancestors) < 32 and len(items) < 512 and len(occurrences) < 2048,
+                    "bounded feature inventory exhausted")
+            feature = bind(raw, "IFeature")
+            require(feature is not None, "feature binding unavailable")
+            require(not any(same(feature, previous, f"{label}.cursor_cycle") for previous in chain),
+                    "cyclic feature cursor")
+            require(not any(same(feature, ancestor, f"{label}.ancestor_cycle") for ancestor in ancestors),
+                    "cyclic subfeature ancestry")
+            chain.append(feature)
+            matches = [index for index, item in enumerate(items)
+                       if same(feature, item["native"], f"{label}.deduplicate")]
+            require(len(matches) <= 1, "ambiguous feature inventory")
+            index = matches[0] if matches else len(items)
+            occurrences.append({"index": index, "parent_inventory_index": parent})
+            if not matches:
+                items.append({"native": feature, "parent_inventory_index": parent})
+                child = read(f"{label}.feature[{index}].first_subfeature",
+                             lambda: feature.GetFirstSubFeature(), opaque=True)
+                walk(child, index, ancestors + (feature,))
+            raw = read(f"{label}.next[{len(occurrences)}]",
+                       lambda: feature.GetNextFeature() if parent is None else feature.GetNextSubFeature(), opaque=True)
+    read(f"{label}.traversal", lambda: walk(part.FirstFeature()))
+    return items, occurrences
+
+
+def structural_tree(features, occurrences):
+    """Descriptive structure, deliberately NOT native or persistent identity."""
+    paths = []
+    for index, row in enumerate(features):
+        require(type(row.get("index")) is int and row["index"] == index, "feature inventory index unavailable")
+        require(all(type(row.get(key)) is str and row[key] for key in ("name", "type")),
+                "feature tree name/type unavailable")
+        require("parent_inventory_index" in row, "feature tree parent unavailable")
+        parent = row["parent_inventory_index"]
+        require(parent is None or (type(parent) is int and 0 <= parent < index), "invalid feature tree parent")
+        path = (() if parent is None else paths[parent]) + ((row["type"], row["name"]),)
+        require(path not in paths, "ambiguous descriptive feature tree path")
+        paths.append(path)
+    links = []
+    for occurrence in occurrences:
+        index, parent = occurrence.get("index"), occurrence.get("parent_inventory_index", MISSING)
+        require(type(index) is int and 0 <= index < len(paths), "tree occurrence feature unavailable")
+        require(parent is None or (type(parent) is int and 0 <= parent < len(paths) and parent != index),
+                "tree occurrence parent unavailable")
+        links.append((paths[index], () if parent is None else paths[parent]))
+    require({row["index"] for row in occurrences} == set(range(len(features))), "tree occurrence coverage incomplete")
+    return {"paths": paths, "relationships": sorted(links), "identity_role": "DESCRIPTIVE_ONLY"}
+
+
+def passive_sm_thread_metadata(part, intended_name, bind, same, failure):
+    """Readonly scalar census only: no access/Edge/activation/physical inventory."""
+    result = {"state": "UNAVAILABLE", "reads": {}, "errors": [], "features": [],
+              "cosmetic_children": [], "causal_conclusion": "NOT_ESTABLISHED"}
+    result["enum_namespaces"] = THREAD_ENUM_NAMESPACES
+    def read(label, reader, *, opaque=False):
+        try:
+            value = reader()
+            result["reads"][label] = {"present": value is not None} if opaque else value
+            return value
+        except BaseException as error:
+            result["errors"].append(failure(f"sm_source.{label}", error))
+            return MISSING
+    items, occurrences = feature_tree(part, bind, same, read, "tree")
+    for index, item in enumerate(items):
+        feature = item["native"]
+        row = {"index": index, "parent_inventory_index": item["parent_inventory_index"]}
+        item["row"] = row
+        result["features"].append(row)
+        for key, reader in (("name", lambda: native_scalar(feature.Name, str)),
+                            ("type", lambda: native_scalar(feature.GetTypeName2(), str))):
+            value = read(f"feature[{index}].{key}", reader)
+            if value is not MISSING:
+                row[key] = value
+    result["tree"] = read("tree.structure", lambda: structural_tree(result["features"], occurrences))
+    if result["tree"] is MISSING:
+        result["tree"] = None
+    targets = [item for item in items if item["row"].get("name") == intended_name and item["row"].get("type") == "HoleWzd"]
+    if read("wizard.unique", lambda: require(len(targets) == 1, "SM intended Wizard unavailable or ambiguous")) is MISSING:
+        return result
+    wizard = targets[0]
+    extension = read("part.extension", lambda: bind(part.Extension, "IModelDocExtension"), opaque=True)
+    def collect_definition(item):
+        feature, row = item["native"], item["row"]
+        label = f"feature[{row['index']}]"
+        def identity():
+            require(extension is not None and extension is not MISSING, "SM part extension unavailable")
+            reference = extension.GetPersistReference3(feature)
+            require(reference is not None, "SM feature reference null")
+            values = list(reference)
+            require(values and all(type(value) is int and 0 <= value <= 255 for value in values),
+                    "SM feature reference unavailable")
+            result["reads"][f"{label}.reference.bytes"] = values
+            pair = extension.GetObjectByPersistReference3(reference)
+            require(isinstance(pair, tuple) and len(pair) == 2, "SM resolution OUT status missing")
+            resolved, status = pair
+            result["reads"][f"{label}.reference.status"] = status
+            result["reads"][f"{label}.reference.resolved_present"] = resolved is not None
+            result["reads"][f"{label}.reference.resolved_type_state"] = "UNAVAILABLE_NOT_READ"
+            require(type(status) is int and status == 0 and resolved is not None, "SM feature resolution unavailable")
+            require(same(resolved, feature, f"sm_source.{label}.reference"), "SM feature persistent identity differs")
+        read(f"{label}.identity", identity)
+        raw = read(f"{label}.definition", lambda: feature.GetDefinition(), opaque=True)
+        row["definition_state"] = "UNAVAILABLE" if raw is MISSING else "NULL_UNSUPPORTED" if raw is None else "PRESENT"
+        interface = DEFINITION_INTERFACES[row["type"]]
+        row["definition_interface"] = interface
+        def typed_definition():
+            require(raw is not None and raw is not MISSING, "SM typed definition unavailable")
+            value = bind(raw, interface)
+            require(value is not None, "SM typed definition null")
+            return value
+        definition = read(f"{label}.typed_definition", typed_definition, opaque=True)
+        row["scalars"] = {} if definition is MISSING else definition_scalars(definition, interface, read, label)
+        return row
+    result["wizard"] = collect_definition(wizard)
+    wizard_index = wizard["row"]["index"]
+    descendants = {wizard_index}
+    for _ in items:
+        expanded = descendants | {link["index"] for link in occurrences if link["parent_inventory_index"] in descendants}
+        if expanded == descendants:
+            break
+        descendants = expanded
+    for item in items:
+        row = item["row"]
+        if row.get("type") != "CosmeticThread":
+            continue
+        owner = read(f"feature[{row['index']}].owner", lambda item=item: item["native"].GetOwnerFeature(), opaque=True)
+        row["owner_state"] = "UNAVAILABLE" if owner is MISSING else "NULL" if owner is None else "PRESENT"
+        associated = MISSING if owner is MISSING else read(
+            f"feature[{row['index']}].wizard_owner",
+            lambda: owner is not None and same(owner, wizard["native"], "sm_source.wizard_owner"))
+        row["wizard_owner_state"] = "UNAVAILABLE" if associated is MISSING else "SAME" if associated else "DIFFERENT"
+        if associated is False and row["index"] not in descendants:
+            continue  # Observed unrelated cosmetic; no arbitrary pairing.
+        read(f"feature[{row['index']}].owner_proof",
+             lambda: require(associated is True, "SM cosmetic child/owner association incomplete"))
+        result["cosmetic_children"].append(collect_definition(item))
+    if not result["errors"]:
+        result["state"] = "OBSERVED"
+        result["cosmetic_child_count"] = len(result["cosmetic_children"])
+    return result
 
 
 def file_identity(path):
@@ -286,8 +509,9 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     result = {"state": "UNAVAILABLE", "reads": {}, "errors": [], "phases": {},
               "access_calls": 0, "release_calls": 0, "access_confirmed": False,
               "clean_comparison": False, "display_generation_permitted": False,
-              "causal_conclusion": "NOT_ESTABLISHED"}
+              "causal_conclusion": "NOT_ESTABLISHED", "reference_observations": {}}
     body_references = {}
+    result["enum_namespaces"] = THREAD_ENUM_NAMESPACES
 
     def read(label, reader, *, opaque=False):
         try:
@@ -305,11 +529,6 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         require(value is not None, f"{interface} null")
         return value
 
-    def scalar(value, expected):
-        require(type(value) is expected or (expected is float and type(value) is int),
-                "native scalar has unexpected type")
-        require(expected is not float or math.isfinite(value), "native scalar is not finite")
-        return value
 
     extension = read("part.extension", lambda: typed(part.Extension, "IModelDocExtension"), opaque=True)
     if extension is MISSING:
@@ -320,11 +539,17 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         require(isinstance(pair, tuple) and len(pair) == 2, "persistent resolution OUT status missing")
         entity, status = pair
         result["reads"][f"{label}.status"] = status
+        result["reads"][f"{label}.resolved_present"] = entity is not None
         require(type(status) is int and status == 0 and entity is not None,
                 "persistent object unresolved in owned part context")
         return entity
 
-    def persistent(entity, label):
+    def persistent(entity, label, feature=None):
+        descriptive = feature is not None and descriptive_tree_container(feature)
+        observation = {"required": not descriptive, "state": "UNAVAILABLE",
+                       "native_identity_claim": False, "resolved_type_state": "UNAVAILABLE_NOT_READ",
+                       "role": "DESCRIPTIVE_TREE" if descriptive else "STRICT"}
+        result["reference_observations"][label] = observation
         def collect():
             reference = extension.GetPersistReference3(entity)
             require(reference is not None, "persistent reference is null")
@@ -332,21 +557,38 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             require(values and all(type(item) is int and 0 <= item <= 255 for item in values),
                     "persistent reference is not a nonempty byte array")
             result["reads"][f"{label}.bytes"] = values
-            resolved = resolve(reference, label)
-            require(same(resolved, entity, f"s1.{label}.resolved_identity"), "persistent identity differs")
+            observation["bytes"] = values
+            try:
+                resolved = resolve(reference, label)
+            finally:
+                for key in ("status", "resolved_present"):
+                    if f"{label}.{key}" in result["reads"]:
+                        observation[key] = result["reads"][f"{label}.{key}"]
+            equal = same(resolved, entity, f"s1.{label}.resolved_identity")
+            observation["native_same"] = 1 if equal else 0
+            result["reads"][f"{label}.native_same"] = observation["native_same"]
+            observation["state"] = "SAME" if equal else "DIFFERENT"
+            proven = require_reference_identity(observation["status"], True, observation["native_same"], feature)
+            observation["native_identity_claim"] = proven and not descriptive
             return reference
-        return read(label, collect, opaque=True)
-
-    wizard_properties = {
-        "CosmeticThreadType": int, "ThreadEndCondition": int, "ThreadClass": str,
-        "Type": int, "FastenerSize": str, "EndCondition": int, "HoleDepth": float,
-        "ThreadDepth": float, "TapDrillDepth": float, "ThruTapDrillDepth": float,
-        "ThreadDiameter": float, "TapDrillDiameter": float, "ThruTapDrillDiameter": float,
-    }
-    cosmetic_properties = {
-        "ApplyThread": int, "BlindDepth": float, "Diameter": float,
-        "DiameterType": int, "EndCondition": int,
-    }
+        if not descriptive:
+            return read(label, collect, opaque=True)
+        try:
+            collect()
+        except Exception as error:
+            try:
+                message = str(error)
+            except BaseException:
+                message = "<exception text unavailable>"
+            observation["error"] = {"type": type(error).__name__, "message": message,
+                                    "traceback_available": error.__traceback__ is not None}
+            frames, tb = [], error.__traceback__
+            while tb is not None:
+                frames.append({"file": tb.tb_frame.f_code.co_filename,
+                               "function": tb.tb_frame.f_code.co_name, "line": tb.tb_lineno})
+                tb = tb.tb_next
+            observation["error"]["traceback_frames"] = frames
+        return MISSING  # Never reuse a descriptive node's token as authority.
 
     def geometry(edge, label):
         error_start = len(result["errors"])
@@ -354,7 +596,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         curve = read(f"{label}.curve", lambda: typed(edge.GetCurve(), "ICurve"), opaque=True)
         if curve is not MISSING:
             for key, reader in (
-                ("circle", lambda: scalar(curve.IsCircle(), bool)),
+                ("circle", lambda: native_scalar(curve.IsCircle(), bool)),
                 ("circle_parameters", lambda: finite_values(curve.CircleParams, 7)),
                 ("curve_domain", lambda: curve.GetEndParams()),
             ):
@@ -377,7 +619,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             params = read(f"{label}.trim", lambda: typed(edge.GetCurveParams3(), "ICurveParamData"), opaque=True)
             if params is not MISSING:
                 for key, expected in (("UMinValue", float), ("UMaxValue", float), ("Sense", bool)):
-                    value = read(f"{label}.{key}", lambda key=key, expected=expected: scalar(getattr(params, key), expected))
+                    value = read(f"{label}.{key}", lambda key=key, expected=expected: native_scalar(getattr(params, key), expected))
                     if value is not MISSING:
                         values[key] = value
                 for key in ("StartPoint", "EndPoint"):
@@ -398,61 +640,48 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
 
     def capture(phase):
         error_start = len(result["errors"])
-        snapshot = {"features": [], "edges": [], "complete": False}
+        snapshot = {"features": [], "edges": [], "complete": False, "tree_complete": False,
+                    "core_identity_complete": False, "all_pid_identity_claim": False}
         result["phases"][phase] = snapshot
-        features, edges = [], []
-
-        def walk(raw, parent=None, depth=0, ancestors=()):
-            chain = []
-            while raw is not None and raw is not MISSING:
-                require(depth < 32 and len(features) < 512, "bounded feature inventory exhausted")
-                feature = typed(raw, "IFeature")
-                require(not any(same(feature, previous, f"s1.{phase}.cursor_cycle") for previous in chain),
-                        "cyclic feature cursor")
-                require(not any(same(feature, ancestor, f"s1.{phase}.ancestor_cycle") for ancestor in ancestors),
-                        "cyclic subfeature ancestry")
-                chain.append(feature)
-                duplicates = [item for item in features if same(feature, item["native"], f"s1.{phase}.deduplicate")]
-                if not duplicates:
-                    index = len(features)
-                    label = f"{phase}.feature[{index}]"
-                    row = {"index": index, "parent_inventory_index": parent, "definition_state": "UNAVAILABLE",
-                           "scalars": {}, "face_state": "UNAVAILABLE"}
-                    snapshot["features"].append(row)
-                    item = {"native": feature, "row": row, "definition": MISSING, "reference": MISSING,
-                            "faces": [], "owner": MISSING}
-                    features.append(item)
-                    for key, reader in (
-                        ("name", lambda: scalar(feature.Name, str)),
-                        ("type", lambda: scalar(feature.GetTypeName2(), str)),
-                        ("rolled_back", lambda: scalar(feature.IsRolledBack(), bool)),
-                    ):
-                        value = read(f"{label}.{key}", reader)
-                        if value is not MISSING:
-                            row[key] = value
-                    item["reference"] = persistent(feature, f"{label}.reference")
-                    item["owner"] = read(f"{label}.owner", lambda: feature.GetOwnerFeature(), opaque=True)
-                    row["owner_state"] = "UNAVAILABLE" if item["owner"] is MISSING else "NULL" if item["owner"] is None else "PRESENT"
-                    raw_definition = read(f"{label}.definition", lambda: feature.GetDefinition(), opaque=True)
-                    row["definition_state"] = "UNAVAILABLE" if raw_definition is MISSING else "NULL_UNSUPPORTED" if raw_definition is None else "PRESENT"
-                    interface = {"HoleWzd": "IWizardHoleFeatureData2",
-                                 "CosmeticThread": "ICosmeticThreadFeatureData"}.get(row.get("type"))
-                    if interface and raw_definition is not None and raw_definition is not MISSING:
-                        definition = read(f"{label}.typed_definition", lambda: typed(raw_definition, interface), opaque=True)
-                        item["definition"] = definition
-                        row["definition_interface"] = interface
-                        if definition is not MISSING:
-                            properties = wizard_properties if interface == "IWizardHoleFeatureData2" else cosmetic_properties
-                            for name, expected in properties.items():
-                                value = read(f"{label}.{name}", lambda name=name, expected=expected: scalar(getattr(definition, name), expected))
-                                if value is not MISSING:
-                                    row["scalars"][name] = value
-                    child = read(f"{label}.first_subfeature", lambda: feature.GetFirstSubFeature(), opaque=True)
-                    walk(child, index, depth + 1, ancestors + (feature,))
-                raw = read(f"{phase}.next[{len(chain)}].depth[{depth}]",
-                           lambda: feature.GetNextFeature() if parent is None else feature.GetNextSubFeature(), opaque=True)
-
-        read(f"{phase}.traversal", lambda: walk(part.FirstFeature()))
+        tree_errors = []
+        def tree_read(label, reader, *, opaque=False):
+            value = read(label, reader, opaque=opaque)
+            if value is MISSING:
+                tree_errors.append(label)
+            return value
+        features, occurrences = feature_tree(part, bind, same, tree_read, phase)
+        snapshot["tree_occurrences"] = occurrences
+        edges = []
+        for index, item in enumerate(features):
+            feature = item["native"]
+            label = f"{phase}.feature[{index}]"
+            row = {"index": index, "parent_inventory_index": item["parent_inventory_index"],
+                   "definition_state": "UNAVAILABLE", "scalars": {}, "face_state": "UNAVAILABLE"}
+            row["non_root_occurrence"] = any(link["index"] == index and link["parent_inventory_index"] is not None
+                                             for link in occurrences)
+            snapshot["features"].append(row)
+            item.update(row=row, definition=MISSING, reference=MISSING, faces=[], owner=MISSING)
+            for key, reader in (
+                ("name", lambda: native_scalar(feature.Name, str)),
+                ("type", lambda: native_scalar(feature.GetTypeName2(), str)),
+                ("rolled_back", lambda: native_scalar(feature.IsRolledBack(), bool)),
+            ):
+                value = tree_read(f"{label}.{key}", reader)
+                if value is not MISSING:
+                    row[key] = value
+            item["owner"] = tree_read(f"{label}.owner", lambda: feature.GetOwnerFeature(), opaque=True)
+            row["owner_state"] = "UNAVAILABLE" if item["owner"] is MISSING else "NULL" if item["owner"] is None else "PRESENT"
+            raw_definition = tree_read(f"{label}.definition", lambda: feature.GetDefinition(), opaque=True)
+            row["definition_state"] = "UNAVAILABLE" if raw_definition is MISSING else "NULL_UNSUPPORTED" if raw_definition is None else "PRESENT"
+            interface = DEFINITION_INTERFACES.get(row.get("type"))
+            if interface and raw_definition is not None and raw_definition is not MISSING:
+                definition = tree_read(f"{label}.typed_definition", lambda: typed(raw_definition, interface), opaque=True)
+                item["definition"] = definition
+                row["definition_interface"] = interface
+                if definition is not MISSING:
+                    row["scalars"] = definition_scalars(definition, interface, tree_read, label)
+        structure = tree_read(f"{phase}.tree.structure", lambda: structural_tree(snapshot["features"], occurrences))
+        snapshot["tree_structure"] = None if structure is MISSING else structure
         # Preserve owner identities and every independent physical feature-face
         # membership. GetFeature gives oldest owner, not exclusive ownership.
         for item in features:
@@ -462,21 +691,23 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             if owner is not MISSING and owner is not None:
                 row["owner_inventory_matches"] = []
                 for other in features:
-                    value = read(f"{label}.owner_vs[{other['row']['index']}]",
+                    value = tree_read(f"{label}.owner_vs[{other['row']['index']}]",
                                  lambda other=other: same(owner, other["native"], f"s1.{label}.owner"))
                     if value is True:
                         row["owner_inventory_matches"].append(other["row"]["index"])
-                read(f"{label}.owner_inventory_complete",
+                tree_read(f"{label}.owner_inventory_complete",
                      lambda: require(len(row["owner_inventory_matches"]) == 1,
                                      "nonnull feature owner not uniquely in source inventory"))
-            faces = read(f"{label}.faces", lambda: feature.GetFaces(), opaque=True)
+            faces = tree_read(f"{label}.faces", lambda: feature.GetFaces(), opaque=True)
             if faces is not MISSING:
                 row["face_state"] = "NULL" if faces is None else "PRESENT"
                 if faces is not None:
                     def collect_faces():
                         require(isinstance(faces, (tuple, list)), "feature faces not an array")
                         item["faces"] = [typed(face, "IFace2") for face in faces]
-                    read(f"{label}.face_array", collect_faces)
+                    tree_read(f"{label}.face_array", collect_faces)
+            row["identity_role"] = "DESCRIPTIVE_TREE" if descriptive_tree_container(row) else "STRICT"
+            item["reference"] = persistent(feature, f"{label}.reference", row)
             for face_index, face in enumerate(item["faces"]):
                 raw_edges = read(f"{label}.face[{face_index}].edges", lambda face=face: face.GetEdges(), opaque=True)
                 if raw_edges is MISSING or raw_edges is None:
@@ -492,13 +723,33 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                             edges.append({"native": edge, "row": edge_row,
                                           "reference": persistent(edge, f"{edge_label}.reference")})
                 read(f"{label}.face[{face_index}].edge_array", collect_edges)
+        for item in features:
+            owners = item["row"].get("owner_inventory_matches", [])
+            if len(owners) == 1 and features[owners[0]]["row"]["identity_role"] == "DESCRIPTIVE_TREE":
+                tree_read(f"{phase}.feature[{item['row']['index']}].core_owner",
+                          lambda item=item: require(item["row"].get("type") in ("AmbientLight", "DirectionLight"),
+                                                    "modeling feature owner cannot use descriptive-only identity"))
         bodies = read(f"{phase}.bodies", lambda: typed(part, "IPartDoc").GetBodies2(-1, False), opaque=True)
         if bodies is not MISSING:
             read(f"{phase}.body_array", lambda: require(isinstance(bodies, (tuple, list)) and len(bodies) > 0,
                                                        "owned part body inventory unavailable"))
         for item in edges:
             item["row"].update(edge_evidence(item["native"], f"{phase}.edge[{item['row']['index']}]", features, bodies))
-        snapshot["complete"] = len(result["errors"]) == error_start and bool(features)
+        snapshot["tree_complete"] = not tree_errors and structure is not MISSING and bool(features)
+        snapshot["core_feature_count"] = sum(item["row"]["identity_role"] == "STRICT" for item in features)
+        observations = [value for key, value in result["reference_observations"].items() if key.startswith(f"{phase}.")]
+        required = [value for value in observations if value["required"]]
+        snapshot["core_identity_complete"] = bool(required) and all(value["state"] == "SAME" for value in required)
+        aliases = {}
+        for item in features:
+            values = result["reads"].get(f"{phase}.feature[{item['row']['index']}].reference.bytes")
+            if values:
+                aliases.setdefault(tuple(values), []).append(item["row"]["index"])
+        snapshot["reference_aliases"] = [
+            {"bytes": list(values), "feature_indices": indices, "role": "BYTE_ALIAS_NOT_IDENTITY"}
+            for values, indices in aliases.items() if len(indices) > 1
+        ]
+        snapshot["complete"] = snapshot["tree_complete"] and snapshot["core_identity_complete"] and len(result["errors"]) == error_start
         snapshot["all_features_rolled_forward"] = snapshot["complete"] and all(
             item["row"].get("rolled_back") is False for item in features)
         return {"features": features, "edges": edges, "bodies": bodies, "snapshot": snapshot}
@@ -536,6 +787,9 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                                      lambda feature=feature: same(oldest, feature["native"], f"s1.{label}.oldest"))
                         if value is True:
                             face_row["oldest_owner_matches"].append(feature_index)
+                            read(f"{label}.adjacent[{index}].oldest_core",
+                                 lambda feature=feature: require(feature["row"].get("identity_role") != "DESCRIPTIVE_TREE",
+                                                                 "physical face owner is a descriptive tree node"))
                     for owned_face in feature["faces"]:
                         value = read(f"{label}.adjacent[{index}].member[{feature_index},{len(face_row['feature_memberships'])}]",
                                      lambda owned_face=owned_face: same(face, owned_face, f"s1.{label}.face_membership"))
@@ -624,6 +878,20 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     # Fresh feature/definition reads, never reuse a pre-rollback definition to
     # claim roll-forward. Even a release/reader error retains after evidence.
     after = capture("after")
+    result["tree_structure_unchanged"] = (
+        before["snapshot"]["tree_complete"] and after["snapshot"]["tree_complete"]
+        and before["snapshot"]["tree_structure"] == after["snapshot"]["tree_structure"]
+    )
+    read("after.tree.stability", lambda: require(result["tree_structure_unchanged"],
+                                                "complete descriptive tree structure changed or unavailable"))
+    result["accessed_tree_structure_unchanged"] = (
+        None if accessed is None else accessed["snapshot"]["tree_complete"]
+        and accessed["snapshot"]["tree_structure"] == before["snapshot"]["tree_structure"]
+    )
+    if confirmed:
+        read("accessed.tree.stability",
+             lambda: require(result["accessed_tree_structure_unchanged"] is True,
+                             "complete accessed descriptive tree structure changed or unavailable"))
     result["feature_identity_after"] = []
     for item in before["features"]:
         if item["reference"] is MISSING:
@@ -635,16 +903,35 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             require(len(matches) == 1, "feature absent/ambiguous after rollback")
             other = matches[0]
             owner_unchanged = item["owner"] is None and other["owner"] is None
+            owner_role = "NATIVE"
+            owner_relation_unchanged = owner_unchanged
             owner_indices = item["row"].get("owner_inventory_matches", [])
             if len(owner_indices) == 1 and other["owner"] is not None and other["owner"] is not MISSING:
                 original_owner = before["features"][owner_indices[0]]
-                owner_unchanged = same(resolve(original_owner["reference"], "after.feature_owner"),
-                                       other["owner"], "s1.after.feature_owner")
+                if original_owner["row"]["identity_role"] == "DESCRIPTIVE_TREE":
+                    owner_role = "DESCRIPTIVE_TREE"
+                    require(item["row"].get("type") in ("AmbientLight", "DirectionLight"),
+                            "modeling feature owner cannot use descriptive-only identity")
+                    current_indices = other["row"].get("owner_inventory_matches", [])
+                    require(len(current_indices) == 1, "live descriptive parent association unavailable")
+                    current_owner = after["features"][current_indices[0]]
+                    owner_unchanged = None
+                    owner_relation_unchanged = (
+                        result["tree_structure_unchanged"]
+                        and current_owner["row"]["identity_role"] == "DESCRIPTIVE_TREE"
+                        and before["snapshot"]["tree_structure"]["paths"][original_owner["row"]["index"]]
+                        == after["snapshot"]["tree_structure"]["paths"][current_owner["row"]["index"]]
+                    )
+                else:
+                    owner_unchanged = same(resolve(original_owner["reference"], "after.feature_owner"),
+                                           other["owner"], "s1.after.feature_owner")
+                    owner_relation_unchanged = owner_unchanged
             result["feature_identity_after"].append({
                 "before": item["row"]["index"], "after": other["row"]["index"],
                 "scalars_unchanged": item["row"]["scalars"] == other["row"]["scalars"],
                 "name_type_unchanged": all(item["row"].get(key) == other["row"].get(key) for key in ("name", "type")),
                 "owner_unchanged": owner_unchanged,
+                "owner_identity_role": owner_role, "owner_relation_unchanged": owner_relation_unchanged,
                 "definition_state_unchanged": item["row"]["definition_state"] == other["row"]["definition_state"],
             })
         read(f"after.feature[{item['row']['index']}].identity", match_feature)
@@ -698,9 +985,11 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     result["clean_comparison"] = (
         confirmed and result.get("release_returned") is True and not result["errors"]
         and after["snapshot"]["all_features_rolled_forward"]
-        and len(before["features"]) == len(after["features"]) == len(result["feature_identity_after"])
+        and result["tree_structure_unchanged"]
+        and result["accessed_tree_structure_unchanged"] is True
+        and before["snapshot"]["core_feature_count"] == after["snapshot"]["core_feature_count"] == len(result["feature_identity_after"])
         and all(row["scalars_unchanged"] and row["name_type_unchanged"]
-                and row["owner_unchanged"] and row["definition_state_unchanged"]
+                and row["owner_relation_unchanged"] and row["definition_state_unchanged"]
                 for row in result["feature_identity_after"])
         and len(before["edges"]) == len(after["edges"]) == len(result["geometry_identity_after"])
         and all(row["geometry_unchanged"] and row["body_same"] and row["face_feature_memberships_unchanged"]
@@ -716,6 +1005,8 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     result["display_generation_permitted"] = (
         result["access_confirmed"] is True and result.get("release_returned") is True
         and after["snapshot"]["complete"] and result["roll_forward_witness"] is True
+        and result["tree_structure_unchanged"]
+        and result["accessed_tree_structure_unchanged"] is True
         and not result["errors"]
     )
     return result
@@ -1268,6 +1559,8 @@ def main():
                         report["s1"] = {"state": "UNAVAILABLE", "reason": "Baseline or native safety witnesses incomplete."}
                     else:
                         def before_access():
+                            require(summary["cases"][0].get("source_metadata", {}).get("state") == "OBSERVED",
+                                    "SM same-interface scalar census must precede source access")
                             live = require_owned_inventory(inventory("before_access"), "before_access")
                             require(len(live) == 2, "both exact owned copies must be live before access")
                             require(all(row.get("warnings") == 0 and type(row.get("warnings")) is int
@@ -1302,6 +1595,11 @@ def main():
                 else:
                     require(bool(report["thread_ink"]["positive_payload_fields"]),
                             "SM positive control did not extract positive native primitive payloads")
+                    report["source_metadata"] = passive_sm_thread_metadata(
+                        part, control["feature_name"], _early_bound, same, failure,
+                    )
+                    require(report["source_metadata"]["state"] == "OBSERVED",
+                            "SM same-interface source scalar census unavailable")
                 report["collection_completed"] = True
             except BaseException as error:
                 failure("collect", error)

@@ -1,14 +1,25 @@
 {
-  "schema": 3,
+  "schema": 4,
   "protocol": {
     "order": "SM readonly positive, then one S1 disposable-copy access/read/release",
     "selected_edge": "Only a unique real CosmeticThread definition; Wizard alone is UNAVAILABLE",
     "cleanup": "SM clean-only; S1 known-dirty copies only, complete owned inventory and UserControl=True before each close",
     "admission": "SM requires extracted positive primitive rows; every open requires exact integer zero errors/warnings",
     "copy_paths": "Strict unaliased cad/out children under trusted ROOT, checked before creation/open and ownership certification",
-    "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward and no source read failures",
+    "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward, unchanged before/accessed/after descriptive tree and no source read failures",
     "geometry": "Every physical edge requires successful native domain/evaluation operations independently of circle classification",
     "failure": "Retain escaping access-body BaseException and original traceback before the single finally release",
+    "tree_metadata": "Only six approved UI container types have descriptive PID quality; complete live tree and all core native identity remain mandatory",
+    "tree_metadata_types": [
+      "EnvFolder",
+      "HistoryFolder",
+      "InkMarkupFolder",
+      "MaterialFolder",
+      "SelectionSetFolder",
+      "SensorFolder"
+    ],
+    "tree_metadata_scope": "Only complete top-level nodes with known Boolean rollback and native NULL definition/faces/owner; all other types and modeling/geometric owners stay strict; raw aliases are not identity",
+    "sm_scalars": "Passive readonly BracketMountingTaps and owned cosmetic-child scalar census; same interfaces/enums as S1, no selection access or causal claim",
     "limitations": "No historical in-memory part hash, flank identity, global telemetry, or hard-crash cleanup guarantee"
   },
   "cases": [

@@ -1,0 +1,3837 @@
+{
+  "evidence": {
+    "run": "20261022T004940650Z-c67fae3af79144898ae8beaae68d7c9c",
+    "source": "a1890a44f4b5069e0cb2af9f1c916b0beb94ad7d",
+    "capture_sha256": "369ae5087dac1b7396a1db3fb927f30766981c8124f7664849d9f50ea217e8d7",
+    "role": "Actual before-access observations; selected cosmetic Edge was NOT read; statuses/IsSame probes are not counts of unique bodies/faces.",
+    "non_authoritative": "No new native result, generated mock, or manufactured accepted identity."
+  },
+  "features": [
+    {
+      "index": 0,
+      "parent_inventory_index": null,
+      "name": "Comments",
+      "type": "CommentsFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 1,
+      "parent_inventory_index": null,
+      "name": "Favorites",
+      "type": "FavoriteFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 2,
+      "parent_inventory_index": null,
+      "name": "History",
+      "type": "HistoryFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 3,
+      "parent_inventory_index": null,
+      "name": "Selection Sets",
+      "type": "SelectionSetFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 4,
+      "parent_inventory_index": null,
+      "name": "Sensors",
+      "type": "SensorFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 5,
+      "parent_inventory_index": null,
+      "name": "Design Binder",
+      "type": "DocsFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 6,
+      "parent_inventory_index": null,
+      "name": "Annotations",
+      "type": "DetailCabinet",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 7,
+      "parent_inventory_index": 6,
+      "name": "Notes",
+      "type": "NotesAreaFtrFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 8,
+      "parent_inventory_index": 6,
+      "name": "Notes1___EndTag___",
+      "type": "NotesAreaFtrFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 9,
+      "parent_inventory_index": null,
+      "name": "Surface Bodies",
+      "type": "SurfaceBodyFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 10,
+      "parent_inventory_index": null,
+      "name": "Solid Bodies",
+      "type": "SolidBodyFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 11,
+      "parent_inventory_index": null,
+      "name": "Lights and Cameras",
+      "type": "EnvFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 12,
+      "parent_inventory_index": 11,
+      "name": "Ambient",
+      "type": "AmbientLight",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 13,
+      "parent_inventory_index": 11,
+      "name": "Directional1",
+      "type": "DirectionLight",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 14,
+      "parent_inventory_index": null,
+      "name": "Markups",
+      "type": "InkMarkupFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 15,
+      "parent_inventory_index": null,
+      "name": "Equations",
+      "type": "EqnFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 16,
+      "parent_inventory_index": null,
+      "name": "Plain Carbon Steel",
+      "type": "MaterialFolder",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 17,
+      "parent_inventory_index": null,
+      "name": "Front Plane",
+      "type": "RefPlane",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 18,
+      "parent_inventory_index": null,
+      "name": "Top Plane",
+      "type": "RefPlane",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 19,
+      "parent_inventory_index": null,
+      "name": "Right Plane",
+      "type": "RefPlane",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 20,
+      "parent_inventory_index": null,
+      "name": "Origin",
+      "type": "OriginProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 21,
+      "parent_inventory_index": null,
+      "name": "NeckProfile",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 22,
+      "parent_inventory_index": null,
+      "name": "Neck",
+      "type": "Extrusion",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 23,
+      "parent_inventory_index": null,
+      "name": "FlangeProfile",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 24,
+      "parent_inventory_index": null,
+      "name": "Flange",
+      "type": "ICE",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 25,
+      "parent_inventory_index": null,
+      "name": "RootRounds",
+      "type": "Fillet",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 26,
+      "parent_inventory_index": null,
+      "name": "FootCorners",
+      "type": "Fillet",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 27,
+      "parent_inventory_index": null,
+      "name": "MountingHoles",
+      "type": "HoleWzd",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {
+        "CosmeticThreadType": -1,
+        "ThreadEndCondition": -1,
+        "ThreadClass": "",
+        "Type": 25,
+        "FastenerSize": "#2",
+        "EndCondition": 1,
+        "HoleDepth": 0.0,
+        "ThreadDepth": 0.0,
+        "TapDrillDepth": 0.0,
+        "ThruTapDrillDepth": 0.0,
+        "ThreadDiameter": 0.0,
+        "TapDrillDiameter": 0.0,
+        "ThruTapDrillDiameter": 0.0
+      },
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 28,
+      "parent_inventory_index": 27,
+      "name": "Sketch4",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 29,
+      "parent_inventory_index": 27,
+      "name": "Sketch3",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 30,
+      "parent_inventory_index": null,
+      "name": "LeverTap",
+      "type": "HoleWzd",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {
+        "CosmeticThreadType": 1,
+        "ThreadEndCondition": 1,
+        "ThreadClass": "2B",
+        "Type": 48,
+        "FastenerSize": "1/4-20",
+        "EndCondition": 1,
+        "HoleDepth": 0.0,
+        "ThreadDepth": 0.0,
+        "TapDrillDepth": 0.0,
+        "ThruTapDrillDepth": 0.049249999945999996,
+        "ThreadDiameter": 0.00635,
+        "TapDrillDiameter": 0.0,
+        "ThruTapDrillDiameter": 0.0051054
+      },
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 31,
+      "parent_inventory_index": 30,
+      "name": "Sketch6",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 32,
+      "parent_inventory_index": 30,
+      "name": "Sketch5",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 33,
+      "parent_inventory_index": 30,
+      "name": "Hole Thread1",
+      "type": "CosmeticThread",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {
+        "ApplyThread": 0,
+        "BlindDepth": 0.0,
+        "Diameter": 0.00635,
+        "DiameterType": 2,
+        "EndCondition": 0
+      },
+      "face_state": "NULL",
+      "owner_state": "PRESENT"
+    },
+    {
+      "index": 34,
+      "parent_inventory_index": null,
+      "name": "MouthBreak",
+      "type": "Chamfer",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "PRESENT",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 35,
+      "parent_inventory_index": null,
+      "name": "MountingCoordinates",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 36,
+      "parent_inventory_index": null,
+      "name": "TapCoordinates",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 37,
+      "parent_inventory_index": null,
+      "name": "ThreadEnvelope",
+      "type": "ProfileFeature",
+      "rolled_back": false,
+      "definition_state": "NULL_UNSUPPORTED",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    },
+    {
+      "index": 38,
+      "parent_inventory_index": null,
+      "name": "Axis1",
+      "type": "RefAxis",
+      "rolled_back": false,
+      "definition_state": "PRESENT",
+      "scalars": {},
+      "face_state": "NULL",
+      "owner_state": "NULL"
+    }
+  ],
+  "feature_reference_reads": {
+    "before.feature[0].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      36,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8,
+      0,
+      0,
+      0
+    ],
+    "before.feature[0].reference.status": 0,
+    "before.feature[1].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[1].reference.status": 0,
+    "before.feature[2].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[2].reference.status": 0,
+    "before.feature[3].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[3].reference.status": 0,
+    "before.feature[4].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[4].reference.status": 0,
+    "before.feature[5].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      36,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      7,
+      0,
+      0,
+      0
+    ],
+    "before.feature[5].reference.status": 0,
+    "before.feature[6].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      21,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    "before.feature[6].reference.status": 0,
+    "before.feature[7].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      36,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      15,
+      0,
+      0,
+      0
+    ],
+    "before.feature[7].reference.status": 0,
+    "before.feature[8].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      36,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      16,
+      0,
+      0,
+      0
+    ],
+    "before.feature[8].reference.status": 0,
+    "before.feature[9].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      20,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      10,
+      0,
+      0,
+      0
+    ],
+    "before.feature[9].reference.status": 0,
+    "before.feature[10].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      20,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      9,
+      0,
+      0,
+      0
+    ],
+    "before.feature[10].reference.status": 0,
+    "before.feature[11].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[11].reference.status": 0,
+    "before.feature[12].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      12,
+      0,
+      0,
+      0
+    ],
+    "before.feature[12].reference.status": 0,
+    "before.feature[13].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      13,
+      0,
+      0,
+      0
+    ],
+    "before.feature[13].reference.status": 0,
+    "before.feature[14].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[14].reference.status": 0,
+    "before.feature[15].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      22,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      14,
+      0,
+      0,
+      0
+    ],
+    "before.feature[15].reference.status": 0,
+    "before.feature[16].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "before.feature[16].reference.status": 0,
+    "before.feature[17].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0
+    ],
+    "before.feature[17].reference.status": 0,
+    "before.feature[18].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3,
+      0,
+      0,
+      0
+    ],
+    "before.feature[18].reference.status": 0,
+    "before.feature[19].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4,
+      0,
+      0,
+      0
+    ],
+    "before.feature[19].reference.status": 0,
+    "before.feature[20].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5,
+      0,
+      0,
+      0
+    ],
+    "before.feature[20].reference.status": 0,
+    "before.feature[21].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      24,
+      0,
+      0,
+      0
+    ],
+    "before.feature[21].reference.status": 0,
+    "before.feature[22].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      32,
+      0,
+      0,
+      0
+    ],
+    "before.feature[22].reference.status": 0,
+    "before.feature[23].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      33,
+      0,
+      0,
+      0
+    ],
+    "before.feature[23].reference.status": 0,
+    "before.feature[24].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      44,
+      0,
+      0,
+      0
+    ],
+    "before.feature[24].reference.status": 0,
+    "before.feature[25].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      46,
+      0,
+      0,
+      0
+    ],
+    "before.feature[25].reference.status": 0,
+    "before.feature[26].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      48,
+      0,
+      0,
+      0
+    ],
+    "before.feature[26].reference.status": 0,
+    "before.feature[27].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      51,
+      0,
+      0,
+      0
+    ],
+    "before.feature[27].reference.status": 0,
+    "before.feature[28].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      50,
+      0,
+      0,
+      0
+    ],
+    "before.feature[28].reference.status": 0,
+    "before.feature[29].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      49,
+      0,
+      0,
+      0
+    ],
+    "before.feature[29].reference.status": 0,
+    "before.feature[30].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      56,
+      0,
+      0,
+      0
+    ],
+    "before.feature[30].reference.status": 0,
+    "before.feature[31].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      55,
+      0,
+      0,
+      0
+    ],
+    "before.feature[31].reference.status": 0,
+    "before.feature[32].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      54,
+      0,
+      0,
+      0
+    ],
+    "before.feature[32].reference.status": 0,
+    "before.feature[33].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      61,
+      0,
+      0,
+      0
+    ],
+    "before.feature[33].reference.status": 0,
+    "before.feature[34].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      64,
+      0,
+      0,
+      0
+    ],
+    "before.feature[34].reference.status": 0,
+    "before.feature[35].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      65,
+      0,
+      0,
+      0
+    ],
+    "before.feature[35].reference.status": 0,
+    "before.feature[36].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      72,
+      0,
+      0,
+      0
+    ],
+    "before.feature[36].reference.status": 0,
+    "before.feature[37].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      77,
+      0,
+      0,
+      0
+    ],
+    "before.feature[37].reference.status": 0,
+    "before.feature[38].reference.bytes": [
+      56,
+      74,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      255,
+      254,
+      255,
+      0,
+      0,
+      0,
+      0,
+      0,
+      79,
+      0,
+      0,
+      0
+    ],
+    "before.feature[38].reference.status": 0
+  },
+  "physical_edges": [
+    {
+      "index": 0,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 1,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 2,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 3,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 4,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 5,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 6,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 7,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 8,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          34
+        ]
+      ]
+    },
+    {
+      "index": 9,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 10,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 11,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          34
+        ]
+      ]
+    },
+    {
+      "index": 12,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          22,
+          24
+        ]
+      ]
+    },
+    {
+      "index": 13,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 14,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          22,
+          24
+        ]
+      ]
+    },
+    {
+      "index": 15,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 16,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          22,
+          24
+        ]
+      ]
+    },
+    {
+      "index": 17,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 18,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          22
+        ]
+      ]
+    },
+    {
+      "index": 19,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 20,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          27
+        ]
+      ]
+    },
+    {
+      "index": 21,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          27
+        ]
+      ]
+    },
+    {
+      "index": 22,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 23,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          22,
+          24
+        ]
+      ]
+    },
+    {
+      "index": 24,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 25,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 26,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 27,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 28,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          22,
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 29,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 30,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 31,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 32,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 33,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 34,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 35,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 36,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 37,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 38,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          27
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 39,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          27
+        ],
+        [
+          24
+        ]
+      ]
+    },
+    {
+      "index": 40,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 41,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 42,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 43,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 44,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 45,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 46,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "NOT_FULL_OR_CONTRADICTORY",
+      "adjacent_feature_memberships": [
+        [
+          24
+        ],
+        [
+          26
+        ]
+      ]
+    },
+    {
+      "index": 47,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          25
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 48,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "UNAVAILABLE",
+      "adjacent_feature_memberships": [
+        [
+          25
+        ],
+        [
+          25
+        ]
+      ]
+    },
+    {
+      "index": 49,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          30
+        ],
+        [
+          34
+        ]
+      ]
+    },
+    {
+      "index": 50,
+      "operations_complete": true,
+      "owned_body_proven": true,
+      "body_source_matches": [
+        0
+      ],
+      "circle_state": "FULL_TRIMMED_CIRCLE",
+      "adjacent_feature_memberships": [
+        [
+          30
+        ],
+        [
+          34
+        ]
+      ]
+    }
+  ],
+  "source_errors": [
+    {
+      "operation": "s1.before.feature[2].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "operation": "s1.before.feature[3].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "operation": "s1.before.feature[4].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "operation": "s1.before.feature[11].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "operation": "s1.before.feature[14].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "operation": "s1.before.feature[16].reference",
+      "type": "RuntimeError",
+      "message": "persistent identity differs",
+      "traceback_available": true,
+      "traceback_frames": [
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "read",
+          "line": 294
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "collect",
+          "line": 336
+        },
+        {
+          "file": "C:\\harmonic\\work\\sources\\a1890a44f4b5-6083ffd309eb35a6\\workspace\\cad\\scripts\\diagnostics\\probe_mg_saved_thread_control.py",
+          "function": "require",
+          "line": 177
+        }
+      ]
+    }
+  ],
+  "persistent_comparisons": [
+    {
+      "operation": "s1.before.feature[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[2].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[3].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[4].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[5].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[6].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[7].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[8].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[9].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[10].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[11].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[12].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[13].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[14].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[15].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[16].reference.resolved_identity",
+      "status": "different",
+      "raw": 0
+    },
+    {
+      "operation": "s1.before.feature[17].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[18].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[19].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[20].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[21].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[22].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[23].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[24].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[25].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[26].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[27].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[28].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[29].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[30].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[31].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[32].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[33].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[34].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[35].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[36].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[37].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.feature[38].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[2].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[3].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[4].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[5].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[6].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[7].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[8].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[9].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[10].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[11].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[12].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[13].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[14].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[15].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[16].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[17].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[18].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[19].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[20].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[21].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[22].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[23].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[24].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[25].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[26].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[27].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[28].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[29].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[30].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[31].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[32].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[33].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[34].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[35].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[36].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[37].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[38].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[39].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[40].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[41].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[42].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[43].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[44].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[45].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[46].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[47].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[48].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[49].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[50].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[0].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[0].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[0].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[1].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[1].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[1].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[2].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[2].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[2].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[3].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[3].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[3].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[4].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[4].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[4].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[5].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[5].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[5].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[6].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[6].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[6].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[7].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[7].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[7].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[8].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[8].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[8].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[9].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[9].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[9].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[10].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[10].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[10].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[11].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[11].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[11].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[12].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[12].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[12].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[13].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[13].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[13].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[14].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[14].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[14].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[15].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[15].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[15].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[16].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[16].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[16].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[17].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[17].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[17].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[18].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[18].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[18].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[19].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[19].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[19].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[20].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[20].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[20].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[21].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[21].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[21].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[22].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[22].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[22].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[23].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[23].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[23].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[24].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[24].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[24].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[25].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[25].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[25].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[26].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[26].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[26].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[27].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[27].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[27].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[28].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[28].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[28].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[29].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[29].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[29].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[30].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[30].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[30].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[31].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[31].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[31].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[32].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[32].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[32].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[33].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[33].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[33].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[34].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[34].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[34].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[35].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[35].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[35].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[36].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[36].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[36].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[37].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[37].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[37].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[38].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[38].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[38].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[39].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[39].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[39].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[40].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[40].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[40].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[41].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[41].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[41].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[42].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[42].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[42].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[43].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[43].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[43].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[44].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[44].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[44].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[45].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[45].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[45].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[46].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[46].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[46].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[47].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[47].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[47].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[48].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[48].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[48].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[49].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[49].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[49].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[50].body_reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[50].adjacent[0].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    },
+    {
+      "operation": "s1.before.edge[50].adjacent[1].reference.resolved_identity",
+      "status": "same",
+      "raw": 1
+    }
+  ],
+  "persistent_statuses": {
+    "before.feature[0].reference.status": 0,
+    "before.feature[1].reference.status": 0,
+    "before.feature[2].reference.status": 0,
+    "before.feature[3].reference.status": 0,
+    "before.feature[4].reference.status": 0,
+    "before.feature[5].reference.status": 0,
+    "before.feature[6].reference.status": 0,
+    "before.feature[7].reference.status": 0,
+    "before.feature[8].reference.status": 0,
+    "before.feature[9].reference.status": 0,
+    "before.feature[10].reference.status": 0,
+    "before.feature[11].reference.status": 0,
+    "before.feature[12].reference.status": 0,
+    "before.feature[13].reference.status": 0,
+    "before.feature[14].reference.status": 0,
+    "before.feature[15].reference.status": 0,
+    "before.feature[16].reference.status": 0,
+    "before.feature[17].reference.status": 0,
+    "before.feature[18].reference.status": 0,
+    "before.feature[19].reference.status": 0,
+    "before.feature[20].reference.status": 0,
+    "before.feature[21].reference.status": 0,
+    "before.feature[22].reference.status": 0,
+    "before.feature[23].reference.status": 0,
+    "before.feature[24].reference.status": 0,
+    "before.feature[25].reference.status": 0,
+    "before.feature[26].reference.status": 0,
+    "before.feature[27].reference.status": 0,
+    "before.feature[28].reference.status": 0,
+    "before.feature[29].reference.status": 0,
+    "before.feature[30].reference.status": 0,
+    "before.feature[31].reference.status": 0,
+    "before.feature[32].reference.status": 0,
+    "before.feature[33].reference.status": 0,
+    "before.feature[34].reference.status": 0,
+    "before.feature[35].reference.status": 0,
+    "before.feature[36].reference.status": 0,
+    "before.feature[37].reference.status": 0,
+    "before.feature[38].reference.status": 0,
+    "before.edge[0].reference.status": 0,
+    "before.edge[1].reference.status": 0,
+    "before.edge[2].reference.status": 0,
+    "before.edge[3].reference.status": 0,
+    "before.edge[4].reference.status": 0,
+    "before.edge[5].reference.status": 0,
+    "before.edge[6].reference.status": 0,
+    "before.edge[7].reference.status": 0,
+    "before.edge[8].reference.status": 0,
+    "before.edge[9].reference.status": 0,
+    "before.edge[10].reference.status": 0,
+    "before.edge[11].reference.status": 0,
+    "before.edge[12].reference.status": 0,
+    "before.edge[13].reference.status": 0,
+    "before.edge[14].reference.status": 0,
+    "before.edge[15].reference.status": 0,
+    "before.edge[16].reference.status": 0,
+    "before.edge[17].reference.status": 0,
+    "before.edge[18].reference.status": 0,
+    "before.edge[19].reference.status": 0,
+    "before.edge[20].reference.status": 0,
+    "before.edge[21].reference.status": 0,
+    "before.edge[22].reference.status": 0,
+    "before.edge[23].reference.status": 0,
+    "before.edge[24].reference.status": 0,
+    "before.edge[25].reference.status": 0,
+    "before.edge[26].reference.status": 0,
+    "before.edge[27].reference.status": 0,
+    "before.edge[28].reference.status": 0,
+    "before.edge[29].reference.status": 0,
+    "before.edge[30].reference.status": 0,
+    "before.edge[31].reference.status": 0,
+    "before.edge[32].reference.status": 0,
+    "before.edge[33].reference.status": 0,
+    "before.edge[34].reference.status": 0,
+    "before.edge[35].reference.status": 0,
+    "before.edge[36].reference.status": 0,
+    "before.edge[37].reference.status": 0,
+    "before.edge[38].reference.status": 0,
+    "before.edge[39].reference.status": 0,
+    "before.edge[40].reference.status": 0,
+    "before.edge[41].reference.status": 0,
+    "before.edge[42].reference.status": 0,
+    "before.edge[43].reference.status": 0,
+    "before.edge[44].reference.status": 0,
+    "before.edge[45].reference.status": 0,
+    "before.edge[46].reference.status": 0,
+    "before.edge[47].reference.status": 0,
+    "before.edge[48].reference.status": 0,
+    "before.edge[49].reference.status": 0,
+    "before.edge[50].reference.status": 0,
+    "before.edge[0].body_reference.status": 0,
+    "before.edge[0].adjacent[0].reference.status": 0,
+    "before.edge[0].adjacent[1].reference.status": 0,
+    "before.edge[1].body_reference.status": 0,
+    "before.edge[1].adjacent[0].reference.status": 0,
+    "before.edge[1].adjacent[1].reference.status": 0,
+    "before.edge[2].body_reference.status": 0,
+    "before.edge[2].adjacent[0].reference.status": 0,
+    "before.edge[2].adjacent[1].reference.status": 0,
+    "before.edge[3].body_reference.status": 0,
+    "before.edge[3].adjacent[0].reference.status": 0,
+    "before.edge[3].adjacent[1].reference.status": 0,
+    "before.edge[4].body_reference.status": 0,
+    "before.edge[4].adjacent[0].reference.status": 0,
+    "before.edge[4].adjacent[1].reference.status": 0,
+    "before.edge[5].body_reference.status": 0,
+    "before.edge[5].adjacent[0].reference.status": 0,
+    "before.edge[5].adjacent[1].reference.status": 0,
+    "before.edge[6].body_reference.status": 0,
+    "before.edge[6].adjacent[0].reference.status": 0,
+    "before.edge[6].adjacent[1].reference.status": 0,
+    "before.edge[7].body_reference.status": 0,
+    "before.edge[7].adjacent[0].reference.status": 0,
+    "before.edge[7].adjacent[1].reference.status": 0,
+    "before.edge[8].body_reference.status": 0,
+    "before.edge[8].adjacent[0].reference.status": 0,
+    "before.edge[8].adjacent[1].reference.status": 0,
+    "before.edge[9].body_reference.status": 0,
+    "before.edge[9].adjacent[0].reference.status": 0,
+    "before.edge[9].adjacent[1].reference.status": 0,
+    "before.edge[10].body_reference.status": 0,
+    "before.edge[10].adjacent[0].reference.status": 0,
+    "before.edge[10].adjacent[1].reference.status": 0,
+    "before.edge[11].body_reference.status": 0,
+    "before.edge[11].adjacent[0].reference.status": 0,
+    "before.edge[11].adjacent[1].reference.status": 0,
+    "before.edge[12].body_reference.status": 0,
+    "before.edge[12].adjacent[0].reference.status": 0,
+    "before.edge[12].adjacent[1].reference.status": 0,
+    "before.edge[13].body_reference.status": 0,
+    "before.edge[13].adjacent[0].reference.status": 0,
+    "before.edge[13].adjacent[1].reference.status": 0,
+    "before.edge[14].body_reference.status": 0,
+    "before.edge[14].adjacent[0].reference.status": 0,
+    "before.edge[14].adjacent[1].reference.status": 0,
+    "before.edge[15].body_reference.status": 0,
+    "before.edge[15].adjacent[0].reference.status": 0,
+    "before.edge[15].adjacent[1].reference.status": 0,
+    "before.edge[16].body_reference.status": 0,
+    "before.edge[16].adjacent[0].reference.status": 0,
+    "before.edge[16].adjacent[1].reference.status": 0,
+    "before.edge[17].body_reference.status": 0,
+    "before.edge[17].adjacent[0].reference.status": 0,
+    "before.edge[17].adjacent[1].reference.status": 0,
+    "before.edge[18].body_reference.status": 0,
+    "before.edge[18].adjacent[0].reference.status": 0,
+    "before.edge[18].adjacent[1].reference.status": 0,
+    "before.edge[19].body_reference.status": 0,
+    "before.edge[19].adjacent[0].reference.status": 0,
+    "before.edge[19].adjacent[1].reference.status": 0,
+    "before.edge[20].body_reference.status": 0,
+    "before.edge[20].adjacent[0].reference.status": 0,
+    "before.edge[20].adjacent[1].reference.status": 0,
+    "before.edge[21].body_reference.status": 0,
+    "before.edge[21].adjacent[0].reference.status": 0,
+    "before.edge[21].adjacent[1].reference.status": 0,
+    "before.edge[22].body_reference.status": 0,
+    "before.edge[22].adjacent[0].reference.status": 0,
+    "before.edge[22].adjacent[1].reference.status": 0,
+    "before.edge[23].body_reference.status": 0,
+    "before.edge[23].adjacent[0].reference.status": 0,
+    "before.edge[23].adjacent[1].reference.status": 0,
+    "before.edge[24].body_reference.status": 0,
+    "before.edge[24].adjacent[0].reference.status": 0,
+    "before.edge[24].adjacent[1].reference.status": 0,
+    "before.edge[25].body_reference.status": 0,
+    "before.edge[25].adjacent[0].reference.status": 0,
+    "before.edge[25].adjacent[1].reference.status": 0,
+    "before.edge[26].body_reference.status": 0,
+    "before.edge[26].adjacent[0].reference.status": 0,
+    "before.edge[26].adjacent[1].reference.status": 0,
+    "before.edge[27].body_reference.status": 0,
+    "before.edge[27].adjacent[0].reference.status": 0,
+    "before.edge[27].adjacent[1].reference.status": 0,
+    "before.edge[28].body_reference.status": 0,
+    "before.edge[28].adjacent[0].reference.status": 0,
+    "before.edge[28].adjacent[1].reference.status": 0,
+    "before.edge[29].body_reference.status": 0,
+    "before.edge[29].adjacent[0].reference.status": 0,
+    "before.edge[29].adjacent[1].reference.status": 0,
+    "before.edge[30].body_reference.status": 0,
+    "before.edge[30].adjacent[0].reference.status": 0,
+    "before.edge[30].adjacent[1].reference.status": 0,
+    "before.edge[31].body_reference.status": 0,
+    "before.edge[31].adjacent[0].reference.status": 0,
+    "before.edge[31].adjacent[1].reference.status": 0,
+    "before.edge[32].body_reference.status": 0,
+    "before.edge[32].adjacent[0].reference.status": 0,
+    "before.edge[32].adjacent[1].reference.status": 0,
+    "before.edge[33].body_reference.status": 0,
+    "before.edge[33].adjacent[0].reference.status": 0,
+    "before.edge[33].adjacent[1].reference.status": 0,
+    "before.edge[34].body_reference.status": 0,
+    "before.edge[34].adjacent[0].reference.status": 0,
+    "before.edge[34].adjacent[1].reference.status": 0,
+    "before.edge[35].body_reference.status": 0,
+    "before.edge[35].adjacent[0].reference.status": 0,
+    "before.edge[35].adjacent[1].reference.status": 0,
+    "before.edge[36].body_reference.status": 0,
+    "before.edge[36].adjacent[0].reference.status": 0,
+    "before.edge[36].adjacent[1].reference.status": 0,
+    "before.edge[37].body_reference.status": 0,
+    "before.edge[37].adjacent[0].reference.status": 0,
+    "before.edge[37].adjacent[1].reference.status": 0,
+    "before.edge[38].body_reference.status": 0,
+    "before.edge[38].adjacent[0].reference.status": 0,
+    "before.edge[38].adjacent[1].reference.status": 0,
+    "before.edge[39].body_reference.status": 0,
+    "before.edge[39].adjacent[0].reference.status": 0,
+    "before.edge[39].adjacent[1].reference.status": 0,
+    "before.edge[40].body_reference.status": 0,
+    "before.edge[40].adjacent[0].reference.status": 0,
+    "before.edge[40].adjacent[1].reference.status": 0,
+    "before.edge[41].body_reference.status": 0,
+    "before.edge[41].adjacent[0].reference.status": 0,
+    "before.edge[41].adjacent[1].reference.status": 0,
+    "before.edge[42].body_reference.status": 0,
+    "before.edge[42].adjacent[0].reference.status": 0,
+    "before.edge[42].adjacent[1].reference.status": 0,
+    "before.edge[43].body_reference.status": 0,
+    "before.edge[43].adjacent[0].reference.status": 0,
+    "before.edge[43].adjacent[1].reference.status": 0,
+    "before.edge[44].body_reference.status": 0,
+    "before.edge[44].adjacent[0].reference.status": 0,
+    "before.edge[44].adjacent[1].reference.status": 0,
+    "before.edge[45].body_reference.status": 0,
+    "before.edge[45].adjacent[0].reference.status": 0,
+    "before.edge[45].adjacent[1].reference.status": 0,
+    "before.edge[46].body_reference.status": 0,
+    "before.edge[46].adjacent[0].reference.status": 0,
+    "before.edge[46].adjacent[1].reference.status": 0,
+    "before.edge[47].body_reference.status": 0,
+    "before.edge[47].adjacent[0].reference.status": 0,
+    "before.edge[47].adjacent[1].reference.status": 0,
+    "before.edge[48].body_reference.status": 0,
+    "before.edge[48].adjacent[0].reference.status": 0,
+    "before.edge[48].adjacent[1].reference.status": 0,
+    "before.edge[49].body_reference.status": 0,
+    "before.edge[49].adjacent[0].reference.status": 0,
+    "before.edge[49].adjacent[1].reference.status": 0,
+    "before.edge[50].body_reference.status": 0,
+    "before.edge[50].adjacent[0].reference.status": 0,
+    "before.edge[50].adjacent[1].reference.status": 0
+  }
+}
