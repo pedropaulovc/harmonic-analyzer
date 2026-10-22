@@ -131,8 +131,11 @@ must be **0.50–0.60 mm normal below the actual cap top face**, with
 **2.00 mm minimum whole-floor thickness under each counterbore, including
 the full-width edge openings**. The recess upper limit controls fixed
 head/wire height for the VN-76 groove clearance, not merely floor thickness.
-The block wing is **72 mm wide**, starts at −54.5 mm and retains the
-1 × 3 in flat-bar stock. Its end is controlled directly by the
+The block wing is nominally **72 mm wide**: its opposed faces are each
+located **36.00 mm from the bearing axis**, with ordinary ±0.51 mm tolerance.
+The overall width derives from those two locations, not a separate size band.
+It starts at −54.5 mm and retains the 1 × 3 in flat-bar stock.
+Its end is controlled directly by the
 **20.60 mm bearing-axis-to-wing-edge reach**, ordinary two-place ±0.51 mm,
 not a competing wing-length/end chain. The source retains the 2 mm
 thread-wall target and 0.50 mm wing/bracket-clearance contract without
