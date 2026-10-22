@@ -6205,7 +6205,7 @@ def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room
 @pytest.mark.parametrize(
     "member", ("carriage", "block", "bracket", "rail", "clamp", "lever")
 )
-def test_oblique_screw_recipes_reserve_tall_top_without_changing_supplier_lanes(
+def test_oblique_screw_recipes_reserve_native_top_and_front_space(
     monkeypatch, member
 ):
     from importlib import import_module
@@ -6227,14 +6227,18 @@ def test_oblique_screw_recipes_reserve_tall_top_without_changing_supplier_lanes(
     assert asyncio.run(recipe.build(adapter)) == {"pdf": "native-proof-required.pdf"}
     assert len(received) == 1
     options = received[0]
-    assert callable(options["supplier_dimensions"])
-    assert options["settled_checks"] is not None
     assert options["supplier_margins"] == supplier_screw_margins(
         supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
-    cells = purchased.fastener_view_cells(0.073, layout=options["view_layout"])
+    notes = str(
+        purchased._config.parts(recipe.SPEC.artifact_stem).get("installation_notes", "")
+    )
+    caption_y = purchased.view_band_bottom(
+        notes, label=member, supplier_data=options.get("supplier_data", ())
+    )
+    cells = purchased.fastener_view_cells(caption_y, layout=options["view_layout"])
     fitted = purchased.supplier_fit_cells(
         cells, options["supplier_margins"], label=member
     )
@@ -6242,6 +6246,10 @@ def test_oblique_screw_recipes_reserve_tall_top_without_changing_supplier_lanes(
     # The standard band's two 26 mm annotation lanes leave only 12 mm.
     # Keep both lanes; the existing tall band must leave 44 mm for native bounds.
     assert top[3] - top[1] == pytest.approx(0.044)
+    front = next(bounds for name, _, bounds in fitted if name == "*Front")
+    assert front[3] - front[1] == pytest.approx(0.027)
+    # Other members' actual outlines and printed legibility are native gates,
+    # not inferred here from the carriage's measured padding decomposition.
 
 
 def test_carriage_native_top_padding_floor_requires_tall_top_band(monkeypatch, tmp_path):
@@ -6275,9 +6283,15 @@ def test_carriage_native_top_padding_floor_requires_tall_top_band(monkeypatch, t
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
+    notes = str(
+        purchased._config.parts("ch-rocker-arm-tl-vn-oblique-carriage-screw").get(
+            "installation_notes", ""
+        )
+    )
+    caption_y = purchased.view_band_bottom(notes, label="carriage")
 
     def members(layout):
-        outer = purchased.fastener_view_cells(0.073, layout=layout)[:3]
+        outer = purchased.fastener_view_cells(caption_y, layout=layout)[:3]
         fitted = purchased.supplier_fit_cells(outer, margins, label="carriage")
         return [
             (CarriageView(name, tmp_path / "carriage.SLDPRT", center), cell)

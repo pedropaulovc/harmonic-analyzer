@@ -97,8 +97,12 @@ scale exceeds the cell by 0.051 mm. No centering move was attempted.
 The six oblique-jig carriage, block, bracket, rail, clamp and lever screw
 recipes select the existing `tall_top` layout, as the shared clamp-screw sheet
 already does. It gives Top a 96 mm band and, with the same lanes, a 44 mm
-geometry cell. It also lowers the bottom-row cells, so the fitter must measure
-all orthographic views and choose their largest common standard scale anew.
+geometry cell. The bottom-row cell tops lower by 32 mm, reducing the Front
+geometry cell from 59 to 27 mm without moving its bottom. The measured carriage
+outline consequently selects 1:2 rather than the 1:1 its Front alone accepted
+in the old layout. All orthographic views must be measured together anew;
+the six rendered sheets and their automated machinist reviews decide whether
+the resulting scale remains readable.
 Keep the lane budgets, independent-scale readback, strict native containment,
 caption checks and supplier-source preservation guards unchanged. Do not
 shrink fixed outline padding, alter coordinate units, add a scale below 1:8,

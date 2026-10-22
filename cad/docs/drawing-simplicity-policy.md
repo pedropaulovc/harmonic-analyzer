@@ -67,10 +67,15 @@ cannot ask for what the authors were told to leave out.
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
-  The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
-  outer Top cell retains the existing 46 mm annotation reserve, leaving
-  50 mm for the measured native outline. The bottom-row cells' tops and
-  the Isometric's bottom lower 32 mm; other sheets keep `standard`.
+  The shared clamp screw and the six oblique-jig carriage, block, bracket,
+  rail, clamp and lever screws select the purchased sheet's `tall_top` layout.
+  Its 96 mm outer Top cell retains each sheet's existing annotation reserve:
+  46 mm for the shared clamp screw leaves 50 mm for its native outline; the
+  oblique screws' 52 mm reserve leaves 44 mm. The bottom-row cells' tops and
+  the Isometric's bottom lower 32 mm. For the oblique screws this reduces the
+  Front geometry cell from 59 to 27 mm, so their common orthographic scale
+  must be selected again and readability judged on every rendered sheet.
+  Sheets not selecting this layout retain `standard`.
   Scale selection still tries the existing standard scales against complete
   native outlines,
   without subtracting fixed sheet-space padding. Short clamp-reference text
