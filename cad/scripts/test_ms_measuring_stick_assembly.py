@@ -35,6 +35,7 @@ import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import _mcmaster_91882a221 as thumb
 from _transforms import rows_from_euler
+from _named_views import octant_axes
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
@@ -103,24 +104,24 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
 
     asyncio.run(builder._author_clamped_setting(Adapter()))
 
-    (left_x, roof_y), (face_x, _) = spec.SETTING_CHORD
+    (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     assert globals_authored == {
         "SettingStickLeft": f"{left_x}mm",
         "SettingBlockFace": f"{face_x}mm",
-        "SettingRoof": f"{roof_y}mm",
+        "SettingContact": f"{contact_y}mm",
     }
     feature = spec.SETTING_FEATURE
     assert equations == {
         f"SettingLeftX@{feature}": '-"SettingStickLeft"',
-        f"SettingRoofY@{feature}": '"SettingRoof"',
+        f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
     assert toleranced == [(feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM)]
 
 
 def test_setting_chord_spans_the_near_face_reference() -> None:
-    assert spec.SETTING_CHORD[0] == (spec.STICK_X_MIN, spec.STICK_TOP_Y)
-    assert spec.SETTING_CHORD[1] == (spec.BLOCK_ORIGIN[0], spec.STICK_TOP_Y)
+    assert spec.SETTING_CHORD[0] == (spec.STICK_X_MIN, spec.STICK_BOTTOM_Y)
+    assert spec.SETTING_CHORD[1] == (spec.BLOCK_ORIGIN[0], spec.STICK_BOTTOM_Y)
     assert spec.SETTING_CHORD[1][0] - spec.SETTING_CHORD[0][0] == pytest.approx(spec.SETTING_NEAR_FACE_MM)
     assert spec.DRAWING_PRECISION == {
         spec.SETTING_FEATURE: {spec.SETTING_DIMENSION: spec.SETTING_PRECISION}
@@ -160,7 +161,8 @@ def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
 
 
 def test_every_rotation_is_proper() -> None:
-    for rows in (spec.STICK_ROWS, spec.THUMB_ROWS, spec.PLATE_SCREW_ROWS, top.MS_ROWS):
+    for rows in (spec.WORKING_ROWS, spec.BLOCK_ROWS, spec.PLATE_ROWS,
+                 spec.STICK_ROWS, spec.THUMB_ROWS, spec.PLATE_SCREW_ROWS, top.MS_ROWS):
         x, y, z = rows
         cross = (
             x[1] * y[2] - x[2] * y[1],
@@ -170,19 +172,23 @@ def test_every_rotation_is_proper() -> None:
         assert cross == pytest.approx(tuple(z))
 
 
-def test_stick_rides_the_roof_graduations_up_centred_in_the_window() -> None:
-    # Graduated face (part z=0) on the roof; the far face (part z=thickness) below.
-    top_face = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, 0.0))
-    bottom = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, stick.BODY_THICKNESS))
-    assert top_face[1] == pytest.approx(stop.WINDOW_Y_MAX)
-    assert bottom[1] == pytest.approx(spec.STICK_BOTTOM_Y)
-    assert spec.STICK_FLOOR_GAP == pytest.approx(
+def test_stick_graduated_face_bears_on_the_window_wall_opposite_the_screw() -> None:
+    graduated = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, 0.0))
+    plain = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, stick.BODY_THICKNESS))
+    window_contact = _image(spec.BLOCK_ROWS, spec.BLOCK_ORIGIN,
+                            (0.0, stop.WINDOW_Y_MAX, 0.0))
+    assert graduated[1] == pytest.approx(window_contact[1])
+    assert graduated[1] == pytest.approx(spec.STICK_BOTTOM_Y)
+    assert plain[1] == pytest.approx(spec.STICK_TOP_Y)
+    assert plain[1] > graduated[1]
+    assert tuple(-v for v in spec.STICK_ROWS[2]) == (0.0, -1.0, 0.0)
+    assert spec.STICK_TAPPED_WALL_GAP == pytest.approx(
         stop.WINDOW_HEIGHT - stick.BODY_THICKNESS
     )
     near = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, 0.0))[2]
     far = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, stick.BODY_WIDTH, 0.0))[2]
-    assert near - stop.WINDOW_Z_MIN == pytest.approx(stop.WINDOW_Z_MAX - far)
-    assert near - stop.WINDOW_Z_MIN > 0.0
+    assert -stop.WINDOW_Z_MIN - near == pytest.approx(far + stop.WINDOW_Z_MAX)
+    assert -stop.WINDOW_Z_MIN - near > 0.0
 
 
 def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
@@ -199,16 +205,17 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
 
-def test_thumbscrew_tip_clamps_the_stick_underside() -> None:
+def test_thumbscrew_head_is_above_tip_which_clamps_the_plain_face() -> None:
+    head = _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (0.0, 0.0, 0.0))
     tip = _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.OVERALL_LEN, 0.0, 0.0))
     collar = _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.HEAD_STACK_LEN, 0.0, 0.0))
-    assert tip == pytest.approx((stop.THUMB_AXIS_X, spec.STICK_BOTTOM_Y, stop.THUMB_AXIS_Z))
-    assert collar[1] < 0.0  # the collar hangs under the block, never bearing on it
+    assert tip == pytest.approx((stop.THUMB_AXIS_X, spec.STICK_TOP_Y, -stop.THUMB_AXIS_Z))
+    assert head[1] > collar[1] > 0.0 > tip[1]
+    assert head[1] == pytest.approx(spec.THUMB_HEAD_FACE_Y)
     assert spec.THUMB_EXPOSED_THREAD == pytest.approx(
-        thumb.SHANK_LEN - stop.FLOOR_THICKNESS - spec.STICK_FLOOR_GAP
+        thumb.SHANK_LEN - stop.FLOOR_THICKNESS - spec.STICK_TAPPED_WALL_GAP
     )
-    # The stick's 8 width covers the tip within the window.
-    assert spec.STICK_Z_MIN < stop.THUMB_AXIS_Z < spec.STICK_Z_MAX
+    assert spec.STICK_Z_MIN < -stop.THUMB_AXIS_Z < spec.STICK_Z_MAX
 
 
 def test_plate_screws_seat_on_the_cover_and_stop_short_of_the_tap_depth() -> None:
@@ -217,11 +224,11 @@ def test_plate_screws_seat_on_the_cover_and_stop_short_of_the_tap_depth() -> Non
         bearing = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, 0.0, 0.0))
         tip = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, -plate_screw.LENGTH, 0.0))
         head = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, plate_screw.HEAD_H, 0.0))
-        assert bearing[2] == pytest.approx(stop.PLATE_Z_MIN)
+        assert bearing[2] == pytest.approx(-stop.PLATE_Z_MIN)
         assert tip[2] == pytest.approx(spec.PLATE_SCREW_TIP_Z)
         assert head[2] == pytest.approx(spec.PLATE_SCREW_HEAD_Z)
         assert (bearing[0], bearing[1]) in {
-            (x, stop.PLATE_HOLE_Y) for x in stop.PLATE_HOLE_XS
+            (x, -stop.PLATE_HOLE_Y) for x in stop.PLATE_HOLE_XS
         }
     assert spec.PLATE_SCREW_ENGAGED == pytest.approx(
         plate_screw.LENGTH - stop.PLATE_THICKNESS
@@ -283,25 +290,66 @@ def test_builder_places_exactly_the_inventory() -> None:
 
 
 def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
-    assert top.MS_HEAD_BOTTOM_Y == pytest.approx(top.LAND_TOP_Y + top.STOP_LAND_GAP)
-    # Whole stop between the column east face and the deck's east edge.
-    assert top.PARK_WEST_LIMIT_X < top.MS_WEST_X < top.MS_EAST_X < top.PARK_EAST_LIMIT_X
-    assert top.MS_FRONT_Z > top.PARK_FRONT_LIMIT_Z
-    # The 200 bar is centred on machine z = 0.
-    assert top.MS_POS[2] + (spec.STICK_X_MIN + spec.STICK_X_MAX) / 2.0 == pytest.approx(0.0)
+    from itertools import product
+
+    corners = tuple(
+        _image(top.MS_ROWS, top.MS_POS, point)
+        for point in product(*zip(spec.EXTENT_MIN, spec.EXTENT_MAX, strict=True))
+    )
+    assert len(corners) == len(set(corners)) == 8
+    assert len(top.MS_PARK_CORNERS) == 8
+    for actual, expected in zip(top.MS_PARK_CORNERS, corners, strict=True):
+        assert actual == pytest.approx(expected)
+        x, y, z = actual
+        assert top.PARK_WEST_LIMIT_X < x < top.PARK_EAST_LIMIT_X
+        assert y >= top.LAND_TOP_Y + top.STOP_LAND_GAP - 1e-9
+        assert top.PARK_FRONT_LIMIT_Z < z < -top.PARK_FRONT_LIMIT_Z
+    assert min(p[1] for p in corners) == pytest.approx(top.MS_BLOCK_BOTTOM_Y)
+    assert top.MS_BLOCK_BOTTOM_Y == pytest.approx(top.LAND_TOP_Y + top.STOP_LAND_GAP)
+    assert top.MS_WEST_X == pytest.approx(min(p[0] for p in corners))
+    assert top.MS_EAST_X == pytest.approx(max(p[0] for p in corners))
+    assert top.MS_FRONT_Z == pytest.approx(min(p[2] for p in corners))
+    assert top.MS_WEST_X + top.MS_EAST_X == pytest.approx(
+        top.PARK_WEST_LIMIT_X + top.PARK_EAST_LIMIT_X
+    )
+    assert min(p[2] for p in corners) + max(p[2] for p in corners) == pytest.approx(0.0)
+    # The unchanged longitudinal axis centres the 200 mm bar on machine Z.
     assert top.MS_POS[2] == pytest.approx(-25.6)
-    assert top.MS_POS[2] + spec.STICK_X_MIN == pytest.approx(-100.0)
-    assert top.MS_POS[2] + spec.STICK_X_MAX == pytest.approx(100.0)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-100)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(100)
     assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
 
 
 def test_stick_keeps_its_machine_orientation() -> None:
-    """Composed through the sub-assembly, the bar still runs machine +Z with
-    the graduated face up, as it did when the top assembly placed it."""
+    """The bar keeps machine +Z; the approved physical flip faces graduations down."""
     composed = _matmul([list(row) for row in spec.STICK_ROWS], top.MS_ROWS)
     assert _flat(composed) == pytest.approx(
-        _flat([[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]])
+        _flat([[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
     )
+    head = _image(top.MS_ROWS, top.MS_POS, spec.THUMB_ORIGIN)
+    tip = _image(top.MS_ROWS, top.MS_POS,
+                 _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.OVERALL_LEN, 0, 0)))
+    assert head[1] == pytest.approx(top.MS_HEAD_TOP_Y)
+    assert head[1] > tip[1]
+    assert (head[0], head[2]) == pytest.approx((tip[0], tip[2]))
+
+
+@pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),
+                                (0.6, -0.8, 0.0), (0.0, -0.8, 0.6)))
+def test_native_standalone_final_guard_reads_solved_screw_transform(monkeypatch, axis) -> None:
+    import build_ms_measuring_stick_assembly as builder
+
+    adapter = object()
+
+    def transform(_current, _instance):
+        return (*axis, 1, 0, 0, 0, 0, 1, 100, 200, 300, 1)
+
+    monkeypatch.setattr(builder, "component_transform", transform)
+    if axis == (0.0, -1.0, 0.0):
+        builder._assert_working_pose(adapter, "native-thumb-1")
+    else:
+        with pytest.raises(RuntimeError, match="thumbscrew head must be above"):
+            builder._assert_working_pose(adapter, "native-thumb-1")
 
 
 def test_joint_rows_name_printed_steps() -> None:
@@ -671,16 +719,83 @@ def test_reference_dimensions_follow_the_spec() -> None:
     values = {label: value for label, value, _callout in drawing.ASSEMBLY_DIMENSIONS}
     assert values["overall length"] == sheet.REFERENCE_OVERALL_LENGTH
     assert values["stop position"] == spec.SETTING_NEAR_FACE_MM
-    assert f"{stop.STOP_MARK:.1f}" in sheet.STOP_POSITION_CALLOUT
     assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
     assert sheet.DRAWING_REFERENCE_PRECISION >= 1
-    # Both texts sit between the front view and the top view above it.
+    # The underside projects below Front; both dimension rows stay above Front.
     assert (
-        drawing.FRONT_CENTER[1]
+        drawing.UNDERSIDE_CENTER[1]
+        < drawing.FRONT_CENTER[1]
         < drawing.STOP_POSITION_TEXT_Y
         < drawing.OVERALL_LENGTH_TEXT_Y
-        < drawing.TOP_CENTER[1]
+        < drawing.SHEET_INNER_BORDER[3]
     )
+
+
+@pytest.mark.parametrize("defect", (None, "style-set", "style-readback", "alignment"))
+def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> None:
+    front, underside, section = object(), object(), object()
+    views = iter((front, underside))
+    projected = []
+    cut = {}
+    style = []
+
+    def settled():
+        pass
+
+    class Extension:
+        def SetUserPreferenceInteger(self, preference, option, value):
+            style.append((preference, option, value))
+            return defect != "style-set"
+
+        def GetUserPreferenceInteger(self, preference, option):
+            assert (preference, option) == (542, 0)
+            return 0 if defect == "style-readback" else 1
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=Extension()))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *a: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *a, **kw: next(views))
+    for name in ("set_hidden_lines_removed", "apply_view_configuration",
+                 "_assert_view_on_sheet", "_add_note_block"):
+        monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
+    monkeypatch.setattr(
+        drawing, "_view_outline",
+        lambda *a, **kw: (0.029412, 0.1739245, 0.240588, 0.2060755),
+    )
+
+    def project(adapter, view, point, **kwargs):
+        projected.append((view, point))
+        x = 0.1199
+        if defect == "alignment" and view is underside:
+            x += 2e-6  # Just beyond the 1 micrometre alignment boundary.
+        return (x, 0.190)
+
+    def create(adapter, parent, **kwargs):
+        assert parent is front
+        cut.update(kwargs)
+        return section
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "create_section_view", create)
+    monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
+    if defect is not None:
+        message = {
+            "style-set": "failed to set end-only",
+            "style-readback": "style did not persist",
+            "alignment": "thumbscrew axes are not aligned",
+        }[defect]
+        with pytest.raises(RuntimeError, match=message):
+            drawing._place_clamped_sheet(adapter)
+        assert not cut
+        return
+    assert drawing._place_clamped_sheet(adapter) is settled
+    assert style == [(542, 0, 1)]
+    axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
+    assert projected == [(front, axis_point), (underside, axis_point)]
+    assert cut["line_start"] == pytest.approx((0.1199, 0.2240755))
+    assert cut["line_end"] == pytest.approx((0.1199, 0.1699245))
+    assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
+    assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
 
 
 @pytest.mark.parametrize(
@@ -698,7 +813,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
     monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 1.85)
     monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 2.5)
-    monkeypatch.setattr(stop, "PLATE_HOLE_POSITION_TOLERANCE_MM", 0.12)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     assignments = [
         node for node in tree.body
@@ -740,14 +854,9 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
         assert changed.SETTING_CRITERION in text
         assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
         assert "FROM LEFT STICK END" in text
-    assert changed.STOP_POSITION_CALLOUT.replace("\n", " ") == (
-        f"{mark:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
-    )
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
-    assert "±0.12 mm LOCATIONS" in pilot
-    assert "DIA 1.85 THROUGH INTO BLOCK" in pilot
     assert "OPEN ITS HOLES TO DIA 2.5" in pilot
     assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
@@ -775,10 +884,14 @@ def _assert_fitter_text_spacing(fitter) -> None:
         drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch
         > drawing.CHECKS_XY[1] + line_pitch
     )
-    assert drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch > 0.090
-    # The stacked callout fits between the setting's extension lines and
-    # ends left of the section-A label (r7 sheet: a 49-character criterion
-    # line crossed both). Default note glyphs measure ~2.5 mm wide.
+    assert (
+        drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch
+        > drawing.SHEET_INNER_BORDER[1] + line_pitch
+    )
+    assert drawing.SETUP_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
+    # Native audit run20261020T155437689Z-8f0ca7b774c4: the original
+    # setting dimension line crossed the section-A label. Keep the stacked
+    # callout between extension lines and left of that label (~2.5 mm glyphs).
     char_width = 0.0026
     section_label_clearance = 0.009  # label's left edge to the near block face
     span = fitter.SETTING_NEAR_FACE_MM / 1000.0
@@ -789,15 +902,24 @@ def _assert_fitter_text_spacing(fitter) -> None:
     centre = drawing.STOP_POSITION_TEXT_FRACTION * span
     assert centre - half_width > 0.0
     assert centre + half_width < span - section_label_clearance
-    # The stacked callout stays above the front silhouette; the overall
-    # reference remains above it and below the top view.
+    # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
+    # left the upper arrow below the setting dimension line.
+    # At text Y220 the native setting line is Y211.6656; its witness ends
+    # 1 mm beyond it. The 18 mm overhang places the complete upper arrow
+    # above that witness, with the overall reference still above the arrow.
+    upper_arrow_y = 0.2060755 + drawing.CLAMP_SECTION_TOP_CLEARANCE
+    setting_line_y = drawing.STOP_POSITION_TEXT_Y - 0.0083344
+    assert upper_arrow_y > setting_line_y + 0.001 + 0.002
+    assert upper_arrow_y + 0.00635 < drawing.OVERALL_LENGTH_TEXT_Y - 0.010
+    # The stacked callout stays above Front; the overall reference above it
+    # retains text-height clearance to the inner border.
     assert (
         drawing.STOP_POSITION_TEXT_Y
         - len(fitter.STOP_POSITION_CALLOUT.splitlines()) * line_pitch
         > drawing.FRONT_CENTER[1] + 0.012
     )
     assert drawing.OVERALL_LENGTH_TEXT_Y > drawing.STOP_POSITION_TEXT_Y + line_pitch
-    assert drawing.OVERALL_LENGTH_TEXT_Y < drawing.TOP_CENTER[1] - line_pitch
+    assert drawing.OVERALL_LENGTH_TEXT_Y + line_pitch < drawing.SHEET_INNER_BORDER[3]
 
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
@@ -937,19 +1059,14 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             return display
 
     start = Edge(
-        (0.0, stick.BODY_WIDTH, 0.0),
-        (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, stick.BODY_THICKNESS),
         spec.STICK_X_MIN,
     )
     end = Edge(
-        (stick.BODY_LENGTH, stick.BODY_WIDTH, 0.0),
-        (stick.BODY_LENGTH, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        (stick.BODY_LENGTH, 0.0, 0.0),
+        (stick.BODY_LENGTH, 0.0, stick.BODY_THICKNESS),
         spec.STICK_X_MAX,
-    )
-    near = Edge(
-        (0.0, 0.0, stop.BLOCK_DEPTH),
-        (0.0, stop.BLOCK_HEIGHT - stop.ROOF_END_CHAMFER, stop.BLOCK_DEPTH),
-        spec.BLOCK_ORIGIN[0],
     )
     distractor = Edge(
         (0.0, stick.BODY_WIDTH, 0.0),
@@ -957,14 +1074,15 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         spec.STICK_X_MIN,
     )
     hidden_face = Edge(
-        (0.0, 0.0, 0.0), (0.0, 0.0, stick.BODY_THICKNESS), spec.STICK_X_MIN
+        (0.0, stick.BODY_WIDTH, 0.0),
+        (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS), spec.STICK_X_MIN
     )
     stick_component = SimpleNamespace(
         GetPathName=lambda: f"C:\\models\\{spec.STICK}.SLDPRT",
         edges=(distractor, hidden_face, end, start),
     )
     block_component = SimpleNamespace(
-        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=(near,)
+        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=()
     )
     front = SimpleNamespace(
         GetVisibleComponents=lambda: (block_component, stick_component)
@@ -1036,8 +1154,8 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             message = "expected one exact visible line.*found 0"
         else:
             duplicate_edge = Edge(
-                (0.0, stick.BODY_WIDTH, 0.0),
-                (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+                (0.0, 0.0, 0.0),
+                (0.0, 0.0, stick.BODY_THICKNESS),
                 spec.STICK_X_MIN,
             )
             stick_component.edges = (*stick_component.edges, duplicate_edge)
@@ -1100,13 +1218,33 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         settled()
 
 
+def _exploded_projection(point) -> tuple[float, float]:
+    octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.values()))
+    x_axis, y_axis, _viewer = octant_axes(*octant)
+    return tuple(sum(value * axis[i] for i, value in enumerate(point)) for axis in (x_axis, y_axis))
+
+
+def test_exploded_camera_is_above_with_the_screw_head_projected_above_its_tip() -> None:
+    octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.values()))
+    _x_axis, y_axis, viewer = octant_axes(*octant)
+    assert y_axis[1] > 0.0 and viewer[1] > 0.0
+    offset = tuple(
+        sum(distance for _label, families, key, distance in explode.EXPLODE_STEPS
+            if spec.THUMB_SCREW in families and key == axis)
+        for axis in "xyz"
+    )
+    head = tuple(spec.THUMB_ORIGIN[i] + offset[i] for i in range(3))
+    tip = tuple(value + offset[i] for i, value in enumerate(
+        _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.OVERALL_LEN, 0.0, 0.0))
+    ))
+    assert _exploded_projection(head)[1] > _exploded_projection(tip)[1]
+
+
 def _iso_hull(box) -> list[tuple[float, float]]:
-    """The convex outline of an axis-aligned box in the standard isometric
-    (viewer at +X+Y+Z, Y up)."""
-    s2, s6 = 2.0**-0.5, 6.0**-0.5
+    """Project physical working-frame boxes through the upright named camera."""
     points = sorted(
         {
-            (round(s2 * (x - z), 9), round(s6 * (2.0 * y - x - z), 9))
+            tuple(round(value, 9) for value in _exploded_projection((x, y, z)))
             for x in box[0]
             for y in box[1]
             for z in box[2]
@@ -1142,21 +1280,21 @@ def _hulls_overlap(a, b) -> bool:
 
 
 def test_exploded_isometric_shows_every_component() -> None:
-    """MS_EXPLODED in the drawing's *Isometric: no component's box hides
-    behind another's, except the long stick crossing the block."""
+    """The upright named camera separates every exploded component box;
+    only the long stick crosses the block."""
     head = plate_screw.HEAD_DIA / 2.0
     knurl = thumb.HEAD_DIA / 2.0
     boxes = {
-        "block": ((0.0, stop.BLOCK_LENGTH), (0.0, stop.BLOCK_HEIGHT), (0.0, stop.BLOCK_DEPTH)),
+        "block": ((0.0, stop.BLOCK_LENGTH), (-stop.BLOCK_HEIGHT, 0.0), (-stop.BLOCK_DEPTH, 0.0)),
         spec.PLATE: (
             (0.0, stop.BLOCK_LENGTH),
-            (0.0, stop.BLOCK_HEIGHT),
-            (stop.PLATE_Z_MIN, stop.PLATE_Z_MAX),
+            (-stop.BLOCK_HEIGHT, 0.0),
+            (-stop.PLATE_Z_MAX, -stop.PLATE_Z_MIN),
         ),
         spec.THUMB_SCREW: (
             (stop.THUMB_AXIS_X - knurl, stop.THUMB_AXIS_X + knurl),
             (spec.THUMB_HEAD_FACE_Y, spec.THUMB_TIP_Y),
-            (stop.THUMB_AXIS_Z - knurl, stop.THUMB_AXIS_Z + knurl),
+            (-stop.THUMB_AXIS_Z - knurl, -stop.THUMB_AXIS_Z + knurl),
         ),
         spec.STICK: (
             (spec.STICK_X_MIN, spec.STICK_X_MAX),
@@ -1171,7 +1309,7 @@ def test_exploded_isometric_shows_every_component() -> None:
         families[name] = spec.PLATE_SCREW
         boxes[name] = (
             (x - head, x + head),
-            (stop.PLATE_HOLE_Y - head, stop.PLATE_HOLE_Y + head),
+            (-stop.PLATE_HOLE_Y - head, -stop.PLATE_HOLE_Y + head),
             (spec.PLATE_SCREW_HEAD_Z, spec.PLATE_SCREW_TIP_Z),
         )
     hulls = {}

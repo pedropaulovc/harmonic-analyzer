@@ -1847,17 +1847,19 @@ JOINTS: tuple[Joint, ...] = (
             "or motion reaches the thumbscrew axis"
         ),
         axial_capture=(
-            "thumbscrew runs up the block's 8.6 tapped wall into the window; its tip pinches the stick "
-            "against the roof; knurled head and collar hang under the block"
+            "thumbscrew points down through the block's 8.6 tapped wall into the window; its tip presses "
+            "the stick's plain face so the graduated face bears on the opposite fixed window wall; "
+            "knurled head and collar sit above the block's tapped face"
         ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "ms_stop_spec.py THUMB_TAP_SPEC (#4-40 through the floor); ms_measuring_stick_assembly_spec.py "
-            "THUMB_ORIGIN/THUMB_TIP_Y (tip on the stick underside); build_ms_measuring_stick_assembly.py "
-            "'stop thumbscrew clamps the stick'"
+            "ms_stop_spec.py THUMB_TAP_SPEC (#4-40 through the tapped wall); ms_measuring_stick_assembly_spec.py "
+            "THUMB_ORIGIN/THUMB_TIP_Y/THUMB_COLLAR_FACE_Y (tip on the stick's plain face, collar above the "
+            "tapped block face); build_ms_measuring_stick_assembly.py "
+            "'stop thumbscrew points down onto the stick's plain face'"
         ),
     ),
     Joint(
@@ -1871,8 +1873,8 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "cover-plate screws: the plate closes the block's window and never moves against the block; "
-            "the stick slides inside the window and the thumbscrew clamps it to the roof, so no operating "
-            "torque reaches the screw axes"
+            "the stick slides inside the window and the thumbscrew clamps its graduated face against the "
+            "opposite fixed window wall, so no operating torque reaches the screw axes"
         ),
         axial_capture=(
             "fillister heads bear on the plate's outer face through its 2.4 clearance holes; threads in the "
@@ -2398,7 +2400,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "ms-measuring-stick/stop-thumbscrew": Occurrence(
         "ms_measuring_stick",
         "build_ms_measuring_stick_assembly.py",
-        "stop thumbscrew clamps the stick",
+        "stop thumbscrew points down onto the stick's plain face",
     ),
     "ms-measuring-stick/plate-screws": Occurrence(
         "ms_measuring_stick",

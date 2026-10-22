@@ -5,11 +5,15 @@ builder imports this module (``test_assembly_sheet_isolation`` pins it) and a
 wording edit rebuilds the drawing alone. Every printed number interpolates a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; none is
 restated here.
+
+The near-face setting remains a controlled native model dimension. Its
+attached callout names the measured block face; step 5 explains the
+stick-mark/thumbscrew-axis indexing purpose. STOP_MARK still owns the nominal
+alignment, with no REF qualifier on the controlled setting.
 """
 
 from __future__ import annotations
 
-import textwrap
 from fractions import Fraction
 
 import ms_measuring_stick_assembly_spec as spec
@@ -46,13 +50,11 @@ BOM_DESCRIPTIONS = {
 }
 
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+UNDERSIDE_CAPTION = "GRADUATED UNDERSIDE"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 SETTING_CRITERION = (
     f"NEAR BLOCK FACE {spec.SETTING_NEAR_FACE_MM:.1f} "
     f"±{spec.SETTING_TOLERANCE_MM:.2f} mm FROM LEFT STICK END"
-)
-SETTING_REFERENCE_DESCRIPTION = (
-    f"{stop.STOP_MARK:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
 )
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode (ms_measuring_stick_explode_spec) runs steps
@@ -60,23 +62,22 @@ SETTING_REFERENCE_DESCRIPTION = (
 # does. The block and its cover are a match-drilled pair (step 1): neither is
 # interchangeable.
 ASSEMBLY_STEPS = (
-    "1. PLATE IS MASTER: LAYOUT BOTH HOLES ON THE STOP COVER PLATE AT ITS OWN "
-    f"±{stop.PLATE_HOLE_POSITION_TOLERANCE_MM:.2f} mm LOCATIONS. CLAMP PLATE "
-    f"AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT FROM PLATE "
-    f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH INTO BLOCK TO "
+    "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER ITS DRAWING; LEAVE UNDRILLED. "
+    f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
+    f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH PLATE INTO BLOCK TO "
     f"{stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH INTO BLOCK "
     "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
     f"DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP BLOCK "
     f"{plate_screw.THREAD} TO {stop.PLATE_TAP_THREAD_DEPTH:.1f} mm FULL THREAD "
     "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
-    f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW UP INTO THE STOP BLOCK FROM "
-    "ITS UNDERSIDE; KEEP THE TIP BELOW THE WINDOW FLOOR.",
-    "3. LAY THE GRADUATED STICK, GRADUATED FACE UP, INTO THE BLOCK WINDOW FROM "
-    "ITS OPEN SIDE.",
+    f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW DOWN INTO THE STOP BLOCK "
+    "FROM ITS TAPPED FACE; KEEP THE TIP CLEAR OF THE WINDOW.",
+    "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
-    "ITS TIP CLAMPS THE STICK AGAINST THE ROOF.",
+    f"5. SET {SETTING_CRITERION} TO INDEX THE {spec.STICK.upper()} SETUP MARK "
+    "ON THE THUMBSCREW AXIS; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
+    "ITS TIP CLAMPS THE PLAIN FACE; THUMBSCREW ABOVE THE STICK.",
 )
 ASSEMBLY_CHECKS = (
     "CHECK: WITH THE THUMBSCREW BACKED OFF THE STICK SLIDES FREELY IN THE WINDOW.",
@@ -85,18 +86,14 @@ ASSEMBLY_CHECKS = (
 )
 CLAMPED_SETUP_NOTE = (
     f"CLAMPED SETUP: SET {SETTING_CRITERION}; THEN CLAMP. "
-    "GRADUATED FACE AGAINST THE ROOF; THUMBSCREW TIP ON THE STICK UNDERSIDE."
+    "GRADUATED FACE AGAINST THE FIXED WINDOW WALL; THUMBSCREW ON THE PLAIN FACE."
 )
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# The dimension itself states the near-face criterion and the setup note
-# repeats it in words; the callout carries only the graduation reference,
-# wrapped narrow enough to sit between the dimension's extension lines.
-STOP_POSITION_CALLOUT_WIDTH = 21  # characters
-STOP_POSITION_CALLOUT = "\n".join(
-    textwrap.wrap(SETTING_REFERENCE_DESCRIPTION, width=STOP_POSITION_CALLOUT_WIDTH)
-)
+# Name the measured face here; step 5 explains the source-owned index purpose
+# without implying that the dimension's witness lands on the thumbscrew axis.
+STOP_POSITION_CALLOUT = "NEAR BLOCK FACE"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)

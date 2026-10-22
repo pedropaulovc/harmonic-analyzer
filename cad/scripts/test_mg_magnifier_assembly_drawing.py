@@ -1,9 +1,10 @@
 """Offline contract for the magnifier assembly drawing and its stack settings."""
 
 import asyncio
+import json
 import math
+from dataclasses import replace
 from fractions import Fraction
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -19,6 +20,7 @@ import mg_magnifier_explode_spec as explode
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
+from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
@@ -43,6 +45,27 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
     assert drawing.FRONT_CENTER == (0.070, 0.150)
     assert drawing.RIGHT_CENTER == (0.168, 0.150)
     assert drawing.ISO_CENTER == (0.225, 0.140)
+
+
+@pytest.mark.parametrize(
+    "orientation, pictorial",
+    [
+        (stack.DRAWING_ISOMETRIC_VIEW, True),
+        (stack.DRAWING_BACK_VIEW, False),
+        (stack.DRAWING_LEFT_VIEW, False),
+    ],
+)
+def test_magnifier_named_views_receive_the_correct_display_rules(
+    orientation, pictorial
+) -> None:
+    assert is_pictorial_orientation(orientation) is pictorial
+
+
+@pytest.mark.parametrize("detail", [drawing.PRESSED, drawing.ENDSHAKE])
+def test_stack_detail_station_increases_right(detail) -> None:
+    assert detail.sheet_xy(detail.centre_d + 1.0) == pytest.approx(
+        (detail.centre[0] + detail.mm, detail.centre[1])
+    )
 
 
 def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
@@ -74,7 +97,6 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == names
-    assert set(notes.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
     assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == 0.05
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
     # One detail imports each setting.
@@ -140,14 +162,18 @@ def test_the_details_and_labels_do_not_overlap() -> None:
     assert _circle_box(drawing.ENDSHAKE)[3] < upper_label_bottom
 
 
-def test_an_above_callout_with_a_line_break_is_refused(monkeypatch) -> None:
-    assert drawing.CALLOUT_LOCATION[stack.PRESS_GAUGE_DIMENSION] == "above"
-    assert drawing._printable_callouts() == notes.DIMENSION_CALLOUTS
-    monkeypatch.setitem(
-        notes.DIMENSION_CALLOUTS, stack.PRESS_GAUGE_DIMENSION, "PRESS GAUGE\nLOCKNUT"
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+def test_an_above_callout_with_a_line_break_is_refused_before_model_writes(
+    monkeypatch, feature
+) -> None:
+    callouts = stack.SETTING_CALLOUTS[feature]
+    above = next(name for name, (part, _text) in callouts.items() if part == 3)
+    monkeypatch.setitem(callouts, above, (3, "ABOVE\nCALLOUT"))
+    monkeypatch.setattr(
+        assembly, "_named_dimension", lambda *_args: pytest.fail("no model writes")
     )
     with pytest.raises(RuntimeError, match="line break do not print"):
-        drawing._printable_callouts()
+        assembly._author_setting_callouts(object(), feature)
 
 
 class _Display:
@@ -158,18 +184,50 @@ class _Display:
         return self.parts.get(part, "")
 
 
-def test_each_callout_reads_back_from_its_own_compartment() -> None:
-    callouts = notes.DIMENSION_CALLOUTS
-    gauge, endshake = stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
+    callouts = stack.SETTING_CALLOUTS[feature]
     good = [
-        (gauge, _Display({3: callouts[gauge]})),
-        (endshake, _Display({4: callouts[endshake].replace("\n", "\r\n")})),
+        (name, _Display({part: text.replace("\n", "\r\n")}))
+        for name, (part, text) in callouts.items()
     ]
     drawing._assert_callouts(good, callouts)
-    # The gauge's text in the below compartment is not its callout.
-    wrong = [(gauge, _Display({4: callouts[gauge]})), good[1]]
-    with pytest.raises(RuntimeError, match="above callout reads ''"):
+    # Text in the other compartment is not the inherited model callout.
+    name, (part, text) = next(iter(callouts.items()))
+    wrong = [(name, _Display({7 - part: text})), *good[1:]]
+    with pytest.raises(RuntimeError, match="callout reads ''"):
         drawing._assert_callouts(wrong, callouts)
+
+
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("failed_readback", [False, True])
+def test_native_setting_text_requires_void_setter_readback(
+    monkeypatch, feature, failed_readback
+) -> None:
+    class Display:
+        def __init__(self):
+            self.text = {}
+
+        def SetText(self, part, text):
+            assert part in (3, 4)  # Never replace the live dimension value.
+            if not failed_readback:
+                self.text[part] = text
+            # The native setter returns void, including when text is unchanged.
+
+        def GetText(self, part):
+            return self.text.get(part, "").replace("\n", "\r\n")
+
+    displays = {name: Display() for name in stack.SETTING_CALLOUTS[feature]}
+    monkeypatch.setattr(
+        assembly,
+        "_named_dimension",
+        lambda _adapter, _owner, name: (displays[name], object()),
+    )
+    if failed_readback:
+        with pytest.raises(RuntimeError, match="native setting callout reads"):
+            assembly._author_setting_callouts(object(), feature)
+    else:
+        assembly._author_setting_callouts(object(), feature)
 
 
 def test_each_detail_frames_both_ends_of_its_dimension() -> None:
@@ -289,6 +347,7 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         "_set_tolerance_precision",
         "apply_drawing_precision",
         "mark_dimensions_for_drawing",
+        "_author_setting_callouts",
     ):
         monkeypatch.setattr(builder, name, lambda *a, **kw: None)
     monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
@@ -359,34 +418,6 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
     assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
 
 
-def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
-    # Code review C03: the BOM, callout and step text is drawing-only, so a
-    # wording edit must re-key the MHA-MG-00 sheet and never the native
-    # assembly:mg_magnifier recipe the builder's closure keys.
-    import _buildgraph
-
-    def closure(module) -> set[str]:
-        return {
-            Path(dep).name for dep in _buildgraph.module_deps_of(Path(module.__file__))
-        }
-
-    assert "mg_magnifier_assembly_sheet.py" in closure(drawing)
-    assert "mg_magnifier_assembly_spec.py" in closure(assembly)
-    assert "mg_magnifier_assembly_sheet.py" not in closure(assembly)
-    # Nothing the sheet prints stays behind in the builder's spec.
-    for name in (
-        "BOM_ORDER",
-        "BOM_DESCRIPTIONS",
-        "STEP_TEXT",
-        "ASSEMBLY_STEPS",
-        "ASSEMBLY_CHECKS",
-        "DIMENSION_CALLOUTS",
-        "LEVER_CALLOUTS",
-        "DRAWING_DIMENSIONS",
-    ):
-        assert not hasattr(stack, name), name
-
-
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     import math
 
@@ -427,7 +458,9 @@ def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() ->
     right = (0.153, 0.091, 0.183, 0.204)
     iso_left = 0.194
     boxes = []
-    for outline, name in ((front, "*Front"), (right, "*Right")):
+    for outline, name in (
+        (front, stack.DRAWING_BACK_VIEW), (right, stack.DRAWING_LEFT_VIEW)
+    ):
         text = drawing.ASSEMBLED_VIEW_CAPTIONS[name]
         left, top = drawing.caption_under(outline, text)
         width = len(text) * drawing.CAPTION_CHAR_WIDTH
@@ -453,11 +486,9 @@ def test_the_lever_settings_match_the_placed_lever_group() -> None:
     assert stack.CLAMP_CENTRE_X == pytest.approx(assembly.CLAMP_X)
     assert stack.FIXTURE_AXIS_Y == pytest.approx(assembly.FIXTURE_POSITION[1])
     assert stack.CLAMP_STATION > 0.0 and stack.FIXTURE_DROP > 0.0
-    assert set(notes.LEVER_CALLOUTS) == set(drawing.LEVER_CALLOUT_LOCATION)
     assert stack.LEVER_DRAWING_DIMENSIONS == {
         stack.LEVER_FEATURE: {stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION}
     }
-    drawing._printable_lever_callouts()
 
 
 def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
@@ -537,6 +568,7 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
         "name_last_feature",
         "apply_drawing_precision",
         "mark_dimensions_for_drawing",
+        "_author_setting_callouts",
     ):
         monkeypatch.setattr(assembly, name, lambda *a, **kw: None)
     monkeypatch.setattr(
@@ -757,16 +789,33 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
         assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
-    steps_bottom = drawing.STEPS_XY[1] - len(
-        drawing.ASSEMBLY_STEPS.splitlines()
-    ) * drawing.NOTE_LINE_PITCH
     checks_bottom = drawing.CHECKS_XY[1] - len(
         drawing.ASSEMBLY_CHECKS.splitlines()
     ) * drawing.NOTE_LINE_PITCH
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    # Measured 0fb89 and 86bc envelopes/ink, translated from their insertions.
+    # Preserve 4 mm native padding on every known seat, not just PDF air.
+    for (
+        steps_y, checks_y, steps_bottom, steps_top, checks_bottom, checks_top,
+        steps_ink_bottom, checks_ink_top,
+    ) in (
+        (0.258, 0.0844, 0.0953983, 0.2584113, 0.0618495, 0.0846455,
+         0.0960089, 0.0843736),
+        (0.2595, 0.0926, 0.0968088, 0.2597953, 0.0701210, 0.0929963,
+         0.0975090, 0.0925736),
+    ):
+        steps_dy = drawing.STEPS_XY[1] - steps_y
+        checks_dy = drawing.CHECKS_XY[1] - checks_y
+        assert steps_bottom + steps_dy - (checks_top + checks_dy) >= drawing._PAD
+        assert steps_top + steps_dy <= drawing.INNER_BORDER[3] - drawing._PAD
+        assert checks_bottom + checks_dy >= drawing.TITLE_BLOCK[3] + drawing._PAD
+        # Matched PDF ink sets separation, rather than nominal font size.
+        assert (
+            steps_ink_bottom + steps_dy - (checks_ink_top + checks_dy)
+            >= min(0.0038733, 0.0038734)
+        )
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
@@ -865,7 +914,7 @@ def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> No
     import mg_vn_wheel_axle_nut_spec as nut
 
     def screen(point):
-        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
+        # Ry(180) placement, then the preserved fitter (+X+Y+Z) projection.
         x, y, z = -point[0], point[1], -point[2]
         return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
 
@@ -973,3 +1022,670 @@ def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
         # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
         # for any even segment count (r12 missed mid-chord at 1:2).
         assert (y, z) == pytest.approx((-radius, 0.0))
+
+
+def _metadata_instances():
+    return [
+        explode.Instance(f"{stem}-{number}", stem)
+        for stem in notes.BOM_ORDER
+        for number in range(1, notes.QUANTITIES[stem] + 1)
+    ]
+
+
+def _metadata_offsets():
+    """Aggregate the actual component plan, retaining stationary instances."""
+    instances = _metadata_instances()
+    offsets = {item.name.casefold(): [0.0, 0.0, 0.0] for item in instances}
+    for step, names in explode.plan_explode(instances):
+        for name in names:
+            offsets[name.casefold()]["xyz".index(step.axis)] += step.distance_mm / 1000.0
+    return {name: tuple(vector) for name, vector in offsets.items()}
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_builder_owned_offsets_roundtrip_actual_component_plan(configuration) -> None:
+    offsets = _metadata_offsets()
+    instances = [
+        explode.Instance(item.name.upper(), item.stem) for item in _metadata_instances()
+    ]
+    encoded = explode.encode_explode_offsets(configuration, offsets, instances)
+    payload = json.loads(encoded)
+    assert set(payload) == {
+        "configuration", "view", "steps", "contract_sha256", "offsets_m"
+    }
+    assert payload["contract_sha256"] == explode.explode_contract_fingerprint(instances)
+    assert len(payload["contract_sha256"]) == 64
+    assert all(character in "0123456789abcdef" for character in payload["contract_sha256"])
+    decoded = explode.decode_explode_offsets(encoded, configuration, instances)
+    assert decoded == offsets
+    assert any(vector == (0.0, 0.0, 0.0) for vector in decoded.values())
+    # The format preserves native aggregate world translations, not a single
+    # nominal axis/step. Multiple native steps may move the same component.
+    name = next(iter(offsets))
+    cumulative = dict(offsets)
+    cumulative[name] = (0.030 + 0.012, -0.025, 0.007)
+    assert explode.decode_explode_offsets(
+        explode.encode_explode_offsets(configuration, cumulative, instances),
+        configuration,
+        instances,
+    )[name] == pytest.approx((0.042, -0.025, 0.007))
+    assert explode.explode_offsets_property(configuration) != (
+        explode.explode_offsets_property(
+            "Default Simplified" if configuration == "Default" else "Default"
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "missing configuration", "wrong configuration", "missing view", "wrong view",
+        "missing steps", "wrong steps", "missing contract_sha256", "wrong contract_sha256",
+        "missing offsets", "missing instance",
+        "extra instance", "short vector", "long vector", "nonnumeric", "boolean",
+        "nan", "infinity", "malformed", "empty",
+    ],
+)
+def test_mg_builder_owned_offsets_refuse_invalid_metadata(damage) -> None:
+    configuration = "Default Simplified"
+    payload = json.loads(
+        explode.encode_explode_offsets(
+            configuration, _metadata_offsets(), _metadata_instances()
+        )
+    )
+    name = next(iter(payload["offsets_m"]))
+    field = damage.removeprefix("missing ")
+    if field in {"configuration", "view", "steps", "contract_sha256", "offsets"}:
+        payload.pop("offsets_m" if field == "offsets" else field)
+    elif damage == "wrong configuration":
+        payload["configuration"] = "Default"
+    elif damage == "wrong view":
+        payload["view"] = "unowned view"
+    elif damage == "wrong steps":
+        payload["steps"] = len(explode.EXPLODE_STEPS) + 1
+    elif damage == "wrong contract_sha256":
+        payload["contract_sha256"] = "0" * 64
+    elif damage == "missing instance":
+        payload["offsets_m"].pop(name)
+    elif damage == "extra instance":
+        payload["offsets_m"]["unexpected-1"] = [0.0, 0.0, 0.0]
+    elif damage in {"short vector", "long vector"}:
+        payload["offsets_m"][name] = [0.0] * (2 if damage == "short vector" else 4)
+    elif damage in {"nonnumeric", "boolean", "nan", "infinity"}:
+        value = {
+            "nonnumeric": "0.1", "boolean": True,
+            "nan": float("nan"), "infinity": float("inf"),
+        }[damage]
+        payload["offsets_m"][name] = [value, 0.0, 0.0]
+    text = json.dumps(payload)
+    if damage == "malformed":
+        text = "{"
+    elif damage == "empty":
+        text = ""
+    with pytest.raises(ValueError) as caught:
+        explode.decode_explode_offsets(
+            text, configuration, _metadata_instances()
+        )
+    assert "builder-owned explode offsets" in str(caught.value)
+    assert "rebuild assembly:mg_magnifier" in str(caught.value)
+
+
+@pytest.mark.parametrize("mutation", ["distance", "axis", "raw members", "resolved members"])
+def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, mutation):
+    configuration = "Default Simplified"
+    instances = _metadata_instances()
+    offsets = _metadata_offsets()
+    encoded = explode.encode_explode_offsets(configuration, offsets, instances)
+    old_plan = explode.plan_explode(instances)
+    changed_steps = list(explode.EXPLODE_STEPS)
+    if mutation == "distance":
+        # A changed spec-derived distance must invalidate the readback even
+        # when the native step count and every component identity still match.
+        changed_steps[0] = replace(
+            changed_steps[0], distance_mm=changed_steps[0].distance_mm - 1.0
+        )
+    elif mutation == "axis":
+        changed_steps[0] = replace(changed_steps[0], axis="x")
+    elif mutation == "raw members":
+        # :02 resolves to exactly the same nut as :2, isolating raw recipe
+        # membership from the separately fingerprinted resolved names.
+        changed_steps[0] = replace(
+            changed_steps[0], members=("mg-vn-wheel-axle-nut:02",)
+        )
+    else:
+        swapped = {
+            "mg-magnifying-wheel": "mg-wheel-drum",
+            "mg-wheel-drum": "mg-magnifying-wheel",
+        }
+        instances = [
+            replace(item, stem=swapped.get(item.stem, item.stem)) for item in instances
+        ]
+    monkeypatch.setattr(explode, "EXPLODE_STEPS", tuple(changed_steps))
+    current_plan = explode.plan_explode(instances)
+    assert len(current_plan) == len(old_plan) == json.loads(encoded)["steps"]
+    assert {item.name.casefold() for item in instances} == set(offsets)
+    if mutation == "raw members":
+        assert [names for _step, names in current_plan] == [
+            names for _step, names in old_plan
+        ]
+    elif mutation == "resolved members":
+        assert [step for step, _names in current_plan] == [
+            step for step, _names in old_plan
+        ]
+        assert [names for _step, names in current_plan] != [
+            names for _step, names in old_plan
+        ]
+    with pytest.raises(ValueError, match="explode contract differs"):
+        explode.decode_explode_offsets(encoded, configuration, instances)
+
+
+def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
+    """Native readbacks are fixed independently of the recipe being authored."""
+    import _mg_magnifier_explode as author
+    from solidworks_mcp.adapters import com_variant
+
+    monkeypatch.setattr(
+        explode,
+        "EXPLODE_STEPS",
+        (
+            explode.ExplodeStep("group out", ("slider",), "x", 30.0),
+            explode.ExplodeStep("first farther", ("slider:1",), "x", 12.0),
+            explode.ExplodeStep("first down", ("slider:1",), "y", -25.0),
+            explode.ExplodeStep("first back", ("slider:1",), "z", 7.0),
+        ),
+    )
+    monkeypatch.setattr(explode, "SHOWN_STEMS", frozenset({"slider", "stationary"}))
+    # Absolute native positions, not recipe vectors or encoder output. All
+    # three baseline translations are nonzero. The small final residuals are
+    # deliberately inside the author's existing 1e-7 m verification tolerance.
+    native_positions = {
+        "slider-1": (
+            (0.500, -0.250, 0.125),
+            (0.53000002, -0.250, 0.125),
+            (0.54200003, -0.250, 0.125),
+            (0.54200003, -0.27500002, 0.125),
+            (0.54200003, -0.27500002, 0.13200004),
+        ),
+        "slider-2": (
+            (-0.200, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+        ),
+        "stationary-1": ((0.100, 0.200, 0.300),) * 5,
+    }
+    requests = (
+        (0.030, ("slider-1", "slider-2"), "X", False),
+        (0.012, ("slider-1",), "X", False),
+        (0.025, ("slider-1",), "Y", True),
+        (0.007, ("slider-1",), "Z", False),
+    )
+    state = SimpleNamespace(
+        stage=0, exploded=False, selected=[], axis=None, views=(),
+        steps=[SimpleNamespace(Name="automatic seed")], show_calls=[], published=[],
+    )
+
+    def transform(name, stage):
+        values = [
+            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            *native_positions[name][stage], 1.0, 0.0, 0.0, 0.0,
+        ]
+        if stage == 4:
+            if mismatch == "translation" and name == "slider-1":
+                values[9] += 0.001
+            elif mismatch == "stationary follower" and name == "stationary-1":
+                values[10] += 0.001
+            elif mismatch == "rotation" and name == "slider-1":
+                values[0] = 0.0
+        return SimpleNamespace(ArrayData=tuple(values))
+
+    def select_component(name, append, data, show_popup):
+        assert append is True and data.Mark == 1 and show_popup is False
+        state.selected.append(name)
+        return True
+
+    components = {
+        name: SimpleNamespace(
+            Name2=name,
+            GetPathName=lambda name=name: f"C:/parts/{name.rsplit('-', 1)[0]}.SLDPRT",
+            GetTotalTransform=lambda presentation, name=name: transform(
+                name, state.stage if presentation and state.exploded else 0
+            ),
+            Transform2=transform(name, 0),
+            Select4=lambda append, data, popup, name=name: select_component(
+                name, append, data, popup
+            ),
+        )
+        for name in native_positions
+    }
+
+    def clear_selection(all_selections):
+        assert all_selections is True
+        state.selected.clear()
+        state.axis = None
+
+    def select_axis(name, kind, x, y, z, append, mark, callout, options):
+        assert (kind, x, y, z, append, mark, callout, options) == (
+            "AXIS", 0.0, 0.0, 0.0, True, 2, None, 0
+        )
+        state.axis = name
+        return True
+
+    def add_step(distance, manipulator, reverse, angle, rotation_axis, *options):
+        expected_distance, names, axis, expected_reverse = requests[state.stage]
+        assert (distance, tuple(state.selected), state.axis, reverse) == (
+            expected_distance, names, axis, expected_reverse
+        )
+        assert (manipulator, angle, rotation_axis, options) == (
+            -1, 0.0, -1, (False, True, False)
+        )
+        state.stage += 1
+        if state.stage == 4 and mismatch == "native members":
+            names = ("stationary-1",)
+        native = SimpleNamespace(
+            Name="unnamed",
+            ExplodeDistance=distance + (
+                0.001 if state.stage == 4 and mismatch == "native distance" else 0.0
+            ),
+            GetComponents=lambda: tuple(components[name] for name in names),
+        )
+        state.steps.append(native)
+        return native, 0
+
+    def delete_seed(name):
+        assert name == "automatic seed" and state.stage == 0
+        state.steps.clear()
+        return True
+
+    def show_exploded(show, view_name):
+        assert state.views == (view_name,)
+        state.exploded = show
+        state.show_calls.append(show)
+        return True
+
+    configuration = SimpleNamespace(
+        Name=configuration_name,
+        GetNumberOfExplodeSteps=lambda: len(state.steps),
+        GetExplodeStep=lambda index: state.steps[index],
+        DeleteExplodeStep=delete_seed,
+        AddExplodeStep2=add_step,
+    )
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=configuration),
+        GetExplodedViewCount2=lambda owner: len(state.views),
+        GetComponents=lambda top_level: tuple(components.values()),
+        GetExplodedViewNames2=lambda owner: state.views,
+        GetExplodedViewConfigurationName=lambda view: configuration_name,
+        ShowExploded2=show_exploded,
+        ClearSelection2=clear_selection,
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(Mark=0)
+        ),
+        Extension=SimpleNamespace(SelectByID2=select_axis),
+        EditRebuild3=lambda: True,
+    )
+    adapter = SimpleNamespace(currentModel=model)
+
+    def create_named_view(actual_model, actual_assembly, owner, view_name):
+        assert actual_model is model and actual_assembly is model
+        assert owner == configuration_name
+        state.views = (view_name,)
+
+    def publish(actual_adapter, properties, *, model):
+        assert actual_adapter is adapter and model is adapter.currentModel
+        assert not state.exploded and state.show_calls == [True, False]
+        assert state.stage == len(state.steps) == 4
+        state.published.append(properties)
+
+    monkeypatch.setattr(author, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(com_variant, "null_callout", lambda: None)
+    monkeypatch.setattr(
+        author, "_global_directions",
+        lambda _adapter, _assembly: {
+            "x": author._Direction("X", True, (1.0, 0.0, 0.0)),
+            "y": author._Direction("Y", True, (0.0, 1.0, 0.0)),
+            "z": author._Direction("Z", True, (0.0, 0.0, 1.0)),
+        },
+    )
+    monkeypatch.setattr(author, "_create_named_view", create_named_view)
+    monkeypatch.setattr(author, "apply_custom_properties", publish)
+    return author, adapter, state
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_actual_mg_author_publishes_final_measured_offsets(monkeypatch, configuration):
+    author, adapter, state = _native_mg_author(monkeypatch, configuration)
+    author.create_mg_magnifier_explode(adapter, configuration)
+    assert len(state.published) == 1
+    properties = state.published[0]
+    assert set(properties) == {explode.explode_offsets_property(configuration)}
+    payload = json.loads(properties[explode.explode_offsets_property(configuration)])
+    assert payload["configuration"] == configuration
+    assert payload["view"] == explode.exploded_view_name(configuration)
+    assert payload["steps"] == 4
+    # Tight absolute tolerance distinguishes native residuals from nominal
+    # recipe sums, earlier steps, absolute positions, and post-collapse zeros.
+    expected = {
+        "slider-1": (0.04200003, -0.02500002, 0.00700004),
+        "slider-2": (0.03000001, 0.0, 0.0),
+        "stationary-1": (0.0, 0.0, 0.0),
+    }
+    assert set(payload["offsets_m"]) == set(expected)
+    for name, vector in expected.items():
+        assert payload["offsets_m"][name] == pytest.approx(vector, abs=1e-14, rel=0)
+    instances = [
+        explode.Instance(name, name.rsplit("-", 1)[0]) for name in expected
+    ]
+    decoded = explode.decode_explode_offsets(
+        properties[explode.explode_offsets_property(configuration)],
+        configuration,
+        instances,
+    )
+    assert decoded["stationary-1"] == (0.0, 0.0, 0.0)
+    assert [step.Name for step in state.steps] == [
+        f"MG {label}" + (" Simplified" if configuration != "Default" else "")
+        for label in ("GROUP OUT", "FIRST FARTHER", "FIRST DOWN", "FIRST BACK")
+    ]
+    assert state.show_calls == [True, False] and not state.exploded
+
+
+@pytest.mark.parametrize(
+    ("mismatch", "message"),
+    [
+        ("translation", "slider-1 moved"),
+        ("stationary follower", "stationary-1 moved"),
+        ("rotation", "presentation rotated or scaled"),
+        ("native distance", "step component/distance readback mismatch"),
+        ("native members", "step component/distance readback mismatch"),
+    ],
+)
+def test_actual_mg_author_never_publishes_failed_readback(monkeypatch, mismatch, message):
+    configuration = "Default Simplified"
+    author, adapter, state = _native_mg_author(monkeypatch, configuration, mismatch)
+    with pytest.raises(RuntimeError, match=message):
+        author.create_mg_magnifier_explode(adapter, configuration)
+    assert state.stage == 4
+    assert state.show_calls == [True, False] and not state.exploded
+    assert state.published == []
+
+
+class _ExplodeSource:
+    """Read-only API contract fake; not evidence of native/byte cleanliness."""
+
+    def __init__(self) -> None:
+        self.active = drawing.ASSEMBLY_VIEW_CONFIGURATION
+        self.exploded = False
+        self.dirty = False
+        self.configuration_switches = []
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=self.active)
+        )
+        self.properties = {
+            explode.explode_offsets_property(owner): explode.encode_explode_offsets(
+                owner, _metadata_offsets(), _metadata_instances()
+            )
+            for owner in drawing.EXPLODED_VIEW_NAMES
+        }
+        transform = SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+        )
+        self.components = [
+            SimpleNamespace(
+                Name2=item.name,
+                GetPathName=lambda stem=item.stem: f"C:/parts/{stem}.SLDPRT",
+                GetTotalTransform=lambda _presentation: transform,
+            )
+            for item in _metadata_instances()
+        ]
+        self.Extension = SimpleNamespace(CustomPropertyManager=self._forbidden)
+
+    def _forbidden(self, *_args, **_kwargs):
+        pytest.fail("drawing must not mutate or reset its released source")
+
+    ShowConfiguration2 = _forbidden
+    ShowExploded2 = _forbidden
+    SetSaveFlag = _forbidden
+    ResetSaveFlag = _forbidden
+    Save3 = _forbidden
+    SaveAs3 = _forbidden
+    AddCustomInfo3 = _forbidden
+    SetCustomInfo2 = _forbidden
+    DeleteCustomInfo2 = _forbidden
+
+    def GetSaveFlag(self):
+        return self.dirty
+
+    def GetComponents(self, top_level):
+        assert top_level is True
+        return self.components
+
+    def GetExplodedViewNames2(self, configuration):
+        return (explode.exploded_view_name(configuration),)
+
+    def GetCustomInfoValue(self, configuration, name):
+        assert configuration == ""
+        return self.properties.get(name, "")
+
+
+def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource()
+    offsets = drawing._validate_source(source)
+    assert offsets == {
+        configuration: _metadata_offsets()
+        for configuration in drawing.EXPLODED_VIEW_NAMES
+    }
+    assert source.active == "Default"
+    assert not source.exploded
+    assert not source.dirty
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource()
+    source.properties.pop(explode.explode_offsets_property(configuration))
+    with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
+        drawing._validate_source(source)
+
+@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
+def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource()
+    if failure == "active configuration":
+        source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
+    elif failure == "families":
+        source.components.pop()
+    else:
+        base = source.components[0].GetTotalTransform(False).ArrayData
+        displaced = list(base)
+        displaced[9] = 0.001
+        source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
+            ArrayData=displaced if presentation else base
+        )
+    with pytest.raises(RuntimeError):
+        drawing._validate_source(source)
+
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_exploded_view_uses_only_its_config_metadata(configuration):
+    metadata = {
+        "Default": {"part-1": (0.01, 0.02, 0.03)},
+        "Default Simplified": {"part-1": (-0.04, 0.05, 0.06)},
+    }
+    view = SimpleNamespace(
+        ReferencedConfiguration=configuration, IsExploded=lambda: True
+    )
+    assert drawing._view_source_explode_offsets(
+        view, metadata, label="wheel"
+    ) == metadata[configuration]
+
+
+def test_mg_collapsed_view_needs_no_source_or_configuration():
+    view = SimpleNamespace(IsExploded=lambda: False)
+    assert drawing._view_source_explode_offsets(view, {}, label="finished") == {}
+
+
+@pytest.mark.parametrize("configuration", ["unknown", "", None])
+def test_mg_exploded_view_refuses_unknown_or_missing_configuration(configuration):
+    view = SimpleNamespace(
+        ReferencedConfiguration=configuration, IsExploded=lambda: True
+    )
+    with pytest.raises(RuntimeError):
+        drawing._view_source_explode_offsets(view, {}, label="wheel")
+
+def test_mg_source_sha256_streams_known_bytes(tmp_path):
+    path = tmp_path / "source.SLDASM"
+    path.write_bytes(b"abc")
+    assert drawing._source_sha256(path) == (
+        "ba7816bf8f01cfea414140de5dae2223"
+        "b00361a396177a9cb410ff61f20015ad"
+    )
+    # Cross two 1 MiB block boundaries; a small fixture alone would not catch
+    # hashing only the first chunk.
+    path.write_bytes(b"\0" * (2 * 1024 * 1024 + 3))
+    import hashlib
+
+    assert drawing._source_sha256(path) == hashlib.sha256(
+        b"\0" * (2 * 1024 * 1024 + 3)
+    ).hexdigest()
+
+
+@pytest.mark.parametrize("failure", [None, "bytes", "dirty"])
+def test_mg_source_identity_requires_same_bytes_and_clean_flag(
+    monkeypatch, tmp_path, failure
+):
+    path = tmp_path / "source.SLDASM"
+    path.write_bytes(b"released assembly")
+    monkeypatch.setattr(drawing, "SOURCE", path)
+    source = _ExplodeSource()
+    expected = drawing._source_sha256(path)
+    if failure == "bytes":
+        path.write_bytes(b"changed assembly")
+        assert not source.GetSaveFlag()
+    elif failure == "dirty":
+        source.dirty = True
+        assert drawing._source_sha256(path) == expected
+    if failure is None:
+        drawing._assert_source_identity(source, expected, phase="offline contract")
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_source_identity(source, expected, phase="offline contract")
+    assert path.read_bytes() == (
+        b"changed assembly" if failure == "bytes" else b"released assembly"
+    )
+    assert source.dirty == (failure == "dirty")
+
+
+
+def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
+    monkeypatch,
+) -> None:
+    events = []
+    warnings = []
+    monkeypatch.setattr(
+        drawing._telemetry,
+        "event",
+        lambda name, **fields: events.append((name, fields)),
+    )
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    source = _ExplodeSource()
+    step = drawing._source_dirty_tracer(source)
+    step("prepared views")
+    source.dirty = True  # Outside the immutable metadata read.
+    step("BOM insertion")
+    step("wheel balloons")
+    assert events == [
+        ("magnifier.source_save_flag", {"step": "prepared views", "dirty": False}),
+        ("magnifier.source_save_flag", {"step": "BOM insertion", "dirty": True}),
+        ("magnifier.source_save_flag", {"step": "wheel balloons", "dirty": True}),
+    ]
+    assert warnings == ["magnifier source went DIRTY after BOM insertion"]
+    assert source.dirty
+    assert source.configuration_switches == []
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert not source.exploded
+
+
+@pytest.mark.parametrize("group", ["lever", "stack"])
+@pytest.mark.parametrize("missing", [False, True])
+def test_mg_settings_only_read_inherited_native_callouts(
+    monkeypatch, group, missing
+) -> None:
+    import _drawing_dimensions as dimension_helpers
+
+    feature = stack.LEVER_FEATURE if group == "lever" else stack.FEATURE
+    callouts = stack.SETTING_CALLOUTS[feature]
+    precision = (
+        stack.LEVER_DRAWING_PRECISION if group == "lever" else stack.DRAWING_PRECISION
+    )[feature]
+    annotations = {}
+    text_parts = {}
+
+    def forbidden(*_args):
+        pytest.fail("drawing settings must not write native callout text")
+
+    for name, (part, text) in callouts.items():
+        text_parts[name] = {part: text.replace("\n", "\r\n")}
+        band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
+        tolerance = SimpleNamespace(
+            Type=4,
+            GetMaxValue=lambda band=band_m: band,
+            GetMinValue=lambda band=band_m: -band,
+        )
+        display = SimpleNamespace(
+            SetText=forbidden,
+            GetText=lambda part, name=name: text_parts[name].get(part, ""),
+            GetPrimaryPrecision2=lambda name=name: precision[name],
+            GetPrimaryTolPrecision2=lambda: stack.TOLERANCE_PRECISION,
+            GetDimension2=lambda _index, tol=tolerance: SimpleNamespace(Tolerance=tol),
+        )
+        annotations[name] = SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display
+        )
+    name, (part, _text) = next(iter(callouts.items()))
+    if missing:
+        text_parts[name][part] = ""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
+    monkeypatch.setattr(
+        dimension_helpers._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
+    for module in (drawing, dimension_helpers):
+        monkeypatch.setattr(module, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda *_a, **_k: list(annotations.values()),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "model_points_in_view",
+        lambda *_a, **_k: ((0.0, 0.0),) * 3,
+    )
+    monkeypatch.setattr(drawing, "_add_setting_axes", lambda *_a: None)
+    monkeypatch.setattr(
+        drawing,
+        "_dimensioned_detail",
+        lambda _adapter, _detail, keep: [annotations[name] for name in keep],
+    )
+    adapter = SimpleNamespace(_attempt=lambda action: action())
+
+    def import_settings():
+        if group == "lever":
+            return drawing._lever_settings(adapter, object(), lambda _phase: None)
+        return drawing._stack_dimensions(adapter, lambda _phase: None)
+
+    if missing:
+        with pytest.raises(RuntimeError, match="callout reads ''"):
+            import_settings()
+        return
+    settled = import_settings()
+    settled()
+    text_parts[name][part] = ""
+    with pytest.raises(RuntimeError, match="callout reads ''"):
+        settled()

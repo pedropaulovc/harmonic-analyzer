@@ -1,8 +1,8 @@
 r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
-Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
-and every assembly setting printed as the assembly's own model dimension
-(mg_magnifier_assembly_spec). The Front view prints the lever group's two
+Sheet 1, ASSEMBLED + SETTINGS: the preserved back, left and back-top-left
+views at 1:4, and every assembly setting printed as the assembly's own model
+dimension (mg_magnifier_assembly_spec). The back view prints the lever group's two
 operator settings, the clamp station and the fixture drop. Two cropped
 side-view details of the wheel axle print one stack setting each:
 - AXLE AS PRESSED (2:1) shows only the bar and the axle. It prints the press
@@ -11,7 +11,7 @@ side-view details of the wheel axle print one stack setting each:
 - WHEEL ENDSHAKE (4:1) shows the stack. It prints the endshake between the
   wheel's spigot face and the front washer.
 
-Each detail is a cropped *Right model view, dimensioned while uncropped and
+Each detail is a cropped MG LEFT model view, dimensioned while uncropped and
 cropped after. On a native detail, the targeted import delivered nothing
 (the ch-amplitude-bar finding). The dimensions belong to construction chains
 the assembly saves blanked. Each view shows its chain in that view only
@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 import math
 from pathlib import Path
 import sys
@@ -77,7 +78,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -152,15 +153,15 @@ RIGHT_CENTER = (0.168, 0.150)
 ISO_CENTER = (0.225, 0.140)
 # Machinist review r3 (run 20261016T120248930Z-2fa1ae0c1aaa4f1ea2370a197868591c):
 # the unlabelled principal view shows the bar in front of the wheel, while
-# step 11 leads the wire "seen from the front". The model's *Front looks from
-# the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view mirrors
-# local x), and its *Right from +x, the fitter's left as he faces the machine
-# front: the drum, at machine -z, prints on its right. Each caption is centred
+# step 11 leads the wire "seen from the front". The preserved MG BACK looks
+# from the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view
+# mirrors local x), and MG LEFT from +x, the fitter's left as he faces the
+# machine front: the drum, at machine -z, prints on its right. Each caption is centred
 # under its view (caption_under); the side view's stays short so it ends left
 # of the isometric (r8's outlines: Right 153-183 mm, Isometric from 194 mm).
 ASSEMBLED_VIEW_CAPTIONS = {
-    "*Front": "VIEW FROM THE BACK",
-    "*Right": "VIEW FROM THE LEFT",
+    stack.DRAWING_BACK_VIEW: "VIEW FROM THE BACK",
+    stack.DRAWING_LEFT_VIEW: "VIEW FROM THE LEFT",
 }
 
 # Sheet geometry, metres: the template's inner border and the title block in
@@ -177,7 +178,7 @@ TITLE_BLOCK = (
 )
 _PAD = 0.004
 
-# Sheet 1, Front view: the lever settings' text, in sheet metres from the
+# Sheet 1, back view: the lever settings' text, in sheet metres from the
 # projected chain points. The clamp station's line runs above the clamp's
 # thumb-screw head with its callout above it. The fixture drop's text stands
 # right of the vertical rod, clear of the fixture screw (toward the bracket,
@@ -188,11 +189,7 @@ _PAD = 0.004
 CLAMP_STATION_RISE = 0.012
 FIXTURE_DROP_RUN = 0.018
 FIXTURE_DROP_BELOW = 0.006
-LEVER_CALLOUT_LOCATION = {
-    stack.CLAMP_STATION_DIMENSION: "above",
-    stack.FIXTURE_DROP_DIMENSION: "below",
-}
-LEVER_VIEW_LABEL = "lever settings (Front)"
+LEVER_VIEW_LABEL = "lever settings (back)"
 
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
 # its caption under it (as the lever sheet's), the BOM in the top-right
@@ -278,7 +275,7 @@ LEVER_LABEL = "lever group exploded"
 # centred over it. The wider column keeps full parent-scoped vendor Numbers
 # intact without reducing the default text size or its line pitch.
 # The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
-STEPS_XY = (0.018, 0.258)
+STEPS_XY = (0.018, 0.2605)
 STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
@@ -308,12 +305,12 @@ FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # on the drum end inside the wheel and read as pointing at a spoke. MHA-MG-VN-56
 # now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
 # (build_mg_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
-# ring's point facing the *Isometric viewer (wire_facing_point). The balloon
+# ring's point facing the preserved fitter isometric viewer (wire_facing_point). The balloon
 # then stands right of the view, its leader dropping this little from the
 # ring so it passes under the vertical rod's lower end, the one part right of
 # the run.
 FINISHED_WIRE_BALLOON_RISE_DEG = -10.0
-ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # *Isometric looks from +X+Y+Z
+ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # ISO MG BACK-TOP-LEFT looks from +X+Y+Z
 
 
 def wire_facing_point(
@@ -324,7 +321,7 @@ def wire_facing_point(
     station: float,
 ) -> tuple[float, float, float]:
     """Part-frame point (mm) on the wire's ring at ``station`` that faces the
-    *Isometric viewer.
+    preserved ISO MG BACK-TOP-LEFT viewer.
 
     The frame is ``build_mg_magnifier_assembly._lever_wire_rows``': part +Y
     onto drum->hook, +X the horizontal perpendicular (d_y, -d_x, 0), +Z = X x Y.
@@ -406,7 +403,7 @@ BOM_NORMALIZED_ALIASES = {
 # shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
 # circle, 45 below the clamp's bottom face once the explode drops the rod
 # (the bottom dome is tangent, like the lever's). Each is
-# pinned to the point of a circle that faces the *Isometric viewer (+X+Y+Z,
+# pinned to the point of a circle that faces the fitter isometric viewer (+X+Y+Z,
 # mg_magnifier_explode_spec): its part normal is the view direction
 # projected square to the rod axis.
 #   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
@@ -430,7 +427,7 @@ _VROD_R = VROD_DIA / 2.0
 # runs nearly along the rays from the view centre, so walked anchors (washer
 # rim, first nut) left 17's leader through both nuts onto 18's arrowhead.
 # Washer and nuts are Ry(180) in the assembly (local x = -X, y = +Y, z = -Z),
-# so their local z = 0 faces the *Isometric viewer, and a local polar angle
+# so their local z = 0 faces the fitter isometric viewer, and a local polar angle
 # phi draws at screen (-cos(phi)/sqrt2, (cos(phi) + 2 sin(phi))/sqrt6): the
 # major-axis ends square to the axle's 30 deg sheet direction are phi 45
 # (up-left) and 225 (down-right). 17 takes the washer rim's up-left end, so its
@@ -504,10 +501,9 @@ ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
-CHECKS_XY = (
-    STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
-)
+# Both measured seats predict at least 4 mm title/sequence clearance here;
+# see the layout-tuning doc for native extents and pending acceptance.
+CHECKS_XY = (STEPS_XY[0], 0.0926)
 if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
     raise AssertionError("the assembly sequence and checks overrun the sheet")
 
@@ -521,9 +517,9 @@ LABEL_INSET = 0.016
 
 @dataclass(frozen=True)
 class StackDetail:
-    """One cropped *Right model view of the axle station.
+    """One cropped MG LEFT model view of the axle station.
 
-    On the Right view, sheet x runs with machine -z (away from the bar) and
+    On this preserved view, sheet x runs with machine -z (away from the bar) and
     sheet y with machine y. ``centre_d`` is the circle's centre as a stack
     station d (from the bar front face, on the axle line); ``centre`` is where
     that point lands on the sheet. ``ink_drop_mm`` is how far below the axle
@@ -636,41 +632,19 @@ ENDSHAKE_KEEP = {
         ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, ENDSHAKE_RISE)[1],
     ),
 }
-CALLOUT_LOCATION = {
-    stack.PRESS_GAUGE_DIMENSION: "above",
-    stack.ENDSHAKE_DIMENSION: "below",
-}
-# swDimensionTextParts_e: the compartment each location writes and reads.
-CALLOUT_TEXT_PART = {"above": 3, "below": 4}
 
 
-def _printable_callouts() -> dict[str, str]:
-    """The callouts, refused if an above one holds a line break.
-
-    SolidWorks keeps a line break in the above compartment, and GetText reads
-    it back, yet prints none of that callout: the gauge's two-line callout in
-    run 20261012T185729782Z, like the thumbnut's and the cone-gear shaft's
-    before it. Below-callout line breaks print.
-    """
-    broken = sorted(
-        name
-        for name, location in CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in notes.DIMENSION_CALLOUTS[name]
-    )
-    if broken:
-        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: notes.DIMENSION_CALLOUTS[name] for name in CALLOUT_LOCATION}
-
-
-def _assert_callouts(displays: list[tuple[str, Any]], callouts: dict[str, str]) -> None:
-    """Each setting's callout reads back from its own compartment."""
+def _assert_callouts(
+    displays: list[tuple[str, Any]], callouts: dict[str, tuple[int, str]]
+) -> None:
+    """Read inherited native setting text without writing the released model."""
     for name, display in displays:
-        part = CALLOUT_TEXT_PART[CALLOUT_LOCATION[name]]
-        text = str(display.GetText(part) or "")
-        if text.replace("\r\n", "\n") != callouts[name]:
+        part, expected = callouts[name]
+        text = str(display.GetText(part) or "").replace("\r\n", "\n")
+        if text != expected:
+            location = {3: "above", 4: "below"}[part]
             raise RuntimeError(
-                f"{name}: {CALLOUT_LOCATION[name]} callout reads {text!r}, "
-                f"not {callouts[name]!r}"
+                f"{name}: {location} callout reads {text!r}, not {expected!r}"
             )
 
 
@@ -683,10 +657,12 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
 
 
 def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
-    """``detail`` uncropped: a *Right model view at its scale, moved so its
+    """``detail`` uncropped: an MG LEFT model view at its scale, moved so its
     circle's centre lands on ``detail.centre``."""
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Right", *detail.centre, scale=detail.scale),
+        place_view(
+            adapter, str(SOURCE), stack.DRAWING_LEFT_VIEW, *detail.centre, scale=detail.scale
+        ),
         "IView",
     )
     label = f"{detail.title} centre"
@@ -753,7 +729,9 @@ def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
 
 
 def _dimensioned_detail(
-    adapter: Any, detail: StackDetail, keep: dict[str, tuple[float, float]]
+    adapter: Any,
+    detail: StackDetail,
+    keep: dict[str, tuple[float, float]],
 ) -> list[Any]:
     """Place ``detail``, show the stack chain in it, import ``keep``, crop it
     and prove the kept dimensions survived the crop."""
@@ -782,19 +760,17 @@ def _dimensioned_detail(
     return annotations
 
 
-def _stack_dimensions(adapter: Any) -> Callable[[], None]:
+def _stack_dimensions(
+    adapter: Any, source_step: Callable[[str], None]
+) -> Callable[[], None]:
     """Both settings, with their callouts, places and bands read back once
     both details are cropped; the returned check re-reads the bands and the
     callouts once the drawing has settled."""
-    callouts = _printable_callouts()
+    callouts = stack.SETTING_CALLOUTS[stack.FEATURE]
     annotations = [
         *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP),
         *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP),
     ]
-    for name, location in CALLOUT_LOCATION.items():
-        set_dimension_callouts(
-            adapter, annotations, {name: callouts[name]}, location=location
-        )
     precision = {
         name: places
         for names in stack.DRAWING_PRECISION.values()
@@ -814,6 +790,7 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
     if sorted(name for name, _ in displays) != sorted(stack.DIMENSION_TOLERANCES):
         raise RuntimeError(f"stack details imported {sorted(n for n, _ in displays)}")
     _assert_callouts(displays, callouts)
+    source_step("stack settings import and readback")
 
     def settled() -> None:
         for name, display in displays:
@@ -830,32 +807,6 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
         _assert_callouts(displays, callouts)
 
     return settled
-
-
-def _printable_lever_callouts() -> dict[str, str]:
-    """The lever callouts, refused if an above one holds a line break (see
-    :func:`_printable_callouts`)."""
-    broken = sorted(
-        name
-        for name, location in LEVER_CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in notes.LEVER_CALLOUTS[name]
-    )
-    if broken:
-        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: notes.LEVER_CALLOUTS[name] for name in LEVER_CALLOUT_LOCATION}
-
-
-def _assert_lever_callouts(
-    displays: list[tuple[str, Any]], callouts: dict[str, str]
-) -> None:
-    for name, display in displays:
-        part = CALLOUT_TEXT_PART[LEVER_CALLOUT_LOCATION[name]]
-        text = str(display.GetText(part) or "")
-        if text.replace("\r\n", "\n") != callouts[name]:
-            raise RuntimeError(
-                f"{name}: {LEVER_CALLOUT_LOCATION[name]} callout reads {text!r}, "
-                f"not {callouts[name]!r}"
-            )
 
 
 def lever_keep(
@@ -878,10 +829,12 @@ def lever_keep(
     }
 
 
-def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
-    """The clamp station and the fixture drop on the Front view, with their
+def _lever_settings(
+    adapter: Any, view: Any, source_step: Callable[[str], None]
+) -> Callable[[], None]:
+    """The clamp station and the fixture drop on the back view, with their
     callouts; the returned check re-reads the callouts once settled."""
-    callouts = _printable_lever_callouts()
+    callouts = stack.SETTING_CALLOUTS[stack.LEVER_FEATURE]
     tip, clamp, fixture = model_points_in_view(
         adapter,
         view,
@@ -902,10 +855,6 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         view_label=LEVER_VIEW_LABEL,
         dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
     )
-    for name, location in LEVER_CALLOUT_LOCATION.items():
-        set_dimension_callouts(
-            adapter, annotations, {name: callouts[name]}, location=location
-        )
     assert_imported_precision(
         adapter,
         annotations,
@@ -925,12 +874,13 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         )
         for annotation in annotations
     ]
-    if sorted(name for name, _ in displays) != sorted(LEVER_CALLOUT_LOCATION):
+    if sorted(name for name, _ in displays) != sorted(callouts):
         raise RuntimeError(
             f"{LEVER_VIEW_LABEL} imported {sorted(n for n, _ in displays)}"
         )
-    _assert_lever_callouts(displays, callouts)
-    return lambda: _assert_lever_callouts(displays, callouts)
+    _assert_callouts(displays, callouts)
+    source_step("lever settings import and readback")
+    return lambda: _assert_callouts(displays, callouts)
 
 
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
@@ -1131,9 +1081,14 @@ def _component_stem(component: Any) -> str:
     return Path(path).stem.casefold()
 
 
-def _validate_source(source_model: Any) -> None:
-    """The builder-owned explodes exist, and the source opens collapsed with
-    exactly the contracted families."""
+def _validate_source(
+    source_model: Any,
+) -> dict[str, dict[str, tuple[float, float, float]]]:
+    """Require the collapsed Default source and its builder-owned explode data.
+
+    File-level native readbacks keep configuration activation and source
+    show/collapse out of drawing generation.
+    """
     assembly = _early_bound(source_model, "IAssemblyDoc")
     manager = _early_bound(source_model.ConfigurationManager, "IConfigurationManager")
     configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
@@ -1146,9 +1101,11 @@ def _validate_source(source_model: Any) -> None:
                 f"magnifier {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
+    instances = []
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
         stem = _component_stem(component)
+        instances.append(explode.Instance(str(component.Name2), stem))
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
@@ -1164,6 +1121,23 @@ def _validate_source(source_model: Any) -> None:
         raise RuntimeError(
             f"magnifier families {counts!r} != contract {BOM_QUANTITIES!r}"
         )
+    offsets_by_configuration = {}
+    for owner in EXPLODED_VIEW_NAMES:
+        text = str(
+            source_model.GetCustomInfoValue("", explode.explode_offsets_property(owner))
+            or ""
+        )
+        try:
+            offsets_by_configuration[owner] = explode.decode_explode_offsets(
+                text, owner, instances
+            )
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        _telemetry.info(
+            f"magnifier {owner}: builder-owned explode offsets read for "
+            f"{len(instances)} instances without source activation"
+        )
+    return offsets_by_configuration
 
 
 def _create_sheets(adapter: Any) -> None:
@@ -1524,28 +1498,59 @@ def balloon_items(
     return tuple((stem, items[stem]) for stem in BOM_COMPONENTS if stem in stems)
 
 
-def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
-    """Front, Right and Isometric at 1:4, the lever settings on the Front
-    view and the two axle-stack details."""
+def _view_source_explode_offsets(
+    view: Any,
+    offsets_by_configuration: dict[str, dict[str, tuple[float, float, float]]],
+    *,
+    label: str,
+) -> dict[str, tuple[float, float, float]]:
+    """Use the source builder's measured presentation, not source activation.
+
+    r7 at 6bb872b2b opened clean; ShowConfiguration2(Default Simplified)
+    immediately dirtied it, before any balloon work. IConfiguration's direct
+    step reader had already read zero for that inactive configuration, while
+    ShowExploded2 only applies to the active one. The builder now publishes
+    every native-verified instance translation before its normal save.
+    """
+    bound = _early_bound(view, "IView")
+    if not bool(bound.IsExploded()):
+        return {}
+    configuration = str(bound.ReferencedConfiguration)
+    if configuration not in offsets_by_configuration:
+        raise RuntimeError(
+            f"{label}: no builder-owned explode offsets for {configuration!r}; "
+            "rebuild assembly:mg_magnifier"
+        )
+    return offsets_by_configuration[configuration]
+
+
+def _place_assembled_sheet(
+    adapter: Any, source_step: Callable[[str], None]
+) -> tuple[Callable[[], None], ...]:
+    """Preserved back, left and isometric at 1:4, the lever settings on the
+    back view and the two axle-stack details."""
     _activate_sheet(adapter, SHEET_NAMES[0])
+    source_step("assembled sheet activation")
     front = None
     captioned = []
     for name, centre in (
-        ("*Front", FRONT_CENTER),
-        ("*Right", RIGHT_CENTER),
-        ("*Isometric", ISO_CENTER),
+        (stack.DRAWING_BACK_VIEW, FRONT_CENTER),
+        (stack.DRAWING_LEFT_VIEW, RIGHT_CENTER),
+        (stack.DRAWING_ISOMETRIC_VIEW, ISO_CENTER),
     ):
         view = place_view(adapter, str(SOURCE), name, *centre, scale=SHEET_SCALE)
-        # Front and Right print the simplified configuration at 1:4; the
-        # isometric is the full-detail view.
-        role = ViewRole.FULL_DETAIL if name == "*Isometric" else ViewRole.PLAIN
+        source_step(f"assembled {name} named view placement and scale")
+        # Back and left print the simplified configuration at 1:4; the
+        # preserved isometric is the full-detail view.
+        role = ViewRole.FULL_DETAIL if name == stack.DRAWING_ISOMETRIC_VIEW else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
-        if name == "*Front":
+        source_step(f"assembled {name} view configuration")
+        if name == stack.DRAWING_BACK_VIEW:
             front = view
         if name in ASSEMBLED_VIEW_CAPTIONS:
             captioned.append((view, name))
-    lever_settled = _lever_settings(adapter, front)
-    stack_settled = _stack_dimensions(adapter)
+    lever_settled = _lever_settings(adapter, front, source_step)
+    stack_settled = _stack_dimensions(adapter, source_step)
     for view, name in captioned:
         _add_note_block(
             adapter,
@@ -1554,6 +1559,7 @@ def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             caption_under(_view_outline(view, label=name), ASSEMBLED_VIEW_CAPTIONS[name]),
             label=f"{name} caption",
         )
+        source_step(f"assembled {name} caption")
     return lever_settled, stack_settled
 
 
@@ -1561,12 +1567,12 @@ def _place_exploded_view(
     adapter: Any, sheet_name: str, field: Box, *, label: str
 ) -> Any:
     """MG_MAGNIFIER_EXPLODED at EXPLODED_SCALE, configured and exploded before
-    anything binds to it; isolated and fitted after the BOM exists."""
+    anything binds to it; isolation and ring fitting also precede the BOM."""
     _activate_sheet(adapter, sheet_name)
     view = place_view(
         adapter,
         str(SOURCE),
-        "*Isometric",
+        stack.DRAWING_ISOMETRIC_VIEW,
         (field[0] + field[2]) / 2.0,
         (field[1] + field[3]) / 2.0,
         scale=EXPLODED_SCALE,
@@ -1592,7 +1598,7 @@ def _place_collapsed_view(
     view = place_view(
         adapter,
         str(SOURCE),
-        "*Isometric",
+        stack.DRAWING_ISOMETRIC_VIEW,
         (field[0] + field[2]) / 2.0,
         (field[1] + field[3]) / 2.0,
         scale=scale,
@@ -1632,12 +1638,78 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: tangent edges read {after}, not visible")
 
 
+def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
+    """Observe the released source at MG phase boundaries, without edits.
+
+    Native artifact198 first went dirty after the lever ClampStation callout
+    SetText, while its preceding import/curation was clean. Stable setting
+    text is now model-authored and drawing-read-only. A dirty flag still does
+    not prove changed geometry; retain phase telemetry and the final refusal
+    before drawing SaveAs3, never a source save or flag reset.
+    """
+    state = {"dirty": bool(source_model.GetSaveFlag())}
+
+    def step(name: str) -> None:
+        dirty = bool(source_model.GetSaveFlag())
+        _telemetry.event("magnifier.source_save_flag", step=name, dirty=dirty)
+        if dirty == state["dirty"]:
+            return
+        state["dirty"] = dirty
+        report = _telemetry.warn if dirty else _telemetry.info
+        report(f"magnifier source went {'DIRTY' if dirty else 'clean'} after {name}")
+
+    return step
+
+
+def _source_sha256(path: Path) -> str:
+    """Stream the released source, following the drive-train identity guard."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _assert_source_identity(
+    source_model: Any, expected_sha256: str, *, phase: str
+) -> None:
+    """Log exact native-leaf evidence; never save or reset a dirty source."""
+    actual_sha256 = _source_sha256(SOURCE)
+    dirty = bool(source_model.GetSaveFlag())
+    _telemetry.info(
+        f"magnifier source {phase}: SHA256 {actual_sha256}; "
+        f"expected {expected_sha256}; dirty={dirty}",
+        source_identity_phase=phase,
+        source_sha256=actual_sha256,
+        source_expected_sha256=expected_sha256,
+        source_dirty=dirty,
+    )
+    if dirty:
+        raise RuntimeError(
+            f"magnifier drawing dirtied the source assembly {phase}; "
+            "refusing to save or reset it"
+        )
+    if actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            f"magnifier drawing changed the source assembly {phase}: "
+            f"SHA256 {expected_sha256} -> {actual_sha256}"
+        )
+
+
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
+    source_sha256 = _source_sha256(SOURCE)
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if bool(source_model.GetSaveFlag()):
+        raise RuntimeError(
+            "magnifier source assembly is already dirty; refusing to discard user changes"
+        )
+    _assert_source_identity(source_model, source_sha256, phase="on source open")
+    source_step = _source_dirty_tracer(source_model)
+    source_step("open source")
     properties = read_required_properties(
         source_model,
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
@@ -1648,12 +1720,19 @@ async def build(adapter: Any) -> dict[str, str]:
             f"magnifier source Number {properties['Number']!r} != "
             f"{notes.DRAWING_NUMBER!r}"
         )
-    _validate_source(source_model)
+    offsets_by_configuration = _validate_source(source_model)
+    source_step("validate source and properties")
     _create_sheets(adapter)
-    settled_checks = _place_assembled_sheet(adapter)
-    # Every view's configuration and exploded state is final before the BOM
-    # binds: a configuration switch after it re-dirties the source.
+    source_step("create sheets")
+    settled_checks = _place_assembled_sheet(adapter, source_step)
+    source_step("assembled views and settings")
+    # Follow the drive-train package order: place/configure every view, then
+    # explode/isolate/fit it, and only then insert the BOM and bind balloons.
+    # That recipe's native probes found post-BOM configuration-switch rebuilds
+    # dirty the source. MG's callouts and explode readbacks are model-owned;
+    # drawing generation never activates a source configuration.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
+    source_step(f"{WHEEL_LABEL} view configuration and explode")
     reference = _place_collapsed_view(
         adapter,
         SHEET_NAMES[1],
@@ -1661,10 +1740,13 @@ async def build(adapter: Any) -> dict[str, str]:
         BOM_REFERENCE_SCALE_LADDER[0],
         label=BOM_REFERENCE_LABEL,
     )
+    source_step(f"{BOM_REFERENCE_LABEL} view configuration")
     lever = _place_exploded_view(adapter, SHEET_NAMES[2], LEVER_FIELD, label=LEVER_LABEL)
+    source_step(f"{LEVER_LABEL} view configuration and explode")
     finished = _place_collapsed_view(
         adapter, SHEET_NAMES[3], FINISHED_FIELD, SHEET_SCALE, label=FINISHED_LABEL
     )
+    source_step(f"{FINISHED_LABEL} view configuration")
     assert_full_detail_view(adapter, label=PDF_TITLE)
 
     # The reference carries no balloons, so its ring is its outline: fit the
@@ -1677,6 +1759,47 @@ async def build(adapter: Any) -> dict[str, str]:
         _grown(BOM_REFERENCE_FIELD, BALLOON_RING_REACH),
         label=BOM_REFERENCE_LABEL,
     )
+    source_step(f"{BOM_REFERENCE_LABEL} ring fit")
+    for sheet_name, view, stems, label in (
+        (SHEET_NAMES[1], wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
+        (SHEET_NAMES[2], lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
+        source_step(f"{label} isolation")
+    _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
+    source_step(f"{LEVER_LABEL} tangent edges")
+
+    scales = {}
+    for sheet_name, view, ladder, field, label in (
+        (
+            SHEET_NAMES[1],
+            wheel,
+            EXPLODED_SCALE_LADDER,
+            WHEEL_FIELD,
+            WHEEL_LABEL,
+        ),
+        (
+            SHEET_NAMES[2],
+            lever,
+            LEVER_SCALE_LADDER,
+            LEVER_FIELD,
+            LEVER_LABEL,
+        ),
+        (
+            SHEET_NAMES[3],
+            finished,
+            FINISHED_SCALE_LADDER,
+            FINISHED_FIELD,
+            FINISHED_LABEL,
+        ),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        source_step(f"{label} ring fit")
+
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    source_step("BOM sheet activation")
     table = insert_bom_table(
         adapter,
         reference,
@@ -1687,54 +1810,29 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="magnifier",
     )
+    source_step("BOM insertion")
     items = _validate_bom(adapter, table)
     _assert_bom_clears_reference_field(table)
+    source_step("BOM validation and layout")
     for view, label in (
         (wheel, WHEEL_LABEL),
         (lever, LEVER_LABEL),
         (finished, FINISHED_LABEL),
     ):
         _link_view_to_bom(view, table, label=label)
-    for view, stems, label in (
-        (wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
-        (lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
-    ):
-        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
-    _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
-    # View-only isolation must leave the logical parts list alone.
+        source_step(f"{label} BOM link")
+    # The full reference must keep every row after isolation and BOM linking.
     if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
-        raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
+        raise RuntimeError("magnifier BOM items moved when its isolated views were linked")
 
     landings = []
-    scales = {}
-    for sheet_name, view, ladder, field, stems, label in (
-        (
-            SHEET_NAMES[1],
-            wheel,
-            EXPLODED_SCALE_LADDER,
-            WHEEL_FIELD,
-            explode.WHEEL_GROUP_STEMS,
-            WHEEL_LABEL,
-        ),
-        (
-            SHEET_NAMES[2],
-            lever,
-            LEVER_SCALE_LADDER,
-            LEVER_FIELD,
-            explode.LEVER_GROUP_STEMS,
-            LEVER_LABEL,
-        ),
-        (
-            SHEET_NAMES[3],
-            finished,
-            FINISHED_SCALE_LADDER,
-            FINISHED_FIELD,
-            frozenset({explode.WIRE_STEM}),
-            FINISHED_LABEL,
-        ),
+    for sheet_name, view, stems, label in (
+        (SHEET_NAMES[1], wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
+        (SHEET_NAMES[2], lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
+        (SHEET_NAMES[3], finished, frozenset({explode.WIRE_STEM}), FINISHED_LABEL),
     ):
         _activate_sheet(adapter, sheet_name)
-        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        source_step(f"{label} balloon sheet activation")
         # TODO(#1667): Restore disabled wheel/lever groups only after the linked
         # fix is validated; remove MB-1667-MG and this TODO with restoration.
         # landings += add_component_bom_balloons(
@@ -1744,6 +1842,9 @@ async def build(adapter: Any) -> dict[str, str]:
         #     anchors=BALLOON_ANCHORS,
         #     label=f"magnifier {label} BOM coverage",
         #     margin=BALLOON_MARGIN,
+        #     explode_offsets=_view_source_explode_offsets(
+        #         view, offsets_by_configuration, label=label
+        #     ),
         # )
     # Preserve the finished-wire partial balloon path.
     landings += add_component_bom_balloons(
@@ -1753,7 +1854,11 @@ async def build(adapter: Any) -> dict[str, str]:
         anchors=BALLOON_ANCHORS,
         label=f"magnifier {FINISHED_LABEL} BOM coverage",
         margin=BALLOON_MARGIN,
+        explode_offsets=_view_source_explode_offsets(
+            finished, offsets_by_configuration, label=FINISHED_LABEL
+        ),
     )
+    source_step(f"{FINISHED_LABEL} balloons")
     # if len(landings) != len(BOM_COMPONENTS):
     #     raise RuntimeError(
     #         f"magnifier package carries {len(landings)} balloons, expected one per "
@@ -1761,6 +1866,7 @@ async def build(adapter: Any) -> dict[str, str]:
     #     )
     (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
     _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
+    source_step(f"{FINISHED_LABEL} wire balloon placement")
 
     _add_note_block(
         adapter,
@@ -1769,6 +1875,7 @@ async def build(adapter: Any) -> dict[str, str]:
         WHEEL_CAPTION_XY,
         label="wheel caption",
     )
+    source_step("wheel caption")
     lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
     _add_note_block(
         adapter,
@@ -1777,6 +1884,7 @@ async def build(adapter: Any) -> dict[str, str]:
         lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), lever_caption),
         label="lever caption",
     )
+    source_step("lever caption")
     finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
     _add_note_block(
         adapter,
@@ -1785,35 +1893,67 @@ async def build(adapter: Any) -> dict[str, str]:
         caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
         label="finished caption",
     )
+    source_step("finished caption")
     _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
     )
+    source_step("assembly sequence")
     _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
     )
+    source_step("assembly checks")
     _activate_sheet(adapter, SHEET_NAMES[1])
+    source_step("BOM sheet activation before reference hide")
     _hide_bom_reference(adapter, reference, table, items)
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title=PDF_TITLE,
-        scale=SHEET_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        # Each sheet's title-block scale is its main view's: the ladder's
-        # rung the exploded and finished views settled on.
-        sheet_scales={
-            SHEET_NAMES[0]: SHEET_SCALE,
-            SHEET_NAMES[1]: scales[WHEEL_LABEL],
-            SHEET_NAMES[2]: scales[LEVER_LABEL],
-            SHEET_NAMES[3]: scales[FINISHED_LABEL],
-        },
-        settled_checks=(
-            *settled_checks,
-            lambda: assert_balloon_landings(adapter, landings),
-        ),
-    )
+    source_step("hide BOM reference")
+    _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
+    try:
+        artifacts = await finalize_drawing(
+            adapter,
+            OUTPUTS,
+            layout=SPEC.layout,
+            pdf_title=PDF_TITLE,
+            scale=SHEET_SCALE,
+            expected_sheet_names=SHEET_NAMES,
+            sheet_layouts=SHEET_LAYOUTS,
+            # Each sheet's title-block scale is its main view's: the ladder's
+            # rung the exploded and finished views settled on.
+            sheet_scales={
+                SHEET_NAMES[0]: SHEET_SCALE,
+                SHEET_NAMES[1]: scales[WHEEL_LABEL],
+                SHEET_NAMES[2]: scales[LEVER_LABEL],
+                SHEET_NAMES[3]: scales[FINISHED_LABEL],
+            },
+            settled_checks=(
+                *settled_checks,
+                lambda: assert_balloon_landings(adapter, landings),
+                lambda: _assert_source_identity(
+                    source_model,
+                    source_sha256,
+                    phase="settled checks before drawing SaveAs",
+                ),
+            ),
+        )
+    finally:
+        primary_error = sys.exception()
+        try:
+            try:
+                _validate_source(source_model)
+            finally:
+                _assert_source_identity(
+                    source_model, source_sha256, phase="after drawing finalization"
+                )
+            _telemetry.success(
+                "magnifier source preserved: Default, collapsed and clean; "
+                f"SHA256 {source_sha256}"
+            )
+        except Exception as proof_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(
+                f"magnifier source identity proof after drawing failure: {proof_error}"
+            )
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:
