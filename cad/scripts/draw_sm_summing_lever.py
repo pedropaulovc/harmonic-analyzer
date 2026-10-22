@@ -15,7 +15,7 @@ shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
-the receiver row's centreline through the hex centre.
+the receiver row's centreline below the unchanged hex centre.
 The ordinary views and native receiver drill/thread-depth callout retain
 the manufacturing definition without auxiliary sections.
 
@@ -83,6 +83,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     LEVER_HOLE_POINTS,
+    RECEIVER_ROW_Y,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
@@ -111,7 +112,6 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
-    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -186,12 +186,11 @@ _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 # equal the requested decimal after SolidWorks' document-unit round trip.
 _NATIVE_NOMINAL_TOL_M = 1e-9
 
-# The -Z end rib's ordinary depth is named by
-# build_sm_summing_lever._receiver_model_bands, and the receiver stations by
-# its hidden coordinate sketch, outside the marked-dimension contract.
+# The receiver stations come from the builder's hidden coordinate sketch,
+# outside the marked-dimension contract. One native 3X rib-thickness dimension
+# sizes both end ribs and the middle rib.
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
     **DRAWING_DIMENSIONS,
-    "EdgeRibBack": {"RibDepth"},
     "ReceiverCoordinates": {"ReceiverX0", "ReceiverX1", "ReceiverY0"},
 }
 
@@ -1464,25 +1463,22 @@ def _mounting_rims(edges: ViewEdges) -> list[Any]:
     ]
 
 
-# VIEW F's controlled ReceiverY0 locates the bracket row from the plate top.
-# The coefficient top stays fixed above the pivot; both tap centres remain
-# y=0. An owned centreline runs through the taps and hex centre, extending
-# past the free-edge station and hex flats. The separate (2.54) reference
-# repeated ReceiverY0's span and was struck by ReceiverX1's extension line.
-RECEIVER_AXIS_STATION_MM = 37.5
+# VIEW F's controlled ReceiverY0 locates the bracket row from the actual plate
+# top. The coefficient top and knife stay fixed; only the matched tap row
+# moves down. Its owned centreline spans the two taps, not the hex centre.
 RECEIVER_AXIS_OVERRUN_MM = 2.0
 
 
 def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
-    """Extend VIEW F's receiver-row centreline through the hex centre."""
+    """Extend VIEW F's centreline along the relocated two-tap row only."""
     z_mm = -PLATE_L / 2.0
-    station = RECEIVER_AXIS_STATION_MM
+    stations = [point[0] for point in LEVER_HOLE_POINTS]
     return _owned_centerline(
         adapter,
         back,
         (
-            (station + RECEIVER_AXIS_OVERRUN_MM, 0.0, z_mm),
-            (-(HEX_W / 2.0 + RECEIVER_AXIS_OVERRUN_MM), 0.0, z_mm),
+            (max(stations) + RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
+            (min(stations) - RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
         ),
         label="receiver row centreline",
     )
@@ -1531,8 +1527,6 @@ TOP_KEEP = {
     # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
     # 9 characters) end 2.9 mm inside the border.
     "PlateLength": (0.405, TOP_CENTER[1]),
-    # Receiver rib's inward depth, beside the -Z end of the plan.
-    "RibDepth": (0.270, 0.1745),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
     "AnchorOuterDia": (0.145, 0.168),
@@ -1556,21 +1550,19 @@ TOP_KEEP = {
     # to target 3.3 mm box clearance. Both stubs are one prism, so the length
     # remains the hidden KnifeStubReference's, along its -X side.
     "KnifeStubLength": (0.2185, 0.1735),
-    # Left of the +Z end rib, above its span: below it the finish symbol and
-    # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
-    # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
+    # One 3X thickness sizes both end ribs and the middle rib, above its span.
+    # Below it the finish symbol and 76.20/39.85 row leave no room; the lower arc
+    # reaches the cylinder at x 0.226. The text stands right of
     # the 76.20 X location's extension line (x 0.1972); the lower arrow
     # stands 3.8 mm left of the finish symbol's text; the text stands above
     # the boss Z location's datum-B extension line (y 0.0919).
     "EdgeRibThickness": (0.2095, 0.1035),
-    # Ordinary mid-rib thickness beside its end, clear of the spring callout.
-    "MiddleRibThickness": (0.2655, 0.1374),
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
     # leader landed on the rib outline that hides it).  Its text stands left
     # of the band, 2.8 mm over the line, which the dimension line covers
     # (farm r11: the dimension line prints that far below its text): right
-    # of the boss's 76.20 extension line (x 0.1972), 3 mm over the 5.08's
+    # of the boss's 76.20 extension line (x 0.1972), 3 mm over the 5.00's
     # text and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }

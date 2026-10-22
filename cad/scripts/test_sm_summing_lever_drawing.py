@@ -71,7 +71,7 @@ def test_end_face_edge_rejects_inboard_flange_and_hidden_underside() -> None:
     spec = sm_summing_lever_spec
     z = spec.PLATE_L / 2.0
     top = _line((0.0, 15.24, z), (30.0, 6.0, z))
-    flange = _line((0.0, 15.24, z - 5.08), (30.0, 6.0, z - 5.08))
+    flange = _line((0.0, 15.24, z - spec.RIB_T), (30.0, 6.0, z - spec.RIB_T))
     underside = _line((30.0, spec.COEFFICIENT_BOTTOM_Y, z), (0.0, -15.24, z))
     plate_end = _line(
         (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, z),
@@ -165,8 +165,8 @@ def _native_boss_face_location(monkeypatch, identity):
         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
     )
     inboard = _line(
-        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
-        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
     )
     state = SimpleNamespace(
         edges=[lower, wrong_axis, inboard, plate, upper],
@@ -287,11 +287,8 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)  # ordinary .XX width
-    # The -Z rib's depth rides the title block (no native band of its own).
-    assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND
-    assert not hasattr(joint, "RECEIVER_DIMENSION_BANDS")
     assert "PlateThickness" in drawing.BACK_KEEP
-    assert "RibDepth" in drawing.TOP_KEEP
+    assert "EdgeRibThickness" in drawing.TOP_KEEP
     order = [_call_name(call) for call in _calls_in_order(_builder_function("build"))]
     bands = order.index("_receiver_model_bands")
     coordinates = order.index("_receiver_coordinate_dimensions")
@@ -300,21 +297,38 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert "volume_check" in order[coordinates:saved]
 
 
-def test_receiver_upper_stop_keeps_drill_inside_the_proven_rib() -> None:
-    """Thickening downward does not remove the receiver's upper-wall limit."""
+def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> None:
+    """Screen ordinary pilot walls, not finished thread walls or strength."""
     import magnifying_bracket_joint_layout as joint
 
     spec = sm_summing_lever_spec
-    drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
-    for x, _y, _z in joint.LEVER_HOLE_POINTS:
+    drill_radius_max = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
+        + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
+        joint.DRILL_DEPTH_MAX + drill_radius_max * joint.DRILL_POINT_H
+    )
+    for x, y, _z in joint.LEVER_HOLE_POINTS:
         assert x - joint.POSITION_BAND - drill_radius_max > spec.CYL_R
         assert x + joint.POSITION_BAND + drill_radius_max < spec.RIB_REACH
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN > 0.0
+        assert spec.COEFFICIENT_TOP_Y - y == pytest.approx(3.25)
+    assert spec.RIB_T + joint.LINEAR_BAND < joint.DRILL_DEPTH_MIN
+    assert spec.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
+    # ReceiverY0 is from the actual top: top-position variation cancels.
     upper_plate_wall = (
-        spec.COEFFICIENT_TOP_Y - joint.LINEAR_BAND - joint.POSITION_BAND
-        - drill_radius_max - joint.DRILL_WANDER_MAX
+        joint.RECEIVER_ROW_FROM_TOP - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall < 1.5
+    lower_plate_wall = (
+        spec.COEFFICIENT_T - joint.LINEAR_BAND - joint.RECEIVER_ROW_FROM_TOP
+        - joint.POSITION_BAND - drill_radius_max - wander
+    )
+    assert upper_plate_wall == pytest.approx(2.220338, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.210338, abs=1e-6)
+    assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
+        min(upper_plate_wall, lower_plate_wall),
+    )
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN >= joint.RECEIVER_PILOT_WALL_MIN
 
 
 def test_receiver_rim_scan_uses_back_entry_face() -> None:
@@ -332,19 +346,76 @@ def test_receiver_rim_scan_uses_back_entry_face() -> None:
     assert [call[2] for call in calls] == [(0.0, 0.0, 1.0)] * len(calls)
 
 
-def test_view_f_axis_centreline_extends_beyond_the_receiver_row() -> None:
-    """The receiver row and hex axis share a line spanning both tap centres."""
-    import magnifying_bracket_joint_layout as joint
+@pytest.mark.parametrize("scale,origin", [(1.0, (0.2, 0.1)), (2.0, (0.3, 0.15))])
+def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
+    monkeypatch, scale, origin,
+) -> None:
+    """Drive the real owned-line path through projection and sketch readback."""
+    adapter, back = SimpleNamespace(), SimpleNamespace()
+    transform = object()
+    back.GetSketch = lambda: SimpleNamespace(ModelToSketchTransform=transform)
+    projected_points, created_lines, activated = [], [], []
 
-    spec = sm_summing_lever_spec
-    assert all(point[1] == 0.0 for point in joint.LEVER_HOLE_POINTS)
-    station = drawing.RECEIVER_AXIS_STATION_MM
-    overrun = drawing.RECEIVER_AXIS_OVERRUN_MM
-    outer_tap = max(point[0] for point in joint.LEVER_HOLE_POINTS)
-    assert outer_tap + joint.TAP_DRILL_DIA / 2.0 < spec.RIB_REACH
-    assert spec.RIB_REACH < station
-    assert station + overrun < spec.PLATE_W
-    assert overrun > 0.0
+    def project(actual_adapter, view, points, **_kwargs):
+        assert actual_adapter is adapter and view is back
+        projected_points.extend(points)
+        return [
+            (origin[0] - scale * x, origin[1] + scale * y)
+            for x, y, _z in points
+        ]
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = values
+
+        def MultiplyTransform(self, actual_transform):
+            assert actual_transform is transform
+            x, y, z = self.ArrayData
+            return Point((x + 0.03, y - 0.02, z))
+
+    manager = SimpleNamespace(AddToDB=False)
+
+    def create(*coordinates):
+        assert manager.AddToDB is True
+        created_lines.append(coordinates)
+        start, end = coordinates[:3], coordinates[3:]
+        return SimpleNamespace(
+            Color=-1,
+            GetStartPoint2=lambda: SimpleNamespace(**dict(zip("XYZ", start))),
+            GetEndPoint2=lambda: SimpleNamespace(**dict(zip("XYZ", end))),
+        )
+
+    manager.CreateCenterLine = create
+    adapter.currentModel = SimpleNamespace(
+        ActivateView=lambda name: activated.append(name) or True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=manager,
+    )
+    adapter.swApp = SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point))
+    adapter._get_attr_or_call = lambda value, name: (
+        getattr(value, name)() if callable(getattr(value, name)) else getattr(value, name)
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW F")
+    monkeypatch.setattr(drawing, "double_array", lambda values: values)
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    segment = drawing._receiver_axis_centerline(adapter, back)
+    assert activated == ["VIEW F"]
+    assert projected_points == [
+        pytest.approx((0.0317, -0.00071, -0.0762)),
+        pytest.approx((0.0140, -0.00071, -0.0762)),
+    ]
+    assert created_lines == [pytest.approx((
+        origin[0] - scale * 0.0317 + 0.03,
+        origin[1] - scale * 0.00071 - 0.02,
+        0.0,
+        origin[0] - scale * 0.0140 + 0.03,
+        origin[1] - scale * 0.00071 - 0.02,
+        0.0,
+    ))]
+    assert manager.AddToDB is False
+    assert segment.Color == 0
 
 
 
@@ -406,6 +477,21 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     assert above | below <= set(keeps)
     for name, _prefix in notes.DIMENSION_PREFIXES:
         assert name in notes.DRAWING_DIMENSIONS
+
+
+def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
+    spec = sm_summing_lever_spec
+    assert lever_build.RIB_T == spec.RIB_T == 5.00
+    assert spec.COUNTER_WEB_T == 5.08
+    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 2.54
+    assert spec.COEFFICIENT_T == 7.0
+    assert notes.DRAWING_DIMENSIONS["EdgeRibFront"] == {"EdgeRibThickness"}
+    assert notes.DIMENSION_PREFIXES[("EdgeRibFront", "EdgeRibThickness")] == "3X "
+    rib_dimensions = {
+        name for names in notes.DRAWING_DIMENSIONS.values() for name in names
+        if name in {"RibDepth", "MiddleRibThickness", "EdgeRibThickness"}
+    }
+    assert rib_dimensions == {"EdgeRibThickness"}
 
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
@@ -1059,21 +1145,10 @@ def test_notes_are_short_stated_shortfalls() -> None:
 
 
 def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesses(monkeypatch) -> None:
-    import _appearance
     import _com
-    import _custom_properties
     import _dimensions
     import _feature_tree
-    import _part_checks
-    import _part_properties
-    import _part_save
-    import _rebuild
-    import _session
-    import _sketch
-    import _sketch_rectangle
-    import _drawing_marks
     import build_sm_summing_lever as part
-    import pytest
 
     class Dimension:
         def __init__(self, name, owner, nominal, kind=0):
@@ -1118,12 +1193,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
             for current, following in zip(children, children[1:]):
                 current.next_subfeature = following
 
-        def Parameter(self, name):
-            return next(
-                (item.GetDimension2(0) for item in self.displays if item.GetDimension2(0).Name == name),
-                None,
-            )
-
         def GetFirstDisplayDimension(self):
             return self.displays[0] if self.displays else None
 
@@ -1152,9 +1221,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         [drill, thread, thread_b, unrelated, angular],
         [sketch_feature, thread_feature, thread_feature_b],
     )
-    rib_depth = Dimension("D1", "EdgeRibBack", lever_build.RECEIVER_RIB_T)
-    features = {"EdgeRibBack": Feature("EdgeRibBack", [rib_depth])}
-    features["BracketMountingTaps"] = taps
+    features = {"BracketMountingTaps": taps}
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
 
     def invoke(value, interface, member, *args):
@@ -1164,30 +1231,11 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         assert not args
         return attribute
 
-    monkeypatch.setattr(_appearance, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_com, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_custom_properties, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_feature_tree, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_checks, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_properties, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_save, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_rebuild, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_session, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_sketch, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_com, "_com_invoke", invoke)
     monkeypatch.setattr(_dimensions, "_com_invoke", invoke)
     monkeypatch.setattr(_feature_tree, "_com_invoke", invoke)
-    monkeypatch.setattr(_drawing_marks, "_com_invoke", invoke)
-    bands = []
-    monkeypatch.setattr(
-        part, "set_dimension_symmetric_tolerance",
-        lambda adapter, feature, name, band: bands.append((feature, name, band)),
-    )
-    precisions = []
-    monkeypatch.setattr(
-        part, "set_dimension_display_precision", lambda *args: precisions.append(args),
-    )
     held = []
     monkeypatch.setattr(
         part, "_band_held_dimension",
@@ -1195,13 +1243,9 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
             (display.GetDimension2(0) is dimension, dimension, band, label)
         ),
     )
-    monkeypatch.setattr(part, "mark_dimensions_for_drawing", lambda *args: None)
     inventory = []
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
-    assert bands == []
-    assert (adapter, "EdgeRibBack", "RibDepth", 2) in precisions
-    assert rib_depth.Name == "RibDepth"
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
@@ -1221,7 +1265,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # mistaken for parent parameters.
     taps.children = ()
     inventory.clear()
-    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth .*found 0"):
         part._receiver_model_bands(adapter)
     assert inventory and any("D1@Hole Thread22" in row for row in inventory)
@@ -1230,7 +1273,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     thread_feature.next_subfeature = None
     sketch_feature.next_subfeature = thread_feature
     thread_feature.displays.append(display(Dimension("D9", thread_feature.Name, 4.95)))
-    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth \\(one per owner\\), found 2"):
         part._receiver_model_bands(adapter)
 
@@ -1414,41 +1456,60 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
     (
         None, "outer-caps-absent", "missing", "empty", "receiver-entry",
         "receiver-inner", "opposite-inner", "extra", "receiver-depth",
-        "opposite-depth", "missing-depth",
+        "opposite-depth", "missing-depth", "middle-missing", "middle-depth",
+        "middle-missing-depth", "middle-inner", "middle-outer", "middle-one-cap",
     ),
 )
-def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) -> None:
+def test_native_rib_end_planes_preserve_uniform_depths_and_fixed_outer_faces(
+    monkeypatch, damage,
+) -> None:
     def face(z):
         surface = SimpleNamespace(
             IsPlane=lambda: True, PlaneParams=(0.0, 0.0, 1.0, 0.0, 0.0, z / 1000.0),
         )
         return SimpleNamespace(GetSurface=lambda: surface)
 
-    planes = {"EdgeRibBack": [-76.2, -67.2], "EdgeRibFront": [71.12, 76.2]}
-    depths = {"EdgeRibBack": 9.0, "EdgeRibFront": 5.08}
+    planes = {
+        "EdgeRibBack": [-76.2, -71.2],
+        "EdgeRibFront": [71.2, 76.2],
+        "MiddleRib": [-2.5, 2.5],
+    }
+    depths = {name: 5.0 for name in planes}
     if damage == "outer-caps-absent":
-        planes = {"EdgeRibBack": [-67.2], "EdgeRibFront": [71.12]}
+        planes["EdgeRibBack"] = [-71.2]
+        planes["EdgeRibFront"] = [71.2]
     elif damage == "receiver-depth":
-        depths["EdgeRibBack"] = 7.3
+        depths["EdgeRibBack"] = 9.0
     elif damage == "opposite-depth":
-        depths["EdgeRibFront"] = 8.2
+        depths["EdgeRibFront"] = 5.08
+    elif damage == "middle-depth":
+        depths["MiddleRib"] = 5.08
     elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
-        planes["EdgeRibBack"][1] = -68.9
+        planes["EdgeRibBack"][1] = -67.2
     elif damage == "opposite-inner":
-        planes["EdgeRibFront"][0] = 68.0
+        planes["EdgeRibFront"][0] = 71.12
+    elif damage == "middle-inner":
+        planes["MiddleRib"][0] = -2.54
+    elif damage == "middle-outer":
+        planes["MiddleRib"][1] = 2.54
+    elif damage == "middle-one-cap":
+        planes["MiddleRib"] = [-2.5]
     elif damage == "extra":
         planes["EdgeRibBack"].append(-70.0)
     elif damage == "empty":
         planes["EdgeRibBack"] = []
 
     def feature(name, values):
-        expected_parameter = "RibDepth" if name == "EdgeRibBack" else "EdgeRibThickness"
+        expected_parameter = "MiddleRibThickness" if name == "MiddleRib" else "EdgeRibThickness"
 
         def parameter(parameter_name):
             assert parameter_name == expected_parameter
-            if damage == "missing-depth" and name == "EdgeRibBack":
+            if (
+                damage == "missing-depth" and name == "EdgeRibBack"
+                or damage == "middle-missing-depth" and name == "MiddleRib"
+            ):
                 return None
             return SimpleNamespace(SystemValue=depths[name] / 1000.0)
 
@@ -1460,29 +1521,29 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
     features = {name: feature(name, values) for name, values in planes.items()}
     if damage == "missing":
         del features["EdgeRibBack"]
+    elif damage == "middle-missing":
+        del features["MiddleRib"]
     monkeypatch.setattr(lever_build, "_early_bound", lambda value, _kind: value)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
     if damage in (None, "outer-caps-absent"):
         lever_build._assert_edge_rib_end_planes(adapter)
     else:
-        with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront"):
+        with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront|MiddleRib"):
             lever_build._assert_edge_rib_end_planes(adapter)
 
 
-def test_receiver_pilots_retain_their_profile_wall_margin() -> None:
-    """The blind pilot cylinders stay inside the unchanged G1 rib footprint."""
+def test_receiver_pilots_keep_independent_profile_and_connected_plate_wall_budgets() -> None:
+    """The rib footprint and the beyond-rib plate continuation both matter."""
     import magnifying_bracket_joint_layout as joint
-    from sm_summing_lever_profile import receiver_wall_margin
+    from sm_summing_lever_profile import receiver_pilot_wall_budget
 
-    pilot_radius_max = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS
-    ) / 2.0
-    for x, y, _z in joint.LEVER_HOLE_POINTS:
-        assert receiver_wall_margin(
-            x + joint.POSITION_BAND,
-            y + joint.POSITION_BAND,
-            pilot_radius_max,
-        ) - joint.LINEAR_BAND - joint.DRILL_WANDER_MAX >= joint.RECEIVER_PILOT_WALL_MIN
+    walls = receiver_pilot_wall_budget()
+    assert [wall.x_mm for wall in walls] == [point[0] for point in joint.LEVER_HOLE_POINTS]
+    assert all(wall.minimum_mm >= joint.RECEIVER_PILOT_WALL_MIN for wall in walls)
+    assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
+        joint.RECEIVER_PILOT_MATERIAL_WALL_MIN,
+    )
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN >= joint.RECEIVER_PILOT_WALL_MIN
 
 
 def _thread_annotation_drawing(monkeypatch, note_count: int = 7):

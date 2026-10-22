@@ -622,27 +622,31 @@ Live catalog verification on October 8, 2026:
   Current native **4.95 ±0.05 mm** cosmetic-thread metadata is retained for
   the screw stack, not used as a manufacturing maximum. Printed **4.95 MIN**
   specifies usable full thread without an additional maximum cutting reach.
-  Only the -Z entry rib, `EdgeRibBack`, extends inward to the owner-approved
-  **9.00 mm** depth (inner cap -67.20, unchanged entry -76.20);
-  `EdgeRibFront` remains 5.08. `RibDepth` keeps two decimals and the ordinary
-  ±0.51 band. The 6.50 ±0.51 cylindrical drill and native full-thread
-  metadata are unchanged. The retained native-pilot point and conservative
-  wander charge remain inside the rib with 0.876133 mm minimum axial
-  containment, not a bottom-wall thickness. The separate worst printed
-  **pilot-only** sharp-step budget uses Ø1.78 +0.10/0 and charges the whole
-  deepest wander: about **2.103443 mm** at 9.00, versus only 1.653 mm at the
-  superseded 8.20 depth. `receiver_pilot_step_wall_budget` /
-  `RECEIVER_PILOT_STEP_WALL_MIN` enforce the independent ≥2 mm pilot design
-  floor. `sm_summing_lever_profile.receiver_pilot_wall_budget` /
-  `ReceiverPilotWallBudget` bound longitudinal pilot walls against
-  `RECEIVER_PILOT_WALL_MIN` using the printed pilot radius plus drill wander.
-  Native trimmed-face comparison separately subtracts **TAP_DRILL_DIA/2**.
-  The native model contains pilot and cosmetic threads, not exact physical
-  thread-cutting geometry. The minimum 0.122 mm
-  head-to-counterbore radial float exceeds the 0.10 mm maximum station
-  pitch mismatch at the printed ±0.05 position bands. The minimum end wall
-  is 2.00 mm from the real end-face station datum, without double-counting
-  its general location band.
+  The owner's 2026-10-22 relocation retains that screw/grip stack but lowers
+  the matched mounting row **0.71 mm**. Both lever taps sit at local
+  **Y=−0.71 mm**, **3.25 ±0.05 mm below the actual coefficient top**; matching
+  bracket holes and installed screws follow, without moving the L bracket
+  body, seat or threaded-lever pose. All three lever rib extrusions are now
+  **5.00 ±0.51 mm**, with end-rib inner caps **Z=±71.20 mm** and outer
+  caps retained at **±76.20 mm**. One native **3X 5.00** dimension sizes them.
+  The separate counter-arm leaf remains 5.08 mm.
+  The ordinary **6.50 ±0.51 mm** pilot and 118° point continue into the
+  connected 7 mm coefficient plate, not a special deep receiver rib.
+  `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
+  enforce a **≥2 mm pilot-only** material design floor. With printed
+  **Ø1.78 +0.10/0**, the maximum radius is **0.94 mm**; the deepest 0.3°
+  wander is approximately **0.039662 mm**. Actual-top row correlation and the
+  ordinary thickness band leave approximately **2.220338 / 2.210338 mm**
+  top/bottom pilot walls. `sm_summing_lever_profile.receiver_pilot_wall_budget`
+  separately bounds longitudinal rib-profile walls; native trimmed-face
+  comparisons subtract **TAP_DRILL_DIA/2**. The native pilot and cosmetic
+  threads do not prove exact physical thread-cutting geometry or strength.
+  The Ø3.8 head-clearance circle is not a counterbore; its **0.122 mm**
+  minimum radial float exceeds the **0.10 mm** station mismatch. The moved
+  row's **5.64 ±0.05 mm** lower-edge ordinate leaves **3.64 / 4.55 mm**
+  lower/upper head-envelope walls under the retained printed bands; the end
+  wall is **7.00 mm**. Native screw-head/knife-mount and rib/nut clearances
+  remain farm acceptance items.
   Receiver depth bands are authored on owned source-model dimensions across
   the Hole Wizard's full subfeature tree, using the same `GetDimension2(0)`
   traversal as the drawing-mark/tolerance helpers. The two validated model
@@ -1586,6 +1590,58 @@ must reject missing or unknown authors, including nested scripts; documentation
 strings and Python function-object identity are not native behavior. Configured
 member export readers remain restricted to the requesting part's registry row,
 and drawing fixtures retain native note, hidden-line and stale-source refusals.
+
+Supplier screw construction keeps a welded witness's already fully constrained
+endpoints rather than adding a redundant origin anchor. Other witnesses still
+receive their normal origin controls; all retain exact final-frame readback and
+the complete sketch's fully-defined guard. Head angles use a native angular
+dimension between the two actual construction rays, with the text point mapped
+from their owning sketch plane, and require exact driving-angle readback.
+Y-axis dowels and X-axis spring pins use native linear measurements of the
+complete axial span between their two end rims. Both drawing-created end conditions
+must remain `None`: neither orthographic edge-on span uses an arc-center
+setter. Exact end-rim attachments, full source length, native type and the
+bandless reference remain checked after layout.
+
+Pin drawing imports validate the original model's value, presentation, band
+and physical witness before import. Only the drawing-local display is formatted,
+including its tolerance-display precision; source values and tolerance bands
+are never written. The drawing checks the independently mapped witness in its
+actual view, then rechecks the original source after dressing and final rebuild.
+
+Read-only supplier presentation refusals identify the first mismatched field
+and its actual/expected values, preserving native getter order and stopping
+before later readers can mask that failure. Imports are not reformatted or
+repaired by this assertion; an error label alone is not its native root cause.
+
+Washer imports explicitly apply the existing supplier-reference **display**
+formatter: native import need not inherit the source display's document-unit
+flag. The original part's body, witness geometry, value, supplier units,
+precision and native band are checked before import, after dressing and after
+final layout. The imported value and band remain independently checked; the
+formatter never changes either. A changed original source is a failure, not
+something the drawing repairs.
+
+The six oblique-trammel screws with opposing Top annotation lanes select the
+shared `supplier_top` layout: a 70 mm Top panel leaves 18 mm for the native
+outline after the two 26 mm annotation budgets. Standard sheets (including the
+shared thumb screw) and the separate 96 mm `tall_top` layout retain their
+existing capacity. Native outline padding is measured at each candidate scale;
+it is not scaled with the part, and the settled view/annotation guards remain
+authoritative. Recorded R38 outlines provide offline fit regressions, not proof
+that the repaired drawing has passed a fresh native run.
+
+Washer ownership failures collect bounded, independent read-only context only
+after an ordinary native exception. Missing readers remain unavailable, never
+measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
+starting or continuing optional observations. The failing ownership predicate
+remains strict; this evidence capture is not a claim that its native cause is fixed.
+
+Nut chord endpoints and washer witness points/segments attach in the drawing's
+namespace. Their independently checked part entities are mapped through the
+exact owning view's `GetCorresponding`; native one-to-one identity, distinct
+endpoints and no extra attachments are required there. Direct comparison
+between a part object and a drawing object is not an attachment proof.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical

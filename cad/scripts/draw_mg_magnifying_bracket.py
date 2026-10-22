@@ -466,7 +466,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         annotations = curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=DRAWING_DIMENSIONS)
         imported[label] = annotations
-    mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
+    mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="plate-tap mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations", dimensions_by_feature={"TapCoordinates": DRAWING_DIMENSIONS["TapCoordinates"]})
     rim = _mounting_rims(bottom)[1]
     mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)

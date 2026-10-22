@@ -33,7 +33,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationPlate": {"WebThickness"},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach"},
     "EdgeRibFront": {"EdgeRibThickness"},
-    "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
     "KnifeEnvelopeReference": {
@@ -52,6 +51,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # replaces the native R, so a radius prefix carries its own; the width's
 # opening parenthesis marks it a reference (its suffix closes it).
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("EdgeRibFront", "EdgeRibThickness"): "3X ",
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
@@ -79,9 +79,9 @@ KNIFE_MOUNT_NUMBER = "MHA-SM-02"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 
 # Drawing-side callout text keyed on the parametric dimension name: each tight
-# band names its mate and function (drawing-guidelines rule 4), and the rib
-# dimensions say which ribs share them (one outline in the end views).  A
-# vertical dimension whose text stands above its span takes its callout above
+# band names its mate and function (drawing-guidelines rule 4). One 3X
+# thickness sizes both end ribs and the middle rib; their profile is shared.
+# A vertical dimension whose text stands above its span takes its callout above
 # the value, one whose text hangs below takes it below, so the dimension line
 # never runs through its own callout.  Callouts above are single lines: a
 # multi-line one never printed (farm r4/r5 2026-10-16, text-unmatched).

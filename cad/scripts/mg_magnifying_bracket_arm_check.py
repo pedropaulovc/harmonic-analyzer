@@ -2,7 +2,7 @@
 
 Pure data, import-time asserts. The bracket reaches from the current mounting
 seat to the drum's wire lane (z -173.51). This module bounds the plain
-threaded neck, cantilever and unchanged two-screw mounting joint:
+threaded neck, cantilever and relocated two-screw mounting row:
 
 * the load at the neck: the lever group's weight plus wire 1's tension at
   the output-fixture hook, which pulls toward the drum end in the x-y plane;
@@ -48,9 +48,10 @@ from mg_lever_thread_joint import (
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
     SCREW_MACHINE_X,
+    SCREW_POSITIONS,
     SCREW_MAJOR_DIA,
     SEAT_PLANE_Z,
-    SIDE_PLATE_HEIGHT,
+    SIDE_PLATE_Y,
     SIDE_PLATE_Z,
 )
 from mg_magnifying_clamp_geom import BLOCK_HEIGHT as CLAMP_HEIGHT
@@ -191,9 +192,11 @@ STEEL_YIELD_REQUIRED = 3.0 * math.hypot(BENDING_STRESS, math.sqrt(3.0) * TORSION
 
 # --- flange joint: two #2-56 at machine x 1 and 14.7 on the seat plane ----------
 SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]  # 13.7
+# The screw origins are on the flange's front face. Project their actual
+# row centroid to the seat plane, where the joint carries shear and prying.
 JOINT = (
-    (SCREW_MACHINE_X[0] + SCREW_MACHINE_X[1]) / 2.0,
-    BRACKET_ORIGIN[1],
+    sum(point[0] for point in SCREW_POSITIONS) / len(SCREW_POSITIONS),
+    sum(point[1] for point in SCREW_POSITIONS) / len(SCREW_POSITIONS),
     SEAT_PLANE_Z,
 )
 # Moments of the neck load about the screw row's centre.
@@ -211,10 +214,12 @@ SCREW_PRELOAD_N = 100.0 / (0.25 * SCREW_MAJOR_DIA)  # 183 N
 # does not reverse, so the flange settles once against the screw shanks.
 # They then carry it in bearing and shear, rather than relying on friction.
 JOINT_SHEAR_DEMAND_N = math.hypot(_FX, _FY) / 2.0 + abs(JOINT_MZ) / SCREW_PITCH_X
-_MZ_MIN_TENSION = joint_load(
+_MIN_FX, _MIN_FY, _MIN_MZ = joint_load(
     WIRE_RATIO * PEN_SIDE_G * G * (1.0 - GUIDE_FRICTION_FRACTION), LEVER_GROUP_N
-)[2]
-_MZ_NO_GROUP = joint_load(WIRE1_TENSION_MAX_N, 0.0)[2]
+)
+JOINT_MZ_MIN_TENSION = _MIN_MZ + _RX * _MIN_FY - _RY * _MIN_FX
+_WIRE_FX, _WIRE_FY, _WIRE_MZ = joint_load(WIRE1_TENSION_MAX_N, 0.0)
+JOINT_MZ_NO_GROUP = _WIRE_MZ + _RX * _WIRE_FY - _RY * _WIRE_FX
 # Shear plane at the seat face, conservatively in the thread: #2-56 basic
 # minor D - 1.299 P = 1.595 mm, 2.00 mm^2.
 SCREW_MINOR_DIA = SCREW_MAJOR_DIA - 1.299 * (25.4 / 56.0)
@@ -225,14 +230,19 @@ SCREW_SHEAR_STRESS = JOINT_SHEAR_DEMAND_N / (
 # McMaster's 70 ksi (483 MPa) minimum tensile, shear ultimate 0.6 x = 290 MPa,
 # allowable a third of that.
 SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2
-# Prying: the flange tips about its lower (or upper) edge, SIDE_PLATE_HEIGHT/2
-# from the row; about Y, about its far end, the row's pitch the lever arm.
+# Prying about X uses the nearer actual flange edge, conservatively allowing
+# tipping either way. The body stays put when the mounting row moves down.
+# About Y, the row's pitch remains the lever arm.
+JOINT_PRYING_ARM_Y = min(
+    JOINT[1] - (BRACKET_ORIGIN[1] + SIDE_PLATE_Y[0]),
+    BRACKET_ORIGIN[1] + SIDE_PLATE_Y[1] - JOINT[1],
+)
 JOINT_TENSION_INCREMENT_N = (
-    abs(JOINT_MX) / (2.0 * SIDE_PLATE_HEIGHT / 2.0) + abs(JOINT_MY) / SCREW_PITCH_X
+    abs(JOINT_MX) / (2.0 * JOINT_PRYING_ARM_Y) + abs(JOINT_MY) / SCREW_PITCH_X
 )
 JOINT_PRELOAD_MARGIN = SCREW_PRELOAD_N / JOINT_TENSION_INCREMENT_N
 
-if not (_MZ < 0.0 and _MZ_MIN_TENSION < 0.0 and _MZ_NO_GROUP < 0.0):
+if not (JOINT_MZ < 0.0 and JOINT_MZ_MIN_TENSION < 0.0 and JOINT_MZ_NO_GROUP < 0.0):
     raise AssertionError(
         "magnifying bracket joint torque reverses; the shanks would not stay bearing"
     )

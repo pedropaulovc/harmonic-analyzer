@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 
 import pytest
 
@@ -57,6 +58,82 @@ def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> 
     # The former fixed-tip arm misses an accepted fitted rod by 1.565 mm.
     assert farthest_tip > thread.ROD_LENGTH - thread.NECK_THICKNESS / 2.0 - lever.THREAD_PROJECTION
     assert arm.joint_load(0.0, 1.0) == pytest.approx((0.0, -1.0, -farthest_tip))
+
+
+def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> None:
+    assert arm.NECK == (40.0, 979.7, -173.51)
+    assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.51))
+    assert joint.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
+    assert joint.SIDE_PLATE_Y == (-6.35, 6.35)
+    assert joint.SIDE_PLATE_FRONT_Z == pytest.approx(
+        joint.SEAT_PLANE_Z - 3.175,
+    )
+    assert (lever.KNIFE_LOCAL_X, lever.KNIFE_LOCAL_Y) == (215.0, 5.134)
+    assert arm.JOINT == pytest.approx((
+        sum(point[0] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
+        979.7 - 0.71,
+        joint.SEAT_PLANE_Z,
+    ))
+    assert arm.JOINT[1] == pytest.approx(
+        sum(point[1] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
+    )
+    fx, fy, mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
+    centered_row_mz = mz + (arm.NECK[0] - arm.JOINT[0]) * fy
+    assert arm.JOINT_MZ == pytest.approx(centered_row_mz - 0.71 * fx)
+    assert arm.JOINT_MZ != pytest.approx(centered_row_mz)
+
+
+@pytest.mark.parametrize("case", ["peak", "minimum_tension", "wire_only"])
+def test_joint_moments_use_actual_force_stations_about_the_moved_row(case) -> None:
+    tension, weight, actual_mz = {
+        "peak": (arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N, arm.JOINT_MZ),
+        "minimum_tension": (
+            WIRE_RATIO * arm.PEN_SIDE_G * arm.G * (1.0 - arm.GUIDE_FRICTION_FRACTION),
+            arm.LEVER_GROUP_N,
+            arm.JOINT_MZ_MIN_TENSION,
+        ),
+        "wire_only": (arm.WIRE1_TENSION_MAX_N, 0.0, arm.JOINT_MZ_NO_GROUP),
+    }[case]
+    wire_fx, wire_fy = (tension * component for component in arm.WIRE_DIR[:2])
+    expected_mz = (
+        (arm.HOOK[0] - arm.JOINT[0]) * wire_fy
+        - (arm.HOOK[1] - arm.JOINT[1]) * wire_fx
+        - (arm.NECK[0] + arm.LEVER_GROUP_ARM_X - arm.JOINT[0]) * weight
+    )
+    assert actual_mz == pytest.approx(expected_mz)
+    assert actual_mz < 0.0
+    if case == "peak":
+        dz = arm.NECK[2] - arm.JOINT[2]
+        assert arm.JOINT_MX == pytest.approx(-dz * (wire_fy - weight))
+        assert arm.JOINT_MY == pytest.approx(dz * wire_fx)
+
+
+def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_shear() -> None:
+    lower, upper = (
+        joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
+    )
+    nearest_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
+    assert nearest_edge == pytest.approx(5.64)
+    assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
+    expected_tension = (
+        abs(arm.JOINT_MX) / (2.0 * nearest_edge)
+        + abs(arm.JOINT_MY) / arm.SCREW_PITCH_X
+    )
+    centered_tension = (
+        abs(arm.JOINT_MX) / joint.SIDE_PLATE_HEIGHT
+        + abs(arm.JOINT_MY) / arm.SCREW_PITCH_X
+    )
+    assert arm.JOINT_TENSION_INCREMENT_N == pytest.approx(expected_tension)
+    assert expected_tension > centered_tension
+    fx, fy, _mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
+    expected_shear = math.hypot(fx, fy) / 2.0 + abs(arm.JOINT_MZ) / arm.SCREW_PITCH_X
+    assert arm.JOINT_SHEAR_DEMAND_N == pytest.approx(expected_shear)
+    assert arm.SCREW_SHEAR_STRESS == pytest.approx(
+        expected_shear / (math.pi / 4.0 * arm.SCREW_MINOR_DIA**2),
+    )
+    assert arm.JOINT_PRELOAD_MARGIN == pytest.approx(
+        arm.SCREW_PRELOAD_N / expected_tension,
+    )
 
 
 def test_deflection_grows_with_span_and_respects_superposition() -> None:

@@ -1,8 +1,9 @@
 r"""Build the approved blued low-carbon-steel L bracket, with no collar or press.
 
-The current-main mounting seat and two screw stations stay fixed. The foot's
-right edge extends to the centred 12.50 neck; there is no rear stub or ledge.
-The Right-plane neck has parallel sides and a true concentric semicircle.
+The mounting seat and threaded-lever pose stay fixed; the two clearance holes
+follow the lowered plate-tap row. The foot's right edge extends to the centred
+12.50 neck, with no rear stub or ledge. The Right-plane neck has parallel sides
+and a true concentric semicircle.
 """
 
 from __future__ import annotations
@@ -173,7 +174,7 @@ async def build(adapter) -> dict[str, str]:
     check("rounded parallel foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[x, y, sum(FLANGE_Z) / 2.0] for x in FLANGE_X for y in FLANGE_Y], propagate=False))
     name_last_feature(adapter, "FootCorners")
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
-    wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "unchanged mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
+    wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "relocated plate-tap mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
     wizard_holes(adapter, TAP_SPEC, [(NECK_HALF_X, 0.0, 0.0)], (1.0, 0.0, 0.0), "lever through tap", name="LeverTap", expect_dia_mm=TAP_DRILL_DIA, placement_dims=[((None, None), (None, None))])
     _assert_placement_sketches_fully_defined(adapter)
     check("both tap mouth chamfers", await adapter.add_chamfer(MOUTH_CHAMFER, [[x, TAP_DRILL_DIA / 2.0, 0.0] for x in (-NECK_HALF_X, NECK_HALF_X)]))

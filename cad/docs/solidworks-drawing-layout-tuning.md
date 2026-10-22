@@ -1542,8 +1542,9 @@ with another unasked thread-major limit or local inspection note.
 The lever no longer imports or prints its local numeric `TipChamfer` size,
 band or `LIMIT RETAINS FULL ENGAGEMENT` text. One native thread-feature
 callout is printed in the enlarged detail: designation, `45° ENTRY CHAMFER`,
-and `MATES MHA-MG-01 BRACKET`. Its actual native attachment and source text
-are retained; there is no detached manual copy. Hide drawing-local duplicates
+`MATES MHA-MG-01`, then `BRACKET` on its own fourth row. Its native
+attachment and source text are retained; there is no detached manual copy.
+Hide drawing-local duplicates
 in the front and isometric without changing the source model's callout.
 The hidden native primary-distance cap remains in the part, while the title
 block supplies the edge maximum. Every crop is created with inference off,
@@ -1570,10 +1571,8 @@ adding an unapproved review exception. The3.175 mounting foot retains its
 ordinary`.XXX`±0.13: worst #2-56 full engagement3.305 exceeds3.2766 with only
 0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that joint.
 The blued material is generic low-carbon steel, matching the existing native
-Plain Carbon Steel assignment. The arm check uses assumed E200GPa/G79GPa for
-compliance and reports factor-three simultaneous bending/torsion von Mises demand
-using the fitted-band maximum gravity arm. That calculated demand is not a
-certified grade/temper or a guaranteed material yield.
+Plain Carbon Steel assignment. The generic-steel qualification below owns
+the fitted-band load-demand screen and its unverified material assumptions.
 
 Keep the assembly's complete thread-projection qualifier attached to that native
 dimension when wrapping or repositioning it. R16 exported successfully while
@@ -1890,7 +1889,14 @@ R0.25 inside restriction. The nominal root uses tangentR0.60 inside andR0.25
 outside arcs across the0.85 offset, with no flat ledge; verify the actual native
 root at enlarged scale. The user-approved5mm free-end extension changes only
 machineX−3 to−8 (local−43 to−48), foot49.25 to54.25 and setbacks4/17.70 to
-9/22.70; both mounting axes, seat, width, thickness and lever pose stay fixed.
+9/22.70; that extension alone leaves both mounting axes, seat, width, thickness
+and lever pose fixed. The separate 2026-10-22 plate-tap relocation lowers the
+matched receiver, bracket-clearance and screw row to localY−0.71 / machineY978.99,
+retaining machineX1/14.7 and the body/seat/threaded-lever pose. Its native row
+dimensions are3.25±0.05 below the actual coefficient top and5.64±0.05 above
+the actual foot lower edge. The fixed-top7.00±0.51 plate backs the receiver
+pilot beyond the uniform5.00±0.51 ribs; retain one native `3X 5.00` rib dimension.
+Do not restore superseded rib-only containment or a finished-thread envelope.
 Pass the actual drawing-created lateral dimension annotation to its layout
 checks; retain its measured two-edge attachments, native name and ordinary band.
 Do not rediscover that annotation through an imported-model dimension name
@@ -2017,12 +2023,15 @@ has a 25 ksi minimum yield, not the frequently quoted 45 ksi typical value.
 No alloy or temper substitution is authorized by this geometry change.
 
 The user explicitly retained generic low-carbon steel with the blued finish,
-not a named certified grade. `error_budget.py` consumes the bracket load
-audit in both JSON and human-readable reports: simultaneous bending and torsion
-demand for a factor of three uses the fitted-band maximum gravity arm, while
-verified yield and verified yield safety factor are unavailable. This is a
-calculated procurement demand, not a material-data acceptance gate or a
-demonstrated safety factor. Its elastic/shear moduli are stated model assumptions.
+not a named certified grade. `mg_magnifying_bracket_arm_check.py` supplies the
+load-demand screen consumed by `error_budget.py` in JSON and human-readable
+reports. Its factor-three simultaneous bending/torsion demand uses the fitted
+maximum gravity arm of161.565 mm, derived from the same length/neck/projection
+bands above, not the nominal160 mm arm. Joint moments use the actual relocated
+screw-row centroid projected to the seat plane. Assumed E200GPa/G79GPa serve
+compliance calculations only; verified yield and verified yield safety factor
+remain unavailable. This is a calculated procurement demand, not a material-data
+acceptance gate, native proof or demonstrated safety factor.
 
 Keep a mounting-face caption beside the view it describes, clear of its
 native hole leader and coordinate witnesses. Distribute short controls

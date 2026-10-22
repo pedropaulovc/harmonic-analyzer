@@ -30,7 +30,7 @@ Seven features (the six .cs features + the hex knife edge):
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
 4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R1 profile at the
-   plate ends, blind-extruded at a start offset.
+   plate ends, each 5.00 mm thick; the middle rib shares that thickness.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
 6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
@@ -101,7 +101,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH_DEVIATIONS,
     THREAD_DEPTH_BAND,
     RECEIVER_PILOT_WALL_MIN,
-    RIB_DEPTH as RECEIVER_RIB_T,
+    receiver_pilot_material_wall_budget,
 )
 from _drawing_marks import (
     apply_drawing_properties,
@@ -156,6 +156,7 @@ from sm_summing_lever_spec import (
     RIB_BLEND_R_BAND,
     RIB_BLEND_R_TOL_TYPE,
     RIB_REACH,
+    RIB_T,
     RIB_WRAP_R,
     SURFACE_FINISHES,
 )
@@ -175,7 +176,6 @@ PLATE_W = 1.75 * IN  # coefficients plate width (along the arm, X)   44.45
 PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
 # Coefficient thickness and fixed top are imported separately from counter web.
 CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
-RIB_T = 0.2 * IN  # edge / middle rib thickness                     5.08
 RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
 SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
 SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
@@ -216,16 +216,12 @@ KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = RIB_WRAP_R
-RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
-# Only the -Z edge rib is the magnifier bracket's receiver: its inward
-# extension gives the #2-56 drill an ordinary depth band without moving the
-# entry face. The independent +Z rib retains RIB_T.
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 67.20; outer -Z face fixed
+RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # In X, all ribs stop at 35.75 before the unchanged spring-hole column and
-# worst jam-nut footprint at 36.45. The 9.00 receiver already overlaps the
-# first spring station in Z; clearance is NOT an axial-separation claim.
+# worst jam-nut footprint at 36.45. The pilot continues beyond the 5.00 mm
+# entry rib into the connected coefficient plate, not an enlarged receiver.
 # The shared positive-X branch meets both plate faces with R1 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
@@ -732,11 +728,12 @@ def _knife_ridge_max_limit(adapter) -> None:
 
 
 def _assert_edge_rib_end_planes(adapter) -> None:
-    """Read the inner caps and depths; outer caps may merge with earlier faces."""
+    """Read all three native rib depths and caps; edge outer caps may merge."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     expected = {
-        "EdgeRibBack": (-RECEIVER_RIB_OFFSET, -PLATE_L / 2.0, "RibDepth", RECEIVER_RIB_T),
+        "EdgeRibBack": (-RIB_OFFSET, -PLATE_L / 2.0, "EdgeRibThickness", RIB_T),
         "EdgeRibFront": (RIB_OFFSET, PLATE_L / 2.0, "EdgeRibThickness", RIB_T),
+        "MiddleRib": (-RIB_T / 2.0, RIB_T / 2.0, "MiddleRibThickness", RIB_T),
     }
     tolerance_mm = 1e-5
     for name, (inner, outer, depth_name, depth_mm) in expected.items():
@@ -767,7 +764,10 @@ def _assert_edge_rib_end_planes(adapter) -> None:
         # Coplanar outside caps can be owned by the earlier plate/cylinder.
         # The required inner cap plus native extrusion depth independently
         # locates that outside cap; any cap this feature does own must agree.
-        if not any(abs(inner - z) <= tolerance_mm for z in planes) or any(
+        required = (inner, outer) if name == "MiddleRib" else (inner,)
+        if not all(
+            any(abs(cap - z) <= tolerance_mm for z in planes) for cap in required
+        ) or any(
             min(abs(z - inner), abs(z - outer)) > tolerance_mm for z in planes
         ):
             raise RuntimeError(
@@ -934,24 +934,18 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
 async def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
-    """The common tangent profile, with independently preserved axial depths."""
+    """The common tangent profile and uniform thickness at either fixed end."""
     v_before = await _measured_volume(adapter, f"before {stem}")
     await _rib_profile_sketch(adapter, stem, drive_jobs)
-    if flip:
-        extrude_at_offset(adapter, RECEIVER_RIB_T, RECEIVER_RIB_OFFSET, flip=True)
-    else:
-        extrude_at_offset(adapter, RIB_T, RIB_OFFSET)
+    extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
     name_last_feature(adapter, stem)
-    added_volume = edge_rib_added_area_mm2() * (RECEIVER_RIB_T if flip else RIB_T)
+    added_volume = edge_rib_added_area_mm2() * RIB_T
     await force_rebuild(adapter)
     await volume_check(
         adapter, f"{stem} net rib addition", v_before + added_volume, 1e-4 * added_volume
     )
-    if stem == "EdgeRibFront":
-        # The -Z rib's depth is the receiver's named RibDepth
-        # (_receiver_model_bands); only the +Z rib takes a plain name here.
-        [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
-        drive_jobs.append((thickness, '"RibT"'))
+    [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
+    drive_jobs.append((thickness, '"RibT"'))
     _assert_native_rib_profile(adapter, stem)
 
 
@@ -1102,6 +1096,85 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     _assert_native_rib_profile(adapter, "MiddleRib")
 
 
+def _assert_receiver_plate_backing(adapter) -> None:
+    """Read the real plate boundaries beyond the entry rib, before drilling.
+
+    The initial uniform slab and merged rib construction supply connectivity.
+    Trimmed-face witnesses must retain the complete nominal pilot width from
+    the inner cap through the drill-point tip. This is nominal geometry proof,
+    not a finished-thread cavity or a manufactured tolerance guarantee; the
+    independent printed-pilot budget and subsequent exact cut-volume gate
+    remain mandatory.
+    """
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    raw = model.FeatureByName("CoefficientsPlate")
+    if raw is None:
+        raise RuntimeError("receiver: missing native coefficient-plate backing")
+    boundaries = (
+        (1, COEFFICIENT_TOP_Y),
+        (1, COEFFICIENT_BOTTOM_Y),
+        (0, PLATE_W),
+    )
+    faces = {boundary: [] for boundary in boundaries}
+    for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        raw_surface = face.GetSurface()
+        if raw_surface is None:
+            raise RuntimeError("receiver: missing native backing surface")
+        surface = _early_bound(raw_surface, "ISurface")
+        if not surface.IsPlane():
+            continue
+        values = tuple(float(value) for value in surface.PlaneParams)
+        if len(values) != 6 or not all(math.isfinite(value) for value in values):
+            raise RuntimeError("receiver: invalid native backing plane parameters")
+        for axis, level in boundaries:
+            if (
+                abs(abs(values[axis]) - 1.0) < 1e-8
+                and all(abs(values[index]) < 1e-8 for index in range(3) if index != axis)
+                and math.isclose(values[axis + 3] * 1000.0, level, abs_tol=1e-5)
+            ):
+                faces[(axis, level)].append(face)
+    if not all(faces.values()):
+        raise RuntimeError("receiver: missing native plate top, underside or free-edge backing plane")
+    radius = TAP_DRILL_DIA / 2.0
+    for x, y, entry_z in LEVER_HOLE_POINTS:
+        inner_z = entry_z + RIB_T
+        tip_z = entry_z + DRILL_DEPTH + DRILL_POINT_DEPTH
+        if not -PLATE_L / 2.0 < inner_z < tip_z < PLATE_L / 2.0:
+            raise RuntimeError("receiver: pilot backing interval is not inside the coefficient plate")
+        for axis, level in boundaries:
+            clearance = level - (x if axis == 0 else y) - radius
+            if axis == 1 and level == COEFFICIENT_BOTTOM_Y:
+                clearance = y - level - radius
+            if clearance < RECEIVER_PILOT_WALL_MIN:
+                raise RuntimeError("receiver: native plate backing loses nominal pilot wall")
+            for z in (inner_z, (inner_z + tip_z) / 2.0, tip_z):
+                for side in (-1.0, 1.0):
+                    witness = (x + side * radius, level, z) if axis == 1 else (
+                        level, y + side * radius, z
+                    )
+                    distances = []
+                    for face in faces[(axis, level)]:
+                        result = face.GetClosestPointOn(
+                            witness[0] / 1000.0, witness[1] / 1000.0, witness[2] / 1000.0
+                        )
+                        if result is None or len(result) != 5 or not all(
+                            math.isfinite(float(value)) for value in result
+                        ):
+                            raise RuntimeError("receiver: invalid native backing closest point")
+                        point = tuple(float(value) * 1000.0 for value in result[:3])
+                        distances.append(math.dist(witness, point))
+                    if min(distances) > 1e-4:
+                        raise RuntimeError(
+                            f"receiver X{x}: native trimmed plate backing misses {witness}; "
+                            f"distance {min(distances):.6f} mm"
+                        )
+        _telemetry.success(
+            f"receiver X{x}, Y{y}: native plate top/underside/free edge retain nominal "
+            f"pilot width from inner cap Z{inner_z:.6f} through point Z{tip_z:.6f}"
+        )
+
+
 def _assert_receiver_profile_walls(adapter) -> None:
     """Cross-check the native pilot profile and its printed tolerance budget.
 
@@ -1110,11 +1183,9 @@ def _assert_receiver_profile_walls(adapter) -> None:
     it does not bound the finished thread cavity. Native pilot-volume/end-plane
     gates remain separate. Later concave roots only add material.
     """
-    from magnifying_bracket_joint_layout import (
-        receiver_pilot_step_wall_budget,
-    )
-
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EdgeRibBack")
+    if raw is None:
+        raise RuntimeError("receiver: missing native entry rib")
     feature = _early_bound(raw, "IFeature")
     sides = []
     for raw_face in feature.GetFaces() or ():
@@ -1128,7 +1199,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
     if not sides:
         raise RuntimeError("receiver: no native longitudinal profile faces")
     radius = TAP_DRILL_DIA / 2.0
-    z = -PLATE_L / 2.0 + RECEIVER_RIB_T / 2.0
+    z = -PLATE_L / 2.0 + RIB_T / 2.0
     for x, y, _ in LEVER_HOLE_POINTS:
         distances = []
         for face in sides:
@@ -1155,6 +1226,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
             f"receiver X{x}: native pilot-profile clearance {native_clearance:.6f} mm "
             f"outside nominal pilot radius {radius:.6f} mm"
         )
+    _assert_receiver_plate_backing(adapter)
     for budget in receiver_pilot_wall_budget():
         if not math.isfinite(budget.minimum_mm) or budget.minimum_mm < RECEIVER_PILOT_WALL_MIN:
             raise RuntimeError(
@@ -1167,15 +1239,15 @@ def _assert_receiver_profile_walls(adapter) -> None:
             f"{budget.minimum_mm:.6f} mm (upper {budget.upper_mm:.6f}, "
             f"lower {budget.lower_mm:.6f}); drill allowance and wander included"
         )
-    step_wall = receiver_pilot_step_wall_budget()
-    if not math.isfinite(step_wall) or step_wall < RECEIVER_PILOT_WALL_MIN:
+    material_wall = receiver_pilot_material_wall_budget()
+    if not math.isfinite(material_wall) or material_wall < RECEIVER_PILOT_WALL_MIN:
         raise RuntimeError(
-            f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
+            f"receiver: printed-pilot connected-material wall {material_wall:.6f} mm "
             f"below {RECEIVER_PILOT_WALL_MIN:g} mm"
         )
     _telemetry.success(
-        f"receiver: printed-pilot sharp-step wall {step_wall:.6f} mm "
-        f">= {RECEIVER_PILOT_WALL_MIN:g} mm; RibDepth {RECEIVER_RIB_T:.2f} mm; pilot only"
+        f"receiver: printed-pilot connected-material wall {material_wall:.6f} mm "
+        f">= {RECEIVER_PILOT_WALL_MIN:g} mm; uniform RibT {RIB_T:.2f} mm; pilot only"
     )
 
 
@@ -1191,7 +1263,7 @@ def coefficient_underside_root_geometry() -> tuple[
     """
     bottom, radius = COEFFICIENT_BOTTOM_Y, RIB_BLEND_R
     runs = (
-        (-RECEIVER_RIB_OFFSET, -RIB_T / 2.0),
+        (-RIB_OFFSET, -RIB_T / 2.0),
         (RIB_T / 2.0, RIB_OFFSET),
     )
     if (
@@ -1223,7 +1295,7 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
     including cylindrical curvature and end-corner interactions. It bounds
     actual ADDED native material, not the unfilleted body's bounding box.
     """
-    end_caps = (-RECEIVER_RIB_OFFSET, RIB_OFFSET)
+    end_caps = (-RIB_OFFSET, RIB_OFFSET)
     middle_caps = (-RIB_T / 2.0, RIB_T / 2.0)
     plate_picks = [
         [25.0, y, z]
@@ -1472,31 +1544,17 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 
 def _receiver_model_bands(adapter) -> None:
-    """Author receiver limits on owned source dimensions, including subfeatures.
+    """Author ordinary blind-tap limits on the Wizard-owned source dimensions.
 
-    The -Z entry rib's depth (EdgeRibBack's D1; EdgeRibFront is the opposite
-    end) is only named and printed: at RIB_DEPTH it holds the drill point at
-    the title block's band (magnifying_bracket_joint_layout)."""
+    Uniform rib thicknesses are already named and driven by the shared RibT.
+    The deeper pilot is backed by the coefficient plate, not by rib depth.
+    """
     from _com import _com_invoke, _early_bound
     from _dimensions import _feature_display_dimensions
     from _drawing_marks import _feature_tree
     from magnifying_bracket_joint_layout import THREAD_DEPTH
 
     model = _early_bound(adapter.currentModel, "IPartDoc")
-    feature_name = "EdgeRibBack"
-    feature = _early_bound(model.FeatureByName(feature_name), "IFeature")
-    dimension = feature.Parameter("D1")
-    if dimension is not None:
-        dimension = _early_bound(dimension, "IDimension")
-    if (
-        dimension is None
-        or abs(float(dimension.SystemValue) * 1000.0 - RECEIVER_RIB_T) > 1e-5
-    ):
-        raise RuntimeError(f"{feature_name}: missing native receiver depth D1")
-    dimension.Name = "RibDepth"
-    set_dimension_display_precision(adapter, feature_name, "RibDepth", 2)
-    mark_dimensions_for_drawing(adapter, feature_name, ["RibDepth"])
-
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
     required = {
         "FullThreadDepth": (THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND)),
@@ -2038,7 +2096,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CoefficientTopY", f"{COEFFICIENT_TOP_Y}mm")
     await set_global(adapter, "CylR", f"{CYL_R}mm")
     await set_global(adapter, "RibT", f"{RIB_T}mm")
-    await set_global(adapter, "ReceiverRibT", f"{RECEIVER_RIB_T}mm")
     await set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")

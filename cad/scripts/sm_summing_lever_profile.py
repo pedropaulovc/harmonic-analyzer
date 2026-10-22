@@ -1,7 +1,8 @@
 """Pure sections for the uniform-7 mm summing lever; lengths are millimetres.
 
-The installed top face, spring row and receiver axes do not move. Each positive-X
-rib flank is the common tangent of the origin-centred wrap and a concave R1
+The installed top face and spring row stay fixed. The matched bracket/receiver
+row is located from that actual top by the joint contract. Each positive-X rib
+flank is the common tangent of the origin-centred wrap and a concave R1
 runout into its coefficient-plate face. No tangent coordinate is a design knob.
 Line/circle boundary integrals give exact areas and first moments: these are
 ideal prismatic unions, excluding native cap-root and longitudinal body fillets.
@@ -266,9 +267,9 @@ class RibProfile:
         return distance if inside else -distance
 
     def receiver_wall_margin(self, x: float, y: float, radius: float) -> float:
-        """Signed profile distance outside a supplied material-removal envelope."""
+        """Signed profile distance outside a circle of the supplied radius."""
         if radius < 0.0:
-            raise ValueError("receiver envelope radius must be nonnegative")
+            raise ValueError("receiver radius must be nonnegative")
         return self.signed_boundary_distance(x, y) - radius
 
     def section_moments(self) -> SectionMoments:
@@ -326,11 +327,14 @@ def receiver_pilot_wall_budget() -> tuple[ReceiverPilotWallBudget, ...]:
 
     Width, wrap and reach each take +/-0.51. The R1 MAX runout independently
     spans 0..1. The independent PlateTopY takes PLATE_TOP_Y_ALLOWANCE and
-    thickness independently +/-0.51. ReceiverY0 is +/-0.05 from the ACTUAL
+    thickness independently +/-0.51. The receiver row is +/-0.05 from the ACTUAL
     top, just as each X station is from the ACTUAL free edge: their shifts
     are shared, not charged again as independent axis motion. The radius is
     the larger native/printed pilot plus its diameter allowance and deepest
-    drill wander. This budget describes the pilot, not finished thread walls.
+    drill wander. These are longitudinal walls within a rib's span only;
+    joint.receiver_pilot_material_wall_budget screens the continuation through
+    the connected plate beyond that rib. Neither budget guarantees finished
+    thread walls, native geometry or strength.
     """
     pilot_radius = (
         max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))

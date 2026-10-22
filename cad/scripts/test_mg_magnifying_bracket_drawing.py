@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -25,12 +27,51 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
     assert part.FLANGE_Z[1] - part.FLANGE_Z[0] == pytest.approx(mounting.SIDE_PLATE_THICKNESS)
     assert mounting.BRACKET_HOLE_POINTS[1][0] - mounting.BRACKET_HOLE_POINTS[0][0] == pytest.approx(mounting.SCREW_MACHINE_X[1] - mounting.SCREW_MACHINE_X[0])
     assert printed_band_mm(spec.DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"]) == mounting.FLANGE_THICKNESS_BAND
-    assert all(point[1] == 0.0 and point[2] == part.FLANGE_Z[0] for point in mounting.BRACKET_HOLE_POINTS)
+    assert all(
+        point[1] == mounting.RECEIVER_ROW_Y and point[2] == part.FLANGE_Z[0]
+        for point in mounting.BRACKET_HOLE_POINTS
+    )
     assert mounting.SIDE_PLATE_X == (-48.0, 6.25)
     assert tuple(point[0] - part.FLANGE_X[0] for point in mounting.BRACKET_HOLE_POINTS) == (9.0, 22.7)
     # The two root arcs share the same tangent point, with no flat ledge.
     assert spec.ROOT_R + spec.FOOT_CORNER_R == pytest.approx(mounting.SIDE_PLATE_HEIGHT / 2.0 - joint.NOSE_R)
     assert spec.ROOT_R <= 1.0
+
+
+def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
+    assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
+    assert mounting.SIDE_PLATE_Y == (-6.35, 6.35)
+    assert mounting.CLEARANCE_SPEC.kind == "clearance"
+    assert mounting.CLEARANCE_SPEC.size == "#2"
+    assert mounting.CLEARANCE_SPEC.fit == "normal"
+    for clearance, pilot, screw in zip(
+        mounting.BRACKET_HOLE_POINTS,
+        mounting.LEVER_HOLE_POINTS,
+        mounting.SCREW_POSITIONS,
+        strict=True,
+    ):
+        assert clearance[0] + mounting.BRACKET_ORIGIN[0] == pytest.approx(screw[0])
+        assert pilot[0] + mounting.LEVER_ORIGIN_X == pytest.approx(screw[0])
+        assert clearance[1] == pilot[1] == mounting.RECEIVER_ROW_Y
+        assert clearance[1] + mounting.BRACKET_ORIGIN[1] == pytest.approx(screw[1])
+        assert clearance[2] + mounting.BRACKET_ORIGIN[2] == pytest.approx(screw[2])
+
+
+def test_layout_retains_four_views_of_the_current_l_bracket() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    placed = [
+        call for call in calls
+        if isinstance(call.func, ast.Name) and call.func.id == "place_view"
+    ]
+    assert len(placed) == 4
+    assert {ast.literal_eval(call.args[2]) for call in placed} == {
+        "*Top", "*Front", "*Right", "*Isometric",
+    }
 
 
 
@@ -49,6 +90,20 @@ def test_mounting_callout_selects_the_visible_exit_not_the_hidden_entry(monkeypa
     # rim even though its XY position, radius and normal all match.
     with pytest.raises(RuntimeError):
         visible.circle_at(mounting.BRACKET_HOLE_POINTS[1], mounting.CLEARANCE_DIA / 2.0, axis=(0.0, 0.0, 1.0), label="hidden entry")
+    centered = ViewEdges(
+        label="obsolete centered mounting row",
+        edges=tuple(
+            ViewEdge(
+                edge=object(), line=None,
+                circle=(point[0], 0.0, mounting.SIDE_PLATE_Z[1], 0.0, 0.0, 1.0, mounting.CLEARANCE_DIA / 2.0),
+                vertices=None,
+            )
+            for point in mounting.BRACKET_HOLE_POINTS
+        ),
+    )
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, *, label: centered)
+    with pytest.raises(RuntimeError):
+        drawing._mounting_rims(object())
 
 
 def _placement_adapter(monkeypatch, statuses):
