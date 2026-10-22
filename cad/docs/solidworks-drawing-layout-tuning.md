@@ -1351,6 +1351,29 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+The summing lever's face-height chain also needs a location from the knife
+ridge to the coefficient top; `19.05`, `5.08` and `6.99` alone do not locate
+that chain from the suspension axis. VIEW F now uses the existing native
+`KnifeEnvelopeReference` **height.end** sketch point at model Y5.134 mm,
+the same endpoint used by Detail D's `RidgeFromLeft` and `RidgeFromRight`.
+Datum A itself stays attached to the physical ridge round; its crest and arc
+centre are not interchangeable with this theoretical sharp. Resolve the unique
+construction height line, verify its native sketch-to-model transform, then
+map that actual endpoint through `IView.GetCorresponding`. Select it with
+`ISketchPoint.Select4` and the visible −Z coefficient-top edge with
+`IEntity.Select4`; `IModelDoc2.AddVerticalDimension2` supplies the measured
+2.594 mm location, displayed as ordinary **2.59** under the existing title block.
+No new model point, profile, tolerance, section or view is added. Missing or
+ambiguous source geometry, null correspondence and failed selection refuse;
+there is no coordinate-only, rounded-crest or cylinder-centre fallback.
+The initial and settled checks prove both exact attachments, native value,
+VIEW F ownership/visibility, projected rise and ordinary two-place precision.
+Its (403.5, 128) mm text request uses the open right/below lane: R2 projection
+predicts X403.5–415.1375, Y125.2219–128.7219 mm text, 3.9625 mm inside the
+right border and right of the tap callout. This is a placement projection;
+fresh native/PDF inspection must prove the complete witnesses, outside arrows,
+shoulder and text remain clear. Shared audit guards remain unchanged.
+
 **l. A datum named by a frame's datum identifier.**
 Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take
 `GetDatumIdentifier` as proof. On the knife mount (farm run

@@ -276,6 +276,225 @@ def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch,
             case.capture()
 
 
+def _native_knife_height(monkeypatch, identity):
+    spec = sm_summing_lever_spec
+    state = SimpleNamespace(
+        selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
+        precision=2, document_precision=2, tolerance=SimpleNamespace(Type=0),
+        activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
+    )
+    view = SimpleNamespace(ScaleRatio=(1.0, 1.0))
+
+    def selectable(name):
+        entity = SimpleNamespace()
+
+        def select(append, data):
+            assert data.View is view and append == bool(state.selected)
+            state.selected.append(entity)
+            state.picks.append(name)
+            return True
+
+        entity.Select4 = select
+        return entity
+
+    point, edge = selectable("height.end"), selectable("plate top")
+    plate = ViewEdge(
+        edge,
+        ((spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0),
+         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0)),
+        None, None,
+    )
+    state.attached = (point, edge)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: state.attached,
+        GetAttachedEntityTypes=lambda: (11, 1), IsDangling=lambda: state.dangling,
+        OwnerType=0, Visible=1, Owner=view,
+    )
+
+    class NativeDimension:
+        SystemValue = property(lambda self: state.value)
+        Tolerance = property(lambda self: state.tolerance)
+
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: NativeDimension(), GetAnnotation=lambda: annotation,
+        GetPrimaryPrecision2=lambda: state.precision,
+    )
+    view.GetAnnotationCount = lambda: 1
+    view.GetAnnotations = lambda: (annotation,)
+    manager = SimpleNamespace(
+        CreateSelectData=SimpleNamespace, GetSelectedObjectCount2=lambda _mark: len(state.selected),
+    )
+
+    def create(*position):
+        assert state.selected == [point, edge]
+        state.placements.append(position)
+        return display
+
+    identity.currentModel = SimpleNamespace(
+        ActivateView=lambda _name: True, ActivateSheet=lambda _name: state.activate,
+        ClearSelection2=lambda _all: state.selected.clear(), SelectionManager=manager,
+        AddVerticalDimension2=create,
+        Extension=SimpleNamespace(GetUserPreferenceInteger=lambda *_args: state.document_precision),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "VIEW F")
+    monkeypatch.setattr(
+        drawing, "_theoretical_knife_vertex_in_view",
+        lambda *_args: (point, (0.0, state.source_y, 0.0)),
+    )
+    monkeypatch.setattr(
+        drawing, "scan_view_edges",
+        lambda *_args, **_kwargs: ViewEdges(label="VIEW F", edges=() if state.missing else (plate,)),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: [(0.3143625 - x, 0.150 + y) for x, y, _z in points],
+    )
+    return SimpleNamespace(
+        capture=lambda: drawing._knife_height_location_check(identity, view),
+        state=state, point=point, edge=edge, view=view, annotation=annotation,
+    )
+
+
+def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatch, identity):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture()
+    check()
+    assert case.state.picks == ["height.end", "plate top"]
+    assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
+    assert case.state.value * 1000.0 == pytest.approx(2.594)
+    case.state.precision = -2
+    check()  # ordinary precision may follow the existing document
+    case.state.document_precision = 3
+    with pytest.raises(RuntimeError, match="two-place"):
+        check()
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("damage", ["crest", "plate", "attachment", "value", "band", "precision", "owner", "hidden", "dangling", "sheet"])
+def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypatch, identity, settled, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture() if settled else case.capture
+    if damage == "crest":
+        case.state.source_y -= 0.00002
+    elif damage == "plate":
+        case.state.missing = True
+    elif damage == "attachment":
+        case.state.attached = (object(), case.edge)
+    elif damage == "value":
+        case.state.value += 0.0001
+    elif damage == "band":
+        case.state.tolerance.Type = 2
+    elif damage == "precision":
+        case.state.precision = 3
+    elif damage == "owner":
+        case.annotation.Owner = object()
+    elif damage == "hidden":
+        case.annotation.Visible = 3
+    elif damage == "dangling":
+        case.state.dangling = True
+    else:
+        case.state.activate = False
+    with pytest.raises(RuntimeError):
+        check()
+
+
+@pytest.mark.parametrize("damage", [None, "missing", "duplicate", "crest", "transform", "correspondence"])
+def test_theoretical_vertex_is_the_existing_height_endpoint_not_a_coincident_flank(monkeypatch, identity, damage):
+    state = SimpleNamespace(shift=0.0, mapped=[], correspondence=True)
+    half = sm_summing_lever_spec.HEX_H / 2000.0
+    sketch = SimpleNamespace()
+
+    def point(x, y):
+        return SimpleNamespace(X=x, Y=y, Z=0.0, GetSketch=lambda: sketch)
+
+    start, vertex, coincident_flank = point(0.0, -half), point(0.0, half), point(0.0, half)
+
+    def line(first, last):
+        return SimpleNamespace(
+            GetType=lambda: 0, ConstructionGeometry=True,
+            GetStartPoint2=lambda: first, GetEndPoint2=lambda: last,
+        )
+
+    height = line(start, vertex)
+    sketch.GetSketchSegments = lambda: state.segments
+    state.segments = [line(coincident_flank, point(0.00404, half / 2.0)), height]
+    inverse = object()
+    sketch.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: inverse)
+
+    def create_point(coordinates):
+        def multiply(transform):
+            assert transform is inverse
+            x, y, z = coordinates
+            return SimpleNamespace(ArrayData=(x, y + state.shift, z))
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    identity.swApp.GetMathUtility = lambda: SimpleNamespace(CreatePoint=create_point)
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+
+    def feature_by_name(name):
+        assert name == "KnifeEnvelopeReference"
+        return feature
+
+    mapped = object()
+
+    def correspond(source):
+        state.mapped.append(source)
+        return mapped if state.correspondence else None
+
+    view = SimpleNamespace(
+        ReferencedDocument=SimpleNamespace(FeatureByName=feature_by_name),
+        GetCorresponding=correspond,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    if damage == "missing":
+        state.segments.remove(height)
+    elif damage == "duplicate":
+        state.segments.append(line(start, vertex))
+    elif damage == "crest":
+        vertex.Y -= 0.00002
+    elif damage == "transform":
+        state.shift = -0.00002
+    elif damage == "correspondence":
+        state.correspondence = False
+    if damage is not None:
+        with pytest.raises(RuntimeError):
+            drawing._theoretical_knife_vertex_in_view(identity, view)
+    else:
+        actual, xyz = drawing._theoretical_knife_vertex_in_view(identity, view)
+        assert actual is mapped and state.mapped == [vertex]
+        assert xyz == pytest.approx((0.0, half, 0.0))
+        spans, _angles = _knife_envelope_model_owners()
+        shared = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
+        assert any(math.dist(reference, (0.0, half * 1000.0)) < 1e-9 for reference in shared)
+
+
+def test_knife_height_location_budgets_whole_right_hand_text_and_route():
+    """Projection of R2 VIEW F geometry/ink, not regenerated native proof."""
+    x, y = drawing.KNIFE_HEIGHT_LOCATION_XY
+    # R2 PlateThickness and receiver readbacks establish model origin X314.3625,
+    # Y150 mm; *Back reverses X. The boss's actual right end is X400.0875 mm.
+    spec = sm_summing_lever_spec
+    boss_end = 0.3143625 - spec.TIP_X / 1000.0 + spec.ANCHOR_R / 1000.0
+    assert x - boss_end >= 0.003
+    # Same ordinary four-character native row/shoulder as the measured 7.00.
+    text = Box(x, y - 0.0027781, x + 0.0116375, y + 0.0007219)
+    assert 0.4318 - 0.0127 - text.xmax >= 0.00357
+    neighbors = (
+        Box(0.3289257, 0.1066122, 0.3894868, 0.1213316),  # whole tap callout
+        Box(0.3049167, 0.1731656, 0.3550833, 0.1877781),  # ReceiverX0 and both rows
+        Box(0.2154417, 0.1689437, 0.2645584, 0.178),  # ReceiverX1 and mate row
+        Box(0.2038833, 0.1529437, 0.253, 0.162),  # ReceiverY0 and mate row
+        Box(0.2513625, 0.1302219, 0.263, 0.1337219),  # complete 7.00
+        Box(0.2597443, 0.0796524, 0.3302765, 0.084418),  # VIEW F caption
+        Box(0.3216982, 0.2007008, 0.4074806, 0.2054665),  # pictorial caption
+    )
+    column = Segment(x, text.ymin, x, 0.150 + spec.HEX_H / 2000.0 + 0.00635)
+    assert all(text.gap(neighbor) >= 0.00357 for neighbor in neighbors)
+    assert all(segment_box_distance(column, neighbor) >= 0.00357 for neighbor in neighbors)
+
+
 def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() -> None:
     import build_sm_summing_lever as part
     import magnifying_bracket_joint_layout as joint
