@@ -229,6 +229,13 @@ Inspection callouts identify the existing C-step reading points and limits:
 chamber excess is chamber height minus flange thickness, not a third gap.
 Neither a centre section nor a static nominal pose replaces the prescribed
 whole-face, endplay, clocking and motion inspections.
+Resolve each fixed reading against only its actual occurrence's visible edges,
+at the unchanged occurrence-local point. Require one native closest-point match
+within the existing `1e-8 mm²` exact-edge tolerance, then select that entity
+through its view. Never substitute a screen-coordinate pick or a nearby rim,
+floor or roof. Enumeration does not prove ownership: retain the selected
+entity's actual occurrence/type and final attachment/landing readbacks. A
+missing, ambiguous or unreadable section edge remains a diagnostic refusal.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture

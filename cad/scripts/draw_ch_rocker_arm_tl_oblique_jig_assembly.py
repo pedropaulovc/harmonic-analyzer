@@ -92,7 +92,6 @@ from _drawing_tables import (
     validate_bom_number_property,
 )
 from _drawing_sections import create_section_view
-from _drawing_selection import _select_view_entity
 from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _section_axis import position_section_caption
 from _drawing_view_configuration import (
@@ -109,7 +108,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _simplified_names import simplified_name
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, visible_component_entities
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
@@ -2768,16 +2767,80 @@ def _capture_overlap(a: Sequence[float], b: Sequence[float]) -> bool:
 
 def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[Any, ...], ...]:
     records = []
+    leaves_by_view = {}
+    edges_by_occurrence = {}
     for reading in capture_readings():
         view = views[reading.view_index]
         label = f"jig capture {reading.text.splitlines()[0]}"
-        point = model_point_in_view(adapter, view, _capture_world_point(reading), label=label)
-        entity = _select_view_entity(adapter, view, "EDGE", point, label=label)
-        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2")
+        world = _capture_world_point(reading)
+        point = model_point_in_view(adapter, view, world, label=label)
         wanted = spec.instance_name(reading.stem, reading.index)
-        if component is None or str(component.Name2).casefold() != wanted.casefold():
-            raise RuntimeError(f"{label}: reading point did not select {wanted!r}'s own edge")
+        context = (
+            f"expected_owner={wanted!r}; local_mm={reading.local_mm}; "
+            f"model_m={world}; sheet_m={point}"
+        )
+        if reading.view_index not in leaves_by_view:
+            _early_bound(view, "IView").UpdateViewDisplayGeometry()
+            leaves_by_view[reading.view_index] = _view_component_leaves(adapter, view, label=label)
+        key = (reading.view_index, wanted.casefold())
+        if key not in edges_by_occurrence:
+            leaves = [
+                leaf for leaf in leaves_by_view[reading.view_index]
+                if leaf.visible and leaf.path.casefold() == wanted.casefold()
+            ]
+            if len(leaves) != 1:
+                raise RuntimeError(
+                    f"{label}: expected one visible occurrence, got {len(leaves)}; {context}"
+                )
+            edges_by_occurrence[key] = visible_component_entities(view, leaves[0].component, 1)
+        # Occurrence-listed edges use part metres, as in assembly balloon
+        # anchoring. Keep the actual section-land point, not a nearby rim.
+        local = tuple(value / 1000.0 for value in reading.local_mm)
+        matches, nearest = [], []
+        for edge in edges_by_occurrence[key]:
+            try:
+                closest = tuple(float(value) for value in (edge.GetClosestPointOn(*local) or ()))[:3]
+            except Exception as exc:
+                raise RuntimeError(f"{label}: native edge closest-point query failed; {context}") from exc
+            if len(closest) != 3 or not all(math.isfinite(value) for value in closest):
+                raise RuntimeError(
+                    f"{label}: native edge closest point is invalid: {closest!r}; {context}"
+                )
+            error_sq = sum((actual - expected) ** 2 for actual, expected in zip(closest, local, strict=True))
+            distance_mm = math.sqrt(error_sq) * 1000.0
+            nearest.append((distance_mm, tuple(value * 1000.0 for value in closest)))
+            if error_sq <= 1e-14:  # ViewEdges.exact_line_through's 1e-8 mm².
+                matches.append((edge, distance_mm))
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: requires one exact occurrence edge, got {len(matches)}; "
+                f"edge_count={len(edges_by_occurrence[key])}; "
+                f"nearest_mm={sorted(nearest)[:3]}; actual_owner='<not-selected>'; "
+                f"native_type='<not-selected>'; {context}"
+            )
+        edge, distance_mm = matches[0]
+        if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(view.GetName2())):
+            raise RuntimeError(f"{label}: failed to activate reading view; {context}")
+        adapter.currentModel.ClearSelection2(True)
+        if not _early_bound(view, "IView").SelectEntity(edge, False):
+            raise RuntimeError(
+                f"{label}: failed to select exact occurrence edge; closest_mm={distance_mm:g}; {context}"
+            )
         manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+        count = int(manager.GetSelectedObjectCount2(-1))
+        if count != 1:
+            raise RuntimeError(f"{label}: exact edge selection produced {count} entities; {context}")
+        entity = manager.GetSelectedObject6(1, -1)
+        native_type = int(manager.GetSelectedObjectType3(1, -1))
+        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2") if entity is not None else None
+        actual_owner = str(component.Name2) if component is not None else ""
+        evidence = (
+            f"actual_owner={actual_owner!r}; native_type={native_type}; "
+            f"closest_mm={distance_mm:g}; {context}"
+        )
+        _telemetry.info(f"{label}: {evidence}")
+        if native_type != 1 or actual_owner.casefold() != wanted.casefold():  # swSelEDGES
+            raise RuntimeError(f"{label}: reading point did not select {wanted!r}'s own edge; {evidence}")
         if manager.SetSelectionPoint2(1, -1, *point, 0.0) is not True:
             raise RuntimeError(f"{label}: could not set native reading point")
         note = adapter.currentModel.InsertNote(reading.text)
