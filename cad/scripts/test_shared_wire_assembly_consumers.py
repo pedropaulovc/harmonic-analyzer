@@ -1,5 +1,6 @@
 """Offline regressions for the two configured consumers of shared music wire."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -63,9 +64,31 @@ def _source(drawing, member, *, reference=None):
                 else "",
                 73 + len(components) + index,
             )
+            if drawing is magnifier and not is_wire:
+                component.Name2 = f"{stem}-{index + 1}"
             components.append(component)
             if is_wire:
                 wire = component
+    properties = {}
+    if drawing is magnifier:
+        instances = [
+            magnifier.explode.Instance(
+                str(component.Name2), Path(component.GetPathName()).stem
+            )
+            for component in components
+        ]
+        offsets = {item.name.casefold(): [0.0, 0.0, 0.0] for item in instances}
+        for step, names in magnifier.explode.plan_explode(instances):
+            for name in names:
+                offsets[name.casefold()]["xyz".index(step.axis)] += (
+                    step.distance_mm / 1000.0
+                )
+        properties = {
+            ("", magnifier.explode.explode_offsets_property(owner)): (
+                magnifier.explode.encode_explode_offsets(owner, offsets, instances)
+            )
+            for owner in drawing.EXPLODED_VIEW_NAMES
+        }
     model = SimpleNamespace(
         ConfigurationManager=SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Default")
@@ -74,6 +97,9 @@ def _source(drawing, member, *, reference=None):
             drawing.EXPLODED_VIEW_NAMES[configuration],
         ),
         GetComponents=lambda _top_level: tuple(components),
+        GetCustomInfoValue=lambda configuration, name: properties.get(
+            (configuration, name), ""
+        ),
     )
     return model, components, wire
 
