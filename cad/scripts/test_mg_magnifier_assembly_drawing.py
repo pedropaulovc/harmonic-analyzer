@@ -3452,7 +3452,7 @@ def immutable_tip_build(monkeypatch, tmp_path, lever_tip_native):
 
     def balloons(_adapter, view, **kwargs):
         state.balloon_calls.append((view, kwargs))
-        return [SimpleNamespace(stem=explode.WIRE_STEM)]
+        return [SimpleNamespace(stem=stem) for stem, _item in kwargs["items"]]
 
     monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
     monkeypatch.setattr(drawing, "_add_note_block", lambda *_a, **_k: object())
@@ -3499,14 +3499,25 @@ def test_build_keeps_source_immutable_through_tip_and_finalization(immutable_tip
         "lever tip settled source, callout and whole-ink readback",
         "lever tip settled source, callout and whole-ink readback",
     ]
-    # PR1764 has not restored groups 1–18. Only wire19 is actually inserted,
-    # with explicit collapsed metadata rather than reading/activating source.
-    assert len(state.balloon_calls) == 1
-    view, kwargs = state.balloon_calls[0]
-    assert view is state.views[drawing.FINISHED_LABEL]
-    assert kwargs["items"] == ((explode.WIRE_STEM, "19"),)
-    assert notes.BOM_ORDER.index(explode.WIRE_STEM) + 1 == 19
-    assert kwargs["explode_offsets"] == {}
+    # Canonical #1842 restores all real BOM groups, with builder-owned
+    # exploded metadata and the separately collapsed finished wire.
+    assert len(state.balloon_calls) == 3
+    seen = []
+    for (view, kwargs), label, stems in zip(
+        state.balloon_calls,
+        (drawing.WHEEL_LABEL, drawing.LEVER_LABEL, drawing.FINISHED_LABEL),
+        (explode.WHEEL_GROUP_STEMS, explode.LEVER_GROUP_STEMS, frozenset({explode.WIRE_STEM})),
+        strict=True,
+    ):
+        assert view is state.views[label]
+        assert {stem for stem, _item in kwargs["items"]} == set(stems)
+        assert kwargs["explode_offsets"] == (
+            {} if label == drawing.FINISHED_LABEL else _metadata_offsets()
+        )
+        seen.extend(kwargs["items"])
+    assert len(seen) == len(set(seen)) == len(notes.BOM_ORDER)
+    assert dict(seen) == {stem: str(i) for i, stem in enumerate(notes.BOM_ORDER, 1)}
+    assert (explode.WIRE_STEM, "19") in seen
 
 
 @pytest.mark.parametrize("stage", ["before-finalizer", "before-settled", "after-save"])
