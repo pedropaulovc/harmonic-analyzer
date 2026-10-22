@@ -80,6 +80,11 @@ cannot ask for what the authors were told to leave out.
   Front and Right reserve the same vertical annotation margins before fitting,
   so their physical projection centres remain aligned without moving a fitted
   view or changing its shared scale; per-view horizontal budgets remain intact.
+  The boss-hook nut keys its existing installation instruction to the visible
+  boundary of its z=0 bearing face, the face seated on the summing-lever boss
+  by the assembly recipe. A native attached leader and its single linked
+  legend are re-proved after the final rebuild; this flag does not establish
+  full-thread engagement or waive the physical shortfall review.
   The five nut stems additionally enforce `text-clearance`, `text-on-line`,
   `dim-line-through-own-text`, `text-on-view` and `arrow-near-text`.
   `extension-through-own-text` remains reported rather than newly enforced:
