@@ -1754,7 +1754,11 @@ def test_source_attachment_readback_skips_second_hop_after_context_mapping_null(
     actual_target = transport.by_raw_id[id(target)] if typed else target
     mapping[id(actual_target)] = None
     reads = _attachment_readback(case)["reads"]
-    assert reads[key + first] == _handle_receipt(None)
+    if typed:
+        assert reads[key + first + ".raw"] == _handle_receipt(None)
+        assert reads[key + first] == {"skipped": f"{key}{first}.raw unavailable"}
+    else:
+        assert reads[key + first] == _handle_receipt(None)
     assert set(reads[key + second]) == {"skipped"}
     assert not any(handle is None for _direction, handle in case.transport_calls)
     assert not case.writes
