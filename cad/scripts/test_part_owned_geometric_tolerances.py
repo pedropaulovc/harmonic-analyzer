@@ -220,6 +220,7 @@ def _mapping_reference_keys(
 
 def _require_part_band_profile(
     tree: ast.Module, call: ast.Call, spec_tree: ast.Module, spec_module: str,
+    *, scripts_root: Path = SCRIPTS,
 ) -> None:
     """Allow a profile zone projected from a part's positive one-sided band."""
     characteristic = _keyword(call, "characteristic")
@@ -270,7 +271,31 @@ def _require_part_band_profile(
     ]
     assert len(imports) == 1, "profile band needs one direct part-spec import"
     imported, alias = imports[0]
-    assert imported.level == 0 and imported.module == spec_module
+    owner = imported.module
+    assert imported.level == 0 and owner and owner.isidentifier()
+    if owner != spec_module:
+        part = spec_module.removesuffix("_spec")
+        assert spec_module.endswith("_spec") and owner.startswith(f"{part}_") and owner.endswith("_spec"), (
+            "profile band needs a spec owned by the same part"
+        )
+        owner_part = owner.removesuffix("_spec")
+        assert not any(
+            (scripts_root / f"{kind}_{owner_part}.py").is_file()
+            for kind in ("draw", "build")
+        ), "profile band owner belongs to another part"
+        owner_path = scripts_root / f"{owner}.py"
+        builder_path = scripts_root / f"build_{part}.py"
+        assert owner_path.is_file(), "profile band owner source is missing"
+        assert builder_path.is_file(), "profile band needs its production builder source"
+        builder_tree = ast.parse(builder_path.read_text(encoding="utf-8"))
+        builder_imports = [
+            item
+            for node in builder_tree.body
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == owner
+            for item in node.names if item.name == alias.name
+        ]
+        assert len(builder_imports) == 1, "profile band needs one top-level production builder import"
+        spec_tree = ast.parse(owner_path.read_text(encoding="utf-8"), filename=str(owner_path))
     assert alias.name.endswith("_BAND")
     assert not any(
         (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id == local_name)
@@ -362,6 +387,96 @@ def test_profile_zone_accepts_only_part_band_projection(assignment: str) -> None
     _require_part_band_profile(
         tree, _fcf_calls(tree)[0], ast.parse("HEIGHT_BAND = (0.5, 0.0)"), "sample_spec",
     )
+
+
+@pytest.mark.parametrize("owner", ["sample_outline_spec", "sample_contact_spec"])
+def test_profile_zone_accepts_a_focused_owner_used_by_the_part_builder(tmp_path, owner: str) -> None:
+    (tmp_path / f"{owner}.py").write_text("HEIGHT_BAND = (0.5, 0.0)\n", encoding="utf-8")
+    (tmp_path / "build_sample.py").write_text(
+        f"from {owner} import HEIGHT_BAND as BUILT_BAND\n", encoding="utf-8",
+    )
+    tree = ast.parse(
+        f"from {owner} import HEIGHT_BAND as LIMIT_BAND\n"
+        "ZONE = f'{LIMIT_BAND[0]:g}'\n"
+        "add_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    _require_part_band_profile(
+        tree, _fcf_calls(tree)[0], ast.parse(""), "sample_spec", scripts_root=tmp_path,
+    )
+
+
+@pytest.mark.parametrize(("owner", "builder_import", "owner_source"), [
+    ("unrelated_spec", True, "HEIGHT_BAND = (0.5, 0.0)"),
+    ("sample2_outline_spec", True, "HEIGHT_BAND = (0.5, 0.0)"),
+    ("sample_outline_notes", True, "HEIGHT_BAND = (0.5, 0.0)"),
+    ("sample_outline_spec", False, "HEIGHT_BAND = (0.5, 0.0)"),
+    ("sample_outline_spec", True, None),
+    ("sample_outline_spec", True, "HEIGHT_BAND = (0.5, -0.1)"),
+    ("sample_outline_spec", True, "HEIGHT_BAND = (0.0, 0.0)"),
+    ("sample_outline_spec", True, "HEIGHT_BAND = OTHER"),
+])
+def test_profile_zone_rejects_unrelated_unused_or_invalid_focused_owners(
+    tmp_path, owner: str, builder_import: bool, owner_source,
+) -> None:
+    if owner_source is not None:
+        (tmp_path / f"{owner}.py").write_text(owner_source, encoding="utf-8")
+    (tmp_path / "build_sample.py").write_text(
+        f"from {owner} import HEIGHT_BAND\n" if builder_import else "OTHER_BAND = (0.5, 0.0)\n",
+        encoding="utf-8",
+    )
+    tree = ast.parse(
+        f"from {owner} import HEIGHT_BAND\n"
+        "ZONE = f'{HEIGHT_BAND[0]:g}'\n"
+        "add_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    with pytest.raises(AssertionError):
+        _require_part_band_profile(
+            tree, _fcf_calls(tree)[0], ast.parse("HEIGHT_BAND = (0.5, 0.0)"),
+            "sample_spec", scripts_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("kind", ["draw", "build"])
+def test_profile_zone_rejects_a_foreign_part_with_a_matching_name_prefix(tmp_path, kind: str) -> None:
+    (tmp_path / "sample_tl_x_spec.py").write_text("HEIGHT_BAND = (0.5, 0.0)\n", encoding="utf-8")
+    (tmp_path / f"{kind}_sample_tl_x.py").write_text("# another production part\n", encoding="utf-8")
+    (tmp_path / "build_sample.py").write_text(
+        "from sample_tl_x_spec import HEIGHT_BAND\n", encoding="utf-8",
+    )
+    tree = ast.parse(
+        "from sample_tl_x_spec import HEIGHT_BAND\n"
+        "ZONE = f'{HEIGHT_BAND[0]:g}'\n"
+        "add_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    with pytest.raises(AssertionError, match="another part"):
+        _require_part_band_profile(
+            tree, _fcf_calls(tree)[0], ast.parse(""), "sample_spec", scripts_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("builder_source", [
+    "from sample_outline_spec import OTHER_BAND",
+    "from unrelated_spec import HEIGHT_BAND",
+    "import sample_outline_spec",
+    "def build():\n    from sample_outline_spec import HEIGHT_BAND",
+    "from sample_outline_spec import HEIGHT_BAND\nfrom sample_outline_spec import HEIGHT_BAND",
+])
+def test_profile_zone_requires_one_top_level_import_of_the_owners_actual_band(
+    tmp_path, builder_source: str,
+) -> None:
+    (tmp_path / "sample_outline_spec.py").write_text(
+        "HEIGHT_BAND = (0.5, 0.0)\nOTHER_BAND = (0.25, 0.0)\n", encoding="utf-8",
+    )
+    (tmp_path / "build_sample.py").write_text(builder_source, encoding="utf-8")
+    tree = ast.parse(
+        "from sample_outline_spec import HEIGHT_BAND\n"
+        "ZONE = f'{HEIGHT_BAND[0]:g}'\n"
+        "add_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    with pytest.raises(AssertionError, match="top-level production builder import"):
+        _require_part_band_profile(
+            tree, _fcf_calls(tree)[0], ast.parse(""), "sample_spec", scripts_root=tmp_path,
+        )
 
 
 @pytest.mark.parametrize(("source", "spec"), [
