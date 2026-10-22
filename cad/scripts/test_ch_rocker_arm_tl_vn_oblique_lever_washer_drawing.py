@@ -35,11 +35,20 @@ def test_catalogue_row_is_the_registered_mcmaster_washer() -> None:
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("91812A230",)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
-    assert stock.material == row["material"]
+    assert stock.material == row["material"] == part.MATERIAL == (
+        "AISI 316 Stainless Steel Sheet (SS)"
+    )
     assert row["number"] == "MHA-CH-06-TL-VN-71"
     assert row["process"] == "purchased"
     assert spec.SKU in row["material_specification"]
     assert "316 stainless" in row["material_specification"]
+    from _part_properties import part_properties
+
+    assert part_properties(STEM)["Material"] == stock.material
+    assert spec.CATALOG_MATERIAL == dims.CATALOG_MATERIAL == (
+        "316 stainless steel, Rockwell C51, case hardened"
+    )
+    assert spec.CATALOG_CHECKED_DATE == dims.CATALOG_CHECKED_DATE == "2026-10-22"
     assert "installation_notes" not in row
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
@@ -56,9 +65,22 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
     assert dims.OD == pytest.approx(0.530 * IN)
     assert dims.THICKNESS_MIN == pytest.approx(0.070 * IN)
     assert dims.THICKNESS_MAX == pytest.approx(0.090 * IN)
-    # The band is taken as the pair's stack and modelled at its maximum.
+    # The supplier band spans the complete pair, modelled at its maximum.
     assert spec.THICKNESS == dims.PAIR_THICKNESS == dims.THICKNESS_MAX
-    assert (dims.PACKAGE_QTY, dims.PACKAGE_PRICE_USD) == (5, 12.40)
+    assert spec.PACK_QUANTITY == dims.PACKAGE_QTY == 5
+    assert dims.PACKAGE_PRICE_USD == 12.40
+
+
+def test_supplier_notes_distinguish_item_pair_from_package() -> None:
+    from _purchased_fastener_drawing import MAX_ITEM_CHARS
+
+    assert len(spec.SUPPLIER_DATA) == 3
+    assert all(len(line) <= MAX_ITEM_CHARS for line in spec.SUPPLIER_DATA)
+    assert spec.SUPPLIER_DATA == (
+        f"ONE ITEM = ONE TWO-PIECE PAIR; PACK = {spec.PACK_QUANTITY} PAIRS.",
+        "THICKNESS = COMPLETE PAIR; MODEL AT MAXIMUM.",
+        "PLAIN ENVELOPE; SPLIT, CAMS AND SERRATIONS NOT MODELLED.",
+    )
 
 
 def test_one_pair_under_each_lever_screw_head() -> None:

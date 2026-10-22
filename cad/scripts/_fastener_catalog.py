@@ -484,7 +484,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "ch-rocker-arm-tl-vn-oblique-block-washer",
         "Extreme-Vibration-Resistant Wedge Lock Washer",
         "91812A215",
-        material="AISI 304",  # native library stand-in; purchased grade is 316
+        material="AISI 316 Stainless Steel Sheet (SS)",
     ),
     # MHA-CH-06-TL-VN-71: the oblique trammel jig's 5/16 wedge-lock washer pairs
     # under the TL-VN-69 feed lever screws' heads (the fastener table's
@@ -494,7 +494,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "ch-rocker-arm-tl-vn-oblique-lever-washer",
         "Extreme-Vibration-Resistant Wedge Lock Washer",
         "91812A230",
-        material="AISI 304",  # native library stand-in; purchased grade is 316
+        material="AISI 316 Stainless Steel Sheet (SS)",
     ),
 }
 

@@ -46,8 +46,8 @@ recipes:
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | `ch-rocker-arm-tl-vn-oblique-clamp-screw` (MHA-CH-06-TL-VN-68; shop fixture; catalogue-only, no vendor model; installed at bought 7/8 in length) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91812A215 | `ch-rocker-arm-tl-vn-oblique-block-washer` (MHA-CH-06-TL-VN-70; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
-| 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A215 | `ch-rocker-arm-tl-vn-oblique-block-washer` (MHA-CH-06-TL-VN-70; shop fixture; catalogue-only, live product verified 2026-10-22, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, live product verified 2026-10-22, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -356,35 +356,65 @@ replica-gated and no copy is kept here:
 - [91812A215](https://www.mcmaster.com/91812A215/)
   (`ch-rocker-arm-tl-vn-oblique-block-washer`, MHA-CH-06-TL-VN-70, 2 pairs in
   the oblique trammel jig: the fastener table's `BLOCK_LOCK_WASHER` row, one
-  pair under each TL-VN-63 block screw head) was read live on October 17, 2026
-  from the No. 8 wedge-lock listing; the product page and its 2-D PDF are
-  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
-  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
-  for No. 8 / M4; ID 0.170 in, OD 0.300 in, thickness 0.080 to 0.100 in;
-  5 per package, $11.71. UNVERIFIED: the listing does not say whether the
-  thickness is the pair's stack or one washer's, nor whether a package is 5
-  pairs; the model takes the band as the pair's stack at its 0.100 in
-  maximum. `diag_build_91812A215.py` builds the pair's envelope, one plain
-  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
-  model was downloaded, so it is not replica-gated: the standalone run is
-  catalogue-only (it builds the recipe, checks the solid and saves it under
-  `cad/out/reference`).
+  pair under each TL-VN-63 block screw head) was read live on October 22, 2026
+  at 23:18:07.110 UTC from the exact product page. Two-piece wedge-lock
+  washer, reusable up to 15 times, comparable to NORD-LOCK; 316 stainless
+  steel, Rockwell C51, case hardened; for No. 8 / M4; ID 0.170 in, OD
+  0.300 in, thickness 0.080 to 0.100 in; $11.71 per pack of 5.
+  The product defines each washer as two pieces locked by internal wedges,
+  with serrations outside; the pack therefore contains five complete pairs,
+  not five individual halves. Its engineering drawing, inspected October 21,
+  spans the complete pair's stack. `diag_build_91812A215.py` retains that
+  stack at its 0.100 in maximum: one plain annulus from y = 0 along +Y
+  (no cam faces, serrations or split). One drawing item and each installed
+  BOM unit remain one pair; the installed quantity stays two, not the pack
+  quantity. Immutable live product text:
+  `D:/farm-runs/rolling-main-post-v44-20261021/washer1852-live-91812A215-20261022.json`.
+  No vendor model was downloaded, so it is not replica-gated: the standalone
+  run remains catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
 - [91812A230](https://www.mcmaster.com/91812A230/)
   (`ch-rocker-arm-tl-vn-oblique-lever-washer`, MHA-CH-06-TL-VN-71, 2 pairs in
   the oblique trammel jig: the fastener table's `LEVER_LOCK_WASHER` row, one
-  pair under each TL-VN-69 feed lever screw head) was read live on October 17,
-  2026 from the wedge-lock listing; the product page and its 2-D PDF are
-  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
-  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
-  for 5/16" / M8; ID 0.340 in, OD 0.530 in, thickness 0.070 to 0.090 in;
-  5 per package, $12.40. UNVERIFIED: the listing does not say whether the
-  thickness is the pair's stack or one washer's, nor whether a package is 5
-  pairs; the model takes the band as the pair's stack at its 0.090 in
-  maximum. `diag_build_91812A230.py` builds the pair's envelope, one plain
-  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
-  model was downloaded, so it is not replica-gated: the standalone run is
-  catalogue-only (it builds the recipe, checks the solid and saves it under
-  `cad/out/reference`).
+  pair under each TL-VN-69 feed lever screw head) was read live on October 22,
+  2026 at 23:18:07.135 UTC from the exact product page. Two-piece wedge-lock
+  washer, reusable up to 15 times, comparable to NORD-LOCK; 316 stainless
+  steel, Rockwell C51, case hardened; for 5/16" / M8; ID 0.340 in, OD
+  0.530 in, thickness 0.070 to 0.090 in; $12.40 per pack of 5.
+  The product defines each washer as two pieces locked by internal wedges,
+  with serrations outside; the pack therefore contains five complete pairs,
+  not five individual halves. Its engineering drawing, inspected October 21,
+  spans the complete pair's stack. `diag_build_91812A230.py` retains that
+  stack at its 0.090 in maximum: one plain annulus from y = 0 along +Y
+  (no cam faces, serrations or split). One drawing item and each installed
+  BOM unit remain one pair; the installed quantity stays two, not the pack
+  quantity. Immutable live product text:
+  `D:/farm-runs/rolling-main-post-v44-20261021/washer1852-live-91812A230-20261022.json`.
+  No vendor model was downloaded, so it is not replica-gated: the standalone
+  run remains catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
+
+For these two washer SKUs only, the native catalogue and registry material
+now use the existing default SOLIDWORKS library entry
+`AISI 316 Stainless Steel Sheet (SS)`, replacing their former `AISI 304`
+stand-in. That exact entry (material ID 91) and its existing density
+`8000.000133 kg/m³` were read on October 22, 2026 from
+`D:/Program Files/Dassault Systemes/SOLIDWORKS 3DEXPERIENCE/SOLIDWORKS/lang/english/sldmaterials/solidworks materials.sldmat`;
+no custom material or density was invented. The library name is a native
+material/mass-property mapping, not a claim about supplier stock form or a
+lot certificate; the supplier's case-hardening and Rockwell C51 data remain
+in `material_specification` and `CATALOG_MATERIAL`. The two existing
+`build_*_washer` modules obtain their native material from those exact
+catalogue rows, while `_part_properties.part_properties` obtains the saved
+`Material` source property from each registry row. The purchased drawing
+requires that saved property to match the registry and links the title
+block to it, so the correction is source-owned rather than patched into
+sheet text. Both specs now carry three short factual supplier-data lines:
+item/pair versus pack, complete-pair thickness/model maximum, and the
+unmodelled split/cams/serrations in the plain envelope. Existing dimensions,
+tolerance bands, construction references, quantities and physical geometry
+are unchanged. The current live captures show a `2-D PDF` control; they do
+not by themselves prove that a PDF was downloaded.
 
 Live catalogue verification on October 12, 2026:
 

@@ -5,13 +5,13 @@ ch-rocker-arm-tl-vn-oblique-lever-washer:
   stock_name: Extreme-Vibration-Resistant Wedge Lock Washer
   supplier: McMaster-Carr
   supplier_skus: ["91812A230"]
-  material: AISI 304
+  material: AISI 316 Stainless Steel Sheet (SS)
   material_specification: "316 stainless steel, Rockwell C51, case hardened; two-piece wedge-lock pair for 5/16 in screws, ID 0.340 in x OD 0.530 in x 0.070-0.090 in; McMaster-Carr 91812A230"
   finish: AS SUPPLIED
-  # https://www.mcmaster.com/products/washers/washer-type~wedge/ listing read
-  # 2026-10-17 (detail page login-walled). UNVERIFIED: whether the thickness is
-  # the pair's stack and whether a package of 5 is five pairs. AISI 304 is the
-  # native library stand-in; the purchased grade is 316.
+  # https://www.mcmaster.com/91812A230/ read live 2026-10-22: 316 stainless;
+  # pack of 5 complete two-piece pairs. Engineering drawing spans the pair.
+  # Native material uses the existing default-library 316 sheet entry;
+  # supplier hardness/heat treatment remain in material_specification.
   # One pair under each of the fastener table's LEVER_TO_CARRIER heads.
   quantity: 2
   tolerance_class: machined_block
