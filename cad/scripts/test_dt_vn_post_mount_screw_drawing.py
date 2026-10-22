@@ -1239,6 +1239,11 @@ def _supplier_seat(monkeypatch, center, scale, *, source_angle=math.pi / 2.0):
         assert adapter is seat and display.name == contract["label"]
         seat.log.append(("reference", display.name))
 
+    def verify_crop(adapter, view, circle, cell):
+        assert adapter is seat and view is stock and circle is not None
+        assert cell == drawing.STOCK_HEAD_CELL
+        seat.log.append(("verified-crop",))
+
     # Existing frame-contract tests count projection calls independently of
     # observational diagnostics; the diagnostic readbacks have their own test.
     monkeypatch.setattr(drawing, "_log_supplier_view_state", lambda *_args, **_kwargs: None)
@@ -1255,6 +1260,7 @@ def _supplier_seat(monkeypatch, center, scale, *, source_angle=math.pi / 2.0):
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     monkeypatch.setattr(drawing, "supplier_reference_dimension", reference)
     monkeypatch.setattr(drawing, "_assert_supplier_profile_frame", verify)
+    monkeypatch.setattr(drawing, "_assert_supplier_crop_circle", verify_crop)
     return seat, stock
 
 
@@ -1323,6 +1329,7 @@ def test_supplier_stock_view_settles_the_measured_frame_before_annotations(
     assert kinds[imported + 1:] == ["reposition"] + ["reference"] * len(keep)
     if crop_head:
         assert verified < kinds.index("crop-sketch") < kinds.index("circle") < kinds.index("crop2") < imported
+        assert kinds.index("circle") < kinds.index("verified-crop") < kinds.index("crop2")
         circle = next(entry for entry in seat.log if entry[0] == "circle")
         cx, cy, _cz, px, py, _pz = (value / 1000.0 for value in circle[2])
         assert (cx, cy) == pytest.approx(center, rel=0.0, abs=1e-12)
@@ -2042,9 +2049,6 @@ def test_supplier_profile_ink_rejects_current_view_inventory_changes(
 @pytest.mark.parametrize(
     "fault,reason",
     [
-        ("missing", "unique persisted"),
-        ("extra", "unique persisted"),
-        ("not-cropped", "unique persisted"),
         ("shifted", "crop frame"),
         ("size", "crop frame"),
         ("noncircle", "complete circle"),
@@ -2052,17 +2056,11 @@ def test_supplier_profile_ink_rejects_current_view_inventory_changes(
         ("null-inverse", "inverse is unavailable"),
     ],
 )
-def test_supplier_profile_ink_rejects_changed_persisted_crop(
+def test_supplier_crop_profile_rejects_bad_geometry_before_consumption(
     monkeypatch, fault, reason
 ):
     seat = _supplier_ink_seat(monkeypatch, True)
-    if fault == "missing":
-        seat.drawing_segments.clear()
-    elif fault == "extra":
-        seat.drawing_segments.append(seat.circle)
-    elif fault == "not-cropped":
-        seat.view.IsCropped = lambda: False
-    elif fault == "shifted":
+    if fault == "shifted":
         seat.circle.center = (0.018, -0.023, 0.0)
     elif fault == "size":
         seat.circle.radius *= 1.1
@@ -2073,14 +2071,28 @@ def test_supplier_profile_ink_rejects_changed_persisted_crop(
     else:
         seat.circle.GetType = lambda: 0
     with pytest.raises(RuntimeError, match=reason):
+        drawing._assert_supplier_crop_circle(
+            seat.adapter, seat.view, seat.circle, seat.cell
+        )
+
+
+@pytest.mark.parametrize("cropped", [True, False])
+def test_supplier_final_crop_state_does_not_require_consumed_profile(monkeypatch, cropped):
+    seat = _supplier_ink_seat(monkeypatch, True)
+    drawing._assert_supplier_crop_circle(
+        seat.adapter, seat.view, seat.circle, seat.cell
+    )
+    seat.drawing_segments.clear()  # Native Crop2 consumes the selected profile.
+    seat.view.IsCropped = lambda: cropped
+    if cropped:
         drawing._assert_supplier_profile_ink(
             seat.adapter, seat.view, seat.cell, seat.geometry, cropped=True
         )
-    assert any(
-        f"drawing_sketch_segment_count={len(seat.drawing_segments)}" in message
-        and "drawing_sketch_segment_types=" in message
-        for message in seat.messages
-    )
+    else:
+        with pytest.raises(RuntimeError, match="no longer cropped"):
+            drawing._assert_supplier_profile_ink(
+                seat.adapter, seat.view, seat.cell, seat.geometry, cropped=True
+            )
 
 
 @pytest.mark.parametrize("cropped", [False, True])
@@ -2101,21 +2113,20 @@ def test_supplier_profile_ink_cell_has_zero_slack(monkeypatch, cropped):
             for point in (line.GetStartPoint2(), line.GetEndPoint2())
         )
     left, bottom, _right, top = seat.cell
-    drawing._assert_supplier_profile_ink(
-        seat.adapter,
-        seat.view,
-        (left, bottom, right, top),
-        seat.geometry,
-        cropped=cropped,
-    )
+
+    def check(cell):
+        if cropped:
+            drawing._assert_supplier_crop_circle(
+                seat.adapter, seat.view, seat.circle, cell
+            )
+        else:
+            drawing._assert_supplier_profile_ink(
+                seat.adapter, seat.view, cell, seat.geometry, cropped=False
+            )
+
+    check((left, bottom, right, top))
     with pytest.raises(RuntimeError, match="ink leaves its cell"):
-        drawing._assert_supplier_profile_ink(
-            seat.adapter,
-            seat.view,
-            (left, bottom, math.nextafter(right, -math.inf), top),
-            seat.geometry,
-            cropped=cropped,
-        )
+        check((left, bottom, math.nextafter(right, -math.inf), top))
 
 
 @pytest.mark.parametrize("fault", ["one-ulp", "duplicate"])

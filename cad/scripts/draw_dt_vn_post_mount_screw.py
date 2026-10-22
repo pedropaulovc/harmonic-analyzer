@@ -42,7 +42,7 @@ view's GetOutline is not its displayed construction-ink extent. Before final
 settling, capture canonical native geometry and frame probes in the actual
 supplier configuration, then restore the original source configuration. Final
 guards project only that immutable capture through the current native view and
-retain mapped native dimension attachments, crop, annotation and note checks.
+retain native model-dimension association, crop, annotation and note checks.
 The source is opened read-only and stays clean through preparation and capture.
 Imported presentation runs afterwards: it can mark the source dirty, but never
 authorizes writing it. Native read-only/path checks and a persisted SHA-256
@@ -615,10 +615,11 @@ def _supplier_stock_view(adapter, *, center, scale, label, crop_head=False):
     _log_supplier_view_state(adapter, stock, stage=f"{label}: prepared", geometry=True)
     if crop_head:
         _activate(adapter, stock, label=label)
-        _sketch_circle(
+        circle = _sketch_circle(
             adapter, stock, center, STOCK_HEAD_RADIUS_MM * scale[0] / scale[1] / 1000.0,
             label="supplier head bounding profile crop",
         )
+        _assert_supplier_crop_circle(adapter, stock, circle, STOCK_HEAD_CELL)
         status = int(stock.Crop2(False, True, 5))
         adapter.currentModel.ClearSelection2(True)
         if not adapter.currentModel.EditRebuild3():
@@ -704,6 +705,45 @@ def _assert_supplier_feature_valid(feature, *, label):
         )
 
 
+def _assert_supplier_crop_circle(adapter, view, circle, cell):
+    """Check the actual selected circle before Crop2 consumes its profile."""
+    label = f"MSC source crop {view_name(adapter, view)}"
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    centre, radius = native_circle_geometry(circle, label=label)
+    inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
+    if inverse is None:
+        raise RuntimeError(f"{label}: crop sketch inverse is unavailable")
+    sheet = [
+        _transform_point(utility, point, inverse, label=label)
+        for point in (
+            centre,
+            (centre[0] + radius, centre[1], centre[2]),
+            (centre[0], centre[1] + radius, centre[2]),
+        )
+    ]
+    cx, cy, _cz = sheet[0]
+    dx = tuple(sheet[1][index] - sheet[0][index] for index in range(2))
+    dy = tuple(sheet[2][index] - sheet[0][index] for index in range(2))
+    rx, ry = math.hypot(*dx), math.hypot(*dy)
+    expected_radius = (
+        STOCK_HEAD_RADIUS_MM * STOCK_HEAD_SCALE[0] / STOCK_HEAD_SCALE[1] / 1000.0
+    )
+    if (
+        any(abs(point[2]) > CIRCLE_TOL_M for point in sheet)
+        or math.dist((cx, cy), STOCK_HEAD_CENTER) > CIRCLE_TOL_M
+        or abs(rx - expected_radius) > CIRCLE_TOL_M
+        or abs(ry - expected_radius) > CIRCLE_TOL_M
+        or abs(dx[0] * dy[0] + dx[1] * dy[1]) > expected_radius**2 * 1e-8
+    ):
+        raise RuntimeError(f"{label}: crop frame changed: {sheet!r}")
+    width, height = math.hypot(dx[0], dy[0]), math.hypot(dx[1], dy[1])
+    bounds = (cx - width, cy - height, cx + width, cy + height)
+    _telemetry.info(f"{label}: native_crop_bounds_m={bounds!r} cell_m={cell!r}")
+    if not _inside(bounds, cell):
+        raise RuntimeError(f"{label}: native source ink leaves its cell: {bounds!r}")
+
+
 def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
     """Bound the verified native construction ink, not the model-view extent.
 
@@ -718,6 +758,13 @@ def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
     view = _early_bound(view, "IView")
     if str(view.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError(f"{label}: wrong source configuration")
+    if cropped:
+        # Crop2 consumes the selected profile. Its geometry was checked before
+        # that call; GetSketch need not retain it as drawing-sketch segments.
+        # Settled frame/binding and annotation checks remain caller-owned.
+        if not bool(view.IsCropped()):
+            raise RuntimeError(f"{label}: source head profile is no longer cropped")
+        return
     drawing_sketch = _early_bound(view.GetSketch(), "ISketch")
     drawing_segments = tuple(drawing_sketch.GetSketchSegments() or ())
     drawing_types = [
@@ -728,48 +775,10 @@ def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
         f"{label}: drawing_sketch_segment_count={len(drawing_segments)} "
         f"drawing_sketch_segment_types={drawing_types!r} cropped={bool(view.IsCropped())}"
     )
-    if not cropped and drawing_segments:
+    if drawing_segments:
         raise RuntimeError(f"{label}: full view has unexpected drawing-sketch geometry")
-    if cropped:
-        if not bool(view.IsCropped()) or len(drawing_segments) != 1:
-            raise RuntimeError(f"{label}: missing unique persisted crop circle")
-        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-        centre, radius = native_circle_geometry(drawing_segments[0], label=label)
-        inverse = _early_bound(
-            drawing_sketch.ModelToSketchTransform, "IMathTransform"
-        ).Inverse()
-        if inverse is None:
-            raise RuntimeError(f"{label}: persisted crop sketch inverse is unavailable")
-        sheet = [
-            _transform_point(utility, point, inverse, label=label)
-            for point in (
-                centre,
-                (centre[0] + radius, centre[1], centre[2]),
-                (centre[0], centre[1] + radius, centre[2]),
-            )
-        ]
-        cx, cy, _cz = sheet[0]
-        dx = tuple(sheet[1][index] - sheet[0][index] for index in range(2))
-        dy = tuple(sheet[2][index] - sheet[0][index] for index in range(2))
-        rx, ry = math.hypot(*dx), math.hypot(*dy)
-        expected_radius = (
-            STOCK_HEAD_RADIUS_MM * STOCK_HEAD_SCALE[0] / STOCK_HEAD_SCALE[1] / 1000.0
-        )
-        if (
-            any(abs(point[2]) > CIRCLE_TOL_M for point in sheet)
-            or math.dist((cx, cy), STOCK_HEAD_CENTER) > CIRCLE_TOL_M
-            or abs(rx - expected_radius) > CIRCLE_TOL_M
-            or abs(ry - expected_radius) > CIRCLE_TOL_M
-            or abs(dx[0] * dy[0] + dx[1] * dy[1]) > expected_radius**2 * 1e-8
-        ):
-            raise RuntimeError(f"{label}: persisted crop frame changed: {sheet!r}")
-        # Entire native crop footprint must fit. Do not clip it to the cell or
-        # use the full (deliberately cropped) carrier's projected endpoint box.
-        width, height = math.hypot(dx[0], dy[0]), math.hypot(dx[1], dy[1])
-        bounds = (cx - width, cy - height, cx + width, cy + height)
-    else:
-        view.UpdateViewDisplayGeometry()
-        bounds = native_sketch_view_bounds(adapter, view, geometry, label=label)
+    view.UpdateViewDisplayGeometry()
+    bounds = native_sketch_view_bounds(adapter, view, geometry, label=label)
     _telemetry.info(f"{label}: native_ink_bounds_m={bounds!r} cell_m={cell!r}")
     if not _inside(bounds, cell):
         raise RuntimeError(f"{label}: native source ink leaves its cell: {bounds!r}")

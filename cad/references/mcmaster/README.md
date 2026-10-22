@@ -1598,6 +1598,10 @@ return distinct contexts even when the source dimension association is intact.
 Coordinates and local point IDs are not substitute ownership proofs. Callers
 with a separately proven mapped-attachment contract retain their stricter
 same-kind member inventory and one-to-one native correspondence checks.
+The MSC head crop's actual circle frame and entire footprint are checked before
+`Crop2` consumes the selected profile. Settled validation checks native crop
+state, view binding/frame and annotation containment; `IView.GetSketch()` is not
+required to expose the consumed profile afterwards.
 These associative references may be nominal supplier gauges; source membership
 does not make a reference line or circle a physical finished edge.
 Source path/configuration, annotation ownership/type/count, final value,
