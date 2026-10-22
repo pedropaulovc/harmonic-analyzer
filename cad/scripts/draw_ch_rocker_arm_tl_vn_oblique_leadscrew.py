@@ -24,6 +24,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -35,7 +37,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _check import check
 from _com import _early_bound, _read_member
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
@@ -56,9 +57,21 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _rebuild import active_configuration_name
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _purchased_fastener_drawing import (
+    _box,
+    _inside,
+    _open_supplier_source_read_only,
+    _source_file_sha256,
+    assert_supplier_view_fits,
+)
+from _supplier_spring_drawing import (
+    _capture_reference_views,
+    _preserve_reference_source_file,
+    _reference_view_bounds,
+)
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as supplier
@@ -111,12 +124,14 @@ MAIN_CENTER = (0.195, 0.160)
 # from the right border, its outline spans y 0.081 .. 0.251, between the
 # title block's top (0.0651) and the top border (0.2667).
 ISO_CENTER = (0.390, 0.166)
-# An independent zero-body supplier gauge inset fits between the two clock
-# sections. It does not refit, replace or dimension the installed screw.
-SUPPLIER_STOCK_CENTER = (0.190, 0.243)
+# Targets for the independently captured zero-body supplier sketch and caption.
+# These positions are not native fit evidence: final guards retain the native
+# outline, complete annotation ink and the caption's separate reserved region.
+SUPPLIER_STOCK_CENTER = (0.183, 0.2425)
 SUPPLIER_STOCK_SCALE = (1, 10)
 SUPPLIER_STOCK_FIELD = (0.135, 0.208, 0.245, 0.265)
-SUPPLIER_STOCK_CAPTION_XY = (0.140, 0.222)
+SUPPLIER_STOCK_CAPTION_XY = (0.140, 0.219)
+SUPPLIER_STOCK_CAPTION_GAP = 0.003
 SUPPLIER_STOCK_CAPTION = (
     "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
 )
@@ -417,33 +432,69 @@ def _outline(view: Any, label: str) -> tuple[float, float, float, float]:
     return box
 
 
-def _center_view(draw: Any, view: Any, center: tuple[float, float], label: str) -> None:
-    """Centre the view's actual outline on ``center`` and keep it on the sheet.
+def _center_view(
+    draw: Any,
+    view: Any,
+    center: tuple[float, float],
+    label: str,
+    *,
+    read_bounds: Callable[[], tuple[float, float, float, float]] | None = None,
+) -> None:
+    """Centre captured geometry without substituting it for native outline guards.
 
-    ``place_view`` does not centre the geometry box (the screw's origin is at
-    its near end), and the rotation turns the outline about the view's own
-    position, so both views are moved by their measured outline.
+    Captured supplier curves provide an independent reference point; native
+    readback must still establish outline/annotation fit after configuration
+    selection. No successful refresh or exported layout is inferred here.
     """
     view = _early_bound(view, "IView")
-    box = _outline(view, label)
-    position = tuple(float(value) for value in view.Position)
-    if len(position) != 2 or not all(map(math.isfinite, position)):
-        raise RuntimeError(f"{label}: invalid view position {position!r}")
-    target = [
-        position[0] + center[0] - (box[0] + box[2]) / 2,
-        position[1] + center[1] - (box[1] + box[3]) / 2,
-    ]
-    if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError(f"{label}: failed to position the view")
-    draw.EditRebuild3()
-    box = _outline(view, label)
-    if (
-        abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
-        or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
-    ):
-        raise RuntimeError(f"{label}: view failed to centre: {box!r}")
-    if not _inside_sheet(box):
-        raise RuntimeError(f"{label}: view leaves the drawable sheet: {box!r}")
+    bounds_reader = read_bounds or (lambda: _outline(view, label))
+    box = native_outline = position = target = None
+    phase = "read initial bounds"
+    failure = None
+    try:
+        box = bounds_reader()
+        phase = "read view position"
+        position = tuple(float(value) for value in view.Position)
+        if len(position) != 2 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"{label}: invalid view position {position!r}")
+        target = [
+            position[0] + center[0] - (box[0] + box[2]) / 2,
+            position[1] + center[1] - (box[1] + box[3]) / 2,
+        ]
+        phase = "set view position"
+        if not view.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"{label}: failed to position the view")
+        draw.EditRebuild3()
+        phase = "read centered bounds"
+        box = bounds_reader()
+        phase = "read native outline"
+        native_outline = box if read_bounds is None else _outline(view, label)
+        phase = "check geometry center"
+        if (
+            abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
+            or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
+        ):
+            raise RuntimeError(f"{label}: view failed to centre: {box!r}")
+        phase = "check native sheet outline"
+        if not _inside_sheet(native_outline):
+            raise RuntimeError(
+                f"{label}: view leaves the drawable sheet: {native_outline!r}"
+            )
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        if read_bounds is not None or failure is not None:
+            actual_center = (
+                None if box is None else ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+            )
+            _telemetry.info(
+                f"{label}: centering phase={phase!r}; geometry_bounds_m={box!r}; "
+                f"native_outline_m={native_outline!r}; initial_position_m={position!r}; "
+                f"actual_center_m={actual_center!r}; "
+                f"requested_center_m={center!r}; target_position_m={target!r}; "
+                f"failure={failure!r}"
+            )
 
 
 def _axis_point(
@@ -909,7 +960,14 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
 
 
 def _add_supplier_stock_inset(adapter: Any):
-    """Import isolated source gauges, never a fictitious as-bought solid."""
+    """Target a captured supplier diagram and reserve its measured caption.
+
+    Capture precedes dimension formatting, while the read-only source is clean.
+    Saved-hidden owner, zero-body and correspondence proofs remain independent
+    of the native outline. Captured curves guide centering, not a claim that
+    refresh or complete native fit has been proven; final readback checks the
+    curves, native outline, annotations and separate caption region.
+    """
     view = _early_bound(
         place_view(
             adapter,
@@ -934,8 +992,43 @@ def _add_supplier_stock_inset(adapter: Any):
     if shown != [owner]:
         raise RuntimeError("leadscrew supplier stock sketch is not saved hidden")
     rebuild_drawing(adapter, label="show leadscrew supplier stock gauges")
+    draw = _early_bound(adapter.currentModel, "IDrawingDoc")
+    draw.ActivateView("")
+    if not draw.GetEditSheet() or draw.ActiveDrawingView is not None:
+        raise RuntimeError("cannot restore sheet context for supplier stock capture")
+    source_model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    captures = _capture_reference_views(
+        adapter,
+        adapter.currentModel,
+        {"*Front": view},
+        source=SOURCE,
+        model=source_model,
+        features={"*Front": (owner,)},
+        configurations={"*Front": supplier.SUPPLIER_STOCK_CONFIGURATION},
+        label="leadscrew supplier stock gauges",
+    )
+
+    def reference_bounds(
+        *, allow_presentation_dirty: bool
+    ) -> tuple[float, float, float, float]:
+        return _reference_view_bounds(
+            adapter,
+            view,
+            capture=captures["*Front"],
+            source=SOURCE,
+            model=source_model,
+            features=(owner,),
+            configuration=supplier.SUPPLIER_STOCK_CONFIGURATION,
+            label="leadscrew supplier stock gauges",
+            allow_presentation_dirty=allow_presentation_dirty,
+        )
+
     _center_view(
-        adapter.currentModel, view, SUPPLIER_STOCK_CENTER, "supplier stock gauges"
+        adapter.currentModel,
+        view,
+        SUPPLIER_STOCK_CENTER,
+        "supplier stock gauges",
+        read_bounds=lambda: reference_bounds(allow_presentation_dirty=False),
     )
     checks = []
     annotate_supplier_screw(
@@ -947,7 +1040,6 @@ def _add_supplier_stock_inset(adapter: Any):
         units=supplier.SUPPLIER_REFERENCE_UNITS,
         settled_checks=checks,
     )
-    draw = _early_bound(adapter.currentModel, "IDrawingDoc")
     draw.ActivateView("")
     if not draw.GetEditSheet() or draw.ActiveDrawingView is not None:
         raise RuntimeError("cannot restore sheet context for supplier stock caption")
@@ -966,31 +1058,123 @@ def _add_supplier_stock_inset(adapter: Any):
             or view.UseSheetScale != 0
         ):
             raise RuntimeError("leadscrew supplier stock configuration/scale changed")
-        assert_supplier_view_fits(
-            adapter,
-            view,
-            SUPPLIER_STOCK_FIELD,
-            label="leadscrew nominal supplier stock gauges",
-        )
-        caption = _early_bound(note, "INote")
-        annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
-        if (
-            str(caption.GetText() or "").replace("\r", "") != SUPPLIER_STOCK_CAPTION
-            or int(annotation.OwnerType) != 1
-            or not _inside(
-                _box(caption.GetExtent(), label="supplier stock caption", kind="note"),
-                SUPPLIER_STOCK_FIELD,
+        curve_bounds = native_outline = caption_box = ink_field = None
+        try:
+            caption = _early_bound(note, "INote")
+            annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
+            caption_extent = caption.GetExtent()
+            curve_bounds = reference_bounds(allow_presentation_dirty=True)
+            native_outline = _outline(view, "supplier stock gauges settled")
+            caption_box = _box(
+                caption_extent, label="supplier stock caption", kind="note"
             )
-        ):
-            raise RuntimeError("leadscrew supplier stock caption changed or left its field")
+            ink_field = (
+                SUPPLIER_STOCK_FIELD[0],
+                caption_box[3] + SUPPLIER_STOCK_CAPTION_GAP,
+                SUPPLIER_STOCK_FIELD[2],
+                SUPPLIER_STOCK_FIELD[3],
+            )
+            if (
+                str(caption.GetText() or "").replace("\r", "") != SUPPLIER_STOCK_CAPTION
+                or int(annotation.OwnerType) != 1
+                or not _inside(caption_box, SUPPLIER_STOCK_FIELD)
+            ):
+                raise RuntimeError(
+                    "leadscrew supplier stock caption changed or left its field"
+                )
+            if not _inside(curve_bounds, ink_field):
+                raise RuntimeError(
+                    "leadscrew supplier stock curves left their caption-free field"
+                )
+            assert_supplier_view_fits(
+                adapter,
+                view,
+                ink_field,
+                label="leadscrew nominal supplier stock gauges",
+            )
+        except RuntimeError as error:
+            raise RuntimeError(
+                f"{error}; source_curve_bounds_m={curve_bounds!r}; "
+                f"native_outline_m={native_outline!r}; caption_box_m={caption_box!r}; "
+                f"ink_field_m={ink_field!r}"
+            ) from error
+        finally:
+            _telemetry.info(
+                "supplier stock gauges settled: "
+                f"source_curve_bounds_m={curve_bounds!r}; "
+                f"native_outline_m={native_outline!r}; caption_box_m={caption_box!r}; "
+                f"ink_field_m={ink_field!r}"
+            )
 
     return settled
 
 
+def _assert_installed_source_state(
+    adapter: Any, source_model: Any, installed_configuration: str, *, stage: str
+) -> None:
+    """Observe the still-live source, never closed drawing/view handles."""
+    configuration = active_configuration_name(adapter, source_model)
+    read_only = source_model.IsOpenedReadOnly()
+    path = str(source_model.GetPathName())
+    if (
+        configuration != installed_configuration
+        or read_only is not True
+        or SOURCE.resolve() != Path(path).resolve()
+    ):
+        raise RuntimeError(
+            f"leadscrew source {stage}: installed source state changed: "
+            f"configuration={configuration!r}; expected={installed_configuration!r}; "
+            f"read_only={read_only!r}; path={path!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
+    """Preserve source bytes and installed configuration on success or refusal."""
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open cut leadscrew", await adapter.open_model(str(SOURCE)))
+    source_sha256 = _source_file_sha256(SOURCE)
+    with _preserve_reference_source_file(
+        SOURCE, source_sha256, label="leadscrew modified-stock drawing"
+    ):
+        source_model = _open_supplier_source_read_only(
+            adapter, SOURCE, label="open cut leadscrew"
+        )
+        installed_configuration = active_configuration_name(adapter, source_model)
+        if installed_configuration in ("", supplier.SUPPLIER_STOCK_CONFIGURATION):
+            raise RuntimeError(
+                "leadscrew source was saved without an installed configuration active: "
+                f"{installed_configuration!r}"
+            )
+        primary = None
+        try:
+            return await _build_read_only_source(
+                adapter, source_model, installed_configuration
+            )
+        except BaseException as error:
+            primary = error
+            raise
+        finally:
+            try:
+                _assert_installed_source_state(
+                    adapter, source_model, installed_configuration,
+                    stage="drawing lifecycle exit",
+                )
+            except BaseException as integrity_error:
+                if primary is None:
+                    raise
+                primary.add_note(
+                    f"leadscrew source integrity check also failed: {integrity_error}"
+                )
+
+
+async def _build_read_only_source(
+    adapter: Any, source_model: Any, installed_configuration: str
+) -> dict[str, str]:
+    if source_model.GetSaveFlag() is not False:
+        raise RuntimeError("leadscrew source must be clean before view creation/capture")
+    _assert_installed_source_state(
+        adapter, source_model, installed_configuration, stage="before view creation"
+    )
     required = (
         "Number",
         "Material Specification",
@@ -1027,6 +1211,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _center_view(draw, iso, ISO_CENTER, "leadscrew isometric")
     for view in (main, iso):
         set_hidden_lines_removed(adapter, view)
+    # Capture while source geometry is clean, before any native text formatting.
+    supplier_stock_check = _add_supplier_stock_inset(adapter)
     annotations = curate_view_dimensions(
         adapter,
         main,
@@ -1069,14 +1255,19 @@ async def build(adapter: Any) -> dict[str, str]:
     callout = str(_early_bound(thread, "INote").GetText() or "")
     if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
         raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
-    supplier_stock_check = _add_supplier_stock_inset(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=PDF_TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(supplier_stock_check,),
+        settled_checks=(
+            supplier_stock_check,
+            lambda: _assert_installed_source_state(
+                adapter, source_model, installed_configuration,
+                stage="settled before drawing save",
+            ),
+        ),
     )
 
 
