@@ -902,7 +902,10 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
     elif fault == "linear_dimension_type":
         state.display.Type2 = 2
     elif fault == "unknown_owner":
-        state.adapter.swApp.IsSame = lambda _first, _second: 2
+        state.adapter.swApp.IsSame = lambda first, second: (
+            2 if first is state.annotation.Owner and second is state.front
+            else int(first is second)
+        )
     elif fault == "malformed_kinds":
         state.annotation.kinds = (1, None)
     elif fault == "owner_type":
