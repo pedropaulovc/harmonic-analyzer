@@ -219,7 +219,7 @@ class _ReferenceFeature:
         self.Name = name
         self.sketch = sketch
         self.kind = kind
-        self.Visible = 2
+        self.Visible = 1  # Saved MODEL-hidden, independent of the drawing override.
         self.suppressed = False
         self.error_state = (0, False)
         self.native_identity = object()
@@ -329,7 +329,7 @@ class _ReferenceInkView:
         self.drawing_text = ()
         self.center_mark = None
         self.correspondence = {
-            id(self.owner): SimpleNamespace(Visible=2),
+            id(self.owner): SimpleNamespace(Visible=1),
             **{id(segment): object() for segment in self.source.GetSketchSegments()},
         }
 
@@ -416,10 +416,14 @@ class _ReferenceDrawing:
         return True
 
     def ActivateView(self, name):
-        self.ActiveDrawingView = next(
-            view for view in self.views.values() if view.Name == name
+        self.ActiveDrawingView = (
+            next(view for view in self.views.values() if view.Name == name)
+            if name else None
         )
-        return True
+        if not name:
+            self.edit_sheet = True
+        # Native ActivateView returns False for sheet context, unlike a named view.
+        return bool(name)
 
     def EditRebuild3(self):
         return True
@@ -750,7 +754,7 @@ def test_reference_capture_reacquires_each_configuration_then_projects_only_immu
         acquired.append(feature)
         for view in harness.views.values():
             view.correspondence = {
-                id(feature): SimpleNamespace(Visible=2),
+                id(feature): SimpleNamespace(Visible=1),
                 **{id(segment): object() for segment in sketch.GetSketchSegments()},
             }
         return result
@@ -844,14 +848,12 @@ def test_reference_capture_refuses_invalid_native_rebuild_status(
         ("configuration", "source document/path/configuration changed"),
         ("source-solid", "has solid/sheet bodies"),
         ("source-sheet", "has solid/sheet bodies"),
-        ("unexpected-visible-sketch", "visible reference inventory changed"),
-        ("unexpected-visible-plane", "unsupported visible source reference"),
-        ("suppressed-owner", "visible reference inventory changed"),
-        ("missing-owner", "visible reference inventory changed"),
+        ("wrong-owner-kind", "source reference|source sketch|source owner"),
+        ("source-unhidden", "hidden"),
+        ("suppressed-owner", "suppressed"),
+        ("missing-owner", "missing|owner|reference"),
         ("missing-segment-correspondence", "no drawing-view correspondence"),
-        ("extra-drawing-sketch", "additional drawing-sketch geometry"),
-        ("missing-drawing-sketch", "additional drawing-sketch geometry"),
-        ("unreadable-visibility", "unreadable view reference visibility"),
+        ("unreadable-source-visibility", "hidden"),
     ],
 )
 def test_reference_capture_rejects_unproven_native_inventory(
@@ -868,62 +870,36 @@ def test_reference_capture_rejects_unproven_native_inventory(
         assert native.GetBodiesCount() == 0
     elif fault == "suppressed-owner":
         native.owner.suppressed = True
-    elif fault in ("unexpected-visible-sketch", "unexpected-visible-plane"):
-        extra = _ReferenceFeature(
-            "UnexpectedReference",
-            native.source,
-            kind="RefPlane"
-            if fault == "unexpected-visible-plane"
-            else "ProfileFeature",
-        )
-        model.features.append(extra)
-        native.correspondence[id(extra)] = SimpleNamespace(Visible=2)
+    elif fault == "wrong-owner-kind":
+        native.owner.kind = "RefPlane"
+    elif fault == "source-unhidden":
+        native.owner.Visible = 2
     elif fault == "missing-owner":
-        native.correspondence[id(native.owner)].Visible = 1
+        model.features.clear()
     elif fault == "missing-segment-correspondence":
         del native.correspondence[id(native.source.GetSketchSegments()[0])]
-    elif fault == "extra-drawing-sketch":
-        native.drawing_segments.append(object())
-    elif fault == "missing-drawing-sketch":
-        native.GetSketch = lambda: None
     else:
-        native.correspondence[id(native.owner)].Visible = -1
+        native.owner.Visible = None
     with pytest.raises(RuntimeError, match=match):
         harness.capture()
     assert model.active == "Installed"
     assert native.outline_calls == 0
 
 
-@pytest.mark.parametrize(
-    "suppressed,part_visibility,view_visibility,allowed",
-    [
-        (False, 1, None, True),
-        (True, 2, None, True),
-        (True, 2, 2, True),
-        (False, 2, None, False),
-        (False, -1, None, False),
-    ],
-)
-def test_reference_capture_requires_positive_hidden_proof_for_missing_correspondence(
-    reference_scene, suppressed, part_visibility, view_visibility, allowed
+@pytest.mark.parametrize("corresponding_visibility", [None, 1, 2, -1])
+def test_reference_capture_does_not_infer_render_visibility_from_corresponding_feature(
+    reference_scene, corresponding_visibility
 ):
     harness = reference_scene()
-    extra = _ReferenceFeature("OtherReference", None, kind="RefPlane")
-    extra.suppressed, extra.Visible = suppressed, part_visibility
-    harness.model.features.append(extra)
-    if view_visibility is not None:
-        harness.view.correspondence[id(extra)] = SimpleNamespace(
-            Visible=view_visibility
-        )
-    if allowed:
-        harness.capture()
-        assert harness.project() == pytest.approx((0.072, 0.133, 0.085, 0.134))
+    if corresponding_visibility is None:
+        del harness.view.correspondence[id(harness.view.owner)]
     else:
-        with pytest.raises(
-            RuntimeError, match="indeterminate native reference visibility"
-        ):
-            harness.capture()
+        harness.view.correspondence[id(harness.view.owner)].Visible = corresponding_visibility
+    harness.capture()
     assert harness.model.active == "Installed"
+    assert harness.view.owner.Visible == 1
+    # Actual source geometry is independent of the corresponding feature's state.
+    assert harness.project() == pytest.approx((0.072, 0.133, 0.085, 0.134))
 
 
 @pytest.mark.parametrize("duplicate", ["same", "alias", "distinct"])
@@ -950,12 +926,12 @@ def test_reference_capture_deduplicates_only_proven_native_feature_identity(
         assert harness.view.source.capture_count == 1
 
 
-def test_reference_capture_unions_distinct_visible_owners(reference_scene):
+def test_reference_capture_unions_distinct_expected_source_owners(reference_scene):
     harness = reference_scene()
     sketch = _source_sketch(((-0.006, 0.007), (0.008, 0.012)), harness.model)
     feature = _ReferenceFeature("SecondOwner", sketch)
     harness.model.features.append(feature)
-    harness.view.correspondence[id(feature)] = SimpleNamespace(Visible=2)
+    harness.view.correspondence[id(feature)] = SimpleNamespace(Visible=1)
     harness.view.correspondence.update(
         {id(segment): object() for segment in sketch.GetSketchSegments()}
     )
@@ -1601,6 +1577,7 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
 
     def fit(_draw, members, *, read_bounds):
         events.append("fit")
+        assert harness.model.active == "Installed"
         if read_bounds is not None:
             for view, cell in members:
                 read_bounds(view, cell[0])
@@ -1690,3 +1667,15 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
     assert ("fit" in events) is (dirty_stage != "prepare")
     assert harness.model.dirty is True
     assert source.read_bytes() == b"offline supplier bytes"
+
+
+@pytest.mark.parametrize("missing", [False, True], ids=["extra-segment", "missing-sketch"])
+def test_reference_projection_rejects_additional_drawing_sketch_ink(reference_scene, missing):
+    harness = reference_scene()
+    if missing:
+        harness.view.GetSketch = lambda: None
+    else:
+        harness.view.drawing_segments.append(object())
+    harness.capture()
+    with pytest.raises(RuntimeError, match="drawing-sketch geometry"):
+        harness.project()

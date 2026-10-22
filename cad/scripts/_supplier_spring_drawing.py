@@ -4,9 +4,11 @@ View configurations are assigned before measuring/fitting. Supplier references
 never dimension the installed span. The optional maximum view is a construction-only nominal gauge, not a callback inserted behind a four-view contract.
 Nominal dimension diagrams are sketch-only configurations, never surrogate parts.
 Their actual native curves are captured once before fitting, with the source
-configuration restored before any projection or annotation callback. Newly placed
-unbroken, uncropped full views project that immutable capture in their current
-frame; installed pictorials retain their native outline and existing ink guards.
+configuration restored before projection or annotation callbacks. Existing
+view-qualified sketch showing and native dimension import provide presentation;
+capture does not infer drawing visibility from a source feature's Visible state.
+Unbroken, uncropped full views project the capture in their current frame;
+installed pictorials retain their native outline and existing ink guards.
 The source is opened read-only and clean. The explicit annotation phase permits
 presentation-only dirty state; drawing finalization must preserve source bytes.
 """
@@ -388,50 +390,6 @@ def _reference_features(model: Any, adapter: Any, *, label: str) -> dict[str, An
     return references
 
 
-def _visible_reference_features(
-    view: Any,
-    references: Mapping[str, Any],
-    *,
-    suppression: Mapping[str, bool],
-    label: str,
-) -> set[str]:
-    visible = set()
-    for name, feature in references.items():
-        suppressed = suppression[name]
-        corresponding = view.GetCorresponding(feature)
-        state = (
-            None
-            if corresponding is None
-            else _early_bound(
-                _bind(corresponding, "IFeature"),
-                "IFeature",
-            ).Visible
-        )
-        if state is None:
-            # None is not general evidence of hidden ink: in another active
-            # configuration even a shown owner may have no correspondence.
-            if suppressed:
-                continue
-            part_visibility = feature.Visible
-            if type(part_visibility) is int and part_visibility == 1:
-                continue
-            raise RuntimeError(
-                f"{label}: indeterminate native reference visibility for {name!r}"
-            )
-        if type(state) is not int or state not in (1, 2):
-            raise RuntimeError(
-                f"{label}: unreadable view reference visibility for {name!r}: {state!r}"
-            )
-        if suppressed or state == 1:
-            continue
-        if str(feature.GetTypeName2()) != "ProfileFeature":
-            raise RuntimeError(
-                f"{label}: unsupported visible source reference {name!r}"
-            )
-        visible.add(name)
-    return visible
-
-
 def _capture_reference_configuration(
     adapter: Any,
     views: Mapping[str, Any],
@@ -452,7 +410,6 @@ def _capture_reference_configuration(
             f"has solid/sheet bodies {counts!r}, expected (0, 0)"
         )
     references = _reference_features(model, adapter, label=label)
-    suppression = {name: _suppressed(feature) for name, feature in references.items()}
     for key, names in owners.items():
         view = _early_bound(views[key], "IView")
         _assert_reference_binding(
@@ -464,21 +421,18 @@ def _capture_reference_configuration(
             label=f"{label} {key}",
         )
         view.UpdateViewDisplayGeometry()
-        visible = _visible_reference_features(
-            view,
-            references,
-            suppression=suppression,
-            label=f"{label} {key}",
-        )
-        if visible != set(names):
-            raise RuntimeError(
-                f"{label} {key}: native visible reference inventory changed: "
-                f"expected={names!r}, observed={tuple(sorted(visible))!r}"
-            )
-        _assert_reference_view_ink(view, label=f"{label} {key}")
     geometry = {}
     for name in dict.fromkeys(name for names in owners.values() for name in names):
-        feature = references[name]
+        feature = references.get(name)
+        if feature is None:
+            raise RuntimeError(f"{label}: expected source sketch {name!r} is missing")
+        if str(feature.GetTypeName2()) != "ProfileFeature":
+            raise RuntimeError(f"{label}: expected source sketch {name!r} is not a ProfileFeature")
+        visibility = feature.Visible
+        if type(visibility) is not int or visibility != 1:
+            raise RuntimeError(f"{label}: expected source sketch {name!r} is not saved model-hidden")
+        if _suppressed(feature):
+            raise RuntimeError(f"{label}: expected source sketch {name!r} is suppressed")
         error = feature.GetErrorCode2()
         if (
             type(error) is not tuple
@@ -677,6 +631,28 @@ def _capture_reference_views(
     return captures
 
 
+def _assert_reference_capture_binding(
+    adapter: Any, view: Any, *, capture: _CapturedReferenceView, source: Path,
+    model: Any, features: Sequence[str], configuration: str, label: str,
+) -> None:
+    if (
+        not isinstance(capture, _CapturedReferenceView)
+        or capture.source.path != source
+        or capture.configuration != configuration
+        or capture.features != tuple(features)
+        or not capture.geometry
+        or len(capture.geometry) != len(capture.features)
+        or int(adapter.swApp.IsSame(capture.source.model, model)) != 1
+        or int(adapter.swApp.IsSame(capture.view, view)) != 1
+        or not capture.name
+        or capture.name != view_name(adapter, view)
+    ):
+        raise RuntimeError(f"{label}: foreign or incomplete supplier native capture")
+    _assert_reference_binding(
+        adapter, view, source=source, model=model, configuration=configuration, label=label,
+    )
+
+
 def _reference_view_bounds(
     adapter: Any,
     view: Any,
@@ -692,26 +668,9 @@ def _reference_view_bounds(
     """Project caller-bound immutable floats; never switch or reread source ink."""
     view = _early_bound(view, "IView")
     source = source.resolve()
-    if (
-        not isinstance(capture, _CapturedReferenceView)
-        or capture.source.path != source
-        or capture.configuration != configuration
-        or capture.features != tuple(features)
-        or not capture.geometry
-        or len(capture.geometry) != len(capture.features)
-        or int(adapter.swApp.IsSame(capture.source.model, model)) != 1
-        or int(adapter.swApp.IsSame(capture.view, view)) != 1
-        or not capture.name
-        or capture.name != view_name(adapter, view)
-    ):
-        raise RuntimeError(f"{label}: foreign or incomplete supplier native capture")
-    _assert_reference_binding(
-        adapter,
-        view,
-        source=source,
-        model=model,
-        configuration=configuration,
-        label=label,
+    _assert_reference_capture_binding(
+        adapter, view, capture=capture, source=source, model=model,
+        features=features, configuration=configuration, label=label,
     )
     _assert_reference_source_restored(
         adapter,

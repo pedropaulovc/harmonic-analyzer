@@ -1524,13 +1524,20 @@ through the current, refreshed native view frame; complete circles use exact
 projected ellipse extrema. One-dimensional projections are valid. Partial arcs,
 blocks, text and explicit user-point ink refuse rather than being omitted.
 Capture proves error-free named source features, actual requested configuration,
-zero solid/sheet bodies, shown reference inventory and drawing correspondences.
+zero solid/sheet bodies, unsuppressed model-hidden construction owners and
+drawing correspondences. It does not infer drawing visibility from a
+corresponding feature's `Visible` property.
 The spring/chain path makes one capture pass per source configuration, then
 restores the original configuration, body counts, dirty/read-only state and
 drawing context before fitting. It never switches or rebuilds the source during
 fitting, dimension placement or final settled checks. Captures are bound to the
 actual source document/path/configuration and view, with no live-sketch fallback;
 the drawing path performs no source geometry mutations after capture.
+Existing drawing-qualified sketch showing and native dimension import remain
+the presentation path. Native farm renders and visual comparison with the
+supplier reference qualify the resulting sheet, independently of the source
+geometry capture. Native dimension association, value, visibility and
+annotation-containment checks remain mandatory.
 Source parts are opened with the native silent/read-only option, with actual
 read-only state and path identity checked; a resident writable source is refused.
 Only clean source documents are captured, without saving or clearing their

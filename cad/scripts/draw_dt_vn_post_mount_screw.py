@@ -119,7 +119,7 @@ from _supplier_reference_geometry import (
     native_sketch_view_bounds,
 )
 from _supplier_screw_dimensions import _assert_source
-from _visibility import FeatureWalk, REFERENCE_FEATURE_KINDS, visible_reference_geometry
+from _visibility import visible_reference_geometry
 from dt_vn_post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
     CUT_END_BREAK_BAND,
@@ -711,42 +711,13 @@ def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
     while GetOutline retains a vertical extent from before the configuration
     switch. That extent is still logged; it is not a sketch-ink measurement.
     This path is restricted to the exact zero-body MSC source configuration.
+    Presentation uses the existing view-scoped show/import path; corresponding
+    IFeature.Visible is not a proven receipt of drawing-view visibility.
     """
     label = f"MSC source ink {view_name(adapter, view)}"
     view = _early_bound(view, "IView")
     if str(view.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError(f"{label}: wrong source configuration")
-    model = _early_bound(view.ReferencedDocument, "IModelDoc2")
-    visible = []
-    reference_states = {}
-    for raw in FeatureWalk(model):
-        feature = _early_bound(raw, "IFeature")
-        if str(feature.GetTypeName2()) not in REFERENCE_FEATURE_KINDS:
-            continue
-        try:
-            corresponding = view.GetCorresponding(feature)
-            state = (
-                None
-                if corresponding is None
-                else int(_early_bound(corresponding, "IFeature").Visible)
-            )
-        except Exception as exc:
-            state = f"read_error: {type(exc).__name__}: {exc}"
-        reference_states[str(feature.Name)] = state
-        if state == 2:  # swVisibilityStateShown, in DRAWING context.
-            visible.append(str(feature.Name))
-    _telemetry.info(
-        f"{label}: view_reference_states={reference_states!r} "
-        f"view_shown_references={visible!r}"
-    )
-    if any(state not in (None, 1, 2) for state in reference_states.values()):
-        raise RuntimeError(
-            f"{label}: unknown drawing reference visibility {reference_states!r}"
-        )
-    if set(visible) != {SUPPLIER_STOCK_FEATURE}:
-        raise RuntimeError(
-            f"{label}: unexpected visible reference inventory {visible!r}"
-        )
     drawing_sketch = _early_bound(view.GetSketch(), "ISketch")
     drawing_segments = tuple(drawing_sketch.GetSketchSegments() or ())
     drawing_types = [

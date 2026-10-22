@@ -1894,19 +1894,7 @@ def _supplier_ink_seat(monkeypatch, cropped):
         Visible=0,
         GetErrorCode2=lambda: (0, False),
     )
-    other = SimpleNamespace(
-        Name="UnrelatedSketch", GetTypeName2=lambda: "ProfileFeature", Visible=2
-    )
-    shown = SimpleNamespace(Visible=2)
-    hidden = SimpleNamespace(Visible=1)
-    correspondence = {id(feature): shown, id(other): hidden}
-    correspondence.update((id(line), line) for line in lines)
     model = SimpleNamespace(FeatureByName=lambda _name: feature)
-    monkeypatch.setattr(
-        drawing,
-        "FeatureWalk",
-        lambda actual: (feature, other) if actual is model else (),
-    )
     center = drawing.STOCK_HEAD_CENTER if cropped else drawing.STOCK_CENTER
     scale = drawing.STOCK_HEAD_SCALE if cropped else drawing.STOCK_SCALE
     ratio = scale[0] / scale[1]
@@ -1954,7 +1942,6 @@ def _supplier_ink_seat(monkeypatch, cropped):
         ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
         ReferencedDocument=model,
         GetBodiesCount=lambda: 0,
-        GetCorresponding=lambda obj: correspondence.get(id(obj)),
         ModelToViewTransform=model_to_sheet,
         GetSketch=lambda: sketch,
         IsCropped=lambda: cropped,
@@ -1979,17 +1966,27 @@ def _supplier_ink_seat(monkeypatch, cropped):
         adapter=adapter,
         view=view,
         lines=lines,
-        shown=shown,
-        hidden=hidden,
         geometry=geometry,
         feature=feature,
         source=source,
-        correspondence=correspondence,
         drawing_segments=drawing_segments,
         circle=circle,
         projected=projected,
         messages=messages,
         cell=drawing.STOCK_HEAD_CELL if cropped else drawing.STOCK_VIEW_CELL,
+    )
+
+
+@pytest.mark.parametrize("cropped", [False, True])
+def test_supplier_profile_ink_does_not_use_feature_visibility_as_view_receipt(
+    monkeypatch, cropped,
+):
+    seat = _supplier_ink_seat(monkeypatch, cropped)
+    seat.view.GetCorresponding = lambda _feature: pytest.fail(
+        "corresponding feature visibility is not a drawing-view receipt"
+    )
+    drawing._assert_supplier_profile_ink(
+        seat.adapter, seat.view, seat.cell, seat.geometry, cropped=cropped,
     )
 
 
@@ -2032,9 +2029,6 @@ def test_supplier_profile_ink_projects_immutable_target_without_live_source_read
     "fault,reason",
     [
         ("configuration", "configuration"),
-        ("missing-shown", "reference inventory"),
-        ("extra-shown", "reference inventory"),
-        ("unknown-visibility", "unknown drawing reference visibility"),
         ("drawing-geometry", "drawing-sketch geometry"),
     ],
 )
@@ -2044,24 +2038,11 @@ def test_supplier_profile_ink_rejects_current_view_inventory_changes(
     seat = _supplier_ink_seat(monkeypatch, False)
     if fault == "configuration":
         seat.view.ReferencedConfiguration = "Default"
-    elif fault == "missing-shown":
-        seat.shown.Visible = 1
-    elif fault == "extra-shown":
-        seat.hidden.Visible = 2
-    elif fault == "unknown-visibility":
-        seat.shown.Visible = 3
     else:
         seat.drawing_segments.append(seat.circle)
     with pytest.raises(RuntimeError, match=reason):
         drawing._assert_supplier_profile_ink(
             seat.adapter, seat.view, seat.cell, seat.geometry, cropped=False
-        )
-    if fault == "unknown-visibility":
-        assert any(
-            "view_reference_states=" in message
-            and "UnrelatedSketch" in message
-            and drawing.SUPPLIER_STOCK_FEATURE in message
-            for message in seat.messages
         )
 
 
@@ -2546,28 +2527,6 @@ def test_supplier_source_bodiless_tolerates_diagnostic_view_count_failure(monkey
     assert seat.state.configuration == "Original"
     assert any(
         "view selection count unavailable" in message for message in seat.state.messages
-    )
-
-
-def test_supplier_profile_ink_logs_complete_census_after_visibility_read_failure(
-    monkeypatch,
-):
-    seat = _supplier_ink_seat(monkeypatch, False)
-    corresponding = seat.view.GetCorresponding
-
-    def fail_source(feature):
-        if getattr(feature, "Name", None) == drawing.SUPPLIER_STOCK_FEATURE:
-            raise RuntimeError("native visibility unavailable")
-        return corresponding(feature)
-
-    seat.view.GetCorresponding = fail_source
-    with pytest.raises(RuntimeError, match="unknown drawing reference visibility"):
-        drawing._assert_supplier_profile_ink(
-            seat.adapter, seat.view, seat.cell, seat.geometry, cropped=False
-        )
-    assert any(
-        "native visibility unavailable" in message and "UnrelatedSketch" in message
-        for message in seat.messages
     )
 
 
