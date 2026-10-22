@@ -3812,6 +3812,7 @@ def task_check():
         SCRIPTS_DIR / "test_supplier_configured_references.py",
         SCRIPTS_DIR / "test_supplier_spring_reference.py",
         SCRIPTS_DIR / "test_supplier_reference_geometry.py",
+        SCRIPTS_DIR / "test_supplier_reference_text.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
