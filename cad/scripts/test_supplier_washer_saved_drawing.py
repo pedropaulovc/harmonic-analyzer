@@ -66,6 +66,12 @@ class _View(_ReadSurface):
         self.model_name = model.GetPathName()
         self.displays = []
         self.edges = []
+        self.forward = {}
+
+    def GetCorresponding(self, entity):
+        if not self.alive:
+            raise AssertionError("stale authoring correspondence used after close")
+        return self.forward.get(id(entity))
 
     def __getattribute__(self, name):
         if name in {
@@ -93,7 +99,7 @@ class _Display(_ReadSurface):
         self.view = view
         self.native = native
         self.selection_name = f"{label}@saved-washer-view"
-        self.Type2 = 11 if label == source.THICKNESS else 6
+        self.Type2 = 2 if label == source.THICKNESS else 6
         self.ShowParenthesis = False
         self.ShowDimensionValue = True
         self.use_document = False
@@ -112,7 +118,9 @@ class _Display(_ReadSurface):
         annotation.IsDangling = lambda: annotation.dangling
         annotation.GetAttachedEntities3 = lambda: annotation.attached
         annotation.GetAttachedEntityCount3 = lambda: len(annotation.attached)
-        annotation.GetAttachedEntityTypes = lambda: (11,) * len(annotation.attached)
+        annotation.GetAttachedEntityTypes = lambda: (
+            (11 if label == source.THICKNESS else 10),
+        ) * len(annotation.attached)
 
     def __getattribute__(self, name):
         if name.startswith("Get") or name in ("Type2", "ShowParenthesis", "ShowDimensionValue"):
@@ -294,13 +302,14 @@ def saved_washer(request, tmp_path, monkeypatch):
     features = {}
     model = _Part(
         GetPathName=lambda: str(path_state.path), GetType=lambda: 1, IsOpenedReadOnly=lambda: True,
-        GetSaveFlag=lambda: False,
+        GetSaveFlag=lambda: False, Extension=SimpleNamespace(reverse={}),
         GetBodies2=lambda _kind, _hidden: (body,), FeatureByName=lambda name: features.get(name),
     )
     original = {name: _View(name, model, f"Authoring{name[1:]}Config") for name in ORIENTATIONS}
     fresh = {name: _View(name, model, original[name].ReferencedConfiguration) for name in ORIENTATIONS}
     drawing = _Drawing(drawing_path, fresh)
     app = _App(drawing, model)
+    model.Extension.GetCorresponding2 = lambda entity: model.Extension.reverse.get(id(entity))
     # Native source coordinate conversion still executes _model_point and its
     # independent marshalled-coordinate check; only the math COM object is fake.
     app.GetMathUtility = lambda: SimpleNamespace(CreatePoint=lambda coords: _Point(coords))
@@ -314,10 +323,11 @@ def saved_washer(request, tmp_path, monkeypatch):
             top = (axis == "y") != (label == source.THICKNESS)
             sketch = SimpleNamespace(ModelToSketchTransform=SimpleNamespace(Inverse=lambda top=top: top))
             features[feature_name] = SimpleNamespace(
-                Name=feature_name, dimensions={},
+                Name=feature_name, dimensions={}, GetTypeName2=lambda: "ProfileFeature",
                 GetSpecificFeature2=lambda sketch=sketch: sketch,
             )
         feature = features[feature_name]
+        sketch = feature.GetSpecificFeature2()
         if label == source.THICKNESS:
             sign = 1.0 if axis == "y" else -1.0
             points = (_point(0.005, 0.0, 0.0), _point(0.005, sign * 0.00091, 0.0))
@@ -325,6 +335,9 @@ def saved_washer(request, tmp_path, monkeypatch):
                 ConstructionGeometry=True, GetType=lambda: 0,
                 GetStartPoint2=lambda: points[0], GetEndPoint2=lambda: points[1],
             )
+            for index, point in enumerate(points):
+                point.GetSketch = lambda sketch=sketch: sketch
+                point.GetID = lambda index=index: (index, index + 1)
             source_entities[label] = points
             feature.GetSpecificFeature2().GetSketchSegments = lambda: (segment,)
         else:
@@ -334,6 +347,8 @@ def saved_washer(request, tmp_path, monkeypatch):
                 GetCenterPoint2=lambda: _point(0.0, 0.0, 0.0),
                 GetRadius=lambda diameter=diameter: diameter / 2000.0,
             )
+            segment.GetSketch = lambda sketch=sketch: sketch
+            segment.GetID = lambda label=label: (0, 1 if label == source.OUTER_DIAMETER else 2)
             source_entities[label] = (segment,)
     face_segments = tuple(source_entities[label][0]
                           for label in (source.OUTER_DIAMETER, source.BORE_DIAMETER))
@@ -366,13 +381,44 @@ def saved_washer(request, tmp_path, monkeypatch):
     monkeypatch.setattr(washer, "_named_dimensions", named_dimensions)
     face_orientation = "*Top" if axis == "y" else "*Front"
     side_orientation = "*Front" if axis == "y" else "*Top"
+    mapped_features = {}
+    mapped_entities = {}
     for collection in (original, fresh):
         for view in collection.values():
             view.edges = list(body_edges)
+            mapped_features[view] = {}
+            mapped_entities[view] = {}
+            for name, feature in features.items():
+                source_sketch = feature.GetSpecificFeature2()
+                mapped_sketch = SimpleNamespace()
+                mapped_feature = SimpleNamespace(
+                    Name=name, GetTypeName2=lambda: "ProfileFeature",
+                    GetSpecificFeature2=lambda sketch=mapped_sketch: sketch,
+                )
+                mapped_features[view][name] = mapped_feature
+                view.forward[id(feature)] = mapped_feature
+                model.Extension.reverse[id(mapped_feature)] = feature
+                # Native generic sketch correspondence is NOT the specific
+                # sketch obtained from the corresponding IFeature.
+                view.forward[id(source_sketch)] = SimpleNamespace()
+                for label, entities in source_entities.items():
+                    if source.SOURCE_DIMENSIONS[label][0] != name:
+                        continue
+                    mapped = []
+                    for entity in entities:
+                        member = SimpleNamespace(**vars(entity))
+                        member.GetSketch = lambda sketch=mapped_sketch: sketch
+                        view.forward[id(entity)] = member
+                        # Measured point inverse succeeds with native null.
+                        model.Extension.reverse[id(member)] = (
+                            None if label == source.THICKNESS else entity
+                        )
+                        mapped.append(member)
+                    mapped_entities[view][label] = tuple(mapped)
         for label, value in VALUES.items():
             view = collection[side_orientation if label == source.THICKNESS else face_orientation]
             if label in bands:
-                native, attached = source_natives[label], source_entities[label]
+                native, attached = source_natives[label], mapped_entities[view][label]
             else:
                 tolerance = _ReadSurface(Type=0)
                 native_name = "D1" if label == source.OUTER_DIAMETER else "D2"
@@ -384,6 +430,12 @@ def saved_washer(request, tmp_path, monkeypatch):
                 edge_index = 2 if label == source.OUTER_DIAMETER else 3
                 attached = (body_edges[edge_index],)
             view.displays.append(_Display(label, native, view, attached, units=0, precision=2))
+    # Importing can put even the canonical IDimension's owner in the mapped
+    # context. OD/bore retain the direct source feature (the measured PD case).
+    thickness_native = source_natives[source.THICKNESS]
+    thickness_native.GetFeatureOwner = lambda: mapped_features[
+        (fresh if str(drawing_path) in app.loaded else original)[side_orientation]
+    ][source.THICKNESS_FEATURE]
     references = tuple(washer._reference(display, view, label, VALUES[label], imported=label in bands)
                        for label in VALUES for view in original.values() for display in view.displays
                        if display.selection_name == f"{label}@saved-washer-view")
@@ -404,6 +456,7 @@ def saved_washer(request, tmp_path, monkeypatch):
         source_path=source_path, path_state=path_state, body_edges=body_edges,
         source_entities=source_entities, source_natives=source_natives,
         source_displays=source_displays, features=features, messages=messages,
+        mapped_features=mapped_features, mapped_entities=mapped_entities,
         invalidate=invalidate, face=face_orientation, side=side_orientation,
         original_bytes=drawing_path.read_bytes(), source_bytes=source_path.read_bytes(),
     )
@@ -837,12 +890,354 @@ def test_same_named_native_clone_cannot_impersonate_actual_source_dimension(save
     assert display.native is not actual_source_native
     assert display.native.FullName == actual_source_native.FullName
     assert display.native.GetFeatureOwner() is actual_source_native.GetFeatureOwner()
-    assert display.annotation.attached == case.source_entities[source.THICKNESS]
+    assert display.annotation.attached == case.mapped_entities[display.view][source.THICKNESS]
     case.invalidate()
     with pytest.raises(RuntimeError, match="not its actual native source"):
         case.proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
     assert not case.messages
+
+
+def _source_context(case, label=source.THICKNESS):
+    view = case.original[case.side if label == source.THICKNESS else case.face]
+    return view, _Display(
+        label, case.source_natives[label], view, case.mapped_entities[view][label],
+        units=0, precision=2,
+    )
+
+
+def _check_source(case, display, label=source.THICKNESS, **context):
+    source.assert_supplier_washer_source_attachment(
+        case.adapter, case.model, display, label=label, axis=case.arguments["axis"],
+        bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91, visible=True, **context,
+    )
+
+
+@pytest.mark.parametrize("label", tuple(VALUES))
+@pytest.mark.parametrize("alternate_kind", (False, True))
+def test_measured_view_source_context_accepts_complete_native_proof(saved_washer, label, alternate_kind):
+    case = saved_washer
+    view, display = _source_context(case, label)
+    feature = case.features[source.SOURCE_DIMENSIONS[label][0]]
+    mapped_feature = case.mapped_features[view][feature.Name]
+    assert mapped_feature is not feature
+    assert view.GetCorresponding(feature.GetSpecificFeature2()) is not mapped_feature.GetSpecificFeature2()
+    assert display.annotation.Owner is view
+    assert display.native is case.source_natives[label]
+    for original, mapped in zip(case.source_entities[label], display.annotation.attached, strict=True):
+        assert original is not mapped
+        assert original.GetSketch() is feature.GetSpecificFeature2()
+        assert mapped.GetSketch() is mapped_feature.GetSpecificFeature2()
+        assert original.GetID() == mapped.GetID()  # IDs are scoped, not authority.
+        assert case.app.IsSame(original, mapped) == 0
+        if label == source.THICKNESS:
+            assert case.model.Extension.GetCorresponding2(mapped) is None
+        else:
+            assert case.model.Extension.GetCorresponding2(mapped) is original
+            assert view.GetCorresponding(original) is mapped
+    assert display.native.GetFeatureOwner() is (
+        mapped_feature if label == source.THICKNESS else feature
+    )
+    if alternate_kind:
+        display.annotation.GetAttachedEntityTypes = lambda: (
+            (25 if label == source.THICKNESS else 24),
+        ) * len(display.annotation.attached)
+    _check_source(case, display, label, view=view)
+    assert case.source_path.read_bytes() == case.source_bytes
+    assert case.path.read_bytes() == case.original_bytes
+
+
+@pytest.mark.parametrize("fault", (
+    "native-clone", "source-missing", "source-name", "source-type", "mapped-null",
+    "mapped-name", "mapped-type", "owner-null", "owner-clone", "owner-name",
+    "owner-type", "reverse-feature-null", "reverse-feature-clone",
+    "source-sketch", "mapped-sketch", "mapped-sketch-generic", "mapped-specific-null",
+    "forward-null", "forward-collapse", "forward-foreign", "source-collapse",
+    "annotation-owner", "annotation-owner-type", "annotation-owner-null",
+    "attachment-count", "attachment-count-bool", "attachment-types", "attachment-type-count",
+    "attachment-extra", "attachment-duplicate", "attachment-null", "attachment-missing", "attachment-clone",
+    "source-extra-segment", "source-not-construction", "source-wrong-endpoint",
+    "source-wrong-plane", "view-document", "view-path", "origin-points",
+))
+@pytest.mark.parametrize("point_kind", (11, 25))
+def test_view_source_context_refuses_incomplete_native_proof(saved_washer, fault, point_kind):
+    case = saved_washer
+    view, display = _source_context(case)
+    feature = case.features[source.THICKNESS_FEATURE]
+    sketch = feature.GetSpecificFeature2()
+    mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
+    originals = case.source_entities[source.THICKNESS]
+    mapped = case.mapped_entities[view][source.THICKNESS]
+    annotation = display.annotation
+    annotation.GetAttachedEntityTypes = lambda: (point_kind,) * len(annotation.attached)
+    if fault == "native-clone":
+        display.native = _ReadSurface(**vars(display.native))
+    elif fault == "source-missing":
+        case.features.pop(source.THICKNESS_FEATURE)
+    elif fault in {"source-name", "mapped-name"}:
+        (feature if fault.startswith("source") else mapped_feature).Name = "OtherWitness"
+    elif fault in {"source-type", "mapped-type"}:
+        (feature if fault.startswith("source") else mapped_feature).GetTypeName2 = lambda: "RefPlane"
+    elif fault == "mapped-null":
+        view.forward[id(feature)] = None
+    elif fault.startswith("owner-"):
+        owner = None if fault == "owner-null" else SimpleNamespace(**vars(mapped_feature))
+        if fault == "owner-name":
+            owner.Name = "OtherWitness"
+        elif fault == "owner-type":
+            owner.GetTypeName2 = lambda: "RefPlane"
+        display.native.GetFeatureOwner = lambda: owner
+    elif fault.startswith("reverse-feature-"):
+        case.model.Extension.reverse[id(mapped_feature)] = (
+            None if fault.endswith("null") else SimpleNamespace(**vars(feature))
+        )
+    elif fault == "source-sketch":
+        originals[0].GetSketch = lambda: SimpleNamespace()
+    elif fault == "mapped-sketch":
+        mapped[0].GetSketch = lambda: sketch
+    elif fault == "mapped-sketch-generic":
+        mapped[0].GetSketch = lambda: view.GetCorresponding(sketch)
+    elif fault == "mapped-specific-null":
+        mapped_feature.GetSpecificFeature2 = lambda: None
+    elif fault == "forward-null":
+        view.forward[id(originals[1])] = None
+    elif fault == "forward-collapse":
+        view.forward[id(originals[1])] = mapped[0]
+    elif fault == "forward-foreign":
+        view.forward[id(originals[1])] = SimpleNamespace(**vars(mapped[1]))
+    elif fault == "source-collapse":
+        sketch.GetSketchSegments()[0].GetEndPoint2 = lambda: originals[0]
+    elif fault == "annotation-owner":
+        annotation.Owner = case.original["*Right"]
+    elif fault == "annotation-owner-type":
+        annotation.OwnerType = 1
+    elif fault == "annotation-owner-null":
+        annotation.Owner = None
+    elif fault == "attachment-count":
+        annotation.GetAttachedEntityCount3 = lambda: 1
+    elif fault == "attachment-count-bool":
+        annotation.GetAttachedEntityCount3 = lambda: True
+    elif fault == "attachment-types":
+        annotation.GetAttachedEntityTypes = lambda: (10, 10)
+    elif fault == "attachment-type-count":
+        annotation.GetAttachedEntityTypes = lambda: (point_kind,)
+    elif fault == "attachment-extra":
+        annotation.attached = (*mapped, SimpleNamespace(**vars(mapped[0])))
+    elif fault == "attachment-duplicate":
+        annotation.attached = (mapped[0], mapped[0])
+    elif fault == "attachment-null":
+        annotation.attached = (mapped[0], None)
+    elif fault == "attachment-missing":
+        annotation.attached = mapped[:1]
+    elif fault == "attachment-clone":
+        annotation.attached = tuple(SimpleNamespace(**vars(point)) for point in mapped)
+    elif fault == "origin-points":
+        origin = _point(0.0, 0.0, 0.0)
+        origin.GetSketch = mapped[0].GetSketch
+        origin.GetID = mapped[0].GetID
+        annotation.attached = (origin, mapped[1])
+    elif fault == "source-extra-segment":
+        segment = sketch.GetSketchSegments()[0]
+        sketch.GetSketchSegments = lambda: (segment, segment)
+    elif fault == "source-not-construction":
+        sketch.GetSketchSegments()[0].ConstructionGeometry = False
+    elif fault == "source-wrong-endpoint":
+        originals[1].Y *= 2
+    elif fault == "source-wrong-plane":
+        sketch.ModelToSketchTransform.Inverse = lambda: case.arguments["axis"] == "y"
+    elif fault == "view-document":
+        view.ReferencedDocument = _Part(**vars(case.model))
+    elif fault == "view-path":
+        view.model_name = str(case.source_path.with_name("foreign.SLDPRT"))
+    with pytest.raises(RuntimeError):
+        _check_source(case, display, view=view)
+    assert case.source_path.read_bytes() == case.source_bytes
+    assert case.path.read_bytes() == case.original_bytes
+
+
+@pytest.mark.parametrize("result", (False, True, 0.0, 1.0, 2, None, "1"),
+                         ids=("false", "true", "float-zero", "float-one", "unsupported", "null", "string"))
+@pytest.mark.parametrize("relation", ("native", "feature", "reverse-feature", "source-self", "mapped-self", "owner-view"))
+def test_view_source_context_requires_real_integer_native_identity(saved_washer, result, relation):
+    case = saved_washer
+    view, display = _source_context(case)
+    feature = case.features[source.THICKNESS_FEATURE]
+    mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
+    original = case.source_entities[source.THICKNESS][0]
+    mapped = case.mapped_entities[view][source.THICKNESS][0]
+    entity = {
+        "native": display.native, "feature": mapped_feature, "reverse-feature": feature,
+        "source-self": original, "mapped-self": mapped, "owner-view": view,
+    }[relation]
+    actual_is_same = case.app.IsSame
+    case.app.IsSame = lambda first, second: (
+        result if first is entity and second is entity else actual_is_same(first, second)
+    )
+    with pytest.raises(RuntimeError):
+        _check_source(case, display, view=view)
+
+
+@pytest.mark.parametrize("inventory", ("source", "mapped", "attached"))
+def test_view_source_inventory_requires_native_distinctness(saved_washer, inventory):
+    case = saved_washer
+    view, display = _source_context(case)
+    members = (case.source_entities[source.THICKNESS] if inventory == "source"
+               else case.mapped_entities[view][source.THICKNESS])
+    actual_is_same = case.app.IsSame
+
+    def same(first, second):
+        if ((first is members[0] and second is members[1])
+                or (first is members[1] and second is members[0])):
+            return 1
+        return actual_is_same(first, second)
+
+    if inventory == "attached":
+        display.annotation.attached = (members[0], members[0])
+    else:
+        case.app.IsSame = same
+    with pytest.raises(RuntimeError):
+        _check_source(case, display, view=view)
+
+
+
+@pytest.mark.parametrize("fault", (
+    "wrong-bore", "reverse-null", "reverse-clone", "reverse-bore", "roundtrip-null",
+    "roundtrip-clone", "unselected-collapse", "unselected-null", "unselected-sketch",
+    "source-duplicate", "partial-circle", "wrong-radius", "wrong-center",
+))
+def test_view_circle_proof_checks_complete_inventory_and_reverse_roundtrip(saved_washer, fault):
+    case = saved_washer
+    view, display = _source_context(case, source.OUTER_DIAMETER)
+    outer = case.source_entities[source.OUTER_DIAMETER][0]
+    bore = case.source_entities[source.BORE_DIAMETER][0]
+    mapped_outer = case.mapped_entities[view][source.OUTER_DIAMETER][0]
+    mapped_bore = case.mapped_entities[view][source.BORE_DIAMETER][0]
+    if fault == "wrong-bore":
+        display.annotation.attached = (mapped_bore,)
+    elif fault.startswith("reverse-"):
+        case.model.Extension.reverse[id(mapped_outer)] = {
+            "reverse-null": None, "reverse-clone": SimpleNamespace(**vars(outer)),
+            "reverse-bore": bore,
+        }[fault]
+    elif fault.startswith("roundtrip-"):
+        def reverse(entity):
+            if entity is mapped_outer:
+                view.forward[id(outer)] = (
+                    None if fault.endswith("null") else SimpleNamespace(**vars(mapped_outer))
+                )
+                return outer
+            return case.model.Extension.reverse.get(id(entity))
+        case.model.Extension.GetCorresponding2 = reverse
+    elif fault == "unselected-collapse":
+        view.forward[id(bore)] = mapped_outer
+    elif fault == "unselected-null":
+        view.forward[id(bore)] = None
+    elif fault == "unselected-sketch":
+        mapped_bore.GetSketch = lambda: outer.GetSketch()
+    elif fault == "source-duplicate":
+        outer.GetSketch().GetSketchSegments = lambda: (outer, outer)
+    elif fault == "partial-circle":
+        outer.IsCircle = lambda: 0
+    elif fault == "wrong-radius":
+        outer.GetRadius = lambda: 0.006
+    elif fault == "wrong-center":
+        outer.GetCenterPoint2 = lambda: _point(0.001, 0.0, 0.0)
+    with pytest.raises(RuntimeError):
+        _check_source(case, display, source.OUTER_DIAMETER, view=view)
+
+
+@pytest.mark.parametrize("context", ({}, {"view": None}), ids=("omitted", "explicit-none"))
+@pytest.mark.parametrize("fault", ("none", "mapped-owner", "mapped-endpoints", "geometry", "construction"))
+def test_part_only_source_guard_retains_direct_source_contract(saved_washer, context, fault):
+    case = saved_washer
+    _, display = _source_context(case)
+    feature = case.features[source.THICKNESS_FEATURE]
+    mapped_owner = display.native.GetFeatureOwner()
+    display.native.GetFeatureOwner = lambda: feature
+    display.annotation.attached = case.source_entities[source.THICKNESS]
+    if fault == "mapped-owner":
+        display.native.GetFeatureOwner = lambda: mapped_owner
+    elif fault == "mapped-endpoints":
+        display.annotation.attached = case.mapped_entities[display.view][source.THICKNESS]
+    elif fault == "geometry":
+        case.source_entities[source.THICKNESS][1].Y *= 2
+    elif fault == "construction":
+        feature.GetSpecificFeature2().GetSketchSegments()[0].ConstructionGeometry = False
+    if fault == "none":
+        _check_source(case, display, **context)
+    else:
+        with pytest.raises(RuntimeError):
+            _check_source(case, display, **context)
+
+
+def test_saved_view_proof_reacquires_mapping_without_changing_native_source(saved_washer, monkeypatch):
+    case = saved_washer
+    calls = []
+    actual_guard = washer.assert_supplier_washer_source_attachment
+
+    def physical_state():
+        features = tuple(
+            (name, feature.Name, feature.GetTypeName2(), tuple(
+                (segment, segment.ConstructionGeometry, segment.GetType())
+                for segment in feature.GetSpecificFeature2().GetSketchSegments()
+            ))
+            for name, feature in case.features.items()
+        )
+        points = tuple((point, point.X, point.Y, point.Z)
+                       for point in case.source_entities[source.THICKNESS])
+        circles = tuple((circle, circle.GetRadius(), circle.GetCenterPoint2().__dict__.copy())
+                        for label in (source.OUTER_DIAMETER, source.BORE_DIAMETER)
+                        for circle in case.source_entities[label])
+        dimensions = tuple(
+            (label, native, native.FullName, native.SystemValue, native.Tolerance.Type,
+             native.Tolerance.GetMinValue(), native.Tolerance.GetMaxValue(),
+             case.source_displays[label].GetUnits(),
+             case.source_displays[label].GetPrimaryPrecision2(),
+             tuple(sorted(case.source_displays[label].text.items())))
+            for label, native in case.source_natives.items()
+        )
+        rims = tuple(edge.GetCurve().CircleParams for edge in case.body_edges)
+        return features, points, circles, dimensions, rims
+
+    def guard(adapter, model, display, **arguments):
+        view = arguments["view"]
+        label = arguments["label"]
+        assert view in case.fresh.values()
+        assert display.annotation.Owner is view
+        assert display.annotation.attached == case.mapped_entities[view][label]
+        assert all(view is not old for old in case.original.values())
+        if label == source.THICKNESS:
+            assert display.native.GetFeatureOwner() is case.mapped_features[view][source.THICKNESS_FEATURE]
+        calls.append(label)
+        return actual_guard(adapter, model, display, **arguments)
+
+    before = physical_state()
+    case.invalidate()
+    monkeypatch.setattr(washer, "assert_supplier_washer_source_attachment", guard)
+    case.proof.saved_check(case.adapter, case.path)
+    assert sorted(calls) == sorted(case.arguments["bands"])
+    assert physical_state() == before
+    _assert_closed_unchanged(case)
+
+
+
+@pytest.mark.parametrize("fault", ("authoring-points", "authoring-feature", "authoring-owner"))
+def test_saved_view_source_context_refuses_stale_authoring_handles(saved_washer, fault):
+    case = saved_washer
+    saved = case.fresh[case.side]
+    old = case.original[case.side]
+    display = _display(case, source.THICKNESS)
+    feature = case.features[source.THICKNESS_FEATURE]
+    if fault == "authoring-points":
+        display.annotation.attached = case.mapped_entities[old][source.THICKNESS]
+    elif fault == "authoring-feature":
+        saved.forward[id(feature)] = case.mapped_features[old][source.THICKNESS_FEATURE]
+    else:
+        display.annotation.Owner = old
+    case.invalidate()
+    with pytest.raises(RuntimeError):
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
 
 
 def test_saved_reader_validates_actual_source_presentation_independently(saved_washer):
@@ -1225,7 +1620,7 @@ def test_saved_recipe_callback_independently_requires_exactly_one_proof(
         asyncio.run(recipe.build(object()))
 
 
-@pytest.mark.parametrize("failure_stage", ("none", "repr", "snapshot", "serialization", "logging", "note"))
+@pytest.mark.parametrize("failure_stage", ("none", "logging", "note"))
 @pytest.mark.parametrize("label", (source.THICKNESS, source.OUTER_DIAMETER))
 def test_source_attachment_diagnostic_preserves_original_exception(
     saved_washer, monkeypatch, failure_stage, label,
@@ -1242,7 +1637,8 @@ def test_source_attachment_diagnostic_preserves_original_exception(
     original = (NoteFailure if failure_stage == "note" else RuntimeError)(
         "original named-owner or attachment refusal"
     )
-    diagnostic_failure = ValueError(f"{failure_stage} diagnostic transport failed")
+    if failure_stage != "note":
+        original.add_note("original native refusal detail")
     calls = []
     original_guard = washer.assert_supplier_washer_source_attachment
 
@@ -1252,66 +1648,80 @@ def test_source_attachment_diagnostic_preserves_original_exception(
         calls.append(("guard", adapter, model, display, arguments))
         raise original
 
-    receipt = {
-        "label": label,
-        "reads": {"dimension.imported_type2": {"value": 11, "python_type": "int"}},
-        "matrices": {},
-    }
-
-    if failure_stage == "repr":
-        class ScalarTransport:
-            def __repr__(self):
-                return "<offline unexpected scalar transport>"
-
-        receipt["reads"]["dimension.imported_type2"]["value"] = ScalarTransport()
-
-    def snapshot(adapter, model, view, display, *, label):
-        calls.append(("snapshot", adapter, model, view, display, label))
-        if failure_stage == "snapshot":
-            raise diagnostic_failure
-        if failure_stage == "serialization":
-            circular = {}
-            circular["self"] = circular
-            return circular
-        return receipt
+    # Deliberately do not replace a private receipt/snapshot implementation.
+    # Failure reporting may change shape; it must never replace the refusal.
 
     def log(message):
         calls.append(("log", message))
         if failure_stage == "logging":
-            raise diagnostic_failure
+            raise ValueError("diagnostic logging failed")
 
     monkeypatch.setattr(washer, "assert_supplier_washer_source_attachment", fail_guard)
-    monkeypatch.setattr(washer, "_source_attachment_failure_readback", snapshot)
     monkeypatch.setattr(washer._telemetry, "info", log)
     with pytest.raises(RuntimeError) as caught:
         case.proof()
     assert caught.value is original
     guard = next(call for call in calls if call[0] == "guard")
-    snapshot_call = next(call for call in calls if call[0] == "snapshot")
     expected_view = case.original[case.side if label == source.THICKNESS else case.face]
-    assert snapshot_call[1:] == (case.adapter, case.model, expected_view, guard[3], label)
     assert guard[4] == dict(label=label, axis=case.arguments["axis"], bore_mm=4.0,
-                           outer_mm=10.0, thickness_mm=0.91, visible=True)
+                           outer_mm=10.0, thickness_mm=0.91, visible=True, view=expected_view)
     assert sum(call[0] == "guard" for call in calls) == 1
-    assert sum(call[0] == "snapshot" for call in calls) == 1
-    notes = getattr(original, "__notes__", ())
-    prefix = "supplier washer source attachment readback: "
-    if failure_stage in {"none", "repr"}:
-        expected_receipt = json.loads(json.dumps(receipt, default=repr))
-        assert [json.loads(note[len(prefix):]) for note in notes if note.startswith(prefix)] == [expected_receipt]
-        assert [json.loads(call[1][len(prefix):]) for call in calls if call[0] == "log"] == [expected_receipt]
-    elif failure_stage != "note":
-        assert notes
-        assert any("diagnostic" in note.lower() or "circular" in note.lower() for note in notes)
+    if failure_stage != "note":
+        assert "original native refusal detail" in original.__notes__
     assert not case.app.open_calls
     assert not case.app.close_calls
     assert case.source_path.read_bytes() == case.source_bytes
 
 
-def test_successful_source_attachment_never_requests_failure_readback(saved_washer, monkeypatch):
+def test_successful_source_attachment_never_emits_failure_diagnostic(saved_washer, monkeypatch):
     def forbidden(*_args, **_kwargs):
-        raise AssertionError("failure-only diagnostic was called on the successful path")
+        raise AssertionError("failure-only diagnostic was emitted on the successful path")
 
-    monkeypatch.setattr(washer, "_source_attachment_failure_readback", forbidden)
+    monkeypatch.setattr(washer._telemetry, "info", forbidden)
     saved_washer.proof()
     assert not saved_washer.messages
+
+
+@pytest.mark.parametrize("failure_stage", ("none", "logging", "note", "both"))
+def test_native_source_context_error_survives_receipt_reporting_failures(
+    saved_washer, monkeypatch, failure_stage,
+):
+    case = saved_washer
+    view, display = _source_context(case)
+    note_attempts = []
+    log_attempts = []
+
+    class NoteFailure(RuntimeError):
+        def add_note(self, note):
+            note_attempts.append(note)
+            raise ValueError("native refusal note reporting failed")
+
+    failure = (NoteFailure if failure_stage in {"note", "both"} else RuntimeError)(
+        "native IsSame refused the independent dimension identity read",
+    )
+    actual_is_same = case.app.IsSame
+
+    def same(first, second):
+        if first is display.native and second is display.native:
+            raise failure
+        return actual_is_same(first, second)
+
+    def log(message):
+        log_attempts.append(message)
+        if failure_stage in {"logging", "both"}:
+            raise ValueError("native refusal telemetry reporting failed")
+
+    monkeypatch.setattr(case.app, "IsSame", same)
+    monkeypatch.setattr(source._telemetry, "info", log)
+    with pytest.raises(RuntimeError) as caught:
+        _check_source(case, display, view=view)
+    assert caught.value is failure
+    if failure_stage in {"note", "both"}:
+        assert note_attempts
+    else:
+        assert any("supplier washer source attachment readback:" in note
+                   for note in failure.__notes__)
+    if failure_stage == "logging":
+        assert log_attempts
+    assert case.source_path.read_bytes() == case.source_bytes
+    assert case.path.read_bytes() == case.original_bytes

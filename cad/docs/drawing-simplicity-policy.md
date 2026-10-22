@@ -74,6 +74,19 @@ cannot ask for what the authors were told to leave out.
   transfers only the source unit/fraction settings with `SetUnits2`; it never
   rewrites imported precision, text, values or bands. The original strict
   presentation and source-geometry checks run after import and final rebuild.
+  Washer source geometry is independently resolved from the named part feature;
+  a drawing check supplies its actual owning view. A native dimension's feature
+  owner may remain in part context or be returned in drawing-view context—even
+  when obtained through the original source display after import. The checker
+  proves the exact source feature or its view-mapped feature with a native
+  reverse feature identity, never merely a matching name, value or sketch ID.
+  The complete independent endpoint/circle inventory must map to distinct
+  native view objects in the mapped feature's actual sketch, and every
+  attachment must match exactly the geometry-selected subset with no extras.
+  Circles additionally prove native reverse/roundtrip identity. Points use the
+  complete forward native bijection: the nullable API does not promise an
+  inverse for every sketch point. The original part-only checker remains
+  strict; drawing-context ownership is not a waiver for a part-only check.
   These sheets also use the purchased builder's post-close `saved_check` hook:
   reopen the actual SLDDRW read-only, reacquire its source/configuration and
   dimensions, repeat native identity/value/attachment/band/presentation checks,
