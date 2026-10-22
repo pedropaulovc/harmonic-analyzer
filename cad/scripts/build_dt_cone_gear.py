@@ -98,9 +98,11 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _gear import equation_curve
+from _configuration_visibility import (
+    assert_reference_geometry_hidden_in_every_configuration,
+)
 from _visibility import (
     assert_reference_geometry_hidden,
-    assert_reference_geometry_hidden_in_every_configuration,
     blank_reference_geometry,
 )
 

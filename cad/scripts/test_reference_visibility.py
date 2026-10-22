@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 import _bore_axis
+import _configuration_visibility
 import _part_save
 import _rebuild
 import _visibility
@@ -312,14 +313,18 @@ def test_every_configuration_is_checked_with_itself_active(
     )
     adapter = SimpleNamespace(currentModel=model)
     with pytest.raises(RuntimeError, match=r"\[T006\].*axis 'Axis1'") as caught:
-        _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+        _configuration_visibility.assert_reference_geometry_hidden_in_every_configuration(
+            adapter, "cone"
+        )
     assert "[T012]" not in str(caught.value)
     assert model.shows == ["T006", "T012", "T120"]
     assert model.active == "T120"
 
     model.shown["T006"] = []
     model.shows.clear()
-    _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    _configuration_visibility.assert_reference_geometry_hidden_in_every_configuration(
+        adapter, "cone"
+    )
     assert model.active == "T120"
 
 
