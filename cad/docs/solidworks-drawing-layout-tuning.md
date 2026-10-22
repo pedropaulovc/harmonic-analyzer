@@ -1624,7 +1624,7 @@ floor remains2.081671 mm. Neither number becomes a redundant drawing note,
 and no ASME internal-maximum-root certificate is claimed.
 Retain `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`; `AT TAP`
 does not constrain unrelated edges. Retain29.50 and .XX±0.51 without a height
-qualifier, and identify MHA-MG-VN-50 at its actual top-tap callout.
+qualifier, and identify MHA-SH-VN-55 at its actual top-tap callout.
 
 Spend17.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
 an unowned nominal half-depth. Intersect actual male/female full-profile

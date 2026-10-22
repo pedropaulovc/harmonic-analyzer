@@ -54,7 +54,6 @@ import dt_cone_gear_spec
 import cone_shaft_land_bands
 import gear_seat_fit
 import sh_vn_music_wire_lever_geom
-import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
 import mg_output_fixture_geom
 import ms_stick_geom

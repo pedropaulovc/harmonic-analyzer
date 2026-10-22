@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -278,7 +279,7 @@ def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
     )
     prefix = "mg-magnifier-1/" if assembly == "ha-harmonic-analyzer" else ""
     components = (
-        InterferenceComponent(f"{prefix}mg-vn-thumb-screw-{screw_number}"),
+        InterferenceComponent(f"{prefix}sh-vn-thumb-screw-{screw_number}"),
         InterferenceComponent(f"{prefix}mg-magnifying-clamp-1"),
     )
     # Each body is below the bound even in the excessive-total case. A
@@ -288,6 +289,31 @@ def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
         InterferenceBody(components, body_volume),
         InterferenceBody(components, body_volume),
     )
+    if assembly == "ha-harmonic-analyzer":
+        # The root also contains DT's two independently referenced instances
+        # of one shared SKU. Let the real selector binder read their native
+        # parent paths, role references, file and Default member.
+        roots = tuple(
+            SimpleNamespace(
+                Name2=f"{stem}-1",
+                ComponentReference="",
+                ReferencedConfiguration="Default",
+                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDASM",
+            )
+            for stem in ("mg-magnifier", "dt-drive-train")
+        )
+        references = tuple(
+            InterferenceComponent(
+                f"dt-drive-train-1/sh-vn-fillister-screw-90280a108-{index}",
+                "Default",
+                native_stem="sh-vn-fillister-screw-90280a108",
+                component_reference=f"{role}:1",
+            )
+            for index, role in enumerate(("FootScrew", "SwingStopScrew"), 1)
+        )
+        adapter.currentModel.GetComponents = lambda top_level_only: (
+            roots if top_level_only else (*roots, *references, *components)
+        )
     allowed = _interference_contracts.allowed_interference_pairs(assembly)
     if rejected:
         with pytest.raises(RuntimeError, match="interference"):

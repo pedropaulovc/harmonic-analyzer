@@ -217,7 +217,7 @@ VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMEN
 # Process and mate belong to the actual bore diameter.
 LEVER_BORE_CALLOUT = "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
 # Ahead of each native thread row.
-THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-MG-VN-50"
+THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-SH-VN-55"
 ROD_TAP_PROCESS = "TAP"
 # Native Hole Wizard depth variables; both taps print their depths at .XX,
 # the thumb tap's thread depth bracketed REF (the bore ends the thread).

@@ -1789,7 +1789,6 @@ def instruction_note_bounds(monkeypatch):
     checks = SimpleNamespace(GetExtent=lambda: checks_extent)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
-    monkeypatch.setattr(drawing._telemetry, "info", lambda _message: None)
     return SimpleNamespace(
         sequence_extent=sequence_extent,
         checks_extent=checks_extent,
@@ -3023,6 +3022,8 @@ class _ExplodeSource:
             SimpleNamespace(
                 Name2=item.name,
                 GetPathName=lambda stem=item.stem: f"C:/parts/{stem}.SLDPRT",
+                ReferencedConfiguration="LeverWire" if item.stem == notes.WIRE else "Default",
+                ComponentReference="LeverWire:1" if item.stem == notes.WIRE else "",
                 GetTotalTransform=lambda _presentation: transform,
             )
             for item in _metadata_instances()
@@ -3045,8 +3046,9 @@ class _ExplodeSource:
     def GetSaveFlag(self):
         return self.dirty
 
-    def GetComponents(self, top_level):
-        assert top_level is True
+    def GetComponents(self, _top_level_only):
+        # This MG source is flat: all immediate children are leaves, so the
+        # recursive and top-level native inventories contain the same handles.
         return self.components
 
     def GetExplodedViewNames2(self, configuration):
@@ -3058,6 +3060,9 @@ class _ExplodeSource:
 
 
 def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypatch):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     offsets = drawing._validate_source(source)
@@ -3072,20 +3077,37 @@ def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypa
 
 @pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
 def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     source.properties.pop(explode.explode_offsets_property(configuration))
     with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
         drawing._validate_source(source)
 
-@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
+@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families", "foreign", "wire member"])
 def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     if failure == "active configuration":
         source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
     elif failure == "families":
         source.components.pop()
+    elif failure == "foreign":
+        source.components.append(SimpleNamespace(
+            Name2="foreign-part-1",
+            ComponentReference="",
+            ReferencedConfiguration="Default",
+            GetPathName=lambda: "C:/parts/foreign-part.SLDPRT",
+            GetTotalTransform=source.components[0].GetTotalTransform,
+        ))
+    elif failure == "wire member":
+        wire = next(component for component in source.components if component.ComponentReference == "LeverWire:1")
+        wire.ReferencedConfiguration = "PenWire"
     else:
         base = source.components[0].GetTotalTransform(False).ArrayData
         displaced = list(base)
@@ -3095,6 +3117,8 @@ def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure
         )
     with pytest.raises(RuntimeError):
         drawing._validate_source(source)
+    assert not source.dirty
+    assert source.configuration_switches == []
 
 
 
@@ -3378,7 +3402,9 @@ def test_tip_inherited_callout_is_required_without_repair(lever_tip_native, stag
 
 
 @pytest.fixture
-def immutable_tip_build(monkeypatch, tmp_path, lever_tip_native):
+def immutable_tip_build(
+    monkeypatch, tmp_path, lever_tip_native, magnifier_bom, instruction_note_bounds,
+):
     """Run build's real source guards and Tip checks; fake only native I/O.
 
     No production source/configuration guard or source_step is replaced. The
@@ -3390,9 +3416,11 @@ def immutable_tip_build(monkeypatch, tmp_path, lever_tip_native):
     monkeypatch.setattr(drawing, "SOURCE", path)
     source = _ExplodeSource()
     drawing_model = native.adapter.currentModel
+    drawing_model.GraphicsRedraw2 = lambda: None
     state = SimpleNamespace(
         source=source, path=path, native=native, saved=False, finalized=False,
         hook=lambda _stage: None, metadata_reads=[], phases=[], balloon_calls=[],
+        bom_items=dict(magnifier_bom.expected_items),
     )
     get_property = source.GetCustomInfoValue
 
@@ -3445,17 +3473,24 @@ def immutable_tip_build(monkeypatch, tmp_path, lever_tip_native):
     ):
         monkeypatch.setattr(drawing, name, lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "_fit_ring", lambda _a, _v, ladder, *_args, **_k: ladder[0])
-    monkeypatch.setattr(drawing, "insert_bom_table", lambda *_a, **_k: object())
-    items = {stem: str(i) for i, stem in enumerate(notes.BOM_ORDER, 1)}
+    monkeypatch.setattr(drawing, "insert_bom_table", lambda *_a, **_k: magnifier_bom.table)
+    items = state.bom_items
     monkeypatch.setattr(drawing, "_validate_bom", lambda *_a: items)
-    monkeypatch.setattr(drawing, "_bom_items", lambda *_a: items)
 
     def balloons(_adapter, view, **kwargs):
         state.balloon_calls.append((view, kwargs))
         return [SimpleNamespace(stem=stem) for stem, _item in kwargs["items"]]
 
     monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
-    monkeypatch.setattr(drawing, "_add_note_block", lambda *_a, **_k: object())
+    monkeypatch.setattr(
+        drawing, "_add_note_block",
+        lambda *_a, label, **_k: SimpleNamespace(
+            GetExtent=lambda: (
+                instruction_note_bounds.sequence_extent if label == "assembly sequence"
+                else instruction_note_bounds.checks_extent
+            ),
+        ),
+    )
     monkeypatch.setattr(
         drawing, "_hide_bom_reference", lambda *_a: state.hook("before-finalizer"),
     )
@@ -3510,14 +3545,16 @@ def test_build_keeps_source_immutable_through_tip_and_finalization(immutable_tip
         strict=True,
     ):
         assert view is state.views[label]
-        assert {stem for stem, _item in kwargs["items"]} == set(stems)
+        assert {stem for stem, _item in kwargs["items"]} == {
+            drawing.BOM_ROW_KEYS[stem] for stem in stems
+        }
         assert kwargs["explode_offsets"] == (
             {} if label == drawing.FINISHED_LABEL else _metadata_offsets()
         )
         seen.extend(kwargs["items"])
     assert len(seen) == len(set(seen)) == len(notes.BOM_ORDER)
-    assert dict(seen) == {stem: str(i) for i, stem in enumerate(notes.BOM_ORDER, 1)}
-    assert (explode.WIRE_STEM, "19") in seen
+    assert dict(seen) == state.bom_items
+    assert (drawing.WIRE_ROW, state.bom_items[drawing.WIRE_ROW]) in seen
 
 
 @pytest.mark.parametrize("stage", ["before-finalizer", "before-settled", "after-save"])

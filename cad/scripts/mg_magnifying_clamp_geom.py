@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _mcmaster_91882a221 import COLLAR_DIA, SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
+from sh_vn_thumb_screw_spec import COLLAR_DIA, SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 from mg_lever_thread_joint import ROD_DIA, ROD_DIA_BAND
 from mg_rod_clamp_joint import (
