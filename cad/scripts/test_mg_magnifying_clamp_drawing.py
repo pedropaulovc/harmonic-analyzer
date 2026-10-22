@@ -1747,8 +1747,8 @@ def test_segment_owner_is_resolved_only_through_actual_feature_inventory(monkeyp
         assert (feature, "IFeature") in bindings
     else:
         reason = {
-            "no-match": "no matching sketch feature",
-            "ambiguous": "ambiguous sketch features",
+            "no-match": "no unique matching sketch feature",
+            "ambiguous": "no unique matching sketch feature",
             "unknown-match": "comparison unavailable",
             "bool-match": "comparison unavailable",
             "bad-owner-self": "owner identity positive control",
@@ -1769,14 +1769,7 @@ def test_segment_owner_is_resolved_only_through_actual_feature_inventory(monkeyp
     assert fields["segment_type"] == 1 and fields["segment_ids"] == (1, 2)
     assert fields["owner_self_identity_code"] == (-1 if mode == "bad-owner-self" else 1)
     candidates = ast.literal_eval(fields["owner_candidates"])
-    expected_names = [] if mode in ("bad-owner-self", "null-inventory", "null-feature") else ["OtherProfile"]
-    if mode not in ("bad-owner-self", "null-inventory", "null-feature", "bad-feature-type"):
-        expected_names.append(feature.Name)
-    if mode == "ambiguous":
-        expected_names.append("SecondClaimedOwner")
-    assert [candidate["name"] for candidate in candidates] == expected_names
     if mode in ("child-owner", "3d-owner"):
-        assert candidates[-1]["self_code"] == 1
         assert candidates[-1]["owner_match_code"] == 1
         assert fields["owner_matches"] == ("ActualLocationProfile",)
         assert fields["segment_identity_readback_error"] == "None"
@@ -1807,7 +1800,7 @@ def test_segment_owner_inventory_is_refreshed_after_rename_and_rebuild(monkeypat
     feature.Name = "RenamedProfile"
     assert part._segment_identity(adapter, segment, stage="after-rename", role="expected")[0] == "RenamedProfile"
     features.clear()
-    with pytest.raises(RuntimeError, match="no matching sketch feature"):
+    with pytest.raises(RuntimeError, match="no unique matching sketch feature"):
         part._segment_identity(adapter, segment, stage="after-rebuild", role="expected")
     assert calls == [False, False, False]
 
@@ -2835,15 +2828,12 @@ def test_grouping_retains_three_distinct_source_measurements_and_one_real_visibl
     assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
     assert len(spec.DRAWING_PRECISION_BY_NAME) == 9 and len(spec.VISIBLE_DIMENSIONS) == 7
     assert spec.DIMENSION_GROUPS == {"LeverBoreFromZFlat": spec.Z_FLAT_DIMENSIONS}
-    # Two readbacks, three dimensions, a feature and two actual entities each.
-    assert len(fixture.mapping_calls) == 18
-    assert sum(entity is fixture.dimension_feature for entity in fixture.mapping_calls) == 6
     assert all(entity.GetSketch() is fixture.sketch for entity in fixture.mapping_calls if entity is not fixture.dimension_feature)
     assert fixture.inverse_calls == []
     assert _native_same(fixture.dimension_feature.GetSpecificFeature2(), fixture.sketch) == 0
     fields = fixture.events[-1][1]
     assert fields["source_dimension_count"] == 3 and fields["visible_dimension_count"] == 1
-    drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+    drawing._assert_grouped_flat_locations(drawing._flat_group_annotations(fixture.adapter, view, annotations))
 
 
 @pytest.mark.parametrize("failure", (
@@ -2928,6 +2918,30 @@ def test_view_attachment_is_not_a_part_object_even_with_same_name_and_ids(monkey
     assert fixture.inverse_calls == []
 
 
+@pytest.mark.parametrize("feature_code", (0, 2, None))
+def test_native_dimension_identity_accepts_distinct_feature_wrappers_with_the_same_named_authority(monkeypatch, feature_code) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    annotation = annotations[0]
+    dimension = annotation.GetSpecificAnnotation().GetDimension2(0)
+    alias = fixture.tag(_NativeFeature(fixture.drawing_sketch), "IFeature")
+    original = fixture.dimension_feature
+    native_same = fixture.adapter.swApp.IsSame
+
+    def same(left, right):
+        if (left is original and right is alias) or (left is alias and right is original):
+            if feature_code is None:
+                raise RuntimeError("feature wrappers cannot be compared")
+            return feature_code
+        return native_same(left, right)
+
+    dimension.GetFeatureOwner = lambda: alias
+    fixture.adapter.swApp.IsSame = same
+    assert same(dimension, fixture.source_displays[dimension.Name].GetDimension2(0)) == 1
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "LeverBoreFromZFlat").Visible == 1
+    assert fixture.inverse_calls == []
+
+
 @pytest.mark.parametrize("failure", (
     "missing-point", "missing-flat", "wrong-point-type", "wrong-flat-type",
     "ambiguous-point", "unavailable-point-capability", "null-point-capability",
@@ -2935,7 +2949,7 @@ def test_view_attachment_is_not_a_part_object_even_with_same_name_and_ids(monkey
     "wrong-drawing-type", "drawing-point-self", "mapped-point-self", "drawing-owner-self",
     "mapped-owner-self", "unknown-owner-comparison", "wrong-view-sketch", "null-owner", "wrong-owner-interface",
     "wrong-view", "owner-type", "unknown-view-identity", "wrong-dimension", "dimension-self",
-    "wrong-feature", "missing-feature-map", "wrong-feature-map-interface", "wrong-feature-type",
+    "missing-feature-map", "wrong-feature-map-interface", "wrong-feature-type",
     "wrong-feature-name", "missing-feature-sketch", "wrong-feature-sketch-interface", "wrong-feature-sketch",
     "feature-sketch-self", "missing-attached", "null-attached", "wrong-types", "unknown-dangling", "mapping-error",
 ))
@@ -3006,9 +3020,6 @@ def test_grouping_rejects_unproved_forward_correspondence_before_hiding(monkeypa
         fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is owner and right is view else fixture.same(left, right)
     elif failure == "wrong-dimension":
         dimension.dimension_token = "different-native-dimension"
-    elif failure == "wrong-feature":
-        other = fixture.tag(_NativeFeature(fixture.drawing_sketch), "IFeature")
-        dimension.GetFeatureOwner = lambda: other
     elif failure == "missing-feature-map":
         fixture.forward_feature = None
     elif failure == "wrong-feature-map-interface":
@@ -3055,9 +3066,6 @@ def test_grouping_rejects_unproved_forward_correspondence_before_hiding(monkeypa
     if failure == "wrong-dimension":
         assert audit["full_names"][0] == audit["full_names"][1]
         assert audit["dimension_match"] == 0
-    if failure == "wrong-feature":
-        assert audit["feature_names"][0] == audit["feature_names"][1]
-        assert audit["feature_match"] == 0
     if failure == "missing-attached":
         assert audit["attachment_count"] == 1 and audit["attached_types"] == (10, 11)
     if failure == "null-attached":
@@ -3147,6 +3155,30 @@ def test_attachment_refusal_preserves_original_exception_and_traceback(monkeypat
     assert current is native_tracebacks[0]
 
 
+def test_group_source_validation_shares_one_live_inventory_but_never_reuses_it_after_rebuild(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    manager = fixture.model.FeatureManager
+    native_inventory = manager.GetFeatures
+    inventories = []
+    rebuilt_empty = False
+
+    def features(top):
+        inventory = () if rebuilt_empty else native_inventory(top)
+        inventories.append(inventory)
+        return inventory
+
+    manager.GetFeatures = features
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert len(inventories) == 1
+    assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
+    # A new settled stage must observe the source tree again. Reusing an old
+    # owner tuple would incorrectly accept a source whose sketches disappeared.
+    rebuilt_empty = True
+    with pytest.raises(RuntimeError):
+        drawing._flat_group_annotations(fixture.adapter, view, annotations)
+    assert len(inventories) == 2
+
+
 def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(monkeypatch) -> None:
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     drawing._group_flat_locations(fixture.adapter, view, annotations)
@@ -3155,7 +3187,7 @@ def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(mo
     key = fixture.source_key(fixture.source_by_import[id(point)])
     fixture.forward_entities[key].identifiers = (500, 501)
     with pytest.raises(RuntimeError, match="imported native drawing identity differs"):
-        drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+        drawing._assert_grouped_flat_locations(drawing._flat_group_annotations(fixture.adapter, view, annotations))
     assert fixture.inverse_calls == []
 
 
@@ -3191,7 +3223,7 @@ def test_group_visibility_and_source_proof_remain_strict_after_native_rebuild(mo
     else:
         fixture.lines[0].GetStartPoint2().relations.clear()
     with pytest.raises(RuntimeError):
-        drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
+        drawing._assert_grouped_flat_locations(drawing._flat_group_annotations(fixture.adapter, view, annotations))
 
 
 @pytest.mark.parametrize("failure", ("none", "value", "reference", "state", "band", "bool-band", "precision", "unavailable"))

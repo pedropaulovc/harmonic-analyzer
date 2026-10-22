@@ -1849,8 +1849,11 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         name: trial.magnifier_setup(reference_inputs()[name])
         for name in budget["reference_inputs"]
     }
+    from mg_magnifying_bracket_arm_check import material_demand_report
+
     r = {
         "nominal": nom.__dict__,
+        "mg_bracket_material_demand": material_demand_report(),
         "linear_gain_mm_per_mm": linear_gain(nom),
         "null_station_mm": d0,
         "harmonics": {f"{d:+.0f}": harmonic_content(d, nom, null=d0) for d in stations},
@@ -1916,6 +1919,12 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     p = print
     n = r["nominal"]
     p("# Coefficient-error budget (error_budget.py)")
+    material = r["mg_bracket_material_demand"]
+    p(
+        f"MG bracket: {material['specified_material']}; calculated yield demand for factor three "
+        f"{material['required_yield_for_factor_three_MPa']:.3f} MPa; "
+        "UNVERIFIED yield and safety factor (no material strength data)."
+    )
     p(
         f"nominal: ecc {n['ecc']:.3f}  rod {n['rod']:.2f}  pin ({n['pin_x']:.3f}, {n['pin_y']:.3f})  "
         f"bar-pin/hook {n['bar_pin_arm']:.1f}/{n['hook_arm']:.1f}  "
@@ -2240,7 +2249,7 @@ def readout_procedure(r: dict[str, Any]) -> str:
         )
     )
     clamp_table = "\n".join(
-        f"| {s:6.2f} | {wire_moment_arm(nom, s):6.1f} | "
+        f"| {s:7.3f} | {wire_moment_arm(nom, s):6.1f} | "
         f"{mag['pen_mm_per_full_scale_bar_at_min'] * wire_moment_arm(nom, s) / arm_min:5.2f} | "
         f"{math.floor(mag['ordinate_capacity_full_scale_bars'] * arm_min / wire_moment_arm(nom, s) * 100.0) / 100.0:5.2f} |"
         for s in stations
@@ -2358,7 +2367,7 @@ $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 **Choose the ordinate scale for the pen first.** The pen's half-stroke is
 {cf["readout"]["pen_half_stroke_mm"]:.0f} mm and the $k=0$ reading must span it
 (step 3 divides everything by it). At the conservative component MINIMUM
-setting -- {mag["lever_radius_min_mm"]:.2f} mm from the knife axis to the
+setting -- {mag["lever_radius_min_mm"]:.3f} mm from the knife axis to the
 clamp/bottom-rod axis -- one full-scale bar moves the pen
 {mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the trial's $k=0$ peak,
 $P = \\sum_i t_i\\,(1 + \\kappa_i)$ with $t_i$ the TABLE ordinate at bar $i$'s
@@ -2384,7 +2393,7 @@ proportional to the clamp's distance from the knife: the wire hooks the
 output fixture {abs(nom.hook_offset_x):.1f} mm on the knife side of the clamp
 and leans toward the wheel, so what the pen sees is the effective wire
 moment arm -- {arm_min:.1f} mm at the conservative component minimum
-({mag["lever_radius_min_mm"]:.2f} mm from the knife),
+({mag["lever_radius_min_mm"]:.3f} mm from the knife),
 {wire_moment_arm(nom, nom.lever_r_built):.1f} mm at the as-built
 {mag["lever_radius_built_mm"]:.0f} mm. Set the clamp at the station whose
 last column matches the trial's $P$ (interpolate between rows), **never past
@@ -2527,7 +2536,7 @@ def _main() -> int:
             est = mag["minimum_pose_wire_estimate"]
             print(
                 "WAIVED: the magnifier's conservative component minimum (clamp at "
-                f"{mag['lever_radius_min_mm']:.2f} mm from the knife, wire arm "
+                f"{mag['lever_radius_min_mm']:.3f} mm from the knife, wire arm "
                 f"{mag['wire_arm_min_mm']:.1f}) is not CAD-gated; it bounds the "
                 "poses scoring "
                 + ", ".join(

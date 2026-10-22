@@ -70,6 +70,8 @@ from __future__ import annotations
 
 import math
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import mg_magnifier_assembly_spec as stack_spec
 from _check import check
@@ -85,6 +87,9 @@ from _drawing_tolerances import (
 )
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
+from _gtol_face_read import face_geometry
+from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
@@ -104,10 +109,12 @@ from _assembly import (
     coincident_mate,
     component_named_ref,
     component_origin,
+    component_transform,
     distance_driver,
     lock_mate,
     named_ref,
     place_component,
+    part_path,
     reset_dof_manifest,
     remap_front_to_machine_front,
     save_assembly_and_images,
@@ -581,7 +588,68 @@ async def _author_axle_stack_reference(adapter) -> None:
         raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
 
 
-async def _author_lever_setting_reference(adapter) -> None:
+def _physical_thread_projection(adapter, lever_name: str, bracket_name: str) -> tuple[float, float]:
+    """Measure the two physical end planes in their actual installed frame."""
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    positions = []
+    for name, stem, feature, dimension_name, normal, factor in (
+        (lever_name, "mg-magnifying-lever", "RodProfile", "OverallLength", (1.0, 0.0, 0.0), 1.0),
+        (bracket_name, "mg-magnifying-bracket", "Neck", "NeckThickness", (-1.0, 0.0, 0.0), 0.5),
+    ):
+        component = _early_bound(assembly.GetComponentByName(name), "IComponent2")
+        if component is None:
+            raise RuntimeError(f"thread projection component is unavailable: {name!r}")
+        model = _early_bound(component.GetModelDoc2(), "IModelDoc2")
+        if model is None or Path(model.GetPathName()).resolve() != Path(part_path(stem)).resolve():
+            raise RuntimeError(f"thread projection component is not the intended part: {name!r}")
+        active = _early_bound(model.ConfigurationManager, "IConfigurationManager").ActiveConfiguration
+        if _early_bound(active, "IConfiguration").Name != component.ReferencedConfiguration:
+            raise RuntimeError(f"thread projection component configuration differs: {name!r}")
+        _, dimension = _named_dimension(SimpleNamespace(currentModel=model), feature, dimension_name)
+        distance = float(dimension.SystemValue) * 1000.0 * factor
+        if not math.isfinite(distance) or distance <= 0.0:
+            raise RuntimeError(f"thread projection physical dimension is invalid: {name!r}")
+        face = resolve_faces(model, {stem: PlanarFace(normal, distance)})[stem]
+        geometry = face_geometry(face)
+        if geometry is None:
+            raise RuntimeError(f"thread projection physical face is unavailable: {name!r}")
+        transform = component_transform(adapter, name)
+        if (
+            len(transform) != 16 or not all(math.isfinite(value) for value in transform)
+            or not math.isclose(transform[12], 1.0, abs_tol=1e-9)
+            or not math.isclose(abs(transform[0]), 1.0, abs_tol=1e-9)
+            or abs(transform[1]) > 1e-9 or abs(transform[2]) > 1e-9
+        ):
+            raise RuntimeError(f"thread projection component is not in the authored axial reference pose: {name!r}")
+        point = geometry.parameters[3:6]
+        positions.append(sum(point[index] * transform[index * 3] for index in range(3)) * 1000.0 + transform[9] * 1000.0)
+    if not math.isclose(positions[1] - positions[0], stack_spec.THREAD_PROJECTION, abs_tol=1e-6):
+        raise RuntimeError(f"physical lever tip/far bracket face do not have the installed projection: {positions!r}")
+    return positions[0], positions[1]
+
+
+def _assert_thread_projection_faces(adapter, lever_name: str, bracket_name: str) -> None:
+    """Refuse a constant witness that no longer measures the installed faces."""
+    expected = _physical_thread_projection(adapter, lever_name, bracket_name)
+    _, dimension = _named_dimension(adapter, stack_spec.THREAD_FEATURE, stack_spec.THREAD_PROJECTION_DIMENSION)
+    if not math.isclose(float(dimension.SystemValue) * 1000.0, expected[1] - expected[0], abs_tol=1e-6):
+        raise RuntimeError("ThreadProjection differs from the actual installed face separation")
+    feature = _early_bound(_early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(stack_spec.THREAD_FEATURE), "IFeature")
+    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    segments = tuple(sketch.GetSketchSegments() or ())
+    if len(segments) != 1:
+        raise RuntimeError("ThreadProjection must have one native construction witness")
+    segment = _early_bound(segments[0], "ISketchSegment")
+    if segment.GetType() != 0 or not segment.ConstructionGeometry:
+        raise RuntimeError("ThreadProjection is not its native straight construction witness")
+    line = _early_bound(segment, "ISketchLine")
+    points = tuple(_early_bound(point, "ISketchPoint") for point in (line.GetStartPoint2(), line.GetEndPoint2()))
+    actual = tuple(float(point.X) * 1000.0 for point in points)
+    if any(not math.isfinite(value) for value in actual) or any(abs(value - want) > 1e-6 for value, want in zip(actual, expected, strict=True)):
+        raise RuntimeError(f"ThreadProjection endpoints do not lie on the actual installed face planes: {actual!r}, {expected!r}")
+
+
+async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_name: str) -> None:
     """The clamp station and the fixture drop as model dimensions: one
     construction chain on the Front plane (sketch x, y = machine x, y) from
     the lever rod's west tip along its axis to the clamp centre, then down the
@@ -666,14 +734,15 @@ async def _author_lever_setting_reference(adapter) -> None:
     if int(feature.Visible) != 1:  # swVisibilityStateHide
         raise RuntimeError(f"{spec.LEVER_FEATURE} still visible after BlankSketch")
 
-    # Independent nonzero witness from the far neck face to the flat tip.
-    # Installation is by depth, never an invented shoulder.
+    # The two coordinates below come from actual native face planes and live
+    # component transforms, not two constants that can agree with themselves.
+    tip_x, far_face_x = _physical_thread_projection(adapter, lever_name, bracket_name)
     dims = SketchDims()
     check("create threaded lever setting", await adapter.create_sketch("Front"))
-    leg = check("thread projection witness", await adapter.add_line(spec.THREADED_TIP_X, spec.LEVER_AXIS_Y, spec.THREAD_FAR_FACE_X, spec.LEVER_AXIS_Y))
+    leg = check("thread projection witness", await adapter.add_line(tip_x, spec.LEVER_AXIS_Y, far_face_x, spec.LEVER_AXIS_Y))
     segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
     segment.ConstructionGeometry = True
-    await anchor_point_to_origin(adapter, f"{leg}.start", spec.THREADED_TIP_X, spec.LEVER_AXIS_Y, "flat threaded tip")
+    await anchor_point_to_origin(adapter, f"{leg}.start", tip_x, spec.LEVER_AXIS_Y, "flat threaded tip")
     dims.record("ThreadedTipX")
     dims.record("ThreadAxisY")
     check("thread projection along lever", await adapter.add_sketch_constraint(leg, None, "horizontal"))
@@ -690,6 +759,7 @@ async def _author_lever_setting_reference(adapter) -> None:
     feature = _early_bound(_early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.THREAD_FEATURE), "IFeature")
     if int(feature.Visible) != 1:
         raise RuntimeError(f"{spec.THREAD_FEATURE} still visible after BlankSketch")
+    _assert_thread_projection_faces(adapter, lever_name, bracket_name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1174,7 +1244,7 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
     await _author_axle_stack_reference(adapter)
-    await _author_lever_setting_reference(adapter)
+    await _author_lever_setting_reference(adapter, lever_name=ml, bracket_name=bracket)
     # Title-block identity for the assembly drawing (draw_mg_magnifier_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

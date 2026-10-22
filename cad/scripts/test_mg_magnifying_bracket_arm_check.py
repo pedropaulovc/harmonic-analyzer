@@ -60,3 +60,16 @@ def test_flange_joint_retains_screw_margins() -> None:
     assert arm.SCREW_SHEAR_STRESS < arm.SCREW_SHEAR_ALLOWABLE
     assert arm.JOINT_TENSION_INCREMENT_N < arm.SCREW_PRELOAD_N
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
+
+
+def test_reported_material_demand_combines_bending_and_torsion_without_certifying_generic_steel() -> None:
+    report = arm.material_demand_report()
+    bending_alone = 3.0 * report["bending_stress_MPa"]
+    torsion_alone = 3.0 * 3.0**0.5 * report["torsion_stress_MPa"]
+    required = report["required_yield_for_factor_three_MPa"]
+    # Simultaneous nonzero loads demand more than either isolated-load check,
+    # while the sum is a conservative bound. This catches the former max-only
+    # calculation without reproducing the implementation's von Mises formula.
+    assert max(bending_alone, torsion_alone) < required < bending_alone + torsion_alone
+    assert report["verified_yield_MPa"] is None
+    assert report["verified_yield_safety_factor"] is None

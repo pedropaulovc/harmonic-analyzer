@@ -30,8 +30,6 @@ import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 from sh_vn_music_wire_lever_geom import WHEEL_X
-from _printed_tolerance import printed_band_mm
-from mg_lever_thread_joint import REQUIRED_FULL_ENGAGEMENT, installation_full_overlap
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.
@@ -82,8 +80,8 @@ DIMENSION_TOLERANCES = {
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
-# The free hemisphere tip stays fixed; the flat threaded tip extends beyond
-# the bracket's far face instead of moving the useful lever/knife position.
+# The nominal machine pose is unchanged. At fit-up the far-face projection
+# controls installation; the free tip may shift within accepted part bands.
 LEVER_AXIS_Y = _bracket.BRACKET_ORIGIN[1]
 LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.BRACKET_LOCAL_X
 CLAMP_STATION = _lever.CLAMP_LOCAL_X
@@ -108,13 +106,11 @@ THREAD_FEATURE = "LeverThreadSetting"
 THREAD_PROJECTION_DIMENSION = "ThreadProjection"
 THREADED_TIP_X = LEVER_TIP_X - _lever.ROD_LENGTH
 THREAD_FAR_FACE_X = _bracket.BRACKET_ORIGIN[0] - _lever.NECK_HALF_X
-THREAD_PROJECTION = THREAD_FAR_FACE_X - THREADED_TIP_X
+THREAD_PROJECTION = _lever.THREAD_PROJECTION
 THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
 THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
-THREAD_PROJECTION_TOL = printed_band_mm(2)
-INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
-if THREAD_PROJECTION - THREAD_PROJECTION_TOL < 0.0 or INSTALLED_FULL_ENGAGEMENT_MIN < REQUIRED_FULL_ENGAGEMENT:
-    raise AssertionError("MG native installation depth loses far-face reach or 1.5D full thread")
+THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
+INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
 # 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are

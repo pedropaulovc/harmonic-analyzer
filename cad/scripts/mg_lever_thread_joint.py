@@ -41,41 +41,13 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 
 # Length from the free hemispherical tip; the opposite end is FLAT, threaded.
 ROD_LENGTH = 167.5
-ROD_LENGTH_TOL = 0.8  # printed title-block .X band
+ROD_LENGTH_TOL = printed_band_mm(1)
 THREAD_LENGTH = 18.00  # flat tip to the end of incomplete root runout
-THREAD_LENGTH_TOL = 0.51  # printed title-block .XX band
+THREAD_LENGTH_TOL = printed_band_mm(2)
 TIP_CHAMFER = 0.20
 TIP_CHAMFER_MAX = MOUTH_CHAMFER_MAX
 TIP_CHAMFER_BAND = (TIP_CHAMFER_MAX - TIP_CHAMFER, -TIP_CHAMFER)
 THREAD_ROOT_X = ROD_LENGTH - THREAD_LENGTH
-FULL_THREAD_START_MAX = ROD_LENGTH + ROD_LENGTH_TOL - (THREAD_LENGTH - THREAD_LENGTH_TOL) + INCOMPLETE_THREAD_MAX
-
-
-def full_thread_overlap(
-    bracket_station: float,
-    *,
-    thickness: float = NECK_THICKNESS,
-    thickness_tol: float = NECK_THICKNESS_TOL,
-    rod_length: float = ROD_LENGTH,
-    rod_length_tol: float = ROD_LENGTH_TOL,
-    thread_length: float = THREAD_LENGTH,
-    thread_length_tol: float = THREAD_LENGTH_TOL,
-    incomplete: float = INCOMPLETE_THREAD_MAX,
-    mouth: float = CHAMFER_LEG_MAX,
-    tip_chamfer: float = CHAMFER_LEG_MAX,
-) -> float:
-    """Worst installed intersection of full male and female thread intervals.
-
-    Both ends' die lead is excluded. The root lead is outside the receiver.
-    Charge the tip chamfer additionally: the printed incomplete-thread limit
-    does not explicitly define a chamfer/die-lead union. A through tap runs
-    completely through, so its lead exits the far face.
-    """
-    female_start = bracket_station - (thickness - thickness_tol) / 2.0 + mouth
-    female_end = bracket_station + (thickness - thickness_tol) / 2.0 - mouth
-    male_start = rod_length + rod_length_tol - (thread_length - thread_length_tol) + incomplete
-    male_end = rod_length - rod_length_tol - incomplete - tip_chamfer
-    return max(0.0, min(female_end, male_end) - max(female_start, male_start))
 
 
 def installation_full_overlap(

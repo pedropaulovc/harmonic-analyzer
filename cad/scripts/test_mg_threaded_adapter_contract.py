@@ -260,12 +260,14 @@ def test_native_return_type_census_distinguishes_void_mutators() -> None:
 
 
 @pytest.mark.parametrize("recipe", (
+    "build_mg_magnifying_lever.py",
+    "build_mg_magnifier_assembly.py",
     "draw_mg_magnifying_bracket.py",
     "draw_mg_magnifying_lever.py",
     "draw_mg_magnifying_clamp.py",
     "draw_mg_magnifier_assembly.py",
 ))
-def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) -> None:
+def test_repaired_recipe_native_calls_bind_including_inline_interfaces(recipe) -> None:
     assert not _undeclared_bound_calls(_tree(SCRIPTS / recipe))
     wrong = ast.parse('def inline_binding(): _early_bound(None, "ISilhouetteEdge").NotADeclaredFaceAccessor()')
     assert _undeclared_bound_calls(wrong) == ["ISilhouetteEdge.NotADeclaredFaceAccessor"]
@@ -397,6 +399,9 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IView", "GetUseParentDisplayMode", 0, 11),
     ("ISldWorks", "RevisionNumber", 0, 8),
     ("ILayerMgr", "GetLayer", 1, 9),
+    ("IAssemblyDoc", "GetComponentByName", 1, 9),
+    ("IAssemblyDoc", "FeatureByName", 1, 9),
+    ("IAnnotation", "SetPosition2", 3, 11),
 ))
 def test_witness_and_bracket_native_method_contracts(interface, member, arity, retval) -> None:
     methods, maps = _native_declaration(interface)
@@ -522,6 +527,9 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
     ("IWizardHoleFeatureData2", "TapDrillDiameter", 5, True),
     ("IWizardHoleFeatureData2", "ThruTapDrillDiameter", 5, True),
     ("IWizardHoleFeatureData2", "ThreadDiameter", 5, True),
+    ("ICosmeticThreadFeatureData", "ApplyThread", 3, True),
+    ("ICosmeticThreadFeatureData", "EndCondition", 3, True),
+    ("ICosmeticThreadFeatureData", "BlindDepth", 5, True),
 ))
 def test_thread_detail_geometry_properties_have_native_result_shapes(interface, member, retval, writable) -> None:
     methods, maps = _native_declaration(interface)

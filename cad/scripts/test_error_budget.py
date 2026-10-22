@@ -50,6 +50,16 @@ def report(budget):
     return eb.build_report(budget)
 
 
+def test_report_consumes_material_demand_without_inventing_a_generic_steel_allowable(report):
+    material = report["mg_bracket_material_demand"]
+    assert material["required_yield_for_factor_three_MPa"] > 0.0
+    assert material["bending_stress_MPa"] > 0.0
+    assert material["torsion_stress_MPa"] > 0.0
+    assert material["verified_yield_MPa"] is None
+    assert material["verified_yield_safety_factor"] is None
+    assert material["status"].startswith("UNVERIFIED:")
+
+
 def negative(budget: dict, **reserved: dict) -> dict:
     """A deliberately-broken budget for a failure-routing test, at a REDUCED
     draw count: these tests assert WHICH gate trips, not the value, and a full

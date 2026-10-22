@@ -765,19 +765,18 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    # R24's native fence drifted from the requested circle; inference was not
-    # independently proved. Bypass it here, leaving the two axle crops unchanged.
-    manager.AddToDB = isinstance(detail, LeverTipDetail)
+    # Every detail uses deterministic creation; inference must not move a
+    # fence onto the model's nearby witnesses or visible edges.
+    manager.AddToDB = True
     try:
         circle = manager.CreateCircle(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if circle is None:
         raise RuntimeError(f"failed to sketch the {detail.title} crop circle")
-    if isinstance(detail, LeverTipDetail):
-        segment = _early_bound(circle, "ISketchSegment")
-        if not segment.Select4(False, null_callout()):
-            raise RuntimeError(f"{detail.title}: cannot select the authored crop circle")
+    segment = _early_bound(circle, "ISketchSegment")
+    if not segment.Select4(False, null_callout()):
+        raise RuntimeError(f"{detail.title}: cannot select the authored crop circle")
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
@@ -792,26 +791,25 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
         raise RuntimeError(
             f"{detail.title} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
-    if isinstance(detail, LeverTipDetail):
-        _projection_crop_box(view)
+    _crop_box(view, detail)
 
 
-def _projection_crop_box(view: Any) -> tuple[float, float, float, float]:
+def _crop_box(view: Any, detail: StackDetail | LeverTipDetail) -> tuple[float, float, float, float]:
     """Read the persisted native fence, not a nominal circle reconstructed in Python."""
     raw = tuple(float(value) for value in _early_bound(view, "IView").GetDetailCircleInfo2())
     # SDK: count, layer, centre[3], start[3], end[3], line type, ...
     # R24's retained native census independently matches these points to its PDF.
     if len(raw) < 17 or not all(math.isfinite(value) for value in raw) or raw[0] != 1:
-        raise RuntimeError(f"{LEVER_TIP.title}: invalid native crop fence {raw!r}")
+        raise RuntimeError(f"{detail.title}: invalid native crop fence {raw!r}")
     centre = raw[2:4]
     radius = math.dist(centre, raw[5:7])
-    _telemetry.info(f"{LEVER_TIP.title}: native crop centre={centre}, radius={radius}")
+    _telemetry.info(f"{detail.title}: native crop centre={centre}, radius={radius}")
     if (
         raw[11] != 3  # swLF_DETAIL
-        or math.dist(centre, LEVER_TIP.centre) > DETAIL_POSITION_TOL_M
-        or abs(radius - LEVER_TIP.crop_radius) > DETAIL_POSITION_TOL_M
+        or math.dist(centre, detail.centre) > DETAIL_POSITION_TOL_M
+        or abs(radius - detail.crop_radius) > DETAIL_POSITION_TOL_M
     ):
-        raise RuntimeError(f"{LEVER_TIP.title}: native crop fence moved: {raw!r}")
+        raise RuntimeError(f"{detail.title}: native crop fence moved: {raw!r}")
     return centre[0] - radius, centre[1] - radius, centre[0] + radius, centre[1] + radius
 
 
@@ -1224,7 +1222,7 @@ def _projection_layout(
     if not view.IsCropped() or tuple(view.ScaleRatio) != LEVER_TIP.scale:
         raise RuntimeError(f"{label}: crop or 4:1 scale changed")
     _assert_projection_components(view)
-    crop_box = _projection_crop_box(view)
+    crop_box = _crop_box(view, LEVER_TIP)
     outline = _view_outline(view, label=label)
     if not all(math.isfinite(value) for value in outline):
         raise RuntimeError(f"{label}: non-finite native view outline {outline!r}")

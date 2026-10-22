@@ -6,6 +6,7 @@ import asyncio
 import itertools
 import json
 import math
+import runpy
 from types import SimpleNamespace
 
 import pytest
@@ -25,13 +26,11 @@ from _drawing_registry import DRAWING_TEMPLATES
 from _layout_audit import (
     find_leader_across_lines,
     find_leader_through_text,
-    find_lines_through_own_text,
     find_text_clearance,
     find_text_separation,
 )
 from _printed_tolerance import drilled_oversize_mm
 from _layout_geometry import (
-    ARROW_TEXT_CLEARANCE_M,
     AnnotationGeometry,
     Box,
     Segment,
@@ -39,28 +38,219 @@ from _layout_geometry import (
     find_border_breaches,
     find_text_on_line,
     find_text_on_text,
-    segment_box_distance,
 )
 
 
+def test_ordinary_overall_and_thread_bands_follow_the_actual_printed_title_block(monkeypatch) -> None:
+    import _config
+
+    original = _config.title_block
+
+    def title_block(name):
+        row = original(name)
+        return {**row, "display": {"linear_1pl": "±0.9", "linear_2pl": "±0.61"}.get(name, row.get("display", ""))}
+
+    monkeypatch.setattr(_config, "title_block", title_block)
+    loaded = runpy.run_path(joint.__file__)
+    assert loaded["ROD_LENGTH_TOL"] == pytest.approx(0.9)
+    assert loaded["THREAD_LENGTH_TOL"] == pytest.approx(0.61)
+
+
+def _physical_projection_fixture(monkeypatch, tmp_path):
+    import _assembly
+    import _gtol_face_read
+    import _gtol_face_resolve
+
+    def bind(value, _interface):
+        return value
+
+    def invoke(value, _interface, member, *args):
+        native = getattr(value, member)
+        return native(*args) if callable(native) else native
+
+    for module in (_assembly, _gtol_face_resolve):
+        monkeypatch.setattr(module, "_early_bound", bind)
+    monkeypatch.setattr(_gtol_face_resolve, "_bind", bind)
+    monkeypatch.setattr(_gtol_face_resolve, "_com_invoke", invoke)
+    monkeypatch.setattr(_gtol_face_read, "_com_invoke", invoke)
+    monkeypatch.setattr(assembly, "_early_bound", bind)
+    monkeypatch.setattr(part, "_early_bound", bind)
+    models, components = {}, {}
+    dimensions = {}
+    for name, stem, normal, local_x, shift in (
+        ("lever-actual", "mg-magnifying-lever", (1.0, 0.0, 0.0), joint.ROD_LENGTH / 1000.0, -joint.ROD_LENGTH / 1000.0),
+        ("bracket-actual", "mg-magnifying-bracket", (-1.0, 0.0, 0.0), -joint.NECK_THICKNESS / 2000.0, (joint.NECK_THICKNESS / 2.0 + installed.THREAD_PROJECTION) / 1000.0),
+    ):
+        surface = SimpleNamespace(Identity=lambda: 4001, PlaneParams=(*normal, local_x, 0.0, 0.0))
+        face = SimpleNamespace(GetSurface=lambda value=surface: value, FaceInSurfaceSense=False, GetBox=lambda: (), GetNextFace=lambda: None)
+        body = SimpleNamespace(GetFirstFace=lambda value=face: value)
+        model = SimpleNamespace(GetPathName=lambda value=stem: str(tmp_path / f"{value}.SLDPRT"), GetBodies2=lambda *_args, value=body: (value,),
+                                ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")))
+        transform = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, shift, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+        component = SimpleNamespace(GetModelDoc2=lambda value=model: value, ReferencedConfiguration="Default", Transform2=SimpleNamespace(ArrayData=transform))
+        models[stem], components[name] = model, component
+        if stem == "mg-magnifying-lever":
+            dimensions[id(model)] = {"OverallLength": joint.ROD_LENGTH / 1000.0, "TipChamfer": joint.TIP_CHAMFER / 1000.0, "ThreadLength": joint.THREAD_LENGTH / 1000.0}
+        else:
+            dimensions[id(model)] = {"NeckThickness": joint.NECK_THICKNESS / 1000.0}
+    line = SimpleNamespace(GetType=lambda: 0, ConstructionGeometry=True,
+                           GetStartPoint2=lambda: SimpleNamespace(X=0.0),
+                           GetEndPoint2=lambda: SimpleNamespace(X=installed.THREAD_PROJECTION / 1000.0))
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: SimpleNamespace(GetSketchSegments=lambda: (line,)))
+    document = SimpleNamespace(GetComponentByName=components.get, FeatureByName=lambda _name: feature)
+    dimensions[id(document)] = {installed.THREAD_PROJECTION_DIMENSION: installed.THREAD_PROJECTION / 1000.0}
+    adapter = SimpleNamespace(currentModel=document)
+
+    def named_dimension(owner, _feature, name):
+        return None, SimpleNamespace(SystemValue=dimensions[id(owner.currentModel)][name])
+
+    monkeypatch.setattr(assembly, "_named_dimension", named_dimension)
+    monkeypatch.setattr(part, "_named_dimension", named_dimension)
+    monkeypatch.setattr(assembly, "part_path", lambda stem: tmp_path / f"{stem}.SLDPRT")
+    return SimpleNamespace(adapter=adapter, models=models, components=components, dimensions=dimensions, line=line)
+
+
+def test_projection_measures_actual_native_planes_in_live_component_frames(monkeypatch, tmp_path) -> None:
+    fixture = _physical_projection_fixture(monkeypatch, tmp_path)
+    names = ("lever-actual", "bracket-actual")
+    assert assembly._physical_thread_projection(fixture.adapter, *names) == pytest.approx((0.0, 1.25))
+    assembly._assert_thread_projection_faces(fixture.adapter, *names)
+    # A rigid translation preserves the fitted separation, but a constant
+    # witness at the former coordinates must no longer pass.
+    for component in fixture.components.values():
+        component.Transform2.ArrayData[9] += 0.025
+    assert assembly._physical_thread_projection(fixture.adapter, *names) == pytest.approx((25.0, 26.25))
+    with pytest.raises(RuntimeError, match="endpoints"):
+        assembly._assert_thread_projection_faces(fixture.adapter, *names)
+
+
+@pytest.mark.parametrize("change", ("pose", "source-dimension", "configuration", "path", "nonaxial", "witness"))
+def test_projection_refuses_physical_or_source_drift_even_when_nominal_constants_are_unchanged(monkeypatch, tmp_path, change) -> None:
+    fixture = _physical_projection_fixture(monkeypatch, tmp_path)
+    lever = fixture.components["lever-actual"]
+    if change == "pose":
+        lever.Transform2.ArrayData[9] += 0.0002
+    elif change == "source-dimension":
+        fixture.dimensions[id(fixture.models["mg-magnifying-lever"])]["OverallLength"] += 0.001
+    elif change == "configuration":
+        lever.ReferencedConfiguration = "Other"
+    elif change == "path":
+        fixture.models["mg-magnifying-lever"].GetPathName = lambda: str(tmp_path / "other.SLDPRT")
+    elif change == "nonaxial":
+        lever.Transform2.ArrayData[0:3] = [0.0, 1.0, 0.0]
+    else:
+        fixture.line.GetStartPoint2 = lambda: SimpleNamespace(X=0.0002)
+    with pytest.raises(RuntimeError):
+        assembly._assert_thread_projection_faces(fixture.adapter, "lever-actual", "bracket-actual")
+
+
+@pytest.mark.parametrize("change", (None, "depth", "apply-thread", "end-condition", "physical-tip"))
+def test_thread_extent_readback_is_bound_to_actual_tip_and_native_thread_definition(monkeypatch, tmp_path, change) -> None:
+    fixture = _physical_projection_fixture(monkeypatch, tmp_path)
+    model = fixture.models["mg-magnifying-lever"]
+    definition = SimpleNamespace(BlindDepth=(joint.THREAD_LENGTH - joint.TIP_CHAMFER) / 1000.0, ApplyThread=0, EndCondition=0)
+    model.FeatureByName = lambda _name: SimpleNamespace(GetDefinition=lambda: definition)
+    if change == "depth":
+        definition.BlindDepth += 0.0002
+    elif change == "apply-thread":
+        definition.ApplyThread = 1
+    elif change == "end-condition":
+        definition.EndCondition = 1
+    elif change == "physical-tip":
+        fixture.dimensions[id(model)]["OverallLength"] += 0.00002
+    adapter = SimpleNamespace(currentModel=model)
+    if change is None:
+        part._assert_native_thread(adapter, "native-thread")
+    else:
+        with pytest.raises(RuntimeError):
+            part._assert_native_thread(adapter, "native-thread")
+
+
+
+@pytest.mark.parametrize("previous", (False, True))
+@pytest.mark.parametrize("fault", (None, "creation", "selection"))
+def test_crop_circle_keeps_actual_geometry_and_selects_only_the_authored_entity(monkeypatch, previous, fault) -> None:
+    manager = SimpleNamespace(AddToDB=previous)
+    document = SimpleNamespace(SketchManager=manager, selected=None)
+    center, radius = (0.245, 0.180), 0.018
+
+    def create_circle(x, y, z, ex, ey, ez):
+        if fault == "creation":
+            raise RuntimeError("native circle creation refused")
+        # Creation-time inference would move the real curve, not merely its
+        # selection. The production routine must prevent that geometry change.
+        if not manager.AddToDB:
+            x += 0.0002
+        circle = SimpleNamespace(geometry=(x, y, z, ex, ey, ez))
+
+        def select(_append, _data):
+            if fault == "selection":
+                return False
+            document.selected = circle
+            return True
+
+        circle.Select4 = select
+        return circle
+
+    manager.CreateCircle = create_circle
+
+    def point(values):
+        native = SimpleNamespace(ArrayData=values)
+        native.MultiplyTransform = lambda _transform: native
+        return native
+
+    adapter = SimpleNamespace(currentModel=document, swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=point)))
+    view = SimpleNamespace(GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate", lambda *_args: None)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    if fault is None:
+        drawing._circle(adapter, view, center, radius)
+        assert document.selected.geometry == pytest.approx((*center, 0.0, center[0] + radius, center[1], 0.0))
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._circle(adapter, view, center, radius)
+        assert document.selected is None
+    assert manager.AddToDB is previous
+
+
+@pytest.mark.parametrize("fault", (None, "short", "nonfinite", "center", "radius", "kind"))
+def test_detail_checks_the_native_persisted_crop_instead_of_trusting_success_status(monkeypatch, fault) -> None:
+    center = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    fence = [1.0, 0.0, *center, 0.0, center[0] + radius, center[1], 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    if fault == "short":
+        fence = fence[:-1]
+    elif fault == "nonfinite":
+        fence[4] = math.nan
+    elif fault == "center":
+        fence[2] += 0.0002
+    elif fault == "radius":
+        fence[5] += 0.0002
+    elif fault == "kind":
+        fence[11] = 1.0
+    view = SimpleNamespace(ScaleRatio=drawing.DETAIL_SCALE, Position=center, SetViewPosition=lambda *_args: True,
+                           Crop2=lambda *_args: 1, IsCropped=lambda: True, CropViewJaggedOutline=False, CropViewNoOutline=False,
+                           GetDetailCircleInfo2=lambda: fence, UpdateViewDisplayGeometry=lambda: None,
+                           GetAnnotations=lambda: tuple(SimpleNamespace(name=name) for name in drawing.DETAIL_KEEP))
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(ClearSelection2=lambda _all: None))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: view)
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda *_args, **_kwargs: center)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "curate_hidden_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(drawing, "_circle", lambda *_args: None)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    if fault is None:
+        assert drawing._detail(adapter)[0] is view
+    else:
+        with pytest.raises(RuntimeError, match="native crop fence"):
+            drawing._detail(adapter)
+
 def _intersection(first, second):
     return max(0.0, min(first[1], second[1]) - max(first[0], second[0]))
-
-
-def test_installed_full_thread_excludes_both_leads_both_mouths_and_tip_chamfer() -> None:
-    overlaps = []
-    for length, thread, thickness in itertools.product(
-        (joint.ROD_LENGTH - joint.ROD_LENGTH_TOL, joint.ROD_LENGTH + joint.ROD_LENGTH_TOL),
-        (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL, joint.THREAD_LENGTH + joint.THREAD_LENGTH_TOL),
-        (joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL, joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL),
-    ):
-        receiver = (geom.BRACKET_LOCAL_X - thickness / 2.0 + joint.CHAMFER_LEG_MAX, geom.BRACKET_LOCAL_X + thickness / 2.0 - joint.CHAMFER_LEG_MAX)
-        male = (length - thread + joint.INCOMPLETE_THREAD_MAX, length - joint.INCOMPLETE_THREAD_MAX - joint.CHAMFER_LEG_MAX)
-        overlaps.append(_intersection(receiver, male))
-        assert length >= geom.BRACKET_LOCAL_X + thickness / 2.0
-    assert geom.FULL_THREAD_OVERLAP_MIN <= min(overlaps) + 1e-9
-    assert geom.FULL_THREAD_OVERLAP_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
-    assert geom.FULL_THREAD_OVERLAP_MIN == pytest.approx(10.272234843105)
 
 
 def test_native_tip_projection_guarantees_full_overlap_independently_of_part_length() -> None:
@@ -75,20 +265,18 @@ def test_native_tip_projection_guarantees_full_overlap_independently_of_part_len
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN <= min(overlaps) + 1e-9
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
     assert installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL > 0.0
-    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.307234843105)
+    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(min(overlaps))
 
 
 def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
-    fixed = joint.full_thread_overlap(geom.BRACKET_LOCAL_X)
     fitted = joint.installation_full_overlap(installed.THREAD_PROJECTION, installed.THREAD_PROJECTION_TOL)
-    fixed_without_tip = joint.full_thread_overlap(geom.BRACKET_LOCAL_X, tip_chamfer=0.0)
     fitted_without_tip = joint.installation_full_overlap(
         installed.THREAD_PROJECTION, installed.THREAD_PROJECTION_TOL, tip_chamfer=0.0,
     )
     assert joint.CHAMFER_LEG_MAX > joint.TIP_CHAMFER_MAX
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[1] == pytest.approx(0.0)
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[0] == pytest.approx(joint.TIP_CHAMFER_MAX)
-    assert fixed_without_tip - fixed == pytest.approx(joint.CHAMFER_LEG_MAX)
+    assert joint.THREAD_LENGTH_TOL == pytest.approx(joint.printed_band_mm(spec.DRAWING_PRECISION["ThreadExtent"]["ThreadLength"]))
     assert fitted_without_tip - fitted == pytest.approx(joint.CHAMFER_LEG_MAX)
 
 
@@ -100,10 +288,18 @@ def test_full_thread_proof_detects_short_neck_thread_and_overlong_runout(change)
 
 
 def test_root_runout_is_wholly_outside_receiver_at_actual_printed_corners() -> None:
-    latest_full_start = joint.ROD_LENGTH + joint.ROD_LENGTH_TOL - (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL) + joint.INCOMPLETE_THREAD_MAX
-    earliest_near_face = geom.BRACKET_LOCAL_X - (joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL) / 2.0
-    assert latest_full_start < earliest_near_face
-    assert geom.ROOT_RUNOUT_CLEARANCE_MIN == pytest.approx(earliest_near_face - latest_full_start)
+    # In the receiver frame the near face is zero. The latest full thread
+    # starts at N + P - T + incomplete, independently of overall rod length.
+    starts = [
+        thickness + projection - thread + joint.INCOMPLETE_THREAD_MAX
+        for thickness, projection, thread in itertools.product(
+            (joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL, joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL),
+            (installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL, installed.THREAD_PROJECTION + installed.THREAD_PROJECTION_TOL),
+            (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL, joint.THREAD_LENGTH + joint.THREAD_LENGTH_TOL),
+        )
+    ]
+    assert max(starts) < 0.0
+    assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(-max(starts))
     assert spec.SINGLE_LIMITS["ThreadExtent", "IncompleteLength"][0] == joint.INCOMPLETE_THREAD_MAX
 
 
@@ -134,31 +330,36 @@ def test_operating_travel_covers_unbalanced_clamps_at_every_accepted_rod_corner(
     assert nominal[0] < operating[0] < operating[1] < operating[2] < nominal[2]
     assert operating[1] == nominal[1] == geom.KNIFE_LOCAL_X - geom.CLAMP_LOCAL_X
     assert assembly.CLAMP_X == assembly.LEVER_X0 - geom.CLAMP_LOCAL_X
-    for length, threaded, thickness, diameter, width, fraction, radius in itertools.product(
+    knife_to_bracket = geom.KNIFE_LOCAL_X - geom.BRACKET_LOCAL_X
+    for length, threaded, thickness, projection, diameter, width, fraction, radius in itertools.product(
         (joint.ROD_LENGTH - joint.ROD_LENGTH_TOL, joint.ROD_LENGTH + joint.ROD_LENGTH_TOL),
         (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL, joint.THREAD_LENGTH + joint.THREAD_LENGTH_TOL),
         (joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL, joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL),
+        (installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL, installed.THREAD_PROJECTION + installed.THREAD_PROJECTION_TOL),
         (joint.ROD_DIA + joint.ROD_DIA_BAND[1], joint.ROD_DIA + joint.ROD_DIA_BAND[0]),
         (clamp.BLOCK_DEPTH, clamp.STOCK_ENVELOPE_MAX),
         (0.0, 0.25, 0.5, 0.75, 1.0),
         (operating[0], operating[2]),
     ):
-        station = geom.KNIFE_LOCAL_X - radius
-        # The point is inside the material envelope, but not necessarily at
-        # its centre. Either directed distance may consume the FULL width.
-        west = station - fraction * width
-        east = station + (1.0 - fraction) * width
-        assert west >= diameter / 2.0 - 1e-9
-        assert east <= length - threaded + 1e-9
-        assert east <= geom.BRACKET_LOCAL_X - thickness / 2.0 + 1e-9
-    # Mutation controls: neither symmetric half-width nor nominal thread
-    # root can replace the conservative one-sided accepted-part endpoint.
-    earliest = joint.ROD_LENGTH - joint.ROD_LENGTH_TOL - joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL
-    wrong_half_width = geom.KNIFE_LOCAL_X - earliest + clamp.STOCK_ENVELOPE_MAX / 2.0
-    wrong_nominal_root = geom.KNIFE_LOCAL_X - joint.THREAD_ROOT_X + clamp.STOCK_ENVELOPE_MAX
-    for wrong_radius in (wrong_half_width, wrong_nominal_root):
-        assert geom.KNIFE_LOCAL_X - wrong_radius + clamp.STOCK_ENVELOPE_MAX > earliest
-    assert geom.KNIFE_LOCAL_X - (geom.KNIFE_LOCAL_X - clamp.STOCK_ENVELOPE_MAX) - clamp.STOCK_ENVELOPE_MAX < joint.ROD_DIA / 2.0
+        # Independent machine coordinates: knife at zero, bracket at C.
+        # Fitting the flat tip fixes its coordinate at the far face minus P.
+        threaded_tip = knife_to_bracket - thickness / 2.0 - projection
+        free_tip = threaded_tip + length
+        block_min = radius - fraction * width
+        block_max = radius + (1.0 - fraction) * width
+        assert block_min >= threaded_tip + threaded - 1e-9
+        assert block_min >= knife_to_bracket + thickness / 2.0 - 1e-9
+        assert block_max <= free_tip - diameter / 2.0 + 1e-9
+    # The former fixed-free-tip bound admits a real unsupported setting.
+    short_rod_free_tip = (
+        knife_to_bracket
+        - (joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL) / 2.0
+        - (installed.THREAD_PROJECTION + installed.THREAD_PROJECTION_TOL)
+        + joint.ROD_LENGTH - joint.ROD_LENGTH_TOL
+    )
+    old_upper = geom.KNIFE_LOCAL_X - joint.ROD_DIA / 2.0 - clamp.STOCK_ENVELOPE_MAX
+    assert old_upper + clamp.STOCK_ENVELOPE_MAX > short_rod_free_tip - joint.ROD_DIA / 2.0
+    assert operating[2] + clamp.STOCK_ENVELOPE_MAX <= short_rod_free_tip - joint.ROD_DIA / 2.0 + 1e-9
 
 
 @pytest.mark.parametrize("field", ("STOCK_ENVELOPE_MAX", "WALL_FLOOR"))
@@ -531,7 +732,7 @@ class _LeverNoteDocument:
         return note
 
 
-@pytest.mark.parametrize("fault", (None, "selection_rejected", "wrong_attachment", "dangling"))
+@pytest.mark.parametrize("fault", (None, "selection_rejected", "wrong_attachment", "dangling", "shared_native_note"))
 def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monkeypatch, tmp_path, fault) -> None:
     """Run real detail/callout ordering, FACE attachment and drawing-thread rewrite."""
     hemisphere = _LeverFace()
@@ -540,7 +741,11 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     document = _LeverNoteDocument((front, iso, detail), fault)
     document.EditRebuild3 = lambda: True
     hemisphere.document = document
-    _thread_adapter, _thread_view, native_thread = _native_thread_note_adapter(view=front)
+    _thread_adapter, _thread_view, native_thread = _native_thread_note_adapter(view=detail, sheet_owned=fault == "shared_native_note")
+    other_threads = [_native_thread_note_adapter(view=view)[2] for view in (front, iso)]
+    if fault == "shared_native_note":
+        for state in other_threads:
+            state.thread.ThreadCallout = native_thread.note
     trace, qualifiers, captured = [], {}, {}
     values = {
         "OverallLength": joint.ROD_LENGTH, "RodDia": joint.ROD_DIA,
@@ -593,6 +798,9 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     detail.IsCropped = lambda: True
     detail.CropViewJaggedOutline = detail.CropViewNoOutline = False
     detail.UpdateViewDisplayGeometry = lambda: None
+    cx, cy = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    detail.GetDetailCircleInfo2 = lambda: (1, 0, cx, cy, 0, cx + radius, cy, 0, cx + radius, cy, 0, 3, 0, 0, 0, 0, 0)
     source = tmp_path / "lever.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
@@ -669,15 +877,13 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "add_surface_finish", lambda _a, view, **kwargs: captured.update(finish=(view, kwargs)))
 
     def attach(_adapter, view, **kwargs):
-        if kwargs["text"] == spec.FREE_END_CALLOUT:
-            return leader_notes.add_attached_note(_adapter, view, **kwargs)
-        assert view is detail and kwargs["entity_type"] == "SILHOUETTE"
-        captured["thread"] = kwargs
-        return None
+        assert kwargs["text"] == spec.FREE_END_CALLOUT and view is front
+        return leader_notes.add_attached_note(_adapter, view, **kwargs)
 
     monkeypatch.setattr(drawing, "add_attached_note", attach)
     if fault is not None:
-        message = "failed to select free end hemisphere face by entity" if fault == "selection_rejected" else "lost its face attachment"
+        message = ("native detail authority" if fault == "shared_native_note" else
+                   "failed to select free end hemisphere face by entity" if fault == "selection_rejected" else "lost its face attachment")
         with pytest.raises(RuntimeError, match=message):
             asyncio.run(drawing.build(adapter))
     else:
@@ -710,22 +916,15 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         right = project(None, front, (controlled.box[3], 0.0, 0.0))[0]
         assert left < finish["edge_xy"][0] < right
         _assert_finish_ink_routes(annotations, finish, captured["notes"][0][2], project, front)
-        thread = captured["thread"]
-        assert thread["entity_xy"] == pytest.approx(project(None, detail, (0.158, joint.ROD_DIA / 2000.0, 0.0)))
-        assert " ".join(thread["text"].split()) == " ".join(spec.PRINT_THREAD_CALLOUT.split())
-        assert joint.THREAD in thread["text"]
-        assert "45° ENTRY CHAMFER" in thread["text"]
-        assert len(thread["text"].splitlines()) == 4
-        assert "0.20" not in thread["text"] and "LIMIT RETAINS" not in thread["text"]
         assert native_thread.writes == [spec.PRINT_THREAD_CALLOUT.replace("\n", "\r\n")]
         assert native_thread.note.GetText() == native_thread.writes[0]
-        assert "2A" not in thread["text"] and "2A" not in native_thread.note.GetText()
-        assert "45° ENTRY CHAMFER" in native_thread.note.GetText()
-        assert len(native_thread.note.GetText().splitlines()) == 3
-        assert "0.20" not in native_thread.note.GetText() and "LIMIT RETAINS" not in native_thread.note.GetText()
-        assert "UNC-2A" in native_thread.model_thread.ThreadCallout
+        assert native_thread.note.GetAnnotation().Visible == 1
+        assert native_thread.note.GetAnnotation().GetPosition() == (*drawing.DETAIL_THREAD_NOTE_XY, 0.0)
+        assert all(state.note.GetAnnotation().Visible == 3 for state in other_threads)
+        assert all(state.writes == [] and "UNC-2A" in state.note.GetText() for state in other_threads)
+        assert native_thread.note.GetAnnotation().Owner is detail
         assert native_thread.thread.ThreadCallout is native_thread.note
-        _assert_detail_ink_routes(annotations, thread, project, detail)
+        assert "UNC-2A" in native_thread.model_thread.ThreadCallout
         # The incomplete-length qualifier also stays beyond its actual,
         # source-derived tip witness; no fixed sheet-x surrogate.
         incomplete_xy = annotations["IncompleteLength"].GetPosition()
@@ -844,110 +1043,6 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     assert free_end.text_boxes[0].ymin - rod_dia.text_boxes[0].ymax > 0.0053
 
 
-def _assert_detail_ink_routes(annotations, thread, project, detail):
-    """Replay R10 ink against real curation and source-derived native witnesses.
-
-    Word widths/row offsets are measured from the hash-bound R10 PDF. New
-    wrapping, arrow choice and note-leader departure remain native-render gates.
-    """
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    region = DrawableRegion.from_margins(
-        template.width_m, template.height_m,
-        left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
-    )
-
-    def sheet(*items):
-        return SheetGeometry(
-            "Sheet1", template.width_m, template.height_m, region, annotations=items,
-        )
-
-    native = {
-        name: annotation.GetSpecificAnnotation().GetDimension().SystemValue
-        for name, annotation in annotations.items()
-    }
-    radius = native["RodDia"] / 2.0
-    root = project(None, detail, (
-        native["OverallLength"] - native["ThreadLength"], radius, 0.0,
-    ))
-    tip = project(None, detail, (native["OverallLength"], radius, 0.0))
-
-    def length_ink(station_x, station_y):
-        end_y, line_y = station_y - 0.0017781, station_y - 0.0027781
-        return AnnotationGeometry(
-            label="ThreadLength", kind="dim", owner="detail",
-            text_boxes=(Box(station_x - 0.0051559, station_y - 0.0018442,
-                            station_x + 0.0056694, station_y + 0.0017211),),
-            segments=(
-                Segment(root[0], root[1] + 0.001, root[0], end_y, "ext-line"),
-                Segment(tip[0], tip[1] + 0.001, tip[0], end_y, "ext-line"),
-                Segment(root[0], line_y, tip[0], line_y, "dim-line"),
-            ),
-            exact=True,
-        )
-
-    old_rows = (
-        Box(0.2736628, 0.2090349, 0.2982645, 0.2129736),
-        Box(0.2732567, 0.2048825, 0.3376268, 0.2084479),
-    )
-    old_note = AnnotationGeometry(
-        label="detail thread", kind="note", owner="detail", text_boxes=old_rows,
-        segments=(Segment(0.3378131, 0.2068159, *thread["entity_xy"], "leader"),),
-        exact=True,
-    )
-    before = sheet(length_ink(0.323, 0.220), old_note)
-    assert any(item.a == old_note.label for item in find_text_on_line(before))
-    assert any(
-        item.kind == "leader-through-own-text" for item in find_leader_through_text(before)
-    )
-
-    # The actual build payload owns both shape and mate; only BRACKET wraps.
-    assert " ".join(thread["text"].split()) == " ".join(spec.PRINT_THREAD_CALLOUT.split())
-    assert thread["text"].splitlines() == [
-        spec.PRINT_THREAD_CALLOUT.splitlines()[0], "45° ENTRY CHAMFER",
-        "MATES MHA-MG-01", "BRACKET",
-    ]
-    x, y = thread["note_xy"]
-    dx, dy = x - 0.273, y - 0.213
-    rows = (
-        Box(old_rows[0].xmin + dx, old_rows[0].ymin + dy,
-            old_rows[0].xmax + dx, old_rows[0].ymax + dy),
-        # Same-font R10 glyph advances total 45.4869 mm for the new shape row;
-        # use a 46 mm envelope, not the removed numeric chamfer annotation.
-        Box(x, old_rows[1].ymin + dy, x + 0.046, old_rows[1].ymax + dy + 0.0004),
-        Box(x + 0.0002567, old_rows[1].ymin + dy - 0.0045257,
-            x + 0.0423395, old_rows[1].ymax + dy - 0.0045257),
-        # 19.5154 mm of measured BRACKET ink, padded to 20.5 mm.
-        Box(x, old_rows[1].ymin + dy - 2.0 * 0.0045257,
-            x + 0.0205, old_rows[1].ymax + dy - 2.0 * 0.0045257),
-    )
-    length_x, length_y, _z = annotations["ThreadLength"].GetPosition()
-    length = length_ink(length_x, length_y)
-    # Reflow may move the side departure towards the new block's centre or
-    # bottom row. Replay both predictions and a conservative width interval;
-    # neither prediction substitutes for the next actual native leader audit.
-    for departure_width, extra_row_drop in itertools.product(
-        (0.044, 0.0465), (0.0045257, 2.0 * 0.0045257),
-    ):
-        leader = Segment(
-            x + departure_width, y - 0.0061841 - extra_row_drop,
-            *thread["entity_xy"], "leader",
-        )
-        note = AnnotationGeometry(
-            label=old_note.label, kind="note", owner="detail",
-            text_boxes=rows, segments=(leader,), exact=True,
-        )
-        after = sheet(length, note)
-        assert find_text_on_line(after) == []
-        assert find_lines_through_own_text(after) == []
-        assert find_leader_through_text(after) == []
-        assert find_leader_across_lines(after) == []
-        assert find_text_on_text(after) == []
-        assert find_border_breaches(after) == []
-    for witness in length.segments[:2]:
-        assert min(segment_box_distance(witness, row) for row in rows) >= ARROW_TEXT_CLEARANCE_M
-    assert min(segment_box_distance(length.segments[2], row) for row in rows) > 0.004
-    assert region.ymax - length.text_boxes[0].ymax > 0.009
-    assert min(row.ymin for row in rows) - max(root[1], tip[1]) > 0.020
 
 
 def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, nullable_empty_arrays=False, fault=None, null_entity_index=0):
@@ -982,6 +1077,10 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
         GetAttachedEntityCount3=lambda: observed("attached_count", len(state.entities) + int(fault == "incomplete_attachments")),
         IsDangling=lambda: observed("dangling", state.dangling),
     )
+    annotation.Visible = 1
+    annotation.position = None
+    annotation.SetPosition2 = lambda x, y, z: setattr(annotation, "position", (x, y, z)) is None
+    annotation.GetPosition = lambda: annotation.position
 
     def set_text(text):
         state.writes.append(text)

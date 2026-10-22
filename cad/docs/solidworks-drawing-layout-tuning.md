@@ -1540,15 +1540,15 @@ not survive hidden in metadata, tests or review context. Do not replace it
 with another unasked thread-major limit or local inspection note.
 
 The lever no longer imports or prints its local numeric `TipChamfer` size,
-band or `LIMIT RETAINS FULL ENGAGEMENT` text. The existing thread-feature
-callout is the sole local shape indication: thread designation, then
-`45° ENTRY CHAMFER`, then `MATES MHA-MG-01 BRACKET`. Its drawing layout may
-wrap the mate onto two rows without dropping words; keeping the short
-`BRACKET` row last avoids the reported leader departure through a long
-bottom row. The hidden native primary-distance cap remains in the part,
-while the title block supplies the printed edge maximum. Callout reflow
-still requires the final native-PNG visual gate; source layout is not
-evidence that the rendered text and leaders are clear.
+band or `LIMIT RETAINS FULL ENGAGEMENT` text. One native thread-feature
+callout is printed in the enlarged detail: designation, `45° ENTRY CHAMFER`,
+and `MATES MHA-MG-01 BRACKET`. Its actual native attachment and source text
+are retained; there is no detached manual copy. Hide drawing-local duplicates
+in the front and isometric without changing the source model's callout.
+The hidden native primary-distance cap remains in the part, while the title
+block supplies the edge maximum. Every crop is created with inference off,
+explicitly selected and checked against its persisted native circular fence.
+Final exported-PNG inspection still decides real ink clearance and visibility.
 
 MHA-MG-03 now has one free hemisphere and a flat threaded end. Import the
 small thread/lead dimensions before circularly cropping its enlarged
@@ -1558,10 +1558,10 @@ specifies installation depth: the flat tip reaches through the far face,
 with no shoulder or added relief groove. Full engaged overlap excludes `q`
 at each female mouth, incomplete male thread at both ends, and an ADDITIVE
 `q` male tip loss: the print does not explicitly define a chamfer/die-lead
-union. The fixed useful pose guarantees **10.272234843** full overlap and
-the independent installed projection guarantees **10.307234843**, both above
-1.5D = 9.525 with the ordinary12.50±0.51 receiver. Root-runout clearance is
-0.780 in the fixed frame; the shortest rod still reaches the far face by0.195.
+union. The single fitted-projection interval guarantees **10.307234843** full
+overlap, above1.5D = 9.525 with the ordinary12.50±0.51 receiver. Root-runout
+clearance is0.815 and minimum tip projection0.740. Rod length variation moves
+the fitted free tip; it does not define a second fixed-position joint proof.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
 The radius/location±0.05 bands preserve the thin nose material; keep those
@@ -1846,15 +1846,14 @@ its complete three-row qualifier collided with the section label and height
 extension. Keep the cleared vertical witness station; move the common-flat
 text station from `(50, 175.5)` to `(150, 175.5)` mm instead of lifting it back
 through the A stroke. R28 proved this station and the seat note at
-`(260, 116)` mm with no gating native layout errors. The clarity cutover keeps
-the attached form callout in `(285, 140)` mm, the two-place AF plus supplied-stock
-below-text at `(152, 255)` mm and the expanded bore wall/floor callout at
-`(165, 145)` mm. The actual TOP hex reaches
-about 239.5 mm; the inner border is 266.7 mm. The front right edge is 104.05 mm
-and the section begins at 222.415 mm. These are placement constraints, not a
-claim of newly measured text clearance. Preserve all five actual flat controls,
-values and bands; native final text/leader boxes and whole-sheet inspection
-must prove the new layout.
+`(260, 116)` mm with no gating native layout errors. The current ordinary
+HEX drawing has one native `12.70 A/F` size, at two places with the default
+band, applying to all three opposed-flat pairs over the full height. It has
+no supplied-stock qualifier, separate receiving-envelope callout or finished
+wall/floor inspection note: those belonged to the superseded acceptance
+scheme. Preserve all five actual native flat-location controls, their values
+and bands. Native final text/leader boxes and whole-sheet inspection, not
+these historical station coordinates, prove the current layout.
 
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
@@ -1942,20 +1941,21 @@ replace native variables with literal copied text. Check the complete native
 text and line/arrow envelopes against the selected shared template's current
 title-block keep-out, including a shoulder that outlasts the text after reflow.
 
-Keep nominal model travel separate from published operating capacity. The
-accepted shortest rod and longest thread move nominal runout X149.50 to
-X148.19; nominal `THREAD_ROOT_X` still owns the part's nominal witness.
-Published setup/capacity uses the conservative component band **83.81 / 165 /
-194.825** from `operating_clamp_radius_band`. The ordinary HEX size, angles
-and actual tap-entry locations keep the station inside the body. Its derived
-full-height17 bound therefore covers either bore end from that station,
-without inventing symmetric±8.5. The lower radius is215−148.19+17; the upper
-is215−17−3.175 because the complete bore must also stay beyond the free
-hemisphere. Check the earliest bracket face too. The built165 pose does not
-move. This is not a new printed stock limit or all-machine clearance claim.
+Keep nominal model travel separate from published operating capacity.
+`operating_clamp_radius_band` uses the fitted tip-projection frame. With
+knife-to-bracket-centre $C=55$, neck $N=12.50\pm0.51$, projection
+$P=1.25\pm0.51$, rod $L=167.5\pm0.8$ and thread $T=18.00\pm0.51$,
+the free tip is $K=C-N/2-P+L$. The ordinary HEX and actual tap-entry locations
+keep the station inside the body; its derived full-height17 bound therefore
+covers either bore end without inventing symmetric±8.5. The minimum radius
+is $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.775$.
+Rod length cancels at runout. The maximum is
+$K_{\min}-D_{\max}/2-17=193.260$, with short rod, thick neck and greatest
+projection acting together. Built165 and nominal part geometry do not move.
+These are not new printed stock limits or all-machine clearance claims.
 
 As-made fit-up can inspect and admit more travel, but published capacity does
-not credit it. These component bounds in the existing knife/free-tip frame are
+not credit it. These fitted component bounds, rather than a fixed free-tip frame, are
 not a positive stop or an all-machine articulation certificate. Keep the entire
 bore clear of the as-made runout/thread and hemisphere. The existing minimum-
 pose/kinematics native gate remains open.
@@ -1973,14 +1973,22 @@ establish an upper root limit or an all-standard-variation wall guarantee.
 
 The retention and wall checks are not a brass strength certification. Wire
 force below the lever produces bending even though there is no torque about
-its thread axis. The conservative 10.7 N wire / 1.08 N hanging-weight audit
-puts nominal stress near the basic 1/4-20 root at approximately 120 MPa,
+its thread axis. The conservative 10.7 N wire / 1.22 N hanging-weight audit
+puts nominal stress near the basic 1/4-20 root above 120 MPa,
 before any thread-notch factor. The specified generic brass has no guaranteed
 alloy/temper yield minimum; do not claim a yield margin from its CAD material
 or transfer the steel bracket's allowable stress to it. For context, even
 [Wieland C36000 under 1/2 in](https://wieland-chase.com/36000-standard-alloys/)
 has a 25 ksi minimum yield, not the frequently quoted 45 ksi typical value.
 No alloy or temper substitution is authorized by this geometry change.
+
+The user explicitly retained generic low-carbon steel with the blued finish,
+not a named certified grade. `error_budget.py` consumes the bracket load
+audit in both JSON and human-readable reports: the simultaneous bending and
+torsion demand for a factor of three is about27.360MPa, while verified yield
+and verified yield safety factor are unavailable. This is a calculated
+procurement demand, not a material-data acceptance gate or a demonstrated
+safety factor. Its elastic/shear moduli are stated model assumptions.
 
 Keep a mounting-face caption beside the view it describes, clear of its
 native hole leader and coordinate witnesses. Distribute short controls

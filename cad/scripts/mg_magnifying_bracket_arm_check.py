@@ -83,13 +83,13 @@ WIRE1_TENSION_SWING_N = WIRE_RATIO * PEN_LOAD_SWING_N  # 7.1 N
 
 _LEVER_G = (
     math.pi / 4.0 * LEVER_ROD_DIA**2 * LEVER_ROD_LENGTH * BRASS_G_PER_MM3
-)  # 39.7 g
-_CLAMP_G = _HEX_AREA * CLAMP_HEX_AF**2 * CLAMP_HEIGHT * BRASS_G_PER_MM3  # 26.0 g
+)  # conservative full-cylinder mass; excludes the dome/chamfer removal
+_CLAMP_G = _HEX_AREA * CLAMP_HEX_AF**2 * CLAMP_HEIGHT * BRASS_G_PER_MM3
 _VROD_G = math.pi / 4.0 * VROD_DIA**2 * VROD_LENGTH * BRASS_G_PER_MM3  # 22.1 g
 _FIXTURE_G = _HEX_AREA * FIXTURE_HEX_AF**2 * FIXTURE_LENGTH * BRASS_G_PER_MM3  # 16.4 g
 _THUMB_SCREWS_G = 2.0 * 3.0  # two 91882A221 knurled #4-40, generous
-LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G  # 110.2 g
-LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.08 N
+LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G
+LEVER_GROUP_N = LEVER_GROUP_G * G
 # Every gram placed at the farthest station, the lever's free tip (machine x
 # 200, the lever spanning x 32.5..200 with the threaded neck at x 40): 160 mm.
 LEVER_GROUP_ARM_X = 160.0
@@ -228,4 +228,19 @@ if SCREW_SHEAR_STRESS > SCREW_SHEAR_ALLOWABLE:
 # The worst load already carries the +50 % guide friction: no separation.
 if JOINT_PRELOAD_MARGIN <= 1.0:
     raise AssertionError("magnifying bracket #2-56 joint separates under prying")
+
+
+def material_demand_report() -> dict[str, float | str | None]:
+    """Report the load demand, not an unprovided generic-steel strength."""
+    return {
+        "specified_material": "generic low-carbon steel, blued",
+        "bending_stress_MPa": BENDING_STRESS,
+        "torsion_stress_MPa": TORSION_STRESS,
+        "required_yield_for_factor_three_MPa": STEEL_YIELD_REQUIRED,
+        "assumed_elastic_modulus_MPa": E_STEEL,
+        "assumed_shear_modulus_MPa": G_STEEL,
+        "verified_yield_MPa": None,
+        "verified_yield_safety_factor": None,
+        "status": "UNVERIFIED: no material strength data; procurement remains generic low-carbon steel",
+    }
 
