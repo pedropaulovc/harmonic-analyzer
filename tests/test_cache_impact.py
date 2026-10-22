@@ -95,7 +95,9 @@ raise AssertionError('drawing imported')
 """)
     put(root, "cad/scripts/draw_impact_group.py", "raise AssertionError('drawing imported')\n")
     put(root, "cad/scripts/impact_leaf_spec.py", "VALUE = 1\nFEATURE_STEP_CONFIGURATIONS = ('Operational',)\n")
-    put(root, "cad/config/parts/impact-leaf.yaml", "description: Fixture part\n")
+    # Parts shards retain the registry stem wrapper; bare row fields would add
+    # a scalar "description" entry to the aggregate production registry.
+    put(root, "cad/config/parts/impact-leaf.yaml", "impact-leaf:\n  description: Fixture part\n")
     for stem in ("impact-group", "impact-top"):
         put(root, f"cad/config/assemblies/{stem}.yaml", "description: Fixture assembly\n")
     put(root, "cad/config/release.yaml", "version: 1\n")
@@ -520,6 +522,21 @@ def test_cli_incomplete_adapter_inputs_return_three_with_evidence(source_fixture
     assert not report["complete"] and "error" not in report
     assert "SolidworksMCP-python" in report["unavailable_inputs"]["part:impact_leaf"]["head"]
     assert "Unavailable inputs" in md_path.read_text()
+
+
+def test_malformed_parts_registry_is_a_tool_error_not_zero_impact(source_fixture, tmp_path):
+    repo = fixture_repo(source_fixture, tmp_path)
+    put(repo, "cad/config/parts/impact-leaf.yaml", "description: Fixture part\n")
+    sha = commit(repo, "malformed parts registry")
+    json_path, md_path = tmp_path / "invalid.json", tmp_path / "invalid.md"
+    code = impact.main(["--repo", str(repo), "--base", sha, "--head", sha,
+                        "--json", str(json_path), "--markdown", str(md_path)])
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+    assert code == 2
+    assert "revision discovery failed" in report["error"]
+    assert "_parts_registry" in report["error"]
+    assert "counts" not in report and "complete" not in report
+    assert "No impact conclusion is available" in md_path.read_text(encoding="utf-8")
 
 
 def test_unknown_generated_input_fails_instead_of_being_omitted(source_fixture, tmp_path):
