@@ -94,7 +94,6 @@ FRONT_CENTER = (0.105, 0.270)
 RIGHT_CENTER = (0.205, 0.270)
 ISO_CENTER = (0.165, 0.145)
 GEAR_DATA_POS = (0.015, 0.410)
-MANUFACTURING_NOTES_POS = (0.015, 0.085)
 # The 6:1 boundary prints 25.2 mm off this centre; NotchDepth's two-row text
 # hangs left of it at x 13.9..36.1 (fixed by its 0.025 dimension line and the
 # 12.7 border zone), so at 0.060 the circle's flank (34.8) crossed "FROM OD"
@@ -573,7 +572,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -581,7 +579,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -725,12 +722,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
-    add_property_linked_note(
-        adapter,
-        "Manufacturing Notes",
-        *MANUFACTURING_NOTES_POS,
-        char_height=0.0025,
-    )
     # Rule 9 (show internal shape in solid lines): the bore is a standard
     # hole its callout defines, so the parent views carry no hidden lines
     # (the kerf detail keeps its own mode); the isometric is reset too
