@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from types import SimpleNamespace
 
@@ -548,15 +549,20 @@ def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_
         assert position[-1][:2] == drawing.OVERALL_REFERENCE_XY
 
 
-@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name", "overall_name"))
-def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault):
-    """Historical native ink stations with updated labels and simulated moves."""
+@pytest.mark.parametrize("row_mm", (5.64, 6.35))
+@pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name", "overall_name"))
+def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault, row_mm):
+    """Historical native stations; mode-change geometry/moves are simulations.
+
+    R2 did not capture MountingY0's final primitive. The extra mode-created
+    shoulder below is a deliberate stale-geometry control, NOT its native trace.
+    """
     rows = {
         "NeckThickness": [("12.50", .1070212, .185, .0142236)],
         "FlangeDepth": [("3.175", .1667191, .123, .0116375)],
         "MountingX0": [("9.00 ±0.05", .0327281, .0532219, .0245438)],
         "MountingX1": [("22.70 ±0.05", .0464351, .0432219, .0271299)],
-        "MountingY0": [("6.35 ±0.05", .0177281, .0772219, .0245438)],
+        "MountingY0": [(f"{row_mm:.2f} ±0.05", .0177281, .0772219, .0245438)],
         "SeatToAxis": [("100.40", .1875951, .1622219, .0168097)],
         "FlangeWidth": [("49.25", .0718882, .0952219, .0142236)],
         "NeckToFootSide": [("0.85", .247, .096, .010)],
@@ -568,7 +574,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "FlangeDepth": [(.104625, .1120512, .141, .1120512), (.104625, .1152262, .141, .1152262), (.2050757, .1174438, .140, .1174438), (.140, .1174438, .140, .1152262), (.140, .1120512, .140, .1057012)],
         "MountingX0": [(.054375, .07265, .054375, .0522219), (.058375, .07265, .058375, .0522219), (.0327281, .0532219, .064725, .0532219)],
         "MountingX1": [(.054375, .07265, .054375, .0422219), (.072075, .07265, .072075, .0422219), (.048025, .0432219, .078425, .0432219)],
-        "MountingY0": [(.057375, .07365, .029, .07365), (.0535796, .080, .029, .080), (.030, .07365, .030, .0673), (.030, .080, .030, .08635)],
+        "MountingY0": [(.057375, .080 - row_mm / 1000.0, .029, .080 - row_mm / 1000.0), (.0535796, .080, .029, .080), (.030, .080 - row_mm / 1000.0, .030, .080 - 2.0 * row_mm / 1000.0), (.030, .080, .030, .080 + row_mm / 1000.0)],
         "SeatToAxis": [(.2215, .1120512, .195, .1120512), (.2340527, .2124488, .195, .2124488), (.196, .1120512, .196, .1622219), (.196, .2124488, .196, .1677781)],
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
         "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
@@ -586,6 +592,14 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         item.GetSpecificAnnotation = lambda item=item: item
     items["NeckToFootSide"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "lateral_name" else "NeckToFootSide")
     items["OverallHeight"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "overall_name" else "OverallHeight")
+    state = SimpleNamespace(modes_settled=False)
+    mode_shoulder_y = .080 + row_mm / 1000.0 + .00445
+    messages = []
+
+    def rebuild(_adapter, *, label):
+        if label == "settle bracket linear text modes" and fault != "unsettled_modes":
+            assert all(items[name].OffsetText for name in ("NeckThickness", "MountingY0", "TapFromSide"))
+            state.modes_settled = True
 
     def native_display(_adapter, item):
         native_lines = list(lines[item.name])
@@ -593,8 +607,11 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
             native_lines = [(a, b, c, d + item.dy) if i < 2 else (a, b + item.dy, c, d + item.dy) for i, (a, b, c, d) in enumerate(native_lines)]
         elif item.name == "FlangeDepth":
             native_lines = [(a if i < 2 else a + item.dx, b, c + item.dx, d) for i, (a, b, c, d) in enumerate(native_lines)]
-        if item.name == "MountingY0" and item.OffsetText:
-            native_lines.append((.030, .08635, rows[item.name][0][1] + item.dx, rows[item.name][0][2] + item.dy))
+        if item.name == "MountingY0" and item.OffsetText and state.modes_settled:
+            native_lines.extend((
+                (.030, .080 + row_mm / 1000.0, rows[item.name][0][1] + item.dx, rows[item.name][0][2] + item.dy),
+                (.030, mode_shoulder_y, .051, mode_shoulder_y),
+            ))
         if fault == "own_crossing" and item.name == "MountingX1" and item.dx:
             x = rows[item.name][0][1] + item.dx + .010
             native_lines.append((x, .041, x, .050))
@@ -610,6 +627,9 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         if fault != "ignored_move":
             item.dx += dx
             item.dy += dy
+        # move_annotation rebuilds in production. This control makes a skipped
+        # mode rebuild visible only after a move, reproducing stale targeting.
+        state.modes_settled = True
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "annotation_display", native_display)
@@ -620,15 +640,16 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
     front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
-    # Causal controls: actual frozen witnesses cross both horizontal size
-    # text boxes, and the 6.35 row is struck at Y80 before placement.
+    # Historical frozen witnesses cross both horizontal size text boxes and
+    # the row text at Y80. The 5.64 case changes the actual measured Y span.
     for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1]), ("TapFromSide", lines["TapFromSide"][0])):
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
     if fault:
-        message = "retained native dimension name" if fault in ("lateral_name", "overall_name") else ("did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line"))
+        message = "retained native dimension name" if fault in ("lateral_name", "overall_name") else ("did not settle" if fault == "ignored_move" else ("own native line" if fault in ("own_crossing", "unsettled_modes") else "neighbouring native line"))
         with pytest.raises(RuntimeError, match=message):
             drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"])
     else:
@@ -644,13 +665,30 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         assert ink["FlangeDepth"].text[2] <= .174 - .004 + 1e-8
         assert ink["MountingX0"].text[2] < .054375
         assert ink["MountingX1"].text[0] > .072075
-        assert ink["MountingY0"].text[1] > .08635
+        assert ink["MountingY0"].text[1] == pytest.approx(mode_shoulder_y + .0022)
+        # Causal stale-target control: deriving the lane from pre-mode lines
+        # places this same shoulder through the text, for either row value.
+        old_bottom = .080 + row_mm / 1000.0 + .0022
+        stale_box = Box(ink["MountingY0"].text[0], old_bottom, ink["MountingY0"].text[2], old_bottom + .0035)
+        assert segment_box_overlap_length(Segment(.030, mode_shoulder_y, .051, mode_shoulder_y), stale_box) > 0.0
         assert items["MountingY0"].OffsetText
         assert ink["TapFromSide"].text[0] > max(line[0] for line in lines["TapFromSide"][:2])
         # R35's X-only jog still failed its native own-ink check. Also clear
         # the real historical witnesses' Y band, without inventing its new jog.
         assert ink["TapFromSide"].text[1] > max(max(line[1], line[3]) for line in lines["TapFromSide"][:2])
         assert items["TapFromSide"].OffsetText
+    if fault not in ("lateral_name", "overall_name", "ignored_move"):
+        stages = [json.loads(fields["auditJSON"]) for _message, fields in messages if "auditJSON" in fields]
+        assert [record["stage"] for record in stages] == ["before_text_modes", "settled_text_modes", "placed"]
+        final = stages[-1]["dimensions"]
+        assert "TapFromSide" in final and len(final) == len(items)
+        actual = drawing._dimension_layout_ink(object(), items["MountingY0"], label="MountingY0")
+        assert final["MountingY0"]["text_box"] == list(actual.text)
+        assert final["MountingY0"]["segments"] == [[line.x0, line.y0, line.x1, line.y1] for line in actual.leader]
+        assert final["MountingY0"]["native_display"]["texts"][0]["t"] == f"{row_mm:.2f} ±0.05"
+        if fault == "unsettled_modes":
+            inner = Box(actual.text[0] + .00015, actual.text[1] + .00015, actual.text[2] - .00015, actual.text[3] - .00015)
+            assert segment_box_overlap_length(Segment(.030, mode_shoulder_y, .051, mode_shoulder_y), inner) > 0.0
 
 
 

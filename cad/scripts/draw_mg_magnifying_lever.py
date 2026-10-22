@@ -259,6 +259,48 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
         raise RuntimeError(f"lever Detail A needs one native cosmetic-thread seed, reported {count}")
     note = _early_bound(thread.ThreadCallout, "INote")
     if note is None:
+        # Importing a cosmetic-thread instance need not insert its drawing
+        # callout. Use the same native selection/creation path as the clamping
+        # hardware sheet, never a detached replacement INote.
+        thread_annotation = _early_bound(thread.GetAnnotation(), "IAnnotation")
+        if thread_annotation is None or int(adapter.swApp.IsSame(thread_annotation, thread_annotation)) != 1:
+            raise RuntimeError("lever Detail A cosmetic-thread annotation identity is unavailable")
+        _activate(adapter, native)
+        draw = _early_bound(adapter.currentModel, "IModelDoc2")
+        drawing = _early_bound(draw, "IDrawingDoc")
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        creation = {"callout_before": False, "requested": False}
+        try:
+            selected = thread_annotation.Select2(False, 0)
+            selected_count = int(manager.GetSelectedObjectCount2(-1))
+            kind = int(manager.GetSelectedObjectType3(1, -1)) if selected_count else 0
+            picked = manager.GetSelectedObject6(1, -1) if selected_count else None
+            picked_annotation = (
+                _early_bound(_early_bound(picked, "ICThread").GetAnnotation(), "IAnnotation")
+                if selected_count == 1 and kind == 39 and picked is not None else None
+            )
+            same = picked_annotation is not None and int(adapter.swApp.IsSame(picked_annotation, thread_annotation)) == 1
+            creation.update(selection_count=selected_count, selection_type=kind, same_thread=same)
+            if selected is not True or selected_count != 1 or kind != 39 or not same:  # swSelCTHREADS
+                raise RuntimeError(f"lever Detail A cannot select its native cosmetic thread: {creation!r}")
+            creation["requested"] = True
+            _telemetry.info(f"lever native thread callout creation: {json.dumps(creation, sort_keys=True)}")
+            drawing.InsertThreadCallout()  # VT_VOID; prove creation on the same ICThread below.
+        finally:
+            draw.ClearSelection2(True)
+        rebuild_drawing(adapter, label="create native lever thread callout")
+        native.UpdateViewDisplayGeometry()
+        fresh = _early_bound(native.GetFirstCThread(), "ICThread")
+        if (
+            int(native.GetCThreadCount()) != 1 or fresh is None or fresh.GetNext() is not None
+            or int(adapter.swApp.IsSame(_early_bound(fresh.GetAnnotation(), "IAnnotation"), thread_annotation)) != 1
+        ):
+            raise RuntimeError("lever Detail A cosmetic thread lost identity after callout insertion")
+        thread = fresh
+        note = _early_bound(thread.ThreadCallout, "INote")
+        creation["callout_after"] = note is not None
+        _telemetry.info(f"lever native thread callout creation: {json.dumps(creation, sort_keys=True)}")
+    if note is None:
         raise RuntimeError("lever Detail A cosmetic thread has no native drawing callout note")
     original = str(note.GetText() or "")
     if " ".join(original.split()) != " ".join(THREAD_CALLOUT.split()):

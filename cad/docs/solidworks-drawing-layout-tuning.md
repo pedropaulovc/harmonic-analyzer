@@ -1869,6 +1869,17 @@ not permission to collapse spaces, blank lines or changed thread/mate text.
 Read every independent post-state field before refusal, with per-reader errors
 and precise indexed identity-call labels. Keep owner/attachment/dangling checks.
 
+The 2026-10-22 R2 lever run imported one cosmetic-thread seed and instance,
+but `ICThread.ThreadCallout` was still null. Import counts do not prove a
+native drawing note exists. As in the clamping-kit hardware drawing, select
+that thread's actual annotation in its view, require one `swSelCTHREADS` (39)
+selection and `ISldWorks.IsSame` annotation identity, then invoke the void
+`IDrawingDoc.InsertThreadCallout`. Rebuild and require the same single thread
+annotation before reading its own `ThreadCallout` again. Only that native
+`INote` receives the four-row print text and the existing owner, attachment,
+literal CRLF, placement and readback checks. A null result, changed thread or
+wrong selected identity remains fatal; never author a detached note.
+
 The user clarified that this bracket is a straightforward tapped through hole.
 Keep the ordinary end view and real native1/4-20 UNC THRU ALL callout; no A-A,
 cutting arrows, orphan section marks or section-thread display/ink machinery
@@ -1893,6 +1904,22 @@ For `TapFromSide`, use the existing `MountingY0` two-axis jog pattern: text
 left4mm beyond the last vertical witness and bottom2.2mm above the measured
 pre-placement leader extent. R35 rejected an X-only jog. Requested positions
 do not prove the new native jog; retain the actual own-ink and neighbor guards.
+
+The 2026-10-22 R2 bracket run also rejected `MountingY0` after changing
+`OffsetText` and rebuilding during its move. Its target came from the old
+pre-offset segments; the failing final box/primitive was not captured, so its
+exact crossing is unknown. Set and rebuild the native `CenterText`/`OffsetText`
+modes first, then derive the existing two-axis jog from the settled native
+text/line geometry. Preserve all own-line, neighbour, silhouette and sheet
+guards. Capture native text runs, raw lines/arrows and decoded boxes/segments
+before modes, after their rebuild and for every final annotation before any
+layout guard can fail. This same measured placement applies to the child's
+5.64 and parent's 6.35 row without changing either model.
+Offline historical-witness and simulated mode-transition controls cover both
+rows, including a stale-target crossing and strict rejection. They are not a
+replay of the uncaptured R2 primitive or proof that a new native sheet clears;
+the combined native drawing run and whole-sheet audit remain required.
+
 The overall seat-to-nose span is a native drawing reference, not a second
 manufacturing tolerance: select the actual mounting-seat edge and nose arc,
 set/read back the maximum arc endpoint, and parenthesize the measured result.
