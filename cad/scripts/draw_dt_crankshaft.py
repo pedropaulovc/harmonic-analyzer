@@ -41,7 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import place_callout_clear
-from _drawing_attachment import _assert_attached_to
+from _drawing_attachment import _assert_attached_to, _is_same_attachment
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -99,6 +99,7 @@ from dt_crankshaft_spec import (
     CROSS_HOLE_PROCESS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     DRIVE_PIN_CIRCLE_RADIUS,
     DRIVE_PIN_FLOOR,
     DRIVE_PIN_HOLE_DIA,
@@ -108,6 +109,7 @@ from dt_crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_END,
     JOURNAL_START,
+    NECK_DIA_PLACES,
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
     PINION_SEAT_DIA,
@@ -116,7 +118,6 @@ from dt_crankshaft_spec import (
     RELIEF_START,
     SEAT_COLLAR,
     SEAT_STEP,
-    SHAFT_NECKS,
     SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
@@ -271,9 +272,9 @@ SIDE_KEEP = {
 # 902433a8d: 2.3 mm read as one callout), its landing line 2 mm over the
 # outboard journal's finish symbol and its fit row 7 mm under the cross-hole
 # callout's landing line; the relief's Ø10.4 stands right of it.
-# The neck's loose Ø9.5 (2X: both bare necks) stands on the inboard neck,
-# over the Ø9.000's block; the Ø9.000's dimension line stands 2 mm past its
-# step so the retention-pin note's leader passes 4.5 mm right of its block.
+# The existing loose Ø9.5 remains on the inboard neck, over the Ø9.000's
+# block. A separate measured diameter identifies the collar-side neck.
+# The Ø9.000's line stays 2 mm past its step, clear of the retention-pin note.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, 0.2195),
     "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
@@ -283,16 +284,25 @@ DIAMETER_POSITIONS = {
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
-# The shank's band is the hub's fit; the two bare necks share one loose
-# 2X Ø9.5 (dt_crankshaft_spec SHAFT_NECKS).  The 2X Ø11.388 names both
-# bearing lands on either side of the relief; the displayed arrow picks the
-# outboard land, and the equal-size callout also governs the inboard land.
+# Approach the short neck from below, between its two physical shoulders.
+# This local bay is above the collar/journal outboard baseline rows and
+# left of the shorter rows; it avoids the collar-rear Ra and fit blocks.
+OUTBOARD_NECK_DIAMETER_XY = ((COLLAR_REAR_X + JOURNAL_START_X) / 2.0, 0.1515)
+OUTBOARD_NECK_ARROW_WINDOW = (
+    COLLAR_REAR_X, _sheet_y(-SHAFT_DIA / 2.0),
+    JOURNAL_START_X, _sheet_y(SHAFT_DIA / 2.0),
+)
+# Sheet-space display readback tolerance, not a model-size tolerance.
+NECK_ARROW_LANDING_TOLERANCE_M = 1e-5  # 0.01 mm against a ~2.34 mm axial land
+NECK_ARROW_DIRECTION_X_SLACK = 1e-6  # normalized-X roundoff near a vertical arrow
+# The shank's band is the hub's fit; each bare neck has its own loose
+# diameter. The 2X Ø11.388 still names both bearing lands across the relief.
 CALLOUTS_ABOVE = {
     "ShaftDiaDim": SLIDING_FIT,
     "JournalDiaDim": JOURNAL_FIT,
     "PinionSeatDiaDim": SLIDING_FIT,
     "SpigotDiaDim": SPIGOT_AIR,
-    "NeckDiaDim": f"{len(SHAFT_NECKS)}X",
+    "NeckDiaDim": "",
 }
 # Each drive-pin location names the mate its +/-0.025 serves
 # (crankshaft_notes), in the clear field under its text; the spigot's length
@@ -386,9 +396,9 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-# High in its field (top row ~4.5 mm under the border), so the neck's 2X Ø9.5
-# and the Ø9.000's block stand under it, and its leader to the hole passes
-# right of the Ø9.000's block.
+# High in its field (top row ~4.5 mm under the border), so the right neck's
+# Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
+# passes right of the Ø9.000's block.
 PINION_PIN_NOTE_XY = (0.273, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
@@ -832,6 +842,258 @@ def _far_end_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
+def _outboard_neck_rim(adapter: Any, view: Any) -> Any:
+    """Resolve the physical core rim where the collar-side neck meets the journal.
+
+    The same-sized right neck and dome-root circle are not this feature.
+    Select a true model circle visible edge-on in FRONT, never a projected
+    shoulder line or a coordinate hit-test.
+    """
+    matches: list[Any] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = visible_component_entities(view, component, 1) or ()  # edges
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) for value in (curve.CircleParams or ()))
+            if len(params) != 7 or not all(math.isfinite(value) for value in params):
+                raise RuntimeError(f"collar-side neck: unreadable circle parameters {params}")
+            cx, cy, cz, ax, ay, az, radius = params
+            if (
+                abs(cx) < 1e-6
+                and abs(cz) < 1e-6
+                and abs(cy - JOURNAL_START / 1000.0) < 1e-6
+                and abs(radius - SHAFT_DIA / 2000.0) < 1e-6
+                and abs(ax) < 1e-9
+                and abs(az) < 1e-9
+                and abs(abs(ay) - 1.0) < 1e-9
+            ):
+                matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"collar-side neck: FRONT shows {len(matches)} physical core rims at "
+            f"journal start {JOURNAL_START}; expected exactly one"
+        )
+    return matches[0]
+
+
+def _native_neck_view_dimensions(side: Any, *, label: str) -> list[tuple[Any, Any, Any]]:
+    """Bind real view dimensions; a type-4 annotation without native data refuses."""
+    dimensions = []
+    for item in _early_bound(side, "IView").GetAnnotations() or ():
+        annotation = _early_bound(item, "IAnnotation")
+        if int(annotation.GetType()) != 4:  # swDisplayDimension
+            continue
+        specific = annotation.GetSpecificAnnotation()
+        if specific is None:
+            raise RuntimeError(f"{label}: type-4 annotation has no native display")
+        display = _early_bound(specific, "IDisplayDimension")
+        native = display.GetDimension2(0)
+        if native is None:
+            raise RuntimeError(f"{label}: no native IDimension")
+        dimensions.append((annotation, display, _early_bound(native, "IDimension")))
+    return dimensions
+
+
+def _assert_plain_neck_size(
+    display: Any, *, label: str, expected_driven_state: int
+) -> float:
+    """Prove a loose native size without rewriting the imported dimension."""
+    native = display.GetDimension2(0)
+    if native is None:
+        raise RuntimeError(f"{label}: no native IDimension")
+    dimension = _early_bound(native, "IDimension")
+    if int(display.Type2) != 6:  # swDiameterDimension, not doubled linear (15)
+        raise RuntimeError(f"{label}: native display is not a diameter")
+    value = dimension.SystemValue
+    if value is None:
+        raise RuntimeError(f"{label}: no native measured value")
+    measured_mm = float(value) * 1000.0
+    if not math.isfinite(measured_mm) or abs(measured_mm - SHAFT_DIA) > 1e-5:
+        raise RuntimeError(f"{label}: measures {measured_mm!r} mm, expected {SHAFT_DIA}")
+    if type(dimension.DrivenState) is not int or dimension.DrivenState != expected_driven_state:
+        raise RuntimeError(
+            f"{label}: native driven state {dimension.DrivenState!r} "
+            f"!= preserved/required state {expected_driven_state}"
+        )
+    places = display.GetPrimaryPrecision2()
+    if places != NECK_DIA_PLACES:
+        raise RuntimeError(f"{label}: primary places {places!r} != {NECK_DIA_PLACES}")
+    tolerance = dimension.Tolerance
+    if tolerance is None or int(_early_bound(tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError(f"{label}: unexpected explicit tolerance band")
+    if display.GetOverride() is not False or display.ShowParenthesis is not False:
+        raise RuntimeError(f"{label}: overridden or parenthesized value loses the general band")
+    prefix = str(display.GetText(1) or "")
+    prose = tuple(str(display.GetText(part) or "") for part in (2, 3, 4))
+    if prefix not in ("", "<MOD-DIAM>") or any(prose):
+        raise RuntimeError(f"{label}: unexpected native diameter text {prefix!r}, {prose!r}")
+    return measured_mm
+
+
+def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
+    """Prove rendered diameter arrows identify the short neck, not the journal."""
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError(f"{label}: no native diameter display data")
+    data = _early_bound(raw, "IDisplayData")
+    count = data.GetArrowHeadCount()
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"{label}: no readable native diameter arrowheads")
+    arrows = []
+    for index in range(count):
+        values = tuple(float(value) for value in (data.GetArrowHeadAtIndex2(index) or ()))
+        if len(values) != 12 or not all(math.isfinite(value) for value in values):
+            raise RuntimeError(f"{label}: malformed native arrowhead {index}: {values!r}")
+        tip = values[0], values[1]
+        tolerance = NECK_ARROW_LANDING_TOLERANCE_M
+        x0, y0, x1, y1 = OUTBOARD_NECK_ARROW_WINDOW
+        if not (
+            x0 - tolerance <= tip[0] <= x1 + tolerance
+            and y0 - tolerance <= tip[1] <= y1 + tolerance
+        ):
+            raise RuntimeError(f"{label}: diameter arrow {tip!r} does not identify the neck")
+        # _layout_audit.arrowhead_segments records 125/125 calibrated PDF
+        # arrows: the direction points from tip back to the arrow's base /
+        # leader body. Positive sheet X therefore approaches from the journal.
+        dx, dy = values[3:5]
+        length = math.hypot(dx, dy)
+        if not math.isfinite(length) or length == 0.0:
+            raise RuntimeError(f"{label}: unreadable native arrow direction {values[3:6]!r}")
+        direction = dx / length, dy / length
+        if direction[0] > NECK_ARROW_DIRECTION_X_SLACK:
+            raise RuntimeError(f"{label}: diameter arrow approaches from the journal side")
+        arrows.append((tip, direction))
+    _telemetry.info(f"{label}: native diameter arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}")
+
+
+def _assert_outboard_neck_dimension(
+    adapter: Any, side: Any, identity: Any, right_driven_state: int, *, phase: str
+) -> None:
+    """Re-read the view's native dimension and physical attachment, without writes.
+
+    Diameter leaders are not note leaders: GetLeaderCount is diagnostic,
+    not an invented one-leader contract. Type, one exact physical edge and
+    its native measured value establish the dimension's correspondence.
+    """
+    label = f"collar-side neck ({phase})"
+    reference = _early_bound(identity, "IDimension")
+    # Read the live FullName from the captured native object: SaveAs may
+    # update its model/title component. A stale selection-name string is
+    # not the persistence identity.
+    full_name = reference.FullName
+    if not isinstance(full_name, str) or not full_name:
+        raise RuntimeError(f"{label}: missing native dimension FullName")
+    # Precision/parenthesis setters explicitly require a redraw for current
+    # display data. EditRebuild3 alone does not promise a fresh arrow buffer.
+    # One void redraw per proof also covers the finalizer's settling rebuild.
+    _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
+    matches: list[tuple[Any, Any]] = []
+    inboard: list[Any] = []
+    for annotation, display, native in _native_neck_view_dimensions(side, label=label):
+        if dimension_name(adapter, annotation) == "NeckDiaDim":
+            inboard.append(display)
+        if native.FullName == full_name and int(adapter.swApp.IsSame(native, reference)) == 1:
+            matches.append((annotation, display))
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one native view dimension {full_name!r}")
+    annotation, display = matches[0]
+    measured_mm = _assert_plain_neck_size(display, label=label, expected_driven_state=1)
+    if len(inboard) != 1:
+        raise RuntimeError(f"{label}: expected one unchanged right-hand NeckDiaDim")
+    _assert_plain_neck_size(
+        inboard[0], label=f"right-hand NeckDiaDim ({phase})",
+        expected_driven_state=right_driven_state,
+    )
+    rim = _outboard_neck_rim(adapter, side)
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    count = int(annotation.GetAttachedEntityCount3())
+    types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+    same = (
+        count == 1
+        and len(attached) == 1
+        and types == (1,)  # swSelEDGES
+        and attached[0] is not None
+        and _is_same_attachment(adapter, attached[0], rim, "EDGE")
+    )
+    if not same or annotation.IsDangling() is not False:
+        raise RuntimeError(
+            f"{label}: lost exact physical rim attachment: count={count}, types={types}"
+        )
+    _assert_neck_arrow_landing(display, label=label)
+    _telemetry.info(
+        f"{label}: native diameter {full_name!r}, measured_mm={measured_mm}, "
+        f"driven=1, places={NECK_DIA_PLACES}, tolerance=NONE, exact_rim=True, "
+        f"native_leaders={annotation.GetLeaderCount()}"
+    )
+
+
+def _add_outboard_neck_dimension(
+    adapter: Any, drawing_model: Any, side: Any
+) -> tuple[Any, int]:
+    """Add only a native driven measurement; never write a diameter value."""
+    label = "collar-side neck"
+    original = [
+        native
+        for annotation, _display, native in _native_neck_view_dimensions(side, label=label)
+        if dimension_name(adapter, annotation) == "NeckDiaDim"
+    ]
+    if len(original) != 1:
+        raise RuntimeError(f"{label}: expected one original right-hand NeckDiaDim")
+    right_driven_state = original[0].DrivenState
+    if type(right_driven_state) is not int or right_driven_state not in (1, 2):
+        raise RuntimeError(f"{label}: unreadable original driven state {right_driven_state!r}")
+    rim = _outboard_neck_rim(adapter, side)
+    _select_view_entity(adapter, side, "EDGE", None, label=label, entity=rim)
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    display, status = extension.AddSpecificDimension(
+        *OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0  # swDiameterDimension; out status
+    )
+    if display is None or type(status) is not int or status != 0:  # success = 0
+        raise RuntimeError(
+            f"{label}: physical edge-on circle rejected native diameter (status={status!r}); "
+            "no note or doubled-linear fallback is permitted"
+        )
+    display = _early_bound(display, "IDisplayDimension")
+    native = display.GetDimension2(0)
+    if native is None:
+        raise RuntimeError(f"{label}: new display has no native IDimension")
+    dimension = _early_bound(native, "IDimension")
+    dimension.DrivenState = 1  # swDimensionDriven; only the new drawing dimension
+    status = display.SetPrecision3(
+        DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
+    )
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: native precision assignment failed ({status!r})")
+    # Driven is not a presentation setting: retain a plain, general-band
+    # callout like the existing NeckDiaDim, not a parenthesized reference.
+    display.ShowParenthesis = False
+    if not isinstance(dimension.FullName, str) or not dimension.FullName:
+        raise RuntimeError(f"{label}: new native dimension has no FullName")
+    drawing_model.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    _assert_outboard_neck_dimension(
+        adapter, side, dimension, right_driven_state, phase="after insertion rebuild"
+    )
+    return dimension, right_driven_state
+
+
+def _outboard_neck_checkpoint(
+    adapter: Any, side: Any, identity: Any, right_driven_state: int, phase: str
+) -> None:
+    """Use the finalizer's existing save boundaries; never reopen the drawing."""
+    if phase in (
+        "after_drawing_save",
+        "after_pdf_save",
+    ):
+        _assert_outboard_neck_dimension(
+            adapter, side, identity, right_driven_state, phase=phase
+        )
+
+
 def _centres_note_field() -> Box:
     """Text below the pictorial caption, right of FRONT's station witnesses."""
     return (
@@ -1084,6 +1346,10 @@ async def build(adapter: Any) -> dict[str, str]:
             continue
         set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
 
+    outboard_neck_dimension, right_neck_driven_state = _add_outboard_neck_dimension(
+        adapter, drawing_model, side
+    )
+
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
     # ASME centre mark, the side view marks the cross-hole circle.
@@ -1219,6 +1485,15 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Crankshaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_outboard_neck_dimension(
+                adapter, side, outboard_neck_dimension, right_neck_driven_state,
+                phase="final settling rebuild",
+            ),
+        ),
+        checkpoint=lambda phase: _outboard_neck_checkpoint(
+            adapter, side, outboard_neck_dimension, right_neck_driven_state, phase
+        ),
     )
 
 

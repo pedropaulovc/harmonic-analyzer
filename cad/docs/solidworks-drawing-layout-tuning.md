@@ -1668,6 +1668,67 @@ end landing and both leader/text clearances, not only attachment count.
 This changes neither centre-hole permission nor the dome's separate punched
 witness, shaft geometry, tolerances or the declared RV-02 rim shortfall.
 
+### Crankshaft necks: two physical native diameter attachments
+
+The right-hand imported `NeckDiaDim` no longer carries `2X`: its native
+callout-above text is explicitly cleared and read back. Its value, precision,
+band and placement are not rewritten. The collar-side neck, between the
+collar's rear face and the left journal, gets a separate native drawing
+diameter measured from the actual core circle at `(0, JOURNAL_START, 0)`,
+radius `SHAFT_DIA / 2`. Resolve exactly one visible model `IEdge` by
+`ICurve.IsCircle` and `CircleParams`, then use the existing direct-entity
+selection pattern. A projected line or a same-sized circle on the right is
+not an equivalent attachment.
+
+`IModelDocExtension.AddSpecificDimension(..., 6, status)` requests
+`swDiameterDimension`; type 15 is a doubled linear distance, not a substitute.
+Require a non-null native display and clean status 0. Only the new
+`IDimension.DrivenState` is set to 1, and only its display precision is
+assigned: `DRAWING_REFERENCE_PRECISION["OutboardNeckDia"]` is a source-owned
+places statement defined from `NECK_DIA_PLACES`, not an alias for a size.
+There is no authored model dimension to import for this physical left-hand
+edge measurement. The derived display remains unparenthesized, without
+numeric overrides or explicit tolerance, so the same one-place title-block
+general band governs both necks. Neither value is typed into a note.
+
+After insertion rebuild, after the final settling rebuild and after the
+finalizer's actual drawing/PDF saves, reacquire the native display from
+FRONT. Match the captured native `IDimension` by its live `FullName` and
+`ISldWorks.IsSame`, not a pre-save selection-name string. Prove diameter
+type, actual unrounded size, driven state, places, read-only
+`IDimension.Tolerance.Type == swTolNONE` and the exact physical-edge
+attachment. Capture the original right-hand driven state and require it
+unchanged (do not assume an imported reference sketch dimension is driving).
+Read back its value/places/band and empty quantity at the same boundaries.
+`GetLeaderCount` is diagnostic, not a note's one-leader contract. Callbacks
+perform no extra opens, no redundant before-save rescans and no close check
+that could prevent `CloseDoc`.
+Each proof forces one void `GraphicsRedraw2()` before reading arrow display
+data: `EditRebuild3` alone does not promise that buffer is current, and the
+precision/parenthesis setters explicitly request a redraw. Redraw failure or
+empty/malformed arrow data refuses; there is no retry or empty-data fallback.
+
+The new value approaches from below at the neck's axial midpoint, above the
+long collar/journal baseline rows and left of the short rows, away from the
+collar-rear finish and running-fit blocks. Read actual dimension arrow tips
+from `GetDisplayData().GetArrowHeadAtIndex2`: every arrow must lie within the
+short neck's projected axial/radial window, with a declared 0.01 mm sheet-space
+readback tolerance, not a model-size tolerance. Require a finite, nonzero
+projected arrow direction and reject journal-side positive-X approach
+(normalized-X roundoff slack `1e-6`). The existing
+`_layout_audit.arrowhead_segments` calibration establishes that direction
+points from the tip back toward the shaft/base (125/125 unambiguous arrows
+on six PDFs). Vertical or left-side approach and native two-arrow diameter
+bracketing are allowed; no note leader or one-arrow assumption is introduced.
+No existing diameter is moved. Native positive
+control is still required: the SDK documents diameter creation in drawings
+but does not guarantee a circle projected edge-on will be accepted. Refuse a
+type mismatch, missing/ambiguous rim, detached dimension or altered band;
+do not replace failure with a literal, unassociated leader or free graphics.
+Inspect the complete exported sheet for both neck landings and clearance
+from the collar, running fit and finish leaders. Preserve centre permission,
+the dome/witness, geometry, tolerance limits and RV-02 unchanged.
+
 ## Synchronous builds and session hygiene
 
 - The COM seat is shared but SELF-SERIALIZING: `_com_seat` (a machine-global
