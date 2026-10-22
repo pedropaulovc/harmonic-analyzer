@@ -185,7 +185,7 @@ def shelve_reference_text(
     label: str,
     force: Collection[str] = (),
 ) -> Callable[[], None]:
-    """Shelf short references in the +axis direction; return a read-only proof.
+    """Shelve short references in the +axis direction; return a read-only proof.
 
     ``reacquire`` must validate the caller's exact identities, attachments and
     source ownership and return fresh displays on every invocation. Its keys
@@ -272,9 +272,14 @@ def shelve_reference_text(
                 raise RuntimeError(f"{label} {name}: cannot shelf supplier reference text")
         rebuild_drawing(adapter, label=f"{label} measured reference text shelves")
 
+    stations = {
+        name: {key: geometry[key] for key in ("tips", "witnesses")}
+        for name, geometry in before.items()
+    }
+
     def settled() -> None:
         found = current_displays()
-        for name, original in before.items():
+        for name, original in stations.items():
             display = _early_bound(found[name], "IDisplayDimension")
             actual = measure_reference_text(
                 adapter, display, axis=axes[name], label=f"{label} {name}"
