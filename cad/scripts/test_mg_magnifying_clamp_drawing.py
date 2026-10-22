@@ -894,7 +894,7 @@ def test_native_af_import_refuses_wrong_source_context_or_postrebuild_drift(monk
 @pytest.mark.parametrize("fault", (
     None, "activation", "wrong-initial-edge", "first-rebuild-switch",
     "stale-property", "raw-link", "leader", "position", "wrong-edge",
-    "dangling", "owner", "owner-type", "lost-height", "unknown-self",
+    "dangling", "owner", "owner-type", "lost-height", "unknown-self", "nonfinite-depth",
 ))
 def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebuild(monkeypatch, fault):
     import _drawing_leader_notes as leader_notes
@@ -924,7 +924,9 @@ def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebu
         return 0
 
     def position(x, y, z):
-        state.position = x, y, z
+        # Actual R32 native note depth, despite SetPosition2 requesting Z0:
+        # this is not a displacement in the sheet's XY placement.
+        state.position = x, y, 0.009421525247823612
         return True
 
     annotation.SetAttachedEntities = attach
@@ -989,7 +991,7 @@ def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebu
     result, retained_edge = drawing._add_stock_form_note(adapter, view)
     assert result is note and retained_edge is edge
     assert state.entities == (edge,) and state.leaders == 1
-    assert state.position == (*drawing.STOCK_FORM_NOTE_XY, 0.0)
+    assert state.position == (*drawing.STOCK_FORM_NOTE_XY, 0.009421525247823612)
     assert properties == {"Manufacturing Notes": spec.DRAWING_NOTES}
     if fault == "stale-property":
         properties["Manufacturing Notes"] = "OLD STOCK"
@@ -1000,6 +1002,8 @@ def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebu
         state.leaders = 0
     elif fault == "position":
         state.position = (0.305, 0.140, 0.0)
+    elif fault == "nonfinite-depth":
+        state.position = (*drawing.STOCK_FORM_NOTE_XY, math.nan)
     elif fault == "wrong-edge":
         state.entities = (SimpleNamespace(**vars(edge)),)
     elif fault == "dangling":

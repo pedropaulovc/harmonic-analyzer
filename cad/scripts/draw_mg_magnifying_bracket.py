@@ -257,11 +257,19 @@ def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
     return display.GetAnnotation()
 
 
-def _layout_linear_annotations(adapter: Any, front: Any, bottom: Any, annotations: list[Any]) -> None:
+def _layout_linear_annotations(
+    adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any,
+) -> None:
     """Place the five reviewed text blocks from native ink, then guard neighbours."""
     names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NeckToFootSide")
-    by_name = {}
-    for name in (*names, "SeatToAxis"):
+    # Retain the actual drawing-created edge dimension instead of rediscovering
+    # it through the model-item name lookup that failed in R32.
+    local_display = _early_bound(_early_bound(lateral_location, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    if str(_early_bound(local_display.GetDimension2(0), "IDimension").Name) != "NeckToFootSide":
+        raise RuntimeError("neck-to-foot retained native dimension name changed")
+    annotations = [*annotations, lateral_location]
+    by_name = {"NeckToFootSide": lateral_location}
+    for name in (*names[:-1], "SeatToAxis"):
         matches = [item for item in annotations if dimension_name(adapter, item) == name]
         if len(matches) != 1:
             raise RuntimeError(f"bracket layout requires exactly one {name}")
@@ -422,8 +430,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *mounting_dimensions, *annotations,
         _early_bound(mounting_callout, "IDisplayDimension").GetAnnotation(),
         _early_bound(tap, "IDisplayDimension").GetAnnotation(),
-        lateral_location,
-    ])
+    ], lateral_location=lateral_location)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 

@@ -1845,6 +1845,10 @@ dimension with ordinary .XX acceptance**, not REF/text-only limits, owns size.
 The property-linked15 MAX note now has one real section-stock-edge leader:
 retain its resolved full-height/plain-body-travel text, native view owner,
 exact edge attachment and position through the final rebuild.
+The note's sheet placement is its XY station; native annotation depth may be
+nonzero (R32 returned Z0.009421525247823612 after insertion at the requested
+XY). Require a finite XYZ readback and the exact sheet XY, not an invented
+Z0 manufacturing or layout requirement.
 Retain the selected stock edge **before** insertion with `_select_view_entity`,
 then use `add_attached_note(entity=E, attached_to=E)` with the property-link text.
 Its post-rebuild identity guard must reject an initial wrong edge; never adopt
@@ -1919,6 +1923,11 @@ outside arcs across the0.85 offset, with no flat ledge; verify the actual native
 root at enlarged scale. The user-approved5mm free-end extension changes only
 machineX−3 to−8 (local−43 to−48), foot49.25 to54.25 and setbacks4/17.70 to
 9/22.70; both mounting axes, seat, width, thickness and lever pose stay fixed.
+Pass the actual drawing-created lateral dimension annotation to its layout
+checks; retain its measured two-edge attachments, native name and ordinary band.
+Do not rediscover that annotation through an imported-model dimension name
+reader. R32 passed its constructor checks but failed that later rediscovery;
+the exact native legacy-reader behavior was not captured.
 The earlier+10 option intersected the existing hex knife stub and was rejected.
 The knife mount's pre-existing0.6835 nominal axial air gap is not a2mm wall
 policy violation or permission to claim a full articulation clearance proof.

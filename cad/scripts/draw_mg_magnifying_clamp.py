@@ -455,7 +455,7 @@ def _assert_stock_form_note(
         resolved_text=text, raw_property_link=raw_link, leader_count=leaders, position=repr(position),
         owner_type=owner_type, identity_codes=repr(codes),
     )
-    if text != DRAWING_NOTES or type(raw_link) is not str or raw_link != property_link("Manufacturing Notes") or type(leaders) is not int or leaders != 1 or type(owner_type) is not int or owner_type != 0 or any(type(code) is not int or code != 1 for code in codes) or len(position) != 3 or any(type(value) not in (int, float) or not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position, (*STOCK_FORM_NOTE_XY, 0.0), strict=True)):
+    if text != DRAWING_NOTES or type(raw_link) is not str or raw_link != property_link("Manufacturing Notes") or type(leaders) is not int or leaders != 1 or type(owner_type) is not int or owner_type != 0 or any(type(code) is not int or code != 1 for code in codes) or len(position) != 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in position) or any(not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position[:2], STOCK_FORM_NOTE_XY, strict=True)):
         raise RuntimeError(f"clamp stock form: attached envelope/function changed at {stage}")
 
 
