@@ -21,6 +21,7 @@ import ch_pivot_bracket_spec as bracket
 import ch_pivot_shaft_spec as shaft
 import ch_vn_rocker_thrust_washer_spec as washer
 import ch_rocker_arm_spec as arm
+import ch_rocker_arm_outline_spec as rocker_outline
 import rocker_bank_layout as bank
 from _buildgraph import config_files_of, module_deps_of
 from _printed_tolerance import printed_band_mm
@@ -325,8 +326,8 @@ def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case(
     an end hub would reach the end bar; the washers (under the bar foot, like
     the hubs) stand both ears off. The washer is 0.031 stock, so its catalogue
     band's thin side counts; the south ear stands a spring set further off."""
-    proud_min = (arm.HUB_LENGTH - arm.ARM_THICKNESS) / 2 - _BAND_2PL
-    face_offset_min = arm.ARM_THICKNESS / 2 + proud_min
+    proud_min = (arm.HUB_LENGTH - rocker_outline.ARM_THICKNESS) / 2 - _BAND_2PL
+    face_offset_min = rocker_outline.ARM_THICKNESS / 2 + proud_min
     standoff_min = washer.THICKNESS_MIN
     clearance = {
         "north": standoff_min + face_offset_min - bar.BAR_WIDTH / 2,
@@ -381,7 +382,7 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     # (upper, lower) deviations: the notch deepens by its upper one, the edge
     # drops by its lower one.
     notch_deeper = bar.BOTTOM_NOTCH_DEPTH_BAND[0]
-    edge_lower = -arm.TOP_EDGE_BAND[1]
+    edge_lower = -rocker_outline.TOP_EDGE_BAND[1]
     assert notch_deeper == edge_lower == 0.0
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
     nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
@@ -442,7 +443,7 @@ def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(
     axis by the coaxiality's radius) that radius must still pass under the
     cheeks' underside."""
     worst = _cheek_cap(
-        monkeypatch, bar.BOTTOM_NOTCH_DEPTH_BAND[0], -arm.TOP_EDGE_BAND[1]
+        monkeypatch, bar.BOTTOM_NOTCH_DEPTH_BAND[0], -rocker_outline.TOP_EDGE_BAND[1]
     )
     places = arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"]
     hub_top = (
@@ -476,7 +477,7 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
     of fundamental at any station (0.04 % of the d = 88 term), from the exact
     chain in error_budget (rocker_arm_spec states both)."""
     notch_shallower = -bar.BOTTOM_NOTCH_DEPTH_BAND[1]
-    edge_higher = arm.TOP_EDGE_BAND[0]
+    edge_higher = rocker_outline.TOP_EDGE_BAND[0]
     lift = notch_shallower + edge_higher
     assert lift == pytest.approx(1.0)
     with monkeypatch.context() as patch:

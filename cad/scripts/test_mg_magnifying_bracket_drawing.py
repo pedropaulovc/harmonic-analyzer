@@ -2265,11 +2265,12 @@ def test_mounting_face_arm_root_fillets_clear_the_summing_lever() -> None:
     bracket and the lever both unrotated)."""
     import magnifying_bracket_joint_layout as joint
     import sm_summing_lever_spec as lever
+    from sm_knife_contact import HEX_W
 
     spec = mg_magnifying_bracket_spec
     # The lever's +X extreme is its plate's free end: the ribs, the pivot
     # cylinder and the hex all stop short of it (the summation arm is -X).
-    assert max(lever.RIB_REACH, lever.CYL_R, lever.HEX_W / 2.0) < lever.PLATE_W
+    assert max(lever.RIB_REACH, lever.CYL_R, HEX_W / 2.0) < lever.PLATE_W
     lever_end_x = joint.LEVER_ORIGIN_X + lever.PLATE_W
     assert lever_end_x == pytest.approx(29.45)
     rear = [point for point, _length in part.ARM_ROOT_EDGES if point[2] == part.FLANGE_Z[1]]

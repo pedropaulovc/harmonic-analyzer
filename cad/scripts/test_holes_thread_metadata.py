@@ -16,15 +16,8 @@ from typing import Any
 
 import pytest
 
-import _appearance
-import _bore_axis
 import _check
-import _part_save
-import _rebuild
-import _sketch
-import _sketch_chains
-import _sketch_circle
-import _sketch_rectangle
+import _cylindrical_holes
 import _holes
 from _hole_spec import HoleSpec
 
@@ -170,16 +163,11 @@ def fake_seat(monkeypatch):
     """A seat whose wizard initializes a through-next tap the way SolidWorks
     does: the termination on the hole, but the THREAD blind with no class."""
     monkeypatch.setattr(_holes, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_holes, "blank_sketch_feature", lambda *args: None)
-    monkeypatch.setattr(_appearance, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_bore_axis, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(
+        _cylindrical_holes, "_early_bound", lambda value, _interface: value
+    )
+    monkeypatch.setattr(_cylindrical_holes, "blank_sketch_feature", lambda *args: None)
     monkeypatch.setattr(_check, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_part_save, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_rebuild, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_sketch, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_sketch_chains, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_sketch_circle, "check", lambda _label, result: result.data)
-    monkeypatch.setattr(_sketch_rectangle, "check", lambda _label, result: result.data)
     from solidworks_mcp.adapters.solidworks import sketch
 
     monkeypatch.setattr(sketch, "_add_sketch_constraint_impl", lambda *args: _Result())
@@ -208,7 +196,7 @@ def test_radial_through_next_tap_commits_thread_class_and_termination(
     adapter, feature = fake_seat
     spec = HoleSpec("tapped", "#4-40", end="through_next")
 
-    _holes.wizard_hole_on_cylinder(
+    _cylindrical_holes.wizard_hole_on_cylinder(
         adapter,
         spec,
         [0.0, 50.718, 3.0],
@@ -237,7 +225,7 @@ def test_radial_tap_fails_loud_when_the_seat_drops_the_termination(
 
     monkeypatch.setattr(feature, "ModifyDefinition", drop_termination)
     with pytest.raises(RuntimeError, match="ThreadEndCondition"):
-        _holes.wizard_hole_on_cylinder(
+        _cylindrical_holes.wizard_hole_on_cylinder(
             adapter,
             HoleSpec("tapped", "#4-40", end="through_next"),
             [0.0, 50.718, 3.0],
@@ -254,7 +242,7 @@ def test_a_blind_radial_tap_is_refused_before_any_write_back(fake_seat) -> None:
     adapter, feature = fake_seat
 
     with pytest.raises(ValueError, match="through_all and through_next only"):
-        _holes.wizard_hole_on_cylinder(
+        _cylindrical_holes.wizard_hole_on_cylinder(
             adapter,
             HoleSpec("tapped", "#4-40", end="blind", depth_mm=4.0),
             [0.0, 50.718, 3.0],
@@ -272,7 +260,7 @@ def test_radial_plain_hole_leaves_the_definition_alone(fake_seat) -> None:
     see _holes.DIAMETER_TOLERANCE_MM)."""
     adapter, feature = fake_seat
 
-    _holes.wizard_hole_on_cylinder(
+    _cylindrical_holes.wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#43", end="through_all"),
         [0.0, 50.718, 3.0],
@@ -299,7 +287,7 @@ def test_every_tap_initializes_ansi_inch_and_writes_its_thread_class(
     )
     spec = HoleSpec("tapped", "#4-40", end="through_next")
 
-    _holes.wizard_hole_on_cylinder(
+    _cylindrical_holes.wizard_hole_on_cylinder(
         adapter,
         spec,
         [0.0, 50.718, 3.0],
@@ -321,3 +309,11 @@ def test_no_metric_tap_kind_or_row_remains() -> None:
     assert TAPPED_KINDS == ("tapped", "tapped_bottoming")
     assert not any(kind.endswith("metric") for kind in _holes._KINDS)
     assert not any(size.startswith("M") for size in TAP_DRILL_MM)
+
+
+@pytest.mark.parametrize(
+    "name", ["wizard_hole_on_cylinder", "cross_hole_volume_mm3"]
+)
+def test_cylindrical_holes_have_one_authoritative_owner(name: str) -> None:
+    assert getattr(_cylindrical_holes, name).__module__ == "_cylindrical_holes"
+    assert not hasattr(_holes, name), "generic holes must not retain a facade"

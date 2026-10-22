@@ -853,6 +853,46 @@ def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
     assert changed("parts") == set()
 
 
+@pytest.mark.parametrize("member", ["_chain_component_identity", "_paths"])
+def test_chain_identity_boundary_preserves_real_native_recipe_keys(
+    isolated_assembly_helper_keys, member
+):
+    dodo, root, snapshot = isolated_assembly_helper_keys
+    scripts = root / "cad" / "scripts"
+    identity = str((scripts / "_chain_component_identity.py").resolve())
+    paths = str((scripts / "_paths.py").resolve())
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
+    assert part_tasks, "the canonical part discovery must not be empty"
+    assert all(identity not in task["file_dep"] for task in part_tasks.values())
+    assert all(
+        identity in dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER
+    )
+    path_readers = {
+        stem for stem, task in part_tasks.items() if paths in task["file_dep"]
+    }
+    assert path_readers, "the shared paths positive control must reach real parts"
+    before = snapshot()
+    mutation = (
+        '\n_CHAIN_LINK_IDENTITIES[("pd-vn-chain-connecting-link", "Default")] = "ConnectingLink"\n'
+        if member == "_chain_component_identity"
+        else "\nIN = 25.5\n"
+    )
+    source = scripts / f"{member}.py"
+    source.write_bytes(source.read_bytes() + mutation.encode("utf-8"))
+    after = snapshot()
+
+    def changed(group):
+        return {
+            stem for stem in before[group] if before[group][stem] != after[group][stem]
+        }
+
+    assert changed("recipes") == set(dodo.ASSEMBLY_ORDER)
+    assert changed("assemblies") == set(dodo.ASSEMBLY_ORDER)
+    expected_parts = set() if member == "_chain_component_identity" else path_readers
+    assert changed("part_recipes") == expected_parts
+    assert changed("parts") == expected_parts
+
+
 def test_assembly_depends_on_exact_child_execution_identities():
     """Issue #301: recipe-equal CAD files can carry different PIDs/rebuild stamps."""
     dodo = _load_dodo()
@@ -5510,3 +5550,83 @@ def test_part_member_publication_loser_adopts_and_validates_winner_whole_set(
         ("A", None), ("B", None),
     ]
     assert not any(f.seats.values())
+
+
+@pytest.mark.parametrize(
+    ("member", "needle", "replacement"),
+    [
+        ("_cylindrical_holes", "n: int = 20001", "n: int = 20003"),
+        (
+            "_holes",
+            'return [("ThreadClass", spec.thread_class), end]',
+            'return [("ThreadClass", "3B"), end]',
+        ),
+    ],
+)
+def test_cylindrical_hole_boundary_preserves_actual_part_cache_keys(
+    isolated_assembly_helper_keys, member, needle, replacement
+):
+    dodo, root, snapshot = isolated_assembly_helper_keys
+    scripts = root / "cad" / "scripts"
+    cylinder_path = str((scripts / "_cylindrical_holes.py").resolve())
+    shared_path = str((scripts / "_holes.py").resolve())
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
+    assert part_tasks, "the canonical part discovery must not be empty"
+    assert all(
+        Path(path).resolve().is_relative_to(root.resolve())
+        for task in part_tasks.values()
+        for path in task["file_dep"]
+    )
+    cylinder_parts = {
+        stem for stem, task in part_tasks.items() if cylinder_path in task["file_dep"]
+    }
+    assert cylinder_parts == {
+        "ch_fulcrum_keeper",
+        "ch_pivot_bracket",
+        "dt_arbor_pedestal",
+        "dt_crank_hub",
+        "dt_crank_pinion",
+        "dt_crankshaft",
+        "dt_pinion_cam",
+        "mg_magnifying_clamp",
+        "mg_output_fixture",
+        "pd_transgear_feed_pinion",
+        "pn_pen_adjust_screw",
+        "pn_pen_v_block",
+    }
+    shared_parts = {
+        stem for stem, task in part_tasks.items() if shared_path in task["file_dep"]
+    }
+    assert cylinder_parts < shared_parts, "shared metadata must stay in both closures"
+    generic_only = shared_parts - cylinder_parts
+    assert {"fr_top_frame", "pd_platen_guide"} <= generic_only
+    # This purchased dowel is an additive revolve, independent of either helper.
+    non_hole_part = "dt_vn_crank_seat_drive_pin"
+    assert non_hole_part in part_tasks
+    assert shared_path not in part_tasks[non_hole_part]["file_dep"]
+    assert cylinder_path not in part_tasks[non_hole_part]["file_dep"]
+
+    before = snapshot()
+    assert snapshot() == before, "unchanged real recipes and keys must be stable"
+    source = scripts / f"{member}.py"
+    original = source.read_bytes()
+    assert original.count(needle.encode("utf-8")) == 1, member
+    mutation = original.replace(needle.encode("utf-8"), replacement.encode("utf-8"))
+    assert mutation != original
+    try:
+        source.write_bytes(mutation)
+        after = snapshot()
+    finally:
+        source.write_bytes(original)
+
+    expected = cylinder_parts if member == "_cylindrical_holes" else shared_parts
+    for group in ("part_recipes", "parts"):
+        changed = {
+            stem for stem in before[group] if before[group][stem] != after[group][stem]
+        }
+        assert changed == expected, (member, group, changed ^ expected)
+        assert after[group][non_hole_part] == before[group][non_hole_part]
+        if member == "_cylindrical_holes":
+            assert not changed & generic_only
+        else:
+            assert generic_only <= changed

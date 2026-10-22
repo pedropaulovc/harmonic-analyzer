@@ -10,6 +10,7 @@ import pytest
 import _config
 import _drawing_contract
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_hub_pin_spec as spec
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -84,7 +85,7 @@ def test_matched_fit_callouts_name_their_mates() -> None:
 def test_sections_follow_the_jig_stack() -> None:
     assert (spec.HEAD_DIA, spec.HEAD_LENGTH) == (16.0, 4.0)
     assert spec.SEAT_LENGTH == trammel.CARRIER_THICK == 12.0
-    assert spec.LOCATOR_LENGTH == trammel.RISER_THICK + rocker.ARM_THICKNESS - 0.5
+    assert spec.LOCATOR_LENGTH == trammel.RISER_THICK + rocker_outline.ARM_THICKNESS - 0.5
     assert spec.LOCATOR_LENGTH == 8.0
     assert spec.OVERALL_LENGTH == 24.0
     assert spec.FIT_DIA + spec.SEAT_BAND[0] < spec.RISER_HUB_CLEARANCE_DIA
@@ -146,7 +147,7 @@ def test_top_is_faced_to_fit_over_the_stack() -> None:
     assert low - spec.LEAD_CHAMFER < 0.0  # a turned-to-print pin can miss the strap
     assert (spec.LOCATOR_SET_MIN, spec.LOCATOR_SET_MAX) == (1.8, 2.2)
     assert spec.LOCATOR_SET_ABOVE_RISER == spec.LOCATOR_LENGTH - trammel.RISER_THICK
-    assert spec.LOCATOR_SET_MAX < rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
+    assert spec.LOCATOR_SET_MAX < rocker_outline.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
     assert spec.LOCATOR_SET_MIN - spec.LEAD_CHAMFER >= spec.STRAP_ENGAGEMENT_MIN
     # The shortest supply still faces clean at the tallest stack.
     tallest = (spec.HEAD_LENGTH + band) + (trammel.CARRIER_THICK + carrier_band)

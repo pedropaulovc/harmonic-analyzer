@@ -14,6 +14,7 @@ from prechips.model import CuttingData, Inventory, Policy
 
 import _process_plans as plans
 import _rocker_interface as rocker_interface
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_spec as rocker
 from _printed_limits import limits
 
@@ -368,10 +369,10 @@ def test_end_blocks_sit_under_the_blank_ends_clear_of_the_arm():
         length_max = limits(block["size_mm"][0], 1)[1]
         if side == "left":
             assert block["at_mm"][0] == raw_left
-            assert block["at_mm"][0] + length_max < -rocker.ROD_TIP_X
+            assert block["at_mm"][0] + length_max < -rocker_outline.ROD_TIP_X
         else:
             assert block["at_mm"][0] + block["size_mm"][0] == raw_right
-            assert raw_right - length_max > rocker.ROD_TIP_X
+            assert raw_right - length_max > rocker_outline.ROD_TIP_X
 
 
 def test_stack_height_seats_the_centred_strap_on_the_raw_ends():
@@ -380,7 +381,9 @@ def test_stack_height_seats_the_centred_strap_on_the_raw_ends():
     raw_thickness = plan["stock"]["section_mm"][1]
     strap_face_op = next(op for op in setups["S3"]["ops"] if op["op"] == 10)
     strap_face_z = strap_face_op["to_z"]
-    assert strap_face_z == pytest.approx((raw_thickness + rocker.ARM_THICKNESS) / 2)
+    assert strap_face_z == pytest.approx(
+        (raw_thickness + rocker_outline.ARM_THICKNESS) / 2
+    )
     stack = _fixture_solids("strap-shim-stack")["stack"]
     height = stack["size_mm"][2]
     assert stack["shim"] is True and stack["bears"] == "face"
@@ -420,7 +423,7 @@ def test_s4_stacks_stay_inside_the_arm_strap_band():
         bottom = rocker_interface.CENTER_Y - math.sqrt(
             rocker_interface.R_BOTTOM**2 - x**2
         )
-        top = rocker_interface.CENTER_Y - math.sqrt(rocker.R_TOP**2 - x**2)
+        top = rocker_interface.CENTER_Y - math.sqrt(rocker_outline.R_TOP**2 - x**2)
         return bottom - rocker_interface.PIVOT_MID_Y, top - rocker_interface.PIVOT_MID_Y
 
     half_l = limits(stack["size_mm"][0], 1)[1] / 2

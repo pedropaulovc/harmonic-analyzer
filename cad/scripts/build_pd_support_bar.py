@@ -72,7 +72,8 @@ from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from _drawing_prefix import set_dimension_prefix
 import _telemetry
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from sh_column_clamp_fit import BORE_DIAMETRAL_CLEARANCE
 from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
 from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND

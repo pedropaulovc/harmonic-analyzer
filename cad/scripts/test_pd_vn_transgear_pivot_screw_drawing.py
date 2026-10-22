@@ -26,7 +26,7 @@ import pd_vn_transgear_pivot_screw_spec as screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _printed_tolerance import angular_band_deg
+from _printed_angular_tolerance import angular_band_deg
 from _stock_recipe import recipe_declaration
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_90325A174 as entry

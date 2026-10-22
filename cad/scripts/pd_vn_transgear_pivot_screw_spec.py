@@ -50,7 +50,7 @@ from _mcmaster_90325a174 import (
     THREAD_LEN_LIMITS as THREAD_LEN_LIMITS,
     THREAD_MAJOR as THREAD_MAJOR,
 )
-from _printed_tolerance import angular_band_deg
+from _printed_angular_tolerance import angular_band_deg
 
 # The faced tip's recess below the bar's front face, as fitted (user ruling
 # 2026-10-15): never proud of the platen's slide face, close enough for the

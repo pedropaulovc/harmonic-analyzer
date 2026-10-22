@@ -44,12 +44,13 @@ from typing import Any
 
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
 _X = printed_band_mm(1)
 _XX = printed_band_mm(2)
-# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_drilled_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 
 # --- Lever: 6061-T6 1/2 x 1 in flat, sawn to length ----------------------

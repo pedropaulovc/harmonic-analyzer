@@ -31,7 +31,8 @@ from _fastener_catalog import FASTENERS
 from _hole_spec import TAP_DRILL_MM
 from _mcmaster_92314a253 import DIMS as BOLT_DIMS
 from _mcmaster_96659a104 import DIMS as WASHER_DIMS
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_92314A253 as bolt_recipe
 from diagnostics import diag_build_96659A104 as washer_recipe

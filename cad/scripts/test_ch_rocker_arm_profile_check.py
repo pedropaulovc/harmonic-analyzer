@@ -13,6 +13,7 @@ import pytest
 import _process_plans as plans
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_profile_check as check
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_spec as rocker
 import export_features
 
@@ -116,15 +117,23 @@ def test_the_template_edge_is_mid_zone_on_every_segment() -> None:
 # above rests on (inventory gauges.arm-outline-template).
 
 _ROCKER_BOT_END_Y = rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM * math.cos(
-    rocker._ALPHA_BOT
+    rocker_outline._ALPHA_BOT
 )
-_ROCKER_TIP_Y = rocker.TOP_END_Y - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP)
+_ROCKER_TIP_Y = rocker_outline.TOP_END_Y - rocker_outline.TIP_FACE * math.cos(
+    rocker_outline._ALPHA_TOP
+)
 # The rocker's BASIC +X outline corners and arc centre, in the template frame.
-_ROCKER_TOP_END = (rocker.TOP_END_X, rocker.TOP_END_Y - rocker_interface.PIVOT_MID_Y)
-_ROCKER_TIP = (rocker.ROD_TIP_X, _ROCKER_TIP_Y - rocker_interface.PIVOT_MID_Y)
-_ROCKER_BOT_END = (rocker.BOT_END_X, _ROCKER_BOT_END_Y - rocker_interface.PIVOT_MID_Y)
+_ROCKER_TOP_END = (
+    rocker_outline.TOP_END_X,
+    rocker_outline.TOP_END_Y - rocker_interface.PIVOT_MID_Y,
+)
+_ROCKER_TIP = (rocker_outline.ROD_TIP_X, _ROCKER_TIP_Y - rocker_interface.PIVOT_MID_Y)
+_ROCKER_BOT_END = (
+    rocker_outline.BOT_END_X,
+    _ROCKER_BOT_END_Y - rocker_interface.PIVOT_MID_Y,
+)
 _ROCKER_CENTRE_Y = rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y
-_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+_ZONE = rocker_outline.TOP_EDGE_BAND[0] - rocker_outline.TOP_EDGE_BAND[1]
 _MID_ZONE = _ZONE / 2.0
 # #1545 (approved 2026-10-15): of the rocker's 0.25 half-zone either side of
 # the aim, filing to the scribed line keeps at least this much.
@@ -136,7 +145,10 @@ def _into_material(point, start, end) -> float:
     dx, dy = end[0] - start[0], end[1] - start[1]
     length = math.hypot(dx, dy)
     normal = (-dy / length, dx / length)
-    middle = (0.0, _ROCKER_CENTRE_Y - (rocker.R_TOP + rocker_interface.R_BOTTOM) / 2.0)
+    middle = (
+        0.0,
+        _ROCKER_CENTRE_Y - (rocker_outline.R_TOP + rocker_interface.R_BOTTOM) / 2.0,
+    )
     if (middle[0] - start[0]) * normal[0] + (middle[1] - start[1]) * normal[1] < 0.0:
         normal = (-normal[0], -normal[1])
     return (point[0] - start[0]) * normal[0] + (point[1] - start[1]) * normal[1]

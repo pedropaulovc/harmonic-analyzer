@@ -21,7 +21,8 @@ import _config
 import sm_vn_knife_hanger_stud_spec as HANGER_SCREW
 import sm_vn_knife_hanger_washer_spec as HANGER_WASHER
 import sm_vn_knife_mount_dowel_spec as KNIFE_DOWEL
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl

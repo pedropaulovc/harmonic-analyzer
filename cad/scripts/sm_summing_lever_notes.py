@@ -104,7 +104,7 @@ BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 # Both stubs are one prism, so their side faces share two planes
 # (``build_sm_summing_lever._hex_knife``), which ties the +Z ridge to datum A
 # on the -Z ridge within
-# ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``. The model
+# ``sm_knife_contact.KNIFE_STUB_RIDGE_OFFSET_MAX``. The model
 # carries that; the print carries the owner's C09 wording, KNIFE EDGE
 # SYMMETRIC TO SIDES, BOTH STUBS, split across the pair, and no coplanarity
 # requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"

@@ -8,9 +8,10 @@ only the #47 rod-pin hole is added after joining (it is located from the
 joined part's reamed bore, so it is not on this detail).
 
 Frame: the MHA-CH-06 frame, so every value below is the finished part's own
-(``ch_rocker_arm_spec``): origin on the bottom arc's midpoint, +X the rod
-side, the hub hole on the mirror axis PIVOT_MID_Y up, the arcs' shared centre
-CENTER_Y up. Nothing here is a new number.
+(``ch_rocker_arm_outline_spec`` for the outline, ``ch_rocker_arm_spec`` for its
+fit): origin on the bottom arc's midpoint, +X the rod side, the hub hole on the
+mirror axis PIVOT_MID_Y up, the arcs' shared centre CENTER_Y up. Nothing here is
+a new number.
 """
 
 from __future__ import annotations
@@ -18,11 +19,10 @@ from __future__ import annotations
 import math
 
 from _rocker_interface import ARM_DEPTH, CENTER_Y, CURVE_RADIUS, PIVOT_MID_Y, R_BOTTOM
-from ch_rocker_arm_spec import (
+from ch_rocker_arm_spec import ARM_THICKNESS_BAND, HUB_DIA
+from ch_rocker_arm_outline_spec import (
     ARM_THICKNESS,
-    ARM_THICKNESS_BAND,
     BOT_END_X,
-    HUB_DIA,
     R_TOP,
     ROD_TIP_X,
     TIP_FACE,

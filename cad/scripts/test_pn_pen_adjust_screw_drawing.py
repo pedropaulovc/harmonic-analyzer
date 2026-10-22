@@ -19,7 +19,7 @@ from _drawing_contract import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import HoleSpec, drill_process
-from _holes import cross_hole_volume_mm3
+from _cylindrical_holes import cross_hole_volume_mm3
 
 
 def _source(module) -> str:
@@ -74,7 +74,8 @@ def test_every_wall_round_the_eye_clears_rule_17_at_worst_case() -> None:
     """drawing-guidelines.md rule 17: the eye's end, shoulder-side and side
     walls at the worst case of the printed bands (.X on the station, the head
     height and the head Ø; DRILLED HOLES +0.10 on the #54) stay >= 1.5."""
-    from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+    from _printed_drilled_tolerance import drilled_oversize_mm
+    from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(1)
     eye_r = (spec.EYE_DIA + drilled_oversize_mm()) / 2.0

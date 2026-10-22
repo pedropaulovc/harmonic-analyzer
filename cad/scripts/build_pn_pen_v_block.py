@@ -73,7 +73,8 @@ from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
-from _holes import TAP_DRILL_MM, cross_hole_volume_mm3, wizard_holes
+from _cylindrical_holes import cross_hole_volume_mm3
+from _holes import TAP_DRILL_MM, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
