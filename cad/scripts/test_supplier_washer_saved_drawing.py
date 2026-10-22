@@ -796,7 +796,13 @@ def test_saved_corruption_is_refused_by_real_native_assertions(saved_washer, fau
     with pytest.raises(RuntimeError, match=message):
         case.proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
-    assert not case.messages
+    if fault in {"wrong-source-attachment", "wrong-native-owner"}:
+        assert len(case.messages) == 1
+        prefix = "supplier washer source attachment readback: "
+        assert case.messages[0].startswith(prefix)
+        assert json.loads(case.messages[0][len(prefix):])["label"] == source.THICKNESS
+    else:
+        assert not case.messages
 
 
 def test_diameter_requires_exact_source_circle_or_physical_rim(saved_washer):
@@ -1217,3 +1223,95 @@ def test_saved_recipe_callback_independently_requires_exactly_one_proof(
     monkeypatch.setattr(recipe, "build_purchased_fastener_drawing", builder)
     with pytest.raises(RuntimeError, match="authored exactly once"):
         asyncio.run(recipe.build(object()))
+
+
+@pytest.mark.parametrize("failure_stage", ("none", "repr", "snapshot", "serialization", "logging", "note"))
+@pytest.mark.parametrize("label", (source.THICKNESS, source.OUTER_DIAMETER))
+def test_source_attachment_diagnostic_preserves_original_exception(
+    saved_washer, monkeypatch, failure_stage, label,
+):
+    """Exercise the real settled caller; receipts here are offline transport only."""
+    case = saved_washer
+    if label not in case.arguments["bands"]:
+        pytest.skip("this fixture deliberately uses a physical rim rather than an imported OD")
+
+    class NoteFailure(RuntimeError):
+        def add_note(self, note):
+            raise ValueError("diagnostic note transport failed")
+
+    original = (NoteFailure if failure_stage == "note" else RuntimeError)(
+        "original named-owner or attachment refusal"
+    )
+    diagnostic_failure = ValueError(f"{failure_stage} diagnostic transport failed")
+    calls = []
+    original_guard = washer.assert_supplier_washer_source_attachment
+
+    def fail_guard(adapter, model, display, **arguments):
+        if arguments["label"] != label:
+            return original_guard(adapter, model, display, **arguments)
+        calls.append(("guard", adapter, model, display, arguments))
+        raise original
+
+    receipt = {
+        "label": label,
+        "reads": {"dimension.imported_type2": {"value": 11, "python_type": "int"}},
+        "matrices": {},
+    }
+
+    if failure_stage == "repr":
+        class ScalarTransport:
+            def __repr__(self):
+                return "<offline unexpected scalar transport>"
+
+        receipt["reads"]["dimension.imported_type2"]["value"] = ScalarTransport()
+
+    def snapshot(adapter, model, view, display, *, label):
+        calls.append(("snapshot", adapter, model, view, display, label))
+        if failure_stage == "snapshot":
+            raise diagnostic_failure
+        if failure_stage == "serialization":
+            circular = {}
+            circular["self"] = circular
+            return circular
+        return receipt
+
+    def log(message):
+        calls.append(("log", message))
+        if failure_stage == "logging":
+            raise diagnostic_failure
+
+    monkeypatch.setattr(washer, "assert_supplier_washer_source_attachment", fail_guard)
+    monkeypatch.setattr(washer, "_source_attachment_failure_readback", snapshot)
+    monkeypatch.setattr(washer._telemetry, "info", log)
+    with pytest.raises(RuntimeError) as caught:
+        case.proof()
+    assert caught.value is original
+    guard = next(call for call in calls if call[0] == "guard")
+    snapshot_call = next(call for call in calls if call[0] == "snapshot")
+    expected_view = case.original[case.side if label == source.THICKNESS else case.face]
+    assert snapshot_call[1:] == (case.adapter, case.model, expected_view, guard[3], label)
+    assert guard[4] == dict(label=label, axis=case.arguments["axis"], bore_mm=4.0,
+                           outer_mm=10.0, thickness_mm=0.91, visible=True)
+    assert sum(call[0] == "guard" for call in calls) == 1
+    assert sum(call[0] == "snapshot" for call in calls) == 1
+    notes = getattr(original, "__notes__", ())
+    prefix = "supplier washer source attachment readback: "
+    if failure_stage in {"none", "repr"}:
+        expected_receipt = json.loads(json.dumps(receipt, default=repr))
+        assert [json.loads(note[len(prefix):]) for note in notes if note.startswith(prefix)] == [expected_receipt]
+        assert [json.loads(call[1][len(prefix):]) for call in calls if call[0] == "log"] == [expected_receipt]
+    elif failure_stage != "note":
+        assert notes
+        assert any("diagnostic" in note.lower() or "circular" in note.lower() for note in notes)
+    assert not case.app.open_calls
+    assert not case.app.close_calls
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+def test_successful_source_attachment_never_requests_failure_readback(saved_washer, monkeypatch):
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("failure-only diagnostic was called on the successful path")
+
+    monkeypatch.setattr(washer, "_source_attachment_failure_readback", forbidden)
+    saved_washer.proof()
+    assert not saved_washer.messages
