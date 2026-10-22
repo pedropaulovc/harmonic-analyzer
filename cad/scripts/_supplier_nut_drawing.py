@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 import math
 from typing import Any
 
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, scan_view_edges
 from _drawing_precision import _named_dimensions
@@ -118,7 +118,8 @@ def _assert_nominal_carrier(
     adapter: Any, front: Any, display: Any, nominal_major_mm: float
 ) -> None:
     """Resolve the source chord, owner and attachments independently of import."""
-    model = _early_bound(front, "IView").ReferencedDocument
+    view = _early_bound(front, "IView")
+    model = view.ReferencedDocument
     if model is None:
         raise RuntimeError("supplier nut has no referenced source part")
     feature_name = FEATURE_BY_PLANE["Front"]
@@ -159,12 +160,27 @@ def _assert_nominal_carrier(
             for axis, expected in zip(("X", "Y", "Z"), (x, 0.0, 0.0), strict=True)
         ):
             raise RuntimeError("supplier nut nominal-major chord differs from its exact source")
-    attached = list(_early_bound(display.GetAnnotation(), "IAnnotation").GetAttachedEntities3() or ())
+    # The import attaches to drawing-view objects, not the part's raw points.
+    # Resolve these exact, physically checked endpoints into the requested view.
+    mapped_points = []
     for point in points:
-        matches = [index for index, entity in enumerate(attached)
-                   if entity is not None and int(adapter.swApp.IsSame(entity, point)) == 1]
+        mapped = view.GetCorresponding(point)
+        if mapped is None:
+            raise RuntimeError("supplier nut nominal-major endpoint is unavailable in its view")
+        mapped_points.append(_early_bound(_bind(mapped, "ISketchPoint"), "ISketchPoint"))
+    if int(adapter.swApp.IsSame(*mapped_points)) != 0:
+        raise RuntimeError("supplier nut nominal-major view endpoints are not distinct")
+    attached = list(_early_bound(display.GetAnnotation(), "IAnnotation").GetAttachedEntities3() or ())
+    for point in mapped_points:
+        matches = [
+            index for index, entity in enumerate(attached)
+            if entity is not None
+            and int(adapter.swApp.IsSame(
+                _early_bound(_bind(entity, "ISketchPoint"), "ISketchPoint"), point
+            )) == 1
+        ]
         if len(matches) != 1:
-            raise RuntimeError("supplier nut nominal-major attachment is not its source endpoint")
+            raise RuntimeError("supplier nut nominal-major attachment is not its mapped source endpoint")
         attached.pop(matches[0])
     if attached:
         raise RuntimeError("supplier nut nominal-major carrier has unexpected attachments")

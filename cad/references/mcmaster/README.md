@@ -1607,6 +1607,20 @@ and its actual/expected values, preserving native getter order and stopping
 before later readers can mask that failure. Imports are not reformatted or
 repaired by this assertion; an error label alone is not its native root cause.
 
+Washer imports explicitly apply the existing supplier-reference **display**
+formatter: native import need not inherit the source display's document-unit
+flag. The original part's body, witness geometry, value, supplier units,
+precision and native band are checked before import, after dressing and after
+final layout. The imported value and band remain independently checked; the
+formatter never changes either. A changed original source is a failure, not
+something the drawing repairs.
+
+Nut chord endpoints and washer witness points/segments attach in the drawing's
+namespace. Their independently checked part entities are mapped through the
+exact owning view's `GetCorresponding`; native one-to-one identity, distinct
+endpoints and no extra attachments are required there. Direct comparison
+between a part object and a drawing object is not an attachment proof.
+
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
 solid/sheet-body counts and face counts and compares all twelve mass-property
