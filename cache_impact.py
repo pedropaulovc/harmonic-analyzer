@@ -421,7 +421,7 @@ def _worker_environment(state: Path) -> dict[str, str]:
     env.update({
         "HOME": str(state), "USERPROFILE": str(state),
         "TMP": str(state), "TEMP": str(state), "TMPDIR": str(state),
-        "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
         "HARMONIC_BUILDGRAPH_CACHE": "off", "HARMONIC_REMOTE_CACHE_MODE": "off",
         "HARMONIC_EXECUTOR": "local", "HARMONIC_SW_AUTOSTART": "0",
         "HARMONIC_COM_LOCK": str(state / "com-seat.lock"),
@@ -438,7 +438,7 @@ def analyze_tree(root: Path, state: Path, gitlinks: dict, timeout: int = 300, sy
     manifest.write_text(json.dumps({"gitlinks": gitlinks, "symlinks": symlinks}), encoding="utf-8")
     result_path = state / "snapshot.json"
     result = subprocess.run(
-        [sys.executable, "-I", "-B", str(Path(__file__).resolve()), "--worker", str(root),
+        [sys.executable, "-I", "-B", "-X", "utf8", str(Path(__file__).resolve()), "--worker", str(root),
          str(state), str(manifest), str(result_path)],
         cwd=state, env=_worker_environment(state), capture_output=True, timeout=timeout,
     )
