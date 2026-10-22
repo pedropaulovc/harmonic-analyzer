@@ -1550,20 +1550,20 @@ TOP_KEEP = {
     # to target 3.3 mm box clearance. Both stubs are one prism, so the length
     # remains the hidden KnifeStubReference's, along its -X side.
     "KnifeStubLength": (0.2185, 0.1735),
-    # One 3X thickness sizes both end ribs and the middle rib, above its span.
-    # Below it the finish symbol and 76.20/39.85 row leave no room; the lower arc
-    # reaches the cylinder at x 0.226. The text stands right of
-    # the 76.20 X location's extension line (x 0.1972); the lower arrow
-    # stands 3.8 mm left of the finish symbol's text; the text stands above
-    # the boss Z location's datum-B extension line (y 0.0919).
-    "EdgeRibThickness": (0.2095, 0.1035),
+    # One model-owned 3X thickness sizes all three ribs, above its span.
+    # R2's native text hangs LEFT of this anchor: x 191.1396..209.5 mm
+    # crossed the boss-X witness at x 197.2187. Move the complete native
+    # text/shoulder/arrow column 16 mm left, not toward the diameter above.
+    # The translated native span x 175.1396..193.5 leaves 3.7187 mm to that
+    # witness and 7.6201 mm to MID RIB CENTRE. Confirm regenerated native ink.
+    "EdgeRibThickness": (0.1935, 0.1035),
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
     # leader landed on the rib outline that hides it).  Its text stands left
     # of the band, 2.8 mm over the line, which the dimension line covers
     # (farm r11: the dimension line prints that far below its text): right
-    # of the boss's 76.20 extension line (x 0.1972), 3 mm over the 5.00's
-    # text and 2.3 mm clear of the web's lower arc.
+    # of the boss's 76.20 extension line (x 0.1972), above and right of the
+    # relocated 3X 5.00 block, and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }
 # VIEW F at 1:1, model X reversed. All stations, thickness and caption ride

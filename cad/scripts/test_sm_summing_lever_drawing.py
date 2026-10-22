@@ -16,6 +16,7 @@ import _drawing_edge_dimensions
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges
 from _hole_spec import blind_cut_dia_mm
+from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
 from _cone_axis_constants import SUMMING_Z
@@ -492,6 +493,50 @@ def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
         if name in {"RibDepth", "MiddleRibThickness", "EdgeRibThickness"}
     }
     assert rib_dimensions == {"EdgeRibThickness"}
+
+
+def test_three_rib_size_clears_boss_witness_and_complete_neighbors() -> None:
+    """Replay the R2 native/PDF envelopes, not proof of regenerated native ink."""
+    # R2 20261022T190921801Z-dbfece22b19a4d68ac2dd248e5168731,
+    # reports/layout-audit/sm-summing-lever.json, Lever Geometry / Drawing View2.
+    # Native rows/lines are rounded to 0.1 um; PDF spans are measured ink.
+    old_x, old_y = 0.2095, 0.1035
+    x, y = drawing.TOP_KEEP["EdgeRibThickness"]
+    dx = x - old_x
+    assert y == old_y, "keep the rib route below the cylinder-diameter callout"
+    witness = Segment(0.1972187, 0.129, 0.1972187, 0.0685219, "ext-line")
+    native_text = Box(0.1911396, 0.1007219, 0.2095, 0.1042219)
+    printed_text = Box(0.1925961, 0.1016558, 0.2080575, 0.1052211)
+    neighbors = (
+        # Every row of 76.20 / BOSS AXIS AND / MID RIB CENTRE, not its anchor.
+        Box(0.1441812, 0.1137781, 0.1558187, 0.1172781),
+        Box(0.1329934, 0.1082219, 0.1670066, 0.1117219),
+        Box(0.1324806, 0.1026656, 0.1675195, 0.1061656),
+        # Complete native diameter text, including its diameter glyph.
+        Box(0.199249, 0.1071951, 0.2187511, 0.1107486),
+        Box(0.221, 0.0875713, 0.2308437, 0.0900713),  # lower Ra 1.6
+    )
+    # The actual printed height is 3.5653 mm; retain a whole text height of air.
+    clearance = 0.00357
+    for recorded in (native_text, printed_text):
+        assert segment_box_overlap_length(witness, recorded) == pytest.approx(recorded.height)
+        placed = Box(
+            recorded.xmin + dx, recorded.ymin,
+            recorded.xmax + dx, recorded.ymax,
+        )
+        assert segment_box_distance(witness, placed) >= clearance
+        assert all(placed.gap(neighbor) >= clearance for neighbor in neighbors)
+    # TOP_KEEP moves the whole native route: its complete shoulder and both
+    # outside-arrow runs must also clear the neighboring text, not just the X.
+    route = (
+        Segment(native_text.xmin + dx, 0.1007219, x, 0.1007219),
+        Segment(x, 0.1007219, x, 0.0944),
+        Segment(x, 0.0919, x, 0.08555),
+    )
+    assert all(
+        segment_box_distance(segment, neighbor) >= clearance
+        for segment in route for neighbor in neighbors
+    )
 
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:

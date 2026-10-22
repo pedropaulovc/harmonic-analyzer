@@ -1433,6 +1433,23 @@ and neighbouring leaders; moving the same centred text up does not widen the
 span. The part-specific offline placement contract bounds that envelope;
 only the regenerated native audit and printed sheet prove the repair.
 
+The summing lever's sheet-1 `3X 5.00` made the same vertical-dimension mistake
+in R2 (`20261022T190921801Z-dbfece22b19a4d68ac2dd248e5168731`): native text/
+shoulder X191.1396–209.5 mm and printed ink X192.5961–208.0575 mm crossed
+the boss-X `76.20` witness at X197.2187 mm. Its existing `TOP_KEEP` curation
+request moves from **(209.5, 103.5) to (193.5, 103.5) mm**: the complete
+native text/shoulder/arrow column moves 16 mm left without a new `OffsetText`
+mode or a detached note. Translation of the recorded native span predicts
+X175.1396–193.5 mm, 3.7187 mm air to the witness and 7.6201 mm to the full
+`MID RIB CENTRE` row. The Ø25.40 block remains above/right, not squeezed by
+an upward nudge; the lower finish symbol and dimension rows stay untouched.
+The existing drawing regression replays both recorded text boxes and the
+moving shoulder/outside-arrow runs against complete neighboring text.
+This is an offline placement projection, not native after-fix acceptance.
+Regenerated native/PDF inspection must prove the complete route and neighbor
+air while retaining the model-owned value, tolerance, attachments, `3X`
+prefix and all six views; geometry and shared audit guards are unchanged.
+
 A genuine diameter hangs the same way and stops READING as one. The output
 fixture's groove root Ø7 is a doubled distance (`AddSpecificDimension`
 `swDiametricLinearDimension`, `Diametric` proven on the part); requested under
