@@ -331,7 +331,7 @@ def test_measure_rejects_non_finite_native_witness(native_reads):
     # arrow tips and other primitives intact while corrupting one witness.
     record = _nut_rd1()
     record["display"]["lines"][1][5] = float("nan")
-    with pytest.raises(RuntimeError, match="line geometry"):
+    with pytest.raises(RuntimeError, match="lost a native witness"):
         core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
 
 

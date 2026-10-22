@@ -5785,6 +5785,8 @@ _SIX_SCREW_KIND_CASES = [
 def test_each_six_screw_fails_its_leaf_on_the_seven_selected_kinds(monkeypatch, tmp_path, stem, build, kind, a, b):
     """Real audit/report/refusal for all 42 stem/kind pairs; clearing only
     the intended defect loses that finding and permits the same REPORT leaf."""
+    import json
+
     from _layout_audit import audit_report, enforced
 
     bad = build(False)
@@ -5794,7 +5796,8 @@ def test_each_six_screw_fails_its_leaf_on_the_seven_selected_kinds(monkeypatch, 
         _run(live, LayoutAuditMode.REPORT, report, stem=stem)
     content, gating = audit_report(stem, LayoutAuditMode.REPORT, [bad])
     records = _nut_report(report)["findings"]
-    assert records == content["findings"]  # Refusal must not filter the report.
+    # JSON turns native segment tuples into arrays; retain every finding/field.
+    assert records == json.loads(json.dumps(content["findings"]))
     [record] = _nut_hits(records, kind, a, b)
     assert record["stem"] == stem and record["severity"] == "gating"
     assert record["detail"] in str(raised.value)

@@ -6911,8 +6911,8 @@ def test_oblique_portrait_registered_cells_preserve_full_supplier_lane_budgets(m
         caption = (cell[0], cell[1] - purchased._CAPTION_TO_CELL - purchased._CAPTION_BELOW,
                    cell[2], cell[1] - purchased._CAPTION_TO_CELL + 0.001)
         assert purchased._inside(caption, border), name
-        assert not Box(*cell).intersects(title), name
-        assert not Box(*caption).intersects(title), name
+        assert min(Box(*cell).penetration(title)) < 0.0, name
+        assert min(Box(*caption).penetration(title)) < 0.0, name
     # Real registry paper and full lane geometry, not captured callback kwargs.
     # New portrait native outlines and actual printed legibility remain gates.
 
