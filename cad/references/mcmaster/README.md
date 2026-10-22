@@ -904,8 +904,9 @@ Catalog specifications checked on September 10, 2026:
   native view scale; the type code alone cannot establish verticality.
   The separate original-stock sheet measures 50.8 mm from that same outer hex
   bearing boundary at `Y=46.7` to the factory tip-face rim at `Y=-4.1`, radius
-  `1.512341666... mm`, not the finished cut end or the factory chamfer's major
-  junction. A fresh HLR scan of the view's exact `AS SUPPLIED STOCK`
+  `1.512358333... mm` (`major_dia/2 - 0.851*pitch`), not the finished cut end
+  or the factory chamfer's major junction. A fresh HLR scan of the view's exact
+  `AS SUPPLIED STOCK`
   configuration resolves those physical entities. `IView.SelectEntity` selects
   them in the drawing view; native selection and attachment identities, exact
   axial stations and the scaled span must agree. A missing selection, null

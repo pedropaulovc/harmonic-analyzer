@@ -457,7 +457,7 @@ def _stock_length_entities(
             valid = True
             for query in ("forward", "membership"):
                 try:
-                    raw = edge.GetClosestPointOn(*point)
+                    raw = edge.GetClosestPointOn(point[0], point[1], point[2])
                     length = 0 if raw is None else len(raw)
                     candidate[f"{query}_length"] = length
                     # SDK: XYZ, UParameter, NotUsed. Never inspect the fifth slot.
@@ -633,7 +633,10 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                 raise RuntimeError(f"{owner}: finished/source-stock separation was lost")
             for raw in view.GetDisplayDimensions() or ():
                 display = _early_bound(raw, "IDisplayDimension")
-                dimension = _early_bound(display.GetDimension2(0), "IDimension")
+                native = display.GetDimension2(0)
+                if native is None:
+                    raise RuntimeError(f"{owner}: settled display has no native dimension")
+                dimension = _early_bound(native, "IDimension")
                 full_name = str(dimension.FullName)
                 name = required.get(full_name)
                 if name is None:

@@ -2434,7 +2434,11 @@ def test_stud_stock_names_outer_hex_and_exact_original_factory_tip(monkeypatch, 
     assert bolt_drawing._stock_factory_tip_radius_mm() == (
         BOLT_DIMS.major_dia / 2 - BOLT_DIMS.pitch * 0.851
     )
-    assert bolt_drawing._stock_factory_tip_radius_mm() == pytest.approx(1.5123416666666667)
+    # Independently expand the catalogue dimensions and supplier chamfer law;
+    # do not pin a separately rounded radius nominal.
+    assert bolt_drawing._stock_factory_tip_radius_mm() == pytest.approx(
+        4.826 / 2 - (25.4 / 24) * 0.851
+    )
     assert stock.top.closest_calls == [stock.top.nearest[:3], stock.top.nearest[:3]]
     receipt = next(
         fields for name, fields in case.events if name == "drawing.physical_stock_length_geometry"
@@ -2658,7 +2662,10 @@ def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
     elif fault == "wrong_factory_radius":
         stock.front.scan = ViewEdges("wrong factory rim", (
             stock.bearing_item,
-            replace(stock.top_item, circle=(*stock.top_item.circle[:6], 1.51234 + 0.001)),
+            replace(
+                stock.top_item,
+                circle=(*stock.top_item.circle[:6], stock.top_item.circle[6] + 0.001),
+            ),
         ))
     elif fault == "missing_dimension":
         stock.front.GetDisplayDimensions = lambda: ()
@@ -2894,3 +2901,28 @@ def test_stud_stock_source_receipt_reports_observed_document_path_without_source
     assert path_reads == [native_path]
     assert receipt["native_source_path"] == native_path
     assert receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("name", ["SupplierHeadHeight", "SupplierStockLength"])
+def test_stud_physical_census_refuses_missing_native_dimension_before_full_name_read(
+    monkeypatch, tmp_path, phase, name,
+):
+    case = (
+        _saved_stud_height_case(monkeypatch, tmp_path) if phase == "saved"
+        else _settled_stud_height_case(monkeypatch)
+    )
+    display = case.display if name == "SupplierHeadHeight" else case.stock_case.display
+    display.GetDimension2 = lambda _index: None
+    with pytest.raises(RuntimeError, match="dimension has no native identity"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model

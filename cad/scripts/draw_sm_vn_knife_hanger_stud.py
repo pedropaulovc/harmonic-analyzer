@@ -435,7 +435,9 @@ def _stock_factory_tip_radius_mm() -> float:
 
 
 def _stock_native_point(edge: Any, query_m: tuple[float, float, float]) -> tuple[float, ...]:
-    raw = _early_bound(edge, "IEdge").GetClosestPointOn(*query_m)
+    raw = _early_bound(edge, "IEdge").GetClosestPointOn(
+        query_m[0], query_m[1], query_m[2]
+    )
     # SDK returns XYZ, UParameter, NotUsed. Validate all used doubles; ignore
     # the fifth slot, which the SDK explicitly declares unused.
     if raw is None or len(raw) != 5 or any(
@@ -690,7 +692,10 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                 raise RuntimeError(f"{owner}: finished/source-stock separation was lost")
             for raw in view.GetDisplayDimensions() or ():
                 display = _early_bound(raw, "IDisplayDimension")
-                dimension = _early_bound(display.GetDimension2(0), "IDimension")
+                raw_dimension = display.GetDimension2(0)
+                if raw_dimension is None:
+                    raise RuntimeError("settled supplier dimension has no native identity")
+                dimension = _early_bound(raw_dimension, "IDimension")
                 full_name = str(dimension.FullName)
                 name = required.get(full_name)
                 if name is None:
