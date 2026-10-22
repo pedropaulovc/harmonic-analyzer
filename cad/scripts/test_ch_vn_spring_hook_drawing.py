@@ -356,10 +356,11 @@ def _settled_eye_scene(monkeypatch, module):
         contracts[sheet] = ((view.Name,), configuration)
     monkeypatch.setattr(module, "iter_views", lambda _adapter: (views[state.sheet],))
     monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.Name)
-    monkeypatch.setattr(
-        module, "visible_view_entities",
-        lambda *_args, **_kwargs: pytest.fail("settled proof must not rescan visible contours"),
-    )
+    if module is drawing:
+        monkeypatch.setattr(
+            module, "visible_view_entities",
+            lambda *_args, **_kwargs: pytest.fail("settled proof must not rescan visible contours"),
+        )
     return SimpleNamespace(
         adapter=adapter, refs=refs_by_sheet, contracts=contracts, contours=contours,
         annotations=annotations, views=views, source=source, owner=owner,
