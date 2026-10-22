@@ -184,7 +184,7 @@ class _Display:
         return self.parts.get(part, "")
 
 
-@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE, stack.THREAD_FEATURE])
 def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
     callouts = stack.SETTING_CALLOUTS[feature]
     good = [
@@ -199,7 +199,7 @@ def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
         drawing._assert_callouts(wrong, callouts)
 
 
-@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE, stack.THREAD_FEATURE])
 @pytest.mark.parametrize("failed_readback", [False, True])
 def test_native_setting_text_requires_void_setter_readback(
     monkeypatch, feature, failed_readback
@@ -517,7 +517,7 @@ def projection_native(monkeypatch):
         *[
             {"text": line, "position": (0.0, -0.003 * (index + 1), 0.0),
              "reference": 5, "height": 0.002, "angle": 0.0, "spacing": 1.0}
-            for index, line in enumerate(notes.LEVER_CALLOUTS[name].splitlines())
+            for index, line in enumerate(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][name][1].splitlines())
         ],
     ]
 
@@ -551,6 +551,9 @@ def projection_native(monkeypatch):
             return (0, 0, 0, 0, x - 0.009, y - 0.012, z, x + 0.009, y - 0.012, z)
 
     class Display(_Display):
+        def SetText(self, *_args):
+            pytest.fail("drawing must inherit model-owned text without writing the source")
+
         def GetDisplayData(self):
             return data
 
@@ -582,7 +585,8 @@ def projection_native(monkeypatch):
     annotation.source = source
     annotation.endpoints = endpoints
     annotation.owner = owner
-    display = Display({4: notes.LEVER_CALLOUTS[name]})
+    part, qualifier = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][name]
+    display = Display({part: qualifier})
     data = Data()
     margins = {0: 0.0127, 1: 0.0127, 2: 0.0127, 3: 0.0127}
     sheet = SimpleNamespace(
@@ -614,13 +618,12 @@ def test_thread_projection_wrap_preserves_every_word_and_below_compartment(
 ) -> None:
     native = projection_native
     name = stack.THREAD_PROJECTION_DIMENSION
-    callouts = drawing._printable_lever_callouts()
-    assert " ".join(callouts[name].split()) == "FLAT LEVER TIP PROUD OF FAR BRACKET FACE"
-    assert len(callouts[name].splitlines()) == 3
-    assert drawing.LEVER_CALLOUT_LOCATION[name] == "below"
-    drawing._assert_lever_callouts([(name, native.display)], callouts)
+    callouts = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE]
+    part, qualifier = callouts[name]
+    assert part == 4
+    drawing._assert_callouts([(name, native.display)], callouts)
     wrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
-    native.rows[1]["text"] = " ".join(callouts[name].split())
+    native.rows[1]["text"] = " ".join(qualifier.split())
     del native.rows[2:]
     unwrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
     assert unwrapped[2] - unwrapped[0] > wrapped[2] - wrapped[0]
@@ -682,9 +685,9 @@ def test_thread_projection_rejects_stored_but_unrendered_qualifier(
     else:
         native.rows[-1]["text"] = "BRACKET"
     # Stored below-text alone is insufficient evidence of printed ink.
-    drawing._assert_lever_callouts(
+    drawing._assert_callouts(
         [(stack.THREAD_PROJECTION_DIMENSION, native.display)],
-        drawing._printable_lever_callouts(),
+        stack.SETTING_CALLOUTS[stack.THREAD_FEATURE],
     )
     with pytest.raises(RuntimeError, match="invalid native text count|missing rendered qualifier"):
         drawing._thread_projection_text_box(native.adapter, native.annotation)
@@ -707,7 +710,7 @@ def test_thread_projection_refuses_malformed_native_qualifier_geometry(
 
 def test_thread_projection_checks_multiline_fragment_height(projection_native) -> None:
     native = projection_native
-    native.rows[1]["text"] = notes.LEVER_CALLOUTS[stack.THREAD_PROJECTION_DIMENSION]
+    native.rows[1]["text"] = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION][1]
     native.rows[1]["spacing"] = 2.0
     del native.rows[2:]
     # Put the block's anchor well below the native shoulder: its full bottom
@@ -722,8 +725,8 @@ def test_thread_projection_checks_multiline_fragment_height(projection_native) -
 
 def test_base_lever_import_excludes_projection_and_preserves_other_settings(monkeypatch) -> None:
     annotations = {
-        key: SimpleNamespace(GetSpecificAnnotation=lambda d=_Display({}): d)
-        for key in (stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION)
+        key: SimpleNamespace(GetSpecificAnnotation=lambda d=_Display({part: text}): d)
+        for key, (part, text) in stack.SETTING_CALLOUTS[stack.LEVER_FEATURE].items()
     }
     by_id = {id(annotation): key for key, annotation in annotations.items()}
     imports, precision, shown = [], [], []
@@ -743,16 +746,11 @@ def test_base_lever_import_excludes_projection_and_preserves_other_settings(monk
         imports.append((view, kwargs))
         return list(annotations.values())
 
-    def callouts(_adapter, imported, values, *, location):
-        assert imported == list(annotations.values())
-        for key, value in values.items():
-            annotations[key].GetSpecificAnnotation().parts[drawing.CALLOUT_TEXT_PART[location]] = value
-
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
-    monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
     monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: precision.append(args))
     view = object()
-    settled = drawing._lever_settings(object(), view)
+    source_steps = []
+    settled = drawing._lever_settings(object(), view, source_steps.append)
     assert imports == [(view, {
         "keep": drawing.lever_keep((0.04, 0.21), (0.06, 0.21), (0.06, 0.19)),
         "view_label": drawing.LEVER_VIEW_LABEL,
@@ -762,6 +760,9 @@ def test_base_lever_import_excludes_projection_and_preserves_other_settings(monk
     assert stack.THREAD_PROJECTION_DIMENSION not in imports[0][1]["keep"]
     assert precision[0][2] == stack.LEVER_DRAWING_PRECISION[stack.LEVER_FEATURE]
     settled()
+    assert source_steps == [
+        "lever settings import and readback", "lever settings settled readback",
+    ]
     annotations[stack.FIXTURE_DROP_DIMENSION].GetSpecificAnnotation().parts[4] = ""
     with pytest.raises(RuntimeError, match="below callout"):
         settled()
@@ -790,6 +791,8 @@ def lever_tip_native(monkeypatch, projection_native):
 
     native = projection_native
     native.failure_captures = []
+    native.source_steps = []
+    native.source_step = native.source_steps.append
 
     def capture_failure(adapter, label, message, **kwargs):
         # Never let offline tests save production documents or capture the host.
@@ -820,7 +823,7 @@ def lever_tip_native(monkeypatch, projection_native):
         UpdateViewDisplayGeometry=lambda: None,
         GetOutline=lambda: native.outline,
         GetDetailCircleInfo2=lambda: native.fence,
-        GetOrientationName=lambda: "*Back",
+        GetOrientationName=lambda: drawing.LEVER_TIP.orientation,
         ReferencedConfiguration="Default",
         GetDisplayMode2=lambda: 2,
         GetFacettedHlrDisplay=lambda: False,
@@ -950,7 +953,7 @@ def lever_tip_native(monkeypatch, projection_native):
         SetPosition2=move_back,
     )
     native.back_caption = SimpleNamespace(
-        GetText=lambda: drawing.ASSEMBLED_VIEW_CAPTIONS["*Front"],
+        GetText=lambda: drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW],
         GetExtent=lambda: native.back_extent,
         GetAnnotation=lambda: native.back_annotation,
     )
@@ -975,8 +978,8 @@ def lever_tip_native(monkeypatch, projection_native):
         cx, cy = drawing.LEVER_TIP.centre
         mx = (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000
         my = stack.LEVER_AXIS_Y / 1000
-        # Actual *Back orientation: reverse X, retain Y; component Z is real,
-        # whereas the authored dimension chain is in the assembly's Z=0 plane.
+        # Current remapped Front preserves old Back: reverse X, retain Y.
+        # Component Z is real; the authored chain is in the assembly's Z=0 plane.
         return tuple(
             (cx - 4 * (x - mx), cy + 4 * (y - my)
              + (native.boundary_paper_dy if len(points) == 4 and index % 2 else 0))
@@ -1000,10 +1003,6 @@ def lever_tip_native(monkeypatch, projection_native):
         if native.drop_on_crop:
             native.annotations.clear()
 
-    def callouts(_adapter, annotations, texts, *, location):
-        assert native.cropped and annotations == [native.annotation]
-        native.display.parts[drawing.CALLOUT_TEXT_PART[location]] = texts[name]
-
     def label(_adapter, text, x, y):
         assert text == drawing.LEVER_TIP.label_text
         assert (x, y) == drawing.LEVER_TIP.label_xy
@@ -1012,7 +1011,6 @@ def lever_tip_native(monkeypatch, projection_native):
 
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "_crop", crop)
-    monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
     monkeypatch.setattr(drawing, "add_note", label)
     native.data.GetLineCount = lambda: 3
 
@@ -1440,7 +1438,7 @@ def test_identity_refusal_captures_mapped_positive_without_view_roundtrip(projec
 
     native = projection_context_native
     with pytest.raises(RuntimeError, match="physical model proof failed") as raised:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert native.g7_calls == [1]
     assert len(native.failure_captures) == 1
     label, _message, capture = native.failure_captures[0]
@@ -1512,7 +1510,7 @@ def test_identity_diagnostic_readers_fail_independently(projection_context_nativ
     else:
         native.view.GetDisplayMode2 = fail
     with pytest.raises(RuntimeError, match="physical model proof failed"):
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     probe = native.failure_captures[0][2]["native_identity_probe"]
     readers = probe["readers"]
     assert "collector_error" not in probe
@@ -1597,7 +1595,7 @@ def test_identity_capture_retains_original_baseexception_and_traceback(lever_tip
 def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lever_tip_native):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,)
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
     )
     assert len(native.imports) == 1
     view, args = native.imports[0]
@@ -1632,16 +1630,16 @@ def test_detail_direction_exposes_the_nose_instead_of_the_occluding_flange():
     assert y + radius_mm < joint.BRACKET_ORIGIN[1] + joint.SIDE_PLATE_Y[1]
     flange_near_z = joint.BRACKET_ORIGIN[2] + joint.SIDE_PLATE_Z[0]
     assert flange_near_z > assembly.LEVER_ROD_Z + drawing.LEVER_ROD_DIA / 2
-    # Reverse only the detail's viewing direction, not the installation.
-    assert detail.orientation == "*Back"
+    # Standard Front now captures old Back, without changing the installation.
+    assert detail.orientation == "*Front"
     assert detail.scale == (4, 1)
     assert assembly.LEVER_ROD_Z - drawing.NOSE_R < flange_near_z
-    assert drawing.ASSEMBLED_VIEW_CAPTIONS["*Front"] == "VIEW FROM THE BACK"
+    assert drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW] == "VIEW FROM THE BACK"
 
 
 def test_detail_proves_transformed_physical_edges_before_import_and_after_crop(lever_tip_native):
     native = lever_tip_native
-    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     physical = next(points for points in native.projected if len(points) == 4)
     assert physical[0] == pytest.approx((
         stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, assembly.LEVER_ROD_Z / 1000,
@@ -1666,7 +1664,7 @@ def test_detail_proves_transformed_physical_edges_before_import_and_after_crop(l
 ])
 def test_detail_refuses_missing_physical_interface_after_rebuild(lever_tip_native, failure):
     native = lever_tip_native
-    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     if failure == "sketch-only":
         native.rendered_edges.clear()
     elif failure == "hidden-component":
@@ -1741,7 +1739,7 @@ def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_n
     assert drawing.boxes_clear(box, drawing._projection_crop_box(native.view))
     assert not drawing.boxes_clear(box, tuple(native.outline))
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,),
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
     )
     assert drawing.boxes_clear(drawing._projection_note_box(native.back_caption), tuple(native.outline))
     assert native.back_extent[1] == before[1] and native.back_extent[4] == before[4]
@@ -1760,7 +1758,7 @@ def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_n
 def test_moved_back_caption_must_still_clear_live_border_after_rebuild(lever_tip_native):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,),
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
     )
     native.back_extent[0] -= 0.002
     native.back_extent[3] -= 0.002
@@ -2169,7 +2167,7 @@ def test_real_numeric_payload_cannot_replace_native_physical_edge_identity(
 
     native.view.GetPolylines7 = polylines
     with pytest.raises(RuntimeError, match="physical model proof failed"):
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert calls == [1]
     assert len(native.failure_captures) == 1
     probe = native.failure_captures[0][2]["native_identity_probe"]
@@ -2198,7 +2196,7 @@ def test_truncated_real_native_payload_keeps_original_failure_and_complete_snaps
 
     native.view.GetPolylines7 = polylines
     with pytest.raises(RuntimeError, match="primitive 35, offset 1128") as caught:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert calls == [1]
     assert len(native.failure_captures) == 1
     _label, message, capture = native.failure_captures[0]
@@ -2215,7 +2213,7 @@ def test_truncated_real_native_payload_keeps_original_failure_and_complete_snaps
     assert [bytes.fromhex(item["ieee754_le"]) for item in buffer["items"]] == [
         struct.pack("<d", value) for value in payload
     ]
-    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["view_state"]["orientation"]["value"] == drawing.LEVER_TIP.orientation
     assert probe["reader_errors"] == {}
     assert native.imports == [] and not native.cropped
 
@@ -2683,7 +2681,7 @@ def test_tip_settled_closure_retains_only_its_authored_crop_context(lever_tip_na
 
     monkeypatch.setattr(drawing, "_crop", retain)
     monkeypatch.setattr(drawing, "_projection_layout", observe)
-    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     settled()
     assert len(seen) == 2 and all(value is context for value in seen)
     assert not native.failure_captures
@@ -2709,7 +2707,7 @@ def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failur
 
     native.view.GetPolylines7 = polylines
     with pytest.raises(RuntimeError, match=r"invalid geometry header \(2.0, 0.0\).*offset 0") as caught:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert calls == [1]
     assert len(native.failure_captures) == 1
     _label, message, capture = native.failure_captures[0]
@@ -2733,7 +2731,7 @@ def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failur
     ]
     state = probe["view_state"]
     assert state["revision"]["value"] == "34.4"
-    assert state["orientation"]["value"] == "*Back"
+    assert state["orientation"]["value"] == drawing.LEVER_TIP.orientation
     assert state["display_mode"]["value"] == 2
     assert state["facetted_hlr"]["value"] is False
     assert state["cropped"]["value"] is False
@@ -2778,7 +2776,7 @@ def test_polyline_capture_retains_original_getter_exception_and_independent_view
     native.view.GetOutline = outline
     native.view.ModelToViewTransform = Transform()
     with pytest.raises(OSError) as caught:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert caught.value is original
     capture = native.failure_captures[0][2]
     assert capture["exception"] is original and capture["sheet_png"] is True
@@ -2859,7 +2857,7 @@ def test_payload_snapshot_failure_cannot_mask_original_or_skip_view_readers(
     probe = capture["native_polyline_probe"]
     assert "raw snapshot refused" in probe["reader_errors"]["original_return"]
     assert probe["view_state"]["revision"]["value"] == "34.4"
-    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["view_state"]["orientation"]["value"] == drawing.LEVER_TIP.orientation
     assert probe["view_state"]["model_to_view"]["length"] == 16
 
 
@@ -2874,7 +2872,7 @@ def test_null_polyline_channels_are_unavailable_and_captured(lever_tip_native, r
 
     native.view.GetPolylines7 = polylines
     with pytest.raises(RuntimeError, match="channel is unavailable at primitive 0, offset 0") as caught:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert calls == [1]
     capture = native.failure_captures[0][2]
     assert capture["exception"] is caught.value and capture["sheet_png"] is True
@@ -2892,7 +2890,7 @@ def test_actual_empty_polyline_arrays_remain_measured_empty(lever_tip_native, mo
     native.view.GetPolylines7 = lambda _cross: ([], [])
     assert drawing._projection_rendered_edges(([], [])) == ()
     with pytest.raises(RuntimeError, match="physical model proof failed"):
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert len(native.failure_captures) == 1
     probe = native.failure_captures[0][2]["native_identity_probe"]
     assert probe["rendered_status"] == "DECODED"
@@ -2995,7 +2993,7 @@ def test_unprintable_secondary_error_keeps_independent_readers_and_forensic_atte
     assert capture["exception"] is original and capture["sheet_png"] is True
     probe = capture["native_polyline_probe"]
     assert probe["reader_errors"][failed_field] == "UnprintableError: <diagnostic text unavailable>"
-    assert probe["view_state"]["orientation"]["value"] == "*Back"
+    assert probe["view_state"]["orientation"]["value"] == drawing.LEVER_TIP.orientation
     assert probe["view_state"]["facetted_hlr"]["value"] is False
     assert probe["view_state"]["model_to_view"]["length"] == 16
 
@@ -3068,7 +3066,7 @@ def test_decoder_failure_is_preserved_before_optional_capture_entry(
     else:
         monkeypatch.setattr(drawing, "_capture_projection_polyline_failure", refuse_capture)
     with pytest.raises(RuntimeError) as caught:
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     assert caught.value is original
     trace = caught.value.__traceback__
     while trace is not None and trace is not tracebacks[0]:
@@ -3084,7 +3082,7 @@ def test_decoder_failure_is_preserved_before_optional_capture_entry(
 ])
 def test_projection_detail_refuses_lost_authority_after_rebuild(lever_tip_native, failure):
     native = lever_tip_native
-    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
     if failure == "source":
         native.source.FullName = f"ThreadProjection@OtherChain@{drawing.SOURCE.stem}"
     elif failure == "value":
@@ -3119,7 +3117,7 @@ def test_projection_detail_refuses_import_lost_to_crop(lever_tip_native):
     native = lever_tip_native
     native.drop_on_crop = True
     with pytest.raises(RuntimeError, match="after crop.*expected one control"):
-        drawing._thread_projection_detail(native.adapter, (), ())
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
 
 
 @pytest.mark.parametrize("failed_reader", ["entities", "types", "owner", "display", "all"])
@@ -3204,7 +3202,7 @@ def test_projection_source_collects_all_identity_codes_before_reader_failure(
 def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native, failure):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,)
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
     )
     if failure == "arrow-border":
         native.arrow_x = 0.012
@@ -3236,7 +3234,7 @@ def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native
 
 def test_step_seven_uses_the_actual_detail_and_attached_qualifier():
     step = notes.STEP_TEXT[steps.LEVER_THREADED_KEY]
-    qualifier = " ".join(notes.LEVER_CALLOUTS[stack.THREAD_PROJECTION_DIMENSION].split())
+    qualifier = " ".join(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION][1].split())
     assert qualifier in step
     assert drawing.LEVER_TIP.title in step
     assert "THREAD PROJECTION" not in step
@@ -3288,12 +3286,12 @@ def test_lever_tip_placement_uses_opposite_native_view_and_isolation(monkeypatch
         lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])),
     )
     assert drawing._placed_detail(adapter, detail) is view
-    assert events[0] == ("place", str(drawing.SOURCE), "*Back", detail.centre, (4, 1))
+    assert events[0] == ("place", str(drawing.SOURCE), "*Front", detail.centre, (4, 1))
     assert view.Position == pytest.approx((0.060, 0.070))
     assert events[-2:] == [
         ("HLR",), ("isolate", frozenset({"mg-magnifying-lever", "mg-magnifying-bracket"})),
     ]
-    assert drawing.PRESSED.orientation == drawing.ENDSHAKE.orientation == "*Right"
+    assert drawing.PRESSED.orientation == drawing.ENDSHAKE.orientation == stack.DRAWING_LEFT_VIEW
     half_span_m = stack.THREAD_PROJECTION / 1000 * detail.scale[0] / detail.scale[1] / 2
     assert half_span_m < detail.crop_radius
     assert math.hypot(half_span_m, drawing._LEVER_R * 0.004) < detail.crop_radius
@@ -3405,6 +3403,8 @@ def test_deterministic_crop_restores_database_mode_on_native_refusal(monkeypatch
 
 def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(monkeypatch):
     views, captions, projection_calls = [], [], []
+    source_steps = []
+    source_step = source_steps.append
     base_check, stack_check, projection_check = (lambda: None), (lambda: None), (lambda: None)
     sheet_view = object()
     adapter = SimpleNamespace(currentModel=SimpleNamespace(
@@ -3423,7 +3423,9 @@ def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(mon
         views.append(view)
         return view
 
-    def stacks(_adapter):
+    def stacks(_adapter, callback):
+        assert callback is source_step
+        callback("stack callback")
         for _ in range(2):
             label = object()
             annotation = SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda n=label: n)
@@ -3435,17 +3437,28 @@ def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(mon
         captions.append(note)
         return note
 
-    def detail(_adapter, neighbours, notes):
+    def detail(_adapter, neighbours, notes, callback):
+        assert callback is source_step
+        callback("tip callback")
         projection_calls.append((neighbours, notes))
         return projection_check
 
     monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "_lever_settings", lambda _a, view: base_check)
+    def lever(_adapter, view, callback):
+        assert view is views[0] and callback is source_step
+        callback("lever callback")
+        return base_check
+
+    monkeypatch.setattr(drawing, "_lever_settings", lever)
     monkeypatch.setattr(drawing, "_stack_dimensions", stacks)
     monkeypatch.setattr(drawing, "_add_note_block", caption)
     monkeypatch.setattr(drawing, "_thread_projection_detail", detail)
-    assert drawing._place_assembled_sheet(adapter) == (base_check, stack_check, projection_check)
-    assert [view.orientation for view in views[:3]] == ["*Front", "*Right", "*Isometric"]
+    assert drawing._place_assembled_sheet(adapter, source_step) == (base_check, stack_check, projection_check)
+    assert [view.orientation for view in views[:3]] == [
+        stack.DRAWING_BACK_VIEW, stack.DRAWING_LEFT_VIEW, stack.DRAWING_ISOMETRIC_VIEW,
+    ]
+    assert source_steps.index("lever callback") < source_steps.index("stack callback")
+    assert source_steps.index("stack callback") < source_steps.index("tip callback")
     assert len(projection_calls) == 1
     neighbours, notes = projection_calls[0]
     assert neighbours == tuple(views) and len(neighbours) == 5
@@ -3868,27 +3881,10 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    # Measured 0fb89 and 86bc envelopes/ink, translated from their insertions.
-    # Preserve 4 mm native padding on every known seat, not just PDF air.
-    for (
-        steps_y, checks_y, steps_bottom, steps_top, checks_bottom, checks_top,
-        steps_ink_bottom, checks_ink_top,
-    ) in (
-        (0.258, 0.0844, 0.0953983, 0.2584113, 0.0618495, 0.0846455,
-         0.0960089, 0.0843736),
-        (0.2595, 0.0926, 0.0968088, 0.2597953, 0.0701210, 0.0929963,
-         0.0975090, 0.0925736),
-    ):
-        steps_dy = drawing.STEPS_XY[1] - steps_y
-        checks_dy = drawing.CHECKS_XY[1] - checks_y
-        assert steps_bottom + steps_dy - (checks_top + checks_dy) >= drawing._PAD
-        assert steps_top + steps_dy <= drawing.INNER_BORDER[3] - drawing._PAD
-        assert checks_bottom + checks_dy >= drawing.TITLE_BLOCK[3] + drawing._PAD
-        # Matched PDF ink sets separation, rather than nominal font size.
-        assert (
-            steps_ink_bottom + steps_dy - (checks_ink_top + checks_dy)
-            >= min(0.0038733, 0.0038734)
-        )
+    # Upstream native envelopes used shorter, non-threaded text. They cannot
+    # certify these combined blocks. Check derived spacing here; final native
+    # whole-note/layout checks must establish clearance for this exact text.
+    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
@@ -5253,6 +5249,7 @@ def test_mg_settings_only_read_inherited_native_callouts(
     for module in (drawing, dimension_helpers):
         monkeypatch.setattr(module, "dimension_name", lambda _adapter, item: item.name)
     monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
     monkeypatch.setattr(
         drawing,
         "curate_view_dimensions",
@@ -5270,11 +5267,12 @@ def test_mg_settings_only_read_inherited_native_callouts(
         lambda _adapter, _detail, keep: [annotations[name] for name in keep],
     )
     adapter = SimpleNamespace(_attempt=lambda action: action())
+    source_steps = []
 
     def import_settings():
         if group == "lever":
-            return drawing._lever_settings(adapter, object(), lambda _phase: None)
-        return drawing._stack_dimensions(adapter, lambda _phase: None)
+            return drawing._lever_settings(adapter, object(), source_steps.append)
+        return drawing._stack_dimensions(adapter, source_steps.append)
 
     if missing:
         with pytest.raises(RuntimeError, match="callout reads ''"):
@@ -5282,6 +5280,364 @@ def test_mg_settings_only_read_inherited_native_callouts(
         return
     settled = import_settings()
     settled()
+    assert source_steps == [
+        f"{group} settings import and readback", f"{group} settings settled readback",
+    ]
     text_parts[name][part] = ""
     with pytest.raises(RuntimeError, match="callout reads ''"):
         settled()
+
+
+def test_tip_camera_preserves_old_back_after_actual_standard_view_remap(monkeypatch):
+    import _assembly
+    import _assembly_named_views
+
+    # Native standard camera rows, before the builder's remap. These are
+    # independent of the drawing's chosen orientation string.
+    old_front = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    old_back = (-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0)
+    old_right = (0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
+    old_iso = (
+        1 / math.sqrt(2), 0.0, -1 / math.sqrt(2),
+        -1 / math.sqrt(6), 2 / math.sqrt(6), -1 / math.sqrt(6),
+        1 / math.sqrt(3), 1 / math.sqrt(3), 1 / math.sqrt(3),
+    )
+
+    class Model:
+        def __init__(self):
+            self.standard = {1: old_front, 2: old_back, 4: old_right, 7: old_iso}
+            self.named = {}
+            self.current = None
+            self.Extension = SimpleNamespace(
+                GetNamedViewRotation=lambda name: self.named[name],
+                UpdateStandardViews=self.update,
+            )
+
+        def GetStandardViewRotation(self, view_id):
+            return self.standard[view_id]
+
+        def ShowNamedView2(self, name, view_id):
+            self.current = self.named[name] if name else self.standard[view_id]
+
+        def NameView(self, name):
+            self.named[name] = self.current
+
+        def update(self, name, view_id):
+            assert name == "" and view_id == 1
+            self.standard[1] = self.current
+            self.standard[2] = tuple(
+                value if index // 3 == 1 else -value
+                for index, value in enumerate(self.current)
+            )
+            return True
+
+    for module in (_assembly, _assembly_named_views):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _iface: value)
+    model = Model()
+    adapter = SimpleNamespace(currentModel=model, _zoom_to_fit=lambda _model: None)
+    # Execute the actual two builder helpers in their canonical order.
+    assembly.name_standard_views(adapter, views=stack.DRAWING_STANDARD_VIEWS, label="MG")
+    assembly.remap_front_to_machine_front(adapter)
+    cameras = {"*Front": model.standard[1], "*Back": model.standard[2], **model.named}
+    tip_rows = cameras[drawing.LEVER_TIP.orientation]
+    assert tip_rows == old_back
+    assert model.current == old_back
+    assert cameras[stack.DRAWING_BACK_VIEW] == old_front
+    assert cameras[drawing.PRESSED.orientation] == old_right
+    assert cameras[drawing.ENDSHAKE.orientation] == old_right
+    assert cameras[stack.DRAWING_ISOMETRIC_VIEW] == old_iso
+    assert is_pictorial_orientation(stack.DRAWING_ISOMETRIC_VIEW)
+    point = (stack.THREADED_TIP_X, stack.LEVER_AXIS_Y, assembly.LEVER_ROD_Z)
+    projected = tuple(
+        sum(point[i] * tip_rows[3 * axis + i] for i in range(3))
+        for axis in range(3)
+    )
+    assert projected == pytest.approx((-point[0], point[1], -point[2]))
+    assert tip_rows[6:] == (0.0, 0.0, -1.0)  # Viewer on the unobstructed -Z side.
+    assert cameras[stack.DRAWING_BACK_VIEW][6:] == (0.0, 0.0, 1.0)
+
+
+@pytest.mark.parametrize("stage", ["import", "settled"])
+@pytest.mark.parametrize("damage", ["missing", "wrong compartment", "changed text"])
+def test_tip_inherited_callout_is_required_without_repair(lever_tip_native, stage, damage):
+    native = lever_tip_native
+    part, text = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION]
+    if stage == "settled":
+        settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+    native.display.parts.clear()
+    if damage == "wrong compartment":
+        native.display.parts[3] = text
+    elif damage == "changed text":
+        native.display.parts[part] = text + "\nCHANGED"
+    before = dict(native.display.parts)
+    with pytest.raises(RuntimeError, match="below callout reads"):
+        if stage == "import":
+            drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+        else:
+            settled()
+    assert native.display.parts == before
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.annotation.endpoints is native.endpoints
+
+
+@pytest.fixture
+def immutable_tip_build(monkeypatch, tmp_path, lever_tip_native):
+    """Run build's real source guards and Tip checks; fake only native I/O.
+
+    No production source/configuration guard or source_step is replaced. The
+    finalizer double runs its supplied settled callbacks before a save marker.
+    """
+    native = lever_tip_native
+    path = tmp_path / drawing.SOURCE.name
+    path.write_bytes(b"released MG source")
+    monkeypatch.setattr(drawing, "SOURCE", path)
+    source = _ExplodeSource()
+    drawing_model = native.adapter.currentModel
+    state = SimpleNamespace(
+        source=source, path=path, native=native, saved=False, finalized=False,
+        hook=lambda _stage: None, metadata_reads=[], phases=[], balloon_calls=[],
+    )
+    get_property = source.GetCustomInfoValue
+
+    def property_value(configuration, name):
+        state.metadata_reads.append((configuration, name))
+        return get_property(configuration, name)
+
+    source.GetCustomInfoValue = property_value
+
+    async def open_model(actual_path):
+        assert actual_path == str(path)
+        native.adapter.currentModel = source
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    native.adapter.open_model = open_model
+    monkeypatch.setattr(
+        drawing, "read_required_properties",
+        lambda *_a, **_k: {"Number": notes.DRAWING_NUMBER},
+    )
+    monkeypatch.setattr(
+        drawing, "_create_sheets",
+        lambda adapter: setattr(adapter, "currentModel", drawing_model),
+    )
+
+    def assembled(adapter, source_step):
+        return (drawing._thread_projection_detail(adapter, (), (), source_step),)
+
+    monkeypatch.setattr(drawing, "_place_assembled_sheet", assembled)
+    monkeypatch.setattr(
+        drawing._telemetry, "event",
+        lambda name, **fields: state.phases.append((name, fields)),
+    )
+    views = {}
+
+    def place(_adapter, _sheet, _field, *_args, label):
+        view = SimpleNamespace(
+            GetOutline=lambda: (0.100, 0.120, 0.200, 0.230),
+            IsExploded=lambda: label in (drawing.WHEEL_LABEL, drawing.LEVER_LABEL),
+            ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        )
+        views[label] = view
+        return view
+
+    monkeypatch.setattr(drawing, "_place_exploded_view", place)
+    monkeypatch.setattr(drawing, "_place_collapsed_view", place)
+    for name in (
+        "assert_full_detail_view", "isolate_drawing_view_components",
+        "_show_tangent_edges", "_assert_bom_clears_reference_field",
+        "_link_view_to_bom", "_move_wire_balloon", "assert_balloon_landings",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_fit_ring", lambda _a, _v, ladder, *_args, **_k: ladder[0])
+    monkeypatch.setattr(drawing, "insert_bom_table", lambda *_a, **_k: object())
+    items = {stem: str(i) for i, stem in enumerate(notes.BOM_ORDER, 1)}
+    monkeypatch.setattr(drawing, "_validate_bom", lambda *_a: items)
+    monkeypatch.setattr(drawing, "_bom_items", lambda *_a: items)
+
+    def balloons(_adapter, view, **kwargs):
+        state.balloon_calls.append((view, kwargs))
+        return [SimpleNamespace(stem=explode.WIRE_STEM)]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
+    monkeypatch.setattr(drawing, "_add_note_block", lambda *_a, **_k: object())
+    monkeypatch.setattr(
+        drawing, "_hide_bom_reference", lambda *_a: state.hook("before-finalizer"),
+    )
+
+    async def finalize(_adapter, _outputs, **kwargs):
+        state.finalized = True
+        state.hook("before-settled")
+        for settled in kwargs["settled_checks"]:
+            settled()
+        state.saved = True
+        state.hook("after-save")
+        return {"drawing": "synthetic artifact"}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    state.views = views
+    return state
+
+
+def test_build_keeps_source_immutable_through_tip_and_finalization(immutable_tip_build):
+    state = immutable_tip_build
+    inherited = dict(state.native.display.parts)
+    expected_sha = drawing._source_sha256(state.path)
+    assert asyncio.run(drawing.build(state.native.adapter)) == {"drawing": "synthetic artifact"}
+    assert state.saved and state.finalized
+    assert state.native.display.parts == inherited
+    assert drawing._source_sha256(state.path) == expected_sha
+    assert not state.source.dirty
+    assert state.source.configuration_switches == []
+    assert state.source.ConfigurationManager.ActiveConfiguration.Name == "Default"
+    owners = tuple(drawing.EXPLODED_VIEW_NAMES)
+    assert state.metadata_reads == [
+        ("", explode.explode_offsets_property(owner)) for owner in (*owners, *owners)
+    ]
+    phases = [fields for name, fields in state.phases if name == "magnifier.source_save_flag"]
+    assert phases and all(not fields["dirty"] for fields in phases)
+    tip_phases = [fields["step"] for fields in phases if fields["step"].startswith("lever tip")]
+    assert tip_phases == [
+        "lever tip view placement, configuration and isolation",
+        "lever tip import, crop and inherited callout readback",
+        "lever tip qualifier and caption placement",
+        "lever tip settled source, callout and whole-ink readback",
+        "lever tip settled source, callout and whole-ink readback",
+    ]
+    # PR1764 has not restored groups 1–18. Only wire19 is actually inserted,
+    # with explicit collapsed metadata rather than reading/activating source.
+    assert len(state.balloon_calls) == 1
+    view, kwargs = state.balloon_calls[0]
+    assert view is state.views[drawing.FINISHED_LABEL]
+    assert kwargs["items"] == ((explode.WIRE_STEM, "19"),)
+    assert notes.BOM_ORDER.index(explode.WIRE_STEM) + 1 == 19
+    assert kwargs["explode_offsets"] == {}
+
+
+@pytest.mark.parametrize("stage", ["before-finalizer", "before-settled", "after-save"])
+@pytest.mark.parametrize("damage", ["dirty", "bytes"])
+def test_build_refuses_source_changes_at_each_save_boundary(immutable_tip_build, stage, damage):
+    state = immutable_tip_build
+
+    def mutate(actual_stage):
+        if actual_stage != stage:
+            return
+        if damage == "dirty":
+            state.source.dirty = True
+        else:
+            state.path.write_bytes(b"externally changed source")
+
+    state.hook = mutate
+    with pytest.raises(RuntimeError, match="dirtied the source|changed the source"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.saved == (stage == "after-save")
+    assert state.finalized == (stage != "before-finalizer")
+    assert state.source.dirty == (damage == "dirty")
+    assert state.path.read_bytes() == (
+        b"externally changed source" if damage == "bytes" else b"released MG source"
+    )
+
+
+@pytest.mark.parametrize("damage", ["configuration", "displaced", "metadata"])
+def test_build_rechecks_source_configuration_collapse_and_metadata_after_save(
+    immutable_tip_build, damage,
+):
+    state = immutable_tip_build
+
+    def mutate(stage):
+        if stage != "after-save":
+            return
+        if damage == "configuration":
+            state.source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
+        elif damage == "metadata":
+            state.source.properties.clear()
+        else:
+            base = state.source.components[0].GetTotalTransform(False).ArrayData
+            displaced = (*base[:9], 0.01, *base[10:])
+            state.source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
+                ArrayData=displaced if presentation else base,
+            )
+
+    state.hook = mutate
+    with pytest.raises(RuntimeError, match="Default configuration|collapsed|rebuild"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.saved
+    assert state.path.read_bytes() == b"released MG source"
+    assert not state.source.dirty
+
+
+def test_build_secondary_proof_and_logging_interrupts_preserve_primary(immutable_tip_build, monkeypatch):
+    state = immutable_tip_build
+    original = KeyboardInterrupt("primary native interruption")
+    traces = []
+
+    def fail_reader():
+        raise SystemExit("secondary source proof")
+
+    def fail_logger(*_args, **_kwargs):
+        raise GeneratorExit("secondary logging")
+
+    def interrupt(stage):
+        if stage != "after-save":
+            return
+        state.source.GetSaveFlag = fail_reader
+        monkeypatch.setattr(drawing._telemetry, "warn", fail_logger)
+        try:
+            raise original
+        except BaseException as exc:
+            traces.append(exc.__traceback__)
+            raise
+
+    state.hook = interrupt
+    with pytest.raises(KeyboardInterrupt) as caught:
+        asyncio.run(drawing.build(state.native.adapter))
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not traces[0]:
+        trace = trace.tb_next
+    assert trace is traces[0]
+
+
+def test_tip_whole_ink_reads_the_current_model_callout_authority(projection_native, monkeypatch):
+    native = projection_native
+    name = stack.THREAD_PROJECTION_DIMENSION
+    callouts = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE]
+    part, original = callouts[name]
+    changed = original.replace(original.split()[0], "MODEL", 1)
+    monkeypatch.setitem(callouts, name, (part, changed))
+    with pytest.raises(RuntimeError, match="callout reads"):
+        drawing._assert_callouts([(name, native.display)], callouts)
+    native.display.parts[part] = changed
+    drawing._assert_callouts([(name, native.display)], callouts)
+    # A good GetText is insufficient while DisplayData still renders old ink.
+    with pytest.raises(RuntimeError, match="missing rendered qualifier"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+    for row, text in zip(native.rows[1:], changed.splitlines(), strict=True):
+        row["text"] = text
+    box = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert box[0] < box[2] and box[1] < box[3]
+
+
+def test_build_refuses_preexisting_dirty_source_before_tip_import(immutable_tip_build):
+    state = immutable_tip_build
+    state.source.dirty = True
+    with pytest.raises(RuntimeError, match="already dirty"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.source.dirty
+    assert state.native.imports == []
+    assert not state.finalized and not state.saved
+    assert state.path.read_bytes() == b"released MG source"
+
+
+def test_build_tip_settled_ink_failure_prevents_save_and_still_proves_source(immutable_tip_build):
+    state = immutable_tip_build
+
+    def erase_qualifier(stage):
+        if stage == "before-settled":
+            del state.native.rows[1:]
+
+    state.hook = erase_qualifier
+    with pytest.raises(RuntimeError, match="missing rendered qualifier"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.finalized and not state.saved
+    assert state.path.read_bytes() == b"released MG source"
+    assert not state.source.dirty
+    assert len(state.metadata_reads) == 2 * len(drawing.EXPLODED_VIEW_NAMES)

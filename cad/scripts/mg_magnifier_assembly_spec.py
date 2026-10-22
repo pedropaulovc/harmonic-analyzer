@@ -102,6 +102,20 @@ LEVER_DRAWING_PRECISION = {
     LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 1, FIXTURE_DROP_DIMENSION: 1}
 }
 
+# A separate native installation witness: flat tip proud of the far neck face.
+# .XX general tolerance is an assembly setting, not a manufactured shoulder.
+THREAD_FEATURE = "LeverThreadSetting"
+THREAD_PROJECTION_DIMENSION = "ThreadProjection"
+THREADED_TIP_X = LEVER_TIP_X - _lever.ROD_LENGTH
+THREAD_FAR_FACE_X = _bracket.BRACKET_ORIGIN[0] - _lever.NECK_HALF_X
+THREAD_PROJECTION = THREAD_FAR_FACE_X - THREADED_TIP_X
+THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
+THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
+THREAD_PROJECTION_TOL = printed_band_mm(2)
+INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
+if THREAD_PROJECTION - THREAD_PROJECTION_TOL < 0.0 or INSTALLED_FULL_ENGAGEMENT_MIN < REQUIRED_FULL_ENGAGEMENT:
+    raise AssertionError("MG native installation depth loses far-face reach or 1.5D full thread")
+
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
 # 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are
 # model annotations, not sheet prose: imported SetText writes through to the
@@ -125,18 +139,11 @@ SETTING_CALLOUTS = {
         CLAMP_STATION_DIMENSION: (3, "CLAMP STATION: SETS MAGNIFICATION"),
         FIXTURE_DROP_DIMENSION: (4, "FIXTURE DROP:\nSETS TRACE HEIGHT"),
     },
+    THREAD_FEATURE: {
+        THREAD_PROJECTION_DIMENSION: (
+            4,
+            "FLAT LEVER TIP\nPROUD OF FAR\nBRACKET FACE",
+        ),
+    },
 }
 
-# A separate native installation witness: flat tip proud of the far neck face.
-# .XX general tolerance is an assembly setting, not a manufactured shoulder.
-THREAD_FEATURE = "LeverThreadSetting"
-THREAD_PROJECTION_DIMENSION = "ThreadProjection"
-THREADED_TIP_X = LEVER_TIP_X - _lever.ROD_LENGTH
-THREAD_FAR_FACE_X = _bracket.BRACKET_ORIGIN[0] - _lever.NECK_HALF_X
-THREAD_PROJECTION = THREAD_FAR_FACE_X - THREADED_TIP_X
-THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
-THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
-THREAD_PROJECTION_TOL = printed_band_mm(2)
-INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
-if THREAD_PROJECTION - THREAD_PROJECTION_TOL < 0.0 or INSTALLED_FULL_ENGAGEMENT_MIN < REQUIRED_FULL_ENGAGEMENT:
-    raise AssertionError("MG native installation depth loses far-face reach or 1.5D full thread")

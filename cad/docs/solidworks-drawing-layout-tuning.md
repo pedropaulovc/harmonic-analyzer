@@ -111,11 +111,14 @@ despite a 4.9354 mm printed gap clearing the 3.8733 mm advisory threshold.
 Evidence: `C:/farm-runs/com-perf-mg-clearance-inspection-20261021/actual-clearance-measurements.json`.
 Raising only sequence Y259.5 to Y260.5 predicts 4.8125 mm native gap,
 5.9354 mm printed gap and 5.9047 mm top-border clearance on that seat;
-title clearance stays 4.1210 mm. The existing fit test retains both measured
-seat cases and requires full 4 mm padding for each.
-Text, wrapping, font, scales, geometry and native guards stay unchanged.
-Fresh exact-head native audit and printed-sheet acceptance remain necessary:
-these translations do not certify the Y260.5 output.
+title clearance stays 4.1210 mm. These are historical upstream measurements
+for that package's unchanged text/wrapping/font, not fit-test or native proof
+for the longer threaded-joint sequence and 72-column CHECK block. No
+recipe-specific whole-CHECK native gate is established by these observations;
+the shared REPORT limits are unchanged. Inspect the fresh combined drawing's
+entire native CHECK extent, printed ink, title-block clearance and sequence/
+border/neighbor gaps. Historical translations do not certify its output.
+
 ### TL-00 instruction-sheet source references
 
 The oblique-jig assembly's `ASSEMBLY STEPS` reference at source `a0ba383f2b70`
@@ -1111,9 +1114,10 @@ temporary and revert when the dimension changes. The drawing-only
 is a separate lane, not the required above/below callouts. No proven
 drawing-only setter preserves these exact callout compartments.
 
-All four MG setting callouts now belong to the assembly model:
+All five MG setting callouts belong to the assembly model:
 `mg_magnifier_assembly_spec.SETTING_CALLOUTS` owns the exact text and native
-compartments for PressGauge, Endshake, ClampStation and FixtureDrop.
+compartments for PressGauge, Endshake, ClampStation, FixtureDrop and
+ThreadProjection.
 `build_mg_magnifier_assembly` authors them beside their reference dimensions,
 strictly reads each compartment back and marks/blanks the chains before its
 normal assembly save, following `build_pd_transgear_arm`'s model-text pattern.
@@ -1123,6 +1127,24 @@ It must reject a stale assembly lacking the text, not stamp it during drawing
 generation. Setting callout wording now re-keys `assembly:mg_magnifier` and
 requires rebuilding that source and its drawing; BOM/step/check prose remains
 drawing-only and must not enter the assembly builder's import closure.
+
+The threaded-joint setting uses its own `LeverThreadSetting` feature and the
+native below-callout compartment for all three rows of `FLAT LEVER TIP /
+PROUD OF FAR / BRACKET FACE`. Author/read it beside the existing 1.25 mm
+reference before blanking that chain; drawing-time text writes would violate
+the same source-clean contract as the original four settings. Keep the sole
+native dimension, far-bracket-face datum, precision and general band unchanged.
+This authority migration requires a new assembly recipe, not new geometry.
+
+Preserve the physical tip camera across standard-view remapping, not an old
+`*Back` string. `_assembly.remap_front_to_machine_front` first shows old
+Back/id2, then makes that orientation Front/id1 with `UpdateStandardViews`.
+Thus the former unobstructed machine−Z tip view is current `*Front`; saved
+`MG BACK` is the old +Z Front, and axle crops still use saved `MG LEFT`.
+Keep per-detail orientation and caption consumers consistent. The source
+camera mapping alone is not native visible-edge, cropped-ink or final-layout
+proof; the same instance/configuration, ownership, physical-boundary and
+whole-ink guards must still pass on the rebuilt source.
 
 The temporary per-operation crop/settings checkpoints and synthetic
 checkpoint-attribution tests are superseded by this native evidence. Keep

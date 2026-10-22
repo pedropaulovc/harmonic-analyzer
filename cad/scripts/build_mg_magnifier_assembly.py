@@ -684,6 +684,7 @@ async def _author_lever_setting_reference(adapter) -> None:
     name_last_feature(adapter, spec.THREAD_FEATURE)
     dims.apply(adapter, spec.THREAD_FEATURE)
     apply_drawing_precision(adapter, spec.THREAD_DRAWING_PRECISION)
+    _author_setting_callouts(adapter, spec.THREAD_FEATURE)
     mark_dimensions_for_drawing(adapter, spec.THREAD_FEATURE, spec.THREAD_DRAWING_DIMENSIONS[spec.THREAD_FEATURE])
     blank_sketch(adapter, spec.THREAD_FEATURE)
     feature = _early_bound(_early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.THREAD_FEATURE), "IFeature")

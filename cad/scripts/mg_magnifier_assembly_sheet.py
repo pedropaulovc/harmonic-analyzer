@@ -20,7 +20,6 @@ from mg_magnifier_assembly_spec import (
     ENDSHAKE_DIMENSION,
     FEATURE,
     PRESS_GAUGE_DIMENSION,
-    THREAD_PROJECTION_DIMENSION,
 )
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 
@@ -28,36 +27,6 @@ from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 # import (the builder marks the banded ones, DIMENSION_TOLERANCES).
 DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
 
-# --- Setting callouts ---------------------------------------------------------
-# Each callout states what its band protects, naming the mate the tight gauge
-# serves (drawing-guidelines.md rule 4; machinist review r6 read the ±0.05 as
-# over-tight without it: mg_wheel_group's worst-case stack spends it, leaving
-# LOCKNUT_THREAD_MARGIN 0.002). The gauge's prints above its
-# value, on one line: SolidWorks keeps a line break in that compartment but
-# prints none of the callout (run 20261012T185729782Z). The endshake's
-# prints below, where line breaks print.
-DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS MHA-MG-VN-52 LOCKNUT ON FULL THREAD",
-    ENDSHAKE_DIMENSION: "\n".join(
-        (
-            "WHEEL FREE, NO RATTLE;",
-            "SET BY THE FIRST NUT,",
-            "LOCKED BY THE SECOND",
-        )
-    ),
-}
-
-# --- Lever setting callouts (LEVER_FEATURE) -----------------------------------
-# What each setting does (joint_retention's clamp and fixture rows): the
-# clamp's radius from the knife is the magnification; the fixture's height on
-# the rod places the trace. Above-callouts print on one line only.
-LEVER_CALLOUTS = {
-    CLAMP_STATION_DIMENSION: "CLAMP STATION: SETS MAGNIFICATION",
-    FIXTURE_DROP_DIMENSION: "FIXTURE DROP:\nSETS TRACE HEIGHT",
-    # Below-text supports line breaks on the enlarged native lever-tip detail.
-    # The complete qualifier remains part of the imported dimension.
-    THREAD_PROJECTION_DIMENSION: "FLAT LEVER TIP\nPROUD OF FAR\nBRACKET FACE",
-}
 THREAD_PROJECTION_DETAIL_TITLE = "LEVER TIP DETAIL"
 
 # --- Fitter package -----------------------------------------------------------
