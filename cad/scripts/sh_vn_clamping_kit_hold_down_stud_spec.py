@@ -104,8 +104,8 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
 }
 DIMENSION_TOLERANCE_TYPES = {"FinishedLength": 0, "CutEndChamfer": 6}  # NONE / MAX
-# The drawing refreshes the angle text from the saved native chamfer definition;
-# these labels do not substitute typed values for the associated MAX driver.
+# The attached side-view chamfer callout reads the saved native angle. Its MAX
+# driver and precision remain source-owned even without a printed end dimension.
 DIMENSION_CALLOUTS = {
     "FinishedLength": "FINISHED CUT LENGTH;\nUPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
@@ -116,7 +116,7 @@ LOWER_END_NOTE = "LOWER FACTORY END UNMODIFIED"
 # REWORK sheet reads STOCK_NOTE and LOWER_END_NOTE through their own properties.
 DRAWING_NOTES = (
     "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT; "
-    "CUT UPPER END PER REWORK."
+    "CUT UPPER END PER SHEET 2."
 )
 
 # REWORK carries the native fabrication controls and their title-block band.

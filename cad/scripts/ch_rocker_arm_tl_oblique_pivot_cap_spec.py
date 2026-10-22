@@ -402,7 +402,7 @@ DIMENSION_CALLOUTS = {
         "MHA-CH-06-TL-VN-76\n"
         "GROOVE CLEARANCE"
     ),
-    "WireWidth": "2X X-PAIR WIRE GROOVE;\nMHA-CH-06-TL-VN-76",
+    "WireWidth": "2X X-PAIR WIRE GROOVE;\nCENTRED ON CAP-SCREW ROW;\nMHA-CH-06-TL-VN-76",
     "WireDepth": "2X NORMAL TO\nACTUAL CAP TOP FACE;\nDEPTH LIMITS OVER\nWHOLE GROOVE FLOOR",
     **{f"Bolt{index}{axis}": "FROM POCKET AXIS;\nLOCATES TL-22 CAP SCREW" for index in range(1, 5) for axis in ("X", "Y")},
     "RegisterDia": "2X INTEGRAL; LOCATES IN TL-22 RECEIVERS",

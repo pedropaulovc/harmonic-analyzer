@@ -88,6 +88,7 @@ async def build_purchased_variant_drawing(
     item: str,
     purchase_unit: str,
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     annotate_member: Callable[
         [Any, str, tuple, list[Any]], tuple[Callable[[], None], ...]
     ] | None = None,
@@ -107,6 +108,8 @@ async def build_purchased_variant_drawing(
     Additional sheets, when requested, are duplicated while the template is
     still blank and authored before the same single finalization. Their checks
     follow (and never replace) the complete purchased-reference sheet checks.
+    ``general_text`` overrides only the footer's general line, retaining its
+    native text/extent checks; None keeps the ``cut_to_suit``-selected default.
     """
     if (additional_sheet_scales is None) != (append_sheets is None):
         raise ValueError("additional sheets require both scales and an author")
@@ -307,6 +310,7 @@ async def build_purchased_variant_drawing(
             properties,
             item=item,
             cut_to_suit=cut_to_suit,
+            general_text=general_text,
             label=spec.artifact_stem,
         )
     )

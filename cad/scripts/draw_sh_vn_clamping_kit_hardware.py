@@ -27,6 +27,7 @@ from _purchased_variant_drawing import (
 )
 from _part_configuration_exports import _sha256
 from _com import _early_bound, _read_member
+from _dimensions import _feature_display_dimensions
 from _drawing_attachment import (
     _assert_attached_to,
     _assert_leader_lands,
@@ -78,21 +79,25 @@ VARIANTS = (
     ("FlangeNut", "[3] FLANGE NUT"),
 )
 PURCHASE_UNIT = "52-PIECE KIT"
+GENERAL_TEXT = (
+    "REFERENCE VIEWS; [2]/[3] AS SUPPLIED; [1] REWORK PER SHEET 2."
+)
 SHEET_SCALE = (2.0, 1.0)
 SHEET_NAMES = ("REWORK",)
 FRONT_CENTER = (0.120, 0.150)
 END_CENTER = (FRONT_CENTER[0], 0.245)
 ISO_CENTER = (0.330, 0.170)
 FRONT_KEEP = {"FinishedLength": (0.060, FRONT_CENTER[1])}
-END_KEEP = {"CutEndChamfer": (0.195, END_CENTER[1])}
-# Permanent third-angle *Top owns the upper-cut-end dimension in the native
-# orientation that imports it; do not transfer it into an unsupported side view.
+END_KEEP: dict[str, tuple[float, float]] = {}
+# The side-view attached callout reads this unchanged native source control;
+# no duplicate imported chamfer dimension is printed in the end view.
 END_VIEW_LABEL = "CUT END VIEW"
 END_VIEW_LABEL_XY = (0.092, 0.224)
 STOCK_NOTE_XY = (0.025, 0.077)
 THREAD_NOTE_XY = (0.065, 0.180)
 THREAD_CALLOUT = f"{stud.THREAD}\nEXISTING THREAD\nNOT MODELLED"
 LOWER_END_NOTE_XY = (0.155, 0.083)
+CHAMFER_NOTE_XY = (0.155, 0.225)
 ASSEMBLY_REFERENCE_XY = (0.025, 0.056)
 STUD_REWORK_PROPERTIES = {
     "Stock Length": f"{stud.STOCK_LENGTH} IN STOCK",
@@ -200,8 +205,17 @@ def upper_cut_end_edge(view: Any) -> Any:
     )
 
 
+def upper_cut_chamfer_edge(view: Any) -> Any:
+    """The actual upper bevel/barrel boundary, not the factory or end-face rim."""
+    return _visible_circular_rim(
+        view, y_mm=stud.LENGTH - stud.CUT_END_CHAMFER_MAX,
+        radius_mm=stud.RADIUS,
+        label="stud upper cut-end chamfer boundary",
+    )
+
+
 def add_rework_notes(adapter: Any, front: Any) -> Callable[[], None]:
-    """Place native leaders on the lower rim and the left thread-blank flank.
+    """Place native leaders on the factory end, thread blank and upper chamfer.
 
     Native b9e4d6b45bbb exposes the barrel silhouette only on model -X:
     its sheet line is X107.3, Y94.8..205.2 mm, not the +X contour. Keep
@@ -213,29 +227,45 @@ def add_rework_notes(adapter: Any, front: Any) -> Callable[[], None]:
     barrel_y = (
         stud.LOWER_FACTORY_CHAMFER + stud.LENGTH - stud.CUT_END_CHAMFER_MAX
     ) / 2.0
+    source_model = _early_bound(front.ReferencedDocument, "IModelDoc2")
+    angle = read_saved_cut_end_angle(source_model)
+    chamfer_text = (
+        f"{stud.CUT_END_CHAMFER_MAX:.{stud.CUT_END_CHAMFER_PLACES}f} MAX "
+        f"X {math.degrees(angle):g}° {stud.DIMENSION_CALLOUTS['CutEndChamfer']}"
+    )
     model_points = (
         (lower_x / 1000.0, 0.0, math.sqrt(lower_radius**2 - lower_x**2) / 1000.0),
         (-stud.RADIUS / 1000.0, barrel_y / 1000.0, 0.0),
+        (
+            stud.RADIUS / 1000.0,
+            (stud.LENGTH - stud.CUT_END_CHAMFER_MAX) / 1000.0,
+            0.0,
+        ),
     )
     points = model_points_in_view(
         adapter, front, model_points, label="stud native note landings",
     )
     lower_rim = lower_factory_end_edge(front)
+    chamfer_rim = upper_cut_chamfer_edge(front)
     thread_flank = face_silhouettes_through(
         adapter, front,
         {"thread": (CylinderFace(stud.MAJOR_DIA, contains_y_mm=barrel_y), points[1])},
         label="stud existing thread blank",
     )["thread"]
     records = []
-    for text, entity, kind, point, note_xy, label in (
+    for text, entity, kind, point, note_xy, label, printed in (
         (
             property_link(f"{stud.CONFIGURATION} Rework Lower End Note"),
             lower_rim, "EDGE", points[0],
-            LOWER_END_NOTE_XY, "unmodified lower factory end",
+            LOWER_END_NOTE_XY, "unmodified lower factory end", stud.LOWER_END_NOTE,
         ),
         (
             THREAD_CALLOUT, thread_flank, "SILHOUETTE", points[1],
-            THREAD_NOTE_XY, "existing hold-down stud thread",
+            THREAD_NOTE_XY, "existing hold-down stud thread", THREAD_CALLOUT,
+        ),
+        (
+            chamfer_text, chamfer_rim, "EDGE", points[2],
+            CHAMFER_NOTE_XY, "upper cut-end chamfer", chamfer_text,
         ),
     ):
         # Select the resolved native entity before setting the selection point:
@@ -261,14 +291,22 @@ def add_rework_notes(adapter: Any, front: Any) -> Callable[[], None]:
             what="attached note", label=label,
         )
         _assert_leader_lands(annotation, point, what="attached note", label=label)
-        records.append((annotation, entity, kind, label))
+        records.append((_early_bound(note, "INote"), annotation, entity, kind, label, printed))
         drawing.ClearSelection2(True)
 
     def settled() -> None:
+        read_saved_cut_end_angle(source_model)
         current_points = model_points_in_view(
             adapter, front, model_points, label="stud settled native note landings",
         )
-        for (annotation, entity, kind, label), point in zip(records, current_points, strict=True):
+        for (note, annotation, entity, kind, label, printed), point in zip(records, current_points, strict=True):
+            owner = annotation.Owner
+            if (
+                int(annotation.OwnerType) != 0 or owner is None
+                or view_name(adapter, _early_bound(owner, "IView")) != view_name(adapter, front)
+                or str(note.GetText() or "").replace("\r\n", "\n") != printed
+            ):
+                raise RuntimeError(f"{label}: native note text or drawing-view ownership changed")
             _assert_attached_to(
                 adapter, annotation, entity, entity_type=kind,
                 what="attached note", label=label,
@@ -353,14 +391,40 @@ def read_saved_cut_end_angle(model: Any) -> float:
     if not math.isclose(distance, stud.CUT_END_CHAMFER_MAX / 1000.0, abs_tol=1e-9):
         raise RuntimeError(f"cut-end chamfer: native feature distance changed: {distance!r} m")
     _telemetry.info(f"cut-end chamfer: saved native angle={angle!r} rad, distance={distance!r} m")
+    dimension = _early_bound(model, "IModelDoc2").Parameter("CutEndChamfer@CutEndChamfer")
+    if dimension is None:
+        raise RuntimeError("cut-end chamfer: saved native dimension is missing")
+    dimension = _early_bound(dimension, "IDimension")
+    full_name = str(dimension.FullName or "")
+    qualified = full_name.split("@")
+    nominal = stud.CUT_END_CHAMFER_MAX / 1000.0
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        len(qualified) != 3 or qualified[:2] != ["CutEndChamfer", "CutEndChamfer"]
+        or not qualified[2] or int(dimension.DrivenState) != 2
+        or not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9)
+        or int(tolerance.Type) != stud.DIMENSION_TOLERANCE_TYPES["CutEndChamfer"]
+        or not math.isclose(float(tolerance.GetMinValue()), -nominal, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError("cut-end chamfer: native source identity, driver or MAX band changed")
+    displays = []
+    for raw in _feature_display_dimensions(feature):
+        display = _early_bound(raw, "IDisplayDimension")
+        candidate = _early_bound(display.GetDimension2(0), "IDimension")
+        if str(candidate.FullName or "") == full_name:
+            displays.append(display)
+    if (
+        len(displays) != 1
+        or int(displays[0].GetPrimaryPrecision2()) != stud.CUT_END_CHAMFER_PLACES
+    ):
+        raise RuntimeError("cut-end chamfer: native source precision changed")
     return float(angle)
 
 
-def set_machining_callouts(adapter: Any, annotations: list[Any], angle: float) -> None:
-    """Read back both source-owned callouts without replacing their native sizes."""
-    callouts = dict(stud.DIMENSION_CALLOUTS)
-    text = f"X {math.degrees(angle):g}° {callouts['CutEndChamfer']}"
-    callouts["CutEndChamfer"] = text
+def set_machining_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Read back the printed length callout without replacing its native size."""
+    callouts = {"FinishedLength": stud.DIMENSION_CALLOUTS["FinishedLength"]}
     set_dimension_callouts(adapter, annotations, callouts)
     remaining = dict(callouts)
     for annotation in annotations:
@@ -376,16 +440,9 @@ def set_machining_callouts(adapter: Any, annotations: list[Any], angle: float) -
 
 
 def assert_machining_controls(adapter: Any, annotations: list[Any]) -> None:
-    """Read native drivers, ordinary precision, and the real chamfer MAX/angle.
-
-    The imported chamfer control is a linear model dimension, not a compound
-    chamfer display. GetDimension2 ignores its index for that display type.
-    Saved feature geometry supplies the angle separately; never set DrivenState
-    or change source precision here.
-    """
+    """Read the printed source-owned length driver, precision and tolerance."""
     remaining = {
         "FinishedLength": stud.LENGTH / 1000.0,
-        "CutEndChamfer": stud.CUT_END_CHAMFER_MAX / 1000.0,
     }
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -416,23 +473,12 @@ def assert_machining_controls(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError(f"{name}: machining control is displayed reference-only")
         if int(tolerance.Type) != stud.DIMENSION_TOLERANCE_TYPES[name]:
             raise RuntimeError(f"{name}: native tolerance type changed")
-        if name == "CutEndChamfer":
-            if not math.isclose(float(tolerance.GetMinValue()), -nominal, abs_tol=1e-12) or not math.isclose(
-                float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12
-            ):
-                raise RuntimeError("cut-end chamfer: native zero-to-MAX band changed")
-            display_type = int(display.Type2)
-            if display_type not in (2, 11, 12):  # linear / horizontal / vertical
-                raise RuntimeError(
-                    f"cut-end chamfer: expected imported linear MAX dimension, Type2={display_type}"
-                )
-            _telemetry.info(
-                f"cut-end chamfer: imported native linear MAX Type2={display_type}, "
-                f"source={full_name!r}"
-            )
     if remaining:
         raise RuntimeError(f"missing native stud controls: {sorted(remaining)}")
-    assert_imported_precision(adapter, annotations, stud.DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(
+        adapter, annotations,
+        {name: stud.DRAWING_PRECISION_BY_NAME[name] for name in FRONT_KEEP},
+    )
 
 
 def assert_rework_view_controls(adapter: Any, front: Any, end: Any) -> None:
@@ -476,10 +522,11 @@ def assert_rework_view_controls(adapter: Any, front: Any, end: Any) -> None:
         raise RuntimeError("stud machining-control view is missing")
     upper_cut_end_edge(end)
     assert_machining_controls(adapter, annotations)
+    read_saved_cut_end_angle(_early_bound(front.ReferencedDocument, "IModelDoc2"))
     _telemetry.info(
-        "stud machining owners: FinishedLength@StudProfile in "
-        f"{view_name(adapter, front)} (*Front); CutEndChamfer@CutEndChamfer in "
-        f"{view_name(adapter, end)} (*Top), visible cut-end rim at Y={stud.LENGTH} mm"
+        "stud machining owner: FinishedLength@StudProfile in "
+        f"{view_name(adapter, front)} (*Front); upper chamfer source-only, "
+        f"visible cut-end rim in {view_name(adapter, end)} at Y={stud.LENGTH} mm"
     )
 
 
@@ -519,7 +566,6 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     configure_reference_views(adapter, stud.CONFIGURATION, rework_views)
     source_model = _early_bound(front.ReferencedDocument, "IModelDoc2")
     source_properties = _assert_stud_rework_properties(source_model)
-    cut_end_angle = read_saved_cut_end_angle(source_model)
     for view in rework_views:
         set_hidden_lines_removed(adapter, view)
     front_annotations = curate_view_dimensions(
@@ -533,7 +579,7 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     )
     annotations = [*front_annotations, *end_annotations]
     assert_machining_controls(adapter, annotations)
-    set_machining_callouts(adapter, annotations, cut_end_angle)
+    set_machining_callouts(adapter, annotations)
     if add_note(adapter, END_VIEW_LABEL, *END_VIEW_LABEL_XY) is None:
         raise RuntimeError("failed to label the permanent stud cut-end view")
     settled_notes = add_rework_notes(adapter, front)
@@ -2263,6 +2309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         variants=VARIANTS,
         item=ITEM,
         purchase_unit=PURCHASE_UNIT,
+        general_text=GENERAL_TEXT,
         annotate_member=annotate_member,
         additional_sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
         append_sheets=append_stud_rework_sheets,
