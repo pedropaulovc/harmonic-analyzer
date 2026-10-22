@@ -293,3 +293,95 @@ state and required view modes. A finish attachment identifies the controlled
 model face and keeps its physical leader landing, not merely a non-dangling
 transient silhouette. A sheet-derived linear reference reads back a linear
 native dimension type before its system value is read as a length.
+
+## Holistic review telemetry
+
+Each aggregate emits one completed `machinist_review.precheck` child span before
+any independent reviewer starts, including when `--force` bypasses precheck.
+This is separate from `layout.audit`. Attributes are:
+
+| Signal | Attributes |
+| --- | --- |
+| Precheck | `name`, `kind`, `judge_reviewer`, `judge_model`, `forced`; `outcome` and `decision` are `skip`, `review`, `bypass`, or `error`; `skip_kind` is `rendering_noise`, `assembly_single_part`, or `none`; `reason` and `error` retain the original text (empty when absent). Bypass has the reason `Precheck bypassed by --force.` |
+| Aggregate completion | `verdict` (`SHIP`, `FIX`, `ERROR`); `decision_basis` (`precheck_skip`, `full_review`, `error`); all precheck classification/text fields prefixed `precheck_`; requested `run_count`, `completed_run_count`, `valid_run_count`, existing run `error_count`, `judge_executed`, aggregate `error`, package `name`/`kind`, reviewer/model and judge reviewer/model. |
+
+`precheck_skip` plus `SHIP` means change triage **without full reviewers**, not
+baseline approval. `full_review` can have partial run errors; use the counts,
+not the basis alone, to assess completeness. A valid zero-finding review does
+not execute the findings judge. `--force` is `bypass`, not a clean precheck;
+precheck failures are `error`, not `review`. Caught failures are represented by
+these outcome/error attributes, not necessarily the SDK span status. These
+signals do not alter the approval JSON or acceptance rules.
+
+In Application Insights, these internal spans are in `dependencies`, with
+attributes in `customDimensions`. The following queries count **observed
+attempts**, not unique packages; ingestion can lag and sampling/retention can
+limit observed totals. With Azure CLI, use `--offset 2h` (or a wider explicit
+window) as well as the KQL time filter.
+
+Completed prechecks in the last two hours, including aggregates still running:
+
+```kusto
+let attempts = dependencies
+| where timestamp > ago(2h) and name == "machinist_review.precheck"
+| extend outcome=tostring(customDimensions.outcome),
+         skip_kind=tostring(customDimensions.skip_kind),
+         reason=tostring(customDimensions.reason),
+         error=tostring(customDimensions.error);
+attempts
+| summarize attempts=count(), skips=countif(outcome == "skip"),
+            reviews=countif(outcome == "review"),
+            bypasses=countif(outcome == "bypass"), errors=countif(outcome == "error")
+| extend eligible_prechecks=skips + reviews
+| extend skip_percent=iff(eligible_prechecks == 0, real(null),
+                         100.0 * skips / eligible_prechecks)
+```
+
+The skip-rate denominator excludes bypasses and failed prechecks. To inspect
+skip kinds and verbatim reasons, replace the final summary above with:
+
+```kusto
+attempts
+| summarize attempts=count() by outcome, skip_kind, reason, error
+| order by attempts desc
+```
+
+Completed aggregate SHIP provenance (including raw bypass/error counts):
+
+```kusto
+let completed = dependencies
+| where timestamp > ago(2h) and name == "machinist_review.aggregate"
+| extend package=tostring(customDimensions.name),
+         kind=tostring(customDimensions.kind),
+         verdict=tostring(customDimensions.verdict),
+         basis=tostring(customDimensions.decision_basis),
+         outcome=tostring(customDimensions.precheck_outcome),
+         skip_kind=tostring(customDimensions.precheck_skip_kind),
+         reason=tostring(customDimensions.precheck_reason),
+         error=tostring(customDimensions.error),
+         completed_runs=toint(customDimensions.completed_run_count),
+         valid_runs=toint(customDimensions.valid_run_count);
+completed
+| summarize attempts=count(),
+            skip_ship=countif(verdict == "SHIP" and basis == "precheck_skip"),
+            full_review_ship=countif(verdict == "SHIP" and basis == "full_review"),
+            eligible_prechecks=countif(outcome in ("skip", "review")),
+            bypasses=countif(outcome == "bypass"),
+            precheck_errors=countif(outcome == "error"),
+            aggregate_errors=countif(verdict == "ERROR")
+| extend skip_ship_percent=iff(eligible_prechecks == 0, real(null),
+                              100.0 * skip_ship / eligible_prechecks)
+```
+
+For the latest completed result per package **within this two-hour window**,
+replace the final summary with the following. This is not an all-time package
+approval inventory, and does not include a newer in-flight aggregate; use the
+precheck query for prompt in-flight decisions.
+
+```kusto
+completed
+| summarize arg_max(timestamp, *) by package, kind
+| project timestamp, package, kind, verdict, basis, outcome, skip_kind,
+          reason, error, completed_runs, valid_runs, operation_Id
+| order by timestamp desc
+```

@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from PIL import Image
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import _drawing_diff as drawing_diff
 import machinist_review as mr
@@ -152,6 +155,107 @@ def _aggregate(package: mr.ReviewPackage, tmp_path: Path, reviewer: str = "claud
         report_dir=tmp_path / "reports", claude="claude-test", codex="codex-test",
         retries=kwargs.pop("retries", 0), **kwargs,
     )
+
+
+@pytest.fixture
+def precheck_spans(monkeypatch: pytest.MonkeyPatch):
+    """Capture real SDK spans without sending telemetry to a collector."""
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "")
+    mr._telemetry.configure(force=True)
+    exporter = InMemorySpanExporter()
+    cast(TracerProvider, mr._telemetry.trace.get_tracer_provider()).add_span_processor(
+        SimpleSpanProcessor(exporter)
+    )
+    yield exporter
+    mr._telemetry.shutdown()
+
+
+@pytest.mark.parametrize("case,outcome,basis,verdict", [
+    ("rendering_noise", "skip", "precheck_skip", "SHIP"),
+    ("assembly_single_part", "skip", "precheck_skip", "SHIP"),
+    ("review", "review", "full_review", "SHIP"),
+    ("findings", "review", "full_review", "FIX"),
+    ("force", "bypass", "full_review", "SHIP"),
+    ("force_review_provider", "bypass", "error", "ERROR"),
+    ("precheck_provider", "error", "error", "ERROR"),
+    ("precheck_inspection", "error", "error", "ERROR"),
+    ("schema", "error", "error", "ERROR"),
+    ("missing_before", "error", "error", "ERROR"),
+    ("snapshot_error", "error", "error", "ERROR"),
+    ("review_provider", "review", "error", "ERROR"),
+    ("judge_provider", "review", "error", "ERROR"),
+])
+def test_precheck_and_aggregate_results_reach_sdk_exporter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, precheck_spans: InMemorySpanExporter,
+    case: str, outcome: str, basis: str, verdict: str,
+) -> None:
+    package = _package(tmp_path, "assembly" if case == "assembly_single_part" else "part")
+    if case == "missing_before":
+        package = mr.ReviewPackage(package.name, package.kind, package.sources)
+    if case == "snapshot_error":
+        package = mr.ReviewPackage(
+            package.name, package.kind, (tmp_path / "missing-after.pdf",),
+            before_sources=package.before_sources,
+        )
+    skip_kind = case if outcome == "skip" else "none"
+    decision = _decision("skip" if outcome == "skip" else "review", skip_kind)
+    decision["reason"] = "Verbatim rationale: Ø4.8 — preserve whitespace.\nSecond line."
+    harness = _Reviewer({"decision": "skip"} if case == "schema" else decision)
+    harness.failure = "review_provider" if case == "force_review_provider" else case
+    harness.findings = case in ("findings", "judge_provider")
+    observed_before_review = []
+
+    def reviewer(command: list[str], **kwargs: Any) -> Any:
+        # This callback is the only CLI boundary; no actual reviewer is invoked.
+        # A full reviewer must see a completed precheck even while aggregate is live.
+        schema = json.loads(_flag(command, "--json-schema"))
+        if "decision" not in schema["properties"]:
+            finished = precheck_spans.get_finished_spans()
+            prechecks = [span for span in finished if span.name == "machinist_review.precheck"]
+            assert len(prechecks) == 1
+            assert prechecks[0].attributes["outcome"] == outcome
+            assert not any(span.name == "machinist_review.aggregate" for span in finished)
+            observed_before_review.append(True)
+        return harness(command, **kwargs)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reviewer)
+    aggregate = _aggregate(package, tmp_path, runs=1, force=case.startswith("force"))
+    finished = precheck_spans.get_finished_spans()
+    precheck, = [span for span in finished if span.name == "machinist_review.precheck"]
+    holistic, = [span for span in finished if span.name == "machinist_review.aggregate"]
+    attrs = precheck.attributes
+    assert attrs["outcome"] == attrs["decision"] == outcome
+    assert attrs["skip_kind"] == skip_kind
+    assert attrs["forced"] == case.startswith("force")
+    assert precheck.parent.span_id == holistic.context.span_id
+    assert attrs["name"] == package.name and attrs["kind"] == package.kind
+    if outcome in ("skip", "review"):
+        assert attrs["reason"] == decision["reason"]
+    elif outcome == "error":
+        assert attrs["error"] == aggregate["precheck"]["error"]
+        assert attrs["error"]
+    else:
+        assert attrs["reason"] == "Precheck bypassed by --force."
+        assert not attrs["error"]
+    assert holistic.attributes["precheck_outcome"] == outcome
+    assert holistic.attributes["verdict"] == aggregate["verdict"] == verdict
+    assert holistic.attributes["decision_basis"] == basis
+    assert holistic.attributes["run_count"] == 1
+    assert holistic.attributes["completed_run_count"] == len(aggregate["runs"])
+    assert holistic.attributes["valid_run_count"] == sum(
+        not run["error"] for run in aggregate["runs"]
+    )
+    assert holistic.attributes["judge_executed"] == (not aggregate["judge"]["skipped"])
+    assert holistic.attributes["error"] == (aggregate["error"] or "")
+    if outcome in ("skip", "error"):
+        assert not observed_before_review
+        assert not any(call["phase"] in ("review", "judge") for call in harness.calls)
+        assert aggregate["runs"] == []
+    else:
+        assert observed_before_review
 
 
 def _main_status(args: list[str]) -> int:
