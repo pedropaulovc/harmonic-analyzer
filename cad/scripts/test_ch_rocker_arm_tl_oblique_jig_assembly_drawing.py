@@ -4560,6 +4560,248 @@ def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
         settled[-1]()
 
 
+@pytest.fixture
+def capture_visibility_probe(monkeypatch):
+    """Read native-shaped channels without placing or accepting any view."""
+    import ast
+
+    messages, writes = [], []
+    state = SimpleNamespace(
+        installed=True, extra=False, parent=True, raw_error=None,
+        hidden_error=None, hidden_none=False,
+    )
+
+    def forbidden(*args, **kwargs):
+        writes.append((args, kwargs))
+        raise AssertionError("visibility probe attempted a native write")
+
+    def guard(value):
+        for name in (
+            "Select", "Select2", "Select4", "SelectEntity", "ActivateView",
+            "ClearSelection2", "EditRebuild3", "ForceRebuild3", "Rebuild",
+            "UpdateViewDisplayGeometry",
+        ):
+            setattr(value, name, forbidden)
+        return value
+
+    class DrawingComponent(SimpleNamespace):
+        @property
+        def Visible(self):
+            if self.key == "parent" and state.raw_error is not None:
+                raise state.raw_error
+            return False if self.key == "root" else getattr(state, self.key)
+
+        @Visible.setter
+        def Visible(self, value):
+            forbidden("raw Visible", value)
+
+    class BoundDrawingComponent:
+        def __init__(self, component):
+            self.component = component
+
+        @property
+        def Visible(self):
+            return (
+                False if self.component.key == "root"
+                else getattr(state, self.component.key)
+            )
+
+        @Visible.setter
+        def Visible(self, value):
+            forbidden("bound Visible", value)
+
+        def __getattr__(self, name):
+            return getattr(self.component, name)
+
+    source = guard(SimpleNamespace(
+        Name2="jig-source-7", GetPathName=lambda: "C:/native/jig.SLDASM",
+        GetParent=lambda: None,
+    ))
+
+    def node(key, parent, children=()):
+        component = guard(SimpleNamespace(
+            Name2=f"{source.Name2}/{key}-1",
+            GetPathName=lambda: f"C:/native/{key}.SLDPRT",
+            GetParent=lambda: parent,
+        ))
+        return guard(DrawingComponent(
+            key=key, Name=f"Draw54-SectionAssembly-1-1/{key}-1",
+            Component=component, GetChildren=lambda: children,
+        ))
+
+    parent = node("parent", source)
+    installed = node("installed", parent.Component)
+    parent.GetChildren = lambda: (installed,)
+    extra = node("extra", source)
+    root = node("root", None, (parent, extra))
+
+    def hidden_components():
+        if state.hidden_error is not None:
+            raise state.hidden_error
+        if state.hidden_none:
+            return None
+        return tuple(
+            item.Component for item in (installed, extra)
+            if not (getattr(state, item.key) and (state.parent if item is installed else True))
+        )
+
+    view = guard(SimpleNamespace(
+        GetName2=lambda: "DrawingView-Probe",
+        RootDrawingComponent2=lambda _resolve: root,
+        GetHiddenComponents=hidden_components,
+        Position=(0.2, 0.1), ScaleRatio=(1, 4),
+        ReferencedConfiguration="Default",
+    ))
+    doc = guard(SimpleNamespace(selected=[object()], active_view="untouched"))
+    adapter = SimpleNamespace(currentModel=doc)
+
+    def bind(value, interface):
+        return (
+            BoundDrawingComponent(value)
+            if interface == "IDrawingComponent" else value
+        )
+
+    monkeypatch.setattr(drawing, "_bind", bind)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing._telemetry, "success", messages.append)
+
+    def payloads(stage, channel):
+        prefix = (
+            "jig capture TEMP isolation probe (diagnostic, not a check) "
+            f"{stage} {channel}: "
+        )
+        return [
+            ast.literal_eval(message[len(prefix):])
+            for message in messages if message.startswith(prefix)
+        ]
+
+    return SimpleNamespace(
+        adapter=adapter, view=view, state=state, writes=writes,
+        root=root, parent=parent, installed=installed, extra=extra,
+        expected=frozenset((installed.Component.Name2,)), payloads=payloads,
+    )
+
+
+def test_capture_visibility_probe_raw_getter_fault_stays_unknown(capture_visibility_probe):
+    probe = capture_visibility_probe
+    error = RuntimeError("raw Visible getter failed")
+    probe.state.raw_error = error
+    drawing._trace_capture_visibility(
+        probe.adapter, probe.view, probe.expected, stage="post-isolate",
+    )
+    raw, = probe.payloads("post-isolate", "raw")
+    bound, = probe.payloads("post-isolate", "bound")
+    hidden, = probe.payloads("post-isolate", "hidden")
+    metadata, = probe.payloads("post-isolate", "metadata")
+    path = probe.installed.Component.Name2
+    assert raw["unknown"] == [path]
+    assert raw["unknown_count"] == 1
+    assert raw["visible_count"] == 0
+    assert raw["hidden_count"] == 1
+    assert raw["actual"] == [] and raw["missing"] == [path]
+    assert bound["actual"] == [path] and bound["unknown"] == []
+    assert bound["missing"] == [] and bound["extra"] == []
+    assert hidden["hidden_names"] == [probe.extra.Component.Name2]
+    assert hidden["hidden_count"] == 1
+    assert hidden["hidden_result_is_none"] is False
+    assert probe.payloads("post-isolate", "error") == [
+        (probe.parent.Name, "raw_visible", repr(error)),
+    ]
+    assert metadata["read_error_count"] == 1
+    parent_sample, = (
+        sample for sample in metadata["samples"]
+        if sample["name"] == probe.parent.Name
+    )
+    assert parent_sample["raw_visible_error"] == repr(error)
+    assert parent_sample["bound_visible"] is True
+    assert parent_sample["bound_visible_type"] == "bool"
+    assert probe.writes == []
+
+
+def test_capture_visibility_probe_hidden_unsupported_is_explicit(capture_visibility_probe):
+    probe = capture_visibility_probe
+    error = AttributeError("GetHiddenComponents is unsupported")
+    probe.state.hidden_error = error
+    drawing._trace_capture_visibility(
+        probe.adapter, probe.view, probe.expected, stage="post-isolate",
+    )
+    hidden, = probe.payloads("post-isolate", "hidden")
+    assert hidden == {"hidden_error": repr(error)}
+    for channel in ("raw", "bound"):
+        observed, = probe.payloads("post-isolate", channel)
+        assert observed["actual"] == sorted(probe.expected)
+        assert observed["missing"] == [] and observed["extra"] == []
+        assert observed["unknown"] == []
+    assert probe.writes == []
+
+
+def test_capture_visibility_probe_observes_source_flag_reset_between_stages(
+    capture_visibility_probe,
+):
+    probe = capture_visibility_probe
+    drawing._trace_capture_visibility(
+        probe.adapter, probe.view, probe.expected, stage="post-isolate",
+    )
+    probe.state.extra = True
+    probe.state.hidden_none = True
+    drawing._trace_capture_visibility(
+        probe.adapter, probe.view, probe.expected, stage="final",
+    )
+    for channel in ("raw", "bound"):
+        isolated, = probe.payloads("post-isolate", channel)
+        final, = probe.payloads("final", channel)
+        assert isolated["actual"] == sorted(probe.expected)
+        assert isolated["extra"] == [] and isolated["hidden_count"] == 1
+        assert final["actual"] == sorted((
+            probe.installed.Component.Name2, probe.extra.Component.Name2,
+        ))
+        assert final["extra"] == [probe.extra.Component.Name2]
+        assert final["missing"] == [] and final["hidden_count"] == 0
+        assert final["unknown_count"] == 0
+    isolated_hidden, = probe.payloads("post-isolate", "hidden")
+    final_hidden, = probe.payloads("final", "hidden")
+    assert isolated_hidden["hidden_names"] == [probe.extra.Component.Name2]
+    assert final_hidden["hidden_count"] == 0
+    assert final_hidden["hidden_names"] == []
+    assert final_hidden["hidden_result_is_none"] is True
+    for stage in ("post-isolate", "final"):
+        metadata, = probe.payloads(stage, "metadata")
+        assert metadata["stage"] == stage
+        assert metadata["view"] == "DrawingView-Probe"
+        assert metadata["leaf_count"] == 2
+        assert metadata["node_count"] == 4
+        assert len(metadata["samples"]) == 4
+        assert {sample["name"] for sample in metadata["samples"]} == {
+            item.Name for item in (probe.root, probe.parent, probe.installed, probe.extra)
+        }
+    assert probe.writes == []
+
+
+def test_capture_visibility_probe_is_read_only(capture_visibility_probe):
+    probe = capture_visibility_probe
+    doc, view = probe.adapter.currentModel, probe.view
+    before = (
+        dict(vars(probe.state)), tuple(doc.selected), doc.active_view,
+        view.Position, view.ScaleRatio, view.ReferencedConfiguration,
+        tuple((item.Name, item.Component.Name2, item.Visible)
+              for item in (probe.root, probe.parent, probe.installed, probe.extra)),
+    )
+    assert drawing._trace_capture_visibility(
+        probe.adapter, view, probe.expected, stage="read-only",
+    ) is None
+    assert (
+        dict(vars(probe.state)), tuple(doc.selected), doc.active_view,
+        view.Position, view.ScaleRatio, view.ReferencedConfiguration,
+        tuple((item.Name, item.Component.Name2, item.Visible)
+              for item in (probe.root, probe.parent, probe.installed, probe.extra)),
+    ) == before
+    assert probe.writes == []
+    assert probe.payloads("read-only", "error") == []
+    for channel in ("raw", "bound"):
+        observed, = probe.payloads("read-only", channel)
+        assert observed["actual"] == sorted(probe.expected)
+
+
 @pytest.mark.parametrize("defect", (
     "source-qualified-name", "carrier-hidden", "empty-path",
 ))

@@ -72,6 +72,7 @@ from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
+    _drawing_component_children,
     _spread_balloons,
     _view_component_leaves,
     add_component_bom_balloons,
@@ -2985,6 +2986,134 @@ def _assert_capture_coverage(landings: Sequence[BalloonLanding], stems: Sequence
         raise RuntimeError("jig capture: both bearing balloons must resolve to item 14")
 
 
+def _trace_capture_visibility(adapter: Any, view: Any, expected: frozenset[str], *, stage: str) -> None:
+    """Temporary read-only native channels; never an isolation acceptance path."""
+    evidence: dict[str, Any] = {"stage": stage}
+    prefix = f"jig capture TEMP isolation probe (diagnostic, not a check) {stage}"
+    leaves = []
+    node_samples = []
+    node_count = 0
+    errors = []
+
+    def component_data(component: Any) -> dict[str, Any]:
+        data = {}
+        try:
+            native = _early_bound(_bind(component, "IComponent2"), "IComponent2")
+            for key, getter in (("name", lambda: native.Name2), ("file", lambda: native.GetPathName())):
+                try:
+                    data[key] = str(getter() or "")
+                except Exception as exc:
+                    data[f"{key}_error"] = repr(exc)
+            try:
+                parent = _early_bound(_bind(native.GetParent(), "IComponent2"), "IComponent2")
+                data["parent"] = None if parent is None else (str(parent.Name2 or ""), str(parent.GetPathName() or ""))
+            except Exception as exc:
+                data["parent_error"] = repr(exc)
+        except Exception as exc:
+            data["binding_error"] = repr(exc)
+        return data
+
+    try:
+        bound_view = _early_bound(_bind(view, "IView"), "IView")
+        evidence["view"] = str(bound_view.GetName2())
+        root = bound_view.RootDrawingComponent2(False)
+        if root is None:
+            raise RuntimeError("drawing view has no root component")
+        pending = [(root, True, True, True)]
+        while pending:
+            drawing_component, raw_parent, bound_parent, is_root = pending.pop()
+            node_count += 1
+            row = {"python_type": type(drawing_component).__name__,
+                   "has_oleobj": hasattr(drawing_component, "_oleobj_"), "path": ""}
+            for key, getter in (
+                ("name", lambda: str(drawing_component.Name or "")),
+                ("raw_visible", lambda: drawing_component.Visible),
+                ("bound_visible", lambda: _early_bound(_bind(drawing_component, "IDrawingComponent"), "IDrawingComponent").Visible),
+            ):
+                try:
+                    value = getter()
+                    row[key] = value
+                    row[f"{key}_type"] = type(value).__name__
+                except Exception as exc:
+                    row[f"{key}_error"] = repr(exc)
+                    errors.append((row.get("name", ""), key, repr(exc)))
+            states = []
+            for channel, parent in (("raw", raw_parent), ("bound", bound_parent)):
+                value = row.get(f"{channel}_visible")
+                visible = bool(value) if isinstance(value, (bool, int)) else None
+                states.append(False if parent is False or visible is False else None if parent is None or visible is None else True)
+                row[f"{channel}_effective"] = states[-1]
+            try:
+                component = drawing_component.Component
+                row["component"] = component
+                native = _early_bound(_bind(component, "IComponent2"), "IComponent2")
+                row["path"] = str(native.Name2 or "")
+            except Exception as exc:
+                errors.append((row.get("name", ""), "component", repr(exc)))
+            try:
+                children = _drawing_component_children(drawing_component)
+                if is_root or (children and len(node_samples) < 2):
+                    node_samples.append(row)
+                if children:
+                    # The settled reader excludes the root's own flag.
+                    inherited = (True, True) if is_root else states
+                    pending.extend((child, *inherited, False) for child in children)
+                else:
+                    leaves.append(row)
+            except Exception as exc:
+                errors.append((row.get("name", ""), "children", repr(exc)))
+        evidence["leaf_count"] = len(leaves)
+        for channel in ("raw", "bound"):
+            actual = {row["path"] for row in leaves if row[f"{channel}_effective"] is True}
+            evidence[channel] = {
+                "visible_count": sum(row[f"{channel}_effective"] is True for row in leaves),
+                "hidden_count": sum(row[f"{channel}_effective"] is False for row in leaves),
+                "unknown_count": sum(row[f"{channel}_effective"] is None for row in leaves),
+                "unknown": sorted(row["path"] for row in leaves if row[f"{channel}_effective"] is None),
+                "actual": sorted(actual), "missing": sorted(expected - actual), "extra": sorted(actual - expected),
+            }
+        samples = list(node_samples)
+        for wanted in (True, False):
+            sample = next((row for row in sorted(leaves, key=lambda item: item["path"])
+                           if (row["path"] in expected) == wanted), None)
+            if sample is not None:
+                samples.append(sample)
+        evidence["samples"] = [
+            {**{key: value for key, value in row.items() if key != "component"},
+             "owner": component_data(row.get("component"))}
+            for row in samples
+        ]
+    except Exception as exc:
+        errors.append(("", "tree", repr(exc)))
+    evidence["node_count"] = node_count
+    try:
+        hidden_result = _early_bound(_bind(view, "IView"), "IView").GetHiddenComponents()
+        hidden = tuple(hidden_result or ())
+        names = []
+        for component in hidden:
+            try:
+                native = _early_bound(_bind(component, "IComponent2"), "IComponent2")
+                names.append(str(native.Name2 or ""))
+            except Exception as exc:
+                errors.append(("", "hidden_component", repr(exc)))
+        evidence["hidden_count"] = len(hidden)
+        evidence["hidden_result_is_none"] = hidden_result is None
+        evidence["hidden_names"] = sorted(names)
+        evidence["hidden_samples"] = [component_data(component) for component in hidden[:4]]
+    except Exception as exc:
+        evidence["hidden_error"] = repr(exc)
+    # Separate full channel records stay small without a stateful delta scheme.
+    for channel in ("raw", "bound"):
+        if channel in evidence:
+            _telemetry.success(f"{prefix} {channel}: {evidence.pop(channel)!r}")
+    hidden_data = {key: evidence.pop(key) for key in tuple(evidence) if key.startswith("hidden_")}
+    _telemetry.success(f"{prefix} hidden: {hidden_data!r}")
+    evidence["read_error_count"] = len(errors)
+    _telemetry.success(f"{prefix} metadata: {evidence!r}")
+    for error in errors:
+        _telemetry.success(f"{prefix} error: {error!r}")
+
+
 def _assert_capture_sheet(
     adapter: Any, views: Sequence[Any], scales: Sequence[tuple[float, float]],
     records: Sequence[tuple[Any, ...]], landings: Sequence[BalloonLanding] = (),
@@ -3136,11 +3265,13 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
                             scale=section_scale, partial=True, label=f"jig capture section {letter}"), "IView")
         # Child occurrence flags do not reliably inherit; isolate it explicitly.
         isolate_drawing_view_components(adapter, view, visible_stems=installed, label=f"jig capture section {letter}")
+        _trace_capture_visibility(adapter, view, installed, stage=f"section {letter} after isolate")
         if str(view.ReferencedConfiguration) != ASSEMBLY_VIEW_CONFIGURATION or bool(view.IsExploded()):
             raise RuntimeError("jig capture: section did not inherit full-detail collapsed parent")
         section = _early_bound(view.GetSection(), "IDrSection")
         section.SetDisplayOnlySurfaceCut(False)
         _orient_capture_section(adapter, view, spec.PIN_ROWS[0] if letter == "A" else spec.PIVOT_CAP_PLACEMENTS[0][1][0])
+        _trace_capture_visibility(adapter, view, installed, stage=f"section {letter} after surface/orient")
         if letter == "A":
             anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
             radius = 0.039
@@ -3151,10 +3282,13 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
         profile = _crop_capture_view(adapter, view, centre, radius * section_scale[0] / section_scale[1], label=f"jig capture section {letter}")
         set_hidden_lines_removed(adapter, view)
         scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], (section_scale,), crop_profile=profile, label=f"jig capture section {letter}"))
+        _trace_capture_visibility(adapter, view, installed, stage=f"section {letter} after crop/HLR/fit")
         position_section_caption(adapter, view, CAPTURE_SECTION_CAPTIONS[index - 2], label=f"jig capture {letter}")
         views.append(view)
         crop_profiles.append(profile)
     records = _place_capture_readings(adapter, views)
+    for index, view in enumerate(views):
+        _trace_capture_visibility(adapter, view, capture_support_instances(cluster, 0) if index == 0 else installed, stage=f"view {index} after labels rebuild")
     _assert_capture_sheet(adapter, views, scales, records, crop_profiles=crop_profiles)
     return tuple(views), tuple(scales), records, tuple(crop_profiles)
 

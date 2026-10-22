@@ -264,6 +264,12 @@ paths with the exact installed set. On refusal, record all four views' sorted
 expected, actual, missing and extra paths plus offending drawing-name/path/
 visibility tuples before changing identity or isolation rules. Successful
 edge selection does not prove settled component visibility.
+For the temporary section-visibility diagnosis, also record direct raw and
+bound `IDrawingComponent.Visible` values/errors and the independent
+`IView.GetHiddenComponents` names. Sample after isolation, surface/orientation
+changes, crop/HLR fitting, and the label rebuild without failing earlier or
+changing visibility. Emit separate full channel records to the task log and
+remove this temporary probe and its smoke coverage once the cause is proved.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture
