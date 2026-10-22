@@ -649,7 +649,8 @@ def test_native_af_authoring_owns_real_limits_precision_and_nonreference_source(
     state.source_display.ShowParenthesis = True
     state.source_display.tolerance_places = -2
     part._author_stock_af(state.adapter)
-    assert state.tolerance.calls == [(-0.00013, 0.00013)]
+    assert len(state.tolerance.calls) == 1
+    assert state.tolerance.calls[0] == pytest.approx((-0.00013, 0.00013), rel=0.0, abs=1e-12)
     assert state.tolerance.Type == 4
     assert state.source_display.precision_calls == [(-1, -1, 2, -1)]
     assert state.source_display.ShowParenthesis is False
@@ -759,9 +760,10 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
     state.display.GetDimension = lambda: state.dimension
     state.view.GetName2 = lambda: "actual top"
     state.annotation.position = None
+    state.annotation.pending_position = None
 
     def position(x, y, z):
-        state.annotation.position = (x, y, z)
+        state.annotation.pending_position = (x, y, z)
         return True
 
     def read_member(value, member):
@@ -773,7 +775,13 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
         assert set(features) == {"HexProfile"}
         return [("HexAf", state.annotation)]
 
+    def rebuild():
+        state.annotation.position = state.annotation.pending_position
+        return True
+
+    state.model.EditRebuild3 = rebuild
     state.annotation.SetPosition = position
+    state.annotation.GetPosition = lambda: state.annotation.position
     state.adapter._get_attr_or_call = read_member
     before = (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
               state.annotation.Owner, tuple(state.points))
@@ -785,7 +793,8 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
     )
     drawing.set_dimension_callouts(state.adapter, curated, {"HexAf": spec.STOCK_AF_CALLOUT})
     assert curated == [state.annotation]
-    assert state.annotation.position == (0.085, 0.255, 0.0)
+    # Assert the settled consumer readback, not a rebuild call-count contract.
+    assert state.annotation.GetPosition() == (0.085, 0.255, 0.0)
     assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
     assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
                       state.annotation.Owner, tuple(state.points))
