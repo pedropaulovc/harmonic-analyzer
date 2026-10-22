@@ -274,6 +274,9 @@ _OWN_ROW_HELPERS = {
     "assert_member_properties": 1,
     "save_member_part": 1,
     "export_member_configurations": 1,
+    "configuration_export_paths": 0,
+    "part_configuration_outputs": 0,
+    "validate_member_exports": 0,
     "build_supplier_spring_drawing": 1,
 }
 
