@@ -115,7 +115,7 @@ BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "RibReach": "ALL POSITIVE RIBS",
-    "ReceiverY0": f"FASTENS {BRACKET_NUMBER}",
+    "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
@@ -127,8 +127,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     # Both locations start on real faces, not the asymmetric plate's midplane:
     # View G measures boss top from coefficient top; the web shares that top.
     "WebThickness": "TOP FACE FLUSH WITH\nCOEFFICIENT TOP",
-    "ReceiverX0": f"FASTENS {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
-    "ReceiverX1": f"FASTENS {BRACKET_NUMBER}",
+    "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
+    "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
     # The plan's 152.4 is the body's end-face span, not the part's overall:
     # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
     # as the overall; drawing-guidelines: nothing reads like an overall that
