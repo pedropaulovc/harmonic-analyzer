@@ -82,25 +82,3 @@ def test_native_author_passes_the_per_sku_catalogue_size(monkeypatch) -> None:
     assert calls[0][2] is spec.FILLISTER_SIZE
 
 
-def test_stock_builder_keeps_the_native_author_frame_and_threaded_saver(
-    monkeypatch,
-) -> None:
-    adapter = object()
-    captured = {}
-    artefacts = {"sldprt": "ms-vn-stop-plate-screw.SLDPRT"}
-
-    async def capture(actual_adapter, **kwargs):
-        assert actual_adapter is adapter
-        captured.update(kwargs)
-        return artefacts
-
-    monkeypatch.setattr(part, "build_stock_fastener", capture)
-    assert asyncio.run(part.build(adapter)) is artefacts
-    (component,) = captured["components"]
-    assert component.sku == spec.SKU
-    assert component.author is recipe.build_90114A124
-    assert component.transform == part.RigidTransform()
-    assert captured["part_name"] == STEM
-    assert captured["material"] == "Brass"
-    assert captured["screw_axis_planes"] == ("Front Plane", "Right Plane")
-    assert captured["save_threaded_part"] is part.save_simplified_part

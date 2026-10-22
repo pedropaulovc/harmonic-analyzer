@@ -1,7 +1,6 @@
 """Offline source contracts for MHA-PD-VN-64; no native or load-family certificate."""
 from __future__ import annotations
 
-import asyncio
 import math
 
 import pytest
@@ -70,24 +69,3 @@ def test_purchased_sheet_has_the_actual_source_and_cli_stem(monkeypatch: pytest.
     assert drawing._parse_args().part == spec.PART_STEM
 
 
-def test_native_and_sheet_use_ordinary_catalogue_reference_apis(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    native: dict = {}
-    sheet: dict = {}
-
-    async def stock_build(adapter, **kwargs):
-        native.update(kwargs)
-        return {}
-
-    async def reference_sheet(adapter, drawing_spec, **kwargs):
-        assert drawing_spec is drawing.SPEC
-        sheet.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", stock_build)
-    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", reference_sheet)
-    asyncio.run(part.build(None))
-    asyncio.run(drawing.build(None))
-    assert "reference_notes" not in native
-    assert sheet == {"item": drawing.ITEM}

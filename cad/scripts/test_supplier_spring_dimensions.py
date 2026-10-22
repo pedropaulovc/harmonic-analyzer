@@ -152,7 +152,7 @@ def _extension_views(spec):
 
 
 def _extension_checks(spec, views):
-    return extension.extension_spring_dimensions(
+    return layout.extension_spring_dimensions(
         object(),
         views,
         free_length_mm=spec.FREE_LENGTH_MM,
@@ -185,7 +185,7 @@ def test_extension_final_checks_reacquire_actual_annotations(
     monkeypatch, spec, corruption
 ):
     views = _extension_views(spec)
-    _readback_environment(monkeypatch, extension, views)
+    _readback_environment(monkeypatch, layout, views)
     checks = _extension_checks(spec, views)
     for check in checks:
         check()
@@ -214,7 +214,7 @@ def test_extension_final_checks_reacquire_actual_annotations(
 @pytest.mark.parametrize("corruption", ["type", "lower", "upper", "precision"])
 def test_channel_source_od_band_is_rechecked_after_rebuild(monkeypatch, corruption):
     views = _extension_views(channel)
-    _readback_environment(monkeypatch, extension, views)
+    _readback_environment(monkeypatch, layout, views)
     checks = _extension_checks(channel, views)
     display = views["free_right"].annotations[0].GetSpecificAnnotation()
     tolerance = display.GetDimension2(0).Tolerance
@@ -415,7 +415,7 @@ def test_extension_dimension_positions_follow_actual_one_dimensional_native_ink(
     views["free_right"].source_points = ((-radius, -radius), (radius, radius))
     views["free_right"].Position = (0.30, 0.21)
     views["free_right"].ScaleRatio = scale
-    _readback_environment(monkeypatch, extension, views)
+    _readback_environment(monkeypatch, layout, views)
     _extension_checks(spec, views)
     assert views["free_front"].kept_positions[extension.FREE_LENGTH] == pytest.approx(
         (0.12, 0.18)
@@ -634,9 +634,9 @@ def test_extension_preparation_only_shows_owners_before_capture(monkeypatch, spe
     def unavailable_bounds(key):
         raise AssertionError("preparation must not project before capture")
 
-    monkeypatch.setattr(extension, "_show_hidden_owners", show_owners)
+    monkeypatch.setattr(layout, "_show_hidden_owners", show_owners)
     assert (
-        extension.prepare_extension_spring_diagrams(
+        layout.prepare_extension_spring_diagrams(
             object(),
             views,
             reference_bounds=unavailable_bounds,

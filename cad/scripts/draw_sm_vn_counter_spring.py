@@ -13,10 +13,11 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _supplier_spring_drawing import build_supplier_spring_drawing
-from _supplier_extension_spring import (
-    SOURCE_FEATURES,
-    extension_spring_dimensions, prepare_extension_spring_diagrams,
+from _supplier_extension_spring import SOURCE_FEATURES
+from _supplier_spring_drawing import (
+    build_supplier_spring_drawing,
+    extension_spring_dimensions,
+    prepare_extension_spring_diagrams,
 )
 import sm_vn_counter_spring_spec as supplier
 

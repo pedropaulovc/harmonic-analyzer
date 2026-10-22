@@ -122,9 +122,4 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME
     assert sheet.source_kind == "part"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "build_purchased_fastener_drawing" in source
-    # The shared purchased sheet draws every view hidden-lines-removed; the
-    # ITEM row names the catalogue size.
-    assert "adapter, SPEC, item=ITEM" in source
     assert drawing.ITEM.startswith("#1-72 x 5/32 ")

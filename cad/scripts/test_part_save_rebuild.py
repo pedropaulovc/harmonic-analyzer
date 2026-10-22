@@ -22,6 +22,7 @@ stale.  The double below reproduces the cg-fx1 seat behaviour.
 
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
 import re
@@ -389,26 +390,41 @@ def test_a_single_configuration_part_regenerates_with_no_switch(seat) -> None:
 
 SCRIPTS = Path(__file__).resolve().parent
 CONFIGURATION_CREATORS = re.compile(
-    r"\bcreate_configuration\(|\bAddConfiguration\d*\(|\badd_simplified_configurations\("
+    r"create_configuration|AddConfiguration\d*|add_simplified_configurations"
 )
 TRIPWIRE = re.compile(r"assert_saved_configurations_regenerate\(adapter, (PART_NAME|part_name)\)")
-SAVE = re.compile(r"save_part_and_images\(adapter, (PART_NAME|part_name)\b")
+SAVE = re.compile(
+    r"(?:save_part_and_images|save_simplified_part|save_supplier_reference_part|"
+    r"persist_configurations_in_place)\(adapter, (PART_NAME|part_name)\b"
+)
 FORCED_REBUILDS = ("ForceRebuild3", "set_active_configuration(", "assert_saved_configuration_topology(")
+
+
+def _creates_configurations(path: Path, *, native_only: bool = False) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = getattr(node.func, "id", getattr(node.func, "attr", ""))
+        if (
+            re.fullmatch(r"AddConfiguration\d*", name)
+            if native_only
+            else CONFIGURATION_CREATORS.fullmatch(name)
+        ):
+            return True
+    return False
 
 
 def _configuration_builders() -> set[str]:
     return {
-        path.stem
-        for path in SCRIPTS.glob("build_*.py")
-        if CONFIGURATION_CREATORS.search(path.read_text(encoding="utf-8"))
+        ".".join(path.relative_to(SCRIPTS).with_suffix("").parts)
+        for path in SCRIPTS.rglob("build_*.py")
+        if _creates_configurations(path)
     }
 
 
-def test_the_builders_that_create_configurations_are_the_known_six() -> None:
-    """A new multi-configuration builder must fail here until it reopens its
-    saved part and runs the tripwire (and joins this set).  Every other builder
-    that derives drawing configurations goes through save_simplified_part,
-    which reopens and runs the tripwire itself."""
+def test_configuration_creators_have_explicit_saved_cache_coverage() -> None:
+    """Enroll actual calls, not comments; both missing and new producers fail."""
     assert _configuration_builders() == {
         "build_dt_crank_handle_ferrule",
         "build_dt_cone_gear",
@@ -416,18 +432,49 @@ def test_the_builders_that_create_configurations_are_the_known_six() -> None:
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
         "build_dt_vn_cone_tip_collar",
+        "build_ch_vn_spring_hook",
+        "build_dt_vn_post_mount_screw",
+        "build_pd_vn_transgear_pivot_screw",
+        "build_sm_vn_boss_hook",
+        "build_sm_vn_knife_hanger_stud",
     }
 
 
 def test_only_the_known_helpers_create_configurations_outside_builders() -> None:
-    """The part-tier simplified-configuration helper and the assembly save
-    chokepoint's Default Simplified are the only other creators."""
+    """Each actual helper creator has separate native state-preservation coverage."""
     creators = {
-        path.stem
-        for path in SCRIPTS.glob("_*.py")
-        if re.search(r"\bAddConfiguration\d*\(", path.read_text(encoding="utf-8"))
+        ".".join(path.relative_to(SCRIPTS).with_suffix("").parts)
+        for path in SCRIPTS.rglob("_*.py")
+        if _creates_configurations(path, native_only=True)
     }
-    assert creators == {"_assembly", "_simplified_part"}
+    assert creators == {"_assembly", "_simplified_part", "_supplier_spring_reference"}
+
+
+@pytest.mark.parametrize("nested", (False, True))
+def test_new_configuration_authors_cannot_escape_the_inventory(
+    monkeypatch, tmp_path, nested
+) -> None:
+    scripts = tmp_path / "scripts"
+    directory = scripts / "nested" if nested else scripts
+    directory.mkdir(parents=True)
+    source = directory / "build_unregistered.py"
+    source.write_text("adapter.create_configuration('Installed')\n", encoding="utf-8")
+    monkeypatch.setitem(globals(), "SCRIPTS", scripts)
+    expected = "nested.build_unregistered" if nested else "build_unregistered"
+    assert _configuration_builders() == {expected}
+    with pytest.raises(AssertionError):
+        test_configuration_creators_have_explicit_saved_cache_coverage()
+
+
+def test_configuration_inventory_cannot_pass_after_a_no_match_scan(
+    monkeypatch, tmp_path
+) -> None:
+    source = tmp_path / "build_comment_only.py"
+    source.write_text("# AddConfiguration3(...) is documentation, not a call\n", encoding="utf-8")
+    monkeypatch.setitem(globals(), "SCRIPTS", tmp_path)
+    assert not _configuration_builders()
+    with pytest.raises(AssertionError):
+        test_configuration_creators_have_explicit_saved_cache_coverage()
 
 
 def _assert_reopened_then_tripwire(source: str) -> None:
@@ -444,11 +491,46 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
     """Reopen, then the tripwire, with nothing force-rebuilding in between: a
     forced rebuild would repair the very caches the tripwire has to read.  A
     builder that saves through save_simplified_part inherits its reopen."""
-    source = inspect.getsource(importlib.import_module(stem).build)
+    module = importlib.import_module(stem)
+    source = inspect.getsource(module.build)
     if "await adapter.open_model(" not in source:
-        assert "await save_simplified_part(" in source
-        return
+        if "await save_simplified_part(" in source:
+            return
+        tree = ast.parse(source)
+        callbacks = [
+            keyword.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "build_stock_fastener"
+            for keyword in node.keywords
+            if keyword.arg == "save_threaded_part"
+        ]
+        assert len(callbacks) == 1 and isinstance(callbacks[0], ast.Name), (
+            f"{stem}: configuration author has no proven saved-cache callback"
+        )
+        source = inspect.getsource(getattr(module, callbacks[0].id))
     _assert_reopened_then_tripwire(source)
+
+
+@pytest.mark.parametrize(
+    "build_source",
+    (
+        "async def build(adapter):\n    await build_stock_fastener(adapter)\n",
+        "async def build(adapter):\n"
+        "    await build_stock_fastener(adapter, save_threaded_part=choose_saver())\n",
+    ),
+)
+def test_configuration_author_with_unknown_saver_fails_closed(
+    monkeypatch, build_source
+) -> None:
+    class Producer:
+        build = object()
+
+    monkeypatch.setattr(importlib, "import_module", lambda _name: Producer)
+    monkeypatch.setattr(inspect, "getsource", lambda _function: build_source)
+    with pytest.raises(AssertionError, match="no proven saved-cache callback"):
+        test_every_configuration_builder_proves_its_saved_caches_on_reopen("unknown")
 
 
 def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:

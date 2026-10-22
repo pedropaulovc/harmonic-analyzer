@@ -7,11 +7,11 @@ that.
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import contextlib
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -435,22 +435,65 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
     assert 'display.SetText(2, ")")' in build_source
 
 
-def test_isometric_view_is_in_the_hidden_lines_removed_loop() -> None:
-    tree = ast.parse(
-        (SCRIPTS / "draw_pd_vn_transgear_pivot_screw.py").read_text(encoding="utf-8")
-    )
-    loops = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.For)
-        and any(
-            isinstance(call, ast.Call)
-            and getattr(call.func, "id", "") == "set_hidden_lines_removed"
-            for call in ast.walk(node)
+@pytest.mark.parametrize("refuse_isometric_mode", (False, True))
+def test_finished_views_remove_hidden_lines_before_annotations(
+    monkeypatch, tmp_path, refuse_isometric_mode
+) -> None:
+    import _drawing_view_display as display
+
+    source = tmp_path / "pivot-screw.SLDPRT"
+    source.touch()
+    views = {}
+
+    def place(_adapter, _source, orientation, *_args, **_kwargs):
+        state = SimpleNamespace(mode=0)
+
+        def set_mode(_parent, mode, *_options):
+            if not (refuse_isometric_mode and orientation == "*Isometric" and mode == 2):
+                state.mode = mode
+            return True
+
+        view = SimpleNamespace(
+            SetDisplayMode4=set_mode, GetDisplayMode2=lambda: state.mode
         )
-    ]
-    (loop,) = loops
-    assert {getattr(item, "id", "") for item in loop.iter.elts} == {"front", "iso"}
+        views[orientation] = view
+        return view
+
+    class AnnotationPhase(Exception):
+        pass
+
+    def reached_annotations(*_args, **_kwargs):
+        raise AnnotationPhase
+
+    async def open_source(_path):
+        return True
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "check", lambda _label, value: value)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        drawing,
+        "new_project_drawing",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(ActivateSheet=lambda _name: True), object()
+        ),
+    )
+    monkeypatch.setattr(drawing, "create_blank_drawing_sheets", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args: None)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", reached_annotations)
+    adapter = SimpleNamespace(currentModel=object(), open_model=open_source)
+    if refuse_isometric_mode:
+        with pytest.raises(RuntimeError, match="hidden-lines-removed"):
+            asyncio.run(drawing.build(adapter))
+        assert views["*Isometric"].GetDisplayMode2() != 2
+    else:
+        with pytest.raises(AnnotationPhase):
+            asyncio.run(drawing.build(adapter))
+        assert set(views) == {"*Front", "*Isometric", "*Top"}
+        assert all(view.GetDisplayMode2() == 2 for view in views.values())
 
 
 def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
