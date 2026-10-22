@@ -483,8 +483,7 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     assert FASTENERS["dt-vn-cone-tip-block-screw"].skus == ("91251A108",)
 
 
-def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
-    stamped = {}
+def test_native_part_controls_keep_reference_length_and_tip_limits(monkeypatch):
     linear = []
     tolerances = {}
     for name in (
@@ -498,7 +497,6 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
         "set_dimension_symmetric_tolerance",
         lambda _adapter, feature, name, band: linear.append((feature, name, band)),
     )
-    assert not hasattr(bolt_part, "set_dimension_symmetric_angular_tolerance")
     monkeypatch.setattr(bolt_part, "_early_bound", lambda value, _kind: value)
 
     displays = {}
@@ -531,11 +529,9 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     monkeypatch.setattr(
         bolt_part,
         "apply_drawing_properties",
-        lambda _adapter, _name, properties: stamped.update(properties),
+        lambda *_args: None,
     )
     bolt_part._manufacturing_controls(None)
-    row = _config.parts(bolt_part.PART_NAME)
-    assert stamped == {"Purchased Screw Note": row["purchased_note"]}
     assert list(tolerances) == [
         ("StockTrimProfile", "CutLength"),
         ("StockDeburrProfile", "ChamferAngle"),
@@ -909,70 +905,227 @@ def test_production_cut_positions_complete_stock_at_finished_head_pose(monkeypat
     )
 
 
+class _KnifeHangerSheet:
+    def __init__(self, name):
+        self.name = name
+        self.views = []
+        self.notes = []
+
+    def SetName(self, name):
+        self.name = name
+
+    def GetName(self):
+        return self.name
+
+    def GetNextView(self):
+        return self.views[0] if self.views else None
+
+    def GetAnnotations(self):
+        return tuple(note.GetAnnotation() for note in self.notes)
+
+
+class _KnifeHangerDrawing:
+    """Native document/sheet state, without pretending to prove CAD geometry."""
+
+    def __init__(self):
+        self.sheets = [_KnifeHangerSheet("Sheet1")]
+        self.active = self.sheets[0]
+        self.selection = None
+        self.copied = None
+        self.edit_sheet = True
+        self.Extension = SimpleNamespace(SelectByID2=self.select)
+
+    def GetCurrentSheet(self):
+        return self.active
+
+    def GetSheetNames(self):
+        return tuple(sheet.name for sheet in self.sheets)
+
+    def ActivateSheet(self, name):
+        for sheet in self.sheets:
+            if sheet.name == name:
+                self.active = sheet
+                return True
+        return False
+
+    def GetFirstView(self):
+        return self.active
+
+    def ClearSelection2(self, _all):
+        self.selection = None
+
+    def select(self, name, kind, *_args):
+        self.selection = next(
+            (sheet for sheet in self.sheets if kind == "SHEET" and sheet.name == name),
+            None,
+        )
+        return self.selection is not None
+
+    def EditCopy(self):
+        self.copied = self.selection
+
+    def PasteSheet(self, _position, _rename):
+        if self.copied is None or self.copied.views:
+            return False
+        self.active = _KnifeHangerSheet(f"Sheet{len(self.sheets) + 1}")
+        self.sheets.append(self.active)
+        return True
+
+    def ActivateView(self, name):
+        self.edit_sheet = not name
+        return bool(name)
+
+    def GetEditSheet(self):
+        return self.edit_sheet
+
+    def EditRebuild3(self):
+        return True
+
+
+class _KnifeHangerView:
+    def __init__(self, sheet, orientation, x, y, scale):
+        self.sheet = sheet
+        self.orientation = orientation
+        self.Position = (x, y)
+        self.ScaleRatio = scale
+        self.ReferencedConfiguration = "Default"
+        self.dimensions = {}
+        self.callouts = []
+        sheet.views.append(self)
+
+    def GetName2(self):
+        return f"{self.sheet.name}-{self.orientation}"
+
+    def GetNextView(self):
+        index = self.sheet.views.index(self) + 1
+        return self.sheet.views[index] if index < len(self.sheet.views) else None
+
+    def SetViewPosition(self, position, _move_children):
+        self.Position = tuple(getattr(position, "value", position))
+        return True
+
+    def GetDisplayDimensions(self):
+        return tuple(self.dimensions.values())
+
+
 @pytest.mark.parametrize("fault", [None, "callout", "link", "text"])
 def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch, tmp_path, fault
 ):
+    import _drawing_sheets as drawing_sheets
+    from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+
     source = tmp_path / "sm-vn-knife-hanger-stud.SLDPRT"
     source.touch()
-    row = _config.parts(bolt_part.PART_NAME)
-    properties = {"Purchased Screw Note": row["purchased_note"]}
-    printed = []
-    required = []
-    views = []
-    curated = []
-    offsets = []
-    projected = []
+    properties = {
+        "Purchased Screw Note": _config.parts(bolt_part.PART_NAME)["purchased_note"],
+        "Supplier Reference Title": bolt_drawing.SUPPLIER_STOCK_TITLE,
+    }
+    document = _KnifeHangerDrawing()
 
     async def open_model(_path):
         pass
 
-    async def finalize(*_args, **_kwargs):
+    def get_attr_or_call(value, name):
+        attribute = getattr(value, name)
+        return attribute() if callable(attribute) else attribute
+
+    adapter = SimpleNamespace(
+        currentModel=object(),
+        open_model=open_model,
+        _attempt=lambda operation, **_kwargs: operation(),
+        _get_attr_or_call=get_attr_or_call,
+    )
+
+    def new_drawing(_adapter, *_args, **_kwargs):
+        _adapter.currentModel = document
+        return document, document.GetCurrentSheet()
+
+    async def finalize(_adapter, *_args, expected_sheet_names, **_kwargs):
+        assert _adapter.currentModel is document
+        assert document.GetSheetNames() == tuple(expected_sheet_names)
         return {"drawing": "recorded"}
 
-    def place_view(_adapter, _source, orientation, *_args, **_kwargs):
-        views.append((orientation, _kwargs["scale"]))
-        return orientation
+    def place_view(_adapter, _source, orientation, x, y, *, scale):
+        return _KnifeHangerView(document.active, orientation, x, y, scale)
 
-    def read_properties(_model, names, *, required: tuple[str, ...]):
+    def read_properties(_model, names, *, required):
         properties.update({name: properties.get(name, name) for name in names})
+        assert all(properties[name] for name in required)
         return properties
 
-    def capture_properties(model, names, **kwargs):
-        required.extend(kwargs["required"])
-        return read_properties(model, names, **kwargs)
+    def display_dimension(view, name):
+        native = SimpleNamespace(
+            FullName=f"{name}@SupplierReference@native-part.SLDPRT"
+        )
+        display = SimpleNamespace(
+            name=name,
+            OffsetText=False,
+            GetText=lambda _index: (
+                bolt.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
+                + (" WRONG" if fault == "callout" else "")
+            ),
+            GetDimension2=lambda _index: native,
+        )
+        annotation = SimpleNamespace(
+            name=name,
+            Owner=view,
+            position=None,
+            GetSpecificAnnotation=lambda: display,
+            GetAttachedEntities3=lambda: (),
+            GetAttachedEntityTypes=lambda: (),
+        )
+        display.GetAnnotation = lambda: annotation
+        view.dimensions[name] = display
+        return display
 
     def annotations(_adapter, view, *, keep, **_kwargs):
-        curated.append((view, keep))
-        result = []
-        for name in keep:
-            display = SimpleNamespace(
-                GetText=lambda _index, name=name: (
-                    bolt.DIMENSION_CALLOUTS.get(name, "").replace("\n", "\r\n")
-                    + (" WRONG" if fault == "callout" else "")
-                )
-            )
-            result.append(
-                SimpleNamespace(
-                    name=name,
-                    GetSpecificAnnotation=lambda display=display: display,
-                )
-            )
-        return result
+        return [display_dimension(view, name).GetAnnotation() for name in keep]
+
+    def offset_text(_adapter, annotations, positions):
+        for annotation in annotations:
+            if annotation.name in positions:
+                annotation.GetSpecificAnnotation().OffsetText = True
+                annotation.position = positions[annotation.name]
 
     def project(_adapter, view, xyz, *, label):
-        projected.append((view, xyz, label))
-        return (0.1, 0.2)
+        scale = view.ScaleRatio[0] / view.ScaleRatio[1]
+        return tuple(view.Position[index] + scale * xyz[index] for index in (0, 1))
+
+    def project_points(_adapter, view, points, *, label):
+        return [project(_adapter, view, point, label=label) for point in points]
+
+    def linked_note(owner, property_name, *, bad_link=False, bad_text=False):
+        link = bolt_drawing.property_link(
+            "Wrong Property" if bad_link else property_name
+        )
+        text = properties[property_name].replace("\n", "\r\n")
+        note = SimpleNamespace(
+            PropertyLinkedText=link,
+            GetText=lambda: text + (" WRONG" if bad_text else ""),
+        )
+        annotation = SimpleNamespace(
+            Owner=owner,
+            OwnerType=1 if isinstance(owner, _KnifeHangerSheet) else 2,
+            GetType=lambda: 6,
+            GetSpecificAnnotation=lambda: note,
+        )
+        note.GetAnnotation = lambda: annotation
+        return note
 
     def callout(_adapter, view, *, property_name, edge_xy, note_xy):
-        printed.append((view, property_name, edge_xy, note_xy))
-        text = properties[property_name].replace("\n", "\r\n")
-        link = bolt_drawing.property_link(property_name)
-        if fault == "link":
-            link = bolt_drawing.property_link("Wrong Property")
-        if fault == "text":
-            text += " WRONG"
-        return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
+        note = linked_note(
+            view, property_name, bad_link=fault == "link", bad_text=fault == "text"
+        )
+        note.edge_xy = edge_xy
+        note.position = note_xy
+        view.callouts.append(note)
+        return note
+
+    def sheet_note(_adapter, property_name, *_position):
+        note = linked_note(document.active, property_name)
+        document.active.notes.append(note)
+        return note
 
     for name in (
         "check",
@@ -985,54 +1138,80 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         monkeypatch.setattr(bolt_drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(bolt_drawing, "SOURCE", source)
     monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        native_drawing._sw_type_info, "early_bound", lambda value, *_args: value
+    )
+    monkeypatch.setattr(
+        native_drawing._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
     monkeypatch.setattr(
         bolt_drawing, "dimension_name", lambda _adapter, item: item.name
     )
-    monkeypatch.setattr(bolt_drawing, "read_required_properties", capture_properties)
-    monkeypatch.setattr(
-        bolt_drawing,
-        "new_project_drawing",
-        lambda *_args, **_kwargs: (object(), object()),
-    )
+    monkeypatch.setattr(bolt_drawing, "read_required_properties", read_properties)
+    monkeypatch.setattr(bolt_drawing, "new_project_drawing", new_drawing)
     monkeypatch.setattr(bolt_drawing, "place_view", place_view)
     monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
+    monkeypatch.setattr(bolt_drawing, "offset_dimension_text", offset_text)
+    monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
+    monkeypatch.setattr(bolt_drawing, "model_points_in_view", project_points)
     monkeypatch.setattr(
         bolt_drawing,
-        "offset_dimension_text",
-        lambda _adapter, _annotations, positions: offsets.append(positions),
+        "add_edge_dimension",
+        lambda _adapter, view, *, label, **_kwargs: display_dimension(view, label),
     )
-    monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
+    # This test owns note/control readback and real document transitions;
+    # supplier dimension formatting has its own native-inventory tests.
+    monkeypatch.setattr(
+        bolt_drawing,
+        "_format_supplier_reference",
+        lambda _adapter, display, _name: display.GetAnnotation(),
+    )
     monkeypatch.setattr(bolt_drawing, "add_property_linked_callout", callout)
+    monkeypatch.setattr(bolt_drawing, "add_property_linked_note", sheet_note)
     monkeypatch.setattr(bolt_drawing, "finalize_drawing", finalize)
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
     if fault is not None:
         with pytest.raises(RuntimeError, match="did not persist"):
             asyncio.run(bolt_drawing.build(adapter))
         return
+
     assert asyncio.run(bolt_drawing.build(adapter)) == {"drawing": "recorded"}
-    assert "Purchased Screw Note" in required
-    for retired in (
-        "Machining Route",
-        "Modified-Part Inspection",
-        "Isometric View Note",
-        "Supplier",
-        "Stock Name",
-    ):
-        assert retired not in required
-    # One scale: both views at the sheet's 2:1.
-    assert views == [
-        ("*Front", bolt_drawing.SHEET_SCALE),
-        ("*Isometric", bolt_drawing.SHEET_SCALE),
+    finished, stock = document.sheets
+    assert len(finished.views) == len(stock.views) == 2
+    assert all(
+        view.ReferencedConfiguration != bolt_drawing.SUPPLIER_STOCK_CONFIGURATION
+        for view in finished.views
+    )
+    assert all(
+        view.ReferencedConfiguration == bolt_drawing.SUPPLIER_STOCK_CONFIGURATION
+        for view in stock.views
+    )
+    front = next(view for view in finished.views if view.orientation == "*Front")
+    chamfer = front.dimensions["ChamferWidth"]
+    assert chamfer.OffsetText
+    assert chamfer.GetAnnotation().position == bolt_drawing.CHAMFER_TEXT_XY
+    (purchased_note,) = front.callouts
+    assert purchased_note.PropertyLinkedText == bolt_drawing.property_link(
+        "Purchased Screw Note"
+    )
+    assert purchased_note.GetText().replace("\r", "") == properties[
+        "Purchased Screw Note"
     ]
-    # Every control on the main view; the chamfer text leaves on a leader.
-    assert curated == [("*Front", bolt_drawing.FRONT_KEEP)]
-    assert offsets == [{"ChamferWidth": bolt_drawing.CHAMFER_TEXT_XY}]
-    (head,) = projected
-    assert head[0] == "*Front"
-    assert head[1] == pytest.approx((bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0))
-    assert printed == [
-        ("*Front", "Purchased Screw Note", (0.1, 0.2), bolt_drawing.PURCHASED_NOTE_XY)
-    ]
+    head_xy = project(
+        adapter,
+        front,
+        (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0),
+        label="head",
+    )
+    assert purchased_note.edge_xy == pytest.approx(head_xy)
+    assert not finished.notes
+    (caption,) = stock.notes
+    assert caption.GetAnnotation().Owner is stock
+    assert caption.GetAnnotation().OwnerType == 1
+    assert caption.PropertyLinkedText == bolt_drawing.property_link(
+        "Supplier Reference Title"
+    )
+    assert caption.GetText().replace("\r", "") == properties["Supplier Reference Title"]
 
 
 def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:

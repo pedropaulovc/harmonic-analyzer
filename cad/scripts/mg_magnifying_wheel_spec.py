@@ -23,7 +23,7 @@ from _gtol_cylinder import CylinderFace
 from _printed_angular_tolerance import angular_band_deg
 from _printed_drilled_tolerance import drilled_oversize_mm
 from _printed_tolerance import printed_band_mm
-from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
@@ -136,12 +136,11 @@ DRAWING_NOTES = "\n".join(
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
 )
-# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle; the spigot is the static
-# seat the drum is pressed onto.  The boss step the drum butts against is a
-# register face and carries no symbol.
+# Only the journal runs. The drum is pressed onto the spigot, whose
+# interference acceptance supplies the fit without a roughness symbol
+# (drawing-guidelines.md rule 6); its shoulder is a register, not a running face.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("mg_wheel_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-    SurfaceFinishControl("mg_wheel_spigot", SEAT_UM, CylinderFace(SPIGOT_DIA)),
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 

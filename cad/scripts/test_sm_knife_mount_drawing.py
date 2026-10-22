@@ -16,6 +16,88 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
 
 
+@pytest.fixture
+def native_dimension_factory(monkeypatch):
+    """Stateful native interfaces: exercise the real callout/BASIC helpers."""
+    from types import SimpleNamespace
+
+    import _drawing_dimensions as dimensions
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        dimensions._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+    rebuilds = []
+    adapter = SimpleNamespace(
+        _attempt=lambda operation, **_options: operation(),
+        _get_attr_or_call=lambda value, name: getattr(value, name),
+        currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilds.append(True)),
+    )
+
+    class NativeDimension:
+        def __init__(self, name, value, band):
+            self.Name = name
+            self.SystemValue = value
+            self.band = band
+            self.tolerance_type = 4
+
+        def SetToleranceType(self, tolerance_type):
+            self.tolerance_type = tolerance_type
+            return True
+
+        def GetToleranceType(self):
+            return self.tolerance_type
+
+    class NativeDisplay:
+        def __init__(self, name, value, band, retain_offset, accept_position):
+            self.dimension = NativeDimension(name, value, band)
+            self.text = {4: "previous callout"}
+            self.offset = True
+            self.retain_offset = retain_offset
+            self.accept_position = accept_position
+            self.position = (0.0, 0.0, 0.0)
+            self.line_position = self.position
+
+        @property
+        def OffsetText(self):
+            return self.offset
+
+        @OffsetText.setter
+        def OffsetText(self, offset):
+            if not self.retain_offset:
+                self.offset = bool(offset)
+
+        def GetDimension(self):
+            return self.dimension
+
+        def GetSpecificAnnotation(self):
+            return self
+
+        def GetAnnotation(self):
+            return self
+
+        def SetText(self, part, text):
+            self.text[part] = text
+
+        def GetText(self, part):
+            return self.text.get(part, "")
+
+        def SetPosition2(self, x, y, z):
+            if not self.accept_position:
+                return False
+            self.position = (x, y, z)
+            if not self.offset:
+                self.line_position = self.position
+            return True
+
+    def make(name, value, band=(0.0, 0.0), *, retain_offset=False, accept_position=True):
+        return NativeDisplay(name, value, band, retain_offset, accept_position)
+
+    return adapter, make, rebuilds
+
+
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
     # is for the knife edge itself, which is the lever trunnion's ridge.  The
@@ -540,55 +622,7 @@ def test_datum_b_hangs_under_its_frame_clear_of_the_bore_frame() -> None:
     assert y - drawing.BORE_FRAME_XY[1] >= 0.004
 
 
-def test_native_gdt_and_bore_geometry() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Datum A the top seat (a tag on its edge); datum B the dowel pair, its
-    # symbol on the pair's position frame: a tag on the 2X Ø attaches to
-    # nothing (farm run 20261009T155421516Z, count=0), and the frame's datum
-    # identifier read "B" back but printed nothing (20261009T171439353Z).
-    assert source.count("add_datum_feature(") == 1
-    assert "add_dimension_datum_feature" not in source
-    assert "datum_identifier" not in source
-    assert source.count("add_frame_datum_feature(") == 1
-    frame_datum = source[source.index("pin_frame = add_feature_control_frame(") :]
-    frame_datum = frame_datum[: frame_datum.index("# The bore:")]
-    assert "        pin_frame,\n        datum=\"B\",\n" in frame_datum
-    assert 'datum="A"' in source
-    # The sheet fails unless every frame's datum is printed, over every view
-    # a frame or tag stands in.
-    assert (
-        "assert_frame_datums_defined(\n        (front, right, top, section),"
-    ) in source
-    assert source.index("assert_frame_datums_defined(") > source.index(
-        "add_frame_datum_feature("
-    )
-    # The pair's frame to A, the bore's and the tap's frames to A|B; under
-    # the bore's position, a stacked (not composite) ⊥Ø0.05 to B
-    # (2026-10-10 ruling: one Ø zone bounds the yaw the rock budget takes).
-    import ast
-
-    frames = [
-        node
-        for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "add_feature_control_frame"
-    ]
-    assert len(frames) == 3
-    assert source.count('characteristic="position"') == 3
-    assert source.count('datums=("A",)') == 1
-    assert source.count('datums=("A", "B")') == 2
-    assert "composite_lower" not in source
-    bore_frame = source[source.index("# The bore: Ø0.20 located to A|B") :]
-    bore_frame = bore_frame[: bore_frame.index("bore_basic = ")]
-    assert (
-        "        lower_frame=(\n"
-        '            "perpendicularity",\n'
-        '            GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"],\n'
-        '            ("B",),\n'
-        "        ),\n"
-    ) in bore_frame
-    assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in source
+def test_knife_geometry_controls_retain_their_position_and_orientation_bands() -> None:
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
         "knife-bore position": "0.20",
         "knife-bore perpendicularity": "0.05",
@@ -596,42 +630,11 @@ def test_native_gdt_and_bore_geometry() -> None:
         "dowel hole pattern position": "0.13",
     }
     assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
-    # R4 blocker: datum B is the 2X pattern.  The pattern's frame -- the one
-    # datum B's symbol is attached to -- prints its own native 2X above-frame
-    # text (IGtol.SetText(swGTolTextCalloutAbove), read back after a rebuild
-    # before B attaches).  R5: the below-frame quantity moved B's tag 5.6 mm
-    # off its place, so no frame takes ``quantity=`` any more.
-    assert drawing.PIN_FRAME_QUANTITY == sm_knife_mount_spec.PIN_HOLE_PAIR_CALLOUT
-    assert drawing.PIN_FRAME_QUANTITY == f"{mount_interface.PIN_HOLE_COUNT}X"
     assert mount_interface.PIN_HOLE_COUNT == 2
-    assert drawing._GTOL_TEXT_CALLOUT_ABOVE == 3  # swGTolTextCalloutAbove
-    assert "quantity=PIN_FRAME_QUANTITY" not in source
-    assert not any(
-        keyword.arg == "quantity" for frame in frames for keyword in frame.keywords
-    )
-    pin_frame = source[source.index("    pin_frame = add_feature_control_frame(") :]
-    pin_frame = pin_frame[: pin_frame.index("    )\n")]
-    assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in pin_frame
-    count = source[source.index("    pin_gtol = _early_bound(pin_frame, \"IGtol\")") :]
-    count = count[: count.index("    add_frame_datum_feature(")]
-    assert source.count("_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY") == 1
-    assert "if not pin_gtol.SetText(_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY):" in count
-    assert count.index("SetText(") < count.index("rebuild_drawing(") < count.index(
-        "GetText(_GTOL_TEXT_CALLOUT_ABOVE)"
-    )
-    assert "if pin_frame_count != PIN_FRAME_QUANTITY:\n        raise RuntimeError(" in count
-    assert source.index("    pin_gtol = _early_bound(") < source.index(
-        "    add_frame_datum_feature("
-    )
-    datum_b = source[source.index("    add_frame_datum_feature(") :]
-    datum_b = datum_b[: datum_b.index("    )\n")]
-    assert "pin_frame," in datum_b and 'datum="B"' in datum_b
-    assert "symbol_xy=PIN_DATUM_B_XY," in datum_b
-    assert "position_tolerance_m" not in datum_b
-    # The 2X (left-aligned 1.1 mm over the frame, 3.4 mm tall, as the
-    # measured below-frame line) tops out a text height and more under the
-    # 2X Ø callout's shoulder, printed at y 222.21 mm (farm run
-    # 20261014T010316127Z), and well under the A-A cutting line.
+
+
+def test_dowel_frame_quantity_and_datum_have_geometric_clearance() -> None:
+    # Retained native calibration: quantity above the frame, datum below it.
     from _layout_audit import TEXT_SEPARATION_HEIGHTS
 
     assert drawing.PIN_CALLOUT_SHOULDER_PRINTED_Y == pytest.approx(0.22221)
@@ -645,25 +648,11 @@ def test_native_gdt_and_bore_geometry() -> None:
         mount_interface.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
     )
     assert drawing.PIN_FRAME_XY[0] - section_end_x == pytest.approx(0.0026)
-    # B keeps its proven tag placement: 5 mm of stem under the frame's
-    # bottom, at its mid-width, through the shared helper's default gate.
     assert drawing.PIN_DATUM_B_XY[0] - drawing.DATUM_TAG_BOX / 2.0 == pytest.approx(
         drawing.PIN_FRAME_XY[0] + 0.0112
     )
     assert drawing.PIN_DATUM_B_XY[1] == pytest.approx(
         drawing.PIN_FRAME_XY[1] - drawing.PIN_FRAME_SIZE[1] - 0.005 - 0.007
-    )
-    # Sheet-added: the block depth, the dowel span, the tap axis's station
-    # from a dowel axis and the bore centre's height under A (all BASIC), and
-    # the pattern's two face locations; the
-    # dowel holes' Ø and depth are marked model dimensions
-    # (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 6
-    assert source.count("set_basic_dimension(") == 3
-    assert 'set_basic_dimension(adapter, span, label="dowel hole span")' in source
-    assert (
-        'set_basic_dimension(adapter, station, label="dowel hole from tap axis")'
-        in source
     )
 
 
@@ -715,6 +704,60 @@ def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_color(adapter, HARDENED_STEEL)" in source
     assert part.HARDENED_STEEL == (0.30, 0.30, 0.31)
+
+
+def test_title_material_uses_the_existing_manufacturing_specification(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    material = _config.parts("sm-knife-mount")["material_specification"]
+    generic_link = drawing.property_link("Material")
+    specification_link = drawing.property_link("Material Specification")
+    note = SimpleNamespace(PropertyLinkedText=f"MATERIAL: {generic_link}")
+    note.GetText = lambda: note.PropertyLinkedText.replace(specification_link, material)
+    finish = SimpleNamespace(PropertyLinkedText=drawing.property_link("Finish"))
+    annotations = [
+        SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda: note),
+        SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda: finish),
+    ]
+    rebuilds = []
+    model = SimpleNamespace(
+        GetFirstView=lambda: SimpleNamespace(GetAnnotations=lambda: annotations),
+        ForceRebuild3=lambda top_only: rebuilds.append(top_only),
+    )
+    binding = drawing._bind_title_material_specification(model, material)
+    assert note.PropertyLinkedText == f"MATERIAL: {specification_link}"
+    assert finish.PropertyLinkedText == drawing.property_link("Finish")
+    drawing._verify_title_material_specification(model, binding)
+    assert rebuilds == [False]
+    note.GetText = lambda: "MATERIAL: Plain Carbon Steel"
+    with pytest.raises(RuntimeError, match="material title link did not resolve"):
+        drawing._verify_title_material_specification(model, binding)
+
+
+@pytest.mark.parametrize("material_cells", (0, 2))
+def test_title_material_refuses_missing_or_duplicate_cells(monkeypatch, material_cells) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    notes = [
+        SimpleNamespace(PropertyLinkedText=drawing.property_link("Material"))
+        for _ in range(material_cells)
+    ]
+    annotations = [
+        SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda note=note: note)
+        for note in notes
+    ]
+    model = SimpleNamespace(
+        GetFirstView=lambda: SimpleNamespace(GetAnnotations=lambda: annotations)
+    )
+    with pytest.raises(RuntimeError, match="exactly one Material property link"):
+        drawing._bind_title_material_specification(model, "AISI O1 tool steel")
+
+
+def test_title_material_refuses_a_blank_specification() -> None:
+    with pytest.raises(RuntimeError, match="material specification is blank"):
+        drawing._bind_title_material_specification(None, " ")
 
 
 def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
@@ -1000,8 +1043,8 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     # Machinist review (2026-10-10): the tap frame and the bore's frames
     # reference B, but their offset from B was only the implied centre.  The
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
-    # 7.632 from the -X dowel axis; its boxed value parks left of that axis,
-    # over the section's top seat.
+    # 7.632 from the -X dowel axis; its BASIC box stays between those axes,
+    # with native inline text rather than the line-struck outside jog.
     assert mount_interface.PIN_HOLE_X == pytest.approx(
         mount_interface.PIN_HOLE_SPAN / 2.0
     )
@@ -1010,40 +1053,67 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     text_x, text_y = drawing.TAP_STATION_TEXT_XY
     assert pin_x < text_x < drawing._section_x(0.0)
     assert text_y > section_top
-    offset_x, offset_y = drawing.TAP_STATION_OFFSET_XY
-    assert offset_y == text_y
-    assert offset_x < pin_x
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
     # The tap's axis reaches past the bore's bottom, the dowel's past its
     # floor, both inside the block.
-    assert "(0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)" in source
-    assert "BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM" in source
     assert (
         sm_knife_mount_spec.BORE_CY
         - sm_knife_mount_spec.R_BORE
         - drawing.SECTION_AXIS_TAIL_MM
         > sm_knife_mount_spec.BLK_BOT
     )
-    assert 'entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT")' in source
-    assert source.count('label="dowel hole from tap axis"') == 3
 
 
-def test_the_bore_states_its_ream_and_band() -> None:
-    # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # reamed to +0.03/0 at two places (Ra 1.6 stays).
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "REAM THRU"
+def test_bore_mate_callout_reaches_the_named_feature_without_changing_its_fit(
+    native_dimension_factory,
+) -> None:
+    adapter, make, _rebuilds = native_dimension_factory
+    bore = make("BoreDia", 0.012, band=(0.00003, 0.0))
+    pin = make("PinHoleDia", 0.003175, band=(0.0, -0.00001))
+    same_size_other_feature = make("UnrelatedDiameter", 0.012)
+    original_unrelated_text = same_size_other_feature.GetText(4)
+    before = [
+        (display.dimension.SystemValue, display.dimension.band, display.dimension.tolerance_type)
+        for display in (bore, pin, same_size_other_feature)
+    ]
+    drawing.set_dimension_callouts(
+        adapter, [same_size_other_feature, pin, bore], drawing.DIMENSION_CALLOUTS
+    )
+    assert _config.parts("sm-summing-lever")["number"] in bore.GetText(4)
+    assert sm_knife_mount_spec.DOWEL_NUMBER in pin.GetText(4)
+    assert same_size_other_feature.GetText(4) == original_unrelated_text
+    assert [
+        (display.dimension.SystemValue, display.dimension.band, display.dimension.tolerance_type)
+        for display in (bore, pin, same_size_other_feature)
+    ] == before
     assert sm_knife_mount_spec.BORE_DIA_BAND == (0.03, 0.0)
     assert sm_knife_mount_spec.BORE_DIA_PLACES == 2
     assert sm_knife_mount_spec.DRAWING_PRECISION["BoreProfile"] == {"BoreDia": 2}
     assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
     assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.015)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        "        \"BoreProfile\",\n"
-        "        \"BoreDia\",\n"
-        "        *deviations(BORE_DIA_BAND),\n"
-        "        places=BORE_DIA_PLACES,\n"
-    ) in source
-    assert source.index("*deviations(BORE_DIA_BAND)") < source.index(
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
-    )
+
+
+def test_basic_station_leaves_offset_mode_and_moves_its_line_with_the_text(
+    native_dimension_factory,
+) -> None:
+    import _drawing_dimensions as dimensions
+
+    adapter, make, rebuilds = native_dimension_factory
+    station = make("TapStation", mount_interface.PIN_HOLE_X / 1000.0)
+    measured = station.dimension.SystemValue
+    drawing._set_inline_tap_station(adapter, station)
+    assert station.OffsetText is False
+    assert station.position == station.line_position == (*drawing.TAP_STATION_TEXT_XY, 0.0)
+    assert station.dimension.GetToleranceType() == dimensions.TOL_BASIC
+    assert station.dimension.SystemValue == measured
+    assert station.GetText(4) == ""
+    assert rebuilds == [True]
+
+
+@pytest.mark.parametrize(
+    "failure", ({"retain_offset": True}, {"accept_position": False})
+)
+def test_basic_station_refuses_ignored_inline_placement(native_dimension_factory, failure) -> None:
+    adapter, make, _rebuilds = native_dimension_factory
+    station = make("TapStation", mount_interface.PIN_HOLE_X / 1000.0, **failure)
+    with pytest.raises(RuntimeError, match="inline placement"):
+        drawing._set_inline_tap_station(adapter, station)

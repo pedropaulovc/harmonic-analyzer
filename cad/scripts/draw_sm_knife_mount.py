@@ -22,7 +22,9 @@ pilot at three places under the title block's DRILLED HOLES row, its full
 thread at two with its own native +/-0.13, its class the title block's
 thread row, its drill depth banded, its drill point dimensioned (under the
 general angular band) and its mating bolt named on its hole callout.
-The bore carries Ra 1.6, the top seat Ra 3.2.  Every view is
+The bore's callout names its MHA-SM-03 knife-seat mate; it carries Ra 1.6,
+the top seat Ra 3.2. The title MATERIAL cell uses the existing manufacturing
+Material Specification (O1), not the generic library material. Every view is
 hidden-lines-removed.
 
 Run with SolidWorks open::
@@ -59,7 +61,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
@@ -74,7 +75,7 @@ from _drawing_gdt import (
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -206,12 +207,10 @@ SECTION_KEEP = {
 SECTION_AXIS_OVERRUN_MM = 2.0
 SECTION_AXIS_TAIL_MM = 1.0
 # The dimension line stands 8 mm over the cut top seat, in the open band
-# under the isometric's caption.  Its boxed value (~14 mm) all but fills the
-# 15.3 mm between the axes, so it parks on a leader left of the -X axis
-# (draw_fr_top_frame's F-F station precedent: text past the arrows
-# otherwise rides the dimension line).
+# under the isometric's caption. Keep its BASIC box between the axes on the
+# native dimension line: the old outside offset jog let the line strike the
+# final digit (2026-10-22 blind review). Native inline text supplies the gap.
 TAP_STATION_TEXT_XY = (_section_x(-PIN_HOLE_X / 2.0), _section_y(BLK_TOP) + 0.008)
-TAP_STATION_OFFSET_XY = (_section_x(-PIN_HOLE_X) - 0.012, TAP_STATION_TEXT_XY[1])
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # The dowel hole's Ø and its three callout lines park in the open band right
@@ -258,10 +257,11 @@ TOP_KEEP = {
         PIN_CALLOUT_SHOULDER_START[1] + PIN_CALLOUT_SHOULDER_DROP,
     ),
 }
-# The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
-# (blind machinist review, 2026-10-09: a bare THRU left drill or ream open).
+# The bore is the rocking knife seat for the summing lever's hex trunnion,
+# not a cylindrical running fit. Name that mate at the existing ream band;
+# short rows retain the bore callout's lane beside the overall-height line.
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU",
+    "BoreDia": "REAM THRU\nKNIFE SEAT\nFOR MHA-SM-03",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The pair's count rides ABOVE its Ø (the pd-latch-hook-bracket PAIR_CALLOUT
@@ -882,12 +882,84 @@ def _tap_lower_rim(adapter: Any, top: Any, x_side: float) -> tuple[float, float]
     )
 
 
+def _set_inline_tap_station(adapter: Any, station: Any) -> None:
+    """Keep the BASIC station on its native line, without an offset leader."""
+    display = _early_bound(station, "IDisplayDimension")
+    display.OffsetText = False
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if bool(display.OffsetText) or not annotation.SetPosition2(
+        *TAP_STATION_TEXT_XY, 0.0
+    ):
+        raise RuntimeError("tap station did not retain native inline placement")
+    set_basic_dimension(adapter, display, label="dowel hole from tap axis")
+    if bool(display.OffsetText):
+        raise RuntimeError("BASIC tap station retained an offset leader")
+
+
+def _bind_title_material_specification(
+    drawing_model: Any, material_specification: str
+) -> tuple[Any, str, str]:
+    """Use the alignment-pinion precedent for this package's O1 title cell."""
+    if not material_specification.strip():
+        raise RuntimeError("knife-mount material specification is blank")
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    sheet_view = drawing.GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError("knife-mount drawing template has no sheet view")
+    sheet_view = _early_bound(sheet_view, "IView")
+    generic_link = property_link("Material")
+    specification_link = property_link("Material Specification")
+    matched = 0
+    binding: tuple[Any, str, str] | None = None
+    for raw_annotation in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
+            continue
+        raw_note = annotation.GetSpecificAnnotation()
+        if raw_note is None:
+            raise RuntimeError("knife-mount title-block note has no INote")
+        note = _early_bound(raw_note, "INote")
+        raw = str(note.PropertyLinkedText)
+        occurrences = raw.count(generic_link)
+        if not occurrences:
+            continue
+        matched += occurrences
+        linked_text = raw.replace(generic_link, specification_link)
+        resolved_text = raw.replace(generic_link, material_specification)
+        note.PropertyLinkedText = linked_text
+        if str(note.PropertyLinkedText) != linked_text:
+            raise RuntimeError("knife-mount material title link did not persist")
+        binding = (note, linked_text, resolved_text)
+    if matched != 1 or binding is None:
+        raise RuntimeError(
+            "knife-mount template must contain exactly one Material "
+            f"property link, found {matched}"
+        )
+    return binding
+
+
+def _verify_title_material_specification(
+    drawing_model: Any, binding: tuple[Any, str, str]
+) -> None:
+    """Resolve the property link only after a source model view exists."""
+    drawing_model.ForceRebuild3(False)
+    note, linked_text, resolved_text = binding
+    actual_link = str(note.PropertyLinkedText)
+    actual_text = str(note.GetText())
+    if actual_link != linked_text or actual_text != resolved_text:
+        raise RuntimeError(
+            "knife-mount material title link did not resolve: "
+            f"expected {resolved_text!r}, got {actual_text!r} "
+            f"from {actual_link!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open knife-mount source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -909,6 +981,9 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    material_binding = _bind_title_material_specification(
+        drawing_model, properties["Material Specification"]
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -925,6 +1000,7 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    _verify_title_material_specification(drawing_model, material_binding)
     # Section A-A cuts the top view on z = 0 through the tap and dowel axes:
     # the blind dowel hole's floor is hidden in the front view (drawing-guidelines.md rule 9 (show internal shape in solid lines)),
     # so its depth is dimensioned on the cut.
@@ -1183,7 +1259,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not pin_axis_x < tap_axis_x:
         raise RuntimeError(
             f"section A-A draws the -X dowel axis at sheet x {pin_axis_x:g}, not left "
-            f"of the tap axis ({tap_axis_x:g}): TAP_STATION_OFFSET_XY assumes +X right"
+            f"of the tap axis ({tap_axis_x:g}): TAP_STATION_TEXT_XY assumes +X right"
         )
     axis_top = BLK_TOP + SECTION_AXIS_OVERRUN_MM
     tap_axis, pin_axis = _add_section_axes(
@@ -1223,15 +1299,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"tap axis, expected {PIN_HOLE_X:g} mm"
         )
     _set_sheet_precision(station, label="dowel hole from tap axis")
-    station_annotation = _early_bound(
-        _early_bound(station, "IDisplayDimension").GetAnnotation(), "IAnnotation"
-    )
-    offset_dimension_text(
-        adapter,
-        [station_annotation],
-        {dimension_name(adapter, station_annotation): TAP_STATION_OFFSET_XY},
-    )
-    set_basic_dimension(adapter, station, label="dowel hole from tap axis")
+    _set_inline_tap_station(adapter, station)
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #10-24 knife-hanger-bolt tap and the MHA-SM-VN-53 dowel
@@ -1398,6 +1466,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=0,
+        settled_checks=(
+            lambda: _verify_title_material_specification(drawing_model, material_binding),
+        ),
     )
 
 

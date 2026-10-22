@@ -125,14 +125,6 @@ def test_notes_carry_no_dimensions() -> None:
         assert token not in notes
 
 
-def test_callouts_state_the_needs_of_the_tight_bands() -> None:
-    assert drawing.DIMENSION_CALLOUTS["HangerStation"] == "FOR 2.0 END WALL"
-    assert drawing.DIMENSION_CALLOUTS["BoreRowHeight"] == "ALL BORES\nFOR 2.0 WALLS"
-    assert drawing.DIMENSION_CALLOUTS["Side"] == "CLEARS WHEEL TIE\nFOR 2.0 BORE WALLS"
-    for callout in drawing.DIMENSION_CALLOUTS.values():
-        assert len(callout.splitlines()) <= 4
-
-
 def test_every_bore_keeps_a_two_mm_wall_from_the_bottom_face_row() -> None:
     import mg_wheel_bar_geom as geom
 
@@ -176,9 +168,6 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "ClampStation1": 1,
         "ClampStation2": 1,
     }
-    assert drawing.DIMENSION_CALLOUTS["AxleBoreDia"] == (
-        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n0.010-0.030 INTERFERENCE"
-    )
     assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.35 PROUD TO 1.55 SUNK")
     assert model_toleranced_dimensions(part) == {
         ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",

@@ -105,6 +105,10 @@ GROOVE_RADIUS_MIN = 0.5
 # is under R (R1.2 over the largest root under the smallest OD) the arc meets
 # the OD first and the mouth is that chord (groove_half_opening).
 GROOVE_RADIUS_CALLOUT = "FULL R"
+# LeverWire is the installed form of MHA-SH-VN-56, not a separate belt.
+# Keep the owner's LIMIT/FULL R profile intact and identify the wire at the
+# groove rather than inventing a fit band or a shoulder-seating component.
+GROOVE_WIRE_CALLOUT = "LEVER WIRE MHA-SH-VN-56\nSEATED IN FULL-R GROOVE"
 # The drilled rod bore prints at one place; its band is the title block's
 # DRILLED HOLES row (+0.10/0): running clearance on the rod, no fit.
 ROD_BORE_DIA_PLACES = 1
@@ -112,6 +116,10 @@ ROD_BORE_DIA_PLACES = 1
 # 16: the largest tool-nose radius the shoulder takes; the model IS the limit).
 SHOULDER_RADIUS_PLACES = 1
 SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
+# This local tool-nose limit belongs to the hex/groove envelope, not to a
+# nonexistent part seating against the shoulder. Its allowed-spigot-maximum
+# corner needs a separate design ruling; this reason does not change the limit.
+SHOULDER_RADIUS_CALLOUT = "HEX / GROOVE CLEARANCE"
 # The tap's drill and thread depths (native Hole Wizard variables): one place,
 # the general .X.  The drill depth governs; the thread depth is REF -- the
 # callout prints it in parentheses, and the callout's own FULL THREAD TO ROD

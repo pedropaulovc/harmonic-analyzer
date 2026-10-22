@@ -76,15 +76,20 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
 }
 
-# Instructions only: every size, station and band is a model dimension or a
-# native hole callout on the sheet.
+# THRU already lives on the native hole callouts. Preserve the existing
+# axle squareness requirement locally: its Z axis sets the wheel plane
+# (mg_wheel_group), and the back face is the real +Z clamp-seating face.
+# The title block's angular-dimension row is not a general orientation control.
+AXLE_ORIENTATION_CALLOUT = (
+    "AXLE BORE SQUARE\nTO THIS BACK FACE\nSETS WHEEL AXIS"
+)
+# The remaining general lines only identify the clearance-hole screws.
 DRAWING_NOTES = "\n".join(
     (
-        "ALL BORES THRU, SQUARE TO THE BACK FACE.",
         f"2X {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
-        "FOR COLUMN-CLAMP SCREWS (MHA-SH-02).",
+        "FOR COLUMN-CLAMP SCREWS (MHA-SH-VN-53).",
         f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
-        "CLEARANCE FOR THE PEN-HANGER SCREW.",
+        "CLEARANCE FOR THE PEN-HANGER SCREW (MHA-PN-VN-50).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

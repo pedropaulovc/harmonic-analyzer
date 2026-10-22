@@ -72,6 +72,7 @@ from _drawing_dimensions import (
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
 from _drawing_projection import model_point_in_view
@@ -106,11 +107,13 @@ from mg_output_fixture_spec import (
     GROOVE_RADIUS_CALLOUT,
     GROOVE_RADIUS_MIN,
     GROOVE_RADIUS_TOL_TYPE,
+    GROOVE_WIRE_CALLOUT,
     GROOVE_STATION,
     LIMIT_BANDS,
     REFERENCE_DIMENSIONS,
     ROD_BORE_CALLOUT,
     SINGLE_LIMITS,
+    SHOULDER_RADIUS_CALLOUT,
     TAP_CALLOUT_PRECISION,
     TAP_DEPTH_PLACES,
     TAP_DRILL_DEPTH_VARIABLE,
@@ -245,6 +248,7 @@ _CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 LIMIT_ROW_PITCH = 0.0045257
 CALLOUT_ROW_PITCH = 0.0055563
 GROOVE_RADIUS_SHOULDER_DROP = LIMIT_ROW_PITCH + CALLOUT_ROW_PITCH / 2.0
+SHOULDER_RADIUS_BLOCK_DROP = RADIUS_SHOULDER_DROP + CALLOUT_ROW_PITCH / 2.0
 _GROOVE_CENTRE_XY = (_side_x(GROOVE_X), _side_y(GROOVE_CENTRE_R))
 # The three rows stand 14.5 mm from the shoulder to the upper limit's ink
 # (r12 printed ink from 0.99 mm over a row's position to 4.42 mm over it),
@@ -302,11 +306,15 @@ _UNDER_ROW = _SIDE_BOTTOM - 0.022
 # LOWER_ARC_KEEP stands it right of the face under the spigot's lower
 # extension; its leader then crosses the face's witnesses (extension lines,
 # rule 14) above the spigot's length, whose shoulder witness starts lower.
-# The r2 sheet's R1.2 MAX, the same nine printed glyphs, measured: text
-# 20.83 mm wide centred on its keep, its full shoulder from 13.91 mm left of
-# and RADIUS_SHOULDER_DROP under the keep to 1.74 mm past the text.
-SHOULDER_RADIUS_TEXT_HALF_WIDTH = 0.02083 / 2.0
-SHOULDER_RADIUS_RUN_IN = 0.01391
+# The original one-row radius measured 20.83 mm wide, with a 13.91 mm
+# run-in. The local envelope reason is wider; grow the block rightward and
+# upward while retaining the upper arc's established leader elbow.
+SHOULDER_RADIUS_TEXT_HALF_WIDTH = max(
+    0.02083 / 2.0, len(SHOULDER_RADIUS_CALLOUT) * _GLYPH_PITCH / 2.0
+)
+SHOULDER_RADIUS_RUN_IN = (
+    0.01391 + SHOULDER_RADIUS_TEXT_HALF_WIDTH - 0.02083 / 2.0
+)
 SHOULDER_RADIUS_OVERRUN = 0.00174
 _SHOULDER_SHEET_X = _side_x(SHOULDER_X)
 SHOULDER_SHEET_RADIUS = SHOULDER_FILLET_R * _S / 1000.0
@@ -331,12 +339,23 @@ SHOULDER_RADIUS_ELBOWS = {
         SHOULDER_ARC_CENTRES["upper"][0] + 0.003,
         _GROOVE_STATION_TEXT_Y + _GROOVE_STATION_TEXT_TOP + 0.003,
     ),
-    "lower": (_FACE_SHEET_X + 0.002, SHOULDER_CORNERS["lower"][1] - 0.007),
+    "lower": (
+        _FACE_SHEET_X + 0.002,
+        SHOULDER_CORNERS["lower"][1] - 0.006 - CALLOUT_ROW_PITCH,
+    ),
 }
 SHOULDER_RADIUS_TEXT_XY = {
-    side: (x + SHOULDER_RADIUS_RUN_IN, y + RADIUS_SHOULDER_DROP)
+    side: (x + SHOULDER_RADIUS_RUN_IN, y + SHOULDER_RADIUS_BLOCK_DROP)
     for side, (x, y) in SHOULDER_RADIUS_ELBOWS.items()
 }
+# A separate attached mate note leaves the owner's compact FULL R / LIMIT
+# stack and its material-arc proof unchanged. Pick the lower face-side arc;
+# the note and its leader lie right of the axial dimensions below the view.
+GROOVE_WIRE_PICK_XY = (
+    _side_x(GROOVE_X + GROOVE_RADIUS / math.sqrt(2.0)),
+    _side_y(-GROOVE_CENTRE_R + GROOVE_RADIUS / math.sqrt(2.0)),
+)
+GROOVE_WIRE_NOTE_XY = (_FACE_SHEET_X + 0.028, SIDE_CENTER[1] - 0.048)
 # In the lower-arc layout the spigot's length's shoulder-side witness (its
 # first reference, build_mg_output_fixture._turned_profile) starts 3 mm
 # under the corner, clear of the radius's arrow.
@@ -1506,12 +1525,16 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*side_annotations, *end_annotations], DRAWING_PRECISION_BY_NAME
     )
-    # Each below its value: the bore's process, and the groove radius's
-    # profile under its LIMIT (read back in _prove_groove_radius).
+    # Feature-attached reasons identify the wire groove and the shoulder's
+    # local envelope without changing the owner's radius limits.
     set_dimension_callouts(
         adapter,
         side_annotations,
-        {"RodBoreDia": ROD_BORE_CALLOUT, "GrooveRadius": GROOVE_RADIUS_CALLOUT},
+        {
+            "RodBoreDia": ROD_BORE_CALLOUT,
+            "GrooveRadius": GROOVE_RADIUS_CALLOUT,
+            "ShoulderRadius": SHOULDER_RADIUS_CALLOUT,
+        },
     )
     # The flats are the bar's as supplied: a stock reference, not a size the
     # shop holds to three places.  The overall length is the part's driven
@@ -1568,6 +1591,14 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: a for name, a in side_by_name.items() if name != "ShoulderRadius"},
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
+    add_attached_note(
+        adapter,
+        side,
+        text=GROOVE_WIRE_CALLOUT,
+        entity_xy=GROOVE_WIRE_PICK_XY,
+        note_xy=GROOVE_WIRE_NOTE_XY,
+        label="lever-wire seat in the output-fixture groove",
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     artifacts = await finalize_drawing(

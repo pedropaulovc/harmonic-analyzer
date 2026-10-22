@@ -279,7 +279,10 @@ FIDUCIAL_EDGE_PICK = (
     * SHEET_SCALE[0]
     / 1000.0,
 )
-FIDUCIAL_CALLOUT_XY = (0.016, 0.196)
+# The measured five-line block was 37.6 mm tall at y=0.196 and overlapped
+# the arm. Use four short rows, raised 6 mm within the measured clear band
+# below the hub-seat text/shoulder at y=0.2111; native extent checks remain.
+FIDUCIAL_CALLOUT_XY = (0.016, 0.202)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
 _END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
@@ -359,7 +362,7 @@ def _fiducial_note_clear(
         box,
         {"arm silhouette": ARM_SILHOUETTE, **{ink.label: ink.text for ink in neighbours}},
     )
-    # Include 2 mm of air around the measured five-line note,
+    # Include 2 mm of air around the measured note,
     # rather than merely proving that adjacent leaders miss its ink.
     leader_keep_out = (
         box[0] - 0.002, box[1] - 0.002, box[2] + 0.002, box[3] + 0.002

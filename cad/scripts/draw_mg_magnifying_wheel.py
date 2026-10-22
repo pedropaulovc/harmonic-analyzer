@@ -68,7 +68,6 @@ from mg_magnifying_wheel_geom import (
     DRUM_PRESS,
     HUB_BACK_Z,
     HUB_FRONT_Z,
-    HUB_STEP_Z,
     SPOKE_X0,
 )
 from mg_magnifying_wheel_spec import (
@@ -224,13 +223,13 @@ FRONT_KEEP = {
     # Near-side, one arrow each: Ø100 up-left on the OD, over the bore's
     # block, its need in two lines under it; Ø88 right through the 0-60
     # window at 19 deg, clear of the A-A line; the bore up-left through the
-    # 120-180 window to its block's shoulder (stacked Ø plus four callout
-    # lines).
+    # 120-180 window to its block's shoulder (stacked Ø plus the matched-fit
+    # acceptance and the axle's name and drawing number).
     "RimOuterDiaDim": _over(_polar((0.0, 0.0), 125.0, RIM_OUTER_DIA / 2.0 + 40.0), 3),
     "RimInnerDiaDim": _over(
         (_RIM_INNER_SHOULDER[0] + _DIA_SHOULDER_LEFT, _RIM_INNER_SHOULDER[1]), 1
     ),
-    "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 6),
+    "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 7),
     # The R3 (concave, inside the 0-60 window) leadered out along the window
     # to a shoulder past the OD at 30 deg; the R4 (convex, from outside the
     # rim) on its centre's -3 deg ray, past the OD and above the tip width's
@@ -400,9 +399,9 @@ _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
 )
-SPIGOT_LENGTH_CALLOUT = "DRUM NOT PROUD"
+SPIGOT_LENGTH_CALLOUT = "MG-WHEEL-DRUM\nMHA-MG-10 NOT PROUD"
 WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
-HUB_LENGTH_CALLOUT = "LOCKNUT ON FULL THREAD"
+HUB_LENGTH_CALLOUT = "MHA-MG-07 AXLE\nLOCKNUT ON FULL THREAD"
 # Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
 # 2.6 mm a character), so a callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
@@ -410,23 +409,27 @@ ARROWS_INSIDE = ("SpigotLength", "HubFrontZ")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SECTION_KEEP = {
     "HubDia": (_HUB_DIA_X, SECTION_CENTER[1]),
-    "GrooveBottomDia": (_GROOVE_DIA_X, SECTION_CENTER[1] + 0.035),
+    # Retained native top ink was Y204.499 at Y200; two new below-text rows
+    # grow it by 5.6 mm. Y199 leaves about 4.70 mm to the Y213.8 witness.
+    # Keep this block no wider than its existing Ø/tolerance: the running
+    # finish and R3 callouts stand to its left. The groove's R names the SKU.
+    "GrooveBottomDia": (_GROOVE_DIA_X, SECTION_CENTER[1] + 0.034),
     # Right of the view only the spigot's Ø, its line 7.2 mm past the spigot
     # end and its text under the spigot, so the matched-fit callout lines
     # stack down toward the spigot length's row: ISO_CLEAR off the
     # isometric, proven at build (_assert_text_off_iso), so no line is wider
-    # than "INTERFERENCE IN".  Its point stands half a line over run 14's, so
-    # the fourth callout line ends a line and a half over run 14's foot.
+    # than "INTERFERENCE IN". Adding the drum number grows the block upward,
+    # retaining its established lower shoulder and clearance to the axial rows.
     "SpigotDia": (
         _section_x(HUB_FRONT_Z) + 0.0072,
-        SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE / 2.0,
+        SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE,
     ),
     "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 3, _SPOKE_ROW + _ONE_LINE_UP),
     "SpigotLength": _beside(
         _section_x(HUB_FRONT_Z),
         1,
-        len(SPIGOT_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[0] + _STACK_UP + _ABOVE_UP,
+        max(map(len, SPIGOT_LENGTH_CALLOUT.splitlines())) + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[0] + _STACK_UP + 2.0 * _ABOVE_UP,
     ),
     "HubFrontZ": _beside(
         _section_x(HUB_FRONT_Z),
@@ -437,8 +440,8 @@ SECTION_KEEP = {
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
         -1,
-        len(HUB_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[2] + _STACK_UP + _ABOVE_UP,
+        max(map(len, HUB_LENGTH_CALLOUT.splitlines())) + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[2] + _STACK_UP + 2.0 * _ABOVE_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at run
     # 13's 35 deg, so the stub it draws past the arc leaves the rim's back
@@ -447,7 +450,10 @@ SECTION_KEEP = {
     # right along that bearing.  Run 17's 5.8 mm left its stacked +0.1 2.93
     # mm over the "R0.8 MAX" (text separation needs 3.57 mm): 1.5 mm more,
     # 2.1 mm right on the bearing.
-    "GrooveR": (SECTION_CENTER[0] + 0.0335, SECTION_CENTER[1] + 0.0695),
+    "GrooveR": (
+        SECTION_CENTER[0] + 0.0335,
+        SECTION_CENTER[1] + 0.0695 + _TEXT_LINE,
+    ),
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
@@ -486,15 +492,19 @@ ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": (
         f"REAM THRU\n{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f} DIAMETRAL\n"
-        "CLEARANCE ON\nMG-WHEEL-AXLE"
+        "CLEARANCE ON\nMG-WHEEL-AXLE\nMHA-MG-07"
     ),
     "SpigotDia": (
         f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}\nDIAMETRAL\n"
-        "INTERFERENCE IN\nMG-WHEEL-DRUM"
+        "INTERFERENCE IN\nMG-WHEEL-DRUM\nMHA-MG-10"
     ),
     # The OD's .XX floor keeps the groove deeper than the pen wire
     # (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN).
     "RimOuterDiaDim": "HOLDS PEN WIRE\nIN GROOVE",
+    # PenWire is the installed configuration of the shared MHA-SH-VN-56
+    # music wire. These controls seat that same wire, not a separate belt.
+    "GrooveBottomDia": "PEN WIRE\nSEAT",
+    "GrooveR": "PEN WIRE SEAT\nMHA-SH-VN-56",
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
@@ -538,12 +548,6 @@ BORE_FINISH_SYMBOL = _face(
     *_polar((0.0, 0.0), _BORE_FINISH_BEARING, RIM_OUTER_DIA / 2.0 + 16.0)
 )
 _BORE_FINISH_POINT = (*_polar((0.0, 0.0), _BORE_FINISH_BEARING, BORE_DIA / 2.0), 0.0)
-# The spigot's finish lands mid-length on the spigot's upper cut line (the
-# cylinder's edge where the A-A plane cuts it, model +Y), its symbol up and
-# right of the landing, above the Ø14.0's upper extension line and under the
-# rim-bore round's shoulder (sheet metres).
-_SPIGOT_FINISH_POINT = (0.0, SPIGOT_DIA / 2.0, (HUB_STEP_Z + HUB_FRONT_Z) / 2.0)
-_SPIGOT_FINISH_OFFSET = (0.012, 0.014)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
@@ -979,10 +983,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _near_side_diameters(adapter, annotations, axis=axis)
     _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
 
-    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running fit (the general machined grade),
-    # the spigot a static locating press seat; both controls are authored on
-    # the part and read back here.  The boss step is the drum's register face
-    # and takes no symbol.
+    # Only the running journal has a roughness control. The static drum
+    # press seat is governed by its interference acceptance (rule 6).
     bore_finish = add_surface_finish(
         adapter,
         front,
@@ -998,22 +1000,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # The rim's axial width across the section between its side faces' cut
     # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
     # own row (above).  Each line is selected as a native entity: a
-    # coordinate hit-test found no edge on farm run 4 (85a5d462d).  One sweep
-    # serves them, the spigot's cut line and the rim-bore round's arc.
+    # coordinate hit-test found no edge on farm run 4 (85a5d462d). One sweep
+    # serves the rim side lines and the rim-bore round's arc.
     section_edges = scan_view_edges(section, label="wheel section edges")
     rim_sides = tuple(
         _line_through(section_edges, point, label=f"rim side cut line z={point[2]:+g}")
         for point in _RIM_SIDE_POINTS
     )
-    rim_back, rim_front, spigot_landing = model_points_in_view(
+    rim_back, rim_front = model_points_in_view(
         adapter,
         section,
         tuple(
             tuple(value / 1000.0 for value in point)
-            for point in (*_RIM_SIDE_POINTS, _SPIGOT_FINISH_POINT)
+            for point in _RIM_SIDE_POINTS
         ),
         label="wheel section picks",
-        names=("rim back side", "rim front side", "spigot finish landing"),
+        names=("rim back side", "rim front side"),
     )
     rim_width = add_edge_dimension(
         adapter,
@@ -1036,21 +1038,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _pass_through_places(
         _early_bound(rim_width, "IDisplayDimension"), "rim axial width"
-    )
-    add_surface_finish(
-        adapter,
-        section,
-        edge_entity=_line_through(
-            section_edges, _SPIGOT_FINISH_POINT, label="spigot upper cut line"
-        ),
-        symbol_xy=(
-            spigot_landing[0] + _SPIGOT_FINISH_OFFSET[0],
-            spigot_landing[1] + _SPIGOT_FINISH_OFFSET[1],
-        ),
-        control=surface_finish_by_key(SURFACE_FINISHES, "mg_wheel_spigot"),
-        label="wheel spigot finish",
-        leader_attach_xy=spigot_landing,
-        char_height=FINISH_CHAR_HEIGHT,
     )
     round_radius = _add_round_radius(adapter, section, section_edges)
     rebuild_drawing(adapter, label="wheel dimension layout")

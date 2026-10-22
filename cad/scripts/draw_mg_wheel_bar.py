@@ -40,7 +40,9 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_edges import scan_view_edges
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _paths import CAD_ROOT
@@ -49,6 +51,7 @@ import _telemetry
 from _column_clamp_interface import BAR_DEPTH
 from mg_wheel_bar_spec import (
     AXLE_BORE_X,
+    AXLE_ORIENTATION_CALLOUT,
     BAR_LENGTH,
     BAR_SIDE,
     BORE_MIN_WALL,
@@ -82,6 +85,9 @@ FRONT_CENTER = (0.155, 0.175)
 # between it and the bar end.
 RIGHT_CENTER = (0.340, 0.175)
 ISO_CENTER = (0.320, 0.095)
+# Label the actual +Z back-face edge in the Right view, clear of the front
+# view's height callout. Keep orientation separate from the axle fit block.
+AXLE_ORIENTATION_NOTE_XY = (RIGHT_CENTER[0] + 0.015, RIGHT_CENTER[1] + 0.055)
 
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
@@ -120,9 +126,12 @@ FRONT_KEEP = {
     # outside the row's extension line.
     "Side": (RIGHT_END + 0.040, FRONT_CENTER[1] + 0.020),
     "BoreRowHeight": (RIGHT_END + 0.021, FRONT_CENTER[1] - 0.019),
-    # The reamed Ø up and right of the bore, the press lines standing clear
-    # of the bar.
-    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
+    # The reamed Ø up and right of the bore. The two added mate/fit rows grow
+    # upward at the native 5.6 mm pitch, retaining the old leader shoulder.
+    "AxleBoreDia": (
+        AXLE_BORE_SHEET_X + 0.035,
+        FRONT_CENTER[1] + 0.042 + 0.0056,
+    ),
 }
 # The bar depth (the extrude's banded model dimension) under the end view,
 # its text right of the extension lines: the callout is wider than the 9.
@@ -142,8 +151,8 @@ CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
 # station's .XX holds its end wall.
 DIMENSION_CALLOUTS = {
     "AxleBoreDia": (
-        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n"
-        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} INTERFERENCE"
+        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\nMHA-MG-07\n"
+        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} DIAMETRAL\nINTERFERENCE"
     ),
     "BarDepth": (
         "MG-WHEEL-AXLE BACK END\n"
@@ -265,6 +274,27 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             process="DRILL",
         )
+
+    back_face_point_mm = (BAR_LENGTH / 2.0, 0.0, BAR_DEPTH / 2.0)
+    back_face_edge = scan_view_edges(
+        right, label="wheel-bar back-face edge"
+    ).exact_line_through(
+        back_face_point_mm, label="bar +Z back-face edge"
+    ).edge
+    add_attached_note(
+        adapter,
+        right,
+        text=AXLE_ORIENTATION_CALLOUT,
+        entity=back_face_edge,
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            right,
+            tuple(value / 1000.0 for value in back_face_point_mm),
+            label="bar +Z back-face edge",
+        ),
+        note_xy=AXLE_ORIENTATION_NOTE_XY,
+        label="axle squareness to the bar back face",
+    )
 
     # Under the length row, which sits 54 mm below the bar.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)

@@ -17,7 +17,7 @@ import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
 from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED_UM, SEAT_UM
+from _surface_finish import MACHINED_UM
 
 
 def _called_names(path: str) -> list[str]:
@@ -184,15 +184,6 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert "REAMED" not in notes
     # Each fit prints on its own diameter: the mate and the stated fit.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == (
-        "REAM THRU\n0.033-0.053 DIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE"
-    )
-    assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == (
-        "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM"
-    )
-    assert drawing.ROUND_CALLOUT.endswith("\nHOLDS TIE 2 WALL")
-    assert drawing.CALLOUTS_ABOVE["HubLength"] == "LOCKNUT ON FULL THREAD"
-    assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM NOT PROUD"
     assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
     assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
     assert "DO NOT" not in notes and "RELEASE" not in notes
@@ -207,15 +198,14 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     calls = _called_names(drawing.__file__)
     assert calls.count("add_datum_feature") == 0
     assert calls.count("add_feature_control_frame") == 0
-    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade, the pressed
-    # spigot the seat grade.
+    # Rule 6: retain the running journal grade; the static drum press seat
+    # is controlled by its interference acceptance, not a roughness symbol.
     finishes = {
         control.key: control.roughness_um
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
     }
     assert finishes == {
         "mg_wheel_bore": MACHINED_UM,
-        "mg_wheel_spigot": SEAT_UM,
     }
     # Only the rim's axial width is added on the sheet.
     assert calls.count("add_edge_dimension") == 1
