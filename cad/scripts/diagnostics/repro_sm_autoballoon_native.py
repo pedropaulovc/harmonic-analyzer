@@ -237,27 +237,55 @@ def _fixture(sw, assembly):
             "spring_name": spring_name}
 
 
+def _packing_app(sw):
+    """Use the production PackAndGo comtypes boundary, never create another seat."""
+    import comtypes
+    import comtypes.client
+
+    if _BINDING is None:
+        raise RuntimeError("primary SOLIDWORKS wrappers have not been loaded")
+    module = comtypes.client.GetModule((
+        comtypes.GUID(str(_BINDING.CLSID)), _BINDING.MajorVersion,
+        _BINDING.MinorVersion, _BINDING.LCID,
+    ))
+    app = comtypes.client.GetActiveObject("SldWorks.Application", interface=module.ISldWorks)
+    actual_pid, held_pid = int(app.GetProcessID()), int(sw.GetProcessID())
+    if actual_pid != held_pid:
+        raise RuntimeError(f"PackAndGo attached to PID {actual_pid}, not held PID {held_pid}")
+    return app
+
+
 def _pack(sw, assembly, destination):
     """Pack native references into a new owned folder; no source SaveAs."""
     destination = Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=False)
     _close_all(sw)
     silent, readonly = _constants(sw, ("swOpenDocOptions_Silent", "swOpenDocOptions_ReadOnly"))
-    model = _open(sw, assembly, 2, options=silent | readonly)
-    extension = _cast(model.Extension, "IModelDocExtension")
-    pack = _cast(extension.GetPackAndGo(), "IPackAndGo")
+    _open(sw, assembly, 2, options=silent | readonly)
+    app = _packing_app(sw)
+    active = app.IActiveDoc2
+    if not active or Path(str(active.GetPathName())).resolve() != Path(assembly).resolve():
+        raise RuntimeError("PackAndGo active document is not the opened read-only source")
+    extension = active.Extension
+    pack = extension.GetPackAndGo()
+    if not pack:
+        raise RuntimeError("comtypes GetPackAndGo returned no interface")
     pack.IncludeDrawings = False
     pack.FlattenToSingleFolder = True
     names = pack.GetDocumentNames()
-    if type(names) is not tuple or len(names) != 2 or names[0] is not True:
+    if (type(names) is not tuple or len(names) != 2 or names[1] is not True
+            or type(names[0]) not in (tuple, list)
+            or len(names[0]) != pack.GetDocumentNamesCount()):
         raise RuntimeError(f"PackAndGo document names shape: {names!r}")
     if not pack.SetSaveToName2(True, str(destination)):
         raise RuntimeError("PackAndGo destination rejected")
     saved = pack.GetDocumentSaveToNames()
-    if type(saved) is not tuple or len(saved) != 3 or saved[0] is not True:
+    if (type(saved) is not tuple or len(saved) != 3 or saved[2] is not True
+            or type(saved[0]) not in (tuple, list) or type(saved[1]) not in (tuple, list)
+            or len(saved[1]) != len(names[0])):
         raise RuntimeError(f"PackAndGo output names shape: {saved!r}")
-    paths = [str(_owned(path, destination)) for path in saved[1]]
-    if len(paths) != len(names[1]) or len(set(paths)) != len(paths):
+    paths = [str(_owned(str(path), destination)) for path in saved[0]]
+    if len(paths) != len(names[0]) or len(set(paths)) != len(paths):
         raise RuntimeError("PackAndGo path count/collision")
     statuses = extension.SavePackAndGo(pack)
     if (type(statuses) not in (tuple, list) or len(statuses) != len(paths)
@@ -265,8 +293,8 @@ def _pack(sw, assembly, destination):
         raise RuntimeError(f"PackAndGo save statuses: {statuses!r}")
     if any(not Path(path).is_file() for path in paths):
         raise RuntimeError("PackAndGo omitted a native dependency")
-    roots = [Path(path) for old, path in zip(names[1], paths, strict=True)
-             if Path(old).resolve() == Path(assembly).resolve()]
+    roots = [Path(path) for old, path in zip(names[0], paths, strict=True)
+             if Path(str(old)).resolve() == Path(assembly).resolve()]
     if len(roots) != 1:
         raise RuntimeError("PackAndGo did not identify the owned assembly")
     _close_all(sw)
