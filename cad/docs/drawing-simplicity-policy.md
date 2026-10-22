@@ -77,8 +77,12 @@ cannot ask for what the authors were told to leave out.
   These sheets also use the purchased builder's post-close `saved_check` hook:
   reopen the actual SLDDRW read-only, reacquire its source/configuration and
   dimensions, repeat native identity/value/attachment/band/presentation checks,
-  and require the saved drawing's SHA-256 to remain unchanged. A pre-save
-  check or an authoring-view handle is not saved-file evidence.
+  and require the saved drawing's SHA-256 to remain unchanged. The source
+  context must be read-only with native `GetSaveFlag()` exactly `False`, whether
+  resident or autoloaded; record both its residency and save flag. Per-field
+  getter readbacks accompany refusals as notes on the original exception.
+  A pre-save check, dirty in-memory source, or authoring-view handle is not
+  saved-file evidence.
   The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
   outer Top cell retains the existing 46 mm annotation reserve, leaving
   50 mm for the measured native outline. The bottom-row cells' tops and

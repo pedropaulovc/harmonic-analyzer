@@ -42,7 +42,7 @@ class _ReadSurface:
 class _Part(_ReadSurface):
     def __getattribute__(self, name):
         if name in {
-            "GetPathName", "GetType", "IsOpenedReadOnly", "GetBodies2", "FeatureByName",
+            "GetPathName", "GetType", "IsOpenedReadOnly", "GetSaveFlag", "GetBodies2", "FeatureByName",
         } and not object.__getattribute__(self, "__dict__").get("_alive", True):
             raise AssertionError("stale unloaded source IModelDoc2 used")
         return object.__getattribute__(self, name)
@@ -294,6 +294,7 @@ def saved_washer(request, tmp_path, monkeypatch):
     features = {}
     model = _Part(
         GetPathName=lambda: str(path_state.path), GetType=lambda: 1, IsOpenedReadOnly=lambda: True,
+        GetSaveFlag=lambda: False,
         GetBodies2=lambda _kind, _hidden: (body,), FeatureByName=lambda name: features.get(name),
     )
     original = {name: _View(name, model, f"Authoring{name[1:]}Config") for name in ORIENTATIONS}
@@ -445,6 +446,8 @@ def test_callable_then_saved_roundtrip_uses_only_fresh_contexts(saved_washer):
     assert all(entry["round_to_fraction"] is False for entry in receipt["dimensions"])
     expected_identities = {1} if source.OUTER_DIAMETER in case.arguments["bands"] else {1, None}
     assert {entry["source_native_identity"] for entry in receipt["dimensions"]} == expected_identities
+    assert receipt["source_resident_before_open"] is True
+    assert receipt["source_save_flag"] is False
 
 
 def test_unloaded_authoring_source_is_reacquired_from_drawing_autoload(saved_washer):
@@ -465,6 +468,9 @@ def test_unloaded_authoring_source_is_reacquired_from_drawing_autoload(saved_was
     assert reloaded is not case.model
     assert case.app.open_calls == [(str(case.path), 3, 1 | 2, "", 0, 0)]
     _assert_closed_unchanged(case)
+    receipt = json.loads(case.messages[0].split(": ", 1)[1])
+    assert receipt["source_resident_before_open"] is False
+    assert receipt["source_save_flag"] is False
 
 
 @pytest.mark.parametrize("fault", ("missing", "wrong-path", "wrong-type", "writable", "unreadable-readonly"))
@@ -489,6 +495,146 @@ def test_saved_source_context_requires_captured_path_native_part_and_readonly(sa
         case.proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
     assert not case.messages
+
+
+def _exception_receipt(error):
+    receipts = []
+    for note in getattr(error, "__notes__", ()):
+        start = note.find("{")
+        if start >= 0:
+            try:
+                receipts.append(json.loads(note[start:]))
+            except json.JSONDecodeError:
+                pass
+    assert len(receipts) == 1, getattr(error, "__notes__", ())
+    return receipts[0]
+
+
+def _autoload_source(case, loaded):
+    case.app.loaded.pop(str(case.source_path))
+    case.model._alive = False
+    case.saved_source = loaded
+
+    def autoload():
+        case.app.loaded[str(case.source_path)] = loaded
+        for view in case.fresh.values():
+            view.ReferencedDocument = loaded
+
+    case.app.on_open = autoload
+
+
+@pytest.mark.parametrize("resident", (True, False), ids=("resident", "autoload"))
+@pytest.mark.parametrize("flag", (True, 0, 0.0, None, "False"),
+                         ids=("dirty", "integer-zero", "float-zero", "missing", "string-false"))
+def test_saved_source_requires_literal_clean_save_flag(saved_washer, resident, flag):
+    case = saved_washer
+    loaded = case.model if resident else _Part(**vars(case.model))
+    loaded.GetSaveFlag = lambda: flag
+    if not resident:
+        _autoload_source(case, loaded)
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_resident_before_open"] is resident
+    assert type(receipt["source_save_flag"]) is type(flag)
+    assert receipt["source_save_flag"] == flag
+
+
+def test_native_source_identity_requires_integer_one_not_boolean_true(saved_washer):
+    case = saved_washer
+    native = case.source_natives[source.THICKNESS]
+    original_is_same = case.app.IsSame
+
+    def is_same(first, second):
+        if first is native and second is native:
+            return True
+        return original_is_same(first, second)
+
+    case.app.IsSame = is_same
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    selection_name = _display(case, source.THICKNESS).selection_name
+    entry = next(item for item in receipt["dimensions"] if item["selection_name"] == selection_name)
+    assert entry["source_native_identity"] is True
+
+
+@pytest.mark.parametrize("resident", (True, False), ids=("resident", "autoload"))
+def test_source_save_flag_read_error_preserves_exception_and_actual_failed_field(
+    saved_washer, resident,
+):
+    case = saved_washer
+    loaded = case.model if resident else _Part(**vars(case.model))
+    failure = RuntimeError("actual native GetSaveFlag read failed: source-state-sentinel")
+
+    def refuse_read():
+        raise failure
+
+    loaded.GetSaveFlag = refuse_read
+    if not resident:
+        _autoload_source(case, loaded)
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_resident_before_open"] is resident
+    field = receipt["source_save_flag"]
+    assert isinstance(field, dict)
+    assert str(failure) in field["read_error"]
+
+
+@pytest.mark.parametrize("getter, field", (
+    ("GetUnits", "units"), ("GetPrimaryPrecision2", "precision"),
+))
+def test_saved_display_getter_error_preserves_exception_and_actual_failed_field(
+    saved_washer, getter, field,
+):
+    case = saved_washer
+    display = _display(case, source.THICKNESS)
+    failure = RuntimeError(f"actual native {getter} read failed: display-field-sentinel")
+
+    def refuse_read():
+        raise failure
+
+    setattr(display, getter, refuse_read)
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    entry = next(item for item in receipt["dimensions"]
+                 if item["selection_name"] == display.selection_name)
+    assert isinstance(entry[field], dict)
+    assert str(failure) in entry[field]["read_error"]
+
+
+def test_failure_receipt_reports_wrong_saved_units_not_authored_source_echo(saved_washer):
+    case = saved_washer
+    display = _display(case, source.THICKNESS)
+    display.units = 3
+    assert case.source_displays[source.THICKNESS].units == 0
+    case.invalidate()
+    with pytest.raises(RuntimeError, match="native supplier presentation differs") as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
+    assert not case.messages
+    receipt = _exception_receipt(caught.value)
+    entry = next(item for item in receipt["dimensions"]
+                 if item["selection_name"] == display.selection_name)
+    assert type(entry["units"]) is int
+    assert entry["units"] == 3
+
 
 
 def test_matching_late_authoring_config_cannot_replace_captured_expectation(saved_washer):

@@ -338,7 +338,7 @@ def washer_import(washer_native, monkeypatch):
     return SimpleNamespace(
         imported=case, source=source, source_state=source_state,
         source_text=source_text, source_calls=source_calls,
-        identity_calls=identity_calls, persist=persist,
+        identity_calls=identity_calls, persist=persist, adapter=adapter,
     )
 
 
@@ -440,6 +440,32 @@ def test_foreign_import_native_is_refused_before_setter(washer_import):
     assert pair.identity_calls[0][1] is case.native
     assert _presentation_snapshot(case) == before
     object.__setattr__(case.display, "GetDimension2", original_getter)
+    _assert_source_unchanged(case)
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (True, False, 1.0, "1", None, 0, -1),
+    ids=("boolean-true", "boolean-false", "float-one", "string-one",
+         "unreadable-none", "integer-zero", "integer-minus-one"),
+)
+def test_import_requires_actual_integer_native_identity(washer_import, identity):
+    pair = washer_import
+    case = pair.imported
+
+    def malformed_identity(left, right):
+        pair.identity_calls.append((left, right))
+        return identity
+
+    object.__setattr__(pair.adapter.swApp, "IsSame", malformed_identity)
+    before = _presentation_snapshot(case)
+    with pytest.raises(RuntimeError, match="not its native source"):
+        pair.persist()
+    assert not case.calls
+    assert not pair.source_calls
+    assert len(pair.identity_calls) == 1
+    assert all(entity is case.native for entity in pair.identity_calls[0])
+    assert _presentation_snapshot(case) == before
     _assert_source_unchanged(case)
 
 
