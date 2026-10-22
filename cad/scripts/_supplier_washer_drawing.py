@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import hashlib
 import json
+from math import cos, dist, isfinite, sin
 from pathlib import Path
 from typing import Any, Literal
 
@@ -21,12 +22,23 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
 from _com import _early_bound
 from _drawing_attachment import _is_same_attachment
+from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+from _drawing_common import rebuild_drawing
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_precision import _named_dimensions
+from _drawing_layout_audit import annotation_display
+from _drawing_leaders import set_near_side_diameter
+from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_geometry import segment_box_distance, segment_box_overlap_length
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
+)
+from _supplier_reference_text import (
+    assert_reference_text_stations,
+    measure_reference_text,
+    shelve_reference_text,
 )
 from _supplier_washer_model import (
     BORE_DIAMETER,
@@ -191,7 +203,7 @@ def assert_supplier_washer_dimensions(
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
     units: Literal["in", "mm"], precision: Mapping[str, int],
     bands: Mapping[str, tuple[float, float, str]],
-) -> None:
+) -> dict[str, Any]:
     """Reacquire displays, source entities and final solid rims after rebuild."""
     if len(references) != 3 or {reference.label for reference in references} != {
         OUTER_DIAMETER, BORE_DIAMETER, THICKNESS,
@@ -242,6 +254,21 @@ def assert_supplier_washer_dimensions(
             presentation=reference.presentation, callout=reference.callout,
         )
         if reference.imported:
+            feature_name, source_name = SOURCE_DIMENSIONS[reference.label]
+            feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+            if feature is None:
+                raise RuntimeError(f"{reference.label}: supplier source feature is missing")
+            source_display, source_native = _named_dimensions(
+                adapter, feature_name, {source_name}, feature=feature,
+            )[source_name]
+            _assert_supplier_washer_presentation(
+                source_display, label=reference.label, units=units,
+                precision=precision[reference.label], expected_mm=reference.expected_mm,
+                callout=reference.callout,
+            )
+            identity = adapter.swApp.IsSame(display.GetDimension2(0), source_native)
+            if type(identity) is not int or identity != 1:
+                raise RuntimeError(f"{reference.label}: imported dimension is not its actual native source")
             assert_supplier_washer_source_attachment(
                 adapter, model, display, label=reference.label, axis=axis,
                 bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
@@ -253,6 +280,145 @@ def assert_supplier_washer_dimensions(
             display, nominal_mm=reference.expected_mm, band=bands.get(reference.label),
             precision=precision[reference.label], label=reference.label,
         )
+    return current
+
+
+_PLACEMENT_TOLERANCE_M = 1e-5
+
+
+@dataclass(frozen=True)
+class _WasherPlacement:
+    """Only immutable sheet-space scalars cross the saved-document boundary."""
+
+    tips: tuple[tuple[float, ...], ...]
+    witnesses: tuple[tuple[float, ...], ...]
+    thickness_x: float
+    face_outline: tuple[float, ...]
+    diameter_positions: tuple[tuple[str, tuple[float, ...]], ...]
+
+
+def _placement_position(annotation: Any, *, label: str) -> tuple[float, ...]:
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if len(position) != 3 or not all(map(isfinite, position)):
+        raise RuntimeError(f"{label}: unreadable washer annotation position")
+    return position
+
+
+def _face_outline(view: Any) -> tuple[float, ...]:
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if (
+        len(outline) != 4 or not all(map(isfinite, outline))
+        or outline[0] >= outline[2] or outline[1] >= outline[3]
+    ):
+        raise RuntimeError("supplier washer face has unreadable native outline")
+    return outline
+
+
+def _diameter_caption(adapter: Any, display: Any, *, label: str) -> tuple[Any, tuple[Any, ...], Any]:
+    """Measure every native caption fragment, including Ø, limits and below text.
+
+    As in draw_pd_support_bar, normalize swTextPosition_e before display_box;
+    never estimate missing widths or use the numeric annotation anchor as ink.
+    """
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    data, errors = annotation_display(adapter, annotation)
+    if errors:
+        raise RuntimeError(f"{label}: refused washer caption display reads: {errors!r}")
+    texts = []
+    for raw in data.get("texts", ()):
+        at = tuple(float(value) for value in raw.get("pos", ()))
+        width, height, angle = (float(raw.get(key) or 0.0) for key in ("w", "h", "ang"))
+        reference = raw.get("ref")
+        if (
+            len(at) != 3 or not all(map(isfinite, (*at, width, height, angle)))
+            or width <= 0.0 or height <= 0.0 or raw.get("ang") is None
+            or type(reference) is not int or reference not in range(6)
+        ):
+            raise RuntimeError(f"{label}: unreadable native washer caption fragment: {raw!r}")
+        dx, dy = {
+            0: (0.0, -height), 1: (0.0, 0.0),
+            2: (-width / 2, -height / 2), 3: (-width, -height),
+            4: (-width, 0.0), 5: (-width / 2, -height),
+        }[reference]
+        texts.append({
+            **raw, "ref": 1,
+            "pos": (at[0] + cos(angle) * dx - sin(angle) * dy,
+                    at[1] + sin(angle) * dx + cos(angle) * dy, at[2]),
+        })
+    text = display_box({"texts": texts})
+    if text is None or not all(map(isfinite, (text.xmin, text.ymin, text.xmax, text.ymax))):
+        raise RuntimeError(f"{label}: washer caption has no finite measured native text")
+    for kind, rows in data.items():
+        if kind != "texts" and any(
+            not row or not all(isfinite(float(value)) for value in row) for row in rows
+        ):
+            raise RuntimeError(f"{label}: non-finite native washer caption graphics ({kind})")
+    if (
+        not data.get("lines") or any(len(row) < 10 for row in data["lines"])
+        or len(data.get("arrows", ())) != 1
+        or any(
+            len(row) < 8 or row[6] <= 0.0 or row[7] <= 0.0 or row[3] ** 2 + row[4] ** 2 == 0.0
+            for row in data["arrows"]
+        )
+    ):
+        raise RuntimeError(f"{label}: washer diameter lost its native single-arrow leader graphics")
+    record = {"type": 4, "display": data, "dim": {"hole_callout": False}}
+    geometry = annotation_geometry(
+        record, owner=label, advance=calibrate_sheet_advance((record,)),
+    )
+    if geometry is None or not geometry.segments or any(
+        not all(map(isfinite, (run.x0, run.y0, run.x1, run.y1)))
+        for run in geometry.segments
+    ):
+        raise RuntimeError(f"{label}: unreadable native washer caption leader")
+    fragments = tuple(display_box({"texts": [raw]}) for raw in texts)
+    return text, fragments, geometry
+
+
+def _assert_diameter_placement(adapter: Any, display: Any, view: Any, *, label: str) -> None:
+    # Read back the documented near-side diameter style, not just setter status.
+    if (
+        display.Diametric is not True or type(display.ArrowSide) is not int or display.ArrowSide != 1
+        or display.SolidLeader is not False or display.GetUseDocBrokenLeader() is not False
+        or type(display.GetBrokenLeader2()) is not int or display.GetBrokenLeader2() != 2
+        or display.GetUseDocSecondArrow() is not False or display.GetSecondArrow() is not False
+    ):
+        raise RuntimeError(f"{label}: washer native diameter leader style changed")
+    text, fragments, geometry = _diameter_caption(adapter, display, label=label)
+    if text.xmin < _face_outline(view)[2] + CLEAR_GAP_M:
+        raise RuntimeError(f"{label}: complete washer caption crowds the native face outline")
+    for segment in geometry.segments:
+        for fragment in fragments:
+            if segment.role == "arrow":
+                if segment_box_distance(segment, fragment) < CLEAR_GAP_M:
+                    raise RuntimeError(f"{label}: native washer arrow crowds its caption")
+            elif segment_box_overlap_length(segment, fragment) > 0.0:
+                raise RuntimeError(f"{label}: native washer leader crosses its caption")
+
+
+def _assert_washer_placement(
+    adapter: Any, current: Mapping[str, Any], face: Any, expected: _WasherPlacement,
+) -> None:
+    display = _early_bound(current[THICKNESS], "IDisplayDimension")
+    actual = measure_reference_text(adapter, display, axis=1, label=THICKNESS)
+    assert_reference_text_stations(
+        {"tips": expected.tips, "witnesses": expected.witnesses}, actual, label=THICKNESS,
+    )
+    if display.OffsetText is not True or actual["text"].ymin < actual["reach"] + CLEAR_GAP_M:
+        raise RuntimeError("washer thickness text crowds its native line")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if abs(_placement_position(annotation, label=THICKNESS)[0] - expected.thickness_x) > _PLACEMENT_TOLERANCE_M:
+        raise RuntimeError("washer thickness transverse position moved")
+    if dist(_face_outline(face), expected.face_outline) > _PLACEMENT_TOLERANCE_M:
+        raise RuntimeError("washer face outline moved after native caption placement")
+    for label, position in expected.diameter_positions:
+        display = _early_bound(current[label], "IDisplayDimension")
+        _assert_diameter_placement(adapter, display, face, label=label)
+        if dist(
+            _placement_position(_early_bound(display.GetAnnotation(), "IAnnotation"), label=label),
+            position,
+        ) > _PLACEMENT_TOLERANCE_M:
+            raise RuntimeError(f"{label}: native washer caption position moved")
 
 
 _WASHER_ORIENTATIONS = frozenset(("*Front", "*Top", "*Right", "*Isometric"))
@@ -309,6 +475,16 @@ def _saved_display_readback(display: Any) -> dict[str, Any]:
         ("attachment_count", lambda: annotation.GetAttachedEntityCount3()),
         ("attachment_types", lambda: list(annotation.GetAttachedEntityTypes() or ())),
         ("dangling", lambda: annotation.IsDangling()),
+        ("annotation_position", lambda: annotation.GetPosition()),
+        ("native_display", lambda: annotation_display(None, annotation)),
+        ("offset_text", lambda: display.OffsetText if display.Type2 in (2, 11, 12) else None),
+        ("diametric", lambda: display.Diametric if display.Type2 == 6 else None),
+        ("arrow_side", lambda: display.ArrowSide if display.Type2 == 6 else None),
+        ("solid_leader", lambda: display.SolidLeader if display.Type2 == 6 else None),
+        ("use_document_broken_leader", lambda: display.GetUseDocBrokenLeader() if display.Type2 == 6 else None),
+        ("broken_leader", lambda: display.GetBrokenLeader2() if display.Type2 == 6 else None),
+        ("use_document_second_arrow", lambda: display.GetUseDocSecondArrow() if display.Type2 == 6 else None),
+        ("second_arrow", lambda: display.GetSecondArrow() if display.Type2 == 6 else None),
         ("tolerance_type", lambda: tolerance.Type),
         ("tolerance_min", lambda: tolerance.GetMinValue() if tolerance.Type else None),
         ("tolerance_max", lambda: tolerance.GetMaxValue() if tolerance.Type else None),
@@ -358,7 +534,8 @@ def _supplier_washer_proof(
     # authoring IView or source COM handle that closing the drawing may unload.
     saved_references = tuple(
         (_early_bound(reference.view, "IView").GetOrientationName(),
-         reference.label, reference.expected_mm, reference.imported, reference.callout)
+         reference.label, reference.expected_mm, reference.imported, reference.callout,
+         reference.full_name if reference.imported else None)
         for reference in references
     )
     if any(reference[0] not in configurations for reference in saved_references):
@@ -366,12 +543,90 @@ def _supplier_washer_proof(
     # Freeze expectations independently of both caller mappings and reopened state.
     precision, bands = dict(precision), dict(bands)
 
-    def settled_check() -> None:
-        assert_supplier_washer_dimensions(
+    def reacquire() -> dict[str, Any]:
+        # Every core phase first repeats the original complete three-reference
+        # source/body/rim/value/band/presentation proof against captured context.
+        if set(views) != _WASHER_ORIENTATIONS:
+            raise RuntimeError("authoring washer standard view census changed during placement")
+        if (
+            _native_path(source.GetPathName(), label="authoring washer source") != source_path
+            or type(source.GetType()) is not int or source.GetType() != 1
+        ):
+            raise RuntimeError("authoring washer source path/type changed during placement")
+        for orientation, raw in views.items():
+            view = _early_bound(raw, "IView")
+            model = view.ReferencedDocument
+            identity = None if model is None else adapter.swApp.IsSame(model, source)
+            if (
+                view.GetOrientationName() != orientation
+                or type(identity) is not int or identity != 1
+                or _native_path(view.GetReferencedModelName(), label=orientation) != source_path
+                or view.ReferencedConfiguration != configurations[orientation]
+            ):
+                raise RuntimeError(f"{orientation}: authoring washer source/view identity changed during placement")
+        return assert_supplier_washer_dimensions(
             adapter, views, references, axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
             precision=precision, bands=bands,
         )
+
+    reacquire()
+    thickness_name = next(reference.full_name for reference in references if reference.label == THICKNESS)
+
+    def reacquire_thickness() -> dict[str, Any]:
+        return {thickness_name: reacquire()[THICKNESS]}
+
+    shelf_check = shelve_reference_text(
+        adapter, reacquire=reacquire_thickness, axes={thickness_name: 1},
+        label="supplier washer thickness", force=(thickness_name,),
+    )
+    face_orientation = "*Top" if axis == "y" else "*Front"
+    face = views[face_orientation]
+    current = reacquire()
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        set_near_side_diameter(current[label].GetAnnotation(), label)
+    rebuild_drawing(adapter, label="supplier washer native diameter leaders")
+    current = reacquire()
+    right = _face_outline(face)[2]
+    moved = False
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        display = _early_bound(current[label], "IDisplayDimension")
+        text, _fragments, geometry = _diameter_caption(adapter, display, label=label)
+        arrow_right = max(
+            coordinate for segment in geometry.segments if segment.role == "arrow"
+            for coordinate in (segment.x0, segment.x1)
+        )
+        dx = max(0.0, max(right, arrow_right) + CLEAR_GAP_M + PLACE_SETTLE_M - text.xmin)
+        if dx:
+            annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+            x, y, z = _placement_position(annotation, label=label)
+            if annotation.SetPosition2(x + dx, y, z) is not True:
+                raise RuntimeError(f"{label}: native washer caption move was rejected")
+            moved = True
+    if moved:
+        rebuild_drawing(adapter, label="supplier washer complete diameter captions")
+    current = reacquire()
+    shelf_check()
+    thickness = measure_reference_text(adapter, current[THICKNESS], axis=1, label=THICKNESS)
+    placement = _WasherPlacement(
+        tips=tuple(tuple(map(float, tip)) for tip in thickness["tips"]),
+        witnesses=tuple(tuple(map(float, witness)) for witness in thickness["witnesses"]),
+        thickness_x=_placement_position(
+            _early_bound(current[THICKNESS].GetAnnotation(), "IAnnotation"), label=THICKNESS,
+        )[0],
+        face_outline=_face_outline(face),
+        diameter_positions=tuple(
+            (label, _placement_position(
+                _early_bound(current[label].GetAnnotation(), "IAnnotation"), label=label,
+            )) for label in (OUTER_DIAMETER, BORE_DIAMETER)
+        ),
+    )
+    _assert_washer_placement(adapter, current, face, placement)
+
+    def settled_check() -> None:
+        current = reacquire()
+        shelf_check()
+        _assert_washer_placement(adapter, current, face, placement)
 
     @_telemetry.traced("drawing.saved_supplier_washer_dimensions")
     def saved_check(saved_adapter: Any, path: Path) -> None:
@@ -391,9 +646,13 @@ def _supplier_washer_proof(
         primary: BaseException | None = None
         receipt: dict[str, Any] = dict(
             drawing_path=str(saved_path), sha256=before,
-            source_resident_before_open=app.GetOpenDocumentByName(str(source_path)) is not None,
         )
         try:
+            try:
+                receipt["source_resident_before_open"] = app.GetOpenDocumentByName(str(source_path)) is not None
+            except Exception as error:
+                receipt["source_resident_before_open"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
             # Generated OpenDoc6 appends the two native [out] LONGs. No BYREF
             # variants, ViewOnly/detailing mode, activation or fresh adapter model.
             opened = app.OpenDoc6(path_string, 3, 1 | 2, "", 0, 0)
@@ -413,17 +672,33 @@ def _supplier_washer_proof(
             # Closing the finalizer's drawing can unload its hidden source.
             # The saved drawing autoloads that source; reacquire its live model
             # from the captured path, never from a view or an old COM handle.
-            loaded_source = app.GetOpenDocumentByName(str(source_path))
+            try:
+                loaded_source = app.GetOpenDocumentByName(str(source_path))
+            except Exception as error:
+                receipt["source_context_read_error"] = f"{type(error).__name__}: {error}"
+                raise
             if loaded_source is None:
                 raise RuntimeError("saved washer source context was not loaded by the drawing")
             loaded_source = _early_bound(loaded_source, "IModelDoc2")
-            receipt["source_path"] = loaded_source.GetPathName()
+            try:
+                receipt["source_path"] = loaded_source.GetPathName()
+            except Exception as error:
+                receipt["source_path"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
             if _native_path(receipt["source_path"], label="saved washer source") != source_path:
                 raise RuntimeError("saved washer source path changed")
-            receipt["source_type"] = kind = loaded_source.GetType()
+            try:
+                receipt["source_type"] = kind = loaded_source.GetType()
+            except Exception as error:
+                receipt["source_type"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
             if type(kind) is not int or kind != 1:
                 raise RuntimeError("saved washer source context is not a native part")
-            receipt["source_read_only"] = loaded_source.IsOpenedReadOnly()
+            try:
+                receipt["source_read_only"] = loaded_source.IsOpenedReadOnly()
+            except Exception as error:
+                receipt["source_read_only"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
             if receipt["source_read_only"] is not True:
                 raise RuntimeError("saved washer source context is not read-only")
             try:
@@ -433,6 +708,40 @@ def _supplier_washer_proof(
                 raise
             if receipt["source_save_flag"] is not False:
                 raise RuntimeError("saved washer source context is dirty or has an unreadable save flag")
+            # MaterialIdName describes the currently active source configuration.
+            # Record the actual freshly reacquired native value, never the
+            # catalogue input or apply_material's returned input echo.
+            try:
+                with source_path.open("rb") as source_file:
+                    receipt["source_sha256"] = hashlib.file_digest(source_file, "sha256").hexdigest()
+            except Exception as error:
+                receipt["source_sha256"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
+            receipt["source_active_configuration_member"] = (
+                "IModelDoc2.ConfigurationManager.ActiveConfiguration.Name"
+            )
+            try:
+                manager = _early_bound(loaded_source.ConfigurationManager, "IConfigurationManager")
+                configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+                receipt["source_active_configuration"] = configuration.Name
+            except Exception as error:
+                receipt["source_active_configuration"] = {"read_error": f"{type(error).__name__}: {error}"}
+                raise
+            if (
+                not isinstance(receipt["source_active_configuration"], str)
+                or not receipt["source_active_configuration"].strip()
+            ):
+                raise RuntimeError("saved washer source active configuration name is missing or non-string")
+            receipt["source_material_member"] = "IPartDoc.MaterialIdName"
+            try:
+                material = _early_bound(loaded_source, "IPartDoc").MaterialIdName
+            except Exception as error:
+                receipt["source_material_read_error"] = f"{type(error).__name__}: {error}"
+                raise
+            receipt["source_material_raw"] = material
+            receipt["source_material_return_type"] = f"{type(material).__module__}.{type(material).__qualname__}"
+            if not isinstance(material, str) or not material.strip():
+                raise RuntimeError("saved washer native material readback is missing, empty or non-string")
             sheets = tuple(_early_bound(model, "IDrawingDoc").GetViews() or ())
             if len(sheets) != 1:
                 raise RuntimeError("saved washer drawing must contain exactly one sheet")
@@ -482,7 +791,7 @@ def _supplier_washer_proof(
                     readbacks[id(display)] = row  # Telemetry index, not native identity proof.
             rim_scans: dict[str, ViewEdges] = {}
             fresh_references = []
-            for orientation, label, expected_mm, imported, callout in saved_references:
+            for orientation, label, expected_mm, imported, callout, source_full_name in saved_references:
                 view = fresh[orientation]
                 matches = []
                 if imported:
@@ -500,6 +809,8 @@ def _supplier_washer_proof(
                         source_display, label=label, units=units, precision=precision[label],
                         expected_mm=expected_mm, callout=callout,
                     )
+                    if str(source_native.FullName or "") != source_full_name:
+                        raise RuntimeError(f"{label}: saved supplier native source full name changed")
                     for display in displays[orientation]:
                         raw = display.GetDimension2(0)
                         if raw is not None and str(
@@ -539,11 +850,12 @@ def _supplier_washer_proof(
                     imported=imported, callout=callout,
                 )
                 fresh_references.append(fresh_reference)
-            assert_supplier_washer_dimensions(
+            current = assert_supplier_washer_dimensions(
                 saved_adapter, fresh, tuple(fresh_references), axis=axis, bore_mm=bore_mm,
                 outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
                 precision=precision, bands=bands,
             )
+            _assert_washer_placement(saved_adapter, current, fresh[face_orientation], placement)
         except BaseException as error:
             primary = error
             raise

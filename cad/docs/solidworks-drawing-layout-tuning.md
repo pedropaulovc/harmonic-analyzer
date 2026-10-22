@@ -111,6 +111,27 @@ attachment, value and format checks, complete cell/caption containment, its
 settled layout checks and post-export inspection/audit using actual PDF ink.
 Native shelf separation alone does not prove body or foreign-line clearance.
 
+The supplier-washer consumer forces this shelf only for the imported linear
+thickness reference, on its measured vertical axis. Every phase first reacquires
+and re-proves all three source/rim references, native identity, value, band and
+presentation against the captured source path and view configurations. Diameter
+references do not use `OffsetText`: the existing near-side diameter leader helper
+is followed by rebuild and native style readback. Placement measures every native
+caption fragment (including the diameter prefix and the below-caption screw-size
+text), normalizes its documented text-reference position, and moves the complete
+caption beyond the face outline and arrow extent with the same 2 mm clearance
+and 0.2 mm settle. Fresh graphics must have no own leader/text intersection or
+arrow/text clearance violation.
+
+Only immutable scalar stations, outlines and annotation positions cross into the
+saved washer reader. It reacquires the actual source, configurations, views and
+references from the read-only reopened drawing; it never calls the mutating shelf
+or retains authoring COM handles in that callback. The source-material receipt
+reads actual native `MaterialIdName`, return type, configuration and source-file
+hash, not the assignment request or installed-library expectation. A resident
+source is explicitly not a cold-source-open proof. These predicates and receipts
+do not replace complete-sheet native render/ink inspection and machinist review.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report
@@ -1153,6 +1174,29 @@ in their authored views, non-dangling, with unchanged native definitions.
 The shared finalizer's exact-count contract is unchanged for other recipes.
 
 **q. A standard view placed as-is is not necessarily in projection.**
+
+Purchased washer annotation reserves must preserve projected axes **before**
+strict native fitting. For the seven MG axle, CH oblique lever/block, PD pivot
+shim, CH thrust and SM knife-hanger washer recipes, Front and Top share outer
+X bounds 25–205 mm. Insetting a cell by `(left, bottom, right, top)` shifts its
+centre by `((left - right) / 2, (bottom - top) / 2)`. Their former 40/35 mm right
+reserves therefore put the paired X centres at 95/97.5 mm: a real 2.5 mm
+misalignment, not a generic clearance allowance. Both now retain the larger
+existing 40 mm reserve and centre at 95 mm.
+
+Front and Right also share their outer Y bounds. Only the two MG washers'
+Front reserves are asymmetric in Y (8 mm bottom, 6 mm top), shifting their
+centre +1 mm. Their previously uninset Right cells now reserve exactly the
+derived 2 mm difference at the bottom, shifting +1 mm too; no top or horizontal
+Right reserve is needed. The other five Fronts have equal bottom/top reserves,
+so their default Right Y centres already match and remain unchanged. These
+recipe-only reserves preserve existing Front/Top vertical annotation lanes,
+catalogue/common orthographic scale selection, native containment and saved
+proofs; they do not move views after fitting or alter shared fitting APIs.
+The existing `test_mg_vn_wheel_axle_front_washer_drawing.py` exercises all seven
+actual recipe calls with real `supplier_fit_cells` geometry. This is an offline
+axis/containment contract, not a native rendered-sheet acceptance claim.
+
 Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
 `*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
 (source `8d6d2088a`, launcher `20261012T124257186Z`): `*Top` was the principal

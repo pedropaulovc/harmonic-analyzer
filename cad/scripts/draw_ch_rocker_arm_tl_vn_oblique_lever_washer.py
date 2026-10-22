@@ -17,9 +17,11 @@ import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as part
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_lever_washer"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "5/16 WEDGE-LOCK WASHER PAIR, ID 8.64 x OD 13.46"
+# Front/Top share outer X bounds, so both need the face's 40 mm right reserve.
+# Front's equal bottom/top reserves already align Y with the uninset Right.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.006),
-    "*Front": (0.0, 0.008, 0.035, 0.008),
+    "*Front": (0.0, 0.008, 0.040, 0.008),
 }
 
 

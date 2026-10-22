@@ -8,6 +8,8 @@ attachment assertions execute unchanged against independently seeded surfaces.
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
+import hashlib
 import importlib
 import json
 from pathlib import Path
@@ -18,6 +20,8 @@ import pytest
 
 import _drawing_attachment as attachment
 import _drawing_edges as edges
+import _drawing_layout_audit as native_audit
+import _supplier_reference_text as reference_text
 import _supplier_dimensions as supplier
 import _supplier_washer_drawing as washer
 import _supplier_washer_model as source
@@ -43,8 +47,11 @@ class _Part(_ReadSurface):
     def __getattribute__(self, name):
         if name in {
             "GetPathName", "GetType", "IsOpenedReadOnly", "GetSaveFlag", "GetBodies2", "FeatureByName",
+            "MaterialIdName", "ConfigurationManager",
         } and not object.__getattribute__(self, "__dict__").get("_alive", True):
             raise AssertionError("stale unloaded source IModelDoc2 used")
+        if name in object.__getattribute__(self, "__dict__").get("_read_errors", {}):
+            raise object.__getattribute__(self, "__dict__")["_read_errors"][name]
         return object.__getattribute__(self, name)
 
 
@@ -94,9 +101,61 @@ class _View(_ReadSurface):
         return (0.02, 0.02, 0.04, 0.04)
 
 
+class _DisplayData:
+    """Native getter-shaped data, independently seeded in sheet metres."""
+
+    def __init__(self, display):
+        self.display = display
+
+    def GetLineCount(self):
+        return len(self.display.graphics()["lines"])
+
+    def GetLineAtIndex3(self, index):
+        return self.display.graphics()["lines"][index]
+
+    def GetArrowHeadCount(self):
+        return len(self.display.graphics()["arrows"])
+
+    def GetArrowHeadAtIndex2(self, index):
+        return self.display.graphics()["arrows"][index]
+
+    def GetArcCount(self):
+        return 0
+
+    GetPolyLineCount = GetPolygonCount = GetTriangleCount = GetEllipseCount = GetArcCount
+
+    def GetTextCount(self):
+        return len(self.display.layout["texts"])
+
+    def GetTextAtIndex(self, index):
+        return self.display.layout["texts"][index]["t"]
+
+    def GetTextPositionAtIndex(self, index):
+        return self.display.layout["texts"][index]["pos"]
+
+    def GetTextHeightAtIndex(self, index):
+        return self.display.layout["texts"][index]["h"]
+
+    def GetTextInBoxWidthAtIndex(self, index):
+        return self.display.layout["texts"][index]["w"]
+
+    def GetTextRefPositionAtIndex(self, index):
+        return self.display.layout["texts"][index]["ref"]
+
+    def GetTextAngleAtIndex(self, index):
+        return self.display.layout["texts"][index]["ang"]
+
+    def GetTextFontAtIndex(self, _index):
+        return "Arial"
+
+    def GetTextLineSpacingAtIndex(self, _index):
+        return 1.0
+
+
 class _Display(_ReadSurface):
     def __init__(self, label, native, view, attached, *, units, precision):
         self.view = view
+        self.label = label
         self.native = native
         self.selection_name = f"{label}@saved-washer-view"
         self.Type2 = 2 if label == source.THICKNESS else 6
@@ -121,6 +180,132 @@ class _Display(_ReadSurface):
         annotation.GetAttachedEntityTypes = lambda: (
             (11 if label == source.THICKNESS else 10),
         ) * len(annotation.attached)
+        annotation.GetName = lambda: self.selection_name
+        annotation.GetType = lambda: 4
+        annotation.GetLeaderCount = lambda: 0
+        annotation.Layer = ""
+        annotation.GetSpecificAnnotation = lambda: self
+        annotation.GetPosition = lambda: self.layout["position"]
+        annotation.GetDisplayData = lambda: _DisplayData(self)
+        annotation.SetPosition2 = self.set_position
+        self.seed_layout(saved=False)
+
+    def seed_layout(self, *, saved):
+        self._offset = saved if self.label == source.THICKNESS else False
+        self.Diametric = True
+        self.ArrowSide = 1
+        self.SolidLeader = False
+        self.broken = 2 if saved else 1
+        self.use_doc_broken = False
+        self.second_arrow = False
+        self.use_doc_second_arrow = False
+        self.placement_calls = []
+        self.placement_defect = None
+        if self.label == source.THICKNESS:
+            delta = 0.01446 if saved else 0.0
+            self.layout = dict(position=(0.055, 0.03 + delta, 0.0), texts=[
+                dict(t="(1.01 mm)", pos=(0.049, 0.029 + delta, 0.0),
+                     w=0.012, h=0.0035, ref=1, ang=0.0),
+                dict(t="(0.81 mm)", pos=(0.049, 0.025 + delta, 0.0),
+                     w=0.012, h=0.0035, ref=1, ang=0.0),
+            ])
+        else:
+            delta = 0.007756 if saved else 0.0
+            y = 0.048 if self.label == source.OUTER_DIAMETER else 0.024
+            self.layout = dict(position=(0.052 + delta, y, 0.0), texts=[
+                dict(t="(Ø", pos=(0.038 + delta, y, 0.0),
+                     w=0.004, h=0.0035, ref=1, ang=0.0),
+                dict(t="10.0 mm)" if self.label == source.OUTER_DIAMETER else "4.0 mm)",
+                     pos=(0.050 + delta, y, 0.0), w=0.016, h=0.0035, ref=1, ang=0.0),
+            ])
+
+    @property
+    def OffsetText(self):
+        if self.label != source.THICKNESS:
+            raise AssertionError("OffsetText is unavailable for native diameter dimensions")
+        return self._offset
+
+    @OffsetText.setter
+    def OffsetText(self, value):
+        if self.label != source.THICKNESS:
+            raise AssertionError("OffsetText must never be set on a native diameter")
+        self.placement_calls.append(("OffsetText", value))
+        if self.placement_defect != "ignored-offset":
+            self._offset = value
+
+    def SetSecondArrow(self, use_doc, second):
+        if self.__dict__.get("_saved_read", False):
+            raise AssertionError("saved reader called native SetSecondArrow")
+        self.placement_calls.append(("SetSecondArrow", use_doc, second))
+        self.use_doc_second_arrow, self.second_arrow = use_doc, second
+
+    def GetUseDocSecondArrow(self):
+        return self.use_doc_second_arrow
+
+    def GetSecondArrow(self):
+        return self.second_arrow
+
+    def SetBrokenLeader2(self, use_doc, broken):
+        if self.__dict__.get("_saved_read", False):
+            raise AssertionError("saved reader called native SetBrokenLeader2")
+        self.placement_calls.append(("SetBrokenLeader2", use_doc, broken))
+        if self.placement_defect == "rejected-leader":
+            return -1
+        if self.placement_defect != "ignored-leader":
+            self.use_doc_broken, self.broken = use_doc, broken
+        return 0
+
+    def GetUseDocBrokenLeader(self):
+        return self.use_doc_broken
+
+    def GetBrokenLeader2(self):
+        return self.broken
+
+    def IsHoleCallout(self):
+        return False
+
+    def set_position(self, x, y, z):
+        if self.__dict__.get("_saved_read", False):
+            raise AssertionError("saved reader called native SetPosition2")
+        self.placement_calls.append(("SetPosition2", x, y, z))
+        phase = "shelf" if self.label == source.THICKNESS and self._offset else "seed"
+        if self.placement_defect == f"rejected-{phase}":
+            return False
+        if self.placement_defect == f"ignored-{phase}":
+            return True
+        old = self.layout["position"]
+        dx, dy = x - old[0], y - old[1]
+        for row in self.layout["texts"]:
+            px, py, pz = row["pos"]
+            row["pos"] = (px + dx, py + dy, pz)
+        self.layout["position"] = (x, y, z)
+        return True
+
+    def graphics(self):
+        if self.label == source.THICKNESS:
+            lines = [
+                [0, 0, 0, 0, 0.04, 0.03, 0, 0.056, 0.03, 0],
+                [0, 0, 0, 0, 0.04, 0.03091, 0, 0.056, 0.03091, 0],
+                [0, 0, 0, 0, 0.055, 0.03, 0, 0.055, 0.02365, 0],
+                [0, 0, 0, 0, 0.055, 0.03091, 0, 0.055, 0.03726, 0],
+            ]
+            arrows = [
+                [0.055, 0.03, 0, 0, -1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+                [0.055, 0.03091, 0, 0, 1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+            ]
+        else:
+            y = 0.048 if self.label == source.OUTER_DIAMETER else 0.024
+            left = min(row["pos"][0] for row in self.layout["texts"])
+            # Broken horizontal text has a shoulder below the caption, not a
+            # through-caption chord. Its native tip remains on the exact rim.
+            lines = [
+                [0, 0, 0, 0, 0.04, y, 0, left - 0.001, y - 0.001, 0],
+                [0, 0, 0, 0, left - 0.001, y - 0.001, 0, left + 0.028, y - 0.001, 0],
+            ] if self.broken == 2 else [
+                [0, 0, 0, 0, 0.04, y + 0.001, 0, left + 0.028, y + 0.001, 0],
+            ]
+            arrows = [[0.04, y, 0, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1]]
+        return self.layout.get("graphics", dict(lines=lines, arrows=arrows))
 
     def __getattribute__(self, name):
         if name.startswith("Get") or name in ("Type2", "ShowParenthesis", "ShowDimensionValue"):
@@ -286,10 +471,22 @@ def _point(x, y, z):
                 ids=("y-all-banded", "z-all-banded", "y-rim-refs", "z-rim-refs"))
 def saved_washer(request, tmp_path, monkeypatch):
     axis, all_banded = request.param
-    for module in (washer, source, supplier, edges, attachment):
+    for module in (washer, source, supplier, edges, attachment, native_audit, reference_text):
         monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(source, "double_array", tuple)
     monkeypatch.setattr(edges, "visible_view_entities", lambda view, _kind, **_kw: view.edges)
+    from _drawing_leaders import _sw_type_info
+    monkeypatch.setattr(_sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj)
+    rebuilds = []
+    transition = SimpleNamespace(on_rebuild=None)
+
+    def rebuild(_adapter, *, label):
+        rebuilds.append(label)
+        if transition.on_rebuild is not None:
+            transition.on_rebuild(label)
+
+    monkeypatch.setattr(washer, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(reference_text, "rebuild_drawing", rebuild)
     drawing_path = tmp_path / "washer.SLDDRW"
     drawing_path.write_bytes(b"independently seeded persisted drawing bytes")
     source_path = tmp_path / "washer.SLDPRT"
@@ -304,6 +501,8 @@ def saved_washer(request, tmp_path, monkeypatch):
         GetPathName=lambda: str(path_state.path), GetType=lambda: 1, IsOpenedReadOnly=lambda: True,
         GetSaveFlag=lambda: False, Extension=SimpleNamespace(reverse={}),
         GetBodies2=lambda _kind, _hidden: (body,), FeatureByName=lambda name: features.get(name),
+        MaterialIdName="Offline Native DB|Recorded Fixture Alloy|700",
+        ConfigurationManager=_ReadSurface(ActiveConfiguration=_ReadSurface(Name="OfflineActiveSourceConfig")),
     )
     original = {name: _View(name, model, f"Authoring{name[1:]}Config") for name in ORIENTATIONS}
     fresh = {name: _View(name, model, original[name].ReferencedConfiguration) for name in ORIENTATIONS}
@@ -429,7 +628,9 @@ def saved_washer(request, tmp_path, monkeypatch):
                 )
                 edge_index = 2 if label == source.OUTER_DIAMETER else 3
                 attached = (body_edges[edge_index],)
-            view.displays.append(_Display(label, native, view, attached, units=0, precision=2))
+            display = _Display(label, native, view, attached, units=0, precision=2)
+            display.seed_layout(saved=collection is fresh)
+            view.displays.append(display)
     # Importing can put even the canonical IDimension's owner in the mapped
     # context. OD/bore retain the direct source feature (the measured PD case).
     thickness_native = source_natives[source.THICKNESS]
@@ -459,12 +660,31 @@ def saved_washer(request, tmp_path, monkeypatch):
         mapped_features=mapped_features, mapped_entities=mapped_entities,
         invalidate=invalidate, face=face_orientation, side=side_orientation,
         original_bytes=drawing_path.read_bytes(), source_bytes=source_path.read_bytes(),
+        rebuilds=rebuilds, transition=transition,
     )
 
 
 def _display(case, label):
     return next(display for view in case.fresh.values() for display in view.displays
                 if display.selection_name == f"{label}@saved-washer-view")
+
+def _authoring_display(case, label):
+    return next(display for view in case.original.values() for display in view.displays
+                if display.label == label)
+
+
+def _reset_authoring_layout(case):
+    for view in case.original.values():
+        for display in view.displays:
+            display.seed_layout(saved=False)
+    case.rebuilds.clear()
+
+
+def _author_again(case):
+    return washer._supplier_washer_proof(
+        case.adapter, case.original, case.references, **case.arguments,
+    )
+
 
 
 def _assert_closed_unchanged(case):
@@ -731,6 +951,7 @@ def test_saved_reader_surfaces_are_write_traps(saved_washer, monkeypatch):
 
 def test_public_authoring_return_exposes_saved_proof(saved_washer, monkeypatch):
     case = saved_washer
+    _reset_authoring_layout(case)
     def curate(_adapter, view, **_kwargs):
         return [SimpleNamespace(GetSpecificAnnotation=lambda display=display: display)
                 for display in view.displays]
@@ -877,7 +1098,7 @@ def test_wrong_named_source_is_not_self_certified_from_saved_names(saved_washer)
     # the captured label's required SOURCE_DIMENSIONS feature/dimension owner.
     display.native.FullName = "SupplierThickness@RenamedWitness@washer.SLDPRT"
     case.invalidate()
-    with pytest.raises(RuntimeError, match="display census"):
+    with pytest.raises(RuntimeError, match="native source full name changed"):
         case.proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
 
@@ -1562,6 +1783,7 @@ def test_recipe_releases_authored_proof_and_closed_adapter_handle_before_open(
     def author(adapter, views, **_kwargs):
         assert adapter is case.adapter
         assert views is case.original
+        _reset_authoring_layout(case)
         result = washer._supplier_washer_proof(
             adapter, views, case.references, **case.arguments,
         )
@@ -1725,3 +1947,658 @@ def test_native_source_context_error_survives_receipt_reporting_failures(
         assert log_attempts
     assert case.source_path.read_bytes() == case.source_bytes
     assert case.path.read_bytes() == case.original_bytes
+
+
+# Placement controls use the real washer consumer, strict three-reference proof,
+# neutral shelf and native display-data reader. These are offline native-shaped
+# inputs, not a claim that the changed source has passed native/MRC acceptance.
+def _replace_authoring_displays(case):
+    for view in case.original.values():
+        replacement = []
+        for old in view.displays:
+            display = _Display(old.label, old.native, view, old.annotation.attached,
+                               units=old.units, precision=old.precision)
+            for name in ("selection_name", "layout", "_offset", "Diametric", "ArrowSide",
+                         "SolidLeader", "broken", "use_doc_broken", "second_arrow",
+                         "use_doc_second_arrow", "placement_defect", "text"):
+                value = getattr(old, name)
+                setattr(display, name, deepcopy(value) if name in {"layout", "text"} else value)
+            replacement.append(display)
+        view.displays = replacement
+
+
+def test_washer_consumer_uses_only_actual_vertical_thickness_and_fresh_handles(
+    saved_washer, monkeypatch,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    actual_shelf = washer.shelve_reference_text
+    calls, inventories = [], []
+
+    def shelf(adapter, *, reacquire, axes, label, force=()):
+        calls.append((adapter, dict(axes), tuple(force)))
+
+        def fresh():
+            found = reacquire()
+            inventories.append(dict(found))
+            return found
+
+        return actual_shelf(adapter, reacquire=fresh, axes=axes, label=label, force=force)
+
+    monkeypatch.setattr(washer, "shelve_reference_text", shelf)
+    case.transition.on_rebuild = lambda _label: _replace_authoring_displays(case)
+    native = case.source_natives[source.THICKNESS]
+    before_sources = tuple(
+        (label, dim.SystemValue, dim.Tolerance.Type, dim.Tolerance.GetMinValue(),
+         dim.Tolerance.GetMaxValue(), tuple(sorted(case.source_displays[label].text.items())))
+        for label, dim in case.source_natives.items()
+    )
+    proof = _author_again(case)
+    assert calls == [(case.adapter, {native.FullName: 1}, (native.FullName,))]
+    assert len(inventories) >= 5
+    assert all(set(found) == {native.FullName} for found in inventories)
+    assert all(found[native.FullName].native is native for found in inventories)
+    assert len({id(found[native.FullName]) for found in inventories}) >= 4
+    current = _authoring_display(case, source.THICKNESS)
+    assert current.OffsetText is True
+    geometry = reference_text.measure_reference_text(case.adapter, current, axis=1, label="thickness")
+    assert geometry["text"].ymin == pytest.approx(0.03946)
+    assert geometry["tips"] == ((0.055, 0.03), (0.055, 0.03091))
+    assert geometry["witnesses"] == ((0.03, 0.04, 0.056), (0.03091, 0.04, 0.056))
+    assert tuple(
+        (label, dim.SystemValue, dim.Tolerance.Type, dim.Tolerance.GetMinValue(),
+         dim.Tolerance.GetMaxValue(), tuple(sorted(case.source_displays[label].text.items())))
+        for label, dim in case.source_natives.items()
+    ) == before_sources
+    count = len(case.rebuilds)
+    writes = tuple(tuple(display.placement_calls) for view in case.original.values()
+                   for display in view.displays)
+    proof()
+    assert len(case.rebuilds) == count
+    assert tuple(tuple(display.placement_calls) for view in case.original.values()
+                 for display in view.displays) == writes
+
+
+_PLACEMENT_PHASES = (
+    "reference text measured", "reference offset anchors", "reference native offset mode",
+    "measured reference text shelves", "native diameter leaders", "complete diameter captions",
+)
+
+
+def _corrupt_placement_source(case, fault):
+    thickness = _authoring_display(case, source.THICKNESS)
+    face = _authoring_display(case, source.BORE_DIAMETER)
+    if fault == "source-format":
+        case.source_displays[source.THICKNESS].text[2] = "wrong source unit suffix"
+    elif fault == "import-format":
+        face.text[1] = "wrong diameter prefix"
+    elif fault == "value":
+        thickness.native.SystemValue += 0.001
+    elif fault == "band":
+        thickness.native.Tolerance.minimum = -0.005
+    elif fault == "attachment":
+        thickness.annotation.attached = (case.source_entities[source.THICKNESS][0],) * 2
+    elif fault == "source-identity":
+        other = _Part(**vars(case.model))
+        for view in case.original.values():
+            view.ReferencedDocument = other
+    elif fault == "source-path":
+        case.path_state.path = case.source_path.with_name("wrong-source.SLDPRT")
+    elif fault == "configuration":
+        case.original["*Isometric"].ReferencedConfiguration = "wrong late configuration"
+    elif fault == "full-name":
+        thickness.native.FullName = thickness.native.FullName.replace("washer.SLDPRT", "other.SLDPRT")
+    elif fault == "native-identity":
+        thickness.native = _ReadSurface(**vars(thickness.native))
+    elif fault == "inventory":
+        case.original[case.face].displays.pop()
+    elif fault == "inventory-extra":
+        view = case.original[case.face]
+        view.displays.append(_Display(face.label, face.native, view, face.annotation.attached,
+                                      units=face.units, precision=face.precision))
+    elif fault == "view-inventory":
+        case.original.pop("*Isometric")
+    elif fault == "rim":
+        case.body_edges.pop()
+    else:
+        raise AssertionError(fault)
+
+
+@pytest.mark.parametrize("phase", _PLACEMENT_PHASES)
+@pytest.mark.parametrize("fault", (
+    "source-format", "import-format", "value", "band", "attachment", "source-identity",
+    "source-path", "configuration", "full-name", "native-identity", "inventory",
+    "inventory-extra", "view-inventory", "rim",
+))
+def test_every_native_placement_phase_repeats_complete_original_source_proof(
+    saved_washer, phase, fault,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    reached = []
+
+    def corrupt(label):
+        if label.endswith(phase):
+            reached.append(label)
+            _corrupt_placement_source(case, fault)
+
+    case.transition.on_rebuild = corrupt
+    with pytest.raises(RuntimeError):
+        _author_again(case)
+    assert len(reached) == 1
+    assert not case.app.open_calls
+    assert case.path.read_bytes() == case.original_bytes
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("fault", ("source-format", "import-format", "attachment", "inventory"))
+def test_bad_three_reference_input_is_refused_before_any_native_placement(saved_washer, fault):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    _corrupt_placement_source(case, fault)
+    with pytest.raises(RuntimeError):
+        _author_again(case)
+    assert not case.rebuilds
+    assert all(not display.placement_calls for view in case.original.values() for display in view.displays)
+
+
+@pytest.mark.parametrize("defect, message", (
+    ("rejected-seed", "seed"), ("ignored-seed", "anchor did not settle"),
+    ("ignored-offset", "offset"), ("rejected-shelf", "shelf"),
+    ("ignored-shelf", "crowds"),
+))
+def test_washer_linear_consumer_refuses_native_setter_failures_and_successful_noops(
+    saved_washer, defect, message,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    display = _authoring_display(case, source.THICKNESS)
+    # A distinct pre-seed text anchor makes an ignored seed observable; this
+    # never changes the independently seeded physical stations.
+    display.set_position(0.057, 0.03, 0.0)
+    display.placement_calls.clear()
+    display.placement_defect = defect
+    with pytest.raises(RuntimeError, match=message):
+        _author_again(case)
+    assert not case.app.open_calls
+
+
+@pytest.mark.parametrize("defect, message", (
+    ("rejected-seed", "caption move was rejected"),
+    ("ignored-seed", "caption crowds"),
+    ("rejected-leader", "broken horizontal leader"),
+    ("ignored-leader", "leader style changed"),
+))
+def test_washer_diameter_consumer_refuses_native_setter_failures_and_noops(
+    saved_washer, defect, message,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    _authoring_display(case, source.BORE_DIAMETER).placement_defect = defect
+    with pytest.raises(RuntimeError, match=message):
+        _author_again(case)
+
+
+@pytest.mark.parametrize("below_ref", (1, 2, 4))
+def test_complete_bore_caption_not_numeric_anchor_drives_native_right_clearance(
+    saved_washer, below_ref,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    display = _authoring_display(case, source.BORE_DIAMETER)
+    callout = "FOR No. 10 SCREW SIZE"
+    display.text[4] = callout
+    case.source_displays[source.BORE_DIAMETER].text[4] = callout
+    case.references = tuple(
+        washer._reference(display, display.view, source.BORE_DIAMETER, 4.0,
+                          imported=source.BORE_DIAMETER in case.arguments["bands"], callout=callout)
+        if reference.label == source.BORE_DIAMETER else reference for reference in case.references
+    )
+    # Native below row is much farther left than both numeric and prefix rows.
+    display.layout["texts"].append(dict(
+        t=callout, pos=(0.034, 0.016, 0.0), w=0.036, h=0.0035, ref=below_ref, ang=0.0,
+    ))
+    initial = display.layout["position"]
+    proof = _author_again(case)
+    text, fragments, _geometry = washer._diameter_caption(case.adapter, display, label="bore")
+    assert len(fragments) == 3
+    assert text.xmin >= 0.04 + washer.CLEAR_GAP_M
+    assert text.xmin == pytest.approx(0.043556 + washer.CLEAR_GAP_M + washer.PLACE_SETTLE_M)
+    assert display.layout["position"][0] - initial[0] >= 0.011756
+    assert display.text[4] == callout
+    assert case.source_displays[source.BORE_DIAMETER].text[4] == callout
+    proof()
+
+
+@pytest.mark.parametrize("label", (source.THICKNESS, source.OUTER_DIAMETER, source.BORE_DIAMETER))
+@pytest.mark.parametrize("fault", ("width-zero", "width-missing", "height-nan", "position-nan", "angle-nan"))
+def test_consumer_rejects_every_unmeasurable_native_fragment(saved_washer, label, fault):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    fragment = _authoring_display(case, label).layout["texts"][0]
+    if fault == "width-zero":
+        fragment["w"] = 0.0
+    elif fault == "width-missing":
+        del fragment["w"]
+    elif fault == "height-nan":
+        fragment["h"] = float("nan")
+    elif fault == "position-nan":
+        fragment["pos"] = (float("nan"), fragment["pos"][1], 0.0)
+    else:
+        fragment["ang"] = float("nan")
+    with pytest.raises(RuntimeError, match="unreadable|measured native size|native position"):
+        _author_again(case)
+
+
+def _strike_caption(display, *, arrow=False):
+    graphics = deepcopy(display.graphics())
+    row = display.layout["texts"][0]  # The Ø/parenthesis fragment, not numeric anchor.
+    x, y, z = row["pos"]
+    if arrow:
+        graphics["arrows"][0][:3] = (x, y + row["h"] / 2, z)
+    else:
+        graphics["lines"].append(
+            [0, 0, 0, 0, x - 0.001, y + row["h"] / 2, z,
+             x + row["w"] + 0.001, y + row["h"] / 2, z],
+        )
+    display.layout["graphics"] = graphics
+
+
+@pytest.mark.parametrize("arrow", (False, True), ids=("leader-through-prefix", "arrow-at-prefix"))
+def test_actual_post_rebuild_caption_graphics_are_proved_not_only_move_success(
+    saved_washer, arrow,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    reached = []
+
+    def strike(label):
+        if label.endswith("complete diameter captions"):
+            reached.append(label)
+            _strike_caption(_authoring_display(case, source.OUTER_DIAMETER), arrow=arrow)
+
+    case.transition.on_rebuild = strike
+    with pytest.raises(RuntimeError, match="arrow crowds|leader crosses"):
+        _author_again(case)
+    assert len(reached) == 1
+
+
+@pytest.mark.parametrize("fault", (
+    "offset", "thickness-text", "tips", "witnesses", "transverse", "diameter-position",
+    "diameter-prefix", "diameter-below", "diameter-line", "diameter-arrow", "leader-style",
+    "diameter-unmeasurable", "face-outline",
+))
+def test_saved_fresh_read_refuses_native_placement_regressions_without_repair(
+    saved_washer, fault,
+):
+    case = saved_washer
+    thickness = _display(case, source.THICKNESS)
+    diameter = _display(case, source.OUTER_DIAMETER)
+    if fault == "offset":
+        thickness._offset = False
+    elif fault == "thickness-text":
+        thickness.layout["texts"][0]["pos"] = (0.049, 0.03, 0.0)
+    elif fault in {"tips", "witnesses"}:
+        graphics = deepcopy(thickness.graphics())
+        if fault == "tips":
+            graphics["arrows"][0][1] += 0.0001
+        else:
+            graphics["lines"][0][4] -= 0.0001
+        thickness.layout["graphics"] = graphics
+    elif fault == "transverse":
+        x, y, z = thickness.layout["position"]
+        thickness.layout["position"] = (x + 0.0001, y, z)
+    elif fault == "diameter-position":
+        x, y, z = diameter.layout["position"]
+        diameter.layout["position"] = (x + 0.0001, y, z)
+    elif fault == "diameter-prefix":
+        diameter.layout["texts"][0]["pos"] = (0.039, 0.048, 0.0)
+    elif fault == "diameter-below":
+        diameter.layout["texts"].append(dict(
+            t="FOR No. 10 SCREW SIZE", pos=(0.039, 0.018, 0.0),
+            w=0.035, h=0.0035, ref=1, ang=0.0,
+        ))
+    elif fault in {"diameter-line", "diameter-arrow"}:
+        _strike_caption(diameter, arrow=fault == "diameter-arrow")
+    elif fault == "leader-style":
+        diameter.broken = 1
+    elif fault == "diameter-unmeasurable":
+        diameter.layout["texts"][0]["w"] = float("nan")
+    else:
+        case.fresh[case.face].GetOutline = lambda: (0.02, 0.02, 0.041, 0.04)
+    before = tuple(deepcopy(display.layout) for view in case.fresh.values() for display in view.displays)
+    writes = tuple(tuple(display.placement_calls) for view in case.fresh.values() for display in view.displays)
+    case.invalidate()
+    count = len(case.rebuilds)
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert len(case.rebuilds) == count
+    assert tuple(display.layout for view in case.fresh.values() for display in view.displays) == before
+    assert tuple(tuple(display.placement_calls) for view in case.fresh.values()
+                 for display in view.displays) == writes
+    receipt = _exception_receipt(caught.value)
+    assert all("annotation_position" in row and "native_display" in row for row in receipt["dimensions"])
+    _assert_closed_unchanged(case)
+
+
+def test_saved_layout_expectations_are_immutable_not_late_authoring_echo(saved_washer):
+    case = saved_washer
+    for collection in (case.original, case.fresh):
+        display = next(display for view in collection.values() for display in view.displays
+                       if display.label == source.THICKNESS)
+        x, y, z = display.layout["position"]
+        display.layout["position"] = (x + 0.001, y, z)
+    case.invalidate()
+    with pytest.raises(RuntimeError, match="transverse position moved"):
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("fault", ("offset", "thickness-text", "diameter-prefix", "diameter-line"))
+def test_final_settled_proof_is_readonly_and_rejects_late_native_regression(saved_washer, fault):
+    case = saved_washer
+    thickness = _authoring_display(case, source.THICKNESS)
+    diameter = _authoring_display(case, source.OUTER_DIAMETER)
+    if fault == "offset":
+        thickness._offset = False
+    elif fault == "thickness-text":
+        thickness.layout["texts"][0]["pos"] = (0.049, 0.03, 0.0)
+    elif fault == "diameter-prefix":
+        diameter.layout["texts"][0]["pos"] = (0.039, 0.048, 0.0)
+    else:
+        _strike_caption(diameter)
+    count = len(case.rebuilds)
+    writes = tuple(tuple(display.placement_calls) for view in case.original.values()
+                   for display in view.displays)
+    with pytest.raises(RuntimeError):
+        case.proof()
+    assert len(case.rebuilds) == count
+    assert tuple(tuple(display.placement_calls) for view in case.original.values()
+                 for display in view.displays) == writes
+
+
+@pytest.mark.parametrize("getter, field", (
+    ("GetPosition", "annotation_position"), ("GetDisplayData", "native_display"),
+))
+def test_saved_placement_getter_errors_keep_distinct_actual_field_readback(
+    saved_washer, getter, field,
+):
+    case = saved_washer
+    display = _display(case, source.OUTER_DIAMETER)
+
+    def refuse():
+        raise RuntimeError(f"native {getter} placement-read-sentinel")
+
+    setattr(display.annotation, getter, refuse)
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    receipt = _exception_receipt(caught.value)
+    row = next(row for row in receipt["dimensions"] if row["selection_name"] == display.selection_name)
+    if getter == "GetDisplayData":
+        assert row[field][1] == {"GetDisplayData": 1}
+    else:
+        assert "placement-read-sentinel" in row[field]["read_error"]
+    _assert_closed_unchanged(case)
+
+
+def test_recorded_mg_back_bore_measures_below_and_diameter_prefix_native_fragments(saved_washer):
+    """464f6ea68 actual MG-back RD2 native display rows, not after-fix evidence."""
+    case = saved_washer
+    display = _display(case, source.BORE_DIAMETER)
+    z = -0.002275
+    display.layout["texts"] = [
+        dict(t="(", pos=(0.1276871, 0.1202767, z), h=0.0035, w=0.0017208, ref=1, ang=0.0),
+        dict(t="<MOD-DIAM>", pos=(0.129408, 0.1202233, z), h=0.0035, w=0.0052784, ref=1, ang=0.0),
+        dict(t="0.200 in)", pos=(0.1346864, 0.1202767, z), h=0.0035, w=0.0184285, ref=1, ang=0.0),
+        dict(t="FOR No. 10 SCREW SIZE", pos=(0.1147246, 0.114667, z),
+             h=0.0035, w=0.0513528, ref=1, ang=0.0),
+    ]
+    display.layout["graphics"] = dict(
+        lines=[
+            [0, 0, 0, 0, 0.1041185, 0.1234101, z, 0.1131371, 0.114667, z],
+            [0, 0, 0, 0, 0.0858815, 0.1410899, z, 0.1041185, 0.1234101, z],
+            [0, 0, 0, 0, 0.1131371, 0.114667, z, 0.1660774, 0.114667, z],
+        ],
+        arrows=[[0.1041185, 0.1234101, z, 0.7179897, -0.6960538, 0,
+                 0.003556, 0.000762, 0, 0, 0, -1]],
+    )
+    text, fragments, _geometry = washer._diameter_caption(case.adapter, display, label="actual MG-back RD2")
+    assert len(fragments) == 4
+    assert (text.xmin, text.ymin, text.xmax, text.ymax) == pytest.approx(
+        (0.1147246, 0.114667, 0.1660774, 0.1237767),
+    )
+    assert fragments[1].xmin == pytest.approx(0.129408)  # The measured Ø glyph row survives.
+    assert text.xmin < 0.1228 < fragments[0].xmin
+    assert not display.placement_calls
+
+
+def test_recorded_thrust_od_native_leader_strike_is_not_hidden_by_style_getters(saved_washer):
+    """Retain the actual old OD stroke/prefix relationship; this is not a render."""
+    case = saved_washer
+    display = _display(case, source.OUTER_DIAMETER)
+    z = -0.0019651
+    display.layout["texts"] = [
+        dict(t=" (", pos=(0.1146474, 0.1427486, z), h=0.0035, w=0.0030139, ref=1, ang=0.0),
+        dict(t="<MOD-DIAM>", pos=(0.1176613, 0.1426951, z), h=0.0035, w=0.0052784, ref=1, ang=0.0),
+        dict(t="0.375 ±0.002 in) ", pos=(0.1229397, 0.1427486, z),
+             h=0.0035, w=0.0352139, ref=1, ang=0.0),
+    ]
+    display.layout["graphics"] = dict(
+        lines=[
+            [0, 0, 0, 0, 0.1162203, 0.1443043, z, 0.1130599, 0.1426951, z],
+            [0, 0, 0, 0, 0.0737797, 0.1226957, z, 0.1162203, 0.1443043, z],
+        ],
+        arrows=[[0.1162203, 0.1443043, z, 0.8911429, 0.4537227, 0,
+                 0.003556, 0.000762, 0, 0, 0, -1]],
+    )
+    # The small fixture outline only isolates the own-caption predicate. This
+    # does not claim that the old actual thrust body cleared its caption.
+    with pytest.raises(RuntimeError, match="leader crosses|arrow crowds"):
+        washer._assert_diameter_placement(case.adapter, display, case.fresh[case.face], label="actual thrust OD")
+    assert not display.placement_calls
+
+
+@pytest.mark.parametrize("phase", _PLACEMENT_PHASES[1:4])
+@pytest.mark.parametrize("fault", ("tips", "witnesses"))
+def test_linear_consumer_rejects_native_station_changes_after_each_transition(
+    saved_washer, phase, fault,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    reached = []
+
+    def corrupt(label):
+        if label.endswith(phase):
+            reached.append(label)
+            display = _authoring_display(case, source.THICKNESS)
+            graphics = deepcopy(display.graphics())
+            if fault == "tips":
+                graphics["arrows"][0][1] += 0.0001
+            else:
+                graphics["lines"][0][4] -= 0.0001
+            display.layout["graphics"] = graphics
+
+    case.transition.on_rebuild = corrupt
+    with pytest.raises(RuntimeError, match="moved|native witness"):
+        _author_again(case)
+    assert len(reached) == 1
+
+
+@pytest.mark.parametrize("resident", (True, False), ids=("resident", "drawing-autoload"))
+def test_saved_material_receipt_captures_actual_raw_type_configuration_and_source_hash(
+    saved_washer, resident,
+):
+    """Offline native getters, deliberately not the catalogue/assignment input."""
+    case = saved_washer
+    raw = "Unanticipated Observed DB|Not The Catalogue Material|701"
+    active_name = "Actually Active Source Configuration"
+    loaded = case.model if resident else _Part(**vars(case.model))
+    loaded.MaterialIdName = raw
+    loaded.ConfigurationManager = _ReadSurface(
+        ActiveConfiguration=_ReadSurface(Name=active_name),
+    )
+    if not resident:
+        case.model.MaterialIdName = "Old Authoring DB|Input Echo Must Not Survive|1"
+        _autoload_source(case, loaded)
+    # Source-side native property writes are traps, not merely unchanged bytes.
+    for surface in (loaded, loaded.ConfigurationManager, loaded.ConfigurationManager.ActiveConfiguration):
+        object.__setattr__(surface, "_saved_read", True)
+    case.invalidate()
+    case.proof.saved_check(case.adapter, case.path)
+    receipt = json.loads(case.messages[0].split(": ", 1)[1])
+    assert receipt["source_material_member"] == "IPartDoc.MaterialIdName"
+    assert receipt["source_material_raw"] == raw
+    assert receipt["source_material_return_type"] == "builtins.str"
+    assert "source_material_read_error" not in receipt
+    assert receipt["source_active_configuration_member"] == (
+        "IModelDoc2.ConfigurationManager.ActiveConfiguration.Name"
+    )
+    assert receipt["source_active_configuration"] == active_name
+    assert active_name not in {view.ReferencedConfiguration for view in case.fresh.values()}
+    assert receipt["source_path"] == str(case.source_path)
+    assert type(receipt["source_type"]) is int and receipt["source_type"] == 1
+    assert receipt["source_read_only"] is True
+    assert receipt["source_save_flag"] is False
+    assert receipt["source_resident_before_open"] is resident
+    assert receipt["source_sha256"] == hashlib.sha256(case.source_bytes).hexdigest()
+    # The raw observation is not a catalogue comparison or a material verdict.
+    assert {key for key in receipt if key.startswith("source_material_")} == {
+        "source_material_member", "source_material_raw", "source_material_return_type",
+    }
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("raw", (None, "", " \t ", 91, False, 1.5, ["DB", "Alloy", "91"]),
+                         ids=("null", "empty", "whitespace", "integer", "boolean", "float", "list"))
+def test_saved_material_null_empty_or_nonstring_is_retained_but_refused(saved_washer, raw):
+    case = saved_washer
+    case.model.MaterialIdName = raw
+    case.invalidate()
+    with pytest.raises(RuntimeError, match="native material readback") as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_material_member"] == "IPartDoc.MaterialIdName"
+    assert receipt["source_material_raw"] == raw
+    assert type(receipt["source_material_raw"]) is type(raw)
+    assert receipt["source_material_return_type"] == f"{type(raw).__module__}.{type(raw).__qualname__}"
+    assert "source_material_read_error" not in receipt
+    assert receipt["source_active_configuration"] == "OfflineActiveSourceConfig"
+    assert receipt["source_sha256"] == hashlib.sha256(case.source_bytes).hexdigest()
+    assert not case.messages
+    _assert_closed_unchanged(case)
+
+
+def test_saved_material_getter_exception_is_not_null_or_an_input_echo(saved_washer):
+    case = saved_washer
+    failure = RuntimeError("native MaterialIdName getter material-read-sentinel")
+    case.model._read_errors = {"MaterialIdName": failure}
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_material_member"] == "IPartDoc.MaterialIdName"
+    assert receipt["source_material_read_error"] == f"RuntimeError: {failure}"
+    assert "source_material_raw" not in receipt
+    assert "source_material_return_type" not in receipt
+    assert receipt["source_sha256"] == hashlib.sha256(case.source_bytes).hexdigest()
+    assert receipt["source_active_configuration"] == "OfflineActiveSourceConfig"
+    assert not case.messages
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("member", ("ConfigurationManager", "ActiveConfiguration", "Name"))
+def test_saved_material_configuration_getter_error_is_distinct_and_preserves_exception(
+    saved_washer, member,
+):
+    case = saved_washer
+    failure = RuntimeError(f"native {member} configuration-read-sentinel")
+
+    class FailedConfigurationMember:
+        def __getattribute__(self, name):
+            if name == member:
+                raise failure
+            raise AssertionError(f"unexpected configuration API {name}")
+
+    if member == "ConfigurationManager":
+        case.model._read_errors = {member: failure}
+    elif member == "ActiveConfiguration":
+        case.model.ConfigurationManager = FailedConfigurationMember()
+    else:
+        case.model.ConfigurationManager.ActiveConfiguration = FailedConfigurationMember()
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_active_configuration"] == {"read_error": f"RuntimeError: {failure}"}
+    assert receipt["source_sha256"] == hashlib.sha256(case.source_bytes).hexdigest()
+    assert "source_material_raw" not in receipt
+    assert "source_material_read_error" not in receipt
+    assert not case.messages
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("name", (None, "", " \t ", 7))
+def test_saved_material_requires_actual_nonempty_active_configuration_name(saved_washer, name):
+    case = saved_washer
+    case.model.ConfigurationManager.ActiveConfiguration.Name = name
+    case.invalidate()
+    with pytest.raises(RuntimeError, match="active configuration name") as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_active_configuration"] == name
+    assert type(receipt["source_active_configuration"]) is type(name)
+    assert "source_material_raw" not in receipt
+    assert "source_material_read_error" not in receipt
+    _assert_closed_unchanged(case)
+
+
+def test_saved_material_source_hash_error_is_distinct_and_preserves_exception(
+    saved_washer, monkeypatch,
+):
+    case = saved_washer
+    failure = OSError("native source file read source-hash-sentinel")
+    original_open = Path.open
+
+    def fail_source_read(path, *args, **kwargs):
+        if path == case.source_path:
+            raise failure
+        return original_open(path, *args, **kwargs)
+
+    case.invalidate()
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", fail_source_read)
+        with pytest.raises(OSError) as caught:
+            case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    receipt = _exception_receipt(caught.value)
+    assert receipt["source_sha256"] == {"read_error": f"OSError: {failure}"}
+    assert receipt["source_path"] == str(case.source_path)
+    assert "source_material_raw" not in receipt
+    assert "source_material_read_error" not in receipt
+    assert not case.messages
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("member, field", (
+    ("GetPathName", "source_path"), ("GetType", "source_type"),
+    ("IsOpenedReadOnly", "source_read_only"),
+))
+def test_saved_material_source_checkpoint_errors_keep_the_actual_failed_field(
+    saved_washer, member, field,
+):
+    case = saved_washer
+    failure = RuntimeError(f"native {member} source-checkpoint-sentinel")
+    case.model._read_errors = {member: failure}
+    case.invalidate()
+    with pytest.raises(RuntimeError) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is failure
+    receipt = _exception_receipt(caught.value)
+    assert receipt[field] == {"read_error": f"RuntimeError: {failure}"}
+    assert "source_material_raw" not in receipt
+    assert "source_material_read_error" not in receipt
+    assert not case.messages
+    _assert_closed_unchanged(case)

@@ -19,9 +19,11 @@ SPEC = DRAWINGS_BY_NAME["sm_vn_knife_hanger_washer"]
 ITEM = "#10 SAE FLAT WASHER"
 # Sheet-metre ink reserves: face picks are 12 mm right plus the supplier
 # diameter/callout width; the 14 mm thickness pick carries stacked limits.
+# Front/Top share outer X bounds, so both need the face's 40 mm right reserve.
+# Front's equal bottom/top reserves already align Y with the uninset Right.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.006),
-    "*Front": (0.0, 0.008, 0.035, 0.008),
+    "*Front": (0.0, 0.008, 0.040, 0.008),
 }
 
 

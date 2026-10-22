@@ -17,9 +17,11 @@ import ch_vn_rocker_thrust_washer_spec as part
 SPEC = DRAWINGS_BY_NAME["ch_vn_rocker_thrust_washer"]
 # The final +Z face is Front; Top is parallel to its thickness witness.
 # Reserve 12 mm face/14 mm side picks plus supplier band/limit ink widths.
+# Front/Top share outer X bounds, so both need the face's 40 mm right reserve.
+# Front's equal bottom/top reserves already align Y with the uninset Right.
 SUPPLIER_MARGINS = {
     "*Front": (0.0, 0.008, 0.040, 0.008),
-    "*Top": (0.0, 0.006, 0.035, 0.006),
+    "*Top": (0.0, 0.006, 0.040, 0.006),
 }
 
 
