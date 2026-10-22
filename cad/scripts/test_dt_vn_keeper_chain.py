@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _supplier_keeper_dimensions as keeper_dimensions
 import dt_crank_arm_spec as arm
 import dt_crank_hub_geometry as hub_geometry
 import dt_crank_hub_spec as hub
@@ -216,3 +218,296 @@ def test_catalogue_bead_diameter_preserves_the_installed_sphere() -> None:
     assert chain.BEAD_DIA == pytest.approx(2.38125, abs=1e-12)
     assert chain.BEAD_DIA / chain.MM_PER_IN == pytest.approx(3 / 32, abs=1e-12)
     assert 2 * chain.BEAD_R == pytest.approx(chain.BEAD_DIA, abs=1e-12)
+
+
+# Lightweight callback doubles below are not native SOLIDWORKS-result evidence.
+_VIEWED_CONFIGURATION = "Keeper catalogue viewed configuration"
+_ACTIVE_CONFIGURATION = "Different active installed configuration"
+_SOURCE_PATH = "D:/native/keeper-chain.SLDPRT"
+_NAME = "CatalogueBeadDiameter"
+_FULL_NAME = f"{_NAME}@SeedProfile@keeper-chain.SLDPRT"
+_BEAD_MM = 2.38125
+
+
+class _NativeDimension:
+    def __init__(self, *, values=(_BEAD_MM / 1000.0,)):
+        self.Name = _NAME
+        self.FullName = _FULL_NAME
+        self.Tolerance = SimpleNamespace(Type=0)
+        self.values = values
+        self.calls = []
+        self.active_reads = 0
+
+    def GetSystemValue3(self, which, configuration):
+        self.calls.append((which, configuration))
+        assert type(which) is int and which == 3
+        # Enforce the scalar BSTR boundary selected to match the shared
+        # supplier getter; this double makes no native ABI-validity claim.
+        assert type(configuration) is str
+        assert configuration == _VIEWED_CONFIGURATION
+        return self.values
+
+    @property
+    def SystemValue(self):
+        self.active_reads += 1
+        raise AssertionError("Active-configuration SystemValue is not owner proof")
+
+
+class _Source:
+    def __init__(self, owner_dimension):
+        self.path = _SOURCE_PATH
+        self.owner_dimension = owner_dimension
+        self.parameter_calls = []
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=_ACTIVE_CONFIGURATION)
+        )
+
+    def GetPathName(self):
+        return self.path
+
+    def Parameter(self, name):
+        self.parameter_calls.append(name)
+        assert name == f"{_NAME}@SeedProfile"
+        return self.owner_dimension
+
+
+class _Display:
+    def __init__(self):
+        # Display dimension and source Parameter are deliberately different
+        # proxies; only the latter provides configured owner-value readback.
+        self.native = _NativeDimension(values=(-0.5,))
+        self.Type2 = 6
+        self.options = None
+
+    def GetDimension2(self, index):
+        assert index == 0
+        return self.native
+
+
+class _Annotation:
+    def __init__(self, display):
+        self.display = display
+        self.annotation_type = 4
+
+    def GetType(self):
+        return self.annotation_type
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+
+class _View:
+    def __init__(self, source):
+        self.ReferencedDocument = source
+        self.ReferencedConfiguration = _VIEWED_CONFIGURATION
+        self.annotations = []
+        self.count_override = None
+
+    def GetOutline(self):
+        return (0.05, 0.12, 0.15, 0.16)
+
+    def GetAnnotations(self):
+        return tuple(self.annotations)
+
+    def GetDisplayDimensionCount(self):
+        if self.count_override is not None:
+            return self.count_override
+        return len(self.annotations)
+
+
+@pytest.fixture
+def keeper_sheet(monkeypatch):
+    owner = _NativeDimension()
+    source = _Source(owner)
+    views = {
+        orientation: _View(source)
+        for orientation in ("*Front", "*Top", "*Right", "*Isometric")
+    }
+    adapter = object()
+    presented = []
+    asserted = []
+
+    def curate(actual_adapter, view, *, keep, view_label, dimensions_by_feature):
+        assert actual_adapter is adapter
+        assert view is views["*Front"]
+        assert keep == {_NAME: (0.156, 0.166)}
+        assert view_label == "keeper catalogue bead diameter"
+        assert dimensions_by_feature == {"SeedProfile": {_NAME}}
+        view.annotations = [_Annotation(_Display())]
+        return view.annotations
+
+    def present(actual_adapter, display, **options):
+        assert actual_adapter is adapter
+        display.options = dict(options)
+        presented.append(display)
+
+    def assert_presentation(actual_adapter, display, **options):
+        assert actual_adapter is adapter
+        assert display.options == options
+        asserted.append(display)
+
+    monkeypatch.setattr(keeper_dimensions, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(keeper_dimensions, "curate_view_dimensions", curate)
+    monkeypatch.setattr(keeper_dimensions, "supplier_reference_dimension", present)
+    monkeypatch.setattr(
+        keeper_dimensions, "assert_supplier_reference_dimension", assert_presentation
+    )
+    settled = keeper_dimensions.annotate_keeper_bead(adapter, views)
+    return SimpleNamespace(
+        views=views,
+        source=source,
+        owner=owner,
+        settled=settled,
+        presented=presented,
+        asserted=asserted,
+    )
+
+
+def test_scalar_viewed_configuration_owner_readback_repeated_reacquisition(keeper_sheet):
+    sheet = keeper_sheet
+    front = sheet.views["*Front"]
+    assert sheet.source.ConfigurationManager.ActiveConfiguration.Name != (
+        front.ReferencedConfiguration
+    )
+    assert sheet.presented[0].options == {
+        "label": f"{_NAME}@SeedProfile",
+        "units": "in",
+        "configuration": _VIEWED_CONFIGURATION,
+        "precision": 0,
+        "expected_mm": _BEAD_MM,
+        "presentation": "diameter",
+        "fraction_denominator": 32,
+        "callout": "CATALOGUE BEAD SIZE",
+    }
+    old_display = sheet.presented[0]
+    old_source = sheet.source
+    old_owner = sheet.owner
+    # The harness invokes the callback twice, replacing both annotations and
+    # source proxies each time. This does not model a post-save finalizer hook.
+    for _invocation in range(2):
+        replacement = _Display()
+        replacement.options = dict(old_display.options)
+        new_owner = _NativeDimension()
+        new_source = _Source(new_owner)
+        old_display.native.FullName = "Stale@Discarded@old.SLDPRT"
+        old_owner.values = (-1.0,)
+        old_parameter_calls = list(old_source.parameter_calls)
+        old_value_calls = list(old_owner.calls)
+        front.annotations = [_Annotation(replacement)]
+        front.ReferencedDocument = new_source
+        sheet.settled()
+        assert sheet.asserted[-1] is replacement
+        assert new_source.parameter_calls == [f"{_NAME}@SeedProfile"]
+        assert new_owner.calls == [(3, _VIEWED_CONFIGURATION)]
+        assert new_owner.active_reads == 0
+        assert replacement.native.calls == []
+        assert replacement.native.active_reads == 0
+        assert old_source.parameter_calls == old_parameter_calls
+        assert old_owner.calls == old_value_calls
+        assert front.GetDisplayDimensionCount() == 1
+        assert all(
+            view.GetDisplayDimensionCount() == 0
+            for orientation, view in sheet.views.items()
+            if orientation != "*Front"
+        )
+        old_display, old_source, old_owner = replacement, new_source, new_owner
+    assert len(sheet.presented) == 1
+    assert len(sheet.asserted) == 2
+    assert sheet.owner.calls == []
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        pytest.param(None, id="no-return"),
+        pytest.param((), id="empty-return"),
+        pytest.param(_BEAD_MM / 1000.0, id="scalar-not-array"),
+        pytest.param("0.00238125", id="string-not-array"),
+        pytest.param((_BEAD_MM / 1000.0, _BEAD_MM / 1000.0), id="multiple-values"),
+        pytest.param((1.3 / 1000.0,), id="wrong-native-diameter"),
+        pytest.param((-_BEAD_MM / 1000.0,), id="negative-native-diameter"),
+        pytest.param(((_BEAD_MM + 2e-5) / 1000.0,), id="outside-existing-tolerance"),
+        pytest.param((float("nan"),), id="nan"),
+        pytest.param((float("inf"),), id="positive-infinity"),
+        pytest.param((float("-inf"),), id="negative-infinity"),
+    ],
+)
+def test_configured_owner_values_fail_closed(keeper_sheet, values):
+    keeper_sheet.owner.values = values
+    with pytest.raises(RuntimeError):
+        keeper_sheet.settled()
+    assert keeper_sheet.owner.calls == [(3, _VIEWED_CONFIGURATION)]
+    assert keeper_sheet.owner.active_reads == 0
+    assert keeper_sheet.asserted == []
+
+
+@pytest.mark.parametrize("offset_mm", [-0.5e-5, 0.0, 0.5e-5])
+def test_existing_millimetre_comparison_tolerance_is_preserved(keeper_sheet, offset_mm):
+    keeper_sheet.owner.values = ((_BEAD_MM + offset_mm) / 1000.0,)
+    keeper_sheet.settled()
+    assert keeper_sheet.owner.calls == [(3, _VIEWED_CONFIGURATION)]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "configuration",
+        "source-path",
+        "source-owner",
+        "dimension-name",
+        "seed-profile",
+        "diameter-type",
+        "missing-owner-dimension",
+        "unprovided-tolerance",
+        "missing-front-reference",
+        "duplicate-front-reference",
+        "missing-annotation-with-count",
+        "foreign-annotation-with-count",
+        "foreign-front-reference",
+    ],
+)
+def test_final_source_and_inventory_drift_fail_closed(keeper_sheet, fault):
+    sheet = keeper_sheet
+    front = sheet.views["*Front"]
+    display = front.annotations[0].display
+    if fault == "configuration":
+        front.ReferencedConfiguration = _ACTIVE_CONFIGURATION
+    elif fault == "source-path":
+        front.ReferencedDocument = _Source(_NativeDimension())
+        front.ReferencedDocument.path = "D:/native/foreign-chain.SLDPRT"
+    elif fault == "source-owner":
+        sheet.owner.FullName = f"{_NAME}@SeedProfile@foreign-chain.SLDPRT"
+    elif fault == "dimension-name":
+        display.native.Name = "RodDiameter"
+    elif fault == "seed-profile":
+        display.native.FullName = f"{_NAME}@InstalledRod@keeper-chain.SLDPRT"
+    elif fault == "diameter-type":
+        display.Type2 = 2
+    elif fault == "missing-owner-dimension":
+        sheet.source.owner_dimension = None
+    elif fault == "unprovided-tolerance":
+        display.native.Tolerance.Type = 2
+    elif fault == "missing-front-reference":
+        front.annotations = []
+    elif fault == "duplicate-front-reference":
+        front.annotations.append(_Annotation(_Display()))
+    elif fault == "missing-annotation-with-count":
+        front.annotations = []
+        front.count_override = 1
+    elif fault == "foreign-annotation-with-count":
+        front.annotations[0].annotation_type = 1
+        front.count_override = 1
+    elif fault == "foreign-front-reference":
+        display.native.FullName = f"{_NAME}@SeedProfile@foreign-chain.SLDPRT"
+    else:
+        raise AssertionError(f"Unhandled fault {fault}")
+    with pytest.raises(RuntimeError):
+        sheet.settled()
+    assert sheet.asserted == []
+
+
+@pytest.mark.parametrize("orientation", ["*Top", "*Right", "*Isometric"])
+def test_reference_in_any_other_view_is_rejected(keeper_sheet, orientation):
+    keeper_sheet.views[orientation].annotations = [_Annotation(_Display())]
+    with pytest.raises(RuntimeError, match="inventory"):
+        keeper_sheet.settled()

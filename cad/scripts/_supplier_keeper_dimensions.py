@@ -56,6 +56,13 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
     supplier_reference_dimension(adapter, display, **presentation)
 
     def settled() -> None:
+        """Verify the surviving owner diameter in the explicit viewed configuration.
+
+        GetSystemValue3 accepts a scalar BSTR or BSTR array. Match the shared
+        supplier reader's scalar BSTR: this binding returned no values for a
+        Python list on the keeper source. Require one exact catalogue value;
+        never substitute the active configuration or repair a source value.
+        """
         # Reacquire from the final view, never retain an annotation COM proxy
         # across rebuild as proof of the surviving source/inventory.
         found = []
@@ -90,18 +97,16 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
                 owner_dimension = _early_bound(source_dimension, "IDimension")
                 if str(owner_dimension.FullName) != str(native.FullName):
                     raise RuntimeError("keeper catalogue bead dimension is not owned by the viewed source")
-                raw_values = owner_dimension.GetSystemValue3(3, [configuration])
-                explicit_values = owner_dimension.GetSystemValue3(3, configuration)
-                print(
-                    "keeper configured getter diagnostic: "
-                    f"configuration={configuration!r} owner={owner_dimension.FullName!r} "
-                    f"list_type={type(raw_values).__name__} list_value={raw_values!r} "
-                    f"bstr_type={type(explicit_values).__name__} bstr_value={explicit_values!r}",
-                    flush=True,
-                )
-                values = tuple(raw_values or ())
-                if len(values) != 1 or abs(float(values[0]) * 1000.0 - chain.BEAD_DIA) > 1e-5:
-                    raise RuntimeError("keeper catalogue bead source value changed in the viewed configuration")
+                values = owner_dimension.GetSystemValue3(3, configuration)  # swSpecifyConfiguration
+                if (
+                    not isinstance(values, (tuple, list))
+                    or len(values) != 1
+                    or not abs(float(values[0]) * 1000.0 - chain.BEAD_DIA) <= 1e-5
+                ):
+                    raise RuntimeError(
+                        "keeper catalogue bead source value changed in the viewed configuration "
+                        f"{configuration!r}: {values!r}"
+                    )
                 if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
                     raise RuntimeError("keeper catalogue bead size acquired an unprovided tolerance")
                 assert_supplier_reference_dimension(adapter, final_display, **presentation)
