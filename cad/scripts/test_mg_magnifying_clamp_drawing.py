@@ -20,7 +20,6 @@ import _drawing_notes as drawing_notes
 from _layout_audit import arrowhead_segments
 from _layout_geometry import (
     ARROW_TEXT_CLEARANCE_M,
-    AnnotationGeometry,
     Box,
     Segment,
     segment_box_distance,
