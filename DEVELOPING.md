@@ -748,6 +748,10 @@ directory cleanup fails. Inherited launcher-owned roots are never deleted here.
 Preserve diagnostics and do not edit/delete a receipt or lock to retry inside
 the same build. Establish that all owned publishers stopped before recovery
 through a fresh build identity.
+There is no automatic sweep of retained failed-build roots. After preserving the
+diagnostics and confirming that the build's runner and publisher process trees
+have exited, remove only the exact owned root named in its warning; do not use a
+wildcard sweep that can include active builds.
 
 ### Interpreting selective execution measurements
 
