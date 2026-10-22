@@ -79,6 +79,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        view_layout="supplier_top",
         supplier_dimensions=supplier_dimensions,
         supplier_margins=supplier_screw_margins(
             supplier.SUPPLIER_REFERENCE_DIMENSIONS,

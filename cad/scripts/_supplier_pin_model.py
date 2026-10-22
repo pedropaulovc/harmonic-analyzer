@@ -2,7 +2,8 @@
 
 Dowel witnesses use the exact constant that authors the solid, checked against
 its native cylindrical face. The separate mating-hole circle is application
-data, not a hole cut or pin-OD tolerance. Drawings import these read-only.
+data, not a hole cut or pin-OD tolerance. Drawings retain these model values
+and bands while explicitly formatting their own imported display dimensions.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from typing import Any
 
 import _telemetry
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, _named_dimensions
 from _feature_tree import name_last_feature
@@ -174,9 +175,10 @@ def _reference_entities(model: Any, feature: str, source: SupplierPinReference) 
 
 
 def assert_supplier_pin_model_reference(
-    adapter: Any, model: Any, display: Any, feature: str, source: SupplierPinReference
+    adapter: Any, model: Any, display: Any, feature: str, source: SupplierPinReference,
+    *, view: Any | None,
 ) -> None:
-    """Read model ownership, ink settings, native band and intended attachment."""
+    """Read the actual model witness and attachments in their owning context."""
     name, kwargs, band = _reference_contract(source, feature)
     display = _early_bound(display, "IDisplayDimension")
     kinds = (6,) if kwargs["presentation"] == "diameter" else (2, 11, 12)
@@ -227,15 +229,29 @@ def assert_supplier_pin_model_reference(
     ):
         raise RuntimeError(f"{source.sku}: imported {name} belongs to the wrong model dimension")
     expected = _reference_entities(model, feature, source)
+    entity_interface = "ISketchPoint" if feature == WALL_FEATURE else "ISketchSegment"
+    if view is not None:
+        mapped = tuple(view.GetCorresponding(entity) for entity in expected)
+        if any(entity is None for entity in mapped):
+            raise RuntimeError(f"{source.sku}: {name} has no intended witness in its drawing view")
+        expected = tuple(_early_bound(_bind(entity, entity_interface), entity_interface)
+                         for entity in mapped)
+        if len(expected) == 2 and int(adapter.swApp.IsSame(*expected)) != 0:
+            raise RuntimeError(f"{source.sku}: {name} drawing witness endpoints are not distinct")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     remaining = list(annotation.GetAttachedEntities3() or ())
     if annotation.IsDangling() or len(remaining) != len(expected):
         raise RuntimeError(f"{source.sku}: {name} has dangling or unexpected source attachments")
     for entity in expected:
-        matches = [index for index, actual in enumerate(remaining)
-                   if actual is not None and int(adapter.swApp.IsSame(actual, entity)) == 1]
+        matches = [
+            index for index, actual in enumerate(remaining)
+            if actual is not None
+            and int(adapter.swApp.IsSame(
+                _early_bound(_bind(actual, entity_interface), entity_interface), entity
+            )) == 1
+        ]
         if len(matches) != 1:
-            raise RuntimeError(f"{source.sku}: {name} does not attach to its named source witness")
+            raise RuntimeError(f"{source.sku}: {name} does not attach to its intended witness")
         remaining.pop(matches[0])
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if band is None:
@@ -286,7 +302,9 @@ def _finish_reference(
     display.SetText(2, f" {source.units})")
     display.SetText(4, kwargs["callout"] or "")
     mark_dimensions_for_drawing(adapter, feature, {name})
-    assert_supplier_pin_model_reference(adapter, adapter.currentModel, display, feature, source)
+    assert_supplier_pin_model_reference(
+        adapter, adapter.currentModel, display, feature, source, view=None,
+    )
 
 
 @_telemetry.traced("drawing.supplier_pin_dowel_source_author")
@@ -305,13 +323,22 @@ async def author_supplier_dowel_references(adapter: Any, source: SupplierPinRefe
     check("exit supplier dowel OD reference", await adapter.exit_sketch())
     _finish_reference(adapter, dims, DIAMETER_FEATURE, source)
     blank_reference_sketches(adapter, (DIAMETER_FEATURE,))
-    assert_supplier_dowel_references(adapter, source)
+    assert_supplier_dowel_references(adapter, adapter.currentModel, source)
 
 
 @_telemetry.traced("drawing.supplier_pin_dowel_source_readback")
-def assert_supplier_dowel_references(adapter: Any, source: SupplierPinReference) -> None:
-    display, _ = _named_dimension(adapter, DIAMETER_FEATURE, DIAMETER_DIMENSION)
-    assert_supplier_pin_model_reference(adapter, adapter.currentModel, display, DIAMETER_FEATURE, source)
+def assert_supplier_dowel_references(
+    adapter: Any, model: Any, source: SupplierPinReference,
+) -> None:
+    feature = _early_bound(model, "IPartDoc").FeatureByName(DIAMETER_FEATURE)
+    if feature is None:
+        raise RuntimeError(f"{source.sku}: missing model reference {DIAMETER_FEATURE}")
+    display, _ = _named_dimensions(
+        adapter, DIAMETER_FEATURE, {DIAMETER_DIMENSION}, feature=feature,
+    )[DIAMETER_DIMENSION]
+    assert_supplier_pin_model_reference(
+        adapter, model, display, DIAMETER_FEATURE, source, view=None,
+    )
 
 
 @_telemetry.traced("drawing.supplier_pin_source_author")
@@ -348,11 +375,20 @@ async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPi
     check("exit supplier mating-hole reference", await adapter.exit_sketch())
     _finish_reference(adapter, dims, MATING_HOLE_FEATURE, source)
     blank_reference_sketches(adapter, (WALL_FEATURE, MATING_HOLE_FEATURE))
-    assert_supplier_spring_pin_references(adapter, source)
+    assert_supplier_spring_pin_references(adapter, adapter.currentModel, source)
 
 
 @_telemetry.traced("drawing.supplier_pin_source_readback")
-def assert_supplier_spring_pin_references(adapter: Any, source: SupplierPinReference) -> None:
-    for feature, name in ((WALL_FEATURE, WALL_DIMENSION), (MATING_HOLE_FEATURE, MATING_HOLE_DIMENSION)):
-        display, _ = _named_dimension(adapter, feature, name)
-        assert_supplier_pin_model_reference(adapter, adapter.currentModel, display, feature, source)
+def assert_supplier_spring_pin_references(
+    adapter: Any, model: Any, source: SupplierPinReference,
+) -> None:
+    for feature_name, name in (
+        (WALL_FEATURE, WALL_DIMENSION), (MATING_HOLE_FEATURE, MATING_HOLE_DIMENSION),
+    ):
+        feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+        if feature is None:
+            raise RuntimeError(f"{source.sku}: missing model reference {feature_name}")
+        display, _ = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
+        assert_supplier_pin_model_reference(
+            adapter, model, display, feature_name, source, view=None,
+        )

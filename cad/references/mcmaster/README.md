@@ -1593,14 +1593,17 @@ receive their normal origin controls; all retain exact final-frame readback and
 the complete sketch's fully-defined guard. Head angles use a native angular
 dimension between the two actual construction rays, with the text point mapped
 from their owning sketch plane, and require exact driving-angle readback.
-Y-axis dowel lengths use native linear end-rim measurements with `None` arc
-conditions; they do not invoke an arc-center setter on an edge-on linear pick.
-Both exact end-rim attachments, the complete source length, native type and
-bandless reference remain checked after layout. X-axis spring pins retain their
-separate arc-center mode. A refused center setter still fails; its existing
-failure path records the actual result, condition readbacks, type/value and
-attachment types independently. Unavailable readers are not measured empty
-inventories, and these diagnostics do not establish a spring-pin native fix.
+Y-axis dowels and X-axis spring pins use native linear measurements of the
+complete axial span between their two end rims. Both imported end conditions
+must remain `None`: neither orthographic edge-on span uses an arc-center
+setter. Exact end-rim attachments, full source length, native type and the
+bandless reference remain checked after layout.
+
+Pin drawing imports validate the original model's value, presentation, band
+and physical witness before import. Only the drawing-local display is formatted,
+including its tolerance-display precision; source values and tolerance bands
+are never written. The drawing checks the independently mapped witness in its
+actual view, then rechecks the original source after dressing and final rebuild.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping
@@ -1614,6 +1617,21 @@ precision and native band are checked before import, after dressing and after
 final layout. The imported value and band remain independently checked; the
 formatter never changes either. A changed original source is a failure, not
 something the drawing repairs.
+
+The six oblique-trammel screws with opposing Top annotation lanes select the
+shared `supplier_top` layout: a 70 mm Top panel leaves 18 mm for the native
+outline after the two 26 mm annotation budgets. Standard sheets (including the
+shared thumb screw) and the separate 96 mm `tall_top` layout retain their
+existing capacity. Native outline padding is measured at each candidate scale;
+it is not scaled with the part, and the settled view/annotation guards remain
+authoritative. Recorded R38 outlines provide offline fit regressions, not proof
+that the repaired drawing has passed a fresh native run.
+
+Washer ownership failures collect bounded, independent read-only context only
+after an ordinary native exception. Missing readers remain unavailable, never
+measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
+starting or continuing optional observations. The failing ownership predicate
+remains strict; this evidence capture is not a claim that its native cause is fixed.
 
 Nut chord endpoints and washer witness points/segments attach in the drawing's
 namespace. Their independently checked part entities are mapped through the
