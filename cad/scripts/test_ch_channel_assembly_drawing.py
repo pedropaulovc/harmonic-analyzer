@@ -696,6 +696,13 @@ def split_balloon_sheet(monkeypatch):
         north=north,
         unproven=None,
         omit=None,
+        targets={
+            stem: (
+                drawing.NORTH_KEEPER_DETAIL.centre[0] - 0.004,
+                drawing.NORTH_KEEPER_DETAIL.centre[1] + 0.003,
+            )
+            for stem in drawing.NORTH_KEEPER_DETAIL.stems
+        },
         created=[],
     )
 
@@ -711,7 +718,7 @@ def split_balloon_sheet(monkeypatch):
                 instance=anchors[stem].instance,
                 note=note,
                 sheet_xy=(
-                    (0.392, 0.170)
+                    state.targets[stem]
                     if view is detail_c and stem != state.unproven
                     else None
                 ),
@@ -806,15 +813,16 @@ def test_keeper_circles_move_by_validated_item_not_landing_creation_order(
     calls = drawing.position_bom_balloon.call_args_list
     assert len(calls) == 3
     assert {call.kwargs["item_number"]: call.kwargs["position_xy"] for call in calls} == expected
-    keeper_notes = {
-        landing.note
+    keeper_landings = [
+        landing
         for landing in state.created
         if landing.stem in drawing.KEEPER_BALLOON_POSITIONS
-    }
-    for call in calls:
-        assert call.args[0] is state.adapter
-        assert set(call.args[1]) == keeper_notes
-        assert len(call.args[1]) == 3
+    ]
+    items_by_stem = dict(state.items)
+    for call, landing in zip(calls, keeper_landings, strict=True):
+        assert call.args == (state.adapter, [landing.note])
+        assert call.kwargs["item_number"] == items_by_stem[landing.stem]
+        assert call.kwargs["position_xy"] == drawing.KEEPER_BALLOON_POSITIONS[landing.stem]
 
 
 @pytest.mark.parametrize(
@@ -826,9 +834,73 @@ def test_detail_c_refuses_each_unproven_listed_edge_before_moving_circles(
 ) -> None:
     state = split_balloon_sheet
     state.unproven = stem
-    with pytest.raises(RuntimeError, match="DETAIL C.*unproven"):
+    with pytest.raises(RuntimeError, match="DETAIL C.*unproven listed-edge") as refused:
+        drawing._place_exploded_sheet(state.adapter, state.north)
+    assert stem in str(refused.value)
+    assert state.north[stem] in str(refused.value)
+    drawing.position_bom_balloon.assert_not_called()
+
+
+@pytest.mark.parametrize("stem", sorted(drawing.NORTH_KEEPER_DETAIL.stems))
+@pytest.mark.parametrize("direction", [(1, 0), (-1, 0), (0, 1), (0, -1)])
+def test_detail_c_refuses_each_ray_landing_just_outside_its_crop(
+    split_balloon_sheet, stem, direction,
+) -> None:
+    state = split_balloon_sheet
+    detail = drawing.NORTH_KEEPER_DETAIL
+    radius = detail.crop_radius_mm * detail.mm
+    state.targets[stem] = tuple(
+        centre + sign * (radius + 1e-7)
+        for centre, sign in zip(detail.centre, direction, strict=True)
+    )
+    with pytest.raises(RuntimeError, match="DETAIL C.*outside.*crop") as refused:
+        drawing._place_exploded_sheet(state.adapter, state.north)
+    assert stem in str(refused.value)
+    assert state.north[stem] in str(refused.value)
+    assert str(state.targets[stem]) in str(refused.value)
+    drawing.position_bom_balloon.assert_not_called()
+
+
+@pytest.mark.parametrize("stem", sorted(drawing.NORTH_KEEPER_DETAIL.stems))
+@pytest.mark.parametrize("direction", [(1, 0), (-1, 0), (0, 1), (0, -1)])
+def test_detail_c_accepts_each_ray_landing_just_inside_its_crop(
+    split_balloon_sheet, stem, direction,
+) -> None:
+    state = split_balloon_sheet
+    detail = drawing.NORTH_KEEPER_DETAIL
+    radius = detail.crop_radius_mm * detail.mm
+    state.targets[stem] = tuple(
+        centre + sign * (radius - 1e-7)
+        for centre, sign in zip(detail.centre, direction, strict=True)
+    )
+    settled = drawing._place_exploded_sheet(state.adapter, state.north)
+    assert drawing.position_bom_balloon.call_count == 3
+    settled()
+    landings = drawing.assert_balloon_landings.call_args.args[1]
+    assert len(landings) == 19
+    landing = next(landing for landing in landings if landing.stem == stem)
+    assert landing.sheet_xy == state.targets[stem]
+
+
+def test_keeper_routing_refuses_a_missing_detail_c_definition(
+    split_balloon_sheet, monkeypatch,
+) -> None:
+    state = split_balloon_sheet
+    remaining = tuple(
+        detail for detail in drawing.EXPLODED_DETAILS
+        if detail is not drawing.NORTH_KEEPER_DETAIL
+    )
+    assert remaining == (drawing.NORTH_BRACKET_DETAIL,)
+    monkeypatch.setattr(drawing, "EXPLODED_DETAILS", remaining)
+    with pytest.raises(
+        RuntimeError, match="channel keeper BOM coverage requires DETAIL C"
+    ):
         drawing._place_exploded_sheet(state.adapter, state.north)
     drawing.position_bom_balloon.assert_not_called()
+    calls = drawing.add_component_bom_balloons.call_args_list
+    assert len(calls) == 1
+    assert calls[0].args == (state.adapter, state.main_view)
+    assert len(calls[0].kwargs["items"]) == 16
 
 
 @pytest.mark.parametrize("stem", [drawing.explode.BRACKET, drawing.explode.KEEPER])
@@ -890,16 +962,22 @@ def test_exploded_detail_returns_the_placed_cropped_labelled_view(monkeypatch) -
 def test_keeper_circle_requests_clear_border_bom_and_existing_caption_fields() -> None:
     """Design envelopes only: final native circles, leaders and ink still need proof."""
     positions = drawing.KEEPER_BALLOON_POSITIONS
-    assert positions == {
-        drawing.explode.KEEPER: (0.411, 0.162),
-        drawing.explode.KEEPER_FOOT_SCREW: (0.371, 0.185),
-        drawing.explode.KEEPER_SET_SCREW: (0.411, 0.190),
+    detail_c = drawing.NORTH_KEEPER_DETAIL
+    offsets = {
+        drawing.explode.KEEPER: (0.020, -0.013),
+        drawing.explode.KEEPER_FOOT_SCREW: (-0.021, 0.015),
+        drawing.explode.KEEPER_SET_SCREW: (0.019, 0.020),
     }
+    assert set(positions) == set(offsets)
+    for stem, offset in offsets.items():
+        assert positions[stem] == pytest.approx(
+            tuple(centre + delta for centre, delta in zip(detail_c.centre, offset))
+        )
     radius = drawing.BALLOON_MAX_RADIUS
     bom_right = drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values())
     nominal_bottom = drawing.BOM_ANCHOR[1] - (len(drawing.BOM_COMPONENTS) + 1) * drawing.BOM_ROW_HEIGHT
     caption_top = drawing.exploded_caption_xy(nominal_bottom)[1]
-    detail_c = drawing.NORTH_KEEPER_DETAIL
+    crop_radius = detail_c.crop_radius_mm * detail_c.mm
     bracket = drawing.NORTH_BRACKET_DETAIL
     bracket_label_bottom = bracket.crop_label_xy[1] - len(bracket.label_text.splitlines()) * NOTE_LINE_PITCH
     for x, y in positions.values():
@@ -907,13 +985,15 @@ def test_keeper_circle_requests_clear_border_bom_and_existing_caption_fields() -
             (x - radius, y - radius, x + radius, y + radius), label="keeper circle request"
         )
         assert x - radius > bom_right + 0.002
-        assert y - radius > max(caption_top, detail_c.crop_label_xy[1]) + 0.004
+        assert y - radius > caption_top + 0.004
+        assert y - radius > detail_c.crop_label_xy[1] + 0.003
+        assert math.dist((x, y), detail_c.centre) - radius > crop_radius
         assert y + radius < bracket_label_bottom - 0.004
     circles = list(positions.values())
     for index, circle in enumerate(circles):
         for other in circles[index + 1:]:
             assert math.dist(circle, other) > 2.0 * radius + 0.004
-    assert "NORTH-MOST" in drawing.EXPLODED_CAPTION
+    assert "ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE." in drawing.EXPLODED_CAPTION
     assert "KEEPER HARDWARE: DETAIL C" in drawing.EXPLODED_CAPTION
 
 

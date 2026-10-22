@@ -1332,18 +1332,25 @@ witness, shaft geometry, tolerances or the declared RV-02 rim shortfall.
 
 The CH recipe splits the existing nineteen validated BOM identities into
 sixteen balloons on the main exploded view and three on the existing isolated
-Detail C: `KEEPER`, `KEEPER_FOOT_SCREW` and `KEEPER_SET_SCREW` (printed items
-8–10). Route the original validated `(stem, item)` rows by family, never by
-balloon creation order, and retain the same north-most component instances.
+Detail C: `KEEPER`, `KEEPER_FOOT_SCREW` and `KEEPER_SET_SCREW`. Route the
+original validated `(stem, item)` rows by family, never by balloon creation
+order, and retain the same north-most component instances.
 The BOM, detail geometry, bracket landing and shared helper/spec files remain
 unchanged; the existing helper may re-ring the other sixteen circles.
 
 Require a non-null `sheet_xy` for each Detail C landing from the shared
-helper's native visibility/ray selection. An owned `listed-edge` attachment
-without that landing proof is not enough. Move only the three circles with
-`position_bom_balloon`, to sheet requests (411, 162), (371, 185), (411, 190) mm
-respectively; never move their attached leader tips. Preserve the combined
-nineteen-balloon settled check and the rebuilt BOM/caption clearance check.
+helper's native visibility/ray selection, and require that point inside the
+unchanged Detail C crop circle. An owned `listed-edge` attachment without
+that landing proof, or a ray-visible target outside the crop, is not enough.
+Move only the three circles with `position_bom_balloon`, passing each returned
+landing's single note and its validated item number. Derive circle requests
+from the detail centre; their full envelopes must lie outside the crop and
+clear the border, BOM and captions. Never move their attached leader tips.
+`KEEPER_INITIAL_RING_MARGIN` is only the transient ring required by the
+existing read-only helper API, not the final circle-placement contract.
+Preserve the combined nineteen-balloon settled check and the rebuilt
+BOM/caption clearance check. The caption retains one balloon per BOM row on
+the north-most instance and identifies keeper hardware on Detail C.
 
 The offline tests exercise identity routing, refusal and requested circle
 envelopes, not native visibility or measured final ink. Fresh exact-source
