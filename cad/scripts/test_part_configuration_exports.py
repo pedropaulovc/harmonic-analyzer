@@ -225,6 +225,30 @@ def test_real_registry_members_have_exact_physical_paths(tmp_path, stem, member,
 
 
 @pytest.mark.parametrize("stem", _MEMBERS)
+def test_member_metadata_and_paths_read_only_the_requested_registry_row(
+    monkeypatch, tmp_path, stem
+):
+    reads = []
+    rows = {name: _config.parts(name) for name in _MEMBERS}
+
+    def own_row(name):
+        reads.append(name)
+        assert name == stem, f"member export read a foreign part row: {name}"
+        return rows[name]
+
+    monkeypatch.setattr(_config, "parts", own_row)
+    assert exports.member_configurations(stem.replace("-", "_")) == _MEMBERS[stem]
+    paths = exports.configuration_export_paths(stem, tmp_path)
+    assert tuple(paths) == _MEMBERS[stem]
+    assert reads == [stem, stem]
+    assert all(
+        path.is_relative_to(tmp_path) and stem in path.name
+        for formats in paths.values()
+        for path in formats.values()
+    )
+
+
+@pytest.mark.parametrize("stem", _MEMBERS)
 def test_producer_exports_rebuilt_members_and_restores_saved_default(
     native_export, stem
 ):

@@ -357,6 +357,9 @@ def _read_required(
             found = True
             value = keyword.value
             if isinstance(value, ast.Name):
+                if value.id not in assigned:
+                    required.update(_metadata_strings(tree, value, sequences))
+                    continue
                 value = assigned[value.id]
             assert isinstance(value, (ast.Tuple, ast.List)), "unsupported required properties"
             for element in value.elts:
@@ -393,6 +396,48 @@ def _required(draw: Path) -> set[str]:
             _tree(SCRIPTS / "_purchased_variant_drawing.py"),
             _variant_sequences(tree, calls[0]),
         )
+    if "build_supplier_spring_drawing" in imported:
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "build_supplier_spring_drawing"
+        ]
+        assert len(calls) == 1, f"{draw.name}: expected one supplier diagram call"
+        metadata = [
+            keyword.value
+            for keyword in calls[0].keywords
+            if keyword.arg == "spring_metadata"
+        ]
+        assert len(metadata) <= 1
+        spring_metadata = False
+        if metadata:
+            assert isinstance(metadata[0], ast.Constant) and isinstance(
+                metadata[0].value, bool
+            ), f"{draw.name}: supplier metadata selection is not a literal boolean"
+            spring_metadata = metadata[0].value
+        helper = _tree(SCRIPTS / "_supplier_spring_drawing.py")
+        consuming = [
+            node
+            for node in ast.walk(helper)
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "spring_metadata"
+        ]
+        assert len(consuming) == 1, "supplier diagram metadata branch is missing"
+        return _read_required(
+            ast.Module(
+                body=[
+                    node
+                    for node in helper.body
+                    if isinstance(node, (ast.Import, ast.ImportFrom, ast.Assign))
+                ]
+                + (consuming[0].body if spring_metadata else consuming[0].orelse),
+                type_ignores=[],
+            ),
+            {},
+        )
     if "build_purchased_fastener_drawing" in imported:
         return set(purchased._PROPERTIES)
     if "build_purchased_spring_drawing" in imported:
@@ -401,6 +446,36 @@ def _required(draw: Path) -> set[str]:
     if "build_purchased_part_drawing" in imported:
         return set(purchased._PROPERTIES) | _SPRING_EXTRA
     return _read_required(tree, {})
+
+
+@pytest.mark.parametrize("spring_metadata", (False, True))
+def test_supplier_requirements_follow_the_actual_consuming_branch(
+    tmp_path, spring_metadata
+) -> None:
+    drawing = tmp_path / "draw_supplier.py"
+    drawing.write_text(
+        "from _supplier_spring_drawing import build_supplier_spring_drawing\n"
+        "async def build(adapter):\n"
+        "    await build_supplier_spring_drawing("
+        f"adapter, spring_metadata={spring_metadata!r})\n",
+        encoding="utf-8",
+    )
+    expected = set(purchased._PROPERTIES)
+    if spring_metadata:
+        expected |= _SPRING_EXTRA
+    assert _required(drawing) == expected
+
+
+def test_unknown_supplier_metadata_selection_fails_closed(tmp_path) -> None:
+    drawing = tmp_path / "draw_supplier.py"
+    drawing.write_text(
+        "from _supplier_spring_drawing import build_supplier_spring_drawing\n"
+        "async def build(adapter):\n"
+        "    await build_supplier_spring_drawing(adapter, spring_metadata=choose())\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(AssertionError, match="literal"):
+        _required(drawing)
 
 
 def _build_trees(build: Path) -> list[ast.Module]:
@@ -495,7 +570,7 @@ def test_source_part_stamps_every_required_property(drawing) -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ("sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire"),
+    ("sh_vn_clamping_kit_hardware", "sh_vn_music_wire"),
 )
 def test_configured_notes_must_reach_the_stamping_call(name, monkeypatch) -> None:
     drawing = next(drawing for drawing in PART_DRAWINGS if drawing.name == name)

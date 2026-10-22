@@ -66,6 +66,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
+    # Supplier-reference saver forwards each model-owned source band's two limits.
+    ("build_pd_vn_transgear_pivot_screw", "band"): (
+        "SUPPLIER_REFERENCE_BANDS",
+        "values",
+    ),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",

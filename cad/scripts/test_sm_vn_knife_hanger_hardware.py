@@ -534,7 +534,8 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     )
     bolt_part._manufacturing_controls(None)
     row = _config.parts(bolt_part.PART_NAME)
-    assert stamped == {"Purchased Screw Note": row["purchased_note"]}
+    assert stamped["Purchased Screw Note"] == row["purchased_note"]
+    assert stamped["Supplier Reference Title"] == bolt_drawing.SUPPLIER_STOCK_TITLE
     assert list(tolerances) == [
         ("StockTrimProfile", "CutLength"),
         ("StockDeburrProfile", "ChamferAngle"),
@@ -915,7 +916,10 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     source = tmp_path / "sm-vn-knife-hanger-stud.SLDPRT"
     source.touch()
     row = _config.parts(bolt_part.PART_NAME)
-    properties = {"Purchased Screw Note": row["purchased_note"]}
+    properties = {
+        "Purchased Screw Note": row["purchased_note"],
+        "Supplier Reference Title": bolt_drawing.SUPPLIER_STOCK_TITLE,
+    }
     printed = []
     required = []
     views = []
@@ -931,7 +935,9 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
 
     def place_view(_adapter, _source, orientation, *_args, **_kwargs):
         views.append((orientation, _kwargs["scale"]))
-        return orientation
+        return SimpleNamespace(
+            name=orientation, ReferencedConfiguration="Default"
+        )
 
     def read_properties(_model, names, *, required: tuple[str, ...]):
         properties.update({name: properties.get(name, name) for name in names})
@@ -942,7 +948,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         return read_properties(model, names, **kwargs)
 
     def annotations(_adapter, view, *, keep, **_kwargs):
-        curated.append((view, keep))
+        curated.append((view.name, keep))
         result = []
         for name in keep:
             display = SimpleNamespace(
@@ -960,11 +966,11 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         return result
 
     def project(_adapter, view, xyz, *, label):
-        projected.append((view, xyz, label))
+        projected.append((view.name, xyz, label))
         return (0.1, 0.2)
 
     def callout(_adapter, view, *, property_name, edge_xy, note_xy):
-        printed.append((view, property_name, edge_xy, note_xy))
+        printed.append((view.name, property_name, edge_xy, note_xy))
         text = properties[property_name].replace("\n", "\r\n")
         link = bolt_drawing.property_link(property_name)
         if fault == "link":
@@ -976,6 +982,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     for name in (
         "check",
         "stamp_drawing_summary",
+        "create_blank_drawing_sheets",
         "set_hidden_lines_removed",
         "verify_cut_length_reference",
         "verify_machining_controls",
@@ -991,7 +998,9 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(
         bolt_drawing,
         "new_project_drawing",
-        lambda *_args, **_kwargs: (object(), object()),
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(ActivateSheet=lambda _name: True), object()
+        ),
     )
     monkeypatch.setattr(bolt_drawing, "place_view", place_view)
     monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
@@ -1003,6 +1012,28 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
     monkeypatch.setattr(bolt_drawing, "add_property_linked_callout", callout)
     monkeypatch.setattr(bolt_drawing, "finalize_drawing", finalize)
+    monkeypatch.setattr(
+        bolt_drawing, "_add_supplier_references", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        bolt_drawing,
+        "_add_stock_reference",
+        lambda _adapter: (
+            SimpleNamespace(
+                name="stock-front",
+                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
+            ),
+            SimpleNamespace(
+                name="stock-isometric",
+                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
+            ),
+            object(),
+        ),
+    )
+    monkeypatch.setattr(
+        bolt_drawing, "_supplier_reference_identities", lambda *_args: {}
+    )
+    monkeypatch.setattr(bolt_drawing, "view_name", lambda _adapter, view: view.name)
     adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
     if fault is not None:
         with pytest.raises(RuntimeError, match="did not persist"):

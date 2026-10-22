@@ -1351,8 +1351,6 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     # at the nominal length; the spec proves the longest pin the band allows
     # is still buried (PIN_BURIED_MARGIN).  The registry row is the
     # drive-train BOM line, qty 2.
-    import inspect
-
     import _config
     import build_dt_vn_pinion_strap_pin as part
     import dt_vn_pinion_strap_pin_spec as pin
@@ -1364,8 +1362,6 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
 
     assert part.SPEC is FASTENERS["dt-vn-pinion-strap-pin"]
     assert part.SPEC.skus == ("98296A027",)
-    source = inspect.getsource(part)
-    assert 'sku="98296A027"' in source and "author=build_98296A027" in source
     assert discovered_recipes()["98296A027"].module == "diagnostics.diag_build_98296A027"
     assert (recipe.PIN_OD, recipe.PIN_LEN) == (pin.PIN_DIA, pin.PIN_LEN)
     assert math.isclose(pin.WALL_T, 0.012 * 25.4)

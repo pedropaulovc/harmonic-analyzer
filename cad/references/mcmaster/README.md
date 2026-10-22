@@ -1511,6 +1511,13 @@ strip gauges from compressed-height/deflection/shaft application gauges.
 Neither diagram asserts an unmodelled loaded shape or a force derived from
 the installed stand-in.
 
+Offline recipe checks follow the supplier consumer's actual required-property
+branch and the producer's real saved-configuration callback. Their inventories
+must reject missing or unknown authors, including nested scripts; documentation
+strings and Python function-object identity are not native behavior. Configured
+member export readers remain restricted to the requesting part's registry row,
+and drawing fixtures retain native note, hidden-line and stale-source refusals.
+
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
 solid/sheet-body counts and face counts and compares all twelve mass-property

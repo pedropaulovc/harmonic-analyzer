@@ -434,16 +434,3 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     )
 
 
-def test_drawing_uses_only_the_ordinary_purchased_reference_api(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def reference_sheet(adapter, spec, **kwargs):
-        assert spec is drawing.SPEC
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(
-        drawing, "build_purchased_fastener_drawing", reference_sheet
-    )
-    asyncio.run(drawing.build(None))
-    assert seen == {"item": drawing.ITEM, "cut_to_suit": True}

@@ -15,7 +15,7 @@ import re
 import time
 from pathlib import Path
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -237,6 +237,9 @@ _DRAWING_OWN_ROW_READERS = {
     # save_part_and_images(adapter, name) forwards its caller's part name to
     # part_properties(name), which the dynamic-row scan sees here.
     "_part_save.py",
+    # save_simplified_part(adapter, part_name) forwards the same caller-owned
+    # name to save_part_and_images; its entrypoint is pinned below as well.
+    "_simplified_part.py",
     # apply_drawing_properties(adapter, name): same callers, same pin.
     "_drawing_marks.py",
     # _config.parts(stock.part_name) after the source identity check
@@ -245,6 +248,13 @@ _DRAWING_OWN_ROW_READERS = {
     # The configured sheet reads spec.source.stem, derived from spec.part;
     # output artifact labels cannot select a foreign registry row.
     "_purchased_variant_drawing.py",
+    # Configured purchased members read/export only the part_name supplied by
+    # their producer. The caller argument checks below cover these entrypoints.
+    "_part_configuration_exports.py",
+    "_purchased_part_variants.py",
+    # source.stem is checked against the registered native source before any
+    # supplier diagram metadata is read; artifact labels never select the row.
+    "_supplier_spring_drawing.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -252,6 +262,11 @@ _OWN_ROW_HELPERS = {
     "save_part_and_images": 1,
     "save_simplified_part": 1,
     "apply_drawing_properties": 1,
+    "require_member_configurations": 0,
+    "create_member_configurations": 1,
+    "save_member_part": 1,
+    "apply_member_properties": 1,
+    "assert_member_properties": 1,
 }
 
 
@@ -280,8 +295,133 @@ def _helper_name_arguments(tree: ast.Module) -> tuple[tuple[str, str], ...]:
         index = _OWN_ROW_HELPERS[name]
         args = [*node.args[index : index + 1]]
         args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
+        assert len(args) == 1, f"{name}: missing or ambiguous part-name argument"
         found.extend((name, ast.unparse(arg)) for arg in args)
     return tuple(found)
+
+
+def _registered_source_row(tree: ast.Module) -> str | None:
+    """Only the declared drawing's native source can select its dynamic row."""
+    if any(
+        isinstance(node, ast.Import)
+        and any(alias.name == "_config" and alias.asname for alias in node.names)
+        for node in ast.walk(tree)
+    ):
+        return None
+    imported = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "_drawing_registry"
+        and any(alias.name == "DRAWINGS_BY_NAME" and alias.asname is None for alias in node.names)
+        for node in tree.body
+    )
+    bindings = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "SPEC" for target in node.targets)
+    ]
+    if not imported or len(bindings) != 1:
+        return None
+    value = bindings[0]
+    if not (
+        isinstance(value, ast.Subscript)
+        and isinstance(value.value, ast.Name)
+        and value.value.id == "DRAWINGS_BY_NAME"
+        and isinstance(value.slice, ast.Constant)
+        and isinstance(value.slice.value, str)
+    ):
+        return None
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "_config"
+        and node.func.attr == "parts"
+    ]
+    if not calls or any(
+        len(call.args) != 1
+        or call.keywords
+        or ast.unparse(call.args[0]) != "SPEC.source.stem"
+        for call in calls
+    ):
+        return None
+    return value.slice.value
+
+
+@pytest.mark.parametrize(
+    "name,index",
+    (
+        ("require_member_configurations", 0),
+        ("create_member_configurations", 1),
+        ("save_member_part", 1),
+        ("apply_member_properties", 1),
+        ("assert_member_properties", 1),
+        ("save_simplified_part", 1),
+    ),
+)
+@pytest.mark.parametrize("selected", ("PART_NAME", "foreign_part", None))
+def test_configured_member_row_calls_reject_foreign_or_missing_part_inputs(
+    monkeypatch, tmp_path, name, index, selected
+):
+    import _buildgraph as bg
+
+    script = tmp_path / "build_sh_vn_chain_link.py"
+    arguments = ["adapter"] * index
+    if selected is not None:
+        arguments.append(selected)
+    script.write_text(
+        'import _config\nPART_NAME = "sh-vn-chain-link"\n'
+        '_config.parts(PART_NAME)\n'
+        f"{name}({', '.join(arguments)})\n",
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    if selected == "PART_NAME":
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+    else:
+        with pytest.raises(AssertionError):
+            test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize("registered", ("fixture", "foreign", None))
+@pytest.mark.parametrize("selector", ("SPEC.source.stem", "foreign_source.stem"))
+@pytest.mark.parametrize("aliased_read", (False, True))
+def test_drawing_source_rows_require_the_selected_registered_native(
+    monkeypatch, tmp_path, registered, selector, aliased_read
+):
+    import _buildgraph as bg
+
+    script = tmp_path / "draw_fixture.py"
+    binding = "" if registered is None else f"SPEC = DRAWINGS_BY_NAME[{registered!r}]\n"
+    extra_read = (
+        "import _config as cfg\ncfg.parts(foreign_source.stem)\n"
+        if aliased_read
+        else ""
+    )
+    script.write_text(
+        "from _drawing_registry import DRAWINGS_BY_NAME\nimport _config\n"
+        + binding
+        + f"_config.parts({selector})\n" + extra_read,
+        encoding="utf-8",
+    )
+    spec = SimpleNamespace(script=script, part="sh_vn_thumb_screw")
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    if registered == "fixture" and selector == "SPEC.source.stem" and not aliased_read:
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+    else:
+        with pytest.raises(AssertionError):
+            test_drawing_closures_read_no_foreign_dynamic_part_row()
 
 
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
@@ -311,7 +451,13 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
                 continue
             tokens, calls, part_name = facts
             if "parts/*" in tokens:
-                assert source.name in {*_DRAWING_OWN_ROW_READERS, own_build}, (
+                registered_source = source == script and _registered_source_row(
+                    ast.parse(source.read_text(encoding="utf-8"))
+                ) == stem
+                assert (
+                    source.name in {*_DRAWING_OWN_ROW_READERS, own_build}
+                    or registered_source
+                ), (
                     f"drawing:{stem} reaches a new dynamic registry read in "
                     f"{source.name}; review it against _expand_parts_token"
                 )

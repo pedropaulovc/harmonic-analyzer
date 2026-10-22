@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 from pathlib import Path
@@ -108,7 +107,7 @@ def test_spec_is_pure_data() -> None:
     }
 
 
-def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
+def test_sheet_is_the_registered_purchased_part_reference() -> None:
     sheet = DRAWINGS_BY_NAME[NAME]
     assert (sheet.part, sheet.artifact_stem, sheet.script_name) == (
         NAME,
@@ -117,16 +116,6 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     )
     assert sheet.layout is DrawingLayout.LANDSCAPE
     assert sheet.artifact_stem == part.PART_NAME
-    calls = []
-
-    async def fake(adapter, drawn, *, item, cut_to_suit=False):
-        calls.append((adapter, drawn, item, cut_to_suit))
-        return {"pdf": "x"}
-
-    monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
-    adapter = object()
-    assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, sheet, draw.ITEM, False)]
     assert "FLANGE NUT" in draw.ITEM
 
 

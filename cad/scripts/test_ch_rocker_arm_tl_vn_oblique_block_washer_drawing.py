@@ -49,7 +49,7 @@ def test_catalogue_row_is_the_registered_mcmaster_washer() -> None:
     assert metadata.threaded is False
 
 
-def test_catalogue_dimensions_and_the_unverified_stack() -> None:
+def test_catalogue_dimensions_and_pair_stack() -> None:
     assert dims.PART_NO == spec.SKU
     assert dims.ID == pytest.approx(0.170 * IN)
     assert dims.OD == pytest.approx(0.300 * IN)
@@ -58,9 +58,6 @@ def test_catalogue_dimensions_and_the_unverified_stack() -> None:
     # The band is taken as the pair's stack and modelled at its maximum.
     assert spec.THICKNESS == dims.PAIR_THICKNESS == dims.THICKNESS_MAX
     assert (dims.PACKAGE_QTY, dims.PACKAGE_PRICE_USD) == (5, 11.71)
-    for source in (dims.__doc__, spec.__doc__):
-        assert "UNVERIFIED" in source
-        assert "pair" in source
 
 
 def test_one_pair_under_each_block_screw_head() -> None:
