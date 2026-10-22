@@ -1,5 +1,8 @@
 # ch_rocker_arm (MHA-CH-06) prechips route, authored from scratch (trial T4, ported from
 # cad/prechips-shop 6d5991c9b onto the merged shop fixtures MHA-CH-06-TL-04/05 and TL-10..19).
+# Those TL CAD parts are retired (Numbers reserved); the fixtures and gauges stay shop
+# inventory items with inline solids, and the outline template's inspection geometry lives
+# in cad/scripts/ch_rocker_arm_profile_check.py.
 # Coordinates: the model frame is the manifest's (pivot axis at model X0 Y8, hub centred
 # on Z0). Setup frames are plan frames below; every number is derived from features.toml.
 # Face references are bare HAF labels; _process_plans.bind_plan binds them to the exported
@@ -616,7 +619,8 @@ contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep
 # ---------------------------------------------------------------------------------------
 # S5: fitting bench, the work on the shop-made filing stand (two end blocks under the raw
 # blank ends, a pedestal under the lower hub face), a clamp across each blank end and one on
-# the upper hub face. The template (MHA-CH-06-TL-13) is laid on the work pinned in the
+# the upper hub face. The arm outline template (gauges.arm-outline-template, a shop-made
+# gauge; its TL-13 CAD part is retired) is laid on the work pinned in the
 # reamed bore by the 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus)
 # and clocked by the 0.0780 in Class ZZ minus pin gauge (gauges.pin-gauges) through its
 # radial rod slot into the #47 rod-pin hole, whenever it scribes (ops 10-20) or gauges (ops
@@ -917,7 +921,8 @@ checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
 # Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
 # with a DTI against the arm outline template. The accept/reject windows are computed in
 # ch_rocker_arm_profile_check from the printed zones, where the template's edge sits in them,
-# its clocking_error and the DTI resolution; test_process_plans pins this text to that module.
+# its clocking_error and the DTI resolution; test_ch_rocker_arm_profile_check pins this text
+# to that module.
 [[setups.ops]]
 op = 97
 do = "inspect"

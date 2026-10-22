@@ -89,8 +89,25 @@ def _tree(root: Path) -> dict[str, bytes]:
         for path in root.rglob("*") if path.is_file()
     }
 
+@pytest.fixture
+def configured_feature_part(monkeypatch) -> str:
+    """Exercise opt-in exports without adding a production export obligation."""
+    from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
 
-def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkeypatch) -> None:
+    # Reuse real feature declarations with test-only configuration names.
+    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    original = export_features.step_configurations
+    monkeypatch.setattr(
+        export_features, "step_configurations",
+        lambda selected: ("Default", INSTALLED_CONFIG) if selected == stem else original(selected),
+    )
+    return stem
+
+
+
+def test_copied_exports_bind_and_stage_exact_scoped_bytes(
+    tmp_path: Path, monkeypatch, configured_feature_part: str,
+) -> None:
     out = bound_output(tmp_path)
 
     def refuse_declarations(*_args):
@@ -115,7 +132,7 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkey
         stem: export_features.configuration_step_paths(stem, out)
         for stem in export_features.SUPPORTED_PARTS
     }
-    assert configured["ch_rocker_arm_tl_riser_block"]
+    assert configured[configured_feature_part]
     files = 2 * len(export_features.SUPPORTED_PARTS) + sum(map(len, configured.values()))
     assert len(checked) == len(staged) == len(expected) == files
     assert _tree(stage) == expected
@@ -126,9 +143,13 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkey
         }
 
 
-def test_missing_configuration_step_never_stages(tmp_path: Path) -> None:
+def test_missing_configuration_step_never_stages(
+    tmp_path: Path, configured_feature_part: str,
+) -> None:
     out = bound_output(tmp_path)
-    missing = export_features.configuration_step_paths("ch_rocker_arm_tl_riser_block", out)["L045"]
+    from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
+
+    missing = export_features.configuration_step_paths(configured_feature_part, out)[INSTALLED_CONFIG]
     missing.unlink()
     with pytest.raises(features_bound.FeaturesBoundError, match="cannot read required file"):
         features_bound.stage_bound_features(out, tmp_path / "stage")

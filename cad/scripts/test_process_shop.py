@@ -19,9 +19,10 @@ MODELS = {
     "shop-policy.toml": Policy,
     "cutting-data.toml": CuttingData,
 }
-# Every shop-made inventory record, enumerated: only these may name a part (their
-# TL CAD parts come with the fixtures themselves), and a new shop-made record is
-# a deliberate addition here. Every other part-named table is a plan input.
+# Every shop-made inventory record, enumerated: only these may name a part (the
+# part they are made for, or their own TL CAD part where one exists), and a new
+# shop-made record is a deliberate addition here. Every other part-named table
+# is a plan input.
 SHOP_MADE_IDS = frozenset(
     {
         "fixtures.angle-plate",
@@ -170,18 +171,41 @@ def test_placeholder_marker_is_the_shared_constant():
     assert len(plans.shop_placeholders()) == tracked + spliced > 0
 
 
-def test_spec_solid_placeholders_are_counted_where_they_bind():
-    expected = {
-        f"inventory.toml:{qualified}.solids[{index}].measured.by"
-        for qualified, _, record in _records()
-        if "cad" in record
-        for index, solid in enumerate(
-            importlib.import_module(f"{record['cad']}_spec").PRECHIPS_SOLIDS
-        )
+# A surviving TL spec that publishes prechips solids. The tracked inventory
+# carries every fixture's solids inline, so the cad-tag splice is exercised on
+# a shop built here around this spec.
+_BOUND_SPEC_STEM = "ch_rocker_arm_tl_oblique_end_bracket"
+
+
+def test_spec_solid_placeholders_are_counted_where_they_bind(tmp_path, monkeypatch):
+    shop = tmp_path / "shop"
+    shop.mkdir()
+    for name in plans.SHOP_FILES:
+        (shop / name).write_text("version = 1\n", encoding="utf-8")
+    (shop / "inventory.toml").write_text(
+        f'[fixtures.bound]\ncad = "{_BOUND_SPEC_STEM}"\n'
+        f"# {plans.PLACEHOLDER_BY}: a comment-declared value\n"
+        'note = "kept"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(plans, "PROCESS_ROOT", tmp_path)
+    module = f"{_BOUND_SPEC_STEM}_spec"
+    assert plans.shop_spec_modules() == (module,)
+    solids = importlib.import_module(module).PRECHIPS_SOLIDS
+    spliced = {
+        f"inventory.toml:fixtures.bound.solids[{index}].measured.by"
+        for index, solid in enumerate(solids)
         if solid["measured"]["by"] == plans.PLACEHOLDER_BY
     }
-    assert expected
-    assert expected <= set(plans.shop_placeholders())
+    assert spliced
+    assert set(plans.shop_placeholders()) == spliced | {
+        "inventory.toml:fixtures.bound line 2 (comment)"
+    }
+    inventory, _, _ = plans.bind_shop(directory=tmp_path / "bound")
+    fixture = tomllib.loads(inventory.read_text(encoding="utf-8"))["fixtures"]["bound"]
+    assert "cad" not in fixture
+    assert fixture["solids"] == solids
+    assert fixture["note"] == "kept"
 
 
 def test_every_bound_solid_states_its_measured_status(tmp_path):

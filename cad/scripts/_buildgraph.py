@@ -73,7 +73,7 @@ ASSEMBLY_ORDER = (
 def is_shop_fixture(stem: str) -> bool:
     """True for a shop-fixture stem (``_tl_``: cad/docs/subsystem-identities.md).
 
-    A fixture part may appear only in a shop-fixture assembly; a fixture
+    A fixture part must belong to a registered shop-fixture assembly; a fixture
     assembly never enters a machine assembly or a machine BOM
     (test_part_coverage.py, #1239)."""
     return "_tl_" in stem
@@ -2359,7 +2359,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
-        "ch_rocker_arm_tl_outline_template_spec",
+        "ch_rocker_arm_profile_check",
         # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
         "ch_rocker_hub_spec",
         # Edge-break row takes the tap mouths off the carrier taps' engagement.
