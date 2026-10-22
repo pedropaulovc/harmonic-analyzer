@@ -9368,6 +9368,7 @@ def _washer_import_native(monkeypatch, *, defect=None):
         GetBodies2=lambda *_args: (SimpleNamespace(GetEdges=lambda: rims),),
     )
     mapped = {id(entity): SimpleNamespace() for entities in source_entities.values() for entity in entities}
+    mapped.update({id(feature): SimpleNamespace() for feature in features.values()})
     def view():
         return SimpleNamespace(
             ReferencedDocument=model, GetOutline=lambda: (0.1, 0.1, 0.12, 0.12),
@@ -9382,7 +9383,8 @@ def _washer_import_native(monkeypatch, *, defect=None):
             case = _supplier_native(monkeypatch, value=value / 1000.0,
                                     kind=2 if label == washer.THICKNESS else 6)
             case.native.FullName = f"{name}@{feature_name}@stock"
-            case.native.GetFeatureOwner = lambda feature_name=feature_name: features[feature_name]
+            owner = mapped[id(features[feature_name])] if imported else features[feature_name]
+            case.native.GetFeatureOwner = lambda owner=owner: owner
             case.native.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.00005,
                                                     GetMaxValue=lambda: 0.00005)
             case.display.GetPrimaryTolPrecision2 = lambda: 3

@@ -188,11 +188,17 @@ def assert_supplier_washer_source_attachment(
     try:
         full_name = str(native.FullName or "")
         owner = native.GetFeatureOwner()
+        expected_owner = feature
+        # Imported feature owners, like their attachments, belong to the view.
+        if view is not None:
+            mapped_owner = _early_bound(view, "IView").GetCorresponding(feature)
+            expected_owner = None if mapped_owner is None else _early_bound(mapped_owner, "IFeature")
         if (
             full_name.split("@")[:2] != [dimension_name, feature_name]
             or str(source_native.FullName).split("@")[:2] != [dimension_name, feature_name]
             or owner is None
-            or int(adapter.swApp.IsSame(owner, feature)) != 1
+            or expected_owner is None
+            or int(adapter.swApp.IsSame(owner, expected_owner)) != 1
             or int(display.Type2) != int(source_display.Type2)
         ):
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
