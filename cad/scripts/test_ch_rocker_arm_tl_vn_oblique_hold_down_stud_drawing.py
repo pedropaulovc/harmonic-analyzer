@@ -761,6 +761,32 @@ def test_source_only_chamfer_keeps_exact_native_max_driver_and_precision(monkeyp
     assert display.primary.DrivenState == (1 if failure == "reference" else 2)
 
 
+def test_saved_chamfer_source_binds_raw_display_dispatch_before_native_readback(monkeypatch):
+    import _com
+
+    model, display, _sides = _saved_cut_model(monkeypatch)
+
+    class RawDisplayDispatch:
+        def InvokeTypes(self, *_args):
+            raise AssertionError("raw display must be wrapped before member access")
+
+    raw = RawDisplayDispatch()
+    monkeypatch.setattr(draw, "_feature_display_dimensions", lambda _feature: iter((raw,)))
+
+    def generated_display_wrapper(proxy, interface):
+        assert proxy._oleobj_ is raw
+        assert interface == "IDisplayDimension"
+        return display
+
+    # Exercise the real _bind adapter for a raw PyIDispatch-shaped value;
+    # replace only the generated wrapper boundary, not its caller or _bind.
+    monkeypatch.setattr(_com, "_early_bound", generated_display_wrapper)
+    assert draw.read_saved_cut_end_angle(model) == pytest.approx(math.pi / 4)
+    display.precision += 1
+    with pytest.raises(RuntimeError, match="native source precision changed"):
+        draw.read_saved_cut_end_angle(model)
+
+
 class _Display:
     def __init__(self, name, value, tolerance, *, state=2, reference=False):
         self.name = name

@@ -26,7 +26,7 @@ from _purchased_variant_drawing import (
     configure_reference_views,
 )
 from _part_configuration_exports import _sha256
-from _com import _early_bound, _read_member
+from _com import _bind, _early_bound, _read_member
 from _dimensions import _feature_display_dimensions
 from _drawing_attachment import (
     _assert_attached_to,
@@ -368,6 +368,8 @@ def read_saved_cut_end_angle(model: Any) -> float:
     The shared adapter owns a drawing here. Resolve its explicitly configured
     view's referenced part using the same IPartDoc lookup as the supplier guards.
     EdgeChamferAngle is radians; angle-distance uses leg zero.
+    Bind raw native feature-display dispatches before checking source identity
+    and precision; _early_bound alone does not wrap those raw objects.
     """
     part = _early_bound(model, "IPartDoc")
     feature = part.FeatureByName("CutEndChamfer")
@@ -410,7 +412,7 @@ def read_saved_cut_end_angle(model: Any) -> float:
         raise RuntimeError("cut-end chamfer: native source identity, driver or MAX band changed")
     displays = []
     for raw in _feature_display_dimensions(feature):
-        display = _early_bound(raw, "IDisplayDimension")
+        display = _bind(raw, "IDisplayDimension")
         candidate = _early_bound(display.GetDimension2(0), "IDimension")
         if str(candidate.FullName or "") == full_name:
             displays.append(display)
