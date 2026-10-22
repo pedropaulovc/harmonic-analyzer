@@ -2125,21 +2125,32 @@ def _projection_model_ink(
     _telemetry.info(f"{label}: reading native physical boundaries")
     view = _early_bound(view, "IView")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    values, errors, evidence = {}, [], {"stage": stage}
+    values, errors, evidence = {}, [], {
+        "stage": stage,
+        "pre_polyline_count5_observed": False,
+        "polyline_preparation": "EMPIRICAL_COUNT_FIRST_NOT_DOCUMENTED_G7_PRECONDITION",
+    }
     raw_snapshot = None
     first_failure: BaseException | None = None
     first_traceback = None
     # Generate once, then freeze the actual return BEFORE component getters,
     # binding/QI, decoding, or diagnostic formatting can fail or mutate it.
+    # R30b returned ((), None) before a later count observed (36, 1201).
+    # Count-first is one empirical preparation experiment, NOT a documented
+    # GetPolylines7 precondition or permission to accept unavailable payload.
     for name, reader in (
         ("zoom", lambda: model.ViewZoomtofit2()),
         ("refresh", lambda: view.UpdateViewDisplayGeometry()),
+        ("polyline_count5", lambda: view.GetPolyLineCount5(1)),
         ("polylines", lambda: view.GetPolylines7(1)),  # exclude crosshatch
         ("drawing_components", lambda: view.GetVisibleDrawingComponents()),
         ("visible_components", lambda: view.GetVisibleComponents()),
     ):
         try:
             values[name] = reader()
+            if name == "polyline_count5":
+                evidence["pre_polyline_count5_observed"] = True
+                evidence["pre_polyline_count5"] = _projection_raw_snapshot(values[name])
             if name == "polylines":
                 raw_snapshot = _projection_raw_snapshot(values[name])
         except BaseException as exc:
@@ -2152,6 +2163,12 @@ def _projection_model_ink(
     evidence["drawing_components"] = []
     rendered = ()
     try:
+        count = values.get("polyline_count5")
+        if (
+            not isinstance(count, (tuple, list)) or len(count) != 2
+            or any(type(value) is not int or value < 0 for value in count)
+        ):
+            raise RuntimeError("GetPolyLineCount5 returned unavailable or invalid typed counts")
         for raw in values.get("drawing_components") or ():
             try:
                 drawing_component = _early_bound(raw, "IDrawingComponent")

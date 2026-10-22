@@ -917,6 +917,9 @@ def lever_tip_native(monkeypatch, projection_native):
     native.polyline = (0, 0, 0, 0, 0, 0, -1, 0, 2, 100, 200, 300, 101, 200, 300)
     native.view.GetVisibleDrawingComponents = lambda: native.drawing_components
     native.view.GetVisibleComponents = lambda: native.visible_components
+    native.view.GetPolyLineCount5 = lambda cross: (
+        len(native.rendered_edges), len(native.polyline) * len(native.rendered_edges),
+    )
     native.view.GetPolylines7 = lambda cross: (
         tuple(native.rendered_edges), native.polyline * len(native.rendered_edges)
     )
@@ -2403,7 +2406,7 @@ def test_r29_refusal_collects_all_raw_slots_without_prefix_association(r29_refus
     native = r29_refusal_native
     with pytest.raises(RuntimeError, match="primitive 11, offset 2355") as caught:
         drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
-    assert native.g7_calls == [1] and native.count_calls == [1]
+    assert native.g7_calls == [1] and native.count_calls == [1, 1]
     assert len(native.failure_captures) == 1
     packet = native.failure_captures[0][2]
     assert packet["exception"] is caught.value
@@ -2479,7 +2482,10 @@ def test_r29_refusal_preserves_raw_first_and_original_traceback(
     monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
     failed_key = None
     if failure == "count":
-        native.view.GetPolyLineCount5 = fail
+        prepared_count = native.view.GetPolyLineCount5
+        native.view.GetPolyLineCount5 = lambda option: (
+            fail() if native.count_calls else prepared_count(option)
+        )
         failed_key = "native_polyline_count5"
     elif failure == "xform":
         native.view.GetXform = fail
@@ -2602,9 +2608,12 @@ def test_r29_raw_return_precedes_component_and_decoder_interrupts(
 
 
 @pytest.mark.parametrize("count", [None, 12, (), (12,), (12, 2370, 11)])
-def test_r29_count_readback_never_infers_missing_out_parameter(r29_refusal_native, count):
+def test_r29_secondary_count_readback_never_infers_missing_out_parameter(r29_refusal_native, count):
     native = r29_refusal_native
-    native.view.GetPolyLineCount5 = lambda _option: count
+    prepared_count = native.view.GetPolyLineCount5
+    native.view.GetPolyLineCount5 = lambda option: (
+        count if native.count_calls else prepared_count(option)
+    )
     with pytest.raises(RuntimeError, match="primitive 11, offset 2355"):
         drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
     readers = native.failure_captures[0][2]["native_polyline_probe"]["readers"]
@@ -5642,3 +5651,127 @@ def test_build_tip_settled_ink_failure_prevents_save_and_still_proves_source(imm
     assert state.path.read_bytes() == b"released MG source"
     assert not state.source.dirty
     assert len(state.metadata_reads) == 2 * len(drawing.EXPLODED_VIEW_NAMES)
+
+
+@pytest.fixture
+def r30b_unavailable_capture():
+    """Actual post-failure count is not a native count-first success witness."""
+    return json.loads(
+        (Path(__file__).parent / "fixtures" / "mg_r30b_projection_unavailable.json").read_text(
+            encoding="utf-8",
+        )
+    )
+
+
+def test_positive_prepared_count_cannot_accept_actual_r30b_unavailable_g7(
+    lever_tip_native, r30b_unavailable_capture,
+):
+    native = lever_tip_native
+    actual = r30b_unavailable_capture["actual_probe"]
+    prepared = [item["value"] for item in actual["post_failure_count5"]["value"]["items"]]
+    assert actual["original_return"]["items"][0]["length"] == 0
+    assert actual["original_return"]["items"][1]["value"] is None
+    calls = []
+
+    def count(option):
+        calls.append(("count", option))
+        return prepared
+
+    def polylines(option):
+        calls.append(("polylines", option))
+        return (), None
+
+    def components():
+        # A later reader must not change the getter-time count witness.
+        prepared[:] = [0, 0]
+        return native.drawing_components
+
+    native.view.GetPolyLineCount5 = count
+    native.view.GetPolylines7 = polylines
+    native.view.GetVisibleDrawingComponents = components
+    with pytest.raises(RuntimeError, match="retval/OUT channel is unavailable") as caught:
+        drawing._projection_model_ink(native.adapter, native.view, stage="uncropped physical boundaries")
+    assert calls == [("count", 1), ("polylines", 1), ("count", 1)]
+    packet = native.failure_captures[0][2]
+    assert packet["exception"] is caught.value
+    probe = packet["native_polyline_probe"]
+    frozen = probe["component_readback"]
+    assert frozen["pre_polyline_count5_observed"] is True
+    assert [item["value"] for item in frozen["pre_polyline_count5"]["items"]] == [36, 1201]
+    assert probe["original_return"] == actual["original_return"]
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert native.imports == []
+
+
+@pytest.mark.parametrize("count", [
+    None, True, 36, (), (36,), (36, 1201, 0), (True, 1201), (36, 1201.0), (-1, 1201),
+])
+def test_prepared_count_requires_both_native_nonnegative_integers_without_retry(
+    lever_tip_native, count,
+):
+    native = lever_tip_native
+    calls = []
+
+    def counted(option):
+        calls.append(("count", option))
+        return count
+
+    def polylines(option):
+        calls.append(("polylines", option))
+        return tuple(native.rendered_edges), native.polyline * len(native.rendered_edges)
+
+    native.view.GetPolyLineCount5 = counted
+    native.view.GetPolylines7 = polylines
+    with pytest.raises(RuntimeError, match="GetPolyLineCount5 returned unavailable or invalid typed counts"):
+        drawing._projection_model_ink(native.adapter, native.view, stage="uncropped physical boundaries")
+    assert calls == [("count", 1), ("polylines", 1), ("count", 1)]
+    probe = native.failure_captures[0][2]["native_polyline_probe"]
+    assert probe["component_readback"]["pre_polyline_count5_observed"] is True
+    assert probe["original_return"]["items"][0]["length"] == len(native.rendered_edges)
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert native.imports == []
+
+
+@pytest.mark.parametrize("error_type", [RuntimeError, KeyboardInterrupt, SystemExit])
+def test_prepared_count_native_failure_keeps_first_error_and_single_raw_g7(
+    lever_tip_native, monkeypatch, error_type,
+):
+    native = lever_tip_native
+    original = error_type("count preparation refused")
+    calls, traces = [], []
+
+    def count(option):
+        calls.append(("count", option))
+        if len(calls) == 1:
+            try:
+                raise original
+            except BaseException as error:
+                traces.append(error.__traceback__)
+                raise
+        return 36, 1201
+
+    def polylines(option):
+        calls.append(("polylines", option))
+        return (), None
+
+    def refuse_decoder(_result):
+        raise AssertionError("failed required count must not license decoded edges")
+
+    native.view.GetPolyLineCount5 = count
+    native.view.GetPolylines7 = polylines
+    monkeypatch.setattr(drawing, "_projection_rendered_edges", refuse_decoder)
+    with pytest.raises(error_type) as caught:
+        drawing._projection_model_ink(native.adapter, native.view, stage="uncropped physical boundaries")
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not traces[0]:
+        trace = trace.tb_next
+    assert trace is traces[0]
+    assert calls == [("count", 1), ("polylines", 1), ("count", 1)]
+    packet = native.failure_captures[0][2]
+    assert packet["exception"] is original
+    probe = packet["native_polyline_probe"]
+    assert probe["component_readback"]["pre_polyline_count5_observed"] is False
+    assert probe["original_return"]["items"][0]["length"] == 0
+    assert probe["original_return"]["items"][1]["value"] is None
+    assert native.imports == []
