@@ -148,6 +148,21 @@ not another released member identity.
 Configured purchased drawings read their registry metadata from the native source
 part identity, not the drawing's output label. Their cache dependencies therefore
 remain scoped to that source part's row.
+The split registry loader requires each non-default `parts/<stem>.yaml` to define
+exactly its filename-matching row; a foreign or additional row is rejected instead
+of silently overriding metadata outside that drawing's cache dependencies.
+Changing either member-inventory field invalidates that drawing's local freshness
+digest and remote cache key, even with its native execution identity unchanged;
+unrelated purchased drawings retain their keys. Keep these reads module-qualified
+(`_config.parts(SPEC.source.stem)`): `from _config import parts` forces conservative
+whole-config dependency expansion.
+For direct `_config.parts(SPEC.source.stem)` reads, the drawing-closure ownership
+guard requires the drawing's registered native source and an unshadowed `SPEC`,
+not a drawing-filename exemption. The same unshadowed registered `SPEC` binding
+is required for `build_supplier_spring_drawing` arguments, including supplier-only
+sheets without direct configuration reads. The simplified part wrapper must
+forward its caller's part name unchanged. These caller checks do not cover the
+purchased-variant or purchased-fastener drawing builders.
 
 Each part task declares and caches all member STEP/PNG files together with its
 `reports/part-neutral/<stem>.json` certificate. The certificate records the
