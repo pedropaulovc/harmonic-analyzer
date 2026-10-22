@@ -16,7 +16,6 @@ from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_edges import scan_view_edges
 from _drawing_layout_audit import annotation_display
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _layout_audit import display_box
 from _layout_geometry import Box
@@ -151,7 +150,7 @@ def _installation_flag(adapter: Any, right: Any) -> Callable[[], None]:
         keys = [item for item in inventory if item[0].GetText() == key]
         legends = [
             item for item in inventory
-            if item[0].PropertyLinkedText == property_link("Installation Notes")
+            if item[0].PropertyLinkedText == '$PRP:"Installation Notes"'
         ]
         instructions = [
             item for item in inventory
