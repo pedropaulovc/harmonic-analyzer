@@ -42,8 +42,8 @@ MM_PER_IN = 25.4
 
 # --- stock: 1/2 in hex brass bar, flats as supplied --------------------------
 HEX_AF = 0.5 * MM_PER_IN  # 12.70 across flats
-# Selected-stock receiving acceptance, explicitly owned by the native stock
-# property/leader; neither a REF size nor generic "Brass" supplies this band.
+# Selected-stock receiving acceptance, explicitly owned by the native,
+# non-reference AF dimension; generic "Brass" supplies no stock-form certificate.
 HEX_AF_BAND = 0.13
 HEX_AC = HEX_AF / math.cos(math.radians(30.0))  # nominal 14.6647 across corners
 # Explicit receiving envelope, measured over the entire finished stock length.

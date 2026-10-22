@@ -1562,28 +1562,37 @@ apply the pre-equation DrivenState check after equations take ownership.
 
 The dependent MHA-MG-02 clamp uses **1/2 in hex** brass, keeps its bore at
 **19.95** from the bottom seat and its overall height at **29.50**. The hook
-stays at **919.7**; neither `.XX` ±0.51 band tightens. Nominal AF is 12.70,
-but the attached stock property explicitly requires AF12.57–12.83 and a
-**15.00 MAX transverse envelope over the full height**. Inspect that envelope
-with straightedges/calipers; do not infer it from exact60° flats or Rule#1,
-which does not automatically control as-supplied STOCK form. The separate
-bore-callout-owned requirement is **2.0 MIN finished net wall at bore/taps
-throughout their depth**, not a claim that AF alone computes a guaranteed wall
-for arbitrarily bowed/twisted stock. Retain the four physical acceptance lines:
+stays at **919.7**; neither `.XX` ±0.51 band tightens. The native TOP
+**HexAf = 12.70 ±0.13**, at **two places and not REF**, owns receiving size
+12.57–12.83. Its attached below-text is `1/2 HEX STOCK; FLATS AS SUPPLIED`.
+Use the existing symmetric-tolerance authoring path and read back native
+value, tolerance type/min/max, both precisions and non-reference presentation.
+Prove its actual source HexProfile endpoints, imported source dimension and
+requested TOP-view ownership again after the final drawing rebuild.
 
-- `1/2 HEX BAR; AF 12.57–12.83; FLATS AS SUPPLIED`
+The independent global receiving-form note reads:
+
+- `AS-SUPPLIED STOCK FORM ACCEPTANCE`
 - `TRANSVERSE ENVELOPE 15.00 MAX OVER FULL HEIGHT`
-- `2.0 MIN FINISHED WALL AT BORE/TAPS`
-- `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`
 
-The stock-face property note owns only the first two lines: AF/flats and the
-full-height envelope. The existing actual-bore native callout owns the single
-finished-wall line as below-text (`SetText(4)` / `GetText(4)`), not as part of
-the stock-face property note. The actual shoulder-seat note owns the fourth
-line. `AT TAP` scopes the no-chamfer/spotface requirement; do not broaden it to
-unrelated edges. These are receiving/finished acceptances, not fabricated
-native measurements of nominal 15 or 2. Native wrapping and attachment
-readback, not source-string count, determine whether four readable lines fit.
+That envelope includes nonideal as-supplied stock over its complete height;
+do not derive it from nominal regular-hex AF/cos(30°), exact 60° normals or
+Rule #1. No supplier, alloy/temper or stock-form certification is implied.
+The actual bore diameter owns the separate finished acceptance:
+
+- `2.0 MIN FINISHED NET WALL`
+- `BORE/TAPS/OUTER FACES, FULL DEPTH`
+
+This concerns actual remaining ligaments, including outer-face drift and hole
+wander through depth, not the intentional thumb-tap/bore opening. It is not
+a certificate computed from nominal AF. The three finished-wall entries in
+`FINISHED_NET_WALL_MINIMUMS` are acceptance thresholds; only the blind rod-tap
+drill-point floor remains in `DERIVED_WALL_BOUNDS` (2.092143505152 mm worst).
+Retain the actual seat's `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`;
+`AT TAP` does not constrain unrelated edges. Neither 15 nor 2 is represented
+by a fabricated native measurement. The isometric is illustrative only:
+the former stock-definition face leader and its correspondence machinery
+are removed, not retained as a second acceptance route.
 The unchanged 29.50 height and its .XX band control **TOP-TAP WALL**; do not
 label the height FULL THREAD ENGAGEMENT. Identify MHA-MG-VN-50 at its actual
 top-tap callout.
@@ -1800,35 +1809,23 @@ face/edge/vertex route. Null, ambiguous or wrong-view results, unknown native
 self/owner identity and malformed keys remain refusals. Reacquire all source
 and drawing proof after rebuilds; never cache correspondence across them.
 
-The attached stock flag must link the model's stock acceptance property and
-resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
-own an across-flats acceptance band. Attach the height precision's functional
-reason to the height dimension itself, and remove only the native hole-callout
-thread-class variable where the title block already owns 2B. Keep live
-thread/drill/depth variables and reject resolved text that still repeats 2B.
+The attached TOP AF stock callout names the supplied form; its **native
+12.70 ±0.13 dimension**, not a REF value or text-only AF limits, owns size.
+The unleadered property-linked global note owns only full-height stock form,
+with resolved native text/position and zero-leader readback after rebuilding.
+Activate the current sheet through `GetCurrentSheet` → `ISheet.GetName` →
+`IDrawingDoc.ActivateSheet`; `ActivateView` does not activate drawing sheets.
+Attach height precision's functional reason to the height dimension itself,
+and remove only the native hole-callout thread-class variable where the title
+block already owns 2B. Keep live thread/drill/depth variables and reject
+resolved text that still repeats 2B.
 
-Select the stock-note face in the active drawing's view context, not directly
-from the underlying part's body traversal. `IEntity.Select4` explicitly requires
-an entity obtained from the active document; setting `SelectData.View` does not
-remove that documented requirement. Reuse the output fixture's established
-feature-to-view route: `IView.GetCorresponding` on the source feature,
-`IFeature.GetFaces` in that context, then the source model extension's
-`GetCorrespondingEntity2` to prove the exact independently resolved supplied
-flat. Require positive native self controls, exact source correspondence and
-one matching face, then use that same view face for selection and attachment.
-Do not substitute FaceID or plane/box similarity for native source association.
-R16 imported all five ordinary location dimensions but its stock flag failed
-the strict FACE attachment check. R17 proved the feature/view/source mapping
-and strict attachment, including distinct source/view handles, then failed
-the final audit because that leader crossed the isometric scale caption.
-Route the actual attached leader clear of the caption; identity closure is
-not sheet-layout acceptance, and neither guard should be weakened.
-R18 cleared that crossing and passed the native audit, but the full height
-qualifier still clipped the left border and both tap-to-rim qualifier blocks
-overlapped the section-cut markers. Wrap and place the entire native text
-block, not just the numeric value, clear of the border, section markers and
-neighbouring dimensions. Preserve every qualifier word, value, band and
-attachment; final PNG inspection remains required even after audit success.
+R17/R18's former stock-face leader exposed crossing and clipping failures;
+the current acceptance cutover removes that leader rather than preserving
+obsolete face-binding tests. Wrap and place complete native text blocks, not
+just their numeric values, clear of borders, section markers and neighbours.
+Source-coordinate predictions are not native layout proof: inspect the final
+whole PNG and require the unchanged native annotation/ink audit.
 
 R21 export completed with the upper 6.35 extension line touching
 the left stroke of the upper A cutting-plane label. Clearance above an arrow
@@ -1839,13 +1836,16 @@ R27 proved all three common-flat imports and their final rebuilt owners, but
 its complete three-row qualifier collided with the section label and height
 extension. Keep the cleared vertical witness station; move the common-flat
 text station from `(50, 175.5)` to `(150, 175.5)` mm instead of lifting it back
-through the A stroke. Bring the seat note to `(260, 116)` mm and the stock note
-to `(285, 140)` mm so their entire native extents stay inside the frame.
-Use the stock note's supported bent/right leader, require integer-zero
-`SetLeader3` success, rebuild, and prove the same native face attachment again.
-These placements preserve every qualifier, value and manufacturing band.
-Predicted translated text boxes are not native clearance proof: inspect the
-rebuilt whole sheet, full leader paths and all neighbouring ink after export.
+through the A stroke. R28 proved this station and the seat note at
+`(260, 116)` mm with no gating native layout errors. The clarity cutover places
+the unleadered global form note in the same cleared `(285, 140)` mm lane,
+the two-place AF plus supplied-stock below-text at `(85, 255)` mm, and the
+expanded bore net-wall callout at `(165, 145)` mm. The actual TOP hex reaches
+about 239.5 mm; the inner border is 266.7 mm. The front right edge is 104.05 mm
+and the section begins at 222.415 mm. These are placement constraints, not a
+claim of newly measured text clearance. Preserve all five actual flat controls,
+values and bands; native final text/leader boxes and whole-sheet inspection
+must prove the new layout.
 
 Hole-callout variable arrays return concrete variable dispatches. Follow the
 existing precision helper's dynamic metadata read for `VariableName`/`Type`,
@@ -1909,18 +1909,38 @@ record index, the observed size 17 or the observed residual length 34. A null
 return channel is unavailable, not an observed empty array; decoder success
 still does not replace actual model-edge identity or final render inspection.
 
-Raw objects from visible-edge enumeration and rendered polyline arrays do not
-establish a shared identity namespace merely because both bind as `IEdge`.
-Before choosing a correspondence route, obtain a known native-visible
-non-target edge positive and a distinct-edge negative, preserve the component
-instance, and prove the supported part/component/view mappings and persistent
-identity in the owning document. Do not replace failed identity with matching
-circle coordinates, component visibility or an unverified OR of mappings.
+Raw visible-edge and rendered-polyline handles do not establish a shared
+identity namespace merely because both bind as `IEdge`. The MG interface
+proof uses one documented route: owned drawing seed, owning source Extension
+`GetCorrespondingEntity2`, exact full component `GetCorrespondingEntity`,
+then native `IsSame == 1` against a supported nonempty G7 edge. Before mapping,
+require the seed's actual native component owner to match that full component
+and its source's actual active configuration to match the referenced one.
+Map the component entity back through the same drawing view; require native
+equality with the original seed, its real owner, and its source-back entity.
+Null owners are unavailable, never positive ownership. Circle/body geometry
+corroborates this route; coordinates, paths, PID bytes and route-OR fallbacks
+cannot replace identity. R28's real target/control matches proved that direct
+cross-context zeros were not evidence of absent ink or occlusion.
+
+Calibrate the independent known-visible positive and distinct native negatives
+on the uncropped exact view. The opposite bracket control lies outside the
+20mm final crop: do not demand or claim its postcrop ink. The detail caller
+owns this private calibration, not a global or view-name cache. Every settled
+pass requires native exact view/component/source-document continuity and fresh
+active/referenced configuration agreement. Re-enumerate and re-prove each
+target's owner, source/component/view roundtrip, geometry and actual G7 ink.
+Re-read retained control capabilities/body/geometry and distinct negatives;
+unknown or stale proof refuses. Calibration never rescues a missing target
+or supplies a cached target correspondence after rebuilding.
+
 On a physical-identity refusal, preserve the single original polyline return,
 including null slots and numeric bytes, actual transforms and independent
 reader errors. Capture the native drawing, image and whole evidence packet
-without labeling successful decoding unavailable. Formatting, logging or
-capture failures must never replace the original refusal or its traceback.
+without labeling successful decoding unavailable. Preserve the original
+refusal and traceback at the local collector/caller boundary even if its
+formatting, logging or capture fails; that local isolation is not a guarantee
+about the unchanged outer shared telemetry.
 
 Suppress sketch inference while creating the crop boundary, restore the prior
 `AddToDB` state, and read the persisted native circle with

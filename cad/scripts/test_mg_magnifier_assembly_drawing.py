@@ -776,6 +776,17 @@ def _native_crop_fence(centre=(0.100, 0.053), radius=0.020):
 def lever_tip_native(monkeypatch, projection_native):
     """Execute the real detail construction and guards with native boundary doubles."""
     import _drawing_dimensions as dimensions
+    import sys
+
+    monkeypatch.setitem(sys.modules, "pythoncom", SimpleNamespace(IID_IUnknown="IUnknown"))
+    monkeypatch.setitem(sys.modules, "solidworks_mcp.adapters._generated.sldworks_2026", SimpleNamespace(
+        IEdge=SimpleNamespace(CLSID="IEdge"), IEntity=SimpleNamespace(CLSID="IEntity"),
+    ))
+
+    class Dispatch:
+        def QueryInterface(self, iid, fallback):
+            assert iid in ("IEdge", "IEntity") and fallback == "IUnknown"
+            return object()
 
     native = projection_native
     native.failure_captures = []
@@ -840,6 +851,7 @@ def lever_tip_native(monkeypatch, projection_native):
     native.visible_components = []
     native.edges = []
     native.component_edges = {}
+    native.controls = []
     for stem, x, radius in (
         ("mg-magnifying-lever", drawing.ROD_LENGTH / 1000,
          (drawing.LEVER_ROD_DIA / 2 - drawing.TIP_CHAMFER) / 1000),
@@ -870,9 +882,32 @@ def lever_tip_native(monkeypatch, projection_native):
             Name2=name, GetPathName=lambda stem=stem: f"C:/parts/{stem}.SLDPRT",
             Transform2=transform,
         )
+        control_x, control_radius = (
+            (drawing.NECK_HALF_X / 1000, drawing.NOSE_R / 1000)
+            if stem == "mg-magnifying-bracket" else
+            ((drawing.ROD_LENGTH - drawing.TIP_CHAMFER) / 1000, drawing.LEVER_ROD_DIA / 2000)
+        )
+        control_curve = SimpleNamespace(
+            IsCircle=lambda: True, CircleParams=(control_x, 0, 0, 1, 0, 0, control_radius),
+        )
+        control = SimpleNamespace(GetCurve=lambda curve=control_curve: curve)
+        native.controls.append(control)
+        native.component_edges[name].append(control)
+        for candidate in (edge, control):
+            candidate._oleobj_ = Dispatch()
+            candidate.GetComponent = lambda full=full: full
+            candidate.GetBody = lambda: SimpleNamespace(IsTemporaryBody=lambda: False)
+        full.ReferencedConfiguration = "Default"
+        full.source = SimpleNamespace(
+            ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
+            Extension=SimpleNamespace(GetCorrespondingEntity2=lambda candidate: candidate),
+        )
+        full.GetModelDoc2 = lambda full=full: full.source
+        full.GetCorrespondingEntity = lambda candidate: candidate
         native.drawing_components.append(SimpleNamespace(Component=full, Visible=True))
         native.visible_components.append(SimpleNamespace(Name2=name))
-    native.rendered_edges = list(native.edges)
+    native.rendered_edges = [*native.edges, *native.controls]
+    native.view.GetCorrespondingEntity = lambda candidate: candidate
     # SDK geometry/metadata/point payload. Coordinates are intentionally NOT sheet
     # coordinates; topology correspondence is the native ink positive control.
     native.polyline = (0, 0, 0, 0, 0, 0, -1, 0, 2, 100, 200, 300, 101, 200, 300)
@@ -1008,8 +1043,289 @@ def lever_tip_native(monkeypatch, projection_native):
 
 
 @pytest.fixture
+def r28_identity_native(lever_tip_native):
+    """Actual G7/match data; new ownership/config/view guards are explicit doubles.
+
+    R28 did NOT observe those new guards. A passing double tests the contract,
+    not a claim that the saved native drawing already passed it.
+    """
+    import json
+
+    native = lever_tip_native
+    native.actual = json.loads(
+        (Path(__file__).parent / "fixtures" / "mg_r28_projection_identity.json").read_text(encoding="utf-8")
+    )
+    native.contexts, native.sources = {}, {}
+    native.mapping_calls, native.g7_calls = [], []
+    native.roundtrip_code = 1
+    native.negative_code = 0
+
+    class NoEdgeInterface(Exception):
+        hresult = -2147467262
+
+    class Dispatch:
+        def __init__(self, supported=True):
+            self.supported = supported
+
+        def QueryInterface(self, iid, fallback):
+            assert iid in ("IEdge", "IEntity") and fallback == "IUnknown"
+            if not self.supported:
+                raise NoEdgeInterface("No such interface supported")
+            return object()
+
+    def edge(params, *, stem=None, role=None, context="g7", slot=None, supported=True, owner=None):
+        curve = SimpleNamespace(IsCircle=lambda: params is not None, CircleParams=params)
+        return SimpleNamespace(
+            _oleobj_=Dispatch(supported), stem=stem, role=role, context=context, slot=slot,
+            GetCurve=lambda: curve, GetBody=lambda: SimpleNamespace(IsTemporaryBody=lambda: False),
+            GetComponent=lambda: owner, GetClosestPointOn=lambda *p: (*p, 0.0, 0.0),
+        )
+
+    native.raw_slots = [
+        edge(row["circle"], slot=index, supported=row["qi_edge"]["status"] == "OBSERVED")
+        for index, row in enumerate(native.actual["g7"]["slots"])
+    ]
+    native.raw_data = list(native.actual["g7"]["doubles"])
+    for index, drawing_component in enumerate(native.drawing_components):
+        component = drawing_component.Component
+        stem = component.Name2.rsplit("-", 1)[0]
+        actual = native.actual["components"][stem]
+        for role, seed in actual["seeds"].items():
+            for context in ("visible", "source", "component", "view"):
+                native.contexts[stem, role, context] = edge(
+                    tuple(seed["circle"]), stem=stem, role=role, context=context,
+                    owner=component if context in ("visible", "view") else None,
+                )
+        native.edges[index] = native.contexts[stem, "target", "visible"]
+        native.component_edges[component.Name2] = [
+            native.contexts[stem, role, "visible"] for role in ("target", "control")
+        ]
+
+        def part(candidate, stem=stem):
+            native.mapping_calls.append(("source", stem, candidate.role, candidate.context))
+            if candidate.stem != stem or candidate.context not in ("visible", "component", "view"):
+                return None
+            return native.contexts[stem, candidate.role, "source"]
+
+        def instance(candidate, stem=stem):
+            native.mapping_calls.append(("component", stem, candidate.role, candidate.context))
+            if candidate.stem != stem or candidate.context != "source":
+                return None
+            return native.contexts[stem, candidate.role, "component"]
+
+        source = SimpleNamespace(
+            ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
+            Extension=SimpleNamespace(GetCorrespondingEntity2=part),
+            GetPathName=component.GetPathName,
+        )
+        native.sources[stem] = source
+        component.GetModelDoc2 = lambda source=source: source
+        component.GetCorrespondingEntity = instance
+
+    def in_view(candidate):
+        native.mapping_calls.append(("view", candidate.stem, candidate.role, candidate.context))
+        if candidate.context != "component":
+            return None
+        return native.contexts[candidate.stem, candidate.role, "view"]
+
+    def same(left, right):
+        if left is right:
+            return 1
+        lc, rc = getattr(left, "context", None), getattr(right, "context", None)
+        if lc == "component" and rc == "g7":
+            row = native.actual["components"][left.stem]["seeds"][left.role]["source_component_g7"][right.slot]
+            return row["value"]["value"] if row["status"] == "OBSERVED" else -1
+        if {lc, rc} == {"visible", "view"}:
+            return native.roundtrip_code if (left.stem, left.role) == (right.stem, right.role) else 0
+        if lc == rc and lc in ("visible", "source", "component") and left.stem == right.stem:
+            return native.negative_code
+        return 0
+
+    def polylines(cross):
+        native.g7_calls.append(cross)
+        return tuple(native.raw_slots), tuple(native.raw_data)
+
+    native.view.GetCorrespondingEntity = in_view
+    native.view.GetPolylines7 = polylines
+    native.adapter.swApp.IsSame = same
+    return native
+
+
+def test_r28_single_route_accepts_actual_matches_only_with_new_guards(r28_identity_native, monkeypatch):
+    import struct
+
+    native = r28_identity_native
+    # Both representations of the retained numeric payload agree; neither is
+    # replaced by a synthetic outline or by the nominal installation dimension.
+    assert b"".join(struct.pack("<d", v) for v in native.raw_data).hex() == native.actual["g7"]["ieee754_le"]
+    evidence = []
+    observe = drawing._projection_component_identity
+
+    def record(*args, **kwargs):
+        result = observe(*args, **kwargs)
+        evidence.append(args[5])
+        return result
+
+    monkeypatch.setattr(drawing, "_projection_component_identity", record)
+    calibration = {}
+    points = drawing._projection_model_ink(
+        native.adapter, native.view, stage="uncropped physical boundaries", calibration=calibration,
+    )
+    assert points[0] == pytest.approx((0.1025, 0.053))
+    assert points[1] == pytest.approx((0.0975, 0.053))
+    assert [row["matched_decoded_indices"] for row in evidence] == [
+        {"target": [30], "control": [28]}, {"target": [10], "control": [8]},
+    ]
+    for row in evidence:
+        for key in ("negative.visible", "negative.source", "negative.component"):
+            assert row["readers"][key]["value"]["value"] == 0
+        for role in ("target", "control"):
+            for key in ("owner_same", "view.same_seed", "view.owner_same", "source_back.same"):
+                assert row["readers"][f"{role}.{key}"]["value"]["value"] == 1
+    assert native.g7_calls == [1] and not native.failure_captures
+    assert set(calibration) == set(native.actual["components"])
+    assert native.imports == [] and not native.cropped
+
+
+@pytest.mark.parametrize("fault", [
+    "wrong-instance", "null-owner", "owner-bool", "wrong-config", "missing-config",
+    "null-source", "null-part", "null-component", "null-view", "bad-view-roundtrip",
+    "view-bool", "wrong-view-owner", "component-as-view", "bad-source-roundtrip",
+    "negative-alias", "typeless-g7", "no-target-ink", "no-control-ink",
+    "wrong-g7-geometry", "temporary-g7",
+])
+def test_r28_new_guard_refusals_capture_original_payload(r28_identity_native, fault):
+    native = r28_identity_native
+    stem = "mg-magnifying-lever"
+    target = native.contexts[stem, "target", "visible"]
+    full = native.drawing_components[0].Component
+    source = native.sources[stem]
+    if fault in ("wrong-instance", "null-owner"):
+        # Same path/name deliberately do NOT make this the same component.
+        other = SimpleNamespace(Name2=full.Name2, GetPathName=full.GetPathName)
+        target.GetComponent = lambda: other if fault == "wrong-instance" else None
+    elif fault == "owner-bool":
+        same = native.adapter.swApp.IsSame
+        native.adapter.swApp.IsSame = lambda a, b: True if a is full and b is full else same(a, b)
+    elif fault == "wrong-config":
+        source.ConfigurationManager.ActiveConfiguration.Name = "Other"
+    elif fault == "missing-config":
+        source.ConfigurationManager.ActiveConfiguration = None
+    elif fault == "null-source":
+        full.GetModelDoc2 = lambda: None
+    elif fault == "null-part":
+        source.Extension.GetCorrespondingEntity2 = lambda _edge: None
+    elif fault == "null-component":
+        full.GetCorrespondingEntity = lambda _edge: None
+    elif fault == "null-view":
+        native.view.GetCorrespondingEntity = lambda _edge: None
+    elif fault in ("bad-view-roundtrip", "view-bool"):
+        native.roundtrip_code = 0 if fault == "bad-view-roundtrip" else True
+    elif fault == "wrong-view-owner":
+        native.contexts[stem, "target", "view"].GetComponent = lambda: SimpleNamespace(Name2=full.Name2)
+    elif fault == "component-as-view":
+        native.view.GetCorrespondingEntity = lambda candidate: candidate
+    elif fault == "bad-source-roundtrip":
+        original = source.Extension.GetCorrespondingEntity2
+        source.Extension.GetCorrespondingEntity2 = lambda candidate: (
+            native.contexts[stem, "control", "source"] if candidate.context == "view" else original(candidate)
+        )
+    elif fault == "negative-alias":
+        native.negative_code = 1
+    elif fault == "typeless-g7":
+        native.raw_slots[30]._oleobj_.supported = False
+    elif fault in ("no-target-ink", "no-control-ink"):
+        # Actual R28 arc30 (981:1020) / arc28 (903:942): collapse geometry
+        # and every tessellation point; correspondence alone cannot supply ink.
+        offset = 981 if fault == "no-target-ink" else 903
+        center = native.raw_data[offset + 2:offset + 5]
+        native.raw_data[offset + 5:offset + 11] = center * 2
+        native.raw_data[offset + 21:offset + 39] = center * 6
+    elif fault == "wrong-g7-geometry":
+        curve = native.raw_slots[30].GetCurve()
+        curve.CircleParams = (*curve.CircleParams[:6], 0.01)
+    else:
+        native.raw_slots[30].GetBody = lambda: SimpleNamespace(IsTemporaryBody=lambda: True)
+    with pytest.raises(RuntimeError, match="physical model proof failed") as raised:
+        drawing._projection_model_ink(native.adapter, native.view, stage="uncropped physical boundaries")
+    assert native.g7_calls == [1]
+    assert len(native.failure_captures) == 1
+    packet = native.failure_captures[0][2]
+    assert packet["exception"] is raised.value
+    probe = packet["native_identity_probe"]
+    assert probe["source_import_and_crop"] == "NOT_REACHED"
+    raw = probe["readers"]["original_return"]["value"]["items"]
+    assert raw[0]["length"] == len(native.raw_slots)
+    assert raw[1]["length"] == len(native.raw_data)
+    if fault in ("wrong-instance", "null-owner", "owner-bool", "wrong-config", "missing-config", "null-source"):
+        proof = probe["physical_evidence"]["visible_components"][0]["identity_proof"]
+        assert proof["readers"]["target.part"]["status"] == "NOT_REACHED"
+    assert native.imports == [] and not native.cropped
+
+
+def test_r28_cropped_proof_uses_uncropped_control_calibration_not_offcrop_ink(r28_identity_native):
+    native = r28_identity_native
+    calibration = {}
+    drawing._projection_model_ink(
+        native.adapter, native.view, stage="uncropped physical boundaries", calibration=calibration,
+    )
+    native.cropped = True
+    # Simulate crop removing the independent controls, not either target. The
+    # bracket control at paper X47.5mm is outside the 20mm-radius final fence.
+    native.raw_slots[8] = native.raw_slots[28] = None
+    for component in native.drawing_components:
+        native.component_edges[component.Component.Name2] = [
+            e for e in native.component_edges[component.Component.Name2] if e.role == "target"
+        ]
+    native.mapping_calls.clear()
+    drawing._projection_model_ink(
+        native.adapter, native.view, stage="settled drawing", calibration=calibration,
+    )
+    assert all(call[2] == "target" for call in native.mapping_calls)
+    assert not native.failure_captures
+    # The same calibration cannot excuse loss of the actual cropped target.
+    native.raw_slots[30] = None
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._projection_model_ink(
+            native.adapter, native.view, stage="settled drawing", calibration=calibration,
+        )
+
+
+@pytest.mark.parametrize("fault", ["missing", "view", "component", "source", "configuration", "target-owner"])
+def test_r28_cropped_calibration_cannot_cross_namespace_or_configuration(r28_identity_native, fault):
+    native = r28_identity_native
+    calibration = {}
+    drawing._projection_model_ink(
+        native.adapter, native.view, stage="uncropped physical boundaries", calibration=calibration,
+    )
+    native.cropped = True
+    stem = "mg-magnifying-lever"
+    if fault == "missing":
+        calibration.clear()
+    elif fault in ("view", "component", "source"):
+        original = calibration[stem][fault]
+        calibration[stem][fault] = SimpleNamespace(
+            name=getattr(original, "name", None),
+            Name2=getattr(original, "Name2", None),
+            GetPathName=getattr(original, "GetPathName", lambda: ""),
+        )
+    elif fault == "configuration":
+        # Even matching current source/component configurations cannot reuse a
+        # calibration collected from a different actual configuration.
+        native.drawing_components[0].Component.ReferencedConfiguration = "Other"
+        native.sources[stem].ConfigurationManager.ActiveConfiguration.Name = "Other"
+    else:
+        native.contexts[stem, "target", "visible"].GetComponent = lambda: None
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._projection_model_ink(
+            native.adapter, native.view, stage="settled drawing", calibration=calibration,
+        )
+    assert native.failure_captures
+
+
+@pytest.fixture
 def projection_context_native(lever_tip_native, monkeypatch):
-    """Synthetic contexts, not missing R27 G7 observations or native proof."""
+    """Synthetic diagnostic contexts with a deliberately unproved view roundtrip."""
     import sys
 
     native = lever_tip_native
@@ -1074,10 +1390,13 @@ def projection_context_native(lever_tip_native, monkeypatch):
                 edge.GetComponent = lambda component=component, context=context: None if context == "part" else component
                 native.contexts[stem, role, context] = edge
             g7.append(native.contexts[stem, role, "g7"])
-        native.component_edges[component.Name2].append(native.contexts[stem, 1, "visible"])
+        native.component_edges[component.Name2] = [target, native.contexts[stem, 1, "visible"]]
         extension = Extension(stem, index)
         native.extensions.append(extension)
-        source = SimpleNamespace(Extension=extension, GetPathName=component.GetPathName)
+        source = SimpleNamespace(
+            Extension=extension, GetPathName=component.GetPathName,
+            ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
+        )
         component.GetModelDoc2 = lambda source=source: source
         component.ReferencedConfiguration = "Default"
         # Preserve the existing callable component transform while exposing its
@@ -1095,8 +1414,8 @@ def projection_context_native(lever_tip_native, monkeypatch):
     def same(left, right):
         if left is right:
             return 1
-        # One synthetic supported context route is positive; raw visible/G7
-        # identity still fails and MUST remain the production refusal.
+        # A component/G7 positive alone is insufficient: this fixture deliberately
+        # lacks view/visible roundtrip identity, so production MUST still refuse.
         return int(
             {getattr(left, "context", None), getattr(right, "context", None)} == {"component", "g7"}
             and (left.stem, left.role) == (right.stem, right.role)
@@ -1116,7 +1435,7 @@ def projection_context_native(lever_tip_native, monkeypatch):
     return native
 
 
-def test_identity_refusal_captures_all_contexts_without_accepting_mapped_positive(projection_context_native):
+def test_identity_refusal_captures_mapped_positive_without_view_roundtrip(projection_context_native):
     import json
 
     native = projection_context_native
@@ -1407,7 +1726,7 @@ def test_physical_reader_failure_still_collects_independent_visibility_and_ink(
         drawing._projection_model_ink(native.adapter, native.view, stage="independent reader regression")
     assert calls == ["drawing", "visible", "polylines"]
     assert "drawing component reader refused" in messages[-1]
-    assert "'rendered_model_edges': 2" in messages[-1]
+    assert "'rendered_model_edges': 4" in messages[-1]
     assert "mg-magnifying-lever-1" in messages[-1] and "mg-magnifying-bracket-1" in messages[-1]
 
 

@@ -1580,9 +1580,217 @@ def _capture_projection_identity_failure(
         raise BaseException.with_traceback(exception, original_traceback)
 
 
+def _projection_supported_edge(raw: Any) -> Any:
+    """Require native IEdge capability; a generated wrapper is not that proof."""
+    import pythoncom
+    from solidworks_mcp.adapters._generated.sldworks_2026 import IEdge
+
+    if raw is None:
+        raise RuntimeError("native edge is unavailable")
+    pointer = raw._oleobj_.QueryInterface(IEdge.CLSID, pythoncom.IID_IUnknown)
+    if pointer is None:
+        raise RuntimeError("native IEdge capability is unavailable")
+    # The QI pointer is only a capability observation, never a member receiver.
+    return _early_bound(raw, "IEdge")
+
+
+def _projection_identity_read(
+    readers: dict[str, Any], key: str, reader: Callable[[], Any], *dependencies: Any,
+) -> Any:
+    """Keep a failed proof reader distinct from a native null or integer zero."""
+    if any(value is None for value in dependencies):
+        readers[key] = {"status": "NOT_REACHED", "reason": "dependency unavailable"}
+        return None
+    try:
+        value = reader()
+    except BaseException as error:
+        readers[key] = {"status": "ERROR", "error": _projection_error_text(error)}
+        try:
+            readers[key]["hresult"] = getattr(error, "hresult", None)
+        except BaseException:
+            pass
+        return None
+    row = {"status": "RETURNED_NULL" if value is None else "OBSERVED"}
+    try:
+        row["value"] = _projection_polyline_snapshot(value)
+    except BaseException as error:
+        row["snapshot_error"] = _projection_error_text(error)
+    readers[key] = row
+    return value
+
+
+def _projection_component_identity(
+    app: Any, view: Any, component: Any, seeds: dict[str, tuple[Any, tuple[float, ...]]],
+    rendered: tuple[tuple[int, Any], ...], evidence: dict[str, Any],
+    *, calibration: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One route only: owned drawing seed -> source -> exact component -> G7.
+
+    R28's actual target/control positives are lever 30/28 and bracket 10/8.
+    Those indices are evidence, not selection criteria. Source/path/geometry
+    coincidence cannot stand in for native instance or edge equality. The final
+    view mapping is compared with the original seed in the SAME drawing context.
+    No configuration setter, alternate correspondence route or PID fallback.
+    """
+    readers = evidence["readers"] = {}
+
+    def read(key: str, reader: Callable[[], Any], *dependencies: Any) -> Any:
+        return _projection_identity_read(readers, key, reader, *dependencies)
+
+    def code(key: str, left: Any, right: Any, expected: int) -> bool:
+        value = read(key, lambda: app.IsSame(left, right), left, right)
+        return type(value) is int and value == expected
+
+    def owner(key: str, edge: Any) -> Any:
+        raw = read(f"{key}.owner", lambda: _early_bound(edge, "IEntity").GetComponent(), edge)
+        return read(f"{key}.owner.component", lambda: _early_bound(raw, "IComponent2"), raw)
+
+    def geometry(key: str, edge: Any, expected: tuple[float, ...]) -> bool:
+        raw_curve = read(f"{key}.curve", lambda: edge.GetCurve(), edge)
+        curve = read(f"{key}.ICurve", lambda: _early_bound(raw_curve, "ICurve"), raw_curve)
+        circular = read(f"{key}.is_circle", lambda: curve.IsCircle(), curve)
+        params = read(
+            f"{key}.circle", lambda: tuple(float(v) for v in curve.CircleParams),
+            curve, curve if circular is True else None,
+        )
+        raw_body = read(f"{key}.body", lambda: edge.GetBody(), edge)
+        body = read(f"{key}.IBody2", lambda: _early_bound(raw_body, "IBody2"), raw_body)
+        temporary = read(f"{key}.temporary", lambda: body.IsTemporaryBody(), body)
+        return (
+            params is not None and len(params) == 7 and all(map(math.isfinite, params))
+            and math.dist(params[:3], expected[:3]) <= DETAIL_POSITION_TOL_M
+            and abs(params[6] - expected[6]) <= DETAIL_POSITION_TOL_M
+            and min(
+                math.dist(params[3:6], expected[3:6]),
+                math.dist(params[3:6], tuple(-v for v in expected[3:6])),
+            ) <= DETAIL_POSITION_TOL_M
+            and temporary is False
+        )
+
+    configuration = read("component.configuration", lambda: component.ReferencedConfiguration)
+    raw_source = read("source", lambda: component.GetModelDoc2())
+    source = read("source.IModelDoc2", lambda: _early_bound(raw_source, "IModelDoc2"), raw_source)
+    manager = read(
+        "source.configuration_manager",
+        lambda: _early_bound(source.ConfigurationManager, "IConfigurationManager"), source,
+    )
+    active = read(
+        "source.active_configuration",
+        lambda: _early_bound(manager.ActiveConfiguration, "IConfiguration"), manager,
+    )
+    active_name = read("source.active_configuration.name", lambda: active.Name, active)
+    configuration_ok = (
+        type(configuration) is str and bool(configuration)
+        and type(active_name) is str and active_name == configuration
+    )
+    if calibration is not None:
+        # The far-side bracket control is outside the final 20 mm crop. Its
+        # visible-ink positive was proved uncropped, never assumed post-crop.
+        calibration_view = code("calibration.view_same", view, calibration["view"], 1)
+        calibration_component = code(
+            "calibration.component_same", component, calibration["component"], 1,
+        )
+        calibration_source = code("calibration.source_same", source, calibration["source"], 1)
+        configuration_ok &= (
+            calibration_view and calibration_component and calibration_source
+            and configuration == calibration["configuration"]
+        )
+    evidence["configuration_matches"] = configuration_ok
+    extension = read(
+        "source.extension", lambda: _early_bound(source.Extension, "IModelDocExtension"), source,
+    )
+    mapped_sources, mapped_components, matches = {}, {}, {}
+    passed = configuration_ok
+    active_seeds = seeds if calibration is None else {"target": seeds["target"]}
+    for name, (raw, params) in active_seeds.items():
+        edge = read(f"{name}.edge", lambda: _projection_supported_edge(raw), raw)
+        seed_owner = owner(name, edge)
+        owner_ok = code(f"{name}.owner_same", seed_owner, component, 1)
+        self_ok = code(f"{name}.self", edge, edge, 1)
+        seed_geometry_ok = geometry(name, edge, params)
+        # Ownership and actual active configuration are mandatory BEFORE mapping.
+        authorized = edge if owner_ok and configuration_ok and self_ok else None
+        part_raw = read(
+            f"{name}.part", lambda: extension.GetCorrespondingEntity2(edge), extension, authorized,
+        )
+        part = read(f"{name}.part.edge", lambda: _projection_supported_edge(part_raw), part_raw)
+        instance_raw = read(
+            f"{name}.component", lambda: component.GetCorrespondingEntity(part), part,
+        )
+        instance = read(
+            f"{name}.component.edge", lambda: _projection_supported_edge(instance_raw), instance_raw,
+        )
+        mapped_sources[name], mapped_components[name] = part, instance
+        view_raw = read(f"{name}.view", lambda: view.GetCorrespondingEntity(instance), instance)
+        drawing_edge = read(
+            f"{name}.view.edge", lambda: _projection_supported_edge(view_raw), view_raw,
+        )
+        view_same = code(f"{name}.view.same_seed", drawing_edge, edge, 1)
+        # GetComponent is authoritative on an assembly entity displayed in the
+        # drawing, not on R28's ownerless component-context/G7 representations.
+        view_owner = owner(f"{name}.view", drawing_edge)
+        view_owner_same = code(f"{name}.view.owner_same", view_owner, component, 1)
+        source_back_raw = read(
+            f"{name}.source_back",
+            lambda: extension.GetCorrespondingEntity2(drawing_edge), extension, drawing_edge,
+        )
+        source_back = read(
+            f"{name}.source_back.edge", lambda: _projection_supported_edge(source_back_raw),
+            source_back_raw,
+        )
+        source_same = code(f"{name}.source_back.same", source_back, part, 1)
+        part_geometry_ok = geometry(f"{name}.part", part, params)
+        component_geometry_ok = geometry(f"{name}.component", instance, params)
+        matching = []
+        comparisons_ok = True
+        for index, other in rendered:
+            value = read(f"{name}.g7[{index}].same", lambda: app.IsSame(instance, other), instance)
+            comparisons_ok &= type(value) is int and value in (0, 1)
+            if type(value) is int and value == 1:
+                matching.append(index)
+                # Native correspondence already establishes identity; the curve
+                # and body readers corroborate it, never supply a fallback.
+                comparisons_ok &= geometry(f"{name}.g7[{index}]", other, params)
+        matches[name] = matching
+        passed &= all((
+            owner_ok, self_ok, seed_geometry_ok, view_same, view_owner_same, source_same,
+            part_geometry_ok, component_geometry_ok, comparisons_ok, bool(matching),
+        ))
+    evidence["matched_decoded_indices"] = matches
+    if calibration is not None:
+        evidence["control_ink_scope"] = "UNCROPPED_CALIBRATION"
+        for context, values in (("source", mapped_sources), ("component", mapped_components)):
+            raw = calibration[f"control_{context}"]
+            values["control"] = read(
+                f"calibration.control.{context}.edge",
+                lambda raw=raw: _projection_supported_edge(raw), raw,
+            )
+            passed &= geometry(
+                f"calibration.control.{context}", values["control"], seeds["control"][1],
+            )
+    else:
+        evidence["control_ink_scope"] = "CURRENT_UNCROPPED_VIEW"
+    # Independent known-visible control must be a distinct edge in all three
+    # supported namespaces, not just a second geometric pick on the same edge.
+    negatives = (
+        code("negative.visible", seeds["target"][0], seeds["control"][0], 0),
+        code("negative.source", mapped_sources["target"], mapped_sources["control"], 0),
+        code("negative.component", mapped_components["target"], mapped_components["control"], 0),
+    )
+    evidence["passed"] = passed and all(negatives)
+    if not evidence["passed"]:
+        raise RuntimeError("physical boundary source/component identity proof failed")
+    return {
+        "view": view, "component": component, "source": source, "configuration": configuration,
+        "control": seeds["control"], "control_source": mapped_sources["control"],
+        "control_component": mapped_components["control"],
+    }
+
+
 @_telemetry.traced("drawing.mg_projection_model_ink", label_param="stage")
 def _projection_model_ink(
     adapter: Any, view: Any, *, stage: str,
+    calibration: dict[str, Any] | None = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
     """Prove the actual flat tip and outer far-face arc, not the assembly sketch.
 
@@ -1661,6 +1869,19 @@ def _projection_model_ink(
     native_inventory: dict[str, Any] = {}
     app = _early_bound(adapter.swApp, "ISldWorks")
     utility = _early_bound(app.GetMathUtility(), "IMathUtility")
+    cropped = _projection_identity_read(evidence, "cropped", lambda: view.IsCropped())
+    if type(cropped) is not bool:
+        errors.append("native crop state unavailable")
+    calibrated = {}
+    supported = []
+    capabilities = evidence["rendered_capabilities"] = {}
+    for index, other in enumerate(rendered):
+        edge = _projection_identity_read(
+            capabilities, f"decoded[{index}].IEdge", lambda: _projection_supported_edge(other),
+        )
+        if edge is not None:
+            supported.append((index, edge))
+    supported = tuple(supported)
     for raw in values.get("visible_components") or ():
         diagnostic = {}
         evidence["visible_components"].append(diagnostic)
@@ -1698,8 +1919,8 @@ def _projection_model_ink(
                 raise RuntimeError("expected one shown physical boundary for this component")
             edge, params = candidates[0]
             observed["target"] = edge
-            # Both arguments are the same supported IEdge interface. Retain the
-            # self-positive-control and every native comparison code on refusal.
+            # Retain the original cross-reader observations, but do not mistake
+            # equality across distinct native contexts for the acceptance proof.
             diagnostic["identity_self"] = app.IsSame(edge, edge)
             diagnostic["identity_rendered"] = [app.IsSame(edge, other) for other in rendered]
             pick = (params[0], params[1], params[2] + z_sign * params[6])
@@ -1722,11 +1943,32 @@ def _projection_model_ink(
             diagnostic["assembly_points"] = world
             observed["world"] = world
             found[stem] = world
-            if (
-                type(diagnostic["identity_self"]) is not int or diagnostic["identity_self"] != 1
-                or not any(type(code) is int and code == 1 for code in diagnostic["identity_rendered"])
-            ):
-                raise RuntimeError("physical boundary has no native solid-model polyline")
+            previous = None
+            if cropped is True:
+                previous = calibration.get(stem) if calibration is not None else None
+                if previous is None:
+                    raise RuntimeError("cropped physical proof has no uncropped identity calibration")
+                control = previous["control"]
+            else:
+                control_x, control_radius = (
+                    (NECK_HALF_X / 1000, NOSE_R / 1000)
+                    if stem == "mg-magnifying-bracket"
+                    else ((ROD_LENGTH - TIP_CHAMFER) / 1000, LEVER_ROD_DIA / 2000)
+                )
+                controls = [
+                    (candidate, circle) for candidate, circle in observed["circles"]
+                    if math.dist(circle[:3], (control_x, 0.0, 0.0)) <= DETAIL_POSITION_TOL_M
+                    and abs(circle[6] - control_radius) <= DETAIL_POSITION_TOL_M
+                ]
+                diagnostic["control_count"] = len(controls)
+                if len(controls) != 1:
+                    raise RuntimeError("expected one independent visible identity control")
+                control = controls[0]
+            proof = diagnostic["identity_proof"] = {}
+            calibrated[stem] = _projection_component_identity(
+                app, view, component, {"target": (edge, params), "control": control},
+                supported, proof, calibration=previous,
+            )
         except Exception as exc:
             errors.append(f"visible component: {_projection_error_text(exc)}")
     evidence["errors"] = errors
@@ -1770,6 +2012,10 @@ def _projection_model_ink(
         centre = ((crop[0] + crop[2]) / 2, (crop[1] + crop[3]) / 2)
         if any(math.dist(point, centre) > (crop[2] - crop[0]) / 2 for point in boundary_points):
             raise RuntimeError(f"{label}: physical boundary points are outside the actual crop")
+    if cropped is False and calibration is not None:
+        # Publish only after the complete uncropped physical/installation proof.
+        calibration.clear()
+        calibration.update(calibrated)
     return centres
 
 
@@ -1811,6 +2057,7 @@ def _fit_projection_back_caption(
 def _projection_layout(
     adapter: Any, view: Any, annotation: Any, caption: Any,
     neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
+    calibration: dict[str, Any],
 ) -> None:
     """Full dimension ink, actual note extents and the physical crop fence."""
     label = LEVER_TIP.title
@@ -1818,7 +2065,7 @@ def _projection_layout(
     view.UpdateViewDisplayGeometry()
     if not view.IsCropped() or tuple(view.ScaleRatio) != LEVER_TIP.scale:
         raise RuntimeError(f"{label}: crop or 4:1 scale changed")
-    _projection_model_ink(adapter, view, stage="settled drawing")
+    _projection_model_ink(adapter, view, stage="settled drawing", calibration=calibration)
     crop_box = _projection_crop_box(view)
     outline = _view_outline(view, label=label)
     if not all(math.isfinite(value) for value in outline):
@@ -1894,7 +2141,10 @@ def _thread_projection_detail(
     """Import the existing control once on the enlarged, isolated Back view."""
     detail = LEVER_TIP
     view = _placed_detail(adapter, detail)
-    tip, face = _projection_model_ink(adapter, view, stage="uncropped physical boundaries")
+    calibration: dict[str, Any] = {}
+    tip, face = _projection_model_ink(
+        adapter, view, stage="uncropped physical boundaries", calibration=calibration,
+    )
     _show_base_view_sketches(adapter, view, (stack.THREAD_FEATURE,), label=detail.title)
     name = stack.THREAD_PROJECTION_DIMENSION
     annotations = curate_view_dimensions(
@@ -1928,7 +2178,9 @@ def _thread_projection_detail(
         _projection_source(adapter, view, current, stage="settled drawing", original=original)
         display = _early_bound(current.GetSpecificAnnotation(), "IDisplayDimension")
         _assert_lever_callouts([(name, display)], _printable_lever_callouts())
-        _projection_layout(adapter, view, current, caption, neighbour_views, neighbour_notes)
+        _projection_layout(
+            adapter, view, current, caption, neighbour_views, neighbour_notes, calibration,
+        )
 
     settled()
     return settled
