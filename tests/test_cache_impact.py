@@ -653,7 +653,7 @@ def test_production_review_profile_callback_changes_context_digest_without_sourc
         path = root / "dodo.py"
         path.write_text(path.read_text(encoding="utf-8") + """
 def _machinist_review_profile():
-    return ReviewProfile("claude", "fixture-alternate-model", "medium")
+    return registered_review_profile()._replace(model="fixture-alternate-model")
 """, encoding="utf-8")
     head = changed_snapshot(source_fixture, tmp_path, mutate)
     report = impact.compare(base_snapshot, head, BASE_SHA, HEAD_SHA)
@@ -664,7 +664,10 @@ def _machinist_review_profile():
     config = "cad/scripts/machinist_review_config.py"
     assert base_snapshot["tasks"][label]["inputs"][config]["digest"] != head["tasks"][label]["inputs"][config]["digest"]
     provenance = head["tasks"][label]["digest_provenance"]
-    assert provenance["profile"]["model"] == "fixture-alternate-model"
+    assert provenance["profile"] == {
+        **base_snapshot["tasks"][label]["digest_provenance"]["profile"],
+        "model": "fixture-alternate-model",
+    }
     assert provenance["method"] == "_machinist_review_cache_key contextual callback"
     assert head["tasks"][label]["production_part_cache_key"] is None
 
