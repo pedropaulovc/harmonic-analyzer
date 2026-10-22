@@ -1402,7 +1402,7 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+_VERIFY_NAMES = ("soundness", "kinematics", "paste_sheet_probe")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -2250,6 +2250,8 @@ def _probe_cache(
     """
     _tag_cache_key(span, key)
     reason = _cache.forced_refresh(label)
+    if reason is not None and label != "verify:paste_sheet_probe":
+        raise RuntimeError(f"diagnostic branch refuses native prerequisite refresh: {label}")
     if reason is not None:
         _cache.note_refresh(label, key, reason)
         span.set_attribute("cache", "miss")
@@ -2261,6 +2263,11 @@ def _probe_cache(
             raise
         outcome = "locked"
     span.set_attribute("cache", outcome)
+    if label != "verify:paste_sheet_probe" and outcome != hit:
+        raise RuntimeError(
+            f"diagnostic branch requires cached native prerequisites: {label} "
+            f"({outcome}, key={key}); no native prerequisite build is authorized"
+        )
     return outcome
 
 
@@ -3175,6 +3182,15 @@ def task_verify_soundness():
         }
 
 
+def _paste_sheet_probe_file_deps() -> list[str]:
+    script = (SCRIPTS_DIR / "paste_sheet_probe.py").resolve()
+    return sorted({
+        str(script),
+        *_helper_deps(script),
+        *_drawing_file_deps("ha_harmonic_analyzer_assembly"),
+    })
+
+
 def task_verify():
     """SolidWorks verification suites -- cache-keyed COM leaves: the seat lock
     serializes them locally, and under ``--executor farm`` each dispatches ONE leaf
@@ -3183,6 +3199,29 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+    probe_deps = _paste_sheet_probe_file_deps()
+    probe_report = REPORTS / "paste-sheet-probe" / "result.json"
+    yield {
+        "name": "paste_sheet_probe",
+        "task_dep": ["assembly:ha_harmonic_analyzer"],
+        "file_dep": probe_deps,
+        "targets": [str(probe_report)],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:paste_sheet_probe",
+                    [sys.executable, str(SCRIPTS_DIR / "paste_sheet_probe.py")],
+                    probe_deps,
+                    [probe_report],
+                    "paste-sheet-probe",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER
@@ -4795,6 +4834,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))
+    rows.append(("verify:paste_sheet_probe", _paste_sheet_probe_file_deps()))
     rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
     from export_features import SUPPORTED_PARTS
