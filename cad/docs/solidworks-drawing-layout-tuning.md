@@ -1169,6 +1169,21 @@ NEW files with a plain write; change existing ones with a small explicit
 string-replacement script. Run `uv run --frozen ruff check` and never
 `ruff format`.
 
+## Crankshaft centre-hole permission: identify the orthographic end
+
+`draw_dt_crankshaft.py` attaches the unchanged centre-hole permission to
+FRONT's right-hand Ø9.000 plain end. Resolve the actual model circle at
+`SHAFT_LENGTH`, then require the sheet-point pick to attach that same edge;
+the isometric's apparent top end is not the identification contract.
+Keep the leader landing in its small FRONT-end window after measured text
+placement. The note's field is below the pictorial caption and above the
+title block, with its leader corridor right of FRONT's station witnesses
+and left of the pictorial/caption, away from MATCH DRILL above the shaft.
+Native acceptance must inspect the complete exported sheet, the actual
+end landing and both leader/text clearances, not only attachment count.
+This changes neither centre-hole permission nor the dome's separate punched
+witness, shaft geometry, tolerances or the declared RV-02 rim shortfall.
+
 ## Synchronous builds and session hygiene
 
 - The COM seat is shared but SELF-SERIALIZING: `_com_seat` (a machine-global

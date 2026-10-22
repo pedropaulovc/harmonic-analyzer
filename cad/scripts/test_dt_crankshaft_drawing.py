@@ -625,87 +625,39 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
-# The isometric's native outline in run 20261020T103553803Z, whose machinist
-# review found the unleadered centres row named no end the sheet identified.
-_RUN_ISO_OUTLINE = (0.3778456, 0.1095392, 0.4181544, 0.2504608)
-# That run's retention-pin note text, measured natively, ended here.
-_RUN_PINION_TEXT_RIGHT = 0.3745611
-# Run 20261020T143150379Z's PDF glyph boxes (pypdfium2) and layout audit: the
-# centres note's 3.5 mm rows printed this far apart, none of its glyphs
-# advanced further than M, its three-row block's bottom row inked this box,
-# and its leader ran from (start) to the rim (tip).
-_RUN_NOTE_ROW_PITCH = 0.0045257
-_RUN_NOTE_GLYPH_ADVANCE_MAX = 0.00444
-_RUN_NOTE_BOTTOM_INK = (0.38041, 0.25036, 0.41073, 0.25392)
-_RUN_NOTE_LEADER = ((0.4112417, 0.2523299), (0.4024147, 0.2369673))
-
-
-def test_far_end_rim_window_follows_the_native_isometric_projection() -> None:
-    # The outline is the part's bounding box projected (+Y up by sqrt(2/3),
-    # the round Ø20.6 collar's corners by its radius over sqrt(6) each way)
-    # plus one constant margin; the far end's rim centre lies on the axis.
-    x0, y0, x1, y1 = _RUN_ISO_OUTLINE
-    assert ((x0 + x1) / 2.0, (y0 + y1) / 2.0) == pytest.approx(drawing.ISO_CENTER, abs=1e-6)
-    margin = ((x1 - x0) - math.sqrt(2.0) * spec.COLLAR_DIA / 1000.0) / 2.0
-    corner_rise = spec.COLLAR_DIA / math.sqrt(6.0) / 1000.0
-    assert drawing.FAR_END_ISO_XY == pytest.approx(
-        (drawing.ISO_CENTER[0], y1 - margin - corner_rise), abs=1e-5
-    )
-    window = drawing.FAR_END_ISO_RIM_WINDOW
-    assert window[0] < drawing.FAR_END_ISO_XY[0] < window[2]
-    assert window[1] < drawing.FAR_END_ISO_XY[1] < window[3] < y1 - margin
-    # The leader's pick is the rim's rightmost point (the ellipse's horizontal
-    # semi-axis is the rim's true radius), inside the window and under the
-    # note's text, which starts left of it.
-    pick = drawing.FAR_END_ISO_RIM_PICK
+def test_far_end_rim_pick_lands_on_the_front_right_plane_lower_half() -> None:
+    pick = drawing.FAR_END_FRONT_RIM_PICK
     assert pick == pytest.approx(
-        (
-            drawing.FAR_END_ISO_XY[0] + spec.PINION_SEAT_DIA / 2000.0,
-            drawing.FAR_END_ISO_XY[1],
-        )
+        (drawing.FAR_END_X, drawing._sheet_y(-spec.PINION_SEAT_DIA / 4.0))
+    )
+    assert drawing.FAR_END_X == pytest.approx(drawing._sheet_x(spec.SHAFT_LENGTH))
+    assert drawing._sheet_y(-spec.PINION_SEAT_DIA / 2.0) < pick[1]
+    assert pick[1] < drawing.SIDE_CENTER[1]
+    window = drawing.FAR_END_FRONT_RIM_WINDOW
+    assert window == pytest.approx(
+        (pick[0] - 0.0005, pick[1] - 0.0005, pick[0] + 0.0005, pick[1] + 0.0005)
     )
     assert drawing._inside(pick, window)
-    assert drawing.CENTRES_NOTE_XY[0] < pick[0]
+    assert drawing._sheet_y(-spec.PINION_SEAT_DIA / 2.0) < window[1]
+    assert window[3] < drawing.SIDE_CENTER[1]
 
 
-def test_centres_note_text_fits_its_field_over_the_isometric() -> None:
-    # Sized like the pin-location rows (2.75 mm a character) at the run's
-    # measured row pitch, the block needs no shift in the field left clear
-    # of that run's measured retention-pin text.
-    rows = notes.CENTRES_NOTE.splitlines()
-    x, y = drawing.CENTRES_NOTE_XY
-    text = (
-        x,
-        y - _RUN_NOTE_ROW_PITCH * len(rows),
-        x + _CALLOUT_CHAR_WIDTH * max(map(len, rows)),
-        y,
-    )
-    field = drawing._centres_note_field(_RUN_PINION_TEXT_RIGHT)
-    assert drawing._shift_into_field(text, field, drawing.NOTE_FIELD_MARGIN) == (0.0, 0.0)
-    assert drawing.NOTE_TEXT_GAP >= 0.0035  # one 3.5 mm text height of air
-    assert field[0] == pytest.approx(_RUN_PINION_TEXT_RIGHT + drawing.NOTE_TEXT_GAP)
-    assert field[1] == pytest.approx(drawing.FAR_END_ISO_RIM_WINDOW[3] + drawing.NOTE_TEXT_GAP)
-    assert field[2] < 0.4191 and field[3] < 0.2667  # ASME B inner border
-
-
-def test_centres_note_leader_leaves_its_bottom_row_away_from_the_text() -> None:
-    # SolidWorks started the leader just past the bottom row's ink end, at
-    # that row's mid-height. Started right of the tip, the leader ran down-left
-    # and was back inside the row's ink before it cleared the row's bottom
-    # (the audit's 0.62 mm leader-through-own-text).
-    (sx, sy), (tx, ty) = _RUN_NOTE_LEADER
-    x0, y0, x1, y1 = _RUN_NOTE_BOTTOM_INK
-    gap = sx - x1
-    assert 0.0 < gap < 0.001 and y0 < sy < y1
-    assert sx > tx and sx - (sy - y0) * (sx - tx) / (sy - ty) < x1
-    # A bottom row inked no further right than one widest advance a glyph
-    # puts that start at or left of the tip, so the leader runs right of the
-    # row and below every row above it.
-    rows = notes.CENTRES_NOTE.splitlines()
-    assert len(rows) <= TEXT_ROW_LIMIT
-    bottom_ink_right = drawing.CENTRES_NOTE_XY[0] + _RUN_NOTE_GLYPH_ADVANCE_MAX * len(rows[-1])
-    assert bottom_ink_right + gap <= tx
-    assert drawing.FAR_END_ISO_RIM_PICK[0] == pytest.approx(tx, abs=1e-4)
+def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> None:
+    field = drawing._centres_note_field()
+    x0, y0, x1, y1 = field
+    assert drawing.NOTE_TEXT_GAP >= 0.0035
+    assert x0 == pytest.approx(drawing.FAR_END_X + drawing.NOTE_TEXT_GAP)
+    assert x0 < x1 < 0.4191  # ASME B inner border
+    assert 0.065 < y0 < y1  # above the title block, including the field's floor
+    assert y1 == pytest.approx(drawing.ISO_NOTE_XY[1] - drawing.NOTE_TEXT_GAP)
+    assert drawing.CENTRES_NOTE_XY == (0.372, 0.093)
+    assert drawing._inside(drawing.CENTRES_NOTE_XY, field)
+    assert len(notes.CENTRES_NOTE.splitlines()) <= TEXT_ROW_LIMIT
+    # The whole text field and landing window stay below MATCH DRILL's
+    # field. These bounds constrain the intended corridor, not native ink.
+    match_floor = drawing.PINION_PIN_NOTE_FIELD[1]
+    assert max(y1, drawing.FAR_END_FRONT_RIM_WINDOW[3]) < match_floor
+    assert drawing.CENTRES_NOTE_XY[0] > drawing.FAR_END_FRONT_RIM_PICK[0]
 
 
 class _CircleEdge:
@@ -729,7 +681,7 @@ def _far_rim(**overrides) -> _CircleEdge:
     return _CircleEdge(centre, radius, **overrides)
 
 
-def _iso_fakes(monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]):
+def _front_fakes(monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(
         drawing,
@@ -741,7 +693,7 @@ def _iso_fakes(monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]):
     return adapter, view
 
 
-def _iso_distractors() -> list[_CircleEdge]:
+def _rim_distractors() -> list[_CircleEdge]:
     # The seat step's two circles share the seat's and shank's radii at
     # SEAT_STEP; the far face's straight seam is no circle.
     return [
@@ -753,7 +705,7 @@ def _iso_distractors() -> list[_CircleEdge]:
 
 def test_far_end_rim_is_the_one_plain_end_circle(monkeypatch: pytest.MonkeyPatch) -> None:
     rim = _far_rim()
-    adapter, view = _iso_fakes(monkeypatch, [*_iso_distractors(), rim])
+    adapter, view = _front_fakes(monkeypatch, [*_rim_distractors(), rim])
     assert drawing._far_end_rim(adapter, view) is rim
 
 
@@ -770,16 +722,16 @@ def test_far_end_rim_is_the_one_plain_end_circle(monkeypatch: pytest.MonkeyPatch
 def test_far_end_rim_refuses_a_missing_or_ambiguous_rim(
     monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]
 ) -> None:
-    adapter, view = _iso_fakes(monkeypatch, [*_iso_distractors(), *edges])
+    adapter, view = _front_fakes(monkeypatch, [*_rim_distractors(), *edges])
     with pytest.raises(RuntimeError, match="expected exactly one"):
         drawing._far_end_rim(adapter, view)
 
 
-def test_centres_note_is_attached_to_the_far_end_rim_on_the_isometric(
+def test_centres_note_is_attached_to_the_far_end_rim_on_front(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rim = _far_rim()
-    adapter, iso = _iso_fakes(monkeypatch, [*_iso_distractors(), rim])
+    adapter, side = _front_fakes(monkeypatch, [*_rim_distractors(), rim])
     note, model = object(), object()
     calls: dict[str, tuple] = {}
 
@@ -794,10 +746,10 @@ def test_centres_note_is_attached_to_the_far_end_rim_on_the_isometric(
     monkeypatch.setattr(drawing, "add_attached_note", attach)
     monkeypatch.setattr(drawing, "_place_note_text_in_field", place)
 
-    assert drawing._add_centres_note(adapter, model, iso, clear_of_x=0.37) is note
+    assert drawing._add_centres_note(adapter, model, side) is note
     adapter_, view, kwargs = calls["attach"]
-    assert adapter_ is adapter and view is iso
-    assert kwargs["entity_xy"] == drawing.FAR_END_ISO_RIM_PICK
+    assert adapter_ is adapter and view is side
+    assert kwargs["entity_xy"] == drawing.FAR_END_FRONT_RIM_PICK
     assert kwargs["attached_to"] is rim
     assert "entity" not in kwargs
     assert kwargs["text"] is notes.CENTRES_NOTE
@@ -805,8 +757,8 @@ def test_centres_note_is_attached_to_the_far_end_rim_on_the_isometric(
     assert calls["place"] == (
         model,
         note,
-        drawing._centres_note_field(0.37),
-        drawing.FAR_END_ISO_RIM_WINDOW,
+        drawing._centres_note_field(),
+        drawing.FAR_END_FRONT_RIM_WINDOW,
         kwargs["label"],
     )
 
@@ -836,4 +788,9 @@ def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
         if isinstance(node, ast.Call) and ast.unparse(node.func) == "_add_centres_note"
     ]
     assert len(placements) == 1
-    assert [kw.arg for kw in placements[0].keywords] == ["clear_of_x"]
+    assert [ast.unparse(arg) for arg in placements[0].args] == [
+        "adapter",
+        "drawing_model",
+        "side",
+    ]
+    assert placements[0].keywords == []
