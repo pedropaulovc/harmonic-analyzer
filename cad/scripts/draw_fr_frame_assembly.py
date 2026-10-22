@@ -17,7 +17,7 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, Sequence
 
-from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -52,7 +52,18 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_leaders import distance_to_point, segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
-from _drawing_ray_pick import _SW_SOLID_BODY
+from _drawing_ray_pick import (
+    _EDGE_HIT,
+    _HIT_WIDTH,
+    _ORIGIN_MARGIN_M,
+    _RAY_OFFSET_M,
+    _RAY_OPTIONS,
+    _RAY_RADIUS_M,
+    _SW_SOLID_BODY,
+    _direction_to_part,
+    _to_model,
+    _to_part,
+)
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
@@ -107,14 +118,13 @@ PNG = OUTPUTS.png
 # B-B looks down on both edges and dimensions the inset between them; step 9
 # points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
-# Machine z stations each inset edge is chosen at, in turn: on both edges,
-# clear of the plate's corner screw heads (z +/-42) and the deck's centre line
-# (z 0). The first station a single edge segment spans picks that segment; the
-# dimension's pick points project from that station.
+# Machine z stations each inset edge's ray is cast at, in turn: on both
+# edges, clear of the plate's corner screw heads (z +/-42) and the deck's
+# centre line (z 0). The first station whose ray meets an edge chooses it; the
+# dimension's pick points project from the first station.
 NAMEPLATE_INSET_PICK_Z_M = (0.025, 0.020, 0.030, 0.015, 0.035)
-# How far (model mm) an edge's ends may lie from the target machine x and the
-# mount-plane y. r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off
-# its target.
+# How far (model mm) the chosen edge's ends may read from the target machine
+# x. r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
 NAMEPLATE_INSET_PICK_TOLERANCE_MM = 0.05
 # swSelectType_e.swSelEDGES
 _SW_SEL_EDGES = 1
@@ -711,70 +721,99 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
     return sections[0], sections[1]
 
 
-def _inset_edge_candidates(
+def _inset_edge_rays(
     adapter: Any,
     view: Any,
     *,
     stem: str,
     target_mm: float,
-    window_mm: float = NAMEPLATE_INSET_PICK_TOLERANCE_MM,
-) -> list[tuple[Any, str, float, tuple[float, float]]]:
-    """Level linear model edges of ``stem`` within ``window_mm`` of machine x ``target_mm``.
+    stations_m: Sequence[float],
+) -> tuple[str, list[tuple[Any, float] | None]]:
+    """The edge of ``stem`` the plan section draws on machine x ``target_mm``, per station.
 
-    Read from the view's referenced assembly, never from the drawing's
-    display lists: on this section ``IView::GetVisibleComponents`` returns no
-    component (r4, run 20261015T024651004Z) and ``GetVisibleEntities2`` no edge
-    (r5, run 20261015T042140629Z). Each solid body's edges are read in part
-    metres and placed with the component's native transform. Returns
-    ``(edge, instance name, machine y, machine z range)`` in metres for every
-    edge whose two ends both lie within ``window_mm`` of the target x and
-    within ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of one machine y (a line
-    along z), nearest x first.
+    One ``IModelDocExtension::RayIntersections`` call per solid body of the
+    stem's one shown instance, read from the view's referenced assembly (on
+    this section ``IView::GetVisibleComponents`` returns no component, r4
+    run 20261015T024651004Z, and ``GetVisibleEntities2`` no edge, r5 run
+    20261015T042140629Z). Each station casts a ray down machine -y through
+    ``(target x, z)`` from above the body, so the first edge it reports is
+    the highest level edge on that x: the outline the section draws there
+    (the plate's top face over its underside, the deck end's chamfer over the
+    foot of its end face). Enumerating the body's edges instead is what the
+    engraved nameplate made a 13 min, telemetry-silent walk (runs
+    20261022T162906839Z and 20261022T165432297Z, the second killed by the
+    900 s op timeout on w4). Returns the instance name and, per station, the
+    nearest edge hit as ``(edge in the instance's context, machine y)`` or
+    ``None``.
     """
-    tolerance_m = NAMEPLATE_INSET_PICK_TOLERANCE_MM / 1000.0
-    window_m = window_mm / 1000.0
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     assembly = _early_bound(model, "IAssemblyDoc")
-    found = []
-    for raw in assembly.GetComponents(True) or ():
-        component = _early_bound(raw, "IComponent2")
-        if _component_stem(component) != stem or bool(component.IsSuppressed()):
-            continue
-        result = adapter._attempt(
-            lambda c=component: c.GetBodies3(_SW_SOLID_BODY), default=None
+    shown = [
+        component
+        for raw in assembly.GetComponents(True) or ()
+        for component in (_early_bound(raw, "IComponent2"),)
+        if _component_stem(component) == stem and not bool(component.IsSuppressed())
+    ]
+    if len(shown) != 1:
+        raise RuntimeError(
+            f"nameplate inset: {len(shown)} shown {stem} instances, expected one"
         )
-        bodies = (
-            tuple(result[0] or ())
-            if isinstance(result, tuple) and len(result) == 2
-            else ()
+    component = shown[0]
+    name = str(component.Name2)
+    result = adapter._attempt(
+        lambda: component.GetBodies3(_SW_SOLID_BODY), default=None
+    )
+    bodies = (
+        tuple(result[0] or ()) if isinstance(result, tuple) and len(result) == 2 else ()
+    )
+    if not bodies:
+        raise RuntimeError(f"nameplate inset: {name!r} resolves no solid body")
+    values = _component_transform(component)
+    down = _direction_to_part(values, (0.0, -1.0, 0.0))
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    found: list[tuple[float, Any] | None] = [None] * len(stations_m)
+    for body in bodies:
+        bound = _early_bound(body, "IBody2")
+        # Start above the body: its extreme point along machine +y, plus margin.
+        extreme = tuple(bound.GetExtremePoint(*_direction_to_part(values, (0.0, 1.0, 0.0))) or ())
+        if len(extreme) != 4 or not extreme[0]:
+            raise RuntimeError(f"nameplate inset: {name!r} body has no extreme point")
+        top_m = _to_model(values, extreme[1:4])[1] + _ORIGIN_MARGIN_M
+        starts: list[float] = []
+        vectors: list[float] = []
+        for z_m in stations_m:
+            starts.extend(_to_part(values, (target_mm / 1000.0, top_m, z_m)))
+            vectors.extend(down)
+        extension.RayIntersections(
+            dispatch_array([body]),
+            double_array(starts),
+            double_array(vectors),
+            _RAY_OPTIONS,
+            _RAY_RADIUS_M,
+            _RAY_OFFSET_M,
+            True,
         )
-        if not bodies:
+        raw = tuple(model.GetRayIntersectionsPoints() or ())
+        topology = tuple(model.GetRayIntersectionsTopology() or ())
+        if len(raw) % _HIT_WIDTH or len(topology) != len(raw) // _HIT_WIDTH:
             raise RuntimeError(
-                f"nameplate inset: {component.Name2!r} resolves no solid body"
+                f"nameplate inset: ray readback on {name} is malformed: "
+                f"{len(raw)} doubles, {len(topology)} entities"
             )
-        transform = _component_transform(component)
-        name = str(component.Name2)
-        for body in bodies:
-            for edge in _early_bound(body, "IBody2").GetEdges() or ():
-                curve = adapter._attempt(
-                    lambda e=edge: _early_bound(e, "IEdge").GetCurve(), default=None
-                )
-                if curve is None or not _early_bound(curve, "ICurve").IsLine():
-                    continue
-                key = _edge_endpoint_key(adapter, edge)
-                if key is None:
-                    continue
-                start, end = (
-                    _transform_point(transform, key[i : i + 3]) for i in (0, 3)
-                )
-                miss_m = max(abs(point[0] - target_mm / 1000.0) for point in (start, end))
-                if miss_m <= window_m and abs(start[1] - end[1]) <= tolerance_m:
-                    z_range = (min(start[2], end[2]), max(start[2], end[2]))
-                    found.append(
-                        (miss_m, edge, name, (start[1] + end[1]) / 2.0, z_range)
-                    )
-    found.sort(key=lambda row: row[0])
-    return [row[1:] for row in found]
+        for k in range(0, len(raw), _HIT_WIDTH):
+            ray = int(raw[k + 1])
+            if not int(raw[k + 2]) & _EDGE_HIT:
+                continue
+            hit_y = _to_model(values, raw[k + 3 : k + 6])[1]
+            if found[ray] is not None and found[ray][0] >= hit_y:
+                continue
+            edge = adapter._attempt(
+                lambda e=topology[k // _HIT_WIDTH]: component.GetCorrespondingEntity(e),
+                default=None,
+            )
+            if edge is not None:
+                found[ray] = (hit_y, edge)
+    return name, [None if row is None else (row[1], row[0]) for row in found]
 
 
 def _read_selected_inset_edge(
@@ -818,56 +857,27 @@ def _pick_inset_edge(
 ) -> Any:
     """Select ``label``'s edge in ``view`` from the model's geometry and prove it.
 
-    The candidates (:func:`_inset_edge_candidates`) are the level edges of
-    ``stem`` on the target x. The plan section looks down machine -y, so of
-    the candidates spanning a station the highest one is the outline the
-    sheet draws there (the plate's top face over its underside; the deck
-    end's chamfer edge over the foot of its end face); the first station in
-    ``stations_m`` where exactly one candidate is highest chooses it, so a
-    segmented edge resolves deterministically and an ambiguous station is
-    skipped, not guessed. The chosen edge is selected through the view by
-    entity, never by a sheet coordinate, and the selection is read back to its
-    owner and machine x before it is used; a read-back off target fails the
-    sheet naming it.
+    :func:`_inset_edge_rays` casts one ray per station down machine -y
+    through the target x; the first station whose ray reports an edge
+    chooses that edge. It is selected through the view by entity, never by a
+    sheet coordinate, and the selection is read back to its owner and both
+    ends' machine x before it is used: a read-back off target (a corner's
+    edge along y, a chamfer's slant) fails the sheet naming it, as does a
+    target x no station's ray meets an edge on.
     """
-    candidates = _inset_edge_candidates(
-        adapter, view, stem=stem, target_mm=target_mm
+    name, rays = _inset_edge_rays(
+        adapter, view, stem=stem, target_mm=target_mm, stations_m=stations_m
     )
-    tolerance_m = NAMEPLATE_INSET_PICK_TOLERANCE_MM / 1000.0
-    chosen = None
-    for z_m in stations_m:
-        spanning = [
-            row
-            for row in candidates
-            if row[3][0] - tolerance_m <= z_m <= row[3][1] + tolerance_m
-        ]
-        if not spanning:
-            continue
-        top = max(row[2] for row in spanning)
-        highest = [row for row in spanning if row[2] >= top - tolerance_m]
-        if len(highest) == 1:
-            chosen = (z_m, highest[0])
-            break
+    chosen = next(
+        ((z_m, row) for z_m, row in zip(stations_m, rays) if row is not None), None
+    )
     if chosen is None:
-        # Name what IS there: the level edges within 5 mm of the target x.
-        nearby = _inset_edge_candidates(
-            adapter, view, stem=stem, target_mm=target_mm, window_mm=5.0
-        )
-        listed = "; ".join(
-            f"{name} y {y * 1000.0:.3f} z {z0 * 1000.0:g}..{z1 * 1000.0:g} mm"
-            for _edge, name, y, (z0, z1) in candidates
-        ) or "none"
-        near = "; ".join(
-            f"{name} y {y * 1000.0:.3f} z {z0 * 1000.0:g}..{z1 * 1000.0:g} mm"
-            for _edge, name, y, (z0, z1) in nearby
-        ) or "none"
         raise RuntimeError(
-            f"nameplate inset {label}: no station in "
-            f"{tuple(z * 1000.0 for z in stations_m)} mm has exactly one highest "
-            f"{stem} edge at machine x {target_mm:g} mm; candidates: {listed}; "
-            f"level {stem} edges within 5 mm of x {target_mm:g}: {near}"
+            f"nameplate inset {label}: no ray down machine -y through x "
+            f"{target_mm:g} mm at z {tuple(z * 1000.0 for z in stations_m)} mm "
+            f"meets an edge of {name}"
         )
-    z_m, (edge, name, y_m, _z_range) = chosen
+    z_m, (edge, y_m) = chosen
     _select_view_entity(adapter, view, "EDGE", None, label=label, entity=edge)
     selected, owner, xs = _read_selected_inset_edge(adapter)
     hit = xs is not None and all(
@@ -888,7 +898,7 @@ def _pick_inset_edge(
         owner=owner,
         machine_y_mm=y_m * 1000.0,
         station_z_mm=z_m * 1000.0,
-        candidates=len(candidates),
+        rays=len(rays),
         machine_x_mm=xs,
         hit=hit,
     )
@@ -904,9 +914,10 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
     """Dimension step 9's nameplate inset from the deck end in plan section B-B.
 
     Both edges come from the model's geometry (:func:`_pick_inset_edge`): the
-    plate's lower edge and the deck end, each the highest level edge on its
-    machine x, selected through the view by entity and read back to its
-    machine x before the dimension is made between them. The measured value is still checked
+    plate's lower edge and the deck end, each the first edge a ray down the
+    plan section's line of sight meets on its machine x, selected through the
+    view by entity and read back to its machine x before the dimension is
+    made between them. The measured value is still checked
     against ``NAMEPLATE_END_INSET``.
     """
     targets = (
