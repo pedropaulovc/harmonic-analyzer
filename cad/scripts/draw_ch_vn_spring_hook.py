@@ -96,13 +96,13 @@ ISO_SCALE = (3.0, 1.0)
 STOCK_SCALE = (5.0, 1.0)
 SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
 STOCK_CENTER = (0.150, 0.1755)
-FRONT_CENTER = (0.100, 0.18625)
+FRONT_CENTER = (0.100, 0.18125)
 ISO_CENTER = (0.310, 0.213)
-# The cut end sits about 0.078 below the view centre (half the 31.3 at 5:1);
-# the centre rose 0.00475 with the 1.9 mm longer shank and 0.0015 more with
-# the 0.6 mm the plate's thickest limit added (code review C10), so the end,
-# its deburr dimensions and the notes keep their 28.8-era stations; the
-# eye's top stands ~2 mm under the top border.
+# a269's settled GetOutline exceeded the unchanged FINISHED cell top by
+# 4.3690642237152 mm, with 36.33093577628477 mm of bottom slack. Lower only
+# this view 5 mm: the smallest whole-mm translation containing that recorded
+# native box. GetOutline does not guarantee a tight physical-edge envelope;
+# the translated placement still needs native qualification. Text anchors stay put.
 # The deburr's value and callout hang right of the shank, clear of their own
 # extension lines (review r8: centred under the 2.3 mm leg they were struck)
 # and above the notes.

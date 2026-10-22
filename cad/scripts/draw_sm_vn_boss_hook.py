@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
@@ -219,6 +220,210 @@ def _supplier_eye_circle(
     return circle
 
 
+def _supplier_eye_selection_observation(
+    adapter: Any, front: Any, finished_configuration: str, *,
+    original: dict[str, Any], document: Any, feature: Any,
+    torus: tuple[float, ...], model_point: tuple[float, ...],
+    sheet_point: tuple[float, ...],
+) -> str:
+    """Failure-only readback of the actual pick, never evidence for acceptance."""
+    def safe(value: Any) -> Any:
+        if isinstance(value, float) and not math.isfinite(value):
+            return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+        if isinstance(value, str):
+            return value[:512]
+        if isinstance(value, dict):
+            return {key: safe(item) for key, item in value.items()}
+        if isinstance(value, (tuple, list)):
+            return [safe(item) for item in value]
+        return value
+
+    def read(row: dict[str, Any], field: str, getter: Any, *, obj: bool = False) -> Any:
+        try:
+            value = getter()
+            row[field] = {"present": value is not None} if obj else {"value": value}
+            return value
+        except Exception as error:
+            row[field] = {"error": {
+                "field": field, "type": type(error).__name__, "message": str(error),
+            }}
+            return None
+
+    def bind(row: dict[str, Any], raw: Any, interface: str) -> Any:
+        return read(row, interface, lambda: _early_bound(raw, interface), obj=True)
+
+    def numbers(raw: Any) -> dict[str, Any]:
+        values = tuple(raw)
+        sample = tuple(float(value) for value in values[:16])
+        return {
+            "length": len(values), "values": sample,
+            "sample_truncated": len(values) > 16,
+            "sample_all_finite": all(math.isfinite(value) for value in sample),
+        }
+
+    def feature_row(raw: Any) -> dict[str, Any]:
+        row: dict[str, Any] = {}
+        native = bind(row, raw, "IFeature")
+        if native is not None:
+            read(row, "Name", lambda: str(native.Name))
+            read(row, "GetTypeName2", lambda: str(native.GetTypeName2()))
+            read(row, "GetID", lambda: int(native.GetID()))
+            read(row, "IsSame_self", lambda: int(adapter.swApp.IsSame(native, native)))
+            read(row, "IsSame_source_Wire", lambda: int(adapter.swApp.IsSame(native, feature)))
+        return row
+
+    def face_row(raw: Any, *, map_to_source: bool) -> dict[str, Any]:
+        row: dict[str, Any] = {"context": "drawing" if map_to_source else "source"}
+        face = bind(row, raw, "IFace2")
+        if face is None:
+            return row
+        owner = read(row, "GetFeature", lambda: face.GetFeature(), obj=True)
+        row["owner"] = feature_row(owner)
+        raw_surface = read(row, "GetSurface", lambda: face.GetSurface(), obj=True)
+        surface = bind(row, raw_surface, "ISurface")
+        if surface is not None:
+            is_torus = read(row, "IsTorus", lambda: bool(surface.IsTorus()))
+            if is_torus:
+                read(row, "TorusParams", lambda: numbers(surface.TorusParams))
+        if map_to_source:
+            raw_extension = read(row, "source.Extension", lambda: document.Extension, obj=True)
+            extension = bind(row, raw_extension, "IModelDocExtension")
+            if extension is not None:
+                mapped = read(
+                    row, "GetCorrespondingEntity2",
+                    lambda: extension.GetCorrespondingEntity2(face), obj=True,
+                )
+                row["mapped_source_face"] = face_row(mapped, map_to_source=False)
+        return row
+
+    def curve_row(raw: Any) -> dict[str, Any]:
+        row: dict[str, Any] = {}
+        curve = bind(row, raw, "ICurve")
+        if curve is not None:
+            read(row, "Identity", lambda: int(curve.Identity()))
+            is_circle = read(row, "IsCircle", lambda: bool(curve.IsCircle()))
+            if is_circle:
+                read(row, "CircleParams", lambda: numbers(curve.CircleParams))
+            is_line = read(row, "IsLine", lambda: bool(curve.IsLine()))
+            if is_line:
+                read(row, "LineParams", lambda: numbers(curve.LineParams))
+        return row
+
+    def view_row(raw: Any) -> dict[str, Any]:
+        row: dict[str, Any] = {}
+        native = bind(row, raw, "IView")
+        if native is not None:
+            read(row, "name", lambda: view_name(adapter, native))
+            read(row, "ReferencedConfiguration", lambda: str(native.ReferencedConfiguration))
+            read(row, "GetDisplayMode2", lambda: int(native.GetDisplayMode2()))
+            referenced = read(row, "ReferencedDocument", lambda: native.ReferencedDocument, obj=True)
+            referenced = bind(row, referenced, "IModelDoc2")
+            if referenced is not None:
+                read(row, "source_path", lambda: str(referenced.GetPathName()))
+            transform = read(row, "ModelToViewTransform", lambda: native.ModelToViewTransform, obj=True)
+            transform = bind(row, transform, "IMathTransform")
+            if transform is not None:
+                read(row, "ArrayData", lambda: numbers(transform.ArrayData))
+        return row
+
+    def entity_row(raw: Any, kind: int | None) -> dict[str, Any]:
+        row: dict[str, Any] = {"present": raw is not None}
+        if raw is None:
+            return row
+        if kind == 12:  # swSelDRAWINGVIEWS: do not pretend a view is a curve.
+            row["drawing_view"] = view_row(raw)
+            return row
+        if kind == 2:  # swSelFACES
+            row["face"] = face_row(raw, map_to_source=True)
+        # A wrong selection kind does not prove that either interface is absent.
+        # Observe their independent errors; neither route can accept the pick.
+        for interface in ("ISilhouetteEdge", "IEdge"):
+            geometry: dict[str, Any] = {}
+            row[interface] = geometry
+            native = bind(geometry, raw, interface)
+            if native is None:
+                continue
+            curve = read(geometry, "GetCurve", lambda: native.GetCurve(), obj=True)
+            geometry["curve"] = curve_row(curve)
+            if interface == "ISilhouetteEdge":
+                face = read(geometry, "GetFace", lambda: native.GetFace(), obj=True)
+                geometry["face"] = face_row(face, map_to_source=True)
+                view = read(geometry, "GetView", lambda: native.GetView(), obj=True)
+                geometry["view"] = view_row(view)
+            else:
+                faces = read(
+                    geometry, "GetTwoAdjacentFaces2",
+                    lambda: native.GetTwoAdjacentFaces2(), obj=True,
+                )
+                if faces is not None:
+                    geometry["adjacent_faces"] = [
+                        face_row(face, map_to_source=True) for face in faces
+                    ]
+        return row
+
+    later: dict[str, Any] = {"view": view_row(front), "source_Wire": feature_row(feature)}
+    source: dict[str, Any] = {}
+    later["source"] = source
+    read(source, "GetPathName", lambda: str(document.GetPathName()))
+    manager = read(source, "ConfigurationManager", lambda: document.ConfigurationManager, obj=True)
+    manager = bind(source, manager, "IConfigurationManager")
+    if manager is not None:
+        configuration = read(source, "ActiveConfiguration", lambda: manager.ActiveConfiguration, obj=True)
+        configuration = bind(source, configuration, "IConfiguration")
+        if configuration is not None:
+            read(source, "active_configuration_name", lambda: str(configuration.Name))
+    current_source = read(source, "view.ReferencedDocument", lambda: front.ReferencedDocument, obj=True)
+    current_source = bind(source, current_source, "IModelDoc2")
+    if current_source is not None:
+        read(source, "current_view_source_path", lambda: str(current_source.GetPathName()))
+        read(source, "IsSame_authoritative_document", lambda: int(
+            adapter.swApp.IsSame(current_source, document)
+        ))
+    selected: dict[str, Any] = {"entries": []}
+    later["selection"] = selected
+    raw_selection = read(
+        selected, "SelectionManager", lambda: adapter.currentModel.SelectionManager, obj=True,
+    )
+    selection = bind(selected, raw_selection, "ISelectionMgr")
+    if selection is not None:
+        count = read(selected, "GetSelectedObjectCount2", lambda: int(selection.GetSelectedObjectCount2(-1)))
+        if count is not None:
+            for index in range(1, count + 1):
+                entry: dict[str, Any] = {"index": index}
+                selected["entries"].append(entry)
+                kind = read(entry, "GetSelectedObjectType3", lambda: int(
+                    selection.GetSelectedObjectType3(index, -1)
+                ))
+                raw = read(entry, "GetSelectedObject6", lambda: selection.GetSelectedObject6(index, -1), obj=True)
+                entry["entity"] = (
+                    {"presence": "unreadable"}
+                    if "error" in entry["GetSelectedObject6"] else entity_row(raw, kind)
+                )
+    packet = {
+        "kind": "sm_eye_id_selection_failure",
+        "expected": {
+            "selected_count": 1, "selected_type": 46, "entity_present": True,
+            "physical_id_mm": SUPPLIER_EYE_ID_MM,
+            "finished_configuration": finished_configuration,
+            "source_path": str(SOURCE.resolve()), "source_feature": _SUPPLIER_EYE_FEATURE,
+            "circle_parameters": 7, "torus_parameters": 8, "all_parameters_finite": True,
+            "absolute_center_limit_m_exclusive": 1e-8,
+            "absolute_axis_z_magnitude": 1.0, "axis_z_error_limit_exclusive": 1e-8,
+            "diameter_error_limit_mm_exclusive": 1e-5,
+            "torus_major_diameter_mm": 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm,
+            "torus_minor_diameter_mm": _SUPPLIER_ANCHOR.wire_dia_mm,
+            "source_owner_IsSame": 1,
+        },
+        "original_predicate": original,
+        "acquisition": {
+            "source_torus": torus, "model_top_inner_point_m": model_point,
+            "projected_sheet_point_m": sheet_point,
+        },
+        "later_readback": later,
+    }
+    return json.dumps(safe(packet), allow_nan=False, separators=(",", ":"))
+
+
 def _supplier_references(
     adapter: Any, front: Any, finished_configuration: str,
 ) -> list[tuple[str, dict[str, Any]]]:
@@ -243,23 +448,80 @@ def _supplier_references(
             f"found {len(eye_tori)}"
         )
     cx, cy, cz, _nx, _ny, _nz, major, minor = eye_tori[0]
+    model_point = (cx, cy + major - minor, cz)
     point = model_points_in_view(
-        adapter, front, [(cx, cy + major - minor, cz)], label="EyeID",
+        adapter, front, [model_point], label="EyeID",
     )[0]
+    original: dict[str, Any] = {
+        "stage": "select_view_entity", "selected_count": "not_read",
+        "selected_type": "not_read", "entity_present": "not_read",
+        "helper_return_present": "not_returned",
+        "exact_source_circle": "not_read",
+    }
+    failure: Exception | None = None
     try:
         eye = _select_view_entity(adapter, front, "SILHOUETTE", point, label="EyeID")
+        original["helper_return_present"] = eye is not None
+        original["stage"] = "selection_manager"
         selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
-        if (
-            int(selection.GetSelectedObjectCount2(-1)) != 1
-            or int(selection.GetSelectedObjectType3(1, -1)) != 46
-            or eye is None
-        ):
-            raise RuntimeError("counter eye ID selection must be one live physical silhouette")
-        if _supplier_eye_circle(adapter, front, eye, finished_configuration) is None:
-            raise RuntimeError("unchanged counter eye has no exact ID circular silhouette")
+        original["stage"] = "selected_count"
+        count = int(selection.GetSelectedObjectCount2(-1))
+        original["selected_count"] = count
+        if count != 1:
+            raise RuntimeError(
+                f"counter eye ID selection expected count=1; actual count={count}"
+            )
+        original["stage"] = "selected_type"
+        kind = int(selection.GetSelectedObjectType3(1, -1))
+        original["selected_type"] = kind
+        if kind != 46:
+            raise RuntimeError(
+                f"counter eye ID selection expected type=46; actual type={kind}"
+            )
+        original["stage"] = "entity_present"
+        original["entity_present"] = eye is not None
+        if eye is None:
+            raise RuntimeError(
+                "counter eye ID selection expected entity_present=True; actual entity_present=False"
+            )
+        original["stage"] = "exact_source_circle"
+        circle = _supplier_eye_circle(adapter, front, eye, finished_configuration)
+        original["exact_source_circle"] = circle is not None
+        if circle is None:
+            raise RuntimeError(
+                "unchanged counter eye has no exact ID circular silhouette; "
+                f"expected physical ID={SUPPLIER_EYE_ID_MM} mm and mapped source Wire; "
+                "actual exact-source-circle predicate=False"
+            )
+        original["stage"] = "AddDiameterDimension2"
         display = adapter.currentModel.AddDiameterDimension2(0.150, 0.241, 0.0)
+    except Exception as error:
+        failure = error
+        original["failure"] = {"type": type(error).__name__, "message": str(error)[:512]}
+        try:
+            note = _supplier_eye_selection_observation(
+                adapter, front, finished_configuration, original=original,
+                document=_document, feature=feature, torus=eye_tori[0],
+                model_point=model_point, sheet_point=point,
+            )
+        except Exception as observation_error:
+            # A receipt failure must never replace the native acquisition error.
+            note = json.dumps({
+                "kind": "sm_eye_id_selection_failure", "original_predicate": original,
+                "observation_error": {
+                    "type": type(observation_error).__name__,
+                    "message": str(observation_error)[:512],
+                },
+            }, allow_nan=False, separators=(",", ":"))
+        error.add_note(note)
+        raise
     finally:
-        adapter.currentModel.ClearSelection2(True)
+        try:
+            adapter.currentModel.ClearSelection2(True)
+        except Exception as clear_error:
+            if failure is None:
+                raise
+            raise failure from clear_error
     if display is None:
         raise RuntimeError("cannot dimension the counter eye ID silhouette")
     contract = dict(

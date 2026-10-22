@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+import _purchased_fastener_drawing as purchased_drawing
 import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
 import draw_sm_vn_boss_hook as boss_drawing
@@ -253,6 +254,157 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
     low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert f"the {low:.2f} low limit" in entry.reason
     assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
+
+
+@pytest.mark.parametrize(
+    "placement,fault",
+    (
+        ("old", None),
+        ("previous-whole-mm", None),
+        ("current", None),
+        ("current", "left"),
+        ("current", "bottom"),
+        ("current", "right"),
+        ("current", "top"),
+        ("current", "missing"),
+    ),
+)
+def test_finished_front_creation_fits_recorded_a269_native_cell(
+    monkeypatch, tmp_path, placement, fault,
+):
+    """Replay native-box translation, not a new-leaf or printed-edge proof."""
+    old_center = (0.100, 0.18625)
+    recorded_outline = (
+        0.06266199906333915, 0.10143093577628477,
+        0.13733800093666088, 0.2710690642237152,
+    )
+    finished_cell = (0.0127, 0.0651, 0.4191, 0.2667)
+    overflow = recorded_outline[3] - finished_cell[3]
+    whole_mm_shift = math.ceil(overflow * 1000) / 1000
+    assert whole_mm_shift <= recorded_outline[1] - finished_cell[1]
+    if placement != "current":
+        shift = 0.0 if placement == "old" else whole_mm_shift - 0.001
+        monkeypatch.setattr(drawing, "FRONT_CENTER", (old_center[0], old_center[1] - shift))
+
+    source_path = tmp_path / "anchor.SLDPRT"
+    source_path.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source_path)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(purchased_drawing, "_early_bound", lambda value, _kind: value)
+    state = SimpleNamespace(sheet="FINISHED")
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        GetCurrentSheet=lambda: sheet,
+    )
+    adapter = SimpleNamespace(currentModel=model, _attempt=lambda operation: operation())
+    views, placements, refreshed, checked_cells = {}, [], [], []
+
+    def make_view(name, outline):
+        view = SimpleNamespace(Name=name, outline=outline)
+        view.UpdateViewDisplayGeometry = lambda: refreshed.append(name)
+        view.GetOutline = lambda: view.outline
+        view.GetFirstDisplayDimension6 = lambda: None
+        view.GetAnnotations = lambda: ()
+        return view
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        if orientation == "*Front":
+            ratio = scale[0] / scale[1] / 5.0
+            outline = tuple(
+                (x, y)[index % 2]
+                + (value - old_center[index % 2]) * ratio
+                for index, value in enumerate(recorded_outline)
+            )
+            if fault in ("left", "bottom", "right", "top"):
+                index = ("left", "bottom", "right", "top").index(fault)
+                values = list(outline)
+                values[index] = finished_cell[index] + (-1e-12 if index < 2 else 1e-12)
+                outline = tuple(values)
+            view = make_view("finished-front", outline)
+        else:
+            view = make_view("finished-iso", (0.280, 0.180, 0.340, 0.240))
+        views[orientation] = view
+        return view
+
+    stock = make_view("stock-front", (0.110, 0.110, 0.190, 0.240))
+    stock_iso = make_view("stock-iso", (0.280, 0.180, 0.340, 0.240))
+
+    def iter_views(_adapter):
+        if state.sheet == "FINISHED":
+            return (
+                (views["*Isometric"],) if fault == "missing"
+                else (views["*Front"], views["*Isometric"])
+            )
+        return stock, stock_iso
+
+    def assert_fits(adapter, view, cell, *, label):
+        assert view.Name in refreshed
+        expected = (
+            finished_cell if state.sheet == "FINISHED"
+            else (0.0127, 0.094, 0.4191, 0.2577)
+        )
+        assert cell == pytest.approx(expected, rel=0, abs=1e-15)
+        checked_cells.append((view.Name, cell))
+        purchased_drawing.assert_supplier_view_fits(adapter, view, cell, label=label)
+
+    async def open_model(_path):
+        return {"success": True}
+
+    async def finalize(_adapter, _outputs, *, settled_checks, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        return {"layout": "contained"}
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "active_configuration_name", lambda *_args: "Default")
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (model, sheet))
+    for name in (
+        "check", "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
+        "add_property_linked_note", "_verify_controls", "_verify_supplier_references",
+        "_verify_source_state",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(drawing, "_supplier_references", lambda *_args: [])
+    monkeypatch.setattr(
+        drawing, "_supplier_stock_sheet",
+        lambda *_args: (stock, stock_iso, [], []),
+    )
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "iter_views", iter_views)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+
+    if placement != "current" or fault is not None:
+        message = "view disappeared" if fault == "missing" else "view leaves its cell"
+        with pytest.raises(RuntimeError, match=message):
+            asyncio.run(drawing.build(adapter))
+        return
+
+    assert asyncio.run(drawing.build(adapter)) == {"layout": "contained"}
+    orientation, x, y, scale = placements[0]
+    assert orientation == "*Front"
+    assert (x, y) == pytest.approx(
+        (old_center[0], old_center[1] - whole_mm_shift), rel=0, abs=1e-15,
+    )
+    assert scale == (5.0, 1.0)
+    assert placements[1] == ("*Isometric", 0.310, 0.213, (3.0, 1.0))
+    assert views["*Front"].outline == pytest.approx(
+        (
+            recorded_outline[0], 0.09643093577628477,
+            recorded_outline[2], 0.2660690642237152,
+        )
+    )
+    assert [name for name, _cell in checked_cells] == [
+        "finished-front", "finished-iso", "stock-front", "stock-iso",
+    ]
 
 
 def _settled_eye_scene(monkeypatch, module):

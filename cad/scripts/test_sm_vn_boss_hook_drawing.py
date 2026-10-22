@@ -1,5 +1,6 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
+import json
 import math
 from types import SimpleNamespace
 
@@ -106,7 +107,13 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
 @pytest.fixture
 def supplier_eye_scene(monkeypatch, tmp_path):
     """Offline native-shaped contracts, not proof of a live SOLIDWORKS pick."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    def bind(value, kind):
+        supported = getattr(value, "_interfaces", None)
+        if supported is not None and kind not in supported:
+            raise TypeError(f"native object does not expose {kind}")
+        return value
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(view_display, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(selection, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", view_display.set_hidden_lines_removed)
@@ -121,8 +128,15 @@ def supplier_eye_scene(monkeypatch, tmp_path):
     )
     queries, projections, picks, dimensions, mappings, clears = [], [], [], [], [], []
     visible_queries, visible = [], []
-    owner = SimpleNamespace(Name="Wire")
-    drawing_owner = SimpleNamespace(Name="Wire")
+    observation_calls, selection_reads = [], []
+    owner = SimpleNamespace(
+        Name="Wire",
+        GetTypeName2=lambda: observation_calls.append("Wire.GetTypeName2") or "Sweep",
+        GetID=lambda: observation_calls.append("Wire.GetID") or 17,
+    )
+    drawing_owner = SimpleNamespace(
+        Name="Wire", GetTypeName2=lambda: "Sweep", GetID=lambda: 17,
+    )
     surface = SimpleNamespace(
         IsTorus=lambda: True,
         TorusParams=(-4.4201138409138974e-11, -1.3548712585881306e-10, 0.0,
@@ -154,11 +168,18 @@ def supplier_eye_scene(monkeypatch, tmp_path):
             owner if name == "Wire" else None
         ),
         Extension=SimpleNamespace(GetCorrespondingEntity2=corresponding),
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Finished"),
+        ),
     )
     front = SimpleNamespace(
         Name="finished-front", ReferencedDocument=source, ReferencedConfiguration="Finished",
         GetDisplayMode2=lambda: state.mode,
         GetVisibleEntities2=lambda *_args: visible_queries.append("visible") or tuple(visible),
+        ModelToViewTransform=SimpleNamespace(
+            ArrayData=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+                       0.100, 0.175, 0.0, 4.0, 0.0, 0.0, 0.0),
+        ),
         GetCorrespondingEntity=lambda _face: pytest.fail("reverse mapping is not required"),
     )
 
@@ -180,16 +201,21 @@ def supplier_eye_scene(monkeypatch, tmp_path):
     def contour(diameter=None, attached_source_face=source_face):
         torus = surface.TorusParams
         curve = SimpleNamespace(
+            Identity=lambda: observation_calls.append("curve.Identity") or 3002,
+            IsLine=lambda: observation_calls.append("curve.IsLine") or False,
             IsCircle=lambda: True,
             CircleParams=(*torus[:3], 0.0, 0.0, 1.0,
                           torus[6] - torus[7] if diameter is None else diameter / 2000),
         )
         face = SimpleNamespace(
             GetFeature=lambda: drawing_owner,
-            GetSurface=lambda: pytest.fail("read torus in drawing context instead of source"),
+            GetSurface=lambda: observation_calls.append("drawing-face.GetSurface") or surface,
         )
         mapped_faces[id(face)] = attached_source_face
-        return SimpleNamespace(GetCurve=lambda: curve, GetFace=lambda: face, GetView=lambda: front)
+        return SimpleNamespace(
+            _interfaces={"ISilhouetteEdge"}, GetCurve=lambda: curve,
+            GetFace=lambda: face, GetView=lambda: front,
+        )
 
     eye, outer = contour(), contour(anchor.eye_od_mm)
     state.pick = eye
@@ -215,14 +241,30 @@ def supplier_eye_scene(monkeypatch, tmp_path):
         dimensions.append((state.pick, point))
         return display
 
+    def selected_count(_mark):
+        selection_reads.append(("count", state.selected))
+        return state.count if state.selected else 0
+
+    def selected_type(index, _mark):
+        selection_reads.append(("type", index, state.selected))
+        entries = getattr(state, "entries", None)
+        return entries[index - 1][0] if entries is not None else state.kind
+
+    def selected_entity(index, _mark):
+        selection_reads.append(("entity", index, state.selected))
+        if not state.selected:
+            return None
+        entries = getattr(state, "entries", None)
+        return entries[index - 1][1] if entries is not None else state.pick
+
     model = SimpleNamespace(
         ActivateView=lambda name: setattr(state, "active_view", name) or True,
         ClearSelection2=clear, AddDiameterDimension2=add_diameter,
         Extension=SimpleNamespace(SelectByID2=select_by_id),
         SelectionManager=SimpleNamespace(
-            GetSelectedObjectCount2=lambda _mark: state.count if state.selected else 0,
-            GetSelectedObjectType3=lambda _index, _mark: state.kind,
-            GetSelectedObject6=lambda _index, _mark: state.pick if state.selected else None,
+            GetSelectedObjectCount2=selected_count,
+            GetSelectedObjectType3=selected_type,
+            GetSelectedObject6=selected_entity,
         ),
     )
     adapter = SimpleNamespace(
@@ -244,6 +286,7 @@ def supplier_eye_scene(monkeypatch, tmp_path):
         eye=eye, outer=outer, contour=contour, projections=projections, picks=picks,
         dimensions=dimensions, queries=queries, clears=clears,
         visible=visible, visible_queries=visible_queries,
+        observation_calls=observation_calls, selection_reads=selection_reads,
     )
 
 
@@ -263,6 +306,7 @@ def test_primary_pick_projects_actual_source_torus_without_visible_enumeration(
     assert scene.dimensions == [(scene.eye, (0.150, 0.241, 0.0))]
     assert scene.mappings == [scene.eye.GetFace()]
     assert scene.visible_queries == [], "Coordinate acquisition is primary, not an enumeration rescue"
+    assert scene.observation_calls == [], "Failure-only native reads must stay off success"
     assert scene.state.hlv_seen and scene.state.hlr_seen and scene.state.mode == 2
     assert scene.state.selected is False and scene.clears[-1] is True
     assert refs == [("EyeID@native", {
@@ -414,6 +458,472 @@ def test_all_native_torus_parameters_must_be_finite(supplier_eye_scene, index, v
     assert not scene.projections and not scene.dimensions
 
 
+def _selection_failure_packet(error):
+    notes = getattr(error, "__notes__", ())
+    assert len(notes) == 1
+
+    def reject_constant(value):
+        pytest.fail(f"Failure receipt is not strict JSON: {value}")
+
+    packet = json.loads(notes[0], parse_constant=reject_constant)
+    assert packet["kind"] == "sm_eye_id_selection_failure"
+    assert "observation_error" not in packet
+    return packet
+
+
+@pytest.mark.parametrize(
+    "count,kind,null_helper,stage,original_count,original_type,original_presence,message",
+    (
+        (0, 46, False, "selected_count", 0, "not_read", "not_read", "expected count=1; actual count=0"),
+        (2, 46, False, "selected_count", 2, "not_read", "not_read", "expected count=1; actual count=2"),
+        (1, 1, False, "selected_type", 1, 1, "not_read", "expected type=46; actual type=1"),
+        (1, 2, False, "selected_type", 1, 2, "not_read", "expected type=46; actual type=2"),
+        (1, 46, True, "entity_present", 1, 46, False, "expected entity_present=True; actual entity_present=False"),
+    ),
+)
+def test_individual_predicate_receipts_keep_original_values_and_expected_contract(
+    supplier_eye_scene, monkeypatch, count, kind, null_helper, stage,
+    original_count, original_type, original_presence, message,
+):
+    scene = supplier_eye_scene
+    scene.state.count, scene.state.kind = count, kind
+    if null_helper:
+        select = drawing._select_view_entity
+
+        def selected_but_null(*args, **kwargs):
+            select(*args, **kwargs)
+            return None
+
+        monkeypatch.setattr(drawing, "_select_view_entity", selected_but_null)
+    with pytest.raises(RuntimeError, match=message) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    original = packet["original_predicate"]
+    assert original["stage"] == stage
+    assert original["selected_count"] == original_count
+    assert original["selected_type"] == original_type
+    assert original["entity_present"] == original_presence
+    assert original["helper_return_present"] is not null_helper
+    expected = packet["expected"]
+    assert (expected["selected_count"], expected["selected_type"], expected["entity_present"]) == (1, 46, True)
+    assert expected["physical_id_mm"] == 7.9375
+    assert expected["absolute_center_limit_m_exclusive"] == 1e-8
+    assert expected["axis_z_error_limit_exclusive"] == 1e-8
+    assert expected["diameter_error_limit_mm_exclusive"] == 1e-5
+    assert expected["source_owner_IsSame"] == 1
+    assert scene.dimensions == [] and scene.state.selected is False
+    assert all(read[-1] is True for read in scene.selection_reads)
+    if null_helper:
+        assert packet["later_readback"]["selection"]["entries"][0]["entity"]["present"] is True
+
+
+def test_failure_receipt_retains_source_projection_transform_configuration_and_native_wire(
+    supplier_eye_scene,
+):
+    scene = supplier_eye_scene
+    scene.state.kind = 1
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    assert packet["acquisition"] == {
+        "source_torus": list(scene.surface.TorusParams),
+        "model_top_inner_point_m": list(scene.projections[0]),
+        "projected_sheet_point_m": list(scene.picks[0]),
+    }
+    assert packet["expected"]["finished_configuration"] == "Finished"
+    assert packet["expected"]["source_path"] == str(scene.source_path.resolve())
+    later = packet["later_readback"]
+    assert later["view"]["name"]["value"] == scene.front.Name
+    assert later["view"]["GetDisplayMode2"]["value"] == 2
+    assert later["view"]["ReferencedConfiguration"]["value"] == "Finished"
+    assert later["view"]["ArrayData"]["value"]["values"] == list(scene.front.ModelToViewTransform.ArrayData)
+    assert later["source"]["GetPathName"]["value"] == str(scene.source_path.resolve())
+    assert later["source"]["current_view_source_path"]["value"] == str(scene.source_path.resolve())
+    assert later["source"]["active_configuration_name"]["value"] == "Finished"
+    assert later["source"]["IsSame_authoritative_document"]["value"] == 1
+    assert later["source_Wire"]["Name"]["value"] == "Wire"
+    assert later["source_Wire"]["GetTypeName2"]["value"] == "Sweep"
+    assert later["source_Wire"]["GetID"]["value"] == 17
+    assert later["source_Wire"]["IsSame_self"]["value"] == 1
+    assert later["source_Wire"]["IsSame_source_Wire"]["value"] == 1
+    geometry = later["selection"]["entries"][0]["entity"]["ISilhouetteEdge"]
+    assert geometry["curve"]["CircleParams"]["value"]["values"] == list(scene.eye.GetCurve().CircleParams)
+    face = geometry["face"]
+    assert face["owner"]["IsSame_source_Wire"]["value"] == 0
+    assert face["mapped_source_face"]["owner"]["IsSame_source_Wire"]["value"] == 1
+    assert face["mapped_source_face"]["TorusParams"]["value"]["values"] == list(scene.surface.TorusParams)
+
+
+def test_count_failure_observes_every_selected_entry_including_edge_and_view(supplier_eye_scene):
+    scene = supplier_eye_scene
+    edge_curve = SimpleNamespace(
+        Identity=lambda: 3001, IsCircle=lambda: False, IsLine=lambda: True,
+        LineParams=(0.0, 0.001, 0.0, 0.0, 1.0, 0.0),
+    )
+    first_face = scene.eye.GetFace()
+    second_face = SimpleNamespace(GetFeature=lambda: scene.drawing_owner, GetSurface=lambda: scene.surface)
+    foreign_owner = SimpleNamespace(Name="Wire", GetTypeName2=lambda: "Sweep", GetID=lambda: 44)
+    scene.mapped_faces[id(second_face)] = SimpleNamespace(
+        GetFeature=lambda: foreign_owner, GetSurface=lambda: scene.surface,
+    )
+    edge = SimpleNamespace(
+        _interfaces={"IEdge"}, GetCurve=lambda: edge_curve,
+        GetTwoAdjacentFaces2=lambda: (first_face, second_face),
+    )
+    scene.state.entries = [(46, scene.eye), (1, edge), (12, scene.front)]
+    scene.state.count = 3
+    with pytest.raises(RuntimeError, match="actual count=3") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    entries = packet["later_readback"]["selection"]["entries"]
+    assert [entry["index"] for entry in entries] == [1, 2, 3]
+    assert [entry["GetSelectedObjectType3"]["value"] for entry in entries] == [46, 1, 12]
+    assert all(entry["GetSelectedObject6"]["present"] for entry in entries)
+    native_edge = entries[1]["entity"]["IEdge"]
+    assert entries[1]["entity"]["ISilhouetteEdge"]["ISilhouetteEdge"]["error"]["type"] == "TypeError"
+    assert native_edge["curve"]["Identity"]["value"] == 3001
+    assert native_edge["curve"]["IsCircle"]["value"] is False
+    assert native_edge["curve"]["LineParams"]["value"]["values"] == list(edge_curve.LineParams)
+    faces = native_edge["adjacent_faces"]
+    assert len(faces) == 2
+    assert faces[0]["mapped_source_face"]["owner"]["IsSame_source_Wire"]["value"] == 1
+    assert faces[1]["mapped_source_face"]["owner"]["IsSame_source_Wire"]["value"] == 0
+    assert faces[1]["mapped_source_face"]["owner"]["Name"]["value"] == "Wire"
+    assert entries[2]["entity"]["drawing_view"]["name"]["value"] == scene.front.Name
+    assert "ISilhouetteEdge" not in entries[2]["entity"]
+    assert scene.dimensions == [] and scene.visible_queries == []
+
+
+@pytest.mark.parametrize("predicate", ("count", "type"))
+def test_later_successful_readback_cannot_overwrite_original_failed_predicate(supplier_eye_scene, predicate):
+    scene = supplier_eye_scene
+    if predicate == "count":
+        values = iter((1, 2, 1))  # helper, original guard, independent later read
+        scene.model.SelectionManager.GetSelectedObjectCount2 = lambda _mark: next(values)
+    else:
+        values = iter((1, 46))  # original guard, independent later read
+        scene.model.SelectionManager.GetSelectedObjectType3 = lambda _index, _mark: next(values)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    original, later = packet["original_predicate"], packet["later_readback"]["selection"]
+    if predicate == "count":
+        assert original["selected_count"] == 2 and original["selected_type"] == "not_read"
+        assert later["GetSelectedObjectCount2"]["value"] == 1
+    else:
+        assert original["selected_type"] == 1 and original["entity_present"] == "not_read"
+        assert later["entries"][0]["GetSelectedObjectType3"]["value"] == 46
+    assert scene.dimensions == []
+
+
+def test_wrong_kind_native_edge_curve_is_observed_without_accepting_it(supplier_eye_scene):
+    scene = supplier_eye_scene
+    scene.state.kind = 1
+    scene.state.pick = SimpleNamespace(
+        _interfaces={"IEdge"}, GetCurve=scene.eye.GetCurve,
+        GetTwoAdjacentFaces2=lambda: (scene.eye.GetFace(), None),
+    )
+    with pytest.raises(RuntimeError, match="expected type=46; actual type=1") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    entity = packet["later_readback"]["selection"]["entries"][0]["entity"]
+    assert entity["IEdge"]["curve"]["IsCircle"]["value"] is True
+    assert entity["IEdge"]["curve"]["CircleParams"]["value"]["sample_all_finite"] is True
+    assert entity["IEdge"]["adjacent_faces"][1]["IFace2"]["present"] is False
+    assert entity["ISilhouetteEdge"]["ISilhouetteEdge"]["error"]["field"] == "ISilhouetteEdge"
+    assert scene.dimensions == []
+
+
+def test_exact_circle_refusal_gets_the_same_complete_packet(supplier_eye_scene):
+    scene = supplier_eye_scene
+    scene.state.pick = scene.outer
+    with pytest.raises(RuntimeError, match="expected physical ID=7.9375 mm") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    original = packet["original_predicate"]
+    assert (original["selected_count"], original["selected_type"], original["entity_present"]) == (1, 46, True)
+    assert original["stage"] == "exact_source_circle"
+    entry = packet["later_readback"]["selection"]["entries"][0]
+    circle = entry["entity"]["ISilhouetteEdge"]["curve"]["CircleParams"]["value"]["values"]
+    assert circle[6] * 2000 == pytest.approx(anchor.eye_od_mm)
+    assert "mapped_source_face" in entry["entity"]["ISilhouetteEdge"]["face"]
+    assert packet["acquisition"]["model_top_inner_point_m"] == list(scene.projections[0])
+    assert scene.dimensions == []
+
+
+def test_helper_native_failure_keeps_identity_and_known_model_sheet_context(supplier_eye_scene):
+    scene = supplier_eye_scene
+    error = OSError("native coordinate hit-test failed")
+
+    def fail(*_args):
+        raise error
+
+    scene.model.Extension.SelectByID2 = fail
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert caught.value is error and str(caught.value) == "native coordinate hit-test failed"
+    packet = _selection_failure_packet(error)
+    original = packet["original_predicate"]
+    assert original["stage"] == "select_view_entity"
+    assert original["helper_return_present"] == "not_returned"
+    assert original["selected_count"] == original["selected_type"] == original["entity_present"] == "not_read"
+    model_point = scene.projections[0]
+    assert packet["acquisition"]["model_top_inner_point_m"] == list(model_point)
+    assert packet["acquisition"]["projected_sheet_point_m"] == [
+        0.100 + 4.0 * model_point[0], 0.175 + 4.0 * model_point[1],
+    ]
+    assert packet["later_readback"]["selection"]["GetSelectedObjectCount2"]["value"] == 0
+    assert packet["later_readback"]["view"]["ArrayData"]["value"]["length"] == 16
+    assert scene.state.selected is False and scene.dimensions == []
+
+
+def test_observation_field_errors_are_independent_and_do_not_mask_native_exception(supplier_eye_scene):
+    scene = supplier_eye_scene
+    error = OSError("native curve failed")
+
+    def fail_curve():
+        raise error
+
+    def fail_owner():
+        raise ValueError("owner unreadable")
+
+    def fail_surface():
+        raise LookupError("surface unreadable")
+
+    scene.eye.GetCurve = fail_curve
+    scene.eye.GetFace().GetFeature = fail_owner
+    scene.eye.GetFace().GetSurface = fail_surface
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert caught.value is error and str(caught.value) == "native curve failed"
+    packet = _selection_failure_packet(error)
+    geometry = packet["later_readback"]["selection"]["entries"][0]["entity"]["ISilhouetteEdge"]
+    assert geometry["GetCurve"]["error"] == {
+        "field": "GetCurve", "type": "OSError", "message": "native curve failed",
+    }
+    assert geometry["face"]["GetFeature"]["error"]["type"] == "ValueError"
+    assert geometry["face"]["GetSurface"]["error"]["type"] == "LookupError"
+    assert geometry["face"]["mapped_source_face"]["owner"]["IsSame_source_Wire"]["value"] == 1
+    assert geometry["view"]["name"]["value"] == scene.front.Name
+    assert scene.state.selected is False and scene.dimensions == []
+
+
+def test_selected_getters_remain_independent_when_later_type_read_fails(supplier_eye_scene):
+    scene = supplier_eye_scene
+    calls = []
+
+    def type_read(_index, _mark):
+        calls.append("type")
+        if len(calls) == 1:
+            return 1
+        raise OSError("later type unavailable")
+
+    scene.model.SelectionManager.GetSelectedObjectType3 = type_read
+    with pytest.raises(RuntimeError, match="actual type=1") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    entry = packet["later_readback"]["selection"]["entries"][0]
+    assert packet["original_predicate"]["selected_type"] == 1
+    assert entry["GetSelectedObjectType3"]["error"]["message"] == "later type unavailable"
+    assert entry["GetSelectedObject6"]["present"] is True
+    assert entry["entity"]["ISilhouetteEdge"]["curve"]["IsCircle"]["value"] is True
+
+
+@pytest.mark.parametrize("value,encoded", ((math.nan, "NaN"), (math.inf, "Infinity"), (-math.inf, "-Infinity")))
+def test_failure_receipt_bounds_numeric_samples_and_strings_and_sanitizes_nonfinite(
+    supplier_eye_scene, value, encoded,
+):
+    scene = supplier_eye_scene
+    scene.eye.GetCurve().CircleParams = (value,) * 40
+    scene.front.ModelToViewTransform.ArrayData = (value,) * 40
+    scene.owner.Name = "W" * 2000
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    curve = packet["later_readback"]["selection"]["entries"][0]["entity"]["ISilhouetteEdge"]["curve"]
+    for sample in (curve["CircleParams"]["value"], packet["later_readback"]["view"]["ArrayData"]["value"]):
+        assert sample["length"] == 40
+        assert sample["values"] == [encoded] * 16
+        assert sample["sample_truncated"] is True and sample["sample_all_finite"] is False
+    assert len(packet["later_readback"]["source_Wire"]["Name"]["value"]) == 512
+    assert scene.dimensions == [] and scene.state.selected is False
+
+
+def test_success_never_invokes_the_failure_observer(supplier_eye_scene, monkeypatch):
+    scene = supplier_eye_scene
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("Successful selection invoked the failure observer")
+
+    monkeypatch.setattr(drawing, "_supplier_eye_selection_observation", unexpected)
+    drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert scene.selection_reads == [("count", True), ("entity", 1, True), ("count", True), ("type", 1, True)]
+    assert scene.observation_calls == [] and len(scene.dimensions) == 1
+
+
+@pytest.mark.parametrize(
+    "member,stage", (
+        ("GetSelectedObjectCount2", "selected_count"),
+        ("GetSelectedObjectType3", "selected_type"),
+        ("GetSelectedObject6", "select_view_entity"),
+    ),
+)
+def test_native_selection_getter_errors_preserve_identity_and_record_unreadable_not_null(
+    supplier_eye_scene, member, stage,
+):
+    scene = supplier_eye_scene
+    error = OSError(f"native {member} failed")
+    manager = scene.model.SelectionManager
+    native = getattr(manager, member)
+    calls = []
+
+    def fail(*args):
+        calls.append(args)
+        if member == "GetSelectedObjectCount2" and len(calls) == 1:
+            return native(*args)  # The helper completed; the original guard fails.
+        raise error
+
+    setattr(manager, member, fail)
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert caught.value is error and str(error) == f"native {member} failed"
+    packet = _selection_failure_packet(error)
+    assert packet["original_predicate"]["stage"] == stage
+    later = packet["later_readback"]["selection"]
+    if member == "GetSelectedObjectCount2":
+        assert packet["original_predicate"]["selected_count"] == "not_read"
+        assert later[member]["error"]["message"] == str(error)
+        assert later["entries"] == []
+    else:
+        entry = later["entries"][0]
+        assert entry[member]["error"]["message"] == str(error)
+        if member == "GetSelectedObjectType3":
+            assert packet["original_predicate"]["selected_type"] == "not_read"
+            assert entry["GetSelectedObject6"]["present"] is True
+        else:
+            assert entry["GetSelectedObjectType3"]["value"] == 46
+            assert entry["entity"] == {"presence": "unreadable"}
+    assert scene.state.selected is False and scene.dimensions == []
+
+
+def test_later_null_selection_is_explicit_without_changing_original_helper_failure(supplier_eye_scene):
+    scene = supplier_eye_scene
+    scene.state.pick = None
+    with pytest.raises(RuntimeError, match="has no entity") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    assert packet["original_predicate"]["helper_return_present"] == "not_returned"
+    entry = packet["later_readback"]["selection"]["entries"][0]
+    assert entry["GetSelectedObject6"] == {"present": False}
+    assert entry["entity"] == {"present": False}
+
+
+def test_cleanup_failure_cannot_replace_the_original_native_failure(supplier_eye_scene):
+    scene = supplier_eye_scene
+    error, cleanup_error = OSError("native curve failed"), OSError("native clear failed")
+    clear = scene.model.ClearSelection2
+
+    def fail_curve():
+        raise error
+
+    def fail_final_clear(all_selected):
+        if scene.state.selected:
+            assert len(error.__notes__) == 1, "Receipt must be attached before clearing selection"
+            raise cleanup_error
+        clear(all_selected)  # The helper's pre-pick clear is unchanged.
+
+    scene.eye.GetCurve = fail_curve
+    scene.model.ClearSelection2 = fail_final_clear
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert caught.value is error and error.__cause__ is cleanup_error
+    assert str(error) == "native curve failed"
+    _selection_failure_packet(error)
+    assert scene.dimensions == []
+
+
+def test_selected_native_view_source_is_recorded_separately_from_authoritative_front(supplier_eye_scene):
+    scene = supplier_eye_scene
+    foreign_path = "D:/foreign/eye.SLDPRT"
+    scene.source.ConfigurationManager.ActiveConfiguration.Name = "Other active source configuration"
+    scene.eye.GetView = lambda: SimpleNamespace(
+        Name="foreign-native-view", ReferencedConfiguration="Foreign configuration",
+        ReferencedDocument=SimpleNamespace(GetPathName=lambda: foreign_path),
+        GetDisplayMode2=lambda: 1, ModelToViewTransform=scene.front.ModelToViewTransform,
+    )
+    with pytest.raises(RuntimeError, match="no exact ID circular silhouette") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    assert packet["original_predicate"]["exact_source_circle"] is False
+    assert packet["expected"]["finished_configuration"] == "Finished"
+    later = packet["later_readback"]
+    assert later["view"]["source_path"]["value"] == str(scene.source_path.resolve())
+    assert later["view"]["ReferencedConfiguration"]["value"] == "Finished"
+    assert later["source"]["active_configuration_name"]["value"] == "Other active source configuration"
+    selected_view = later["selection"]["entries"][0]["entity"]["ISilhouetteEdge"]["view"]
+    assert selected_view["name"]["value"] == "foreign-native-view"
+    assert selected_view["GetDisplayMode2"]["value"] == 1
+    assert selected_view["ReferencedConfiguration"]["value"] == "Foreign configuration"
+    assert selected_view["source_path"]["value"] == foreign_path
+    assert scene.dimensions == [] and scene.state.selected is False
+
+
+@pytest.mark.parametrize("mapping_fault", ("null", "native-error"))
+def test_failure_receipt_records_source_mapping_result_or_error_without_substituting_owner(
+    supplier_eye_scene, mapping_fault,
+):
+    scene = supplier_eye_scene
+    error = OSError("native drawing-to-source mapping failed")
+
+    def mapping(_face):
+        if mapping_fault == "native-error":
+            raise error
+        return None
+
+    scene.source.Extension.GetCorrespondingEntity2 = mapping
+    expected_error = OSError if mapping_fault == "native-error" else RuntimeError
+    with pytest.raises(expected_error) as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    if mapping_fault == "native-error":
+        assert caught.value is error
+    packet = _selection_failure_packet(caught.value)
+    face = packet["later_readback"]["selection"]["entries"][0]["entity"]["ISilhouetteEdge"]["face"]
+    if mapping_fault == "native-error":
+        assert face["GetCorrespondingEntity2"]["error"] == {
+            "field": "GetCorrespondingEntity2", "type": "OSError",
+            "message": "native drawing-to-source mapping failed",
+        }
+    else:
+        assert face["GetCorrespondingEntity2"] == {"present": False}
+    assert face["mapped_source_face"]["IFace2"] == {"present": False}
+    assert face["owner"]["Name"]["value"] == "Wire"
+    assert face["owner"]["IsSame_source_Wire"]["value"] == 0
+    assert scene.dimensions == [] and scene.state.selected is False
+
+
+def test_adjacent_face_getter_error_does_not_hide_wrong_kind_curve(supplier_eye_scene):
+    scene = supplier_eye_scene
+    scene.state.kind = 1
+
+    def fail_faces():
+        raise OSError("native adjacent faces unavailable")
+
+    scene.state.pick = SimpleNamespace(
+        _interfaces={"IEdge"}, GetCurve=scene.eye.GetCurve,
+        GetTwoAdjacentFaces2=fail_faces,
+    )
+    with pytest.raises(RuntimeError, match="actual type=1") as caught:
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    packet = _selection_failure_packet(caught.value)
+    edge = packet["later_readback"]["selection"]["entries"][0]["entity"]["IEdge"]
+    assert edge["curve"]["IsCircle"]["value"] is True
+    assert edge["GetTwoAdjacentFaces2"]["error"] == {
+        "field": "GetTwoAdjacentFaces2", "type": "OSError",
+        "message": "native adjacent faces unavailable",
+    }
+    assert scene.dimensions == [] and scene.state.selected is False
+
+
 @pytest.mark.parametrize("count,kind,pick", ((0, 46, "eye"), (2, 46, "eye"), (1, 1, "eye"), (1, 2, "eye"), (1, 46, "null")))
 def test_coordinate_hit_must_leave_one_nonnull_type46_selection(
     supplier_eye_scene, count, kind, pick,
@@ -550,8 +1060,17 @@ def test_native_failure_is_not_suppressed_retried_or_replaced(supplier_eye_scene
         scene.model.AddDiameterDimension2 = fail
     with pytest.raises(OSError) as caught:
         drawing._supplier_references(scene.adapter, scene.front, "Finished")
-    assert caught.value is error and calls == [operation]
-    assert not getattr(error, "__notes__", ())
+    assert caught.value is error
+    if operation in ("GetFaces", "projection"):
+        assert calls == [operation] and not getattr(error, "__notes__", ())
+    else:
+        # The independent failure readback may revisit a failed getter, but
+        # never retries acquisition or dimension creation as an acceptance path.
+        assert calls == [operation] * (2 if operation in ("GetCurve", "GetCorrespondingEntity2") else 1)
+        packet = _selection_failure_packet(error)
+        assert packet["original_predicate"]["failure"] == {
+            "type": "OSError", "message": f"native {operation} failed",
+        }
     assert scene.state.selected is False and scene.visible_queries == []
 
 

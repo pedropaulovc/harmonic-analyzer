@@ -204,6 +204,55 @@ Full worker logs and structured census packets are retained out of tree in
 `D:/farm-runs/rolling-main-post-v44-20261021`; provisional census collectors are
 not part of the permanent repair.
 
+## Actual normal pair at a269
+
+Source `a26968d210944376eb94625d8c1a44a6a7dbc75b`, run
+`20261022T232742226Z-53e97735a0dd4255949373180a1b41e9`, build
+`20261022T232809.254333Z-adb02773b2b24e458d4aefe89596c6a6`, had two source-part
+cache hits and two failed drawings. Neither produced a qualified PDF, PNG,
+native drawing or layout audit.
+
+CH passed strict contour discovery and created supplier references. The first
+settled layout callback then refused the finished front's native `GetOutline()`:
+
+```text
+(0.06266199906333915, 0.10143093577628477,
+ 0.13733800093666088, 0.2710690642237152) m
+```
+
+The actual 12.7 mm sheet-zone margins give the unchanged finished cell
+`(0.0127, 0.0651, 0.4191, 0.2667) m`. Its top overflow is
+`4.3690642237152 mm`; bottom clearance is `36.33093577628477 mm`. The outline
+midpoint equals the former front centre `(0.100, 0.18625) m`. A downward
+translation of 5 mm is the smallest whole-millimetre correction satisfying
+those recorded bounds. It changes only the finished front centre to
+`(0.100, 0.18125) m`, predicting native-outline Y bounds
+`(0.09643093577628477, 0.2660690642237152) m`.
+
+This is a placement correction inside the existing cell, not a larger cell,
+smaller scale or relaxed guard. Control values and explicit text anchors,
+isometric view and stock-sheet placement remain unchanged. `GetOutline()` is
+not documented as a tight printed-edge envelope: the readback does not prove
+that part geometry itself crosses the border or identify display padding.
+The next native leaf must prove layout and leader readability. Because layout
+ran before attachment verification, this attempt proves neither post-rebuild
+attachment survival nor native-save survival.
+
+SM found its unique exact source torus and the coordinate-selection helper
+returned a non-null object. It then failed the immediate count/type guard:
+`counter eye ID selection must be one live physical silhouette`. The native
+count and type were not emitted. Do not infer count one, type 46, an acquired
+ID circle, or an alternate valid type from that exception.
+
+Failure receipts therefore retain each assertion's expected and actual
+primitive values separately, plus the complete live selected-object inventory,
+native curve/source-face identity and model-to-sheet acquisition context.
+Original predicate-time values remain distinct from independent later reads;
+individual getter errors cannot mask the original failure. These observations
+run only on failure, before selection is cleared, and do not change selection
+or any acceptance predicate. They are not another visible-geometry census or
+evidence that SM's actual discovery failure has been repaired.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate
