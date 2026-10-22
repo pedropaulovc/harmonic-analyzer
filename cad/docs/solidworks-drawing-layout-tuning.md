@@ -890,6 +890,29 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
 
+The summing lever's R3 Detail D proves why a successful angular text readback
+is not route acceptance. At request (51, 81) mm, the native connector from
+(58.3221, 166.7272) to (69.6861, 75.4438) mm strikes the final `T` in
+`MHA-SM-02 SEAT` below `4X 122.4° ±0.5°`. The native/PDF evidence is
+`D:/farm-runs/summing-plate-taps-20261022/r3-sm-visual-evidence/`
+(`sm-native-layout-audit.json`, `sm-flank-angle-small-defect.png` and
+`sm-detail-d-complete.png`). Keep the exterior arc seed **(58, 184) mm**
+and use the same native angular shelf at **(51, 211) mm**, a text-only
+**130 mm upward** move. Its entire lower row starts at native Y205.4437 mm,
+4.1036 mm above the height's upper witness; its right edge X69.6861 mm is
+4.9138 mm left of the ridge witness. A smaller left/upper nudge is not a
+whole-neighbor repair: the height's X34.2 mm dimension run crosses that pocket.
+The new shelf is above every point on the retained native arc, so any straight
+connector from that arc ends below both complete printed rows, leaving at least
+0.9338 mm ink air. Do not freeze or rigidly translate the old connector's arc
+attachment. The regression replays both native/PDF rows, the complete neighboring
+blocks and witnesses, the retained arc/arrows, and the entire possible connector
+envelope. The connector crosses the upper height witness rather than the lower
+one, a line/line crossing, not text. These are placement projections: fresh
+native/PDF inspection must prove the actual re-solved route and full-sheet ink.
+The model-owned angle, one-place precision, symmetric band, attachments, all six
+views, and the separate `3X 5.00` / `2.59` placements remain unchanged.
+
 The rocker's abandoned angular-offset attempt is not a reusable placement
 contract. R26's false-offset 109-degree seed did not determine its final
 connector: offset restored the old stubs and landed at 105.690091123 degrees,

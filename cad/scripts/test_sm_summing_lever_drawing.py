@@ -1033,6 +1033,88 @@ def test_flank_text_refuses_failed_arc_or_shelf_placement(monkeypatch, damage) -
             drawing._place_flank_text(adapter, [annotation])
 
 
+def test_flank_shelf_clears_recorded_angular_route_and_complete_neighbors() -> None:
+    """R3 native/PDF placement projection, not regenerated native acceptance."""
+    # r3-sm-visual-evidence/sm-native-layout-audit.json, sheet 2 / Detail D.
+    # The source arc stays seeded separately; its connector may re-solve on
+    # that arc. Do not translate or freeze R3's old connector attachment.
+    native_rows = (
+        Box(0.0347931, 0.081, 0.0672070, 0.0845),
+        Box(0.0323139, 0.0754437, 0.0696861, 0.0789437),
+    )
+    printed_rows = (
+        Box(0.0349097, 0.0819339, 0.0670622, 0.0854993),
+        Box(0.0325705, 0.0763776, 0.0696114, 0.079943),
+    )
+    old_connector = Segment(0.0583221, 0.1667272, 0.0696861, 0.0754438)
+    assert segment_box_overlap_length(old_connector, printed_rows[1]) > 0.003
+    x, y = drawing.FLANK_TEXT_XY
+    assert x == 0.051, "retain the measured horizontal shelf/neighbor relationship"
+    dy = y - 0.081
+    native = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in native_rows)
+    printed = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in printed_rows)
+    clearance = 0.00357  # one complete recorded printed cap height
+    neighbors = (
+        # Combined complete native/PDF blocks, not just the closest numbers.
+        Box(0.0153583, 0.1388875, 0.0530416, 0.1600555),  # all four height rows
+        Box(0.0251583, 0.2399375, 0.0628416, 0.2611055),  # left ridge, all four rows
+        Box(0.1779316, 0.2399656, 0.2240684, 0.2555774),  # right ridge, all three rows
+        Box(0.1655003, 0.2162219, 0.1964997, 0.2207211),  # complete R0.1
+        Box(0.1908059, 0.0802219, 0.2151941, 0.0847865),  # reference width
+        Box(0.1114999, 0.2011553, 0.1184999, 0.2093401),  # whole A symbol/triangle
+        Box(0.0986641, 0.0548708, 0.1310708, 0.0710741),  # detail caption and scale
+        Box(0.2038833, 0.1529437, 0.253, 0.1629992),  # complete ReceiverY0 block
+        Box(0.2154417, 0.1689437, 0.2645584, 0.1789993),  # complete ReceiverX1 block
+    )
+    neighbor_lines = (
+        Segment(0.0332, 0.0986601, 0.1139999, 0.0986601),
+        Segment(0.0332, 0.2013401, 0.1139999, 0.2013401),
+        Segment(0.0342, 0.0986601, 0.0342, 0.1388875),
+        Segment(0.0342, 0.1611125, 0.0342, 0.2013401),
+        Segment(0.0745999, 0.1766701, 0.0745999, 0.2409375),
+        Segment(0.1149999, 0.2113401, 0.1149999, 0.2409656),
+        Segment(0.0251583, 0.2399375, 0.1149999, 0.2399375),
+        Segment(0.1149999, 0.2399656, 0.2240684, 0.2399656),
+        Segment(0.0745999, 0.0792219, 0.0745999, 0.1746701),
+        Segment(0.1553999, 0.0792219, 0.1553999, 0.1746701),
+        Segment(0.11595, 0.2004674, 0.1639128, 0.2162219),
+    )
+    for row in (*native, *printed):
+        assert row.xmin - 0.0127 >= clearance
+        assert 0.2667 - row.ymax >= clearance
+        assert all(row.gap(neighbor) >= clearance for neighbor in neighbors)
+        assert all(segment_box_distance(line, row) >= clearance for line in neighbor_lines)
+    # The whole recorded exterior arc and both native witness lines remain.
+    # Its bounding rectangle also bounds every possible connector attachment.
+    arc = Box(0.0560269, 0.1657097, 0.0745999, 0.1942428)
+    witnesses = (
+        Segment(0.0737559, 0.1751338, 0.05808, 0.1651734),
+        Segment(0.0745999, 0.1766701, 0.0745999, 0.1952428),
+    )
+    # A length-plus-half-width square conservatively contains either arrow
+    # direction, so the budget does not depend on arrow-vector convention.
+    arrow_reach = 0.003556 + 0.000762 / 2.0
+    arrows = tuple(
+        Box(px - arrow_reach, py - arrow_reach, px + arrow_reach, py + arrow_reach)
+        for px, py in ((0.058924, 0.1657097), (0.0745999, 0.1942428))
+    )
+    for row in (*native, *printed):
+        assert all(row.gap(ink) >= clearance for ink in (arc, *arrows))
+        assert all(segment_box_distance(line, row) >= clearance for line in witnesses)
+    shelf_y = 0.0754438 + dy
+    shoulder = Segment(native[1].xmin, shelf_y, native[1].xmax, shelf_y)
+    connector = Box(
+        min(arc.xmin, shoulder.x1), min(arc.ymin, shelf_y),
+        max(arc.xmax, shoulder.x1), max(arc.ymax, shelf_y),
+    )
+    assert all(connector.gap(neighbor) >= clearance for neighbor in neighbors)
+    assert all(segment_box_distance(shoulder, neighbor) >= clearance for neighbor in neighbors)
+    # Underlining is intentional; neither that shelf nor ANY straight
+    # connector on the unchanged arc may enter either complete printed row.
+    assert all(connector.gap(row) >= 0.0009 for row in printed)
+    assert all(segment_box_distance(shoulder, row) >= 0.0009 for row in printed)
+
+
 @pytest.mark.parametrize("kind", ["width", "ridge"])
 @pytest.mark.parametrize("damage", [None, "missing", "duplicate", "wrong_start", "short_tail"])
 def test_local_witness_placement_rebuilds_and_checks_projected_ink(
