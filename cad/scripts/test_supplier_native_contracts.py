@@ -252,12 +252,13 @@ def _refused_pin(monkeypatch, *, attachment_types=(1, 1), reader_interrupt=False
             raise KeyboardInterrupt("optional observer failed")
 
     monkeypatch.setattr(pins._telemetry, "info", log)
-    circles = [SimpleNamespace(circle=(0.0, station, 0.0, 0.0, 1.0, 0.0, 1.0), edge=object())
-               for station in (0.0, 4.7625)]
+    circles = [SimpleNamespace(circle=(station, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0), edge=object())
+               for station in (-2.38125, 2.38125)]
     view = SimpleNamespace(GetOutline=lambda: (0.09, 0.09, 0.11, 0.12))
-    source = SimpleNamespace(sku="98381A433", length_mm=4.7625)
+    source = SimpleNamespace(sku="spring-pin", length_mm=4.7625)
     with pytest.raises(RuntimeError, match="cannot center native end-rim endpoint 1"):
-        pins._supplier_length(None, view, circles, source, axis=1, stations=(0.0, 4.7625))
+        pins._supplier_length(None, view, circles, source, axis=0,
+                              stations=(-2.38125, 2.38125), endpoint_mode="arc_center")
     return events[0]
 
 

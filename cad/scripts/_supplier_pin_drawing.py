@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
@@ -196,12 +196,15 @@ def _supplier_diameter(
 
 def _supplier_length(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
-    *, axis: int, stations: tuple[float, float]
+    *, axis: int, stations: tuple[float, float],
+    endpoint_mode: Literal["linear", "arc_center"],
 ) -> tuple[Any, Callable[[Any], None]]:
+    if endpoint_mode not in ("linear", "arc_center"):
+        raise ValueError(f"unsupported native pin endpoint mode {endpoint_mode!r}")
     label = f"{source.sku} supplier length"
     ends = tuple(_end_circle(circles, axis, station, label=label) for station in stations)
-    # Project actual end-rim points in one batch. Center arc conditions below
-    # make the span end-plane to end-plane, not a tangent-offset distance.
+    # Project actual end-rim picks. Linear mode measures their axial
+    # stations directly; arc_center retains the spring-pin arc conditions.
     points = []
     for edge in ends:
         point = list(edge.circle[:3])
@@ -221,32 +224,33 @@ def _supplier_length(
     if int(display.Type2) not in (2, 11, 12):
         raise RuntimeError(f"{label}: end-plane reference is not a native length")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    for index in (1, 2):
-        status = dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
-        if status != 0:
-            failure = RuntimeError(f"{label}: cannot center native end-rim endpoint {index}")
-            try:
-                fields = {"label": label, "endpoint": index, "setter_return": status}
-                readers = (
-                    ("arc_end_condition_1", lambda: dimension.GetArcEndCondition(1)),
-                    ("arc_end_condition_2", lambda: dimension.GetArcEndCondition(2)),
-                    ("display_dimension_type", lambda: display.Type2),
-                    ("native_value_m", lambda: dimension.SystemValue),
-                    ("attached_entity_types", lambda: _early_bound(
-                        display.GetAnnotation(), "IAnnotation"
-                    ).GetAttachedEntityTypes()),
-                )
-                for field, reader in readers:
-                    try:
-                        value = reader()
-                        fields[field] = value
-                        fields[f"{field}_state"] = "UNAVAILABLE_NULL" if value is None else "OBSERVED"
-                    except BaseException as error:
-                        fields[f"{field}_state"] = "UNAVAILABLE"
-                        fields[f"{field}_error_type"] = type(error).__name__
-                _telemetry.info("supplier pin arc-end condition refused", **fields)
-            finally:
-                raise failure
+    if endpoint_mode == "arc_center":
+        for index in (1, 2):
+            status = dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+            if status != 0:
+                failure = RuntimeError(f"{label}: cannot center native end-rim endpoint {index}")
+                try:
+                    fields = {"label": label, "endpoint": index, "setter_return": status}
+                    readers = (
+                        ("arc_end_condition_1", lambda: dimension.GetArcEndCondition(1)),
+                        ("arc_end_condition_2", lambda: dimension.GetArcEndCondition(2)),
+                        ("display_dimension_type", lambda: display.Type2),
+                        ("native_value_m", lambda: dimension.SystemValue),
+                        ("attached_entity_types", lambda: _early_bound(
+                            display.GetAnnotation(), "IAnnotation"
+                        ).GetAttachedEntityTypes()),
+                    )
+                    for field, reader in readers:
+                        try:
+                            value = reader()
+                            fields[field] = value
+                            fields[f"{field}_state"] = "UNAVAILABLE_NULL" if value is None else "OBSERVED"
+                        except BaseException as error:
+                            fields[f"{field}_state"] = "UNAVAILABLE"
+                            fields[f"{field}_error_type"] = type(error).__name__
+                    _telemetry.info("supplier pin arc-end condition refused", **fields)
+                finally:
+                    raise failure
     display = supplier_reference_dimension(
         adapter, display, label=label, units=source.units,
         precision=source.length_precision, expected_mm=source.length_mm,
@@ -260,8 +264,9 @@ def _supplier_length(
         if int(current.Type2) not in (2, 11, 12):
             raise RuntimeError(f"{label}: final reference is not a native length")
         native = _early_bound(current.GetDimension2(0), "IDimension")
-        if any(int(native.GetArcEndCondition(index)) != 1 for index in (1, 2)):
-            raise RuntimeError(f"{label}: final end-rim endpoints are not centered")
+        expected_arc_condition = 1 if endpoint_mode == "arc_center" else 0
+        if any(int(native.GetArcEndCondition(index)) != expected_arc_condition for index in (1, 2)):
+            raise RuntimeError(f"{label}: final end-rim conditions do not match {endpoint_mode}")
         assert_dimension_measures(
             adapter, current, expected_mm=source.length_mm, label=label,
             entities=(ends[0].edge, ends[1].edge),
@@ -312,7 +317,8 @@ def add_supplier_dowel_dimensions(
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
     length, length_check = _supplier_length(
-        adapter, front, circles, source, axis=1, stations=(0.0, source.length_mm)
+        adapter, front, circles, source, axis=1, stations=(0.0, source.length_mm),
+        endpoint_mode="linear",
     )
     top = views["*Top"]
     outline = tuple(float(value) for value in top.GetOutline())
@@ -352,6 +358,7 @@ def add_supplier_spring_pin_dimensions(
     length, length_check = _supplier_length(
         adapter, front, circles, source, axis=0,
         stations=(-source.length_mm / 2.0, source.length_mm / 2.0),
+        endpoint_mode="arc_center",
     )
     center = tuple(float(value) for value in right.Position)
     imported = _import_model_references(

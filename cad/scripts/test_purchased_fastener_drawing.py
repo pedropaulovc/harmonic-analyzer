@@ -5952,6 +5952,84 @@ def test_supplier_presentation_retains_native_empty_callout_normalization(monkey
     assert case.native.SystemValue == 0.0111125
 
 
+def _linear_supplier_pin_reference(monkeypatch):
+    import _drawing_edge_dimensions as edge_dimensions
+    import _supplier_pin_drawing as pins
+
+    case = _supplier_native(monkeypatch, value=0.0047625, kind=2)
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag",
+                        lambda value, _interface, *_members: value)
+    monkeypatch.setattr(pins, "model_points_in_view",
+                        lambda _adapter, _view, points, **_kw: [(0.1+x, 0.1+y) for x, y, _z in points])
+    monkeypatch.setattr(pins, "add_edge_dimension", lambda *_args, **_kw: case.display)
+    case.arc_conditions = {1: 0, 2: 0}
+    case.native.GetArcEndCondition = lambda index: case.arc_conditions[index]
+    case.native.GetSystemValue3 = lambda *_args: (case.native.SystemValue,)
+    case.native.Tolerance = SimpleNamespace(Type=0)
+
+    def forbidden_arc_setter(*_args):
+        raise AssertionError("linear end-plane picks are not arc-ended dimensions")
+
+    case.native.SetArcEndCondition = forbidden_arc_setter
+    case.annotation.GetAttachedEntityTypes = lambda: (1,) * len(case.annotation.entities)
+    case.view.GetOutline = lambda: (0.09, 0.09, 0.11, 0.12)
+    case.adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    circles = [
+        SimpleNamespace(circle=(0.0, station, 0.0, 0.0, 1.0, 0.0, 1.190625), edge=entity)
+        for station, entity in zip((0.0, 4.7625), case.annotation.entities)
+    ]
+    source = SimpleNamespace(sku="98381A433", length_mm=4.7625, units="in", length_precision=3)
+    case.display, case.assert_length = pins._supplier_length(
+        case.adapter, case.view, circles, source, axis=1,
+        stations=(0.0, 4.7625), endpoint_mode="linear",
+    )
+    return case
+
+
+def test_supplier_linear_pin_retains_observed_full_length_and_none_end_conditions(monkeypatch):
+    case = _linear_supplier_pin_reference(monkeypatch)
+    case.assert_length(case.display)
+    assert case.native.SystemValue == 0.0047625
+    assert case.arc_conditions == {1: 0, 2: 0}
+    assert case.native.Tolerance.Type == 0
+
+
+@pytest.mark.parametrize("drift,error", [
+    ("condition", "conditions do not match linear"),
+    ("value", "native value"),
+    ("attachment", "named entities"),
+    ("tolerance", "unsourced tolerance"),
+    ("type", None),
+])
+def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(monkeypatch, drift, error):
+    case = _linear_supplier_pin_reference(monkeypatch)
+    if drift == "condition":
+        case.arc_conditions[2] = 1
+    elif drift == "value":
+        case.native.SystemValue += 0.0001
+    elif drift == "attachment":
+        case.annotation.entities = (case.annotation.entities[0], object())
+    elif drift == "tolerance":
+        case.native.Tolerance.Type = 2
+    else:
+        case.display.Type2 = 6
+    native_value = case.native.SystemValue
+    with pytest.raises(RuntimeError, match=error):
+        case.assert_length(case.display)
+    assert case.native.SystemValue == native_value
+
+
+def test_supplier_pin_endpoint_mode_refuses_unknown_mode_before_native_access():
+    import _supplier_pin_drawing as pins
+
+    with pytest.raises(ValueError, match="unsupported native pin endpoint mode"):
+        pins._supplier_length(None, None, [], None, axis=1, stations=(0.0, 4.7625),
+                              endpoint_mode="unknown")
+
+
+
 @pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
 def test_supplier_fraction_requires_an_exact_integer_power_of_two(
     monkeypatch, denominator
