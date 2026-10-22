@@ -311,7 +311,8 @@ def _source_attachment_failure_readback(
             matrices[name] = [[same_receipt(a, b) for b in right] for a in left]
 
     def member(
-        key: str, interface: str | None, *, kind_key: str | None = None, typed: bool = False,
+        key: str, interface: str | None, *, space: Literal["source", "view"],
+        kind_key: str | None = None, typed: bool = False,
     ) -> None:
         if interface is None:
             missing_kind = values.get(kind_key, unavailable)
@@ -334,9 +335,17 @@ def _source_attachment_failure_readback(
                              key, typed=typed, interface="ISketch")
         same(f"{key}.sketch_source_identity", sketch, f"{source}.sketch")
         same(f"{key}.sketch_feature_identity", sketch, f"{source}.feature_sketch")
-        mapped_sketch = forward(f"{key}.sketch_view", sketch, typed=typed, interface="ISketch")
+        # Each hop receives the documented source context, not the same sketch
+        # blindly sent in both directions. Derived points inherit this space.
+        if space == "source":
+            mapped_sketch = forward(f"{key}.sketch_view", sketch, typed=typed, interface="ISketch")
+            reversed_sketch = reverse(f"{key}.sketch_reverse", mapped_sketch,
+                                      typed=typed, interface="ISketch")
+        else:
+            reversed_sketch = reverse(f"{key}.sketch_reverse", sketch, typed=typed, interface="ISketch")
+            mapped_sketch = forward(f"{key}.sketch_view", reversed_sketch,
+                                    typed=typed, interface="ISketch")
         same(f"{key}.sketch_view_identity", mapped_sketch, f"{source}.sketch_view")
-        reversed_sketch = reverse(f"{key}.sketch_reverse", sketch, typed=typed, interface="ISketch")
         same(f"{key}.sketch_reverse_identity", reversed_sketch, f"{source}.sketch")
         same(f"{key}.sketch_reverse_feature_identity", reversed_sketch, f"{source}.feature_sketch")
         same(f"{key}.sketch_mapped_feature_identity", sketch, f"{source}.feature_view_sketch")
@@ -356,7 +365,7 @@ def _source_attachment_failure_readback(
                     point = object_read(f"{key}.{end}", lambda entity, getter=method: getattr(
                         _early_bound(entity, "ISketchLine"), getter)(), key,
                         typed=typed, interface="ISketchPoint")
-                    member(point, "ISketchPoint", typed=typed)
+                    member(point, "ISketchPoint", space=space, typed=typed)
             elif type(values[kind]) is int and values[kind] == 1:  # swSketchARC
                 take(f"{key}.is_circle", lambda entity: _early_bound(entity, "ISketchArc").IsCircle(),
                      key)
@@ -365,7 +374,7 @@ def _source_attachment_failure_readback(
                 center = object_read(f"{key}.center", lambda entity: _early_bound(
                     entity, "ISketchArc").GetCenterPoint2(), key,
                     typed=typed, interface="ISketchPoint")
-                member(center, "ISketchPoint", typed=typed)
+                member(center, "ISketchPoint", space=space, typed=typed)
             else:
                 reads[f"{key}.geometry"] = {
                     "skipped": f"{kind} does not identify an available line or arc interface",
@@ -457,8 +466,12 @@ def _source_attachment_failure_readback(
             annotation, "IAnnotation").Owner, f"dimension.{context}_annotation", handle=True)
         take(f"dimension.{context}_annotation_owner_type", lambda annotation: _early_bound(
             annotation, "IAnnotation").OwnerType, f"dimension.{context}_annotation")
-        forward(f"dimension.{context}_owner_view", owner)
-        reverse(f"dimension.{context}_owner_reverse", owner)
+        if context == "source":
+            owner_view = forward(f"dimension.{context}_owner_view", owner)
+            reverse(f"dimension.{context}_owner_reverse", owner_view)
+        else:
+            owner_source = reverse(f"dimension.{context}_owner_reverse", owner)
+            forward(f"dimension.{context}_owner_view", owner_source)
         same(f"dimension.{context}_owner_reverse_identity",
              f"dimension.{context}_owner_reverse", "source.feature")
     same("dimension.source_import_identity", "dimension.source_native", "dimension.imported_native")
@@ -497,7 +510,7 @@ def _source_attachment_failure_readback(
     segments = inventory("source.segments")
     interface = "ISketchPoint" if label == THICKNESS else "ISketchSegment"
     for key in sources or ():
-        member(key, interface)
+        member(key, interface, space="source")
     attachment_interfaces: list[tuple[str | None, str]] = []
     for index, key in enumerate(attachments or ()):
         kind_key = take(f"{key}.attached_type", lambda kinds: kinds[index], "annotation.types")
@@ -511,7 +524,7 @@ def _source_attachment_failure_readback(
             elif kind in (10, 24):  # swSelSKETCHSEGS / swSelEXTSKETCHSEGS
                 actual_interface = "ISketchSegment"
         attachment_interfaces.append((actual_interface, kind_key))
-        member(key, actual_interface, kind_key=kind_key)
+        member(key, actual_interface, space="view", kind_key=kind_key)
     mapped = None if sources is None else [
         forward(f"view.members.{index}", key) for index, key in enumerate(sources)
     ]
@@ -522,14 +535,14 @@ def _source_attachment_failure_readback(
         forward(f"roundtrip.members.{index}", key) for index, key in enumerate(normalized)
     ]
     for key in mapped or ():
-        member(key, interface)
-    for keys in (normalized, roundtrips):
+        member(key, interface, space="view")
+    for keys, space in ((normalized, "source"), (roundtrips, "view")):
         for key, (actual_interface, kind_key) in zip(keys or (), attachment_interfaces, strict=True):
-            member(key, actual_interface, kind_key=kind_key)
+            member(key, actual_interface, space=space, kind_key=kind_key)
 
     endpoints: list[str] | None = None if segments is None else []
     for key in segments or ():
-        member(key, "ISketchSegment")
+        member(key, "ISketchSegment", space="source")
         for end in ("start", "end"):
             point = f"{key}.{end}"
             if point in reads:
@@ -599,6 +612,18 @@ def _source_attachment_failure_readback(
                                    lambda feature: feature.GetSpecificFeature2(), owner,
                                    typed=True, interface="ISketch")
         same(f"typed.dimension.{context}_owner_sketch_identity", owner_sketch, "typed.source.sketch")
+        if context == "source":
+            owner_view = forward(f"typed.dimension.{context}_owner_view", owner,
+                                 typed=True, interface="IFeature")
+            reverse(f"typed.dimension.{context}_owner_reverse", owner_view,
+                    typed=True, interface="IFeature")
+        else:
+            owner_source = reverse(f"typed.dimension.{context}_owner_reverse", owner,
+                                   typed=True, interface="IFeature")
+            forward(f"typed.dimension.{context}_owner_view", owner_source,
+                    typed=True, interface="IFeature")
+        same(f"typed.dimension.{context}_owner_reverse_identity",
+             f"typed.dimension.{context}_owner_reverse", "typed.source.feature")
     same("typed.dimension.source_import_identity",
          "typed.dimension.source_native", "typed.dimension.imported_native")
     same("typed.dimension.import_source_identity",
@@ -649,11 +674,11 @@ def _source_attachment_failure_readback(
         typed_attachments.append(attached)
         typed_normalized.append(normalized_key)
         typed_roundtrips.append(roundtrip)
-        for member_key in (attached, normalized_key, roundtrip):
-            member(member_key, actual_interface, kind_key=kind_key, typed=True)
-    for keys in (typed_sources, typed_mapped):
+        for member_key, space in ((attached, "view"), (normalized_key, "source"), (roundtrip, "view")):
+            member(member_key, actual_interface, space=space, kind_key=kind_key, typed=True)
+    for keys, space in ((typed_sources, "source"), (typed_mapped, "view")):
         for key in keys or ():
-            member(key, interface, typed=True)
+            member(key, interface, space=space, typed=True)
     for name, left, right, left_name, right_name in (
         ("typed_source_self_distinct", typed_sources, typed_sources,
          "typed.source.members", "typed.source.members"),

@@ -655,23 +655,49 @@ def attachment_readback_case(request, monkeypatch):
     )
     display = surface(Type2=kind, GetDimension2=lambda _index: imported_native,
                       GetAnnotation=lambda: annotation)
-    forward_map = {id(source_sketch): sketches["view"]}
-    reverse_map = {id(sketch): source_sketch for sketch in sketches.values()}
+    forward_map = {
+        id(source_sketch): sketches["view"],
+        id(sketches["normalized"]): sketches["roundtrip"],
+    }
+    reverse_map = {
+        id(sketches["view"]): source_sketch,
+        id(sketches["attachment"]): sketches["normalized"],
+        id(sketches["roundtrip"]): sketches["normalized"],
+    }
     mapped_feature, reverse_feature = surface(), surface()
     forward_map[id(feature)] = mapped_feature
+    forward_map[id(reverse_feature)] = mapped_feature
     reverse_map[id(mapped_feature)] = reverse_feature
+    reverse_map[id(imported_owner)] = reverse_feature
     for index in range(len(contexts["source"])):
         forward_map[id(contexts["source"][index])] = contexts["view"][index]
         forward_map[id(contexts["normalized"][index])] = contexts["roundtrip"][index]
         reverse_map[id(contexts["attachment"][index])] = contexts["normalized"][index]
         reverse_map[id(contexts["view"][index])] = contexts["source"][index]
+        reverse_map[id(contexts["roundtrip"][index])] = contexts["normalized"][index]
+    part_context = {
+        id(handle): handle for handle in
+        (source_sketch, sketches["normalized"], feature, reverse_feature,
+         *contexts["source"], *contexts["normalized"])
+    }
+    drawing_context = {
+        id(handle): handle for handle in
+        (sketches["view"], sketches["attachment"], sketches["roundtrip"],
+         mapped_feature, imported_owner,
+         *contexts["view"], *contexts["attachment"], *contexts["roundtrip"])
+    }
+    transport_calls = []
 
     def forward(handle):
         forward_calls.append(handle)
+        transport_calls.append(("forward", handle))
+        assert id(handle) in part_context, "IView.GetCorresponding requires PART/ASM context"
         return forward_map.get(id(handle))
 
     def reverse(handle):
         reverse_calls.append(handle)
+        transport_calls.append(("reverse", handle))
+        assert id(handle) in drawing_context, "GetCorresponding2 requires DRAWING/ASM context"
         return reverse_map.get(id(handle))
 
     extension = surface(GetCorresponding2=reverse)
@@ -703,6 +729,8 @@ def attachment_readback_case(request, monkeypatch):
     object.__setattr__(display, "GetNameForSelection", lambda: "actual-imported-selection")
     source_annotation = surface(Owner=model, OwnerType=0)
     object.__setattr__(source_display, "GetAnnotation", lambda: source_annotation)
+    part_context[id(source_annotation)] = source_annotation
+    drawing_context[id(annotation)] = annotation
 
     def named(actual_adapter, actual_feature_name, names, *, feature):
         assert actual_adapter is adapter
@@ -721,13 +749,20 @@ def attachment_readback_case(request, monkeypatch):
         writes=writes, bindings=bindings, identity_calls=identity_calls,
         forward_calls=forward_calls, reverse_calls=reverse_calls, table=table,
         forward_map=forward_map, reverse_map=reverse_map,
+        part_context=part_context, drawing_context=drawing_context,
+        transport_calls=transport_calls, mapped_feature=mapped_feature,
+        reverse_feature=reverse_feature,
     )
 
 
 def _attachment_readback(case):
-    return washer_drawing._source_attachment_failure_readback(
+    result = washer_drawing._source_attachment_failure_readback(
         case.adapter, case.model, case.view, case.display, label=case.label,
     )
+    for direction, handle in case.transport_calls:
+        registry = case.part_context if direction == "forward" else case.drawing_context
+        assert id(handle) in registry, f"{direction} correspondence used wrong document context"
+    return result
 
 
 def _scalar_receipt(value):
@@ -802,8 +837,13 @@ def test_source_attachment_readback_records_independent_contexts_and_full_matric
             assert reads[f"{prefix}.sketch_feature_identity"] == _scalar_receipt(
                 1 if context == "source" else 0,
             )
-            assert reads[f"{prefix}.sketch_reverse"] == _handle_receipt(case.source_sketch)
-            assert reads[f"{prefix}.sketch_reverse_identity"] == _scalar_receipt(1)
+            reversed_sketch = case.sketches[
+                "source" if context in {"source", "view"} else "normalized"
+            ]
+            assert reads[f"{prefix}.sketch_reverse"] == _handle_receipt(reversed_sketch)
+            assert reads[f"{prefix}.sketch_reverse_identity"] == _scalar_receipt(
+                1 if context in {"source", "view"} else 0,
+            )
             if case.label == washer_model.THICKNESS:
                 for suffix, value in (("x", 0.005), ("y", index * 0.00091), ("z", 0.0)):
                     assert reads[f"{prefix}.{suffix}"] == _scalar_receipt(value)
@@ -1257,6 +1297,11 @@ def _typed_attachment_transport(case, monkeypatch):
                 case.annotation, case.source_display.GetAnnotation(),
                 case.forward_map[id(case.feature)]):
         clone(raw)
+    for registry in (case.part_context, case.drawing_context):
+        originals = tuple(registry.values())
+        for raw in originals:
+            bound = clone(raw)
+            registry[id(bound)] = bound
     for raw_id, mapped in tuple(case.forward_map.items()):
         if raw_id in bound_by_raw_id:
             case.forward_map[id(bound_by_raw_id[raw_id])] = mapped
@@ -1459,12 +1504,17 @@ def _annotation_attachment_transport(case, monkeypatch):
     object.__setattr__(case.annotation, "GetSpecificAnnotation", lambda: case.display)
     case.forward_map[id(source_annotation)] = mapped_annotation
     case.reverse_map[id(case.annotation)] = reverse_annotation
+    case.part_context.update({id(source_annotation): source_annotation,
+                              id(reverse_annotation): reverse_annotation})
+    case.drawing_context.update({id(case.annotation): case.annotation,
+                                 id(mapped_annotation): mapped_annotation})
     typed = _typed_attachment_transport(case, monkeypatch)
     for raw in (mapped_annotation, reverse_annotation, mapped_display, reverse_display,
                 mapped_native, reverse_native):
-        typed.by_raw_id[id(raw)] = _Surface(
-            case.writes, **{key: value for key, value in vars(raw).items() if key != "_calls"},
-        )
+        if id(raw) not in typed.by_raw_id:
+            typed.by_raw_id[id(raw)] = _Surface(
+                case.writes, **{key: value for key, value in vars(raw).items() if key != "_calls"},
+            )
     return SimpleNamespace(
         source=source_annotation, imported=case.annotation,
         forward=mapped_annotation, reverse=reverse_annotation,
@@ -1604,4 +1654,107 @@ def test_source_attachment_readback_isolates_annotation_bridge_getter_failures(
     assert reads[f"annotation.{direction}_identity"] == _scalar_receipt(0)
     assert set(reads[f"annotation.{direction}_native_full_name"]) == {"skipped"}
     assert reads[f"typed.annotation.{direction}_native_identity"] == _scalar_receipt(0)
+    assert not case.writes
+
+
+@pytest.mark.parametrize("typed", (False, True), ids=("raw-contexts", "bound-contexts"))
+def test_source_attachment_readback_orders_correspondence_by_document_context(
+    attachment_readback_case, monkeypatch, typed,
+):
+    case = attachment_readback_case
+    transport = _typed_attachment_transport(case, monkeypatch) if typed else None
+
+    def actual(handle):
+        return transport.by_raw_id[id(handle)] if typed else handle
+
+    reads = _attachment_readback(case)["reads"]
+    prefix = "typed." if typed else ""
+
+    def ordered(first_direction, first_handle, second_direction, second_handle):
+        assert any(
+            direction == first_direction and handle is first_handle
+            and next_direction == second_direction and next_handle is second_handle
+            for (direction, handle), (next_direction, next_handle)
+            in zip(case.transport_calls, case.transport_calls[1:])
+        ), (first_direction, second_direction)
+
+    for context in ("source", "view", "attachment", "normalized", "roundtrip"):
+        owning_sketch = case.sketches[context]
+        if context in {"source", "normalized"}:
+            view_sketch = case.forward_map[id(owning_sketch)]
+            source_sketch = case.reverse_map[id(view_sketch)]
+            ordered("forward", actual(owning_sketch), "reverse", actual(view_sketch))
+        else:
+            source_sketch = case.reverse_map[id(owning_sketch)]
+            view_sketch = case.forward_map[id(source_sketch)]
+            ordered("reverse", actual(owning_sketch), "forward", actual(source_sketch))
+        key = f"{prefix}{context}.members.0"
+        assert reads[f"{key}.sketch_view"] == _handle_receipt(actual(view_sketch))
+        assert reads[f"{key}.sketch_reverse"] == _handle_receipt(actual(source_sketch))
+        assert reads[f"{key}.sketch_view_identity"] == _scalar_receipt(
+            1 if context in {"source", "view"} else 0,
+        )
+        assert reads[f"{key}.sketch_reverse_identity"] == _scalar_receipt(
+            1 if context in {"source", "view"} else 0,
+        )
+    ordered("forward", actual(case.feature), "reverse", actual(case.mapped_feature))
+    ordered("reverse", actual(case.imported_owner), "forward", actual(case.reverse_feature))
+    for owner in ("source", "imported"):
+        key = f"{prefix}dimension.{owner}_owner"
+        assert reads[f"{key}_view"] == _handle_receipt(actual(case.mapped_feature))
+        assert reads[f"{key}_reverse"] == _handle_receipt(actual(case.reverse_feature))
+        assert reads[f"{key}_reverse_identity"] == _scalar_receipt(0)
+    assert not case.writes
+
+
+@pytest.mark.parametrize("typed", (False, True), ids=("raw-contexts", "bound-contexts"))
+def test_source_attachment_readback_fixture_rejects_undocumented_correspondence_contexts(
+    attachment_readback_case, monkeypatch, typed,
+):
+    case = attachment_readback_case
+    transport = _typed_attachment_transport(case, monkeypatch) if typed else None
+
+    def actual(handle):
+        return transport.by_raw_id[id(handle)] if typed else handle
+
+    for handle in (case.sketches["view"], case.sketches["attachment"],
+                   case.sketches["roundtrip"], case.imported_owner, case.mapped_feature):
+        with pytest.raises(AssertionError, match="requires PART/ASM context"):
+            case.view.GetCorresponding(actual(handle))
+    for handle in (case.source_sketch, case.sketches["normalized"],
+                   case.feature, case.reverse_feature):
+        with pytest.raises(AssertionError, match="requires DRAWING/ASM context"):
+            case.model.Extension.GetCorresponding2(actual(handle))
+    assert not case.writes
+
+
+@pytest.mark.parametrize("typed", (False, True), ids=("raw-contexts", "bound-contexts"))
+@pytest.mark.parametrize("path", ("source-sketch", "view-sketch", "normalized-sketch",
+                                  "source-owner", "imported-owner"))
+def test_source_attachment_readback_skips_second_hop_after_context_mapping_null(
+    attachment_readback_case, monkeypatch, typed, path,
+):
+    case = attachment_readback_case
+    transport = _typed_attachment_transport(case, monkeypatch) if typed else None
+    prefix = "typed." if typed else ""
+    if path.endswith("sketch"):
+        context = path.removesuffix("-sketch")
+        target = case.sketches[context]
+        first = "sketch_reverse" if context == "view" else "sketch_view"
+        second = "sketch_view" if context == "view" else "sketch_reverse"
+        key = f"{prefix}{context}.members.0."
+        mapping = case.reverse_map if context == "view" else case.forward_map
+    else:
+        context = "source" if path == "source-owner" else "imported"
+        target = case.feature if context == "source" else case.imported_owner
+        first = "view" if context == "source" else "reverse"
+        second = "reverse" if context == "source" else "view"
+        key = f"{prefix}dimension.{context}_owner_"
+        mapping = case.forward_map if context == "source" else case.reverse_map
+    actual_target = transport.by_raw_id[id(target)] if typed else target
+    mapping[id(actual_target)] = None
+    reads = _attachment_readback(case)["reads"]
+    assert reads[key + first] == _handle_receipt(None)
+    assert set(reads[key + second]) == {"skipped"}
+    assert not any(handle is None for _direction, handle in case.transport_calls)
     assert not case.writes
