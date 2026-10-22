@@ -21,7 +21,7 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _supplier_screw_dimensions import annotate_supplier_screw
+from _supplier_screw_dimensions import _attachment_correspondence, annotate_supplier_screw
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 import _telemetry
 
@@ -117,7 +117,7 @@ def _physical_edges(
 def _assert_nominal_carrier(
     adapter: Any, front: Any, display: Any, nominal_major_mm: float
 ) -> None:
-    """Resolve the source chord, owner and attachments independently of import."""
+    """Prove the exact source chord and both distinct view-mapped endpoints."""
     model = _early_bound(front, "IView").ReferencedDocument
     if model is None:
         raise RuntimeError("supplier nut has no referenced source part")
@@ -159,15 +159,29 @@ def _assert_nominal_carrier(
             for axis, expected in zip(("X", "Y", "Z"), (x, 0.0, 0.0), strict=True)
         ):
             raise RuntimeError("supplier nut nominal-major chord differs from its exact source")
-    attached = list(_early_bound(display.GetAnnotation(), "IAnnotation").GetAttachedEntities3() or ())
+    # Compare chord endpoints with the inventory in model context only. The
+    # drawing attachments are different objects; compare those with the complete
+    # view-mapped inventory using the importer's positive and negative controls.
+    source_points = list(sketch.GetSketchPoints2() or ())
     for point in points:
-        matches = [index for index, entity in enumerate(attached)
+        matches = [index for index, entity in enumerate(source_points)
                    if entity is not None and int(adapter.swApp.IsSame(entity, point)) == 1]
         if len(matches) != 1:
-            raise RuntimeError("supplier nut nominal-major attachment is not its source endpoint")
-        attached.pop(matches[0])
-    if attached:
-        raise RuntimeError("supplier nut nominal-major carrier has unexpected attachments")
+            raise RuntimeError("supplier nut nominal-major source inventory lost a chord endpoint")
+        source_points.pop(matches[0])
+    if source_points:
+        raise RuntimeError("supplier nut nominal-major source has unexpected sketch points")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    types = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+    if len(attached) != 2 or types != (11, 11):  # swSelSKETCHPOINTS
+        raise RuntimeError("supplier nut nominal-major carrier requires both endpoint attachments")
+    correspondence = _attachment_correspondence(
+        adapter, _early_bound(front, "IView"),
+        source_sketch=sketch, entities=attached, types=types,
+    )
+    if not correspondence["proven"]:
+        raise RuntimeError("supplier nut nominal-major attachment is not its view-mapped source endpoint")
 
 
 @_telemetry.traced("drawing.supplier_nut_dimensions")

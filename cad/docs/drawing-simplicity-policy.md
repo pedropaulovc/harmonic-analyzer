@@ -63,6 +63,12 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Purchased nuts additionally prove one exact centred construction chord and
+  its two distinct endpoints. Source endpoints must exhaust the model sketch's
+  point inventory; both drawing attachments must match different members of
+  that inventory mapped through `IView.GetCorresponding`. Complete mapping,
+  native self-comparison and known-negative comparisons remain mandatory.
+  Raw drawing/model point inequality is not a failed correspondence.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
