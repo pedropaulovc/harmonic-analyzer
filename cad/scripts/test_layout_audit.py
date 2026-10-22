@@ -5319,6 +5319,18 @@ def _nut_dim_line_case(fixed):
     return _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])])
 
 
+def _nut_text_on_line_case(fixed):
+    """Retain the recorded nut row and cross it with a foreign dimension.
+
+    The compound rocker note fixture also intersects its foreign view, so
+    clearing only its extension line cannot prove a clean five-kind leaf.
+    This nut case retains every recorded primitive instead of hiding that
+    unrelated rocker defect or weakening the text-on-view guard.
+    """
+    foreign, span = _nut_jam_foreign_line(0.2 if fixed else 0.16594)
+    return _nut_jam_rd1_dump(foreign=foreign, foreign_span=span)
+
+
 def _nut_text_on_view_case(fixed, *, own_view=False):
     """knife-mount's Ra 0.8 (test_text_beside_a_view_is_measured_against_its
     _printed_edges_not_its_padded_outline): View1's note printed over View2's
@@ -5355,7 +5367,7 @@ def _nut_arrow_case(fixed, *, own_text=False):
 # (build, kind, a, b): bad geometry at build(False), moved clear at build(True).
 _NUT_KIND_CASES = [
     pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="text-clearance"),
-    pytest.param(_rocker_seat_note, "text-on-line", "SeatNote", "Depth", id="text-on-line"),
+    pytest.param(_nut_text_on_line_case, "text-on-line", "RD1", "Foreign", id="text-on-line"),
     pytest.param(_nut_dim_line_case, "dim-line-through-own-text", "Suppressed", "Suppressed", id="dim-line-through-own-text"),
     pytest.param(_nut_text_on_view_case, "text-on-view", "note Ra", "view View2", id="text-on-view"),
     pytest.param(_nut_arrow_case, "arrow-near-text", "HeelReliefHt", "foot", id="arrow-near-text"),
