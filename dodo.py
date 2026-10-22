@@ -1087,8 +1087,8 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
       * a DRAWING reads its OWN part's row -> parts/<dashed-part>.yaml +
         _defaults (none for an assembly-sourced sheet, which has no row).
         Every dynamic registry read a drawing closure reaches is its own part
-        (``_part_properties.part_properties``, ``_purchased_fastener_drawing``,
-        ``_drawing_marks.apply_drawing_properties``);
+        (property/member helpers and reads of the drawing's native source
+        identity);
         test_dodo_recipe.test_drawing_closures_read_no_foreign_dynamic_part_row
         fails loud on any new one.  A literal read of ANOTHER part's row
         (``_config.parts("ch-pivot-bracket")``) is its own concrete token;

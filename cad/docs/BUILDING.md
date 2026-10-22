@@ -148,6 +148,11 @@ not another released member identity.
 Configured purchased drawings read their registry metadata from the native source
 part identity, not the drawing's output label. Their cache dependencies therefore
 remain scoped to that source part's row.
+Changing either member-inventory field invalidates that drawing's local freshness
+digest and remote cache key, even with its native execution identity unchanged;
+unrelated purchased drawings retain their keys. Keep these reads module-qualified
+(`_config.parts(SPEC.source.stem)`): `from _config import parts` forces conservative
+whole-config dependency expansion.
 
 Each part task declares and caches all member STEP/PNG files together with its
 `reports/part-neutral/<stem>.json` certificate. The certificate records the

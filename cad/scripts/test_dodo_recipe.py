@@ -255,6 +255,11 @@ _DRAWING_OWN_ROW_READERS = {
     # source.stem is checked against the registered native source before any
     # supplier diagram metadata is read; artifact labels never select the row.
     "_supplier_spring_drawing.py",
+    # These sheets read SPEC.source.stem, the same native source identity dodo
+    # uses for own-row dependency expansion, never artifact_stem.
+    "draw_sh_vn_chain_link.py",
+    "draw_sh_vn_music_wire.py",
+    "draw_sh_vn_thumb_screw.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -262,11 +267,13 @@ _OWN_ROW_HELPERS = {
     "save_part_and_images": 1,
     "save_simplified_part": 1,
     "apply_drawing_properties": 1,
+    "member_configurations": 0,
     "require_member_configurations": 0,
     "create_member_configurations": 1,
-    "save_member_part": 1,
     "apply_member_properties": 1,
     "assert_member_properties": 1,
+    "save_member_part": 1,
+    "export_member_configurations": 1,
 }
 
 
@@ -283,7 +290,7 @@ def _module_part_name(tree: ast.Module) -> str | None:
     return None
 
 
-def _helper_name_arguments(tree: ast.Module) -> tuple[tuple[str, str], ...]:
+def _helper_name_arguments(tree: ast.AST) -> tuple[tuple[str, str], ...]:
     found = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -440,6 +447,20 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
         if source.name in _DRAWING_OWN_ROW_READERS:
             return tokens, (), None  # forwards its caller's name
         tree = ast.parse(source.read_text(encoding="utf-8"))
+        if source.name == "_simplified_part.py":
+            # This wrapper forwards the caller's part_name. Keep its exact
+            # boundary checked; save_simplified_part callers still go through
+            # the own-builder/PART_NAME checks below.
+            wrapper = next(
+                node for node in tree.body
+                if isinstance(node, ast.AsyncFunctionDef)
+                and node.name == "save_simplified_part"
+            )
+            assert wrapper.args.args[1].arg == "part_name"
+            assert _helper_name_arguments(tree) == _helper_name_arguments(wrapper) == (
+                ("save_part_and_images", "part_name"),
+            )
+            return tokens, (), None
         return tokens, _helper_name_arguments(tree), _module_part_name(tree)
 
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
@@ -475,12 +496,15 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
 
     dodo = _load_dodo()
     stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
+    configured_stems = (
+        "sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire"
+    )
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
     # T_oyK), so the checkout carries the config tree its keys hash.
     sources = {dodo.RELEASE_VERSION_FILE, *dodo.CONFIG_DIR.rglob("*.yaml")}
-    for stem in stems:
+    for stem in (*stems, *configured_stems):
         spec = dodo.DRAWINGS_BY_NAME[stem]
         sources.update((spec.script, *spec.assets))
         sources.update(Path(path) for path in dodo._helper_deps(spec.script))
@@ -492,7 +516,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         bg.clear_import_caches()
         bg.config_files_of.cache_clear()
 
-    def checkout(name="repo", *, crlf=False):
+    def checkout(name="repo", *, crlf=False, drawing_stems=stems):
         root = tmp_path / name
         scripts = root / "cad" / "scripts"
         for relative, content in contents.items():
@@ -538,7 +562,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
 
         reload_registry()
         index = {}
-        for stem in stems:
+        for stem in drawing_stems:
             spec = dodo.DRAWINGS_BY_NAME[stem]
             kind = spec.source_kind
             source = Path(
@@ -562,7 +586,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
             clear_closure()
             dodo._ARTEFACT_DIGEST_MEMO.clear()
             result = {}
-            for stem in stems:
+            for stem in drawing_stems:
                 deps = dodo._drawing_file_deps(stem)
                 assert all(
                     Path(path).resolve().is_relative_to(root.resolve()) for path in deps
@@ -677,6 +701,72 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
     for stem in ("ch_vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem], stem
+
+
+@pytest.mark.parametrize(
+    "changed_stem",
+    ["sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire"],
+)
+@pytest.mark.parametrize("field", ["default_configuration", "configuration_quantities"])
+def test_purchased_configuration_changes_invalidate_only_own_drawing(
+    isolated_drawing_keys, monkeypatch, changed_stem, field
+):
+    """Real member consumers and direct drawing keys agree on registry ownership."""
+    import _config
+    import _part_configuration_exports as exports
+    import _purchased_part_variants as variants
+    import yaml
+
+    purchased = ("sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire")
+    dodo, _root, drawing_keys = isolated_drawing_keys(
+        drawing_stems=(*purchased, "pd_platen_guide")
+    )
+    monkeypatch.setattr(_config, "CONFIG_DIR", dodo.CONFIG_DIR)
+
+    def snapshot():
+        _config._parts_registry.cache_clear()
+        _config._doc.cache_clear()
+        try:
+            members = {}
+            for stem in purchased:
+                paths = exports.configuration_export_paths(stem, dodo.CAD_OUT)
+                members[stem] = (
+                    paths,
+                    {
+                        name: variants._member_properties(
+                            stem.replace("_", "-"), name, name, {}
+                        )
+                        for name in paths
+                    },
+                )
+            return drawing_keys(), members
+        finally:
+            _config._parts_registry.cache_clear()
+            _config._doc.cache_clear()
+
+    before_keys, before_members = snapshot()
+    dashed = changed_stem.replace("_", "-")
+    path = dodo.CONFIG_DIR / "parts" / f"{dashed}.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    row = document[dashed]
+    quantities = row["configuration_quantities"]
+    if field == "default_configuration":
+        row[field] = next(name for name in quantities if name != row[field])
+    else:
+        quantities[row["default_configuration"]] += 1
+        row["quantity"] = sum(quantities.values())
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    after_keys, after_members = snapshot()
+
+    for stem in before_keys:
+        if stem == changed_stem:
+            # Both local freshness and the cross-machine cache must invalidate,
+            # even with the native producer recipe/execution identity held fixed.
+            assert all(a != b for a, b in zip(before_keys[stem], after_keys[stem]))
+        else:
+            assert after_keys[stem] == before_keys[stem], stem
+    for stem in purchased:
+        assert (after_members[stem] != before_members[stem]) == (stem == changed_stem), stem
 
 
 @pytest.mark.parametrize(
