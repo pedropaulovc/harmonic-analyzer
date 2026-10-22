@@ -9,7 +9,7 @@ import magnifying_bracket_joint_layout as joint
 import mg_lever_thread_joint as thread
 import mg_magnifying_bracket_arm_check as arm
 import mg_magnifying_lever_geom as lever
-import mg_vn_lever_wire_geom as wire
+import sh_vn_music_wire_lever_geom as wire
 import spring_force_model
 
 from mg_magnifying_wheel_geom import WIRE_RATIO

@@ -122,7 +122,7 @@ def test_clamp_compensation_keeps_rod_seating_hook_and_thumb_tip() -> None:
 
 
 def test_thumb_head_envelope_clears_rail_at_the_contact_angle_bound() -> None:
-    from _mcmaster_91882a221 import TIP_FLAT_R
+    from sh_vn_thumb_screw_spec import TIP_FLAT_R
     from mg_magnifying_clamp_geom import THUMB_CONTACT_ANGLE_MAX
     from mg_lever_thread_joint import ROD_DIA as lever_dia
 
