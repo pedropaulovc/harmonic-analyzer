@@ -202,6 +202,37 @@ def test_same_sized_mutation_and_identical_tree_processes_are_isolated(source_fi
     assert impact.compare(base_snapshot, identical, BASE_SHA, HEAD_SHA)["counts"]["direct"] == 0
 
 
+def test_revision_default_text_reads_preserve_unicode_independently_of_locale(source_fixture, base_snapshot, tmp_path, monkeypatch):
+    # Start in a UTF-8 locale rather than C so Python 3.14's automatic C-locale
+    # UTF-8 mode cannot mask the regression. Revision code then selects C.
+    monkeypatch.setenv("LANG", "C.UTF-8")
+
+    def mutate(root):
+        put(root, "cad/scripts/impact_dimensions.py", "VALUE = 'café — 中文'\n")
+        path = root / "dodo.py"
+        path.write_text(path.read_text(encoding="utf-8") + """
+import ast as _impact_ast
+import locale as _impact_locale
+_impact_locale.setlocale(_impact_locale.LC_CTYPE, "C")
+_impact_value = _impact_ast.literal_eval(
+    _impact_ast.parse((SCRIPTS_DIR / "impact_dimensions.py").read_text()).body[0].value
+)
+if _impact_value != "café — 中文":
+    raise ValueError("revision default-encoding read corrupted Unicode source")
+""", encoding="utf-8")
+
+    head = changed_snapshot(source_fixture, tmp_path, mutate)
+    report = impact.compare(base_snapshot, head, BASE_SHA, HEAD_SHA)
+    assert report["complete"]
+    assert labels(report, "direct_recipe_changes") == {"part:impact_leaf"}
+    changes = report["direct_recipe_changes"][0]["changed_inputs"]
+    assert [change["input"] for change in changes] == ["cad/scripts/impact_dimensions.py"]
+    assert changes[0]["head"]["available"]
+    assert changes[0]["base"]["digest"] != changes[0]["head"]["digest"]
+    assert (base_snapshot["tasks"]["part:impact_leaf"]["production_part_cache_key"]
+            != head["tasks"]["part:impact_leaf"]["production_part_cache_key"])
+
+
 def test_missing_required_template_is_reported_not_silently_hashed_as_empty(source_fixture, base_snapshot, tmp_path):
     head = changed_snapshot(source_fixture, tmp_path, lambda root: (root / "cad/templates/harmonic-analyzer.PRTDOT").unlink())
     report = impact.compare(base_snapshot, head, BASE_SHA, HEAD_SHA)
