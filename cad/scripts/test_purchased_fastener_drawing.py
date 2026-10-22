@@ -5709,6 +5709,7 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
 @pytest.mark.parametrize(
     "drift",
     (
+        "model-import",
         "missing",
         "duplicate",
         "unknown",
@@ -5840,6 +5841,19 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         expected_mm=11.1125,
         configuration="Default",
     )
+    if drift == "model-import":
+        def unsupported_drawing_attachment(*_args):
+            pytest.fail("imported model association must not inspect drawing point wrappers")
+
+        case.annotation.GetAttachedEntities3 = unsupported_drawing_attachment
+        case.annotation.GetAttachedEntityTypes = unsupported_drawing_attachment
+        case.view.GetCorresponding = unsupported_drawing_attachment
+        source_feature.GetSpecificFeature2 = unsupported_drawing_attachment
+        assert screws._assert_dimension_source(
+            adapter, case.view, case.display, name="Length", feature="SupplierReference"
+        ) is source_feature
+        return
+
     assert set(
         screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)
     ) == {"Length"}

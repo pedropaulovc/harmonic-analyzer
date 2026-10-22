@@ -1503,7 +1503,7 @@ def _supplier_settled_seat(monkeypatch, *, newline="\n"):
     membership = []
     monkeypatch.setattr(
         drawing,
-        "_assert_source",
+        "_assert_dimension_source",
         lambda adapter, view, display, **kwargs: membership.append(
             (view, display, kwargs)
         ),
@@ -1548,16 +1548,14 @@ def _supplier_settled_seat(monkeypatch, *, newline="\n"):
                 GetPrimaryTolPrecision2=lambda: drawing.SUPPLIER_PRECISION,
             )
 
-            class NoLiveCoordinates:
-                def __getattr__(self, attribute):
-                    pytest.fail(f"settled attachment must not read {attribute}")
+            def no_drawing_point_proof():
+                pytest.fail("model import association must not inspect drawing point wrappers")
 
-            points = (NoLiveCoordinates(), NoLiveCoordinates())
             annotations.append(SimpleNamespace(
                 name=row.name, Visible=1,
                 GetSpecificAnnotation=lambda display=display: display,
-                GetAttachedEntityTypes=lambda: (11, 11),
-                GetAttachedEntities3=lambda points=points: points,
+                GetAttachedEntityTypes=no_drawing_point_proof,
+                GetAttachedEntities3=no_drawing_point_proof,
             ))
         views.append(SimpleNamespace(
             Name=name, ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
@@ -1627,8 +1625,7 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(m
     ("hidden", "dimension is hidden"), ("owner", "ownership/type"),
     ("type", "ownership/type"), ("driven", "ownership/type"),
     ("tolerance-type", "limit type"), ("tolerance-band", "limit band"),
-    ("tolerance-precision", "limit precision"), ("attachments", "two diagram vertices"),
-    ("attachment-kind", "two diagram vertices"), ("mapped-membership", "mapped member changed"),
+    ("tolerance-precision", "limit precision"), ("model-membership", "model member changed"),
     ("presentation", "native presentation changed"), ("note-owner", "source label changed"),
     ("note-hidden", "source label changed"), ("note-bounds", "source label changed"),
 ])
@@ -1672,17 +1669,13 @@ def test_supplier_settled_capture_retains_native_guards(monkeypatch, fault, reas
         native.Tolerance.GetMaxValue = lambda: 0.1
     elif fault == "tolerance-precision":
         display.GetPrimaryTolPrecision2 = lambda: -1
-    elif fault == "attachments":
-        annotation.GetAttachedEntities3 = lambda: ()
-    elif fault == "attachment-kind":
-        annotation.GetAttachedEntityTypes = lambda: (2, 2)
-    elif fault in ("mapped-membership", "presentation"):
+    elif fault in ("model-membership", "presentation"):
         def refuse(*_args, **_kwargs):
             raise RuntimeError(reason)
 
         monkeypatch.setattr(
             drawing,
-            "_assert_source" if fault == "mapped-membership" else "assert_supplier_reference_dimension",
+            "_assert_dimension_source" if fault == "model-membership" else "assert_supplier_reference_dimension",
             refuse,
         )
     elif fault == "note-owner":

@@ -118,7 +118,7 @@ from _supplier_reference_geometry import (
     capture_native_sketch_geometry,
     native_sketch_view_bounds,
 )
-from _supplier_screw_dimensions import _assert_source
+from _supplier_screw_dimensions import _assert_dimension_source
 from _visibility import visible_reference_geometry
 from dt_vn_post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
@@ -1130,13 +1130,9 @@ def _check_supplier_stock(adapter, full, head, notes, capture: SupplierStockCapt
             row = rows[name]
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
             assert_supplier_reference_dimension(adapter, display, **_supplier_contract(row))
-            _assert_source(adapter, view, display, name=name, feature=SUPPLIER_STOCK_FEATURE)
+            _assert_dimension_source(adapter, view, display, name=name, feature=SUPPLIER_STOCK_FEATURE)
             native = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-            kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-            entities = tuple(annotation.GetAttachedEntities3() or ())
-            if len(entities) != 2 or len(kinds) != 2 or any(kind not in (11, 25) for kind in kinds):
-                raise RuntimeError(f"{name}: source dimension must attach to two diagram vertices")
             assert_supplier_profile_state(
                 row, qualified_name=str(native.FullName), native_type=int(display.Type2),
                 driven_state=int(native.DrivenState), tolerance_type=int(tolerance.Type),

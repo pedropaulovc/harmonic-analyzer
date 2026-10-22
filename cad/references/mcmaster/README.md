@@ -1592,17 +1592,12 @@ a dimension enumerated from the intended source feature. Within the source
 context, the named parameter and enumerated feature member must compare
 `IsSame == 1`. Cross-context `IsSame == 2` is diagnostic only; source-annotation
 mapping into the view is not required. Actual drawing/view annotation ownership
-remains checked. Enumerate the
-actual source sketch's same-kind `GetSketchPoints2()` or `GetSketchSegments()`
-members and map each individually through the view's `GetCorresponding()`.
-Source and mapped counts must match; each member must compare equal to itself
-(`IsSame == 1`) and distinct from every other same-context member (`IsSame == 0`).
-Each attached point or segment needs a non-null `GetSketch()`, a positive native
-self-comparison, and exactly one mapped same-kind match; all other candidates
-must compare distinct. Attachments must map one-to-one to source members.
-Empty, unreadable, unsupported or ambiguous inventories refuse the drawing.
-Sketch-level or reverse mappings, names, coordinates, local IDs, persistent IDs
-and wrapper identity cannot substitute for these individual correspondences.
+remains checked. Model-import validation does not require imported point wrappers
+to compare equal to source or `GetCorresponding()` wrappers: native MSC imports
+return distinct contexts even when the source dimension association is intact.
+Coordinates and local point IDs are not substitute ownership proofs. Callers
+with a separately proven mapped-attachment contract retain their stricter
+same-kind member inventory and one-to-one native correspondence checks.
 These associative references may be nominal supplier gauges; source membership
 does not make a reference line or circle a physical finished edge.
 Source path/configuration, annotation ownership/type/count, final value,
