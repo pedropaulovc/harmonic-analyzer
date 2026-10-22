@@ -174,16 +174,22 @@ class CadIdentityMap:
                     raise ValueError(f"Unsafe CAD identity file path: {relative}")
         self.original_paths = {new: old for old, new in renames.items()}
 
-    def source_file(self, cad: Path, logical_relative: str) -> Path:
-        """Select exactly one map-declared filename inside the archived CAD tree."""
+    def source_file(self, cad: Path, logical_relative: str, *, parent=None,
+                    configuration=None, role=None) -> Path:
+        """Select one declared historical member before inspecting file presence."""
         logical = PurePosixPath(logical_relative)
         if (not logical_relative or logical.is_absolute() or ".." in logical.parts
                 or logical.as_posix() != logical_relative
                 or "\\" in logical_relative or ":" in logical_relative):
             raise ValueError(f"Unsafe logical CAD source path: {logical_relative}")
         canonical = "cad/" + logical_relative
-        aliases = current_identity().source_aliases(self.original_paths)
-        sealed = aliases.get(canonical, canonical)
+        aliases = current_identity().source_aliases(
+            self.original_paths, parent=parent, configuration=configuration, role=role)
+        selected = aliases.get(canonical, (canonical,))
+        if len(selected) != 1:
+            reason = "Ambiguous" if selected else "Missing"
+            raise ValueError(f"{reason} archived CAD source identity for {canonical}: {selected}")
+        sealed = selected[0]
         original = self.original_paths.get(sealed, sealed)
         candidates = [cad.parent / relative for relative in dict.fromkeys((original, sealed, canonical))]
         present = [path for path in candidates if path.is_file()]
@@ -195,15 +201,19 @@ class CadIdentityMap:
             raise ValueError(f"Archived CAD source escapes snapshot: {path}")
         return path
 
-    def import_module(self, cad: Path, logical_name: str):
-        path = self.source_file(cad, f"scripts/{logical_name}.py")
+    def import_module(self, cad: Path, logical_name: str, *, parent=None,
+                      configuration=None, role=None):
+        path = self.source_file(cad, f"scripts/{logical_name}.py", parent=parent,
+                                configuration=configuration, role=role)
         module = importlib.import_module(path.stem)
         if not getattr(module, "__file__", None) or Path(module.__file__).resolve() != path.resolve():
             raise ValueError(f"CAD module {path.stem} was not imported from the exact archived source {path}")
         return module
 
-    def registry_name(self, cad: Path, logical_stem: str) -> str:
-        return self.source_file(cad, f"config/parts/{logical_stem}.yaml").stem
+    def registry_name(self, cad: Path, logical_stem: str, *, parent=None,
+                      configuration=None, role=None) -> str:
+        return self.source_file(cad, f"config/parts/{logical_stem}.yaml", parent=parent,
+                                configuration=configuration, role=role).stem
 
 
 def magnifier_installation(path: Path) -> dict[str, float]:

@@ -66,7 +66,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable
 
 import _config
@@ -103,6 +103,7 @@ from _assembly_postbuild import (
     load_dof_manifest,
 )
 from _chain_mounts import mounted_wheels
+from _component_references import REFERENCE_IDENTITIES, bind_component_selectors
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 from _native_bank_retention import measure as measure_bank_retention
@@ -867,6 +868,73 @@ def _soundness_chain_mounts(name: str) -> Any:
     return mounted_wheels()
 
 
+def _shared_reference_counts(name: str) -> dict[str, dict[str, int]]:
+    """Expected role-local inventories in each native parent scope."""
+    if name == "ha-harmonic-analyzer":
+        return {
+            f"{child}-1": _shared_reference_counts(child)[""]
+            for child in ("dt-drive-train", "pd-paper-drive", "mg-magnifier", "pn-pen")
+        }
+    if name == "pd-paper-drive":
+        from _chain import LINK_COUNT
+
+        return {"": {"InnerLink": LINK_COUNT // 2, "OuterLink": LINK_COUNT // 2 - 1}}
+    if name == "ch-rocker-arm-tl-oblique-jig":
+        import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
+
+        return {
+            "": {
+                "HoldDownStud": jig.QUANTITIES[jig.HOLD_DOWN_STUD],
+                "TNut": jig.QUANTITIES[jig.T_NUT],
+                "FlangeNut": jig.QUANTITIES[jig.FLANGE_NUT],
+            }
+        }
+    roles = {
+        "dt-drive-train": {"FootScrew": 1, "SwingStopScrew": 1},
+        "mg-magnifier": {"LeverWire": 1},
+        "pn-pen": {"PenWire": 1},
+    }.get(name)
+    return {"": roles} if roles is not None else {}
+
+
+def _assert_shared_component_references(adapter: Any, name: str) -> None:
+    """Prove persisted shared members and exact role counts in the open document."""
+    scopes = _shared_reference_counts(name)
+    if not scopes:
+        return
+    expected = {
+        f"{scope}/@{role}:{number}" if scope else f"@{role}:{number}"
+        for scope, counts in scopes.items()
+        for role, count in counts.items()
+        for number in range(1, count + 1)
+    }
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    for raw in assembly.GetComponents(False) or ():
+        component = _early_bound(raw, "IComponent2")
+        native_name = str(component.Name2 or "").replace("\\", "/")
+        scope, _separator, _leaf = native_name.rpartition("/")
+        counts = scopes.get(scope)
+        if counts is None:
+            continue
+        reference = str(component.ComponentReference or "")
+        role = reference.partition(":")[0]
+        native_stem = PureWindowsPath(str(component.GetPathName() or "")).stem.casefold()
+        if role not in counts and native_stem not in {
+            REFERENCE_IDENTITIES[member][0] for member in counts
+        }:
+            continue
+        selector = f"{scope}/@{reference}" if scope else f"@{reference}"
+        if selector not in expected:
+            raise RuntimeError(
+                f"{name}: unexpected shared occurrence {native_name!r}, "
+                f"file {native_stem!r}, reference {reference!r}; "
+                "shared role inventory must match exactly"
+            )
+    # Native helper proves file+selected member (only ' Simplified' normalized),
+    # missing references and duplicates; no Name2 allocator suffix is assumed.
+    bind_component_selectors(adapter.currentModel, sorted(expected))
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -909,6 +977,11 @@ def _run_soundness_battery(
         f"{name}:model-healthy",
         lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
+    if _shared_reference_counts(name):
+        report.gate(
+            f"{name}:shared-component-references",
+            lambda: _assert_shared_component_references(adapter, name),
+        )
     report.gate(
         f"{name}:interference-free",
         lambda: check_no_interference(
@@ -1055,6 +1128,11 @@ async def _verify_static_one(
         f"{name}:model-healthy",
         lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
+    if _shared_reference_counts(name):
+        report.gate(
+            f"{name}:shared-component-references",
+            lambda: _assert_shared_component_references(adapter, name),
+        )
     report.gate(
         f"{name}:interference-free",
         lambda: check_no_interference(
@@ -1563,7 +1641,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """
     import build_mg_magnifier_assembly as _mag
     from mg_output_fixture_geom import HOOK_LOCAL
-    import mg_vn_lever_wire_geom as _wire
+    import sh_vn_music_wire_lever_geom as _wire
 
     name = "mg-magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -1587,6 +1665,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
     model = adapter.currentModel
+    wire_name = bind_component_selectors(model, ("@LeverWire:1",))["@LeverWire:1"]
     log("--- live chain: magnifier lever sweep (knife rock, WIRE 1) ---")
 
     # Machine anchors for the invariants (the magnifier is authored
@@ -1606,7 +1685,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("mg-vn-lever-wire-1")
+        rows, pos = _xform(wire_name)
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat
@@ -1883,7 +1962,7 @@ def verify_base_footprint(report: Report) -> None:
         import dt_cone_swing_platform_geometry as platform
         import build_dt_drive_train_assembly as train
         import fr_harmonic_base_spec as base
-        import dt_vn_swing_stop_screw_spec as sscrew
+        import dt_swing_stop_screw_spec as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1925,7 +2004,7 @@ def verify_base_footprint(report: Report) -> None:
                 pscrew.HEAD_DIA / 2.0,
             ),
             (
-                "dt-vn-swing-stop-screw",
+                "@SwingStopScrew:1",
                 train.STOP_X,
                 train.STOP_Z,
                 sscrew.HEAD_DIA / 2.0,

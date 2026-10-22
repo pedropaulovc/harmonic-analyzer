@@ -18,7 +18,7 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
   still bears outside the back one, and the screw's faced tip stays below
   the front face the platen slides on, staked at the front mouth;
 * the latch hook's (MHA-PD-14) two #4-40 THROUGH taps for its base screws
-  (MHA-PD-VN-59) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
+  (MHA-SH-VN-52) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
   max both faces (their exits on the front face lie under the platen
   footprint, machine x -33.25..236.39).
 """
@@ -49,7 +49,7 @@ BAR_HEIGHT_BAND = 0.13
 # back. 9.5, not the 9.0 stock read, so the MHA-PD-VN-57 pivot screw's faced tip
 # (0.20-0.50 below the front face) keeps rule 18's 1.5D at the thinnest bar
 # (user ruling 2026-10-15; transgear_hanger_joints).
-# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-PD-VN-59)
+# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-SH-VN-52)
 # tips spend the bar's .XXX thickness band.
 # build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
@@ -64,7 +64,7 @@ PIVOT_TAP_THREAD = "#8-32"
 PIVOT_TAP_CSK_DIA = 4.3  # MAX, both faces
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_THREAD]
 
-# --- Latch-hook base taps (MHA-PD-14's base, MHA-PD-VN-59 screws) -----------------
+# --- Latch-hook base taps (MHA-PD-14's base, MHA-SH-VN-52 screws) -----------------
 BRACKET_TAP_X = (65.0, 72.0)
 BRACKET_TAP_SPEC = HoleSpec("tapped", "#4-40")
 BRACKET_TAP_CSK_DIA = 3.1  # MAX, both faces

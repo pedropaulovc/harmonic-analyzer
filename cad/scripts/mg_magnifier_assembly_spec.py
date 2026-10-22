@@ -29,7 +29,7 @@ import mg_output_fixture_geom as _fixture
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
-from mg_vn_lever_wire_geom import WHEEL_X
+from sh_vn_music_wire_lever_geom import WHEEL_X
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.

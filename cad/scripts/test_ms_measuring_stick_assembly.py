@@ -33,7 +33,7 @@ import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
-import _mcmaster_91882a221 as thumb
+import sh_vn_thumb_screw_spec as thumb
 from _transforms import rows_from_euler
 from _named_views import octant_axes
 
@@ -157,7 +157,7 @@ def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
     assert thumb.COLLAR_H == pytest.approx(row["collar_h"])
     assert thumb.HEAD_DIA == pytest.approx(2.0 * row["head_r"])
     assert thumb.HEAD_H == pytest.approx(row["head_h"])
-    assert _config.parts("ms-vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
+    assert _config.parts("sh-vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
 
 
 def test_every_rotation_is_proper() -> None:
@@ -249,7 +249,7 @@ def test_thread_allowances_are_the_spec_values() -> None:
     )
     pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
     assert set(pairs) == {
-        frozenset(("ms-vn-thumb-screw-1", "ms-stop-block-1")),
+        frozenset(("sh-vn-thumb-screw-1", "ms-stop-block-1")),
         frozenset(("ms-vn-stop-plate-screw-1", "ms-stop-block-1")),
         frozenset(("ms-vn-stop-plate-screw-2", "ms-stop-block-1")),
     }
@@ -712,11 +712,11 @@ def test_reference_dimensions_follow_the_spec() -> None:
         - stop.BLOCK_LENGTH / 2.0
     )
     assert stop.THUMB_AXIS_X == pytest.approx(stop.BLOCK_LENGTH / 2.0)
-    assert {label for label, _value, _callout in drawing.ASSEMBLY_DIMENSIONS} == {
+    assert {label for label, _value in drawing.ASSEMBLY_DIMENSIONS} == {
         "overall length",
         "stop position",
     }
-    values = {label: value for label, value, _callout in drawing.ASSEMBLY_DIMENSIONS}
+    values = dict(drawing.ASSEMBLY_DIMENSIONS)
     assert values["overall length"] == sheet.REFERENCE_OVERALL_LENGTH
     assert values["stop position"] == spec.SETTING_NEAR_FACE_MM
     assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
@@ -928,6 +928,181 @@ def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
     _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
+def _section_setting_geometry(upper_extension):
+    """Native dimension arrays with a marker calibrated to b3's measured gap.
+
+    Lines and arrows follow the retained 20261020T083921201Z native audit's
+    NearFace display: witnesses extend 1 mm past the dimension line. The
+    plain value rests on that line, as the same audit's native RD1 does.
+    At 16 mm upper extension, b3 measured 0.354 mm clearance. Only that gap
+    was retained, so this synthetic marker envelope reproduces the gap,
+    not unknown b3 absolute bounds, glyph height or arrow dimensions.
+    Translation from that measured baseline is an offline layout control;
+    native acceptance and the upper overall-reference gap still need review.
+    """
+    upper_shift = upper_extension - 0.016
+    marker_bottom = 0.2126656 + 0.000354 + upper_shift
+    arrow_y = marker_bottom + 0.003
+    marker_height = 0.0115739
+    section = [
+        1, 0, 1,
+        0, 0.1199, arrow_y, 0, 0.1199, 0.1699245, 0,
+        0.1199, arrow_y, 0, 0.1079, arrow_y, 0, 0.006, 0.003, 0,
+        0.1199, 0.1699245, 0, 0.1079, 0.1699245, 0, 0.006, 0.003, 0,
+        0.0999105, marker_bottom + marker_height, 0,
+        0.0999105, 0.1776114, 0,
+        marker_height,
+    ]
+    lines = [
+        (0, 0, 0, 0, 0.035, 0.1993875, -0.0038495, 0.035, 0.2126656, -0.0038495),
+        (0, 0, 0, 0, 0.1094, 0.1993875, -0.0038495, 0.1094, 0.2126656, -0.0038495),
+        (0, 0, 0, 0, 0.035, 0.2116656, -0.0038495, 0.1094, 0.2116656, -0.0038495),
+    ]
+    arrows = [
+        (0.035, 0.2116656, -0.0038495, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1),
+        (0.1094, 0.2116656, -0.0038495, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1),
+    ]
+    text_position = [0.050, 0.2116656, -0.0038495]
+    data = SimpleNamespace(
+        GetLineCount=lambda: len(lines),
+        GetLineAtIndex2=lambda index: lines[index],
+        GetArrowHeadCount=lambda: len(arrows),
+        GetArrowHeadAtIndex2=lambda index: arrows[index],
+        GetTextCount=lambda: 1,
+        GetTextAtIndex=lambda index: "74.4 ±0.10",
+        GetTextPositionAtIndex=lambda index: text_position,
+        GetTextHeightAtIndex=lambda index: 0.0035,
+        GetTextAngleAtIndex=lambda index: 0.0,
+        GetTextRefPositionAtIndex=lambda index: 1,
+    )
+    front = SimpleNamespace(GetSectionLineInfo2=lambda: section)
+    display = SimpleNamespace(GetDisplayData=lambda: data)
+    return front, display, section, lines, arrows
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (None, "old placement", "witness intrusion", "arrow intrusion", "truncated section",
+     "missing section", "missing ink", "truncated line", "truncated arrow",
+     "text below line", "missing text", "truncated text", "wrong reference",
+     "rotated text", "nonfinite text", "zero text height"),
+)
+def test_section_marker_clears_native_setting_ink(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    front, display, section, lines, arrows = _section_setting_geometry(
+        drawing.CLAMP_SECTION_TOP_CLEARANCE
+    )
+    if defect == "old placement":
+        front, display, section, lines, arrows = _section_setting_geometry(0.016)
+    elif defect == "witness intrusion":
+        lines.append((0, 0, 0, 0, 0.1094, 0.198, 0, 0.1094, 0.224, 0))
+    elif defect == "arrow intrusion":
+        arrows[0] = (0.1094, 0.217, 0, 0, 1, 0, 0.004, 0.000762, 0, 0, 0, 1)
+    elif defect == "truncated section":
+        section.pop()
+    elif defect == "missing section":
+        section[0] = 0
+    elif defect == "missing ink":
+        lines.clear()
+        arrows.clear()
+    elif defect == "truncated line":
+        lines[0] = lines[0][:8]
+    elif defect == "truncated arrow":
+        arrows[0] = arrows[0][:8]
+    elif defect == "text below line":
+        display.GetDisplayData().GetTextPositionAtIndex = lambda index: (0.050, 0.210, 0.0)
+    elif defect == "missing text":
+        display.GetDisplayData().GetTextCount = lambda: 0
+    elif defect == "truncated text":
+        display.GetDisplayData().GetTextPositionAtIndex = lambda index: (0.050,)
+    elif defect == "wrong reference":
+        display.GetDisplayData().GetTextRefPositionAtIndex = lambda index: 2
+    elif defect == "rotated text":
+        display.GetDisplayData().GetTextAngleAtIndex = lambda index: 0.25
+    elif defect == "nonfinite text":
+        display.GetDisplayData().GetTextPositionAtIndex = lambda index: (0.050, float("nan"), 0.0)
+    elif defect == "zero text height":
+        display.GetDisplayData().GetTextHeightAtIndex = lambda index: 0.0
+    if defect is None:
+        drawing._assert_section_setting_clearance(front, display)
+    else:
+        with pytest.raises(RuntimeError, match="clamped setting:"):
+            drawing._assert_section_setting_clearance(front, display)
+
+
+def test_marker_deficit_translation_keeps_bounds_on_refusal(monkeypatch) -> None:
+    """The applied production extension must recover b3's measured deficit.
+
+    This checks the physical clearance after the recipe's actual extension
+    change, not a separately hardcoded successful translation. Absolute
+    marker bounds remain synthetic, as described by the calibrated fixture.
+    """
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    measured_extension = 0.016
+    measured_gap = 0.000354
+    events = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
+    front, display, *_ = _section_setting_geometry(measured_extension)
+    with pytest.raises(RuntimeError, match="marker bottom.*dimension ink top"):
+        drawing._assert_section_setting_clearance(front, display)
+    front, display, *_ = _section_setting_geometry(
+        drawing.CLAMP_SECTION_TOP_CLEARANCE
+    )
+    drawing._assert_section_setting_clearance(front, display)
+    before, after = [
+        attributes for name, attributes in events
+        if name.endswith(".section_setting_clearance")
+    ]
+    applied_shift = drawing.CLAMP_SECTION_TOP_CLEARANCE - measured_extension
+    assert before["section_clearance_m"] == pytest.approx(measured_gap)
+    assert before["section_clearance_m"] < drawing.SECTION_SETTING_CLEARANCE
+    assert after["section_marker_bottom_m"] - before["section_marker_bottom_m"] == pytest.approx(
+        applied_shift
+    )
+    assert after["section_ink_top_m"] == before["section_ink_top_m"]
+    assert after["section_clearance_m"] == pytest.approx(measured_gap + applied_shift)
+    assert after["section_clearance_m"] >= drawing.SECTION_SETTING_CLEARANCE
+    assert after["required_clearance_m"] == drawing.SECTION_SETTING_CLEARANCE
+
+
+@pytest.mark.parametrize("text_drop", (0.0, 2.0**-27, 2.0**-25, 0.0005))
+def test_plain_native_value_rests_on_dimension_line(monkeypatch, text_drop) -> None:
+    """Replay actual RD1 display data, not a value lifted above its witnesses.
+
+    Captured in the 20261020T083921201Z stick layout audit: native text and
+    horizontal dimension line share Y234.2219 mm; witnesses end 1 mm higher.
+    The section marker is a separate translated offline control, placed well
+    above this recorded overall dimension solely to isolate text clearance.
+    """
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    front, display, _section, lines, arrows = _section_setting_geometry(0.050)
+    lines[:] = [
+        (0, 0, 0, 0, 0.035, 0.1993875, -0.0039495, 0.035, 0.2352219, -0.0039495),
+        (0, 0, 0, 0, 0.235, 0.1993875, -0.0039495, 0.235, 0.2352219, -0.0039495),
+        (0, 0, 0, 0, 0.035, 0.2342219, -0.0039495, 0.235, 0.2342219, -0.0039495),
+    ]
+    arrows[:] = [
+        (0.035, 0.2342219, -0.0039495, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1),
+        (0.235, 0.2342219, -0.0039495, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1),
+    ]
+    data = display.GetDisplayData()
+    data.GetTextAtIndex = lambda index: " (200.0) "
+    data.GetTextPositionAtIndex = lambda index: (
+        0.1261674, 0.2342219 - text_drop, -0.0039495
+    )
+    # At this sheet coordinate one float32 ULP is 2^-26 m (~15 nm).
+    # Half an ULP is display roundoff; two ULPs and 0.5 mm are real below-line
+    # excursions and cannot be admitted as a placement tolerance.
+    if text_drop <= 2.0**-26:
+        drawing._assert_section_setting_clearance(front, display)
+    else:
+        with pytest.raises(RuntimeError, match="below its dimension line"):
+            drawing._assert_section_setting_clearance(front, display)
+
+
 @pytest.mark.parametrize(
     "dimension_types",
     (
@@ -1024,6 +1199,11 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         def GetPrimaryPrecision2(self):
             return self.precision
 
+        def GetDisplayData(self):
+            return _section_setting_geometry(
+                drawing.CLAMP_SECTION_TOP_CLEARANCE
+            )[1].GetDisplayData()
+
     class Draw:
         Extension = SimpleNamespace(
             SelectByID2=lambda *args: pytest.fail("coordinate hit-test used")
@@ -1085,7 +1265,10 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=()
     )
     front = SimpleNamespace(
-        GetVisibleComponents=lambda: (block_component, stick_component)
+        GetVisibleComponents=lambda: (block_component, stick_component),
+        GetSectionLineInfo2=_section_setting_geometry(
+            drawing.CLAMP_SECTION_TOP_CLEARANCE
+        )[0].GetSectionLineInfo2,
     )
     adapter = SimpleNamespace(
         currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
@@ -1194,7 +1377,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
     assert [display.value * 1000.0 for display in displays] == pytest.approx(
         [200.0, spec.SETTING_NEAR_FACE_MM]
     )
-    for index, (display, (_, _, callout)) in enumerate(zip(displays, drawing.ASSEMBLY_DIMENSIONS)):
+    for index, display in enumerate(displays):
         assert display.value_reads == 1
         assert display.text[1] == ("(" if index == 0 else "")
         assert display.text[2] == (")" if index == 0 else "")
@@ -1205,9 +1388,8 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             assert display.Tolerance.Type == 4
             assert display.minimum == pytest.approx(-spec.SETTING_TOLERANCE_MM / 1000)
             assert display.maximum == pytest.approx(spec.SETTING_TOLERANCE_MM / 1000)
-        if callout:
-            assert display.text[4] == callout
-            assert 4 in display.readbacks
+            assert display.text[3] == display.text[4] == ""
+            assert {3, 4} <= set(display.readbacks)
     settled()
     displays[1].maximum *= 2.0
     with pytest.raises(RuntimeError, match="settled assembly setting band"):
@@ -1216,6 +1398,12 @@ def test_reference_dimensions_select_owned_visible_end_edges(
     displays[1].text[1] = "("
     with pytest.raises(RuntimeError, match="settled assembly setting band"):
         settled()
+    displays[1].text[1] = ""
+    for field in (3, 4):
+        displays[1].text[field] = "STALE CAPTION"
+        with pytest.raises(RuntimeError, match="settled native caption"):
+            settled()
+        displays[1].text[field] = ""
 
 
 def _exploded_projection(point) -> tuple[float, float]:

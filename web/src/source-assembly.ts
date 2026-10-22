@@ -10,8 +10,8 @@ import type { PartOverride, Point3, Quaternion4 } from './scene'
  * Source: jfH-NbsmvD4 setup 43..74, service 170..230, photos 234..285,
  * pen assembly 565..649; approved CAD 81539e53 / raw 60a62a2e.
  * Archived inventory/model bytes, transforms and identity-map hashes stay
- * pinned. Current parent-scoped paths are an ingestion-only metadata projection,
- * not regenerated geometry or a replacement claim about the historical model.
+ * pinned. Current shared/member paths are archive-role-local logical selectors,
+ * not rebuilt-native Name2 or regenerated geometry or historical model claims.
  *
  * Runtime contract: on EVERY view/state change, Machine.update first restores
  * every native part, performs the normal operating solve, then calls this solver
@@ -157,7 +157,7 @@ const CHANNEL_STATIONS = Object.freeze(Array.from({ length: 20 }, (_, index) => 
   lever: `${CHANNEL_CHASSIS}/ch-channel-lever-${index + 1}`,
 })))
 const MARKER = `${PEN}pn-vn-pen-marker-1`
-const WIRE = `${PEN}pn-vn-pen-wire-1`
+const WIRE = `${PEN}sh-vn-music-wire--PenWire-1`
 const SPARE = `${PAPER}pd-transgear-removable-3`
 const GEAR_IDS: readonly SourceGearId[] = ['T24', 'T12', 'T18-upper', 'T18-crank']
 /** Sole declaration of the two genuine existing Scene/template instances. */
@@ -189,7 +189,7 @@ function bindingGroup(id: string): readonly string[] {
 }
 const CRANK_CARRIER = Object.freeze([
   HUB, `${DRIVE}dt-crank-arm-1`, `${DRIVE}dt-vn-crank-hub-pin-1`, `${DRIVE}dt-crank-pin-eye-1`,
-  `${DRIVE}dt-vn-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
+  `${DRIVE}sh-vn-brass-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
   `${DRIVE}dt-crank-handle-butt-cup-1`, `${DRIVE}dt-crank-handle-pivot-screw-1`,
 ])
 const CRANK_PIN = Object.freeze([PIN, `${DRIVE}dt-crank-pin-ring-1`])
@@ -202,10 +202,12 @@ const FRAME_GROUP = Object.freeze([FRAME, `${PEN}pn-vn-pen-set-screw-1`])
 const NATIVE_LINKS = [...MECHANISM_DATA.paperDrive.chain.nativeLinks].sort((a, b) => a.restStationMm - b.restStationMm)
 export const SOURCE_CHAIN_PART_PATHS = Object.freeze(NATIVE_LINKS.map(link => link.partPath))
 if (NATIVE_LINKS.length !== 68) throw new Error('Source assembly requires exactly 68 native chain links.')
+const CHAIN_MEMBER = new RegExp(`^${PAPER}sh-vn-chain-link--(InnerLink|OuterLink)-[1-9]\\d*$`)
 for (let i = 0; i < 68; i++) {
   const link = NATIVE_LINKS[i]!, next = NATIVE_LINKS[(i + 1) % 68]!
+  const member = CHAIN_MEMBER.exec(link.partPath)?.[1], nextMember = CHAIN_MEMBER.exec(next.partPath)?.[1]
   if (link.nextPartPath !== next.partPath || !REST.has(link.partPath)
-    || link.partPath.includes('outer') === next.partPath.includes('outer')) throw new Error('Source assembly native chain connectivity/alternation is incompatible.')
+    || !member || !nextMember || member === nextMember) throw new Error('Source assembly native chain connectivity/alternation is incompatible.')
 }
 export const SOURCE_ASSEMBLY_GROUPS = Object.freeze({ crankCarrier: CRANK_CARRIER, crankPin: CRANK_PIN, keeper: KEEPER, hanger: HANGER, penFrame: FRAME_GROUP })
 export const OPERATING_SOURCE_ASSEMBLY: CompiledSourceAssembly = Object.freeze({ state: Object.freeze({ kind: 'operating' }), requiredPartPaths: Object.freeze([]), physicalKey: '{"kind":"operating"}' })

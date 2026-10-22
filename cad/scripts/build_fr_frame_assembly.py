@@ -148,7 +148,7 @@ from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
-from _mcmaster_90114a511 import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from sh_vn_brass_fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
 from fr_nameplate_spec import (
     MOUNT_EULER as NAMEPLATE_EULER,
     MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
@@ -470,7 +470,7 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     quantities = {
         "fr-harmonic-base": 1, "fr-tube-frame": 4, "fr-vn-tube-frame-cap": 4,
         "fr-top-frame": 1, "fr-rocker-arm-support": 1, "fr-vn-lag-screw": 4,
-        "fr-nameplate": 1, "fr-vn-fillister-screw": 4, "fr-vn-frame-cross-screw": 8,
+        "fr-nameplate": 1, "sh-vn-brass-fillister-screw": 4, "fr-vn-frame-cross-screw": 8,
         "fr-vn-gooseneck-set-screw": 1,
     }
     components = tuple(
@@ -516,9 +516,9 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
         ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
         ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["fr-vn-fillister-screw"]], "y", 0.025),
-        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["fr-vn-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["fr-vn-fillister-screw"], "y", 0.035),
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.025),
+        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", 0.080),
+        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.035),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each
@@ -679,7 +679,7 @@ async def build(adapter) -> dict[str, str]:
     _part("fr-vn-lag-screw")  # support hold-down; placed via place_component below
     _part("fr-vn-frame-cross-screw")  # eight casting/column retainers
     _part("fr-vn-gooseneck-set-screw")  # west-hub set screw; placed via place_component
-    _part("fr-vn-fillister-screw")  # nameplate corner screws; placed via place_component
+    _part("sh-vn-brass-fillister-screw")  # nameplate corner screws; placed via place_component
     _part("fr-vn-tube-frame-cap")  # four intact stock push-on caps
     top_frame_path = _part("fr-top-frame")
 
@@ -886,7 +886,7 @@ async def build(adapter) -> dict[str, str]:
         np_target = [nx, NAMEPLATE_FRONT_Y, nz]
         np_screw = await place_component(
             adapter,
-            "fr-vn-fillister-screw",
+            "sh-vn-brass-fillister-screw",
             np_target,
             NAMEPLATE_SCREW_EULER,
             NAMEPLATE_SCREW_ROWS,

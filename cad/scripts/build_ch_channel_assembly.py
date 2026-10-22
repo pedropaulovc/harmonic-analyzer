@@ -29,7 +29,7 @@ the M6.8 mirror layer is gone).
   short of the north one, #1341) +
   bracket-hold-down-screw x2 (MHA-CH-VN-57, one down through each foot into
   the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
-  ch-vn-arbor-set-screw x2 (MHA-CH-VN-53, one down through each MHA-CH-08 ear's
+  sh-vn-arbor-set-screw x2 (MHA-SH-VN-54, one down through each MHA-CH-08 ear's
   apex onto the shaft's flat)
 * fulcrum-keeper x2 + frame-side-screw x2 + fulcrum-set-screw x2 (the black
   shaft-END brackets on the top-frame west rail top face -- ch17 p.40
@@ -389,7 +389,7 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # rocker_bank_layout. Hub 19 bears on the north MHA-CH-VN-56 washer, which bears
 # on the north ear's inner face, the bank's datum; the MHA-CH-VN-54 spring
 # between the south ear and the south washer on hub 0 preloads the bank north
-# onto it. The plain shaft is held by one MHA-CH-VN-53 set screw per ear on a
+# onto it. The plain shaft is held by one MHA-SH-VN-54 set screw per ear on a
 # flat. Feet outboard to the rocker-arm-support's +-90.25 end faces (it is the
 # only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
@@ -459,18 +459,18 @@ if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 
     raise AssertionError("rocker bank spring is not its installed envelope")
 if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
     raise AssertionError("rocker bank spring's north face is not on the washer")
-# Apex set screws (MHA-CH-VN-53, user 2026-10-10): the part's cup end is its
-# origin and its axis +Y (build_ch_vn_arbor_set_screw, the drive train's IDENTITY
+# Apex set screws (MHA-SH-VN-54, user 2026-10-10): the part's cup end is its
+# origin and its axis +Y (build_sh_vn_arbor_set_screw, the drive train's IDENTITY
 # placement), so IDENTITY at the flat's height drops each one down through its
 # ear's apex tap onto the flat. The shaft is the concentric seed, so the cup
 # sits on the MODELLED flat, as the arbor's screws sit on the modelled arbor
 # top (build_dt_drive_train_assembly SET_SCREW_TIP_Y). IDENTITY keeps the
 # shaft's part +Y, its flats, on machine +Y.
-from _mcmaster_91375a106 import LENGTH as _SET_SCREW_LEN  # noqa: E402
-from _mcmaster_91375a106 import THREAD as _SET_SCREW_THREAD  # noqa: E402
+from sh_vn_arbor_set_screw_spec import LENGTH as _SET_SCREW_LEN  # noqa: E402
+from sh_vn_arbor_set_screw_spec import THREAD as _SET_SCREW_THREAD  # noqa: E402
 
 if _SET_SCREW_THREAD != _bracket_spec.SET_SCREW_THREAD:
-    raise AssertionError("the ears' apex tap is not the MHA-CH-VN-53 thread")
+    raise AssertionError("the ears' apex tap is not the MHA-SH-VN-54 thread")
 SET_SCREW_TIP_Y = PIVOT[1] + _PIVOT_SHAFT_DIA / 2.0 - _PIVOT_FLAT_DEPTH
 if abs(SUPPORT_APEX_Y + _bracket_spec.BORE_H - PIVOT[1]) > 1e-9:
     raise AssertionError("pivot bracket bore is off the rocker pivot axis")
@@ -1479,14 +1479,14 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    # Apex set screws (MHA-CH-VN-53): one per ear, on its mid-plane, cup down on
+    # Apex set screws (MHA-SH-VN-54): one per ear, on its mid-plane, cup down on
     # the shaft's flat. Placed in the brackets' order (south first), so screw
     # n is in bracket n (_interference_contracts names the pairs).
     for name in _bracket_sides.SIDES:
         screw_z = _bracket_sides.MOUNT_Z[name]
         set_screw = await place_component(
             adapter,
-            "ch-vn-arbor-set-screw",
+            "sh-vn-arbor-set-screw",
             [PIVOT[0], SET_SCREW_TIP_Y, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,

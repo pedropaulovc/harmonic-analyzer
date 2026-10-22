@@ -175,7 +175,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "ms_measuring_stick_assembly_sheet.py",
                     "ms_stop_spec.py",
                     "ms_stick_spec.py",
-                    "_mcmaster_91882a221.py",
+                    "sh_vn_thumb_screw_spec.py",
                     "_mcmaster_90114a124.py",
                 )
             } <= set(deps)
@@ -249,7 +249,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "ha_harmonic_analyzer_assembly_steps.py",
                     "dt_drive_train_steps.py",
                     "pd_paper_drive_assembly_steps.py",
-                    "pn_vn_pen_wire_geom.py",
+                    "sh_vn_music_wire_pen_geom.py",
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)

@@ -26,7 +26,7 @@ the curve. Everything below the guides rides the rod:
 * pn-pen-adjust-screw + pn-vn-pen-adjust-nut -- the height adjuster on the rod
   top: the stud threads into the rod's #0-80 tap, the jam nut locks it, and
   the pen wire ties through its eye.
-* pn-vn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
+* sh-vn-music-wire (PenWire) -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
   rim's 3 o'clock tangent onto the stud's eye head (the rod line is the rim's
   mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
   tie-off are not modeled; the kinematic coupling stays a Motion-study mate
@@ -137,7 +137,8 @@ from pn_pen_hanger_spec import (
     SCREW_HOLE_XY as HANGER_HOLE_XY,
     STRAP_Z as HANGER_STRAP_Z,
 )
-from pn_vn_pen_wire_geom import (
+from sh_vn_music_wire_pen_geom import (
+    CONFIGURATION as PEN_WIRE_CONFIGURATION,
     WHEEL_MID_Z,
     WIRE_BOTTOM as PEN_WIRE_BOTTOM,
     WIRE_LEN as PEN_WIRE_LEN,
@@ -250,7 +251,7 @@ RIDERS = (
     ("pn-vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
     ("pn-pen-adjust-screw", STUD_POS, IDENTITY),
     ("pn-vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
-    ("pn-vn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
+    ("sh-vn-music-wire", PEN_WIRE_BOTTOM, IDENTITY),
 )
 
 
@@ -455,7 +456,14 @@ async def build(adapter) -> dict[str, str]:
 
     for part, pos, rows in RIDERS:
         name = await place_component(
-            adapter, part, list(pos), euler_from_rows(rows), rows, ground=False
+            adapter,
+            part,
+            list(pos),
+            euler_from_rows(rows),
+            rows,
+            ground=False,
+            configuration=PEN_WIRE_CONFIGURATION if part == spec.WIRE else "",
+            component_reference="PenWire:1" if part == spec.WIRE else "",
         )
         await lock_mate(
             adapter,

@@ -19,7 +19,7 @@ The gauge that sets the coefficients. Ten divisions, hand stamped, with a thumbs
 | `ms-stop-block` | 1 | brass, blackened | TODO |
 | `ms-stop-plate` | 1 | brass, blackened | TODO |
 | `ms-vn-stop-plate-screw` | 2 | brass (McMaster-Carr 90114A124) | #2-56 x 1/4 fillister |
-| `ms-vn-thumb-screw` | 1 | steel (McMaster-Carr 91882A221) | #4-40 thumb screw |
+| `sh-vn-thumb-screw` | 1 | steel (McMaster-Carr 91882A221) | #4-40 thumb screw |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

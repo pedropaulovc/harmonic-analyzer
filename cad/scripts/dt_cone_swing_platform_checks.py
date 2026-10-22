@@ -11,7 +11,7 @@ import math
 
 import _config
 import dt_vn_cone_pivot_screw_spec as pivot_stock
-import dt_vn_swing_stop_screw_spec as stop_stock
+import dt_swing_stop_screw_spec as stop_stock
 from cone_pitch import COS_I as _COS_I, INCLINE_DEG, SIN_I as _SIN_I
 from dt_cone_swing_platform_geometry import (
     EAST_HALF_S,

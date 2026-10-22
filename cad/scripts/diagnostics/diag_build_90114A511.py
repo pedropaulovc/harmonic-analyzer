@@ -44,7 +44,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-from _mcmaster_90114a511 import (  # noqa: E402
+from sh_vn_brass_fillister_screw_spec import (  # noqa: E402
     BF_MAJOR_R,
     BF_LEN,
     BF_HH,

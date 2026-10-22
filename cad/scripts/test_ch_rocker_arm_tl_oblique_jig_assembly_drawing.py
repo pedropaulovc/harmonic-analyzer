@@ -13,8 +13,11 @@ from types import SimpleNamespace
 
 import pytest
 
+import _com
 import _config
 import _drawing_balloons
+import _component_references
+import _drawing_tables
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
@@ -557,12 +560,16 @@ def test_every_bom_row_carries_one_balloon() -> None:
     walked = {
         stem: anchor
         for stem, anchor in drawing.BALLOON_ANCHORS.items()
-        if stem != spec.BASE_BAR
+        if stem != spec.BASE_BAR and stem not in spec.KIT_IDENTITIES
     }
     assert all(
         anchor.instance is None and anchor.point_mm is None
         for anchor in walked.values()
     )
+    for family in spec.KIT_IDENTITIES:
+        anchor = drawing.BALLOON_ANCHORS[family]
+        assert anchor.instance == spec.instance_name(family, 0)
+        assert anchor.point_mm is None
     # Review r5: balloon 1 lands on the bar's operator-side long edge, part
     # frame, mid-span between the spindle end and the far hold-down slot.
     bar = drawing.BALLOON_ANCHORS[spec.BASE_BAR]
@@ -609,8 +616,13 @@ def test_leaders_converging_under_the_run_on_do_not_toggle() -> None:
 
 def test_bom_identity_is_the_registry() -> None:
     for stem in spec.BOM_ORDER:
-        assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
+        physical, _configuration = spec.COMPONENT_IDENTITIES[stem]
+        assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(physical)["number"]
     assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
+    assert drawing.BOM_COMPONENT_IDENTITIES == spec.COMPONENT_IDENTITIES
+    assert {drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES} == {
+        "MHA-SH-VN-57"
+    }
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)
     }
@@ -638,6 +650,88 @@ def test_steps_cite_every_screw_by_item_number() -> None:
         assert not line.rstrip().endswith(("ITEM", "(ITEM"))
 
 
+@pytest.fixture
+def native_bom_bindings(monkeypatch):
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _component_references, "_early_bound", lambda value, _interface: value
+    )
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+
+
+def _native_component(family, index=0, *, simplified=True):
+    physical, member = spec.COMPONENT_IDENTITIES[family]
+    configuration = member or "Default"
+    if simplified:
+        configuration += " Simplified"
+    return SimpleNamespace(
+        Name2=f"{family}-{501 - index * 17}",
+        ComponentReference=f"{member}:{index + 1}" if member else "",
+        ReferencedConfiguration=configuration,
+        GetPathName=lambda: f"C:/native/{physical}.SLDPRT",
+        GetModelDoc2=lambda: SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property: drawing.BOM_PART_NUMBERS[
+                family
+            ]
+        ),
+        GetTotalTransform=lambda _include_explode: SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+        ),
+    )
+
+
+@pytest.mark.parametrize("simplified", (False, True))
+def test_component_census_distinguishes_shared_file_members(
+    native_bom_bindings, simplified
+):
+    for family in spec.KIT_IDENTITIES:
+        component = _native_component(family, simplified=simplified)
+        assert drawing._component_stem(component) == family
+
+
+@pytest.mark.parametrize(
+    "configuration", ("Default", "WrongMember", "TNut OtherSuffix")
+)
+def test_component_census_refuses_unknown_kit_configuration(
+    native_bom_bindings, configuration
+):
+    component = _native_component(spec.T_NUT)
+    component.ReferencedConfiguration = configuration
+    with pytest.raises(RuntimeError, match="unexpected jig identity"):
+        drawing._component_stem(component)
+
+
+def test_source_census_proves_all_twelve_native_kit_references(native_bom_bindings):
+    components = [
+        _native_component(family, index, simplified=False)
+        for family, quantity in spec.QUANTITIES.items()
+        for index in range(quantity)
+    ]
+    source = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(
+                Name=drawing.ASSEMBLY_VIEW_CONFIGURATION
+            )
+        ),
+        GetComponents=lambda _top_only: tuple(reversed(components)),
+        GetExplodedViewNames2=lambda owner: (drawing.EXPLODED_VIEW_NAMES[owner],),
+    )
+    drawing._validate_source(source)
+    [first_stud] = [
+        component
+        for component in components
+        if component.ComponentReference == "HoldDownStud:1"
+    ]
+    first_stud.ComponentReference = ""
+    with pytest.raises(RuntimeError, match="missing native component references"):
+        drawing._validate_source(source)
+
+
 class _Table:
     """A BOM in SolidWorks' order, with the edits and measures the recipe uses."""
 
@@ -646,7 +740,7 @@ class _Table:
         self.cells += [
             [
                 str(item),
-                stem,
+                drawing.BOM_PART_NUMBERS[stem],
                 drawing.BOM_DESCRIPTIONS[stem],
                 str(spec.QUANTITIES[stem]),
             ]
@@ -654,29 +748,97 @@ class _Table:
         ]
         self.widths: dict[int, float] = {}
         self.heights: dict[int, float] = {}
+        self.row_hidden = {}
         self.position = (*drawing.BOM_ANCHOR, 0.0)
+        self.native_members = [
+            tuple(
+                _native_component(family, index)
+                for index in range(spec.QUANTITIES[family])
+            )
+            for family in native_order
+        ]
+        self.association_configurations = []
+        self.column_types = [
+            (202, "", 0),
+            (204, '$PRP:"Number"', 0),
+            (204, "", 0),
+            (203, "", 0),
+            (201, "", 0),
+        ]
+        self.hidden = [False] * 4 + [True]
+        self.number_property = "Number"
 
     @property
     def RowCount(self):
         return len(self.cells)
 
     @property
+    def TotalRowCount(self):
+        return self.RowCount
+
+    def RowHidden(self, row):
+        if not 0 <= row < self.TotalRowCount:
+            raise IndexError(row)
+        return self.row_hidden.get(row, False)
+
+    @property
     def ColumnCount(self):
-        return len(self.cells[0])
+        return self.hidden.count(False)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.column_types)
+
+    def _physical_column(self, column, include_hidden=True):
+        columns = [
+            index
+            for index, hidden in enumerate(self.hidden)
+            if include_hidden or not hidden
+        ]
+        return columns[column] if 0 <= column < len(columns) else None
 
     def DisplayedText(self, row, column):
-        return self.cells[row][column]
+        return self.DisplayedText2(row, column, False)
 
-    def IsCellTextEditable(self, row, column):
-        return True
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            return ""
+        if physical < len(self.cells[row]):
+            return self.cells[row][physical]
+        return "PART NUMBER" if row == 0 else self.cells[row][1]
 
-    def SetText2(self, row, column, linked, text):
-        assert linked is False
-        self.cells[row][column] = text
+    def GetColumnTitle2(self, column, include_hidden):
+        return self.DisplayedText2(0, column, include_hidden)
+
+    def GetColumnType3(self, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        return (-1, None, 0) if physical is None else self.column_types[physical]
+
+    def ColumnHidden(self, column):
+        # Visibility PROPERTY indices are 1-based; storage remains physical.
+        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
+
+    def GetColumnCustomProperty(self, column):
+        if not 0 <= column < len(self.column_types):
+            return ""
+        if column == 1 and self.column_types[column][0] == 204:
+            return self.number_property
+        return ""
+
+    def SetText2(self, *_args):
+        raise AssertionError("Number cells must stay natively property-linked")
+
+    def GetComponents2(self, row, configuration):
+        self.association_configurations.append(configuration)
+        return self.native_members[row - 1]
 
     def SetColumnWidth(self, column, width, options):
         assert options == 0
-        self.widths[column] = width
+        physical = self._physical_column(column, False)
+        if physical is None:
+            raise IndexError(column)
+        self.widths[physical] = width
         return width
 
     def SetRowHeight(self, row, height, options):
@@ -685,7 +847,10 @@ class _Table:
         return height
 
     def GetColumnWidth(self, column):
-        return self.widths[column]
+        physical = self._physical_column(column, False)
+        if physical is None:
+            return 0.0
+        return self.widths.get(physical, 0.02)
 
     def GetRowHeight(self, row):
         return self.heights[row]
@@ -694,11 +859,115 @@ class _Table:
         return SimpleNamespace(GetPosition=lambda: self.position)
 
 
-_ADAPTER = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+@pytest.mark.parametrize("hidden", (True, None, 0, 1, ""))
+@pytest.mark.parametrize("row", (0, 1))
+def test_bom_cells_requires_exact_visible_row_before_physical_text(hidden, row) -> None:
+    reads = []
+    table = SimpleNamespace(
+        RowCount=2,
+        ColumnCount=1,
+        RowHidden=lambda index: hidden if index == row else False,
+        DisplayedText2=lambda *args: reads.append(args) or "TEXT",
+    )
+    with pytest.raises(RuntimeError):
+        drawing._bom_cells(table)
+    assert reads == ([(0, 0, True)] if row == 1 else [])
 
 
-def test_bom_prints_registry_numbers_one_line_a_row(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+_ADAPTER = SimpleNamespace(
+    currentModel=SimpleNamespace(
+        EditRebuild3=lambda: True, GraphicsRedraw2=lambda: None
+    )
+)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "native-column",
+        "number-column",
+        "number-property",
+        "visible-prefix",
+        "displayed-number",
+        "member",
+        "quantity",
+        "hidden-row",
+        "unreadable-row",
+    ),
+)
+def test_package_settled_checks_reread_native_bom_without_mutating_layout(
+    monkeypatch, native_bom_bindings, fault
+) -> None:
+    from _test_stubbed_build import stub_seat
+
+    table = _Table(spec.BOM_ORDER)
+    column_types = table.column_types
+    hidden = table.hidden
+    seat = stub_seat(
+        monkeypatch,
+        drawing,
+        keep=("_place_package", "validate_bom_number_property"),
+    )
+    reference = SimpleNamespace(ReferencedConfiguration="Default Simplified")
+    seat._place_reference_view.return_value = reference
+    seat.insert_bom_table.return_value = table
+    seat._validate_bom.return_value = tuple(
+        (stem, str(item)) for item, stem in enumerate(spec.BOM_ORDER, 1)
+    )
+    seat._place_assembled_sheet.return_value = lambda: None
+    seat._place_kit_bom_note.return_value = lambda: None
+    seat._place_cluster_view.side_effect = lambda _adapter, cluster: (
+        object(),
+        drawing.SHEET_SCALES[cluster.sheet],
+    )
+    seat._balloon_cluster.side_effect = (
+        lambda _adapter, _view, cluster, _items, _bom_name: [
+            SimpleNamespace(stem=stem) for stem in cluster.stems
+        ]
+    )
+    monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "offline BOM")
+    _scales, checks = drawing._place_package(object())
+    expected_configurations = [reference.ReferencedConfiguration] * len(spec.BOM_ORDER)
+    assert table.association_configurations == expected_configurations
+    table.association_configurations.clear()
+    for check in checks:
+        check()
+    assert table.association_configurations == expected_configurations
+
+    if fault == "native-column":
+        column_types[-1] = (204, "", 0)
+    elif fault == "number-column":
+        column_types[1] = (201, "", 0)
+    elif fault == "number-property":
+        table.number_property = "Description"
+    elif fault == "visible-prefix":
+        hidden[2] = True
+    elif fault == "displayed-number":
+        table.cells[1][1] = "UNLINKED"
+    elif fault == "quantity":
+        table.cells[1][3] = str(int(table.cells[1][3]) + 1)
+    elif fault == "hidden-row":
+        table.row_hidden[1] = True
+    elif fault == "unreadable-row":
+        table.row_hidden[1] = None
+    else:
+        stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD])
+        t_nut_member = spec.COMPONENT_IDENTITIES[spec.T_NUT][1]
+        table.native_members[stud_row - 1][
+            0
+        ].ReferencedConfiguration = f"{t_nut_member} Simplified"
+    with pytest.raises(RuntimeError):
+        for check in checks:
+            check()
+    seat.insert_bom_table.assert_called_once()
+    seat._validate_bom.assert_called_once()
+    seat.assert_balloon_landings.assert_called_once()
+    assert table.widths == {} and table.heights == {}
+
+
+def test_bom_prints_registry_numbers_one_line_a_row(
+    monkeypatch, native_bom_bindings
+) -> None:
     events = []
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
@@ -709,6 +978,26 @@ def test_bom_prints_registry_numbers_one_line_a_row(monkeypatch) -> None:
         (stem, str(item)) for item, stem in enumerate(spec.BOM_ORDER, 1)
     )
     assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]
+    assert table.DisplayedText2(0, 3, True) == "QTY."
+    assert table.DisplayedText(0, 3) == "QTY."
+    assert table.GetColumnType3(3, True)[0] == 203
+    assert table.GetColumnType3(3, False)[0] == 203
+    assert table.ColumnHidden(5) is True
+    assert table.ColumnHidden(4) is False
+    proof = drawing.validate_bom_number_property(
+        table,
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        label="jig",
+        expected_rows=1 + len(spec.BOM_ORDER),
+        occurrence_quantities=True,
+    )
+    assert [(row, number, quantity) for row, _members, number, quantity in proof] == [
+        (row, drawing.BOM_PART_NUMBERS[stem], str(spec.QUANTITIES[stem]))
+        for row, stem in enumerate(spec.BOM_ORDER, 1)
+    ]
+    for row, stem in enumerate(spec.BOM_ORDER, 1):
+        assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[stem]
+        assert table.DisplayedText2(row, 3, False) == str(spec.QUANTITIES[stem])
     for row, stem in zip(table.cells[1:], spec.BOM_ORDER, strict=True):
         assert row[1:] == [
             drawing.BOM_PART_NUMBERS[stem],
@@ -722,37 +1011,107 @@ def test_bom_prints_registry_numbers_one_line_a_row(monkeypatch) -> None:
     [(name, attrs)] = events
     assert name == "drawing.bom_piece"
     assert attrs["rows"] == len(spec.BOM_ORDER) + 1 and attrs["violations"] == ()
+    assert set(table.association_configurations) == {
+        drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    }
+    kit_rows = [
+        table.cells[int(spec.ITEM_NUMBERS[family])] for family in spec.KIT_IDENTITIES
+    ]
+    assert [row[1] for row in kit_rows] == ["MHA-SH-VN-57"] * 3
+    assert [row[3] for row in kit_rows] == ["4"] * 3
 
 
-def test_bom_refuses_items_numbered_off_the_steps(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+def test_bom_refuses_items_numbered_off_the_steps(native_bom_bindings) -> None:
     with pytest.raises(RuntimeError, match="spec.BOM_ORDER"):
         drawing._validate_bom(_ADAPTER, _Table(tuple(reversed(spec.BOM_ORDER))))
 
 
-def test_bom_refuses_a_wrong_quantity(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+def test_bom_refuses_a_wrong_quantity(native_bom_bindings) -> None:
     table = _Table(spec.BOM_ORDER)
     table.cells[1][3] = "1"  # the base bar row grouped per configuration
     with pytest.raises(RuntimeError, match="quantity"):
         drawing._validate_bom(_ADAPTER, table)
 
 
-def test_bom_refuses_a_part_number_that_does_not_stick(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+def test_bom_refuses_an_unlinked_part_number(native_bom_bindings) -> None:
+    table = _Table(spec.BOM_ORDER)
+    table.cells[int(spec.ITEM_NUMBERS[spec.T_NUT])][1] = spec.T_NUT
+    with pytest.raises(RuntimeError, match="associative part number"):
+        drawing._validate_bom(_ADAPTER, table)
 
-    class Stubborn(_Table):
-        def SetText2(self, row, column, linked, text):
-            if row == len(spec.BOM_ORDER):
-                return  # the last row keeps its file-name part number
-            super().SetText2(row, column, linked, text)
 
+def test_bom_rechecks_number_after_rebuild(native_bom_bindings) -> None:
+    table = _Table(spec.BOM_ORDER)
+
+    def rebuild():
+        table.cells[-1][1] = "unlinked-file-name"
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
     with pytest.raises(RuntimeError, match="part number for"):
-        drawing._validate_bom(_ADAPTER, Stubborn(spec.BOM_ORDER))
+        drawing._validate_bom(adapter, table)
 
 
-def test_bom_refuses_a_row_that_wraps_into_the_title_block(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+def test_bom_refuses_wrong_dedicated_number_binding_despite_raw_expression(
+    native_bom_bindings,
+) -> None:
+    table = _Table(spec.BOM_ORDER)
+    assert table.column_types[1][1] == '$PRP:"Number"'
+    table.number_property = "Description"
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(_ADAPTER, table)
+
+
+@pytest.mark.parametrize("fault", ("quantity", "native-count", "same-number-member"))
+def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
+    native_bom_bindings, fault
+) -> None:
+    table = _Table(spec.BOM_ORDER)
+    stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD])
+    rebuilds = []
+
+    def rebuild():
+        rebuilds.append(True)
+        if fault == "quantity":
+            table.cells[stud_row][3] = str(int(table.cells[stud_row][3]) - 1)
+        elif fault == "native-count":
+            table.native_members[stud_row - 1] = table.native_members[stud_row - 1][:-1]
+        else:
+            table.native_members[stud_row - 1][
+                0
+            ].ReferencedConfiguration = (
+                f"{spec.COMPONENT_IDENTITIES[spec.T_NUT][1]} Simplified"
+            )
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    message = (
+        "native occurrence count"
+        if fault != "same-number-member"
+        else "merged distinct members"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._validate_bom(adapter, table)
+    assert rebuilds == [True]
+
+
+@pytest.mark.parametrize("fault", ("wrong-member", "merged-members", "missing-member"))
+def test_bom_refuses_ambiguous_native_kit_rows(native_bom_bindings, fault):
+    table = _Table(spec.BOM_ORDER)
+    stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD]) - 1
+    nut_row = int(spec.ITEM_NUMBERS[spec.T_NUT]) - 1
+    if fault == "wrong-member":
+        for member in table.native_members[nut_row]:
+            member.ReferencedConfiguration = "FlangeNut Simplified"
+    elif fault == "merged-members":
+        table.native_members[nut_row] += table.native_members[stud_row]
+    else:
+        table.native_members[nut_row] = ()
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(_ADAPTER, table)
+
+
+def test_bom_refuses_a_row_that_wraps_into_the_title_block(native_bom_bindings) -> None:
 
     class Wrapping(_Table):
         def GetRowHeight(self, row):
@@ -760,6 +1119,175 @@ def test_bom_refuses_a_row_that_wraps_into_the_title_block(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="enters the title block"):
         drawing._validate_bom(_ADAPTER, Wrapping(spec.BOM_ORDER))
+
+
+def test_kit_bom_key_uses_registry_identity_and_native_item_mapping(
+    native_bom_bindings,
+):
+    # Reversed native rows prove the citations are not copied from spec item 18-20.
+    order = tuple(reversed(spec.BOM_ORDER))
+    table = _Table(order)
+    text = drawing._kit_bom_note_text(
+        table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    )
+    registry = _config.parts(spec.CLAMPING_KIT)
+    assert registry["number"] in text
+    assert str(registry["supplier"]).upper() in text
+    assert all(sku in text for sku in registry["supplier_skus"])
+    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
+        [citation] = [line for line in text.splitlines() if member in line]
+        assert f"ITEM {order.index(family) + 1}:" in citation
+        assert f"({registry['configuration_quantities'][member]})" in citation
+    assert "CONFIGURATIONS" in text and "INSTALLED QTY." in text
+    assert "MEMBERS, NOT KITS" in text
+
+
+class _KitBomNote:
+    """Native-style note geometry with a nonzero insertion-to-extent offset."""
+
+    def __init__(self, text, xy, *, width, move):
+        self.text = text
+        self.position = (*xy, 0.0)
+        self.width = width
+        self.move = move
+        self.OwnerType = 1
+        self.Visible = 1
+        self.leaders = 0
+
+    def GetAnnotation(self):
+        return self
+
+    def GetPosition(self):
+        return self.position
+
+    def GetExtent(self):
+        x, y, _z = self.position
+        return x + 0.005, y - 0.036, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
+
+    def GetText(self):
+        return self.text.replace("\n", "\r\n")
+
+    def GetLeaderCount(self):
+        return self.leaders
+
+    def SetPosition2(self, *position):
+        if self.move == "refused":
+            return False
+        if self.move != "ignored":
+            self.position = position
+        return True
+
+
+@pytest.fixture
+def kit_bom_note_state(monkeypatch, native_bom_bindings):
+    table = _Table(spec.BOM_ORDER)
+    table.widths = dict(enumerate(drawing.BOM_COLUMN_WIDTHS.values()))
+    table.heights = {
+        row: drawing.BOM_ROW_HEIGHT for row in range(len(spec.BOM_ORDER) + 1)
+    }
+    state = SimpleNamespace(
+        table=table,
+        outline=(0.060, 0.125, 0.190, 0.230),
+        notes=[],
+        width=0.145,
+        move="applied",
+    )
+    state.reference = SimpleNamespace(
+        ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        GetOutline=lambda: state.outline,
+    )
+
+    def add_block(_adapter, sheet, text, xy, *, label):
+        assert sheet == drawing.BOM_SHEET
+        note = _KitBomNote(text, xy, width=state.width, move=state.move)
+        state.notes.append(note)
+        return note
+
+    monkeypatch.setattr(drawing, "_add_note_block", add_block)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    return state
+
+
+def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state):
+    state = kit_bom_note_state
+    settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+    [note] = state.notes
+    extent = drawing._kit_bom_note_extent(note)
+    bom = drawing._bom_bounds(state.table)
+    field = drawing.kit_bom_note_region(bom, state.outline)
+    assert _inside(extent, field) and _inside_sheet(extent)
+    assert state.outline[1] - extent[3] >= 0.004
+    assert bom[0] - extent[2] >= 0.004
+    assert drawing.TITLE_BLOCK[0] - extent[2] >= 0.004
+    assert extent[0] > note.position[0]  # placement used ink, not the annotation origin
+    settled()
+    for family in spec.KIT_IDENTITIES:
+        row = state.table.cells[int(spec.ITEM_NUMBERS[family])]
+        assert row[1] == drawing.BOM_PART_NUMBERS[family] and row[3] == "4"
+
+
+@pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
+def test_kit_bom_key_refuses_a_native_note_that_does_not_fit(kit_bom_note_state, fault):
+    state = kit_bom_note_state
+    if fault == "oversized":
+        state.width = 0.250
+    else:
+        state.move = fault
+    with pytest.raises(RuntimeError):
+        drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "bom-moved",
+        "reference-moved",
+        "wrong-text",
+        "wrong-member",
+        "wrong-quantity",
+        "wrong-number",
+        "view-owned",
+        "hidden",
+        "leader",
+        "empty-extent",
+        "nonfinite-extent",
+    ),
+)
+def test_kit_bom_key_rechecks_content_and_clearance_after_final_rebuild(
+    kit_bom_note_state, fault
+):
+    state = kit_bom_note_state
+    settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+    [note] = state.notes
+    extent = drawing._kit_bom_note_extent(note)
+    member_row = int(spec.ITEM_NUMBERS[spec.T_NUT])
+    if fault == "bom-moved":
+        state.table.position = (extent[2] + 0.003, state.table.position[1], 0.0)
+    elif fault == "reference-moved":
+        left, _bottom, right, top = state.outline
+        state.outline = left, extent[3] + 0.003, right, top
+    elif fault == "wrong-text":
+        note.text += "\nUNRELATED KIT"
+    elif fault == "wrong-member":
+        for component in state.table.native_members[member_row - 1]:
+            component.ReferencedConfiguration = "FlangeNut Simplified"
+    elif fault == "wrong-quantity":
+        state.table.cells[member_row][3] = "12"
+    elif fault == "wrong-number":
+        state.table.cells[member_row][1] = "UNRELATED-PURCHASE"
+    elif fault == "view-owned":
+        note.OwnerType = 0
+    elif fault == "hidden":
+        note.Visible = 3
+    elif fault == "leader":
+        note.leaders = 1
+    elif fault == "empty-extent":
+        note.width = 0.0
+    else:
+        note.width = math.nan
+    with pytest.raises(RuntimeError):
+        settled()
 
 
 class _Manager:

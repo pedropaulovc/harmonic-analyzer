@@ -23,6 +23,8 @@ from typing import Any
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
+from _component_references import component_reference_names
+from sh_vn_music_wire_pen_geom import CONFIGURATION as PEN_WIRE_CONFIGURATION
 from _simplified_names import simplified_name
 from pn_pen_assembly_spec import QUANTITIES
 from pn_pen_explode_spec import (
@@ -118,6 +120,9 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
         )
     if int(assembly.GetExplodedViewCount2(configuration_name)):
         raise RuntimeError(f"{view_name}: {configuration_name} unexpectedly contains exploded views")
+    component_reference_names(
+        model, {"@PenWire:1": ("sh-vn-music-wire", PEN_WIRE_CONFIGURATION)}
+    )
 
     components = tuple(
         _early_bound(component, "IComponent2")

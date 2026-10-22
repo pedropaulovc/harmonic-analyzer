@@ -163,6 +163,37 @@ def test_a_missing_row_is_omitted_when_another_row_names_its_parts() -> None:
     assert _kinds(_audit(VALID, required=required)) == {(second.id, Kind.OMITTED)}
 
 
+@pytest.mark.parametrize(
+    "gone",
+    [
+        "ha-harmonic-analyzer/spring-foot-screw-in-base",
+        "ha-harmonic-analyzer/swing-stop-screw-in-base",
+    ],
+)
+def test_shared_stock_does_not_merge_operational_foot_and_stop_joints(gone) -> None:
+    ids = {
+        "ha-harmonic-analyzer/spring-foot-screw-in-base",
+        "ha-harmonic-analyzer/swing-stop-screw-in-base",
+    }
+    rows = tuple(joint for joint in jr.JOINTS if joint.id in ids)
+    assert len(rows) == 2
+    assert {joint.member for joint in rows} == {"sh_vn_fillister_screw_90280a108"}
+    assert {joint.receiver for joint in rows} == {"fr_harmonic_base"}
+    assert sum(joint.quantity for joint in rows) == 2
+    assert all(joint.quantity == 1 for joint in rows)
+    inventory = Inventory(
+        {"ha_harmonic_analyzer": frozenset({rows[0].member, rows[0].receiver})}
+    )
+    findings = jr.audit(
+        tuple(joint for joint in rows if joint.id != gone),
+        inventory,
+        threaded=frozenset({rows[0].member, rows[0].receiver}),
+        unthreaded=frozenset(),
+        required={joint.id: jr.REQUIRED_JOINTS[joint.id] for joint in rows},
+    )
+    assert _kinds(findings) == {(gone, Kind.OMITTED)}
+
+
 def test_a_row_the_registry_does_not_list_is_unregistered() -> None:
     extra = dataclasses.replace(SCREW, id="pd-paper-drive/second-screw-in-base")
     assert _kinds(_audit((*VALID, extra))) == {(extra.id, Kind.UNREGISTERED)}
@@ -356,7 +387,7 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
     for banned in ("LOCTITE", "THREADLOCK"):
         assert banned not in rocker_fitup.upper()
         assert banned not in row.evidence.upper()
-    assert jr._config.parts("ch-vn-arbor-set-screw")["number"] not in fulcrum_fitup
+    assert jr._config.parts("sh-vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     findings = jr.audit(
         jr.JOINTS,

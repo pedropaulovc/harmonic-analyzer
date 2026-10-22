@@ -23,9 +23,11 @@ from typing import Any, Mapping, NamedTuple, Sequence
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
+from _component_references import component_reference_names
 from _simplified_names import simplified_name
 from cone_line import COS_I, SIN_I
 from dt_drive_train_assembly_spec import (
+    COMPONENT_IDENTITIES,
     CONE_AXIS_SOURCE,
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
@@ -190,10 +192,11 @@ def create_drive_train_explode(
     """Author the released presentation in the active ``configuration_name``
     and restore the free working model.
 
-    ``roles`` maps a component name to the role the builder tagged it with at
-    insertion (the MHA-DT-VN-63 that pins the arbor collar). The builder runs this
-    in Default and in Default Simplified
-    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
+    ``roles`` maps returned native component names to their insertion roles.
+    The two same-stock screw roles are also read back from persisted native
+    references, proving the map against file/configuration associations. The
+    builder runs this in Default and Default Simplified; each owns its explode.
+    """
     from solidworks_mcp.adapters.com_variant import null_callout
 
     view_name = exploded_view_name(configuration_name)
@@ -222,6 +225,10 @@ def create_drive_train_explode(
     unknown_roles = sorted(set(roles) - set(by_name))
     if unknown_roles:
         raise RuntimeError(f"{view_name}: roles name absent components {unknown_roles!r}")
+    reference_names = component_reference_names(model, COMPONENT_IDENTITIES)
+    for selector, name in reference_names.items():
+        if roles.get(name) != selector[1:]:
+            raise RuntimeError(f"{view_name}: {selector!r} disagrees with insertion role map")
     instances = [
         Instance(
             name=name,

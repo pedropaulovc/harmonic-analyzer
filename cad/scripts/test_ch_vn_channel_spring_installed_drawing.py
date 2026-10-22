@@ -16,3 +16,17 @@ def test_installed_spring_stays_within_catalogue_load_envelope() -> None:
 def test_two_point_qc_measures_the_catalogue_rate() -> None:
     measured = (channel_force_n(80.0) - channel_force_n(60.0)) / 20.0
     assert math.isclose(measured, spec.SPRING_RATE_N_PER_MM, rel_tol=1e-12)
+
+
+def test_source_gauges_preserve_exact_values_and_supplier_spelling() -> None:
+    assert math.isclose(spec.FREE_LENGTH_MM, 1.948 * 25.4)
+    assert math.isclose(spec.MAX_LENGTH_MM, 5.448 * 25.4)
+    assert math.isclose(spec.SUPPLIER_COIL_OD_MM, 0.25 * 25.4)
+    assert math.isclose(spec.SUPPLIER_WIRE_DIA_MM, 0.026 * 25.4)
+    assert math.isclose(spec.SUPPLIER_COIL_OD_TOLERANCE_MM, 0.008 * 25.4)
+    assert spec.SUPPLIER_PRECISION == {
+        "SupplierFreeLength": 3, "SupplierMaximumLength": 3,
+        "SupplierCoilOD": 2, "SupplierWireDiameter": 3,
+    }
+
+

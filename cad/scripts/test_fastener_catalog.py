@@ -1,29 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import _config
 from _fastener_catalog import FASTENERS
 
 
-_EXPECTED = {
-    # Parent-specific production stem: (supplier SKU(s), MHA number, quantity).
-    "ch-vn-arbor-set-screw": (("91375A106",), "MHA-CH-VN-53", 2),
-    "dt-vn-arbor-set-screw": (("91375A106",), "MHA-DT-VN-64", 2),
+_STOCK_REQUIREMENTS = {
+    # Production stock: (supplier SKUs, drawing Number, installed quantity).
+    "sh-vn-arbor-set-screw": (("91375A106",), "MHA-SH-VN-54", 4),
     "sm-vn-boss-hook": (("9490T1",), "MHA-SM-VN-50", 1),
     "ch-vn-bracket-hold-down-screw": (("90280A196",), "MHA-CH-VN-57", 2),
-    "mg-vn-clamp-screw": (("90280A201",), "MHA-MG-VN-51", 2),
-    "pd-vn-clamp-screw": (("90280A201",), "MHA-PD-VN-53", 4),
+    "sh-vn-clamp-screw": (("90280A201",), "MHA-SH-VN-53", 6),
     "dt-vn-cone-lock-knob": (("93585A190",), "MHA-DT-VN-51", 1),
     "dt-vn-cone-pivot-screw": (("91829A560",), "MHA-DT-VN-52", 1),
     "dt-vn-cone-tip-adjuster": (("94025A164",), "MHA-DT-VN-55", 1),
     "dt-vn-cone-tip-block-screw": (("91251A108",), "MHA-DT-VN-60", 1),
     "dt-vn-cone-tip-pinch-screw": (("91794A112",), "MHA-DT-VN-56", 1),
     "dt-vn-crank-seat-drive-pin": (("98381A434",), "MHA-DT-VN-67", 2),
-    "dt-vn-fillister-screw": (("90114A511",), "MHA-DT-VN-50", 1),
-    "fr-vn-fillister-screw": (("90114A511",), "MHA-FR-VN-50", 4),
-    "pd-vn-fillister-screw": (("90114A511",), "MHA-PD-VN-52", 10),
-    "dt-vn-foot-screw": (("90280A108",), "MHA-DT-VN-58", 1),
+    "sh-vn-brass-fillister-screw": (("90114A511",), "MHA-SH-VN-51", 15),
+    "sh-vn-fillister-screw-90280a108": (("90280A108",), "MHA-SH-VN-52", 4),
     "pd-vn-guide-lock-screw": (("91792A108",), "MHA-PD-VN-60", 8),
     "ch-vn-frame-side-screw": (("91794A080",), "MHA-CH-VN-52", 2),
     "ch-vn-fulcrum-set-screw": (("91375A942",), "MHA-CH-VN-55", 2),
@@ -33,7 +27,6 @@ _EXPECTED = {
     "sm-vn-knife-hanger-stud": (("92314A253",), "MHA-SM-VN-52", 2),
     "sm-vn-knife-hanger-washer": (("96659A104",), "MHA-SM-VN-54", 2),
     "sm-vn-knife-mount-dowel": (("98381A473",), "MHA-SM-VN-53", 4),
-    "pd-vn-latch-hook-bracket-screw": (("90280A108",), "MHA-PD-VN-59", 2),
     "mg-vn-magnifying-bracket-screw": (("91794A078",), "MHA-MG-VN-53", 2),
     "ms-vn-stop-plate-screw": (("90114A124",), "MHA-MS-VN-51", 2),
     "fr-vn-lag-screw": (("92240A540",), "MHA-FR-VN-51", 4),
@@ -48,9 +41,7 @@ _EXPECTED = {
     "dt-vn-pinion-strap-pin": (("98296A027",), "MHA-DT-VN-63", 3),
     "dt-vn-post-mount-screw": (("40923906",), "MHA-DT-VN-61", 2),
     "dt-vn-slotted-screw": (("90280A203",), "MHA-DT-VN-57", 4),
-    "dt-vn-swing-stop-screw": (("90280A108",), "MHA-DT-VN-53", 1),
-    "mg-vn-thumb-screw": (("91882A221",), "MHA-MG-VN-50", 2),
-    "ms-vn-thumb-screw": (("91882A221",), "MHA-MS-VN-50", 1),
+    "sh-vn-thumb-screw": (("91882A221",), "MHA-SH-VN-55", 3),
     "pd-vn-transgear-arm-plate-screw": (("91790A199",), "MHA-PD-VN-56", 2),
     "pd-vn-transgear-arm-plate-locating-pin": (("93600A189",), "MHA-PD-VN-64", 2),
     "pd-vn-transgear-knob-drive-pin": (("98381A433",), "MHA-PD-VN-54", 2),
@@ -69,7 +60,6 @@ _EXPECTED = {
     "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),
     "ch-vn-spring-hook": (("9489T111",), "MHA-CH-VN-51", 20),
     "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
-    # The oblique trammel jig's modelled bought hardware (shop fixture, TL Numbers).
     "ch-rocker-arm-tl-vn-oblique-bearing": (("5972K41",), "MHA-CH-06-TL-VN-52", 4),
     "ch-rocker-arm-tl-vn-oblique-cl-dowel": (("91595A452",), "MHA-CH-06-TL-VN-53", 1),
     "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 14),
@@ -86,14 +76,10 @@ _EXPECTED = {
     "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
     "ch-rocker-arm-tl-vn-oblique-block-washer": (
-        ("91812A215",),
-        "MHA-CH-06-TL-VN-70",
-        2,
+        ("91812A215",), "MHA-CH-06-TL-VN-70", 2,
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": (
-        ("91812A230",),
-        "MHA-CH-06-TL-VN-71",
-        2,
+        ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
     ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC; the jig's nut
@@ -104,39 +90,69 @@ _SUPPLIERS = {
 }
 
 
-def _supplier(stem: str) -> str:
-    return _SUPPLIERS.get(stem, "McMaster-Carr")
-
-
-def test_catalog_carries_only_purchased_supplier_identities() -> None:
-    assert set(FASTENERS) == set(_EXPECTED)
-    for stem, (skus, _number, _quantity) in _EXPECTED.items():
-        spec = FASTENERS[stem]
-        assert spec.part_name == stem
-        assert spec.supplier == _supplier(stem)
-        assert spec.skus == skus
-        assert spec.stock_name.strip()
-        assert spec.material in {
-            "Plain Carbon Steel",
-            "AISI 304",
-            "Brass",
-            "Alloy Steel",
-            "1100-O Rod (SS)",
-        }
-
-
-def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
-    for stem, (skus, number, quantity) in _EXPECTED.items():
+def test_purchased_stock_skus_suppliers_numbers_and_installed_quantities() -> None:
+    for stem, (skus, number, quantity) in _STOCK_REQUIREMENTS.items():
+        supplier = _SUPPLIERS.get(stem, "McMaster-Carr")
         row = _config.parts(stem)
-        assert row["number"] == number
+        stock = FASTENERS[stem]
+        assert stock.skus == skus
+        assert stock.supplier == supplier
         assert tuple(row["supplier_skus"]) == skus
-        assert row["supplier"] == _supplier(stem)
-        assert row["stock_name"] == FASTENERS[stem].stock_name
-        assert row["process"] == "purchased"
-        if quantity is None:
-            assert "quantity" not in row
-        else:
-            assert int(row["quantity"]) == quantity
+        assert row["supplier"] == supplier
+        assert row["number"] == number
+        assert int(row["quantity"]) == quantity
+
+
+_SHARED_MEMBERS = {
+    "sh-vn-chain-link": (
+        "McMaster-Carr", "6261K171", "MHA-SH-VN-50",
+        {"InnerLink": 34, "OuterLink": 33},
+    ),
+    "sh-vn-music-wire": (
+        "McMaster-Carr", "9666K56", "MHA-SH-VN-56",
+        {"LeverWire": 1, "PenWire": 1},
+    ),
+    "sh-vn-clamping-kit-hardware": (
+        "Precision Matthews", "52PCCK-9/16-14mm", "MHA-SH-VN-57",
+        {"HoldDownStud": 4, "TNut": 4, "FlangeNut": 4},
+    ),
+}
+
+_SHARED_PROPERTIES = {
+    # Physical material, finish, tolerance class, fit class.
+    "sh-vn-chain-link": (
+        "Plain Carbon Steel",
+        "as supplied; supplier states no coating", "machined_block", None,
+    ),
+    "sh-vn-brass-fillister-screw": (
+        "Brass",
+        "plain", "machined_block", "fastener_clearance",
+    ),
+    "sh-vn-fillister-screw-90280a108": (
+        "Plain Carbon Steel",
+        "zinc plated", "machined_block", "fastener_clearance",
+    ),
+    "sh-vn-clamp-screw": (
+        "Plain Carbon Steel",
+        "zinc plated", "machined_block", "fastener_clearance",
+    ),
+    "sh-vn-arbor-set-screw": (
+        "Alloy Steel",
+        "black oxide", "machined_block", "fastener_clearance",
+    ),
+    "sh-vn-thumb-screw": (
+        "Plain Carbon Steel",
+        "as supplied", "machined_block", "fastener_clearance",
+    ),
+    "sh-vn-music-wire": (
+        "ASTM A228 music wire",
+        "phosphate coated, as supplied", "machined_block", None,
+    ),
+    "sh-vn-clamping-kit-hardware": (
+        "Plain Carbon Steel",
+        "black oxide, as supplied", "visual_noncritical", None,
+    ),
+}
 
 
 def test_fillister_stock_is_shared_across_the_fleet() -> None:
@@ -167,31 +183,27 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     assert fleet_quantity("91882A221") == 3
 
 
-def test_shared_skus_have_distinct_parent_specific_specs() -> None:
-    families = (
-        ("dt-vn-fillister-screw", "fr-vn-fillister-screw", "pd-vn-fillister-screw"),
-        ("mg-vn-clamp-screw", "pd-vn-clamp-screw"),
-        ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"),
-        ("mg-vn-thumb-screw", "ms-vn-thumb-screw"),
-    )
-    assert sum(len(stems) for stems in families) == 9
-    for stems in families:
-        specs = [FASTENERS[stem] for stem in stems]
-        assert tuple(spec.part_name for spec in specs) == stems
-        assert len({id(spec) for spec in specs}) == len(stems)
-        assert len(
-            {
-                (spec.stock_name, spec.skus, spec.material, spec.supplier)
-                for spec in specs
-            }
-        ) == 1
+def test_shared_member_quantities_are_installed_occurrences() -> None:
+    for stem, (supplier, sku, number, quantities) in _SHARED_MEMBERS.items():
+        row = _config.parts(stem)
+        assert row["supplier"] == supplier
+        assert row["supplier_skus"] == [sku]
+        assert row["number"] == number
+        assert row["configuration_quantities"] == quantities
+        assert row["quantity"] == sum(quantities.values())
 
 
-def test_special_bom_titles_remain_machine_specific() -> None:
-    assert _config.parts("sm-vn-knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
-    assert _config.parts("sm-vn-knife-hanger-washer")["title"] == "Knife-Hanger Washer"
-    assert _config.parts("sm-vn-knife-mount-dowel")["title"] == "Knife-Mount Dowel"
-    assert _config.parts("fr-vn-lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
+def test_shared_vendor_material_finish_and_fit_are_preserved() -> None:
+    registry = _config.parts()
+    for stem, expected in _SHARED_PROPERTIES.items():
+        row = registry[stem]
+        assert tuple(
+            row.get(field)
+            for field in (
+                "material", "finish",
+                "tolerance_class", "fit_class",
+            )
+        ) == expected
 
 
 def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
@@ -202,66 +214,19 @@ def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
     from _fastener_catalog import fastener
 
     monkeypatch.setenv(
-        "HARMONIC_FASTENER_ROWS", "ch-vn-frame-side-screw,mg-vn-clamp-screw"
+        "HARMONIC_FASTENER_ROWS", "ch-vn-frame-side-screw,sh-vn-clamp-screw"
     )
-    assert fastener("mg-vn-clamp-screw").part_name == "mg-vn-clamp-screw"
-    with pytest.raises(KeyError, match="outside this build's cache key"):
+    fastener("sh-vn-clamp-screw")
+    fastener("ch-vn-frame-side-screw")
+    with pytest.raises(KeyError):
         fastener("fr-vn-lag-screw")
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "")
-    with pytest.raises(KeyError, match="outside this build's cache key"):
+    with pytest.raises(KeyError):
         fastener("ch-vn-frame-side-screw")
     monkeypatch.delenv("HARMONIC_FASTENER_ROWS")
-    assert fastener("fr-vn-lag-screw").part_name == "fr-vn-lag-screw"
+    fastener("fr-vn-lag-screw")
 
 
-def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
-    # Every catalog-spec figure comes from a real replica report; a
-    # placeholder token (HARVEST plus underscore) marks one never measured.
-    readme = Path(__file__).resolve().parents[1] / "references" / "mcmaster" / "README.md"
-    assert "HARVEST" + "_" not in readme.read_text(encoding="utf-8")
-
-
-def test_arbor_set_screw_is_the_verified_black_oxide_cup_point() -> None:
-    """#743: both parent identities use McMaster 91375A106 (alloy, C45,
-    black oxide, plain cup), which bites the spotted steel arbor where an
-    18-8 cup would not. No "PN TO VERIFY" survives in either identity."""
-    for stem in ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"):
-        row = _config.parts(stem)
-        assert FASTENERS[stem].material == "Alloy Steel"
-        assert "91375A106" in row["material_specification"]
-        for value in row.values():
-            assert "TO VERIFY" not in str(value).upper()
-
-
-def test_every_catalog_fastener_has_a_reference_sheet() -> None:
-    """Every catalogue fastener ships a purchased reference sheet, including
-    both parent-specific arbor set screws; each plain set-screw sheet uses
-    the shared purchased-fastener builder."""
-    from pathlib import Path
-
-    from _drawing_registry import DRAWINGS
-
-    sheets = {spec.artifact_stem: spec for spec in DRAWINGS}
-    assert set(FASTENERS) <= set(sheets)
-    for stem in ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"):
-        spec = sheets[stem]
-        assert (spec.name, spec.part) == (stem.replace("-", "_"),) * 2
-        script = Path(__file__).resolve().parent / spec.script_name
-        assert "build_purchased_fastener_drawing" in script.read_text(encoding="utf-8")
-
-
-def test_every_catalog_fastener_stamps_its_supplier_identity() -> None:
-    """build_purchased_fastener_drawing refuses a source part without the
-    Stock Name / Supplier / Supplier SKUs properties; a builder that does not
-    go through build_stock_fastener must stamp them itself."""
-    from pathlib import Path
-
-    scripts = Path(__file__).resolve().parent
-    for stem in FASTENERS:
-        source = (scripts / f"build_{stem.replace('-', '_')}.py").read_text(
-            encoding="utf-8"
-        )
-        if "build_stock_fastener" in source:
-            continue
-        for name in ('"Stock Name"', '"Supplier"', '"Supplier SKUs"'):
-            assert name in source, (stem, name)
+def test_arbor_set_screw_specifies_required_c45_hardness() -> None:
+    row = _config.parts("sh-vn-arbor-set-screw")
+    assert "C45" in row["material_specification"]

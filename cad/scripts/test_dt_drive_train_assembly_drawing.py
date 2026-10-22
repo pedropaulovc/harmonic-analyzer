@@ -6,6 +6,7 @@ import ast
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import _config
 import cone_line
@@ -23,6 +24,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
 BUILDER = SCRIPTS / "build_dt_drive_train_assembly.py"
+SCREW_STEM = "sh-vn-fillister-screw-90280a108"
+# Deliberately not role-local ordinal 1: native allocation is unrelated.
+STOP_NAME = f"{SCREW_STEM}__SwingStopScrew-9"
+FOOT_NAME = f"{SCREW_STEM}__FootScrew-42"
 # The rig's steps at the built assembly's counts.
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
@@ -76,14 +81,14 @@ def _instances(**overrides) -> list[spec.Instance]:
         ],
         "dt-cylinder-end-disc": [(drum_x, drum_y, bank_layout.SOUTH_DISC_Z[0])],
         "dt-vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.BANK_SPRING_Z[0])],
-        "dt-vn-arbor-set-screw": [
+        "sh-vn-arbor-set-screw": [
             (drum_x, drum_y, z)
             for z in (bank_layout.FRONT_SET_SCREW_Z, bank_layout.BACK_SET_SCREW_Z)
         ],
         "dt-cylinder-gear": [
             (drum_x, drum_y, bank_layout.station_z(j)) for j in range(bank_layout.COUNT)
         ],
-        "dt-vn-foot-screw": [(7.49, 52.0, 74.0)],
+        SCREW_STEM: [(0.0, cone_line.Y_BASE_TOP, 0.0), (7.49, 52.0, 74.0)],
         "dt-vn-pedestal-hold-down-screw": [
             (drum_x, 55.8, -91.652),
             (drum_x, 55.8, 94.202),
@@ -106,11 +111,17 @@ def _instances(**overrides) -> list[spec.Instance]:
         "dt-vn-pinion-strap-pin": [(-12.1, 62.8, -74.0), (-12.1, 62.8, 81.0), (-18.4, 90.5, -127.0)],
     }
     layout.update(overrides)
-    roles = {"dt-vn-pinion-strap-pin-3": spec.COLLAR_PIN_ROLE}
+    roles = {
+        "dt-vn-pinion-strap-pin-3": spec.COLLAR_PIN_ROLE,
+        STOP_NAME: spec.SWING_STOP_SCREW_ROLE,
+        FOOT_NAME: spec.FOOT_SCREW_ROLE,
+    }
     instances = []
     for stem in sorted(_builder_stems() | set(layout)):
         for index, origin in enumerate(layout.get(stem, [(0.0, 100.0, 0.0)]), start=1):
             name = f"{stem}-{index}"
+            if stem == SCREW_STEM:
+                name = (STOP_NAME, FOOT_NAME)[index - 1]
             instances.append(spec.Instance(name, stem, origin, roles.get(name)))
     return instances
 
@@ -313,15 +324,164 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
-def test_same_catalogue_screws_keep_distinct_assembly_roles() -> None:
-    stop = drawing.BOM_DESCRIPTIONS["dt-vn-swing-stop-screw"]
-    foot = drawing.BOM_DESCRIPTIONS["dt-vn-foot-screw"]
-    assert "90280A108" in stop and "90280A108" in foot
-    assert "SWING STOP" in stop and "SPRING FOOT" in foot
-    assert (
-        drawing.BOM_PART_NUMBERS["dt-vn-swing-stop-screw"]
-        != drawing.BOM_PART_NUMBERS["dt-vn-foot-screw"]
+def test_shared_screws_combine_quantity_without_merging_operational_roles() -> None:
+    facts = _drawing_facts()
+    assert drawing.BOM_PART_NUMBERS[SCREW_STEM] == "MHA-SH-VN-52"
+    assert "90280A108" in drawing.BOM_DESCRIPTIONS[SCREW_STEM]
+    assert facts.components.count(SCREW_STEM) == 1
+    assert facts.count(SCREW_STEM) == 2
+    assert facts.role_count(spec.SWING_STOP_SCREW_SELECTOR) == 1
+    assert facts.role_count(spec.FOOT_SCREW_SELECTOR) == 1
+    assert STOP_NAME in facts.clusters["cone-set"]
+    assert FOOT_NAME not in facts.clusters["cone-set"]
+    assert FOOT_NAME in facts.clusters["pinion-rig"]
+    assert STOP_NAME not in facts.clusters["pinion-rig"]
+    moved = {step.label: names for step, names in spec.plan_explode(facts.instances)}
+    assert moved["swing stop lifts"] == (STOP_NAME,)
+    assert moved["spring foot screw lifts"] == (FOOT_NAME,)
+    assert FOOT_NAME in moved["pivot blocks drop"]
+    assert STOP_NAME not in moved["pivot blocks drop"]
+    for cluster, selector in (
+        ("cone-set", spec.SWING_STOP_SCREW_SELECTOR),
+        ("pinion-rig", spec.FOOT_SCREW_SELECTOR),
+    ):
+        assert drawing.DRIVE_TRAIN_BALLOON_ANCHORS[cluster][SCREW_STEM].instance == selector
+
+
+@pytest.mark.parametrize("shared_quantity", [2, 1])
+def test_native_bom_requires_the_combined_screw_quantity(
+    monkeypatch: pytest.MonkeyPatch, shared_quantity: int,
+) -> None:
+    facts = _drawing_facts()
+
+    class Table:
+        def __init__(self):
+            self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+            self.cells.extend(
+                [
+                    str(index), stem, drawing.BOM_DESCRIPTIONS[stem],
+                    str(shared_quantity if stem == SCREW_STEM else facts.count(stem)),
+                ]
+                for index, stem in enumerate(facts.components, start=1)
+            )
+            self.RowCount = len(self.cells)
+            self.ColumnCount = 4
+            self.heights = {}
+
+        def DisplayedText(self, row, column):
+            return self.cells[row][column]
+
+        def DisplayedText2(self, row, column, _include_hidden):
+            return self.cells[row][column]
+
+        def SetColumnWidth(self, _column, width, _options):
+            return width
+
+        def IsCellTextEditable(self, _row, _column):
+            return True
+
+        def SetText2(self, row, column, _include_hidden, value):
+            self.cells[row][column] = value
+
+        def GetHeaderCount(self):
+            return 1
+
+        def SetRowHeight(self, row, height, _options):
+            self.heights[row] = height
+            return height
+
+        def GetRowHeight(self, row):
+            return self.heights[row]
+
+    table = Table()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    if shared_quantity != 2:
+        with pytest.raises(RuntimeError, match="model has 2"):
+            drawing._validate_bom(adapter, table, facts)
+        return
+    items, headers = drawing._validate_bom(adapter, table, facts)
+    assert headers == 1
+    assert len(items) == len(facts.components)
+    rows = [row for row in table.cells[1:] if row[1] == "MHA-SH-VN-52"]
+    assert len(rows) == 1 and rows[0][3] == "2"
+
+
+@pytest.mark.parametrize("proud", [0.0, 1.75])
+def test_shared_stop_frame_preserves_world_geometry_and_static_lock(proud: float) -> None:
+    import build_dt_drive_train_assembly as assembly
+
+    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
+    insertions = {
+        node.targets[0].id: node.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Await)
+        and isinstance(node.value.value, ast.Call)
+        and isinstance(node.value.value.func, ast.Name)
+        and node.value.value.func.id == "place_component"
+    }
+    for name, reference in (
+        ("stop_screw", "SwingStopScrew:1"),
+        ("spring_foot_screw", "FootScrew:1"),
+    ):
+        call = insertions[name]
+        assert ast.literal_eval(call.args[1]) == SCREW_STEM
+        options = {keyword.arg: keyword.value for keyword in call.keywords}
+        assert ast.literal_eval(options["component_reference"]) == reference
+        assert ast.literal_eval(options["ground"]) is False
+        assert isinstance(call.args[4], ast.Name) and call.args[4].id == "IDENTITY"
+    namespace = {**vars(assembly), "STOP_PROUD_LEN": proud}
+    position = eval(
+        compile(ast.Expression(insertions["stop_screw"].args[2]), str(BUILDER), "eval"),
+        namespace,
     )
+    assert position == [assembly.STOP_X, assembly.Y_BASE_TOP + proud, assembly.STOP_Z]
+    # Canonical stock's tip and under-head plane equal the former translated
+    # stop body's points, including a nonzero proud-length regression.
+    for local_y in (-assembly.STOP_SHANK_LEN, 0.0, assembly.STOP_HEAD_DIA / 2.0):
+        assert position[1] + local_y == pytest.approx(
+            assembly.Y_BASE_TOP + (local_y + proud)
+        )
+    namespace.update(sx=assembly._FOOT_SCREW_XZ[0][0], sz=assembly._FOOT_SCREW_XZ[0][1])
+    foot_position = eval(
+        compile(ast.Expression(insertions["spring_foot_screw"].args[2]), str(BUILDER), "eval"),
+        namespace,
+    )
+    assert foot_position == [
+        namespace["sx"], assembly.Y_BASE_TOP + assembly.SPRING_T, namespace["sz"],
+    ]
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    assert any(
+        isinstance(call.func, ast.Name)
+        and call.func.id == "_lock_static"
+        and [getattr(arg, "id", None) for arg in call.args] == ["adapter", "stop_screw", "arbor"]
+        for call in calls
+    )
+    appearances = [
+        call for call in calls
+        if isinstance(call.func, ast.Name) and call.func.id == "apply_component_color"
+        and len(call.args) >= 3
+        and getattr(call.args[1], "id", None) in {"stop_screw", "spring_foot_screw"}
+    ]
+    assert len(appearances) == 1
+    assert appearances[0].args[1].id == "spring_foot_screw"
+    color = eval(compile(ast.Expression(appearances[0].args[2]), str(BUILDER), "eval"), namespace)
+    assert color == pytest.approx((0.08, 0.08, 0.09))
+
+
+@pytest.mark.parametrize("role", [spec.FOOT_SCREW_ROLE, spec.SWING_STOP_SCREW_ROLE])
+def test_shared_screw_explode_rejects_missing_and_duplicate_roles(role: str) -> None:
+    census = _instances()
+    missing = [spec.Instance(i.name, i.stem, i.origin_mm, None if i.role == role else i.role) for i in census]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(missing)
+    original = next(i for i in census if i.role == role)
+    duplicate = spec.Instance("unrelated-native-index-77", original.stem, original.origin_mm, role)
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode([*census, duplicate])
 
 
 def test_changed_gear_bom_counts_come_from_their_specs() -> None:
@@ -386,7 +546,7 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
-    """MHA-DT-VN-53 bounds the DISENGAGE swing; the engaged mesh is set at
+    """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set at
     assembly (cone_set_stack): pedestals snug-loose, shims at T012 and T120,
     pedestals tightened, then the T120 feeler and MHA-DT-VN-51 -- never the stop."""
     import cone_set_stack as set_stack
@@ -395,7 +555,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     t012 = f"{set_stack.feeler_gap_mm(12):.2f} AT T012"
     t120 = f"{set_stack.feeler_gap_mm(120):.2f} AT T120"
     order = [
-        check.index("TO THE MHA-DT-VN-53 STOP, CLEAR OF EVERY MHA-DT-12"),
+        check.index("TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12"),
         check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
         check.index(t012),
         check.index(t120),
@@ -407,18 +567,18 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
     assert order == sorted(order), check
-    assert "RETURN IT TO THE MHA-DT-VN-53" not in check
+    assert "RETURN IT TO THE MHA-SH-VN-52" not in check
 
 
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
     """The supplied thread class does not prove the assembled stop's engagement."""
-    import dt_vn_swing_stop_screw_spec as stop_screw
+    import dt_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     minimum = f"{stop_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
-    assert f"VERIFY MHA-DT-VN-53 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    assert f"VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
     assert "HEAD FULLY SEATED" in check
     assert "MHA-DT-20 REMAINS SEATED THROUGH P1" in check
 
@@ -635,15 +795,15 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     moved = {step.label: names for step, names in plan}
     assert moved["south pedestal"] == (
         "dt-arbor-pedestal-1",
-        "dt-vn-arbor-set-screw-1",
         "dt-vn-pedestal-hold-down-screw-1",
+        "sh-vn-arbor-set-screw-1",
     )
     assert moved["north pedestal"] == (
         "dt-arbor-pedestal-2",
-        "dt-vn-arbor-set-screw-2",
         "dt-vn-pedestal-hold-down-screw-2",
+        "sh-vn-arbor-set-screw-2",
     )
-    assert moved["apex set screws lift"] == ("dt-vn-arbor-set-screw-1", "dt-vn-arbor-set-screw-2")
+    assert moved["apex set screws lift"] == ("sh-vn-arbor-set-screw-1", "sh-vn-arbor-set-screw-2")
     assert moved["pedestal screws lift"] == (
         "dt-vn-pedestal-hold-down-screw-1",
         "dt-vn-pedestal-hold-down-screw-2",
@@ -651,8 +811,8 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert moved["south end disc"] == ("dt-cylinder-end-disc-1",)
     assert moved["bank spring"] == ("dt-vn-cylinder-bank-spring-1",)
     assert not any(i.name == "dt-cylinder-end-disc-2" for i in _instances())
-    assert moved["spring foot screw lifts"] == ("dt-vn-foot-screw-1",)
-    assert moved["spring steps east"] == ("dt-pinion-spring-1", "dt-vn-foot-screw-1")
+    assert moved["spring foot screw lifts"] == (FOOT_NAME,)
+    assert moved["spring steps east"] == ("dt-pinion-spring-1", FOOT_NAME)
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
@@ -710,7 +870,7 @@ def test_crank_hub_families_explode_with_the_crank_arm() -> None:
 
 
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:
-    moved = {stem for step in spec.EXPLODE_STEPS for stem in step.stems}
+    moved = {spec.component_stem(key) for step in spec.EXPLODE_STEPS for key in step.stems}
     assert not moved & spec.STATIONARY_STEMS
     assert moved | spec.STATIONARY_STEMS == spec.classified_stems()
 
@@ -720,7 +880,7 @@ def test_clusters_partition_every_instance_once() -> None:
     members = drawing.cluster_members(census)
     flat = [name for names in members.values() for name in names]
     assert sorted(flat) == sorted(i.name for i in census)
-    assert "dt-vn-foot-screw-1" in members["pinion-rig"]
+    assert FOOT_NAME in members["pinion-rig"]
     assert {"dt-vn-pedestal-hold-down-screw-1", "dt-vn-pedestal-hold-down-screw-2"} <= set(
         members["cylinder-bank"]
     )

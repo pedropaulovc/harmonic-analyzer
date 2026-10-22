@@ -5,7 +5,8 @@ standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet runs
 at 1:2: the front view carries the outline, the bosses and every hole
 coordinate from the plate's bottom-left corner, an enlarged 1:1 right view the
-thickness and the boss height, a 4:1 partial section A-A through one
+thickness on a native text shelf clear of its witnesses and the boss height,
+a 4:1 partial section A-A through one
 counterbore the user-accepted counterbore floor as a reference dimension with
 its worst case, and a 1:4 isometric the form.  The counterbores' far side is
 named in their callout.
@@ -35,6 +36,14 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    PLACE_SETTLE_M,
+    callout_ink,
+    move_annotation,
+    require_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -46,11 +55,13 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
 import _drawing_hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leaders import dimension_segments
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -273,7 +284,7 @@ GUIDE_CALLOUT_XY = (0.128, 0.248)
 # Four rows at most (r4 tall-block): the drill, the far-side counterbore and
 # the screw whose heads it sinks share one (r5 asked for the process word).
 GUIDE_CALLOUT_PROCESS = (
-    "PATTERN MATCHES MHA-PD-11\nDRILL, C'BORE FAR SIDE FOR MHA-PD-VN-52\n"
+    "PATTERN MATCHES MHA-PD-11\nDRILL, C'BORE FAR SIDE FOR MHA-SH-VN-51\n"
 )
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
@@ -316,6 +327,50 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _place_thickness_text(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the 3.850 line fixed and shelf its complete function/value block.
+
+    The native review crop shows both witnesses striking the digits.  Offset
+    only the text, then measure its full native shoulder rather than sizing
+    the move from the number alone (the function row is much wider).
+    """
+    matches = [
+        _early_bound(annotation, "IAnnotation")
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "Depth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one platen Depth dimension, found {len(matches)}")
+    annotation = matches[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if int(display.Type2) not in (2, 11, 12):
+        raise RuntimeError("platen thickness is not a native linear dimension")
+    rebuild_drawing(adapter, label="platen thickness function text")
+    lines = dimension_segments(annotation)
+    if not lines:
+        raise RuntimeError("platen thickness has no native dimension lines")
+    right = max(point[0] for line in lines for point in line)
+    position = tuple(float(value) for value in annotation.GetPosition())
+    # Seed beside the existing line and outside-arrow tail.  The native
+    # shoulder then supplies the actual width of both rows for the final move.
+    offset_dimension_text(adapter, [annotation], {"Depth": (right, position[1])})
+    ink = callout_ink(adapter, annotation, label="platen thickness")
+    dx = right + CLEAR_GAP_M + PLACE_SETTLE_M - ink.text[0]
+    target = (right + dx, position[1])
+    move_annotation(adapter, annotation, dx, 0.0, label="platen thickness text")
+    ink = callout_ink(adapter, annotation, label="platen thickness")
+    placed = tuple(float(value) for value in annotation.GetPosition())
+    if not bool(display.OffsetText) or math.dist(placed[:2], target) > 1e-5:
+        raise RuntimeError(f"platen thickness text offset did not persist: {placed}")
+    if str(display.GetText(3) or "") != DIMENSION_CALLOUTS_ABOVE["Depth"]:
+        raise RuntimeError("platen thickness lost its native function text")
+    if ink.text[0] < right + CLEAR_GAP_M:
+        raise RuntimeError(
+            f"platen thickness text {ink.text} still crowds its native line at {right}"
+        )
+    require_inside("platen thickness text", ink.text, sheet_region(adapter))
 
 
 def _dress_boss_fillet_radius(adapter: Any, annotations: list[Any]) -> None:
@@ -584,6 +639,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
+    _place_thickness_text(adapter, right_annotations)
 
     marks = (
         _early_bound(front, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()

@@ -5,21 +5,36 @@ from __future__ import annotations
 import argparse
 import sys
 from typing import Any
+from collections.abc import Callable
 
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
+from dt_vn_crank_seat_drive_pin_spec import SUPPLIER_REFERENCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_crank_seat_drive_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "Ø3/32 x 1/4 DOWEL PIN (Ø2.38 x 6.35)"
+ITEM = "Ø3/32 x 1/4 DOWEL PIN"
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    proofs: list[Callable[[], None]] = []
+
+    def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> None:
+        proofs.append(add_supplier_dowel_dimensions(adapter, views_by_orientation, SUPPLIER_REFERENCE))
+
+    def assert_supplier_dimensions() -> None:
+        if len(proofs) != 1:
+            raise RuntimeError("crank-seat drive pin supplier callback must run exactly once")
+        proofs[0]()
+
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM
+        adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
+        settled_checks=(assert_supplier_dimensions,),
+        supplier_margins=DOWEL_SUPPLIER_MARGINS,
     )
 
 

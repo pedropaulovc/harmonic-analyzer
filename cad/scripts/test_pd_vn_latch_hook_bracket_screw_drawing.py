@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-PD-VN-59 latch-hook bracket screws (90280A108)."""
+"""Shared 90280A108 stock and its two-screw latch-hook installation contract."""
 
 from __future__ import annotations
 
@@ -6,29 +6,25 @@ import pytest
 
 from _column_clamp_interface import BAR_DEPTH
 import _config
-import build_pd_vn_latch_hook_bracket_screw as part
-import pd_vn_latch_hook_bracket_screw_spec as spec
+import pd_latch_hook_bracket_screw_spec as spec
 import pd_support_bar_spec as bar
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from pd_latch_hook_geometry import SCREW_X
 from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_90280A108 as recipe
 
-STEM = "pd-vn-latch-hook-bracket-screw"
+STEM = "sh-vn-fillister-screw-90280a108"
 _DRILL = blind_cut_dia_mm(bar.BRACKET_TAP_SPEC)
 
 
-def test_catalogue_row_is_the_foot_screw_sku() -> None:
+def test_catalogue_row_is_shared_stock_not_the_latch_application_count() -> None:
     row = _config.parts(STEM)
     stock = FASTENERS[STEM]
-    assert part.SPEC is stock
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,)
-    assert FASTENERS["dt-vn-foot-screw"].skus == stock.skus
-    assert row["number"] == "MHA-PD-VN-59"
-    assert row["quantity"] == 2
+    assert stock.material == "Plain Carbon Steel"
+    assert row["quantity"] == 4
+    assert len(SCREW_X) == 2  # Only the two latch seats belong to this application.
     metadata = discovered_recipes()[spec.SKU]
-    assert metadata.module == recipe.__name__
     assert metadata.threaded is True
 
 
@@ -60,14 +56,3 @@ def test_tip_stays_inside_the_bar_front_face() -> None:
     assert spec.tip_short_worst(BAR_DEPTH, 0.0) > spec.tip_short_worst(
         BAR_DEPTH, bar.BAR_DEPTH_BAND
     )
-
-
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_pd_vn_latch_hook_bracket_screw as drawing
-
-    sheet = DRAWINGS_BY_NAME["pd_vn_latch_hook_bracket_screw"]
-    assert drawing.SPEC is sheet
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES

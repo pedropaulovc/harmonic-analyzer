@@ -6,6 +6,8 @@ drawings without tables stay independent.
 
 from __future__ import annotations
 
+import json
+from math import isfinite
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
@@ -18,6 +20,9 @@ from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _activate_and_select_view, _select_edge
 import _telemetry
+
+# Global row index, native file/member occurrence counts, released Number, QTY.
+BomSnapshot = tuple[tuple[int, tuple[tuple[str, str, int], ...], str, str], ...]
 
 
 def add_hole_group_tags(
@@ -418,6 +423,576 @@ def _bom_identity_map(
     return identities
 
 
+@_telemetry.traced("drawing.bom_row_identities")
+def bom_row_identities(
+    table: Any,
+    *,
+    configuration: str,
+    component_identities: dict[str, tuple[str, str | None]],
+) -> dict[str, int]:
+    """Associate logical rows through native components, never displayed Number.
+
+    Different members of a shared purchased file have the same released Number.
+    Conversely, interchangeable occurrences of one member must share a row. The
+    native row association proves both without depending on a mutable cell value.
+    ``None`` permits any configuration of an otherwise unambiguous file family
+    (for example, the deliberately grouped transgear wheels).
+    """
+    from _component_references import component_identity, member_configuration
+
+    if not configuration:
+        raise ValueError("a top-level BOM requires its assembly configuration")
+    expected: dict[tuple[str, str | None], str] = {}
+    for logical, (stem, member) in component_identities.items():
+        identity = (
+            stem.casefold(),
+            member_configuration(member) if member is not None else None,
+        )
+        if identity in expected:
+            raise ValueError(
+                f"BOM rows {expected[identity]!r} and {logical!r} share {identity!r}"
+            )
+        expected[identity] = logical
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetComponents2"
+    )
+    row_count = int(table.RowCount)
+    result: dict[str, int] = {}
+    observed: dict[tuple[int, str, str], int] = {}
+    row_count_after = -1
+    try:
+        for row in range(1, row_count):
+            components = tuple(annotation.GetComponents2(row, configuration) or ())
+            if not components:
+                raise RuntimeError(f"BOM row {row} has no native component association")
+            row_keys: set[str] = set()
+            for component in components:
+                stem, member = component_identity(component)
+                native_key = (row, stem, member)
+                if native_key in observed or len(observed) < 64:
+                    observed[native_key] = observed.get(native_key, 0) + 1
+                matches = {
+                    logical
+                    for (file_stem, member_name), logical in expected.items()
+                    if file_stem == stem and member_name in (None, member)
+                }
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        f"BOM row {row} component {(stem, member)!r} matches "
+                        f"{sorted(matches)!r}; expected one logical member"
+                    )
+                row_keys.update(matches)
+            if len(row_keys) != 1:
+                raise RuntimeError(
+                    f"BOM row {row} merged distinct members {sorted(row_keys)!r}"
+                )
+            logical = row_keys.pop()
+            if logical in result:
+                raise RuntimeError(f"BOM member {logical!r} appears in multiple rows")
+            result[logical] = row
+        row_count_after = int(table.RowCount)
+        if row_count_after != row_count:
+            raise RuntimeError(
+                f"BOM row count changed while reading native associations: "
+                f"{row_count} -> {row_count_after}"
+            )
+        missing = sorted(set(component_identities) - result.keys())
+        if missing:
+            raise RuntimeError(
+                f"BOM native associations are missing members {missing!r}"
+            )
+    finally:
+        _telemetry.annotate(
+            configuration=configuration,
+            rows_before=row_count,
+            rows_after=row_count_after,
+            expected_members=len(component_identities),
+            observed_members=tuple(
+                f"{row}:{stem[:96]}@{member[:96]}={count}"
+                for (row, stem, member), count in observed.items()
+            ),
+        )
+    return result
+
+
+def _bom_column_hidden(table: Any, physical_column: int, *, label: str) -> bool:
+    """Read the native one-based visibility PROPERTY for a physical column."""
+    if type(physical_column) is not int or physical_column < 0:
+        raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
+    hidden = table.ColumnHidden(physical_column + 1)
+    if type(hidden) is not bool:
+        raise RuntimeError(
+            f"{label} BOM column visibility is not BOOL at physical index "
+            f"{physical_column}"
+        )
+    return hidden
+
+
+def _set_bom_column_hidden(
+    table: Any, physical_column: int, hidden: bool, *, label: str
+) -> None:
+    """Set visibility without changing physical typed/text or width indexing."""
+    if type(physical_column) is not int or physical_column < 0:
+        raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
+    if type(hidden) is not bool:
+        raise ValueError(f"{label} BOM column hidden state must be BOOL")
+    table.SetColumnHidden(physical_column + 1, hidden)  # VT_VOID, not success.
+
+
+def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], ...]:
+    """Read the complete typed prefix, proving any advertised empty tail."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty"
+    )
+
+    def unsupported(index: int, physical_type: Any) -> tuple[Any, ...]:
+        visible_type = table.GetColumnType3(index, False)
+        titles = (
+            table.GetColumnTitle2(index, True),
+            table.GetColumnTitle2(index, False),
+        )
+        headers = (
+            table.DisplayedText2(0, index, True),
+            table.DisplayedText2(0, index, False),
+        )
+        width = table.GetColumnWidth(index)
+        hidden = _bom_column_hidden(table, index, label=label)
+        binding = annotation.GetColumnCustomProperty(index)
+        for kind, property_data, status in (physical_type, visible_type):
+            if (
+                type(kind) is not int
+                or kind != -1
+                or property_data is not None
+                or type(status) is not int
+                or status not in (0, 1)  # Observed Success / documented InvalidIndex.
+            ):
+                raise RuntimeError(
+                    f"{label} BOM unsupported column type at physical index {index}"
+                )
+        if (
+            titles != ("", "")
+            or headers != ("", "")
+            or type(width) is not float
+            or width != 0.0
+            or hidden is not False
+            or binding != ""
+        ):
+            raise RuntimeError(
+                f"{label} BOM nonempty unsupported column at physical index {index}"
+            )
+        return (physical_type, visible_type, titles, headers, width, hidden, binding)
+
+    try:
+        visible = int(table.ColumnCount)
+        declared = int(table.TotalColumnCount)
+        if not 1 <= visible <= declared <= 16:
+            raise RuntimeError(
+                f"{label} BOM physical column census bounds are {visible}/{declared}"
+            )
+        # Discover the whole typed prefix before reading visibility. A trailing
+        # native column's PROPERTY index can equal the first typed-invalid slot.
+        typed_prefix: list[Any] = []
+        typed_tail: list[tuple[int, Any]] = []
+        in_tail = False
+        for index in range(declared):
+            physical_type = table.GetColumnType3(index, True)
+            kind, _property_data, status = physical_type
+            if type(kind) is int and kind == -1:
+                typed_tail.append((index, physical_type))
+                in_tail = True
+                continue
+            if (
+                in_tail
+                or type(kind) is not int
+                or not (kind == 0 or 201 <= kind <= 211)
+                or type(status) is not int
+                or status != 0
+            ):
+                raise RuntimeError(
+                    f"{label} BOM invalid typed column prefix at physical index {index}"
+                )
+            typed_prefix.append(physical_type)
+
+        physical: list[tuple[int, bool]] = []
+        metadata: list[tuple[Any, Any, Any]] = []
+        visible_index = 0
+        for index, physical_type in enumerate(typed_prefix):
+            kind, _property_data, _status = physical_type
+            hidden = _bom_column_hidden(table, index, label=label)
+            # The unversioned width accessor uses visible positions, not the
+            # visibility PROPERTY's +1 domain. Hidden reads only prove a finite
+            # nonnegative accessor result; they do not measure hidden width.
+            width = table.GetColumnWidth(index if hidden else visible_index)
+            if not hidden:
+                visible_index += 1
+            if (
+                type(width) is not float
+                or not isfinite(width)
+                or width < 0.0
+                or (not hidden and width == 0.0)
+            ):
+                raise RuntimeError(
+                    f"{label} BOM invalid column visibility/width at physical index {index}"
+                )
+            physical.append((kind, hidden))
+            metadata.append(
+                (
+                    physical_type,
+                    table.GetColumnTitle2(index, True),
+                    table.DisplayedText2(0, index, True),
+                )
+            )
+        if not physical or sum(not hidden for _kind, hidden in physical) != visible:
+            raise RuntimeError(
+                f"{label} BOM typed column visibility count does not match {visible}"
+            )
+        # Advertised empty slots must match two independent beyond-count
+        # controls in every accessor domain, including mapped visibility.
+        control = unsupported(declared, table.GetColumnType3(declared, True))
+        if control != unsupported(
+            declared + 1, table.GetColumnType3(declared + 1, True)
+        ):
+            raise RuntimeError(f"{label} BOM unsupported column controls disagree")
+        for index, physical_type in typed_tail:
+            if unsupported(index, physical_type) != control:
+                raise RuntimeError(
+                    f"{label} BOM unsupported column tail disagrees at {index}"
+                )
+        visible_indices = [
+            index for index, (_kind, hidden) in enumerate(physical) if not hidden
+        ]
+        for visible_index, physical_index in enumerate(visible_indices):
+            visible_type = table.GetColumnType3(visible_index, False)
+            kind, _property_data, status = visible_type
+            projected = (
+                visible_type,
+                table.GetColumnTitle2(visible_index, False),
+                table.DisplayedText2(0, visible_index, False),
+            )
+            if (
+                type(kind) is not int
+                or type(status) is not int
+                or status != 0
+                or projected != metadata[physical_index]
+            ):
+                observations = ""
+                try:
+                    columns = tuple(
+                        (
+                            index, index + 1, kind, hidden,
+                            repr(metadata[index][0])[:192],
+                            str(metadata[index][1])[:96],
+                            str(metadata[index][2])[:96],
+                        )
+                        for index, (kind, hidden) in enumerate(physical)
+                    )
+                    observations = (
+                        f"; ColumnCount={visible}, TotalColumnCount={declared}; "
+                        f"columns(physical,visibility_property,kind,hidden,type,title,header)"
+                        f"={columns!r}; visible_read={repr(projected)[:512]}"
+                    )
+                except Exception:
+                    pass  # Failure evidence must not replace the strict refusal.
+                raise RuntimeError(
+                    f"{label} BOM visible column projection disagrees at "
+                    f"{visible_index} (physical {physical_index}){observations}"
+                )
+        return tuple(physical)
+    except RuntimeError:
+        raise
+    except Exception as error:
+        raise RuntimeError(f"{label} BOM physical column census read failed") from error
+
+
+def _bind_bom_number_property(
+    adapter: Any,
+    table: Any,
+    *,
+    configuration: str,
+    label: str,
+) -> None:
+    """Display associative Numbers without replacing the native grouping column."""
+    rows = int(table.RowCount)
+    if int(table.TotalRowCount) != rows:
+        raise RuntimeError(f"{label} BOM has hidden rows before Number binding")
+    for row in range(rows):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
+    headers = [
+        str(table.DisplayedText2(0, column, True) or "").strip().upper()
+        for column in range(int(table.ColumnCount))
+    ]
+    if "PART NUMBER" not in headers:
+        raise RuntimeError(f"{label} BOM has no PART NUMBER column")
+    column = headers.index("PART NUMBER")
+    visible_columns = int(table.ColumnCount)
+    physical = _bom_physical_columns(table, label=label)
+    if any(hidden for _kind, hidden in physical):
+        raise RuntimeError(f"{label} BOM starts with typed hidden columns")
+    if [index for index, (kind, _hidden) in enumerate(physical) if kind == 201] != [
+        column
+    ]:
+        raise RuntimeError(f"{label} BOM has no unique native PART NUMBER column")
+    # Keep the native grouping key intact and physically last. Only the new
+    # user-defined column is bound to the released Number custom property.
+    native_column = len(physical) - 1
+    moved = physical[:column] + physical[column + 1 :] + (physical[column],)
+    if column != native_column:
+        result = table.MoveColumn(
+            column,
+            3,
+            native_column,  # swTableItemInsertPosition_After
+        )
+        if not result:
+            raise RuntimeError(f"{label} BOM native column could not be moved")
+        if _bom_physical_columns(table, label=label) != moved:
+            raise RuntimeError(f"{label} BOM column sequence changed during move")
+    result = table.InsertColumn2(
+        2,
+        column,
+        "PART NUMBER",
+        0,  # Before; swInsertColumn_DefaultWidth
+    )
+    if not result:
+        raise RuntimeError(f"{label} BOM Number column could not be inserted")
+    inserted = _bom_physical_columns(table, label=label)
+    if (
+        len(inserted) != len(moved) + 1
+        or inserted[column] != (204, False)
+        or inserted != moved[:column] + (inserted[column],) + moved[column:]
+    ):
+        raise RuntimeError(f"{label} BOM column sequence changed during insertion")
+    native_column = len(inserted) - 1
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "SetColumnCustomProperty"
+    )
+    # Bind the already-204 column while every real column is still visible.
+    result = annotation.SetColumnCustomProperty(column, "Number")
+    if result is not True:
+        raise RuntimeError(
+            f"{label} BOM Number property binding failed: {result!r}"
+        )
+    if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
+        raise RuntimeError(f"{label} BOM Number property binding did not persist")
+    if _bom_physical_columns(table, label=label) != inserted:
+        raise RuntimeError(f"{label} BOM column sequence changed during Number binding")
+    _set_bom_column_hidden(table, native_column, True, label=label)
+    retained = inserted[:-1] + ((201, True),)
+    if _bom_physical_columns(table, label=label) != retained:
+        raise RuntimeError(f"{label} BOM retained native column is not hidden")
+    if not table.SetColumnTitle2(column, "PART NUMBER", True):
+        raise RuntimeError(f"{label} BOM PART NUMBER header could not be restored")
+    rebuild_drawing(adapter, label="bind_bom_number_property")
+    if int(table.ColumnCount) != visible_columns:
+        raise RuntimeError(f"{label} BOM visible column count changed")
+    validate_bom_number_property(table, configuration=configuration, label=label)
+
+
+def _bom_number_column(table: Any, *, label: str) -> int:
+    """Rediscover physical columns after SKU insertion, splitting or rebuilding."""
+    visible = int(table.ColumnCount)
+    physical = _bom_physical_columns(table, label=label)
+    if len(physical) != visible + 1:
+        raise RuntimeError(
+            f"{label} BOM retained native column count is {visible}/{len(physical)}"
+        )
+    native_columns: list[int] = []
+    number_columns: list[int] = []
+    for index, (kind, hidden) in enumerate(physical):
+        if hidden is not (index == visible):
+            raise RuntimeError(
+                f"{label} BOM visible columns are not a contiguous prefix"
+            )
+        if int(kind) == 201:  # swBomTableColumnType_PartNumber
+            native_columns.append(index)
+        if (
+            index < visible
+            and str(table.DisplayedText2(0, index, True) or "").strip().upper()
+            == "PART NUMBER"
+        ):
+            # The BOM property getter proves the binding, not this raw variant.
+            if int(kind) != 204:
+                raise RuntimeError(f"{label} BOM Number column type/property changed")
+            number_columns.append(index)
+    if native_columns != [len(physical) - 1]:
+        raise RuntimeError(f"{label} BOM has no unique trailing native column")
+    if len(number_columns) != 1:
+        raise RuntimeError(f"{label} BOM has no unique PART NUMBER column")
+    return number_columns[0]
+
+
+def validate_bom_number_property(
+    table: Any,
+    *,
+    configuration: str,
+    label: str,
+    expected_rows: int | None = None,
+    row_indices: Sequence[int] | None = None,
+    occurrence_quantities: bool = False,
+) -> BomSnapshot:
+    """Read-prove columns/rows and snapshot membership, Number and quantity.
+
+    Split pieces supply global ``row_indices``, never local renumbering.
+    ``occurrence_quantities`` is an explicit count-based assembly contract;
+    bulk or length quantities must leave it disabled.
+    """
+    from _com import _early_bound
+    from _component_references import component_identity
+
+    row_count = int(table.RowCount)
+    if row_count < 2 or (expected_rows is not None and row_count != expected_rows):
+        raise RuntimeError(
+            f"{label} BOM Number proof has {row_count} rows; "
+            f"expected {expected_rows if expected_rows is not None else 'at least 2'}"
+        )
+    data_rows = tuple(range(1, row_count) if row_indices is None else row_indices)
+    if (
+        not data_rows
+        or len(set(data_rows)) != len(data_rows)
+        or any(type(row) is not int or row < 1 for row in data_rows)
+    ):
+        raise RuntimeError(f"{label} BOM Number proof has invalid data row indices")
+    if row_indices is None and int(table.TotalRowCount) != row_count:
+        raise RuntimeError(f"{label} BOM Number proof has hidden rows")
+    hidden_rows: list[list[Any]] = []
+    try:
+        for row in (0, *data_rows):
+            try:
+                hidden = table.RowHidden(row)
+            except Exception as error:
+                hidden_rows.append([row, f"{type(error).__name__}: {error}"[:160]])
+                raise
+            hidden_rows.append([row, hidden])
+            if hidden is not False:
+                raise RuntimeError(f"{label} BOM row {row} is not proven visible")
+    finally:
+        if row_indices is not None:
+            # The caller has already proved these global rows belong to this
+            # split piece. Record native visibility evidence, never infer it
+            # from a false result on an unchecked row index.
+            try:
+                proof = {
+                    "configuration": configuration,
+                    "rows": row_count,
+                    "total_rows": int(table.TotalRowCount),
+                    "global_rows": list(data_rows[:64]),
+                    "hidden": hidden_rows[:65],
+                    "truncated": len(data_rows) > 64,
+                }
+                payload = json.dumps(proof, separators=(",", ":"))
+                _telemetry.annotate(bom_split_row_visibility=payload)
+                _telemetry.info("drawing.bom_split_row_visibility " + payload)
+            except Exception:
+                pass  # Visibility diagnostics cannot replace the strict proof.
+    column = _bom_number_column(table, label=label)
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty", "GetComponents2"
+    )
+    if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
+        raise RuntimeError(f"{label} BOM Number property binding did not persist")
+    # Rediscovery above proves the visible physical columns are a contiguous
+    # prefix, including after SKU insertion; only then map visible indices.
+    visible_physical = tuple(range(int(table.ColumnCount)))
+    quantity_columns = [
+        index
+        for index in visible_physical
+        if table.GetColumnType3(index, True)[0] == 203
+        and str(table.DisplayedText2(0, index, True) or "")
+        .strip()
+        .upper()
+        .startswith("QTY")
+    ]
+    if len(quantity_columns) != 1:
+        raise RuntimeError(f"{label} BOM has no unique quantity column")
+    quantity_column = quantity_columns[0]
+
+    def visible_cell(row: int, physical_column: int, name: str) -> str:
+        physical_text = str(
+            table.DisplayedText2(row, physical_column, True) or ""
+        )
+        visible_text = str(
+            table.DisplayedText2(
+                row, visible_physical.index(physical_column), False
+            )
+            or ""
+        )
+        if visible_text != physical_text:
+            raise RuntimeError(
+                f"{label} BOM row {row}: visible {name} {visible_text!r} "
+                f"does not match physical {name} {physical_text!r}"
+            )
+        return physical_text.strip()
+
+    visible_cell(0, column, "Number header")
+    visible_cell(0, quantity_column, "quantity header")
+    snapshot: list[tuple[int, tuple[tuple[str, str, int], ...], str, str]] = []
+    for row in data_rows:
+        components = tuple(annotation.GetComponents2(row, configuration) or ())
+        if not components:
+            raise RuntimeError(f"{label} BOM row {row} has no native components")
+        numbers: set[str] = set()
+        identities: dict[tuple[str, str], int] = {}
+        for raw_component in components:
+            component = _early_bound(raw_component, "IComponent2")
+            identity = component_identity(component)
+            identities[identity] = identities.get(identity, 0) + 1
+            native = component.GetModelDoc2()
+            if native is None:
+                raise RuntimeError(
+                    f"{label} BOM row {row}: component document is not resolved"
+                )
+            native = _early_bound(native, "IModelDoc2")
+            member = str(component.ReferencedConfiguration or "")
+            # SOLIDWORKS uses a configuration property before its document
+            # property. Read the actual member, including Simplified children.
+            number = str(
+                native.GetCustomInfoValue(member, "Number")
+                or native.GetCustomInfoValue("", "Number")
+                or ""
+            ).strip()
+            if not number:
+                raise RuntimeError(
+                    f"{label} BOM row {row}: {component.Name2!r} "
+                    f"configuration {member!r} has no Number property"
+                )
+            numbers.add(number)
+        displayed = visible_cell(row, column, "Number")
+        if len(numbers) != 1 or displayed not in numbers:
+            raise RuntimeError(
+                f"{label} BOM row {row}: associative Number {displayed!r} "
+                f"does not match native component Numbers {sorted(numbers)!r}"
+            )
+        quantity = visible_cell(row, quantity_column, "quantity")
+        if occurrence_quantities:
+            # Only the four count-based assembly consumers opt in. Bulk/length
+            # quantities must not be inferred from the number of native objects.
+            try:
+                printed_count = int(quantity)
+            except ValueError:
+                printed_count = -1
+            if printed_count != len(components):
+                raise RuntimeError(
+                    f"{label} BOM row {row}: native occurrence count "
+                    f"{len(components)} does not match printed quantity {quantity!r}"
+                )
+        snapshot.append(
+            (
+                row,
+                tuple(
+                    sorted(
+                        (stem, member, count)
+                        for (stem, member), count in identities.items()
+                    )
+                ),
+                displayed,
+                quantity,
+            )
+        )
+    if int(table.RowCount) != row_count:
+        raise RuntimeError(f"{label} BOM rows changed during its Number proof")
+    return tuple(snapshot)
+
+
 @_telemetry.traced("drawing.bom_table", label_param="label")
 def insert_bom_table(
     adapter: Any,
@@ -427,7 +1002,10 @@ def insert_bom_table(
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
     identity_aliases: dict[str, str] | None = None,
-    configuration_grouping: Literal["separate", "same-part"] = "separate",
+    component_identities: dict[str, tuple[str, str | None]] | None = None,
+    part_number_property: Literal["Number"] | None = None,
+    configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
+    configuration: str | None = None,
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -439,16 +1017,39 @@ def insert_bom_table(
     number present, so a BOM that silently dropped a component can never ship.
     ``identity_aliases`` maps alternate displayed identities (such as released
     part numbers) back to the expected component stems.
+    ``component_identities`` instead binds logical member rows to native
+    (file stem, configuration) identities; use it when Numbers repeat across
+    configured members. ``same-name`` groups by the model's BOM part-number key,
+    retaining distinct member keys while combining the transgear variants.
+    ``part_number_property="Number"`` makes the PART NUMBER column associative
+    to the model custom property without changing the internal BOM grouping key.
+    ``configuration`` selects native BOM membership independently of the rendered
+    view; ``None`` retains the view-derived configuration. An explicit name must
+    be nonempty. Bind it before Number, quantity and layout authoring.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
     table rebound as ``ITableAnnotation``.
     """
+    grouping_values = {"separate": 1, "same-part": 2, "same-name": 3}
+    if configuration_grouping not in grouping_values:
+        raise ValueError(f"unsupported BOM grouping {configuration_grouping!r}")
+    if component_identities is not None and set(component_identities) != set(
+        expected_components
+    ):
+        raise ValueError("BOM native identities must cover exactly the expected rows")
+    if part_number_property not in (None, "Number"):
+        raise ValueError("only the released Number custom property is supported")
+    if part_number_property is not None and component_identities is None:
+        raise ValueError("an associative Number column requires native row identities")
+    if configuration is not None and not configuration.strip():
+        raise ValueError("an explicit BOM configuration must be nonempty")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
-    configuration = str(
-        adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
-    )
+    if configuration is None:
+        configuration = str(
+            adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
+        )
     bom = view.InsertBomTable6(
         False,  # UseAnchorPoint=False -> place at the explicit X/Y below
         anchor_xy[0],
@@ -466,10 +1067,9 @@ def insert_bom_table(
     draw.ClearSelection2(True)
     if bom is None:
         raise RuntimeError(f"SolidWorks failed to create the {label} BOM table")
-    # A COM-inserted top-level BOM starts with NO configuration bound (a
-    # header-only table without even its per-configuration QTY column) --
-    # IBomFeature::SetConfigurations is the documented binding path for
-    # top-level tables, so bind the view's own configuration.
+    # Top-level membership is selected through IBomFeature, not the insertion
+    # Configuration argument. Set every available configuration's visibility
+    # explicitly, rather than relying on the drawing-creation selection.
     bom = _sw_type_info.early_bound_or_flag(bom, "IBomTableAnnotation", "BomFeature")
     feature = adapter._get_attr_or_call(bom, "BomFeature")
     if feature is None:
@@ -478,22 +1078,88 @@ def insert_bom_table(
         feature,
         "IBomFeature",
         "SetConfigurations",
+        "GetConfigurations",
         "PartConfigurationGrouping",
         "DisplayAsOneItem",
     )
-    if not feature.SetConfigurations(
-        True, bool_array([True]), bstr_array([configuration])
+    names, _visibility = feature.GetConfigurations(False, None)
+    names = tuple(names or ())
+    if (
+        not names
+        or any(type(name) is not str or not name for name in names)
+        or len(set(names)) != len(names)
+        or configuration not in names
     ):
+        raise RuntimeError(
+            f"{label} BOM requested configuration {configuration!r} is not "
+            f"uniquely available: {repr(names)[:512]}"
+        )
+    # Use the complete available-name/visibility contract, including explicit
+    # false flags for every other configuration, before authoring any columns.
+    if feature.SetConfigurations(
+        False,
+        bool_array([name == configuration for name in names]),
+        bstr_array(names),
+    ) is not True:
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
         )
-    grouping_value = 2 if configuration_grouping == "same-part" else 1
+    settled_names, settled_visibility = feature.GetConfigurations(False, None)
+    settled_names = tuple(settled_names or ())
+    settled_visibility = tuple(settled_visibility or ())
+    if (
+        len(settled_names) != len(names)
+        or any(type(name) is not str for name in settled_names)
+        or set(settled_names) != set(names)
+        or len(settled_visibility) != len(settled_names)
+        or any(type(visible) is not bool for visible in settled_visibility)
+        or any(
+            visible is not (name == configuration)
+            for name, visible in zip(settled_names, settled_visibility, strict=True)
+        )
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration selection did not persist for "
+            f"{configuration!r}: names={repr(settled_names)[:512]}, "
+            f"visibility={repr(settled_visibility)[:256]}"
+        )
+    _telemetry.annotate(
+        bom_configuration_names=settled_names,
+        bom_configuration_visibility=settled_visibility,
+    )
+    # swDisplay_ConfigurationWithSameName_AsOneItem=3 groups the internal BOM
+    # names, not the displayed released Number custom property. Retain the
+    # established setter order and materialize grouped rows before binding it.
+    grouping_value = grouping_values[configuration_grouping]
     setattr(feature, "PartConfigurationGrouping", grouping_value)
     setattr(feature, "DisplayAsOneItem", configuration_grouping == "same-part")
+    draw.ForceRebuild3(False)
+    rebuild_drawing(adapter, label="insert_bom_table")
+    table = _sw_type_info.early_bound(bom, "ITableAnnotation")
+    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
+        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
+    _telemetry.annotate(
+        configuration=configuration,
+        rows_before_number_binding=int(table.RowCount),
+        expected_rows=1 + len(expected_components),
+        grouping_requested=grouping_values[configuration_grouping],
+    )
+    if part_number_property is not None:
+        _bind_bom_number_property(
+            adapter,
+            table,
+            configuration=configuration,
+            label=label,
+        )
+    _telemetry.annotate(rows_after_number_binding=int(table.RowCount))
     actual_grouping = int(
         adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
     )
     actual_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
+    _telemetry.annotate(
+        grouping_after_setup=actual_grouping,
+        one_item_after_setup=actual_one_item,
+    )
     if actual_grouping != grouping_value or actual_one_item != (
         configuration_grouping == "same-part"
     ):
@@ -501,18 +1167,20 @@ def insert_bom_table(
             f"{label} BOM configuration grouping did not persist: "
             f"grouping={actual_grouping}, one_item={actual_one_item}"
         )
-    draw.ForceRebuild3(False)
-    rebuild_drawing(adapter, label="insert_bom_table")
-    table = _sw_type_info.early_bound(bom, "ITableAnnotation")
-    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
-        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
-    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
-    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    rows = int(table.RowCount)
+    columns = int(table.ColumnCount)
+    if int(table.TotalRowCount) != rows:
+        raise RuntimeError(f"{label} BOM has hidden rows before cell readback")
+    for row in range(rows):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
     contents = tuple(
         tuple(
             str(
                 adapter._attempt(
-                    lambda row=row, column=column: table.DisplayedText(row, column)
+                    lambda row=row, column=column: table.DisplayedText2(
+                        row, column, True
+                    )
                 )
                 or ""
             )
@@ -526,10 +1194,30 @@ def insert_bom_table(
             f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
             f"{contents!r}"
         )
-    identities = _bom_identity_map(expected_components, identity_aliases)
+    native_rows = (
+        bom_row_identities(
+            table,
+            configuration=configuration,
+            component_identities=component_identities,
+        )
+        if component_identities is not None
+        else None
+    )
+    identities = (
+        _bom_identity_map(expected_components, identity_aliases)
+        if native_rows is None
+        else {}
+    )
+    row_keys = (
+        {row: logical.strip().lower() for logical, row in native_rows.items()}
+        if native_rows is not None
+        else {}
+    )
     header = [cell.strip().upper() for cell in contents[0]]
     part_column = header.index("PART NUMBER") if "PART NUMBER" in header else None
-    if part_column is None:
+    if native_rows is not None:
+        observed = {logical.strip().lower() for logical in native_rows}
+    elif part_column is None:
         observed = {cell.strip().lower() for row in contents[1:] for cell in row}
     else:
         observed = {
@@ -558,13 +1246,15 @@ def insert_bom_table(
         for row in range(1, rows):
             part = (
                 str(
-                    adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
+                    adapter._attempt(
+                        lambda r=row: table.DisplayedText2(r, part_column, True)
+                    )
                     or ""
                 )
                 .strip()
                 .lower()
             )
-            text = remaining.pop(identities.get(part, part), None)
+            text = remaining.pop(row_keys.get(row, identities.get(part, part)), None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):
@@ -584,6 +1274,47 @@ def insert_bom_table(
                 f"{sorted(remaining)}"
             )
         rebuild_drawing(adapter, label="insert_bom_table")
+    final_rows = int(table.RowCount)
+    final_columns = int(table.ColumnCount)
+    final_grouping = int(
+        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
+    )
+    final_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
+    _telemetry.annotate(
+        rows_after=final_rows,
+        grouping_after=final_grouping,
+        one_item_after=final_one_item,
+    )
+    if (final_rows, final_columns) != (rows, columns):
+        raise RuntimeError(
+            f"{label} BOM dimensions changed during finalization: "
+            f"{rows}x{columns} -> {final_rows}x{final_columns}"
+        )
+    if final_grouping != grouping_value or final_one_item != (
+        configuration_grouping == "same-part"
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration grouping changed during finalization: "
+            f"grouping={final_grouping}, one_item={final_one_item}"
+        )
+    if descriptions and native_rows is not None:
+        final_native_rows = bom_row_identities(
+            table,
+            configuration=configuration,
+            component_identities=component_identities,
+        )
+        if final_native_rows != native_rows:
+            raise RuntimeError(
+                f"{label} BOM native associations changed during finalization: "
+                f"{native_rows!r} -> {final_native_rows!r}"
+            )
+    if part_number_property is not None:
+        validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label=label,
+            expected_rows=expected_rows,
+        )
     _telemetry.success(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )
@@ -598,8 +1329,8 @@ def _set_bom_cell_text(
     *,
     label: str,
 ) -> None:
-    """Write and verify one visible BOM cell."""
-    table.SetText2(row, column, False, text)
-    applied = str(table.DisplayedText2(row, column, False) or "")
+    """Write and verify one physical BOM cell."""
+    table.SetText2(row, column, True, text)
+    applied = str(table.DisplayedText2(row, column, True) or "")
     if applied != text:
         raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")

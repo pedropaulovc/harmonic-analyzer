@@ -197,10 +197,31 @@ network data or recovers files from Git.
 Current consumers use `current-native-identity.mjs` and the independently pinned
 `content/current-native-identities.json` at archive ingestion. Current Numbers
 have two identity digits (`MHA-DT-28`, assembly `MHA-DT-00`), while configuration
-qualifiers such as `T006` retain all three digits. Purchased parts use their
-immediate assembly parent (`dt-vn-fillister-screw`, `MHA-DT-VN-50`); the same
-archived vendor may resolve differently under FR, DT or PD. Tooling nests that
-scope (`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
+qualifiers such as `T006` retain all three digits. Repeated supplier-qualified
+SKUs share one native part per SKU across consumers:
+
+| Current stem / Number | Exact native configurations |
+| --- | --- |
+| `sh-vn-chain-link` / `MHA-SH-VN-50` | `InnerLink`, `OuterLink` |
+| `sh-vn-brass-fillister-screw` / `MHA-SH-VN-51` | `Default` |
+| `sh-vn-fillister-screw-90280a108` / `MHA-SH-VN-52` | `Default` |
+| `sh-vn-clamp-screw` / `MHA-SH-VN-53` | `Default` |
+| `sh-vn-arbor-set-screw` / `MHA-SH-VN-54` | `Default` |
+| `sh-vn-thumb-screw` / `MHA-SH-VN-55` | `Default` |
+| `sh-vn-music-wire` / `MHA-SH-VN-56` | `LeverWire`, `PenWire` |
+| `sh-vn-clamping-kit-hardware` / `MHA-SH-VN-57` | `HoldDownStud`, `TNut`, `FlangeNut` |
+
+Member context is explicit: `sh-vn-music-wire--LeverWire-1` under magnifier,
+`sh-vn-music-wire--PenWire-1` under pen, and chain/kit paths use their exact
+`--InnerLink`, `--OuterLink`, `--HoldDownStud`, `--TNut` or `--FlangeNut` member.
+Their bare neutral exports are the actual active first members `InnerLink`,
+`LeverWire` and `HoldDownStud`, respectively, not a `Default` alias.
+Default shared screws have no configuration qualifier. Only colliding DT
+90280A108 roles use `sh-vn-fillister-screw-90280a108__FootScrew-N` and
+`sh-vn-fillister-screw-90280a108__SwingStopScrew-N`; these are role labels,
+not invented `--FootScrew` or `--SwingStopScrew` configurations.
+Unique purchased parts remain parent-scoped; tooling nests that scope
+(`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
 The projection table pins the exact current `../cad/config/current-identity-map.json`
 bytes; Node source authority compares its active rows only with that map's
 `parts_and_assemblies`. The 18 standalone tooling families retired on 2026-10-21
@@ -224,17 +245,48 @@ the already byte-verified model's names and declared identity extras. Archived
 GLB bytes, source names, hashes, URLs, inventory matrices and measured geometry
 remain unchanged; current projection provenance is separate from model provenance.
 
+Projection provenance declares `occurrenceNamespace: 'archive-role-local'`.
+Projected paths are logical archive selectors: their historical role-local
+ordinals are not rebuilt-native `Name2` indices. The binding registry checks
+this namespace and rejects a rebuilt-native namespace; neither matching index
+values nor guessed offsets establish correspondence. Refreshing bindings for
+rebuilt-native occurrences first requires checked file identity, exact member
+configuration and `ComponentReference` (`Role:1`, with a 1-based semantic index)
+readback. That gate must establish the actual bridge before a rebuilt-native
+binding refresh; this archive projection supplies no such mapping.
+
+Logical occurrence qualifiers are case-sensitive: `--InnerLink-1` is not the
+physical mesh key `--innerlink`. The lowercased logical selector is rejected.
+Configuration export paths come from the CAD member-export inventory: the first
+member uses bare STEP/PNG filenames, other members use sanitized lowercase
+configuration suffixes, and STL keys remain configuration-qualified. Each of
+the seven distinct members retains STEP, STL and PNG coverage.
+
+Archived source lookup selects identity before checking file availability.
+`CadIdentityMap.source_file(..., parent='pn-pen', configuration='PenWire',
+role='PenWire')` resolves the declared historical wire member; an unqualified
+shared source with multiple candidates is ambiguous even if only one file is
+present. Explicit current member-module paths compose through `sourceFiles`.
+These are exact archived-source lookups, not compatibility modules or claims
+that a merged producer has one arbitrary historical implementation.
+
 ```sh
 npm --prefix web run verify:identity-evidence
 # From web/: read-only seals and deterministic byte replay
-uv run --isolated --no-project python scripts/canonical-native-evidence.py validate
-uv run --isolated --no-project python scripts/canonical-native-evidence.py check
-# Explicit authoring only, after an intentional mapping/input change:
-uv run --isolated --no-project --python 3.13 python scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py validate
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py check
+# Historical derivative authoring only, not for current-name/table-only updates:
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py generate
 ```
 
-Use stock-zlib Python 3.13 for authoring: a different gzip implementation can
-change stored compressed evidence bytes even when decoded measurements agree.
+For a current identity-only update, refresh only the affected
+`canonicalConsumerInputs` seals (CRLF-to-LF normalization); do not regenerate
+historical derivatives, snapshots, source hashes or mapping provenance.
+
+Pin Python 3.13.9 with stock zlib 1.3.1 for replay and authoring: deterministic
+gzip bytes must match the recorded compression toolchain. A different compressor
+(such as Python 3.14's zlib-ng) can change stored bytes even when decoded
+measurements agree.
 
 `verify:sync` runs the identity evidence check first. Both read-only commands
 check exact original, derivative and historical-snapshot SHA-256 seals,
@@ -714,7 +766,7 @@ their old projection/GPU proof; they do not qualify current geometry.
 From the repository root, store an authored input without reserializing JSON:
 
 ```sh
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
 ```
 
 The command retains the source file and writes exact-byte deterministic gzip
@@ -722,17 +774,17 @@ The command retains the source file and writes exact-byte deterministic gzip
 namespace is accepted. Compression preserves numeric spelling and supplies no
 geometry or fidelity qualification.
 
-After authoring stops, regenerate in this order using the pinned source-fit
-requirements for the four producers:
+After authoring stops, regenerate in this order using Python 3.13.9 and the
+pinned source-fit requirements for the four producers:
 
 ```sh
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py check
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py check
 ```
 
 The first canonical generation refreshes input seals; the final generate/check

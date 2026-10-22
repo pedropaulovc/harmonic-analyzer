@@ -25,3 +25,32 @@ PITCH = IN / 56.0
 # (major dia, length, head height, head dia, pitch): the slotted-head
 # recipe's size row (diagnostics.diag_mcmaster_fillister.build_fillister).
 PAN_HEAD_SIZE = (MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, PITCH)
+
+# Actual supplier engineering drawing inspected 2026-10-19.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260610/72386355/"
+    "92446A077_Brass%20Pan%20Head%20Slotted%20ScrewsX.GIF"
+)
+# Production axis is Z, head -Z: Top sketch Y is model -Z.
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -LENGTH, "vertical"),
+    ("SupplierHeadHeight", HEAD_H, "vertical"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
+    ("SupplierThreadDiameter", MAJOR_DIA, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierThreadDiameter": (-MAJOR_DIA / 2.0, -LENGTH / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierLength": "Top",
+    "SupplierHeadHeight": "Top",
+    "SupplierThreadDiameter": "Top",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "2-56"),
+}

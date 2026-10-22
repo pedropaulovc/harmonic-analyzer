@@ -16,8 +16,8 @@ Sources:
 * FROM THE FASTENER TABLE (imported): thread, printed length, head, count,
   grip and the joint (``fasteners.KP08_TO_BRACKET``); the catalogue's thread and
   length must equal the row's (checked at import).
-* STANDARD: the row gives no drive or socket depth, so it is the family's #6
-  hex and the standard's minimum key engagement (``_mcmaster_91251a150``).
+* STANDARD: the socket depth is the standard's minimum key engagement
+  (``_mcmaster_91251a150``); the exact-current page now confirms the 7/64 in drive.
 * The geometry is the 91251A family's catalogue recipe
   (``diag_mcmaster_socket_head.build_socket_head``: plain cylindrical head,
   0.75P tip chamfer, 45 deg thread neck); no vendor model was downloaded
@@ -48,3 +48,45 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     raise AssertionError(
         f"{SKU}: major {DIMS.major_dia}, the row's thread is {ROW.major_mm}"
     )
+
+# Exact-current product table and engineering drawing read 2026-10-21.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# Drawing precision: length/head Ø/head height .XXX, major Ø .XXXX,
+# drive an exact 7/64 fraction. The standard-only socket depth is omitted.
+SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A150/"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/FD01A0DF/"
+    "91251A150_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
+    ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierThreadDiameter": "bottom",
+    "SupplierDriveWidth": "bottom",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierThreadDiameter": (4, "diameter", None, "6-32"),
+    "SupplierDriveWidth": (0, "length", 64, None),
+}

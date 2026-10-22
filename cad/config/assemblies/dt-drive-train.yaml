@@ -65,7 +65,7 @@ allowed_free_stems:
   - dt-vn-crank-seat-drive-pin
   - dt-crankshaft
   - dt-cylinder-gear
-  - dt-vn-fillister-screw
+  - sh-vn-brass-fillister-screw
   # MHA-DT-VN-65/150: lock-mated to the arm, they ride the crank spin.
   - dt-vn-keeper-chain
   - dt-vn-keeper-chain-link

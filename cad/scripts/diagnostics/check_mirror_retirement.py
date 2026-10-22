@@ -8,8 +8,10 @@ expected formulas below now describe the new machine frame; the documented
 exceptions carry their own widened tolerances inline (lever-wire 2c artifact,
 crank-family solver noise, chain-pattern fill drift).
 
-Ephemeral migration validator: it needs the machine-local golden dump and can
-be deleted once #151 merges and the post-rebuild pose diff is clean.
+The golden keys are archived role-local selectors, not current native Name2
+identities. Shared-stock comparisons report their canonical file/member and
+semantic reference explicitly; only a separate native readback can bridge them
+to a rebuilt occurrence. This validator never rewrites the sealed pose dump.
 
 Run: ``uv run python cad/scripts/diagnostics/check_mirror_retirement.py``
 """
@@ -35,8 +37,73 @@ def _status(ok: bool, line: str) -> None:
     (_telemetry.debug if ok else _telemetry.error)(line)
 
 
+_ARCHIVE_MEMBERS = {
+    "pd-vn-chain-inner-link": ("sh-vn-chain-link", "InnerLink", "InnerLink"),
+    "pd-vn-chain-outer-link": ("sh-vn-chain-link", "OuterLink", "OuterLink"),
+    "mg-vn-lever-wire": ("sh-vn-music-wire", "LeverWire", "LeverWire"),
+    "pn-vn-pen-wire": ("sh-vn-music-wire", "PenWire", "PenWire"),
+    "dt-vn-foot-screw": ("sh-vn-fillister-screw-90280a108", "Default", "FootScrew"),
+    "dt-vn-swing-stop-screw": (
+        "sh-vn-fillister-screw-90280a108", "Default", "SwingStopScrew"
+    ),
+}
+_ARCHIVE_STOCK = {
+    "dt-vn-fillister-screw": "sh-vn-brass-fillister-screw",
+    "fr-vn-fillister-screw": "sh-vn-brass-fillister-screw",
+    "pd-vn-fillister-screw": "sh-vn-brass-fillister-screw",
+    "pd-vn-latch-hook-bracket-screw": "sh-vn-fillister-screw-90280a108",
+    "mg-vn-clamp-screw": "sh-vn-clamp-screw",
+    "pd-vn-clamp-screw": "sh-vn-clamp-screw",
+    "ch-vn-arbor-set-screw": "sh-vn-arbor-set-screw",
+    "dt-vn-arbor-set-screw": "sh-vn-arbor-set-screw",
+    "mg-vn-thumb-screw": "sh-vn-thumb-screw",
+    "ms-vn-thumb-screw": "sh-vn-thumb-screw",
+}
+
+
+def _archive_occurrence(component):
+    """Describe an archived selector without claiming a rebuilt native index."""
+    parent, separator, leaf = component.rpartition("/")
+    stem, dash, ordinal = leaf.rpartition("-")
+    if not dash or not ordinal.isdecimal() or int(ordinal) < 1:
+        raise ValueError(f"invalid archived occurrence: {component!r}")
+    member = _ARCHIVE_MEMBERS.get(stem)
+    if member is not None:
+        native_stem, configuration, role = member
+        reference = f"{role}:{int(ordinal)}"
+    else:
+        native_stem, configuration = _ARCHIVE_STOCK.get(stem, stem), "Default"
+        reference = None
+    return {
+        "namespace": "archive-role-local",
+        "archiveSelector": component,
+        "parent": parent if separator else "",
+        "nativeStem": native_stem,
+        "configuration": configuration,
+        "semanticReference": reference,
+    }
+
+
+def _archive_member_key(stem, configuration, reference):
+    """Project an exact current member/role into the sealed archive namespace."""
+    role, separator, ordinal = reference.partition(":")
+    if not separator or not ordinal.isdecimal() or int(ordinal) < 1:
+        raise ValueError(f"invalid semantic reference: {reference!r}")
+    matches = [
+        archived_stem
+        for archived_stem, identity in _ARCHIVE_MEMBERS.items()
+        if identity == (stem, configuration, role)
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"ambiguous or missing archived member: {(stem, configuration, reference)!r}")
+    return f"{matches[0]}-{int(ordinal)}"
+
+
 def expect(asm, comp, pos, rows, label, pos_tol=1e-3, row_tol=1e-6):
-    g = json.load(open(GOLD / f"{asm}.json"))[comp]
+    archived = _archive_occurrence(comp)
+    _telemetry.debug(f"archived pose selector {archived!r}; no rebuilt Name2 claim")
+    with (GOLD / f"{asm}.json").open(encoding="utf-8") as source:
+        g = json.load(source)[archived["archiveSelector"]]
     gp = [v * 1000.0 for v in g[9:12]]
     gr = g[0:9]
     fr = [c for row in rows for c in row]
@@ -105,7 +172,12 @@ import build_pn_pen_assembly as p
 expect("pn-pen", "pn-pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pn-pen-hanger")
 expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 for _stem, _pos, _rows in p.RIDERS:
-    expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
+    archived_key = (
+        _archive_member_key(_stem, "PenWire", "PenWire:1")
+        if _stem == "sh-vn-music-wire"
+        else f"{_stem}-1"
+    )
+    expect("pn-pen", archived_key, list(_pos), _rows, _stem)
 expect("pn-pen", "pn-vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "pn-vn-hanger-screw")
 expect("pn-pen", "pn-vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "pn-vn-pen-hanger-nut")
 expect(

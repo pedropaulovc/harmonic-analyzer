@@ -1,6 +1,6 @@
 # Building the model
 
-Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 00 and retain the `-assembly` artifact suffix; fabricated parts start at 01 within each subsystem, and vendor parts start at VN-50 within their direct parent assembly.
+Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 00 and retain the `-assembly` artifact suffix; fabricated parts start at 01 within each subsystem; a vendor part unique to one assembly starts at VN-50 within that direct parent; a supplier-qualified SKU used by several assemblies (or by several differing members) is one shared `sh_vn_*` part numbered MHA-SH-VN-50 onward, with heterogeneous members as named configurations, so `part:sh_vn_chain_link` builds both the `InnerLink` and `OuterLink` members and every consuming assembly or drawing selects its member configuration explicitly rather than building a parent-scoped copy.
 
 The CAD model is generated headlessly from a clean checkout. Every task that
 drives COM needs a SolidWorks seat, and there are two ways to have one:
@@ -108,6 +108,10 @@ uv run python -m doit build_bare
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
 uv run python -m doit part:dt_cone_gear
 
+# One shared vendor part: every consuming assembly (here mg, pn) stays stale
+# until rebuilt; there is no per-parent copy to select instead
+uv run python -m doit part:sh_vn_music_wire
+
 # Just one assembly (+ its stale prerequisites), or a single gate
 uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit verify:soundness        # one SW gate
@@ -121,6 +125,48 @@ uv run python -m doit release
 uv run python -m doit list --all
 uv run python -m doit clean
 ```
+
+The heterogeneous shared vendor parts preserve **every member's STEP and
+isometric PNG** in their own `part:<stem>` task, alongside their one native
+SLDPRT. The registry's `configuration_quantities` and `default_configuration`
+are the sole member inventory:
+
+| Part | Bare STEP/PNG member | Other members |
+| --- | --- | --- |
+| `sh-vn-chain-link` | `InnerLink` | `OuterLink` |
+| `sh-vn-music-wire` | `LeverWire` | `PenWire` |
+| `sh-vn-clamping-kit-hardware` | `HoldDownStud` | `TNut`, `FlangeNut` |
+
+For example, `step/sh-vn-chain-link.STEP` and
+`png/sh-vn-chain-link/sh-vn-chain-link_isometric.png` depict **InnerLink only**.
+OuterLink uses `step/sh-vn-chain-link--outerlink.STEP` and
+`png/sh-vn-chain-link--outerlink/sh-vn-chain-link--outerlink_isometric.png`.
+All suffixes use the existing lowercase configuration mesh-key convention.
+Scene-generated STLs remain qualified for every named member, including
+`sh-vn-chain-link--innerlink.STL`; the bare build STL remains a placement sidecar,
+not another released member identity.
+Configured purchased drawings read their registry metadata from the native source
+part identity, not the drawing's output label. Their cache dependencies therefore
+remain scoped to that source part's row.
+
+Each part task declares and caches all member STEP/PNG files together with its
+`reports/part-neutral/<stem>.json` certificate. The certificate records the
+configuration for each file, its exact bytes, and the native `.execution`
+identity. Subsequent parent-assembly saves may change raw native bytes without
+changing that execution identity. The part action validates the complete member
+set after execution stamping on every cache/worker return and before publishing.
+An invalid restored set fails closed with its part name, cache key, and explicit
+refresh recovery instruction; it never silently rebuilds or retries for success.
+Full neutral export validates and consumes the part-owned files unchanged, even
+with `--force`; missing or stale member outputs fail closed and require an
+explicit refresh of their owning part task. The release manifest records the
+explicit member-to-format mapping and requires all seven configured scene STLs
+rather than silently dropping a member.
+
+Native qualification of these member STEP/PNG outputs needs only the changed
+shared-part targets; it does **not** require submitting the aggregate `export`
+closure. Select affected assemblies and drawings separately when qualifying
+their configuration usage.
 
 `cad/config/release.yaml` reserves the Revision stamped into every native CAD
 file and linked drawing title block. Migrated and enrolled process plans in

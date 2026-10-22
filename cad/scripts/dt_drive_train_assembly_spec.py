@@ -18,6 +18,21 @@ from typing import Literal, Sequence
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
+# Native occurrence references distinguish applications of the same physical
+# Default part. These selectors are role-local, never native Name2 indices.
+FOOT_SCREW_ROLE = "FootScrew:1"
+SWING_STOP_SCREW_ROLE = "SwingStopScrew:1"
+FOOT_SCREW_SELECTOR = f"@{FOOT_SCREW_ROLE}"
+SWING_STOP_SCREW_SELECTOR = f"@{SWING_STOP_SCREW_ROLE}"
+COMPONENT_IDENTITIES: dict[str, tuple[str, str]] = {
+    FOOT_SCREW_SELECTOR: ("sh-vn-fillister-screw-90280a108", "Default"),
+    SWING_STOP_SCREW_SELECTOR: ("sh-vn-fillister-screw-90280a108", "Default"),
+}
+_ROLE_SELECTORS = {
+    FOOT_SCREW_ROLE: FOOT_SCREW_SELECTOR,
+    SWING_STOP_SCREW_ROLE: SWING_STOP_SCREW_SELECTOR,
+}
+
 # Families still arriving from a sibling branch, classified ahead of time so
 # the integration head needs no plan edit; an absent pending family is not an
 # error. Empty since the crank-hub cluster (MHA-DT-31/138, #831) landed.
@@ -37,7 +52,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-vn-cylinder-bank-spring",
         "dt-cylinder-gear",
         "dt-vn-pedestal-hold-down-screw",
-        "dt-vn-arbor-set-screw",
+        "sh-vn-arbor-set-screw",
     ),
     "cone-set": (
         "dt-cone-gear-shaft",
@@ -53,7 +68,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-vn-post-mount-screw",
         "dt-vn-cone-lock-knob",
         "dt-vn-cone-pivot-screw",
-        "dt-vn-swing-stop-screw",
+        SWING_STOP_SCREW_SELECTOR,
     ),
     "crank": (
         "dt-crankshaft",
@@ -65,7 +80,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-crank-pin-eye",
         "dt-vn-keeper-chain",
         "dt-vn-keeper-chain-link",
-        "dt-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         "dt-crank-handle",
         "dt-crank-handle-ferrule",
         "dt-crank-handle-butt-cup",
@@ -90,7 +105,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-pinion-arbor-collar",
         "dt-vn-pinion-strap-pin",
         "dt-vn-slotted-screw",
-        "dt-vn-foot-screw",
+        FOOT_SCREW_SELECTOR,
     ),
 }
 Pick = Literal["south", "north"]
@@ -99,7 +114,7 @@ Pick = Literal["south", "north"]
 # where it stands, so a layout move cannot re-pick it.  MHA-DT-VN-63 serves both as
 # the two strap set pins (stationary with the straps) and as the MHA-DT-33 collar
 # pin, which leaves with the arbor it pins.
-Role = Literal["arbor-collar-pin"]
+Role = Literal["arbor-collar-pin", "FootScrew:1", "SwingStopScrew:1"]
 COLLAR_PIN_ROLE: Role = "arbor-collar-pin"
 
 
@@ -131,14 +146,14 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # cylinder bank: slide the retention stack off each end of the arbor
     ExplodeStep(
         "south pedestal",
-        ("dt-arbor-pedestal", "dt-vn-pedestal-hold-down-screw", "dt-vn-arbor-set-screw"),
+        ("dt-arbor-pedestal", "dt-vn-pedestal-hold-down-screw", "sh-vn-arbor-set-screw"),
         "z",
         -35.0,
         ("south",),
     ),
     ExplodeStep(
         "north pedestal",
-        ("dt-arbor-pedestal", "dt-vn-pedestal-hold-down-screw", "dt-vn-arbor-set-screw"),
+        ("dt-arbor-pedestal", "dt-vn-pedestal-hold-down-screw", "sh-vn-arbor-set-screw"),
         "z",
         35.0,
         ("north",),
@@ -148,7 +163,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # read as one ring. Separate their ink without reaching the north pedestal.
     ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", 22.0),
     ExplodeStep("pedestal screws lift", ("dt-vn-pedestal-hold-down-screw",), "y", 30.0),
-    ExplodeStep("apex set screws lift", ("dt-vn-arbor-set-screw",), "y", 20.0),
+    ExplodeStep("apex set screws lift", ("sh-vn-arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,
     # the MHA-DT-VN-54 collar locked on it) withdraws north out of the post along
     # its own axis, so the MHA-DT-04 journal stands clear of the post (user
@@ -170,7 +185,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # showed only a head sliver there (#1687 r6 and DtPinionLeverPin r2,
     # balloon 16); 75 stands the head 8 mm of sheet higher, below the
     # MHA-DT-VN-61 heads that set the sheet's top.
-    ExplodeStep("swing stop lifts", ("dt-vn-swing-stop-screw",), "y", 75.0),
+    ExplodeStep("swing stop lifts", (SWING_STOP_SCREW_SELECTOR,), "y", 75.0),
     ExplodeStep(
         "cone rotor withdraws",
         ("dt-cone-gear-shaft", "dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-tip-collar"),
@@ -223,7 +238,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "dt-crank-pin-eye",
             "dt-vn-keeper-chain",
             "dt-vn-keeper-chain-link",
-            "dt-vn-fillister-screw",
+            "sh-vn-brass-fillister-screw",
             "dt-crank-handle",
             "dt-crank-handle-ferrule",
             "dt-crank-handle-butt-cup",
@@ -257,7 +272,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         -25.0,
     ),
     ExplodeStep("keeper chain", ("dt-vn-keeper-chain", "dt-vn-keeper-chain-link"), "y", -20.0),
-    ExplodeStep("anchor screw", ("dt-vn-fillister-screw",), "z", -35.0),
+    ExplodeStep("anchor screw", ("sh-vn-brass-fillister-screw",), "z", -35.0),
     ExplodeStep("anchor eyelet", ("dt-crank-pin-eye",), "z", -18.0),
     # MHA-DT-VN-59 comes forward out of the arm/hub seam, past the anchor screw
     # head (#1121): it sits 11 from the screw axis.
@@ -274,7 +289,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "dt-pinion-pivot-block",
             "dt-vn-slotted-screw",
             "dt-pinion-spring",
-            "dt-vn-foot-screw",
+            FOOT_SCREW_SELECTOR,
         ),
         "y",
         -50.0,
@@ -295,8 +310,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # shank (DtPinionLeverPin r2, 20261019T012255621Z, balloon 32): MHA-DT-24
     # and its screw step east off the strap, the blade ~7 clear of the block's
     # north-east corner in the view, then the screw lifts out of the foot.
-    ExplodeStep("spring steps east", ("dt-pinion-spring", "dt-vn-foot-screw"), "x", -30.0),
-    ExplodeStep("spring foot screw lifts", ("dt-vn-foot-screw",), "y", 25.0),
+    ExplodeStep("spring steps east", ("dt-pinion-spring", FOOT_SCREW_SELECTOR), "x", -30.0),
+    ExplodeStep("spring foot screw lifts", (FOOT_SCREW_SELECTOR,), "y", 25.0),
     ExplodeStep("pinion lever", ("dt-pinion-lever", "dt-pinion-lever-pin"), "z", -40.0),
     # The MHA-DT-33 collar is pinned to the arbor, so it comes out with it.
     ExplodeStep(
@@ -337,8 +352,25 @@ class Instance:
     role: Role | None = None
 
 
+def component_stem(selector: str) -> str:
+    """Physical BOM family for a family key or explicit occurrence selector."""
+    return COMPONENT_IDENTITIES[selector][0] if selector.startswith("@") else selector
+
+
+def instance_selector(instance: Instance) -> str:
+    """Presentation key from a validated physical family and occurrence role."""
+    selector = _ROLE_SELECTORS.get(instance.role)
+    if selector is not None:
+        if instance.stem != component_stem(selector):
+            raise ValueError(f"{instance.name}: role {instance.role!r} has wrong family")
+        return selector
+    if instance.stem in {identity[0] for identity in COMPONENT_IDENTITIES.values()}:
+        raise ValueError(f"{instance.name}: shared screw requires an occurrence role")
+    return instance.stem
+
+
 def classified_stems() -> frozenset[str]:
-    return frozenset(stem for stems in CLUSTERS.values() for stem in stems)
+    return frozenset(component_stem(key) for keys in CLUSTERS.values() for key in keys)
 
 
 def unclassified_stems(stems: Sequence[str]) -> list[str]:
@@ -373,10 +405,12 @@ def plan_explode(
     unknown = unclassified_stems(sorted(stems))
     if unknown:
         raise ValueError(f"explode plan does not classify {unknown!r}")
-    role_stems: dict[Role, set[str]] = {}
+    role_stems: dict[Role, set[str]] = {
+        role: {component_stem(selector)} for role, selector in _ROLE_SELECTORS.items()
+    }
     for step in EXPLODE_STEPS:
         for role in step.roles:
-            role_stems.setdefault(role, set()).update(step.stems)
+            role_stems.setdefault(role, set()).update(component_stem(key) for key in step.stems)
     for role, owners in role_stems.items():
         tagged = [instance for instance in instances if instance.role == role]
         if len(tagged) != 1 or tagged[0].stem not in owners:
@@ -390,7 +424,7 @@ def plan_explode(
     if stray:
         raise ValueError(f"instances carry roles no step moves: {stray!r}")
 
-    moved_stems = {stem for step in EXPLODE_STEPS for stem in step.stems}
+    moved_stems = {component_stem(key) for step in EXPLODE_STEPS for key in step.stems}
     unplanned = sorted(stems - moved_stems - STATIONARY_STEMS)
     if unplanned:
         raise ValueError(f"families neither exploded nor stationary: {unplanned!r}")
@@ -407,7 +441,7 @@ def plan_explode(
             sorted(
                 instance.name
                 for instance in instances
-                if instance.stem in step.stems and _picked(step, instance)
+                if instance_selector(instance) in step.stems and _picked(step, instance)
             )
         )
         if not names:

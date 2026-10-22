@@ -17,9 +17,14 @@ Sources:
   washer, reusable up to 15 times, comparable to NORD-LOCK; 316 stainless
   steel, Rockwell C51, case hardened; for No. 8 / M4; ID 0.170 in, OD
   0.300 in, thickness 0.080 to 0.100 in; 5 per package, $11.71.
-* UNVERIFIED: the listing does not say whether the thickness is the pair's
-  stack or one washer's, nor whether a package is 5 pairs.  The model takes
-  it as the pair's stack at its 0.100 in maximum (``_mcmaster_91812a215``),
+* EXACT-CURRENT PRIMARY, https://www.mcmaster.com/91812A215/ read 2026-10-21:
+  the product table repeats those dimensions. Its engineering drawing
+  (``SUPPLIER_DRAWING_URL``) spans the depicted two-piece stack, not an
+  individual half. References below describe only the unchanged plain
+  envelope; they do not assert that the model contains a physical pair.
+* RETAINED RECEIPT CAVEAT: the 2026-10-17 listing alone did not identify a
+  pair stack or a single half, nor whether a package is 5 pairs. The model
+  keeps the pair's stack at its 0.100 in maximum (``_mcmaster_91812a215``),
   the worst case for the screw's engagement and its head's stand-out; the
   C4 calculator carries the same stack as a literal
   (``leadscrew.BLOCK_SCREW_LOCK_STACK``), pinned here.  Verify on receipt.
@@ -77,6 +82,38 @@ PACK_QUANTITY = PACKAGE_QTY  # UNVERIFIED: pairs or single washers
 THICKNESS = PAIR_THICKNESS  # the modelled pair's stack, 2.54
 BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
+
+# Exact-current engineering image inspected 2026-10-21. Use its two-place
+# inch precision (.17 ID, .30 OD, .08-.10 stack), not the product table's
+# three-place typography (.170, .300, .080-.100); the values agree exactly.
+# No diameter band is supplied. Keep the existing maximum-stack envelope
+# and receipt caveat; neither the pair split nor its locking faces are added.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260617/507EC1D2/"
+    "91812A215_Extreme-Vibration-Resistant%20Wedge%20Lock%20WasherX.GIF"
+)
+SUPPLIER_UNITS = "in"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 2,
+    "supplier bore diameter": 2,
+    "supplier thickness": 2,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
+}
+SUPPLIER_BORE_CALLOUT = "FOR No. 8 / M4 SCREW SIZE"
+SUPPLIER_DATA = (
+    "SUPPLIER DRAWING SHOWS A TWO-PIECE WEDGE-LOCK STACK.",
+    "MODEL IS THE MAXIMUM-THICKNESS PLAIN ENVELOPE.",
+    "SPLIT, CAMS AND SERRATIONS ARE NOT MODELLED.",
+    "PAIR / PACKAGE INTERPRETATION: VERIFY ON RECEIPT.",
+)
+REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)
+DRAWING_PRECISION = {
+    "SupplierWasherThicknessReference": {
+        "SupplierThickness": DRAWING_REFERENCE_PRECISION["supplier thickness"],
+    },
+}
 
 _CBORE_BAND = printed_band_mm(pivot_block.SIDE_CBORE_PLACES)
 # Diametral clearance in the smallest counterbore: 7.81 - 7.62.

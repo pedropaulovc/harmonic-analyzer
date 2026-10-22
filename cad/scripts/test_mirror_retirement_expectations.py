@@ -305,3 +305,59 @@ def test_magnifying_bracket_screws_are_free_and_locked_to_the_bracket() -> None:
     )
     assert ast.unparse(mate.args[1]) == "named_ref(f'Front Plane@{screw}', 'PLANE')"
     assert ast.unparse(mate.args[2]) == "named_ref(f'Front Plane@{bracket}', 'PLANE')"
+
+
+def _archive_helpers() -> dict:
+    """Load only the pure archive descriptors, never the golden-pose script."""
+    source = ast.parse(DIAGNOSTIC.read_text(encoding="utf-8"))
+    selected = [
+        node for node in source.body
+        if (
+            isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name)
+                and target.id in {"_ARCHIVE_MEMBERS", "_ARCHIVE_STOCK"}
+                for target in node.targets
+            )
+        ) or (
+            isinstance(node, ast.FunctionDef)
+            and node.name in {"_archive_occurrence", "_archive_member_key"}
+        )
+    ]
+    assert len(selected) == 4
+    namespace = {}
+    exec(compile(ast.Module(body=selected, type_ignores=[]), str(DIAGNOSTIC), "exec"), namespace)
+    return namespace
+
+
+@pytest.mark.parametrize(
+    ("archived", "stem", "configuration", "reference"),
+    [
+        ("dt-vn-foot-screw-1", "sh-vn-fillister-screw-90280a108", "Default", "FootScrew:1"),
+        ("dt-vn-swing-stop-screw-1", "sh-vn-fillister-screw-90280a108", "Default", "SwingStopScrew:1"),
+        ("mg-vn-lever-wire-1", "sh-vn-music-wire", "LeverWire", "LeverWire:1"),
+        ("pd-vn-chain-inner-link-34", "sh-vn-chain-link", "InnerLink", "InnerLink:34"),
+        ("pd-vn-chain-outer-link-33", "sh-vn-chain-link", "OuterLink", "OuterLink:33"),
+    ],
+)
+def test_shared_archive_selectors_never_claim_rebuilt_native_name_equality(
+    archived, stem, configuration, reference
+) -> None:
+    qualified = f"parent-1/{archived}"
+    assert _archive_helpers()["_archive_occurrence"](qualified) == {
+        "namespace": "archive-role-local",
+        "archiveSelector": qualified,
+        "parent": "parent-1",
+        "nativeStem": stem,
+        "configuration": configuration,
+        "semanticReference": reference,
+    }
+
+
+def test_configured_pen_rider_projects_to_its_exact_archived_role() -> None:
+    archive_key = _archive_helpers()["_archive_member_key"]
+    assert archive_key("sh-vn-music-wire", "PenWire", "PenWire:1") == "pn-vn-pen-wire-1"
+    with pytest.raises(ValueError, match="ambiguous or missing"):
+        archive_key("sh-vn-music-wire", "LeverWire", "PenWire:1")
+    with pytest.raises(ValueError, match="ambiguous or missing"):
+        archive_key("sh-vn-music-wire", "Default", "PenWire:1")

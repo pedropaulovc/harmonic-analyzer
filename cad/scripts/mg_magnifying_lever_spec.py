@@ -96,7 +96,7 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
     )
 
 # --- the MHA-MG-02 clamp screw's seat: the Ø6 body ---------------------------
-# Owner ruling 2026-10-17: the clamp's thumb screw (MHA-MG-VN-50) pinches the
+# Owner ruling 2026-10-17: the clamp's thumb screw (MHA-SH-VN-55) pinches the
 # lever wherever the operator sets the clamp, so the OD it bears on is a
 # static locating seat, Ra 3.2 (drawing-guidelines.md rule 6, SEAT_UM;
 # mg-magnifying-lever.yaml machinist_exceptions RV-01).  The screw stands on

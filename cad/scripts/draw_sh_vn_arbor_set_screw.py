@@ -1,0 +1,57 @@
+"""Create the shared MHA-SH-VN-54 reference sheet for McMaster 91375A106."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from functools import partial
+from typing import Any
+
+import _telemetry
+from _session import run_build
+from _drawing_registry import DRAWINGS_BY_NAME
+from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _supplier_screw_dimensions import annotate_supplier_screw
+from _supplier_screw_layout import supplier_screw_margins
+import sh_vn_arbor_set_screw_spec as supplier
+
+
+SPEC = DRAWINGS_BY_NAME["sh_vn_arbor_set_screw"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "#4-40 x 1/4 SOCKET SET SCREW, CUP POINT"
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    checks = []
+    return await build_purchased_fastener_drawing(
+        adapter,
+        SPEC,
+        item=ITEM,
+        supplier_dimensions=partial(
+            annotate_supplier_screw,
+            dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            formats=supplier.SUPPLIER_REFERENCE_FORMATS,
+            starts=supplier.SUPPLIER_REFERENCE_STARTS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            settled_checks=checks,
+        ),
+        supplier_margins=supplier_screw_margins(
+            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+        ),
+        settled_checks=checks,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[SPEC.artifact_stem])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

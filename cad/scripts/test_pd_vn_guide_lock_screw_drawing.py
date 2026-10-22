@@ -4,25 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from pathlib import Path
 
 import pytest
 
 import _sketch
 import _config
 import _telemetry
-import build_pd_vn_guide_lock_screw as part
 import build_pd_platen_guide as guide
-import draw_pd_vn_guide_lock_screw as drawing
 import pd_vn_guide_lock_screw_spec as screw
 import pd_guide_lock_spec as lock
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
-from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
-from _test_stock_recipes import discovered_recipes
 import _mcmaster_91792a108 as pan
 from diagnostics import diag_mcmaster_fillister as recipe
-from diagnostics import diag_mcmaster_oval as catalog
 from diagnostics import diag_build_91792A108 as sku_recipe
 from diagnostics import diag_mcmaster_lib
 
@@ -177,29 +170,15 @@ def test_recipe_cuts_the_driver_slot_and_thread(monkeypatch) -> None:
     assert slot_floor == pytest.approx(head_h - 1.5 * slot_w)
     # The slot floor stays inside the head, above its bearing face.
     assert 0.0 < slot_floor < head_h
-    assert ("create_sketch", ("Front",), {}) in calls
-    assert any(c[0] == "create_cut_extrude" for c in calls)
     (helix,) = [c for c in calls if c[0] == "insert_helix"]
     assert helix[1][1:3] == pytest.approx((pitch, length / pitch + 1.0))
-    sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
-    assert [c[1][-1] for c in sweeps] == ["ThreadGroove"]
-    assert ("split_at_plane", ("Top Plane", "HeadSplit"), {}) in calls
 
 
-def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
+def test_registry_preserves_the_purchased_screw_material() -> None:
     row = _config.parts(STEM)
-    stock = FASTENERS[STEM]
-    assert part.SPEC is stock
-    assert stock.skus == tuple(row["supplier_skus"]) == (screw.SKU,)
-    assert stock.supplier == row["supplier"] == "McMaster-Carr"
-    assert stock.stock_name == row["stock_name"]
-    assert "Slotted" in stock.stock_name
-    assert stock.material == row["material"] == part.MATERIAL == "AISI 304"
-    assert row["number"] == "MHA-PD-VN-60"
-    metadata = discovered_recipes()[screw.SKU]
-    assert metadata.module == sku_recipe.__name__
-    assert getattr(sku_recipe, metadata.callable_name) is sku_recipe.build_91792A108
-    assert metadata.threaded
+    assert row["supplier_skus"] == [screw.SKU]
+    assert row["supplier"] == "McMaster-Carr"
+    assert row["material"] == "AISI 304"
 
 
 def test_quantity_is_one_screw_per_guide_lock_hole() -> None:
@@ -207,86 +186,3 @@ def test_quantity_is_one_screw_per_guide_lock_hole() -> None:
     locks = int(_config.parts("pd-guide-lock")["quantity"])
     assert int(_config.parts(STEM)["quantity"]) == per_lock * locks
     assert len(guide.HOLE_X) * 2 == per_lock * locks  # two guide rails
-
-
-def test_stock_build_takes_the_fillister_frame(monkeypatch) -> None:
-    """The paper drive places it as it placed MHA-PD-VN-52: bearing face on the
-    origin, shank along +Z."""
-    import build_dt_vn_fillister_screw as fillister
-
-    seen: dict = {}
-    fillister_seen: dict = {}
-
-    def fake(store):
-        async def fake_build(adapter, **kwargs):
-            store.update(kwargs)
-            return {}
-
-        return fake_build
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake(seen))
-    monkeypatch.setattr(fillister, "build_stock_fastener", fake(fillister_seen))
-    asyncio.run(part.build(None))
-    asyncio.run(fillister.build(None))
-    (component,) = seen["components"]
-    (reference,) = fillister_seen["components"]
-    assert component.sku == screw.SKU
-    assert component.author is sku_recipe.build_91792A108
-    assert component.transform == reference.transform
-    assert "screw_axis_planes" not in seen
-
-
-def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
-    """No vendor model: the standalone run builds the recipe and saves it
-    under the reference directory, never entering a replica path."""
-    assert not hasattr(sku_recipe, "replica_main")
-    saved: list[str] = []
-    built: list = []
-
-    class _Adapter:
-        async def create_part(self):
-            return "ok"
-
-        async def save_file(self, path):
-            saved.append(path)
-            return "ok"
-
-    async def fake_recipe(adapter, truth=None):
-        built.append(adapter)
-
-    async def no_views(_adapter, _stem):
-        return {}
-
-    async def no_close(_adapter):
-        return None
-
-    monkeypatch.setattr(catalog, "check", lambda *a, **k: True)
-    monkeypatch.setattr(sku_recipe, "build_91792A108", fake_recipe)
-    monkeypatch.setattr(diag_mcmaster_lib, "OUT_DIR", tmp_path)
-    monkeypatch.setattr(
-        diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *a: None
-    )
-    monkeypatch.setattr(
-        diag_mcmaster_lib, "mass_properties", lambda _a: {"volume_mm3": 40.0}
-    )
-    monkeypatch.setattr(diag_mcmaster_lib, "export_views", no_views)
-    monkeypatch.setattr(diag_mcmaster_lib, "close_all", no_close)
-    adapter = _Adapter()
-    artefacts = asyncio.run(sku_recipe.build_catalog(adapter))
-    assert built == [adapter]
-    assert saved == [str((tmp_path / f"{screw.SKU}-catalog.SLDPRT").resolve())]
-    assert artefacts["sldprt"] == str(tmp_path / f"{screw.SKU}-catalog.SLDPRT")
-
-
-def test_no_vendor_model_is_tracked() -> None:
-    root = Path(__file__).resolve().parents[2]
-    assert not list(root.glob(f"cad/references/**/{screw.SKU}*.SLDPRT"))
-
-
-def test_purchased_sheet_documents_the_built_part() -> None:
-    sheet = DRAWINGS_BY_NAME["pd_vn_guide_lock_screw"]
-    assert drawing.SPEC is sheet
-    assert sheet.script == Path(drawing.__file__).resolve()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES

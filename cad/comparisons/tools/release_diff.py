@@ -19,14 +19,13 @@ Bundles are read straight from the GitHub release zips over HTTP range
 requests -- only the central directory and the needed members are fetched,
 never the whole 460 MB asset.
 
-The current identity map projects active and retired prior category identities,
-composed with the sealed historical map for archived releases. Retirement reserves
-release identities; it does not remove their historical pairings. A shared prior
-vendor member can pair with every parent-specific clone without merging those
-clones. Configuration suffixes and actual cache basenames are retained on both sides.
-Overlapping identities in one bundle are rejected; new, deleted and renamed
-members are separate from geometry verdicts. ``--parts`` accepts any mapped
-historical or current spelling, but only members paired in both bundles.
+The current identity map composes active and retired release provenance with the
+sealed historical map. Retired rows reserve identities without reactivating CAD
+or API entries. Shared vendor aliases converge by exact member configuration,
+retaining every historical candidate rather than selecting one clone. Bare shared
+neutral files represent only their declared active member. Configuration/stretch
+qualifiers remain distinct. ``--parts`` accepts historical or current geometry
+mesh keys, not archive-role-local selectors or native Component2.Name2 paths.
 
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --parts summing-lever,knife-mount
@@ -38,13 +37,17 @@ import json
 import re
 import os
 import struct
+import sys
 import urllib.request
 import zlib
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import trimesh
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from _part_configuration_exports import member_export_paths, mesh_key as export_mesh_key
 
 CACHE = Path(os.environ.get("RELEASE_DIFF_CACHE", "/tmp/release_diff_cache"))
 IDENTITY_MAP = Path(__file__).resolve().parents[2] / "config" / "current-identity-map.json"
@@ -57,48 +60,108 @@ def _check_stems(*stems):
             raise ValueError(f"identity map requires dashed lowercase stems: {stem!r}")
 
 
+class MeshTarget(NamedTuple):
+    stem: str
+    configuration: str | None = None
+
+
+class AliasContext(NamedTuple):
+    generations: frozenset[str]
+    prior_stems: frozenset[str]
+
+
+class IdentityMapping(NamedTuple):
+    aliases: dict[str, tuple[MeshTarget, ...]]
+    shared_groups: dict[str, dict]
+    alias_contexts: dict[str, AliasContext]
+
+
 def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP):
-    """Map historical/prior stems to active or retired targets for comparisons only."""
+    """Compose immutable archive aliases with current member-aware identities."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1:
         raise ValueError("release diff current identity map requires schema_version 1")
-    mapping = {}
-    targets = set()
-    prior_numbers, target_numbers = set(), set()
-    # Retired rows remain release provenance, not a source of active API entries.
+    groups, numbers = {}, {}
+    for group in payload.get("shared_vendor_groups", []):
+        stem, number = group["stem"], group["number"]
+        _check_stems(stem)
+        configurations = group["configurations"]
+        if (stem in groups or number in numbers or not configurations
+                or any(not isinstance(c, str) or not c for c in configurations)
+                or len({c.lower() for c in configurations}) != len(configurations)
+                or ("Default" in configurations and configurations != ["Default"])
+                or group["neutral_export_configuration"] not in configurations):
+            raise ValueError(f"conflicting shared vendor group: {group!r}")
+        groups[stem], numbers[number] = group, stem
+
+    aliases, identities, old_stems = {}, {}, set()
+    prior_identities, prior_numbers = {}, {}
+    row_numbers = set()
+    contexts = {}
+
+    def assign(alias, targets, generation, prior_stems):
+        _check_stems(alias)
+        targets = tuple(dict.fromkeys(targets))
+        if not targets or (alias in aliases and aliases[alias] != targets):
+            raise ValueError(f"conflicting or empty current identity alias: {alias!r}")
+        aliases[alias] = targets
+        previous = contexts.get(alias, AliasContext(frozenset(), frozenset()))
+        contexts[alias] = AliasContext(
+            previous.generations | {generation}, previous.prior_stems | frozenset(prior_stems),
+        )
+
     rows = payload["parts_and_assemblies"] + payload.get("retired_identities", [])
     for row in rows:
         old = row["old_stem"]
-        current = tuple(identity["stem"] for identity in row["new_identities"])
-        _check_stems(old, *current)
-        if not current or old in mapping or len(set(current)) != len(current) or targets.intersection(current):
-            raise ValueError(f"duplicate or empty current identity map entry: {old!r}, {current!r}")
-        # Minimal stem-only maps remain useful for offline comparisons. Real rows
-        # also reserve Numbers, independently in the prior and target namespaces.
-        prior_number = row.get("old_number")
-        if prior_number is not None:
-            if prior_number in prior_numbers:
-                raise ValueError(f"duplicate prior identity Number: {prior_number!r}")
-            prior_numbers.add(prior_number)
+        if old in old_stems:
+            raise ValueError(f"duplicate current identity map entry: {old!r}")
+        old_stems.add(old)
+        old_number = row.get("old_number")
+        if old_number is not None:
+            if old_number in row_numbers:
+                raise ValueError(f"duplicate prior identity Number: {old_number!r}")
+            row_numbers.add(old_number)
+        targets, lineages = [], []
         for identity in row["new_identities"]:
-            number = identity.get("number")
+            stem, number = identity["stem"], identity.get("number")
+            _check_stems(stem)
+            if ((stem in identities and identities[stem] != number)
+                    or (number is not None and number in numbers and numbers[number] != stem)):
+                raise ValueError(f"duplicate or conflicting current identity: {identity!r}")
+            if stem in identities and stem not in groups:
+                raise ValueError(f"duplicate current identity: {identity!r}")
+            identities[stem] = number
             if number is not None:
-                if number in target_numbers:
-                    raise ValueError(f"duplicate target identity Number: {number!r}")
-                target_numbers.add(number)
-        mapping[old] = current
-        targets.update(current)
+                numbers[number] = stem
+            configuration = None
+            if stem in groups:
+                group = groups[stem]
+                configuration = identity.get("configuration")
+                if (number != group["number"] or configuration not in group["configurations"]
+                        or not identity.get("prior_number") or not identity.get("role")):
+                    raise ValueError(f"conflicting shared member identity: {identity!r}")
+                prior = identity.get("prior_stem")
+                _check_stems(prior)
+                prior_number, role = identity["prior_number"], identity["role"]
+                contract = (prior_number, stem, configuration, role)
+                if ((prior in prior_identities and prior_identities[prior] != contract)
+                        or (prior_number in prior_numbers and prior_numbers[prior_number] != prior)):
+                    raise ValueError(f"conflicting prior shared identity: {identity!r}")
+                prior_identities[prior], prior_numbers[prior_number] = contract, prior
+                assign(prior, (MeshTarget(stem, configuration),), "prior-current", (prior,))
+            targets.append(MeshTarget(stem, configuration))
+            lineages.append(identity.get("prior_stem", stem))
+        assign(old, targets, "category", lineages)
+    if groups.keys() - identities.keys():
+        raise ValueError("shared vendor group has no current identity")
 
-    # These explicit post-v39 category changes bridge the sealed targets to the
-    # prior vendor namespace. They are aliases only in historical comparisons.
     for row in payload.get("historical_current_aliases", []):
         old, prior, current = row["old_stem"], row["prior_current_stem"], row["current_stem"]
         _check_stems(old, prior, current)
-        if current not in mapping.get(prior, ()):
+        targets = aliases.get(prior, ())
+        if not targets or any(target.stem != current for target in targets):
             raise ValueError(f"historical alias has no current identity: {row!r}")
-        if old in mapping and mapping[old] != (current,):
-            raise ValueError(f"conflicting historical identity alias: {old!r}")
-        mapping[old] = (current,)
+        assign(old, targets, "category-alias", contexts[prior].prior_stems)
 
     historical = json.loads(Path(historical_path).read_text(encoding="utf-8"))
     if historical.get("schema_version") != 2:
@@ -107,18 +170,15 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
     for row in historical["identities"]:
         old, prior = row["old_stem"], row["new_stem"]
         if old is None:
-            # Families introduced at that cutover have no archived counterpart.
             continue
         _check_stems(old, prior)
         if old in old_stems or prior in historical_targets:
             raise ValueError(f"duplicate historical identity map entry: {old!r}, {prior!r}")
         old_stems.add(old)
         historical_targets.add(prior)
-        current = mapping.get(prior, (prior,))
-        if old in mapping and mapping[old] != current:
-            raise ValueError(f"conflicting historical identity alias: {old!r}")
-        mapping[old] = current
-    return mapping
+        lineages = contexts[prior].prior_stems if prior in contexts else (prior,)
+        assign(old, aliases.get(prior, (MeshTarget(prior),)), "archive", lineages)
+    return IdentityMapping(aliases, groups, contexts)
 
 
 def split_mesh_key(key):
@@ -130,41 +190,99 @@ def split_mesh_key(key):
     return (key[:suffix.start()], suffix.group()) if suffix else (key, "")
 
 
-def canonical_keys(key, mapping):
-    """Project only the stem, retaining every target and the complete qualifier."""
+def _member_key(stem, configuration):
+    return export_mesh_key(stem, configuration)
+
+
+def geometry_key(key):
+    """Validate a physical mesh basename, refusing namespaced occurrence input."""
+    if (not isinstance(key, str) or "archive-role-local" in key.lower()
+            or re.search(r"[/\\:]", key) or "__" in key):
+        raise ValueError(f"cross-namespace occurrence request is not a geometry mesh key: {key!r}")
+    return key.lower()
+
+
+def canonical_keys(key, mapping, *, drawing=False):
+    """Project geometry keys, never reinterpret occurrence ordinals as mesh keys.
+
+    A shared drawing covers all declared members; a bare neutral geometry file
+    covers only the declared active configuration. Other qualifiers stay exact.
+    """
+    key = geometry_key(key)
+    known = mapping.aliases.keys() | mapping.shared_groups.keys()
+    if any(re.fullmatch(re.escape(stem) + r"-\d+", key) for stem in known):
+        raise ValueError(f"native occurrence request is not a geometry mesh key: {key!r}")
     stem, suffix = split_mesh_key(key)
-    stem = stem.lower()
-    return tuple(target + suffix for target in mapping.get(stem, (stem,)))
+    group = mapping.shared_groups.get(stem)
+    if group:
+        if re.fullmatch(r"--.+-\d+", suffix):
+            raise ValueError(f"archive-role-local occurrence request is not a geometry mesh key: {key!r}")
+        if suffix:
+            return (key,)
+        configurations = group["configurations"] if drawing else (group["neutral_export_configuration"],)
+        return tuple(_member_key(stem, configuration) for configuration in configurations)
+    targets = mapping.aliases.get(stem, (MeshTarget(stem),))
+    return tuple(dict.fromkeys(
+        (_member_key(target.stem, target.configuration) if target.configuration else target.stem) + suffix
+        for target in targets
+    ))
 
 
-def identity_inventory(keys, mapping):
-    """Index projected identities; distinct current clones never collapse."""
-    inventory = {}
+def _declared_shared_collision(logical, actuals, mapping):
+    """Allow distinct same-generation sources, not overlapping stale aliases."""
+    stem, _ = split_mesh_key(logical)
+    group = mapping.shared_groups.get(stem)
+    if group is None:
+        return False
+    keys = [geometry_key(actual) for actual in actuals]
+    current = [split_mesh_key(key)[0] == stem for key in keys]
+    if any(current):
+        # The first member's declared STEP and STL use different basenames.
+        return all(current) and set(keys) == {
+            stem, _member_key(stem, group["neutral_export_configuration"]),
+        }
+    contexts = [mapping.alias_contexts.get(split_mesh_key(key)[0]) for key in keys]
+    if any(context is None for context in contexts):
+        return False
+    generations = set(contexts[0].generations)
+    claimed = set()
+    for context in contexts:
+        generations.intersection_update(context.generations)
+        if claimed.intersection(context.prior_stems):
+            return False
+        claimed.update(context.prior_stems)
+    return bool(generations)
+
+
+def identity_inventory(keys, mapping, *, drawing=False):
+    """Index every actual candidate; only declared shared convergence may collide."""
+    inventory, seen = {}, set()
     for actual in keys:
-        for logical in canonical_keys(actual, mapping):
-            if logical in inventory:
+        folded = geometry_key(actual)
+        if folded in seen:
+            raise ValueError(f"duplicate logical identity (case-insensitive member): {actual!r}")
+        seen.add(folded)
+        for logical in canonical_keys(actual, mapping, drawing=drawing):
+            if logical in inventory and not _declared_shared_collision(
+                logical, [*inventory[logical], actual], mapping,
+            ):
                 raise ValueError(
                     f"duplicate logical identity {logical!r}: {inventory[logical]!r}, {actual!r}"
                 )
-            inventory[logical] = actual
-    return inventory
+            inventory.setdefault(logical, []).append(actual)
+    return {logical: tuple(sorted(actuals)) for logical, actuals in inventory.items()}
 
 
-def paired_keys(old_keys, new_keys, mapping):
-    """Return every new-actual -> old-actual pair, reusing shared prior sources."""
-    old = identity_inventory(old_keys, mapping)
-    new = identity_inventory(new_keys, mapping)
+def paired_keys(old_keys, new_keys, mapping, *, drawing=False):
+    """Return new-actual -> all old-actual candidates, with no source preference."""
+    old = identity_inventory(old_keys, mapping, drawing=drawing)
+    new = identity_inventory(new_keys, mapping, drawing=drawing)
     pairs = {}
-    for logical, actual in new.items():
-        if logical not in old:
-            continue
-        previous = old[logical]
-        if actual in pairs and pairs[actual] != previous:
-            raise ValueError(
-                f"ambiguous prior identity for {actual!r}: {pairs[actual]!r}, {previous!r}"
-            )
-        pairs[actual] = previous
-    return pairs
+    for logical, actuals in new.items():
+        for actual in actuals:
+            if logical in old:
+                pairs.setdefault(actual, set()).update(old[logical])
+    return {actual: tuple(sorted(previous)) for actual, previous in pairs.items()}
 
 
 # --------------------------------------------------------------------------- #
@@ -288,11 +406,36 @@ def extract(url, entry, dest):
 
 
 def member(cd, sub, base, ext):
-    for cand in (f"{sub}/{base}{ext}", f"{sub}/{base}{ext.upper()}"):
-        for name, e in cd.items():
-            if name.lower() == cand.lower():
-                return e
-    return None
+    expected = f"{sub}/{geometry_key(base)}{ext}".lower()
+    matches = [entry for name, entry in cd.items() if name.lower() == expected]
+    if len(matches) > 1:
+        raise ValueError(f"ambiguous case-insensitive release member: {expected!r}")
+    return matches[0] if matches else None
+
+
+def artifact_member(cd, sub, base, ext, mapping):
+    """Resolve an exact physical member, then its declared per-format neutral path.
+
+    Only current shared member metadata authorizes STEP/STL basename differences.
+    Archived names use their actual files, never a guessed shared export path.
+    """
+    canonical_keys(base, mapping)
+    entry = member(cd, sub, base, ext)
+    if entry is not None:
+        return entry, base
+    stem, suffix = split_mesh_key(base.lower())
+    group = mapping.shared_groups.get(stem)
+    if group is None:
+        return None
+    configuration = (group["neutral_export_configuration"] if not suffix else next(
+        (name for name in group["configurations"] if _member_key(stem, name) == base.lower()), None,
+    ))
+    if configuration is None:
+        return None
+    paths = member_export_paths(stem, configuration, group["neutral_export_configuration"])
+    physical = paths[sub].stem
+    entry = member(cd, sub, physical, ext)
+    return (entry, physical) if entry is not None else None
 
 
 # --------------------------------------------------------------------------- #
@@ -318,6 +461,7 @@ def solid_volume(shape):
 
 def boolean_cut(tag_a, tag_b, base_a, base_b):
     """Return removed/added material volumes (mm^3) via exact CAD booleans."""
+    base_a, base_b = geometry_key(base_a), geometry_key(base_b)
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
     a = read_step(CACHE / tag_a / f"{base_a}.step")
     b = read_step(CACHE / tag_b / f"{base_b}.step")
@@ -365,6 +509,7 @@ def _directed(src, dst):
 
 
 def mesh_deviation(tag_a: str, tag_b: str, base_a: str, base_b: str) -> dict[str, Any]:
+    base_a, base_b = geometry_key(base_a), geometry_key(base_b)
     a = trimesh.load(CACHE / tag_a / f"{base_a}.stl", process=False)
     b = trimesh.load(CACHE / tag_b / f"{base_b}.stl", process=False)
     d_ab = _directed(a, b)
@@ -380,6 +525,71 @@ def mesh_deviation(tag_a: str, tag_b: str, base_a: str, base_b: str) -> dict[str
         tris_a=len(a.faces), tris_b=len(b.faces))
 
 
+def release_inventory(cd, mapping):
+    """Index one comparison source per member, with CRCs kept per format.
+
+    Historical clones remain separate sources. Current shared first-member
+    STEP/STL spellings are merged by the declared physical export paths, so a
+    bare STEP is never compared with a qualified STL signature.
+    """
+    physical = {}
+    for name, entry in cd.items():
+        path = Path(name)
+        kind = path.parent.as_posix().lower()
+        if (kind, path.suffix.lower()) not in (("step", ".step"), ("stl", ".stl")):
+            continue
+        key = geometry_key(path.stem)
+        formats = physical.setdefault(key, {})
+        if kind in formats:
+            raise ValueError(f"ambiguous case-insensitive release member: {name!r}")
+        formats[kind] = entry
+    identity_inventory(physical, mapping)
+
+    inventory = {}
+    for actual, formats in physical.items():
+        stem, suffix = split_mesh_key(actual)
+        group = mapping.shared_groups.get(stem)
+        configuration = None
+        if group is not None:
+            configuration = (group["neutral_export_configuration"] if not suffix else next(
+                (name for name in group["configurations"] if _member_key(stem, name) == actual), None,
+            ))
+        if configuration is None:
+            source = actual  # Archive names and derived variants retain their own files.
+        else:
+            source = _member_key(stem, configuration)
+            paths = member_export_paths(stem, configuration, group["neutral_export_configuration"])
+            for kind in formats:
+                if paths[kind].stem.lower() != actual:
+                    raise ValueError(
+                        f"conflicting shared {kind} export for {source!r}: {actual!r}; "
+                        f"declared physical member is {paths[kind].stem!r}"
+                    )
+        combined = inventory.setdefault(source, {})
+        if combined.keys() & formats.keys():
+            raise ValueError(f"duplicate per-format source identity: {source!r}")
+        combined.update(formats)
+    return inventory
+
+
+def crc_changes(old, new, pairs):
+    """Rank changed logical sources by like-format CRCs and byte deltas."""
+    def signature(formats):
+        return {kind: entry["crc"] for kind, entry in formats.items()}
+
+    common = sorted(pairs)
+    changed = [key for key in common if any(
+        signature(old[previous]) != signature(new[key]) for previous in pairs[key]
+    )]
+    same = [key for key in common if key not in changed]
+    changed.sort(key=lambda key: -max(
+        abs(sum(entry["uncomp"] for entry in new[key].values())
+            - sum(entry["uncomp"] for entry in old[previous].values()))
+        for previous in pairs[key]
+    ))
+    return changed, same
+
+
 # --------------------------------------------------------------------------- #
 def main():
     ap = argparse.ArgumentParser()
@@ -389,7 +599,7 @@ def main():
     ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
                     help="current schema-1 identity table (composed with sealed historical identities)")
     ap.add_argument("--top", type=int, default=0,
-                    help="auto-select N parts with largest STEP byte delta")
+                    help="auto-select N parts with largest STEP/STL byte delta")
     ap.add_argument("--no-boolean", action="store_true",
                     help="skip the (3b) STEP boolean cut")
     args = ap.parse_args()
@@ -400,39 +610,29 @@ def main():
 
     mapping = load_identity_map(args.identity_map)
 
-    def steps(cd):
-        entries = [(Path(n).stem.lower(), e) for n, e in cd.items()
-                   if n.lower().startswith("step/") and n.lower().endswith(".step")]
-        identity_inventory((key for key, _ in entries), mapping)
-        return dict(entries)
-    sa, sb = steps(ca), steps(cb)
+    sa, sb = release_inventory(ca, mapping), release_inventory(cb, mapping)
     pairs = paired_keys(sa, sb, mapping)
     common = sorted(pairs)
     added = sorted(set(sb) - set(pairs))
-    deleted = sorted(set(sa) - set(pairs.values()))
+    deleted = sorted(set(sa) - {old for sources in pairs.values() for old in sources})
     print(f"new parts: {', '.join(added) or '(none)'}")
     print(f"deleted parts: {', '.join(deleted) or '(none)'}")
-    renamed = {new: old for new, old in pairs.items() if new != old}
+    renamed = {new: old for new, old in pairs.items() if old != (new,)}
     print(f"renamed parts: {renamed}")
 
-    # CRC32 (from the central directory) is the change signal: a geometry edit can
-    # rewrite coordinates while preserving the exact byte count, so STEP size is
-    # NOT a reliable gate. Rank CRC-different parts by |size delta| only for a
-    # stable, readable order.
-    changed_crc = [k for k in common if sa[pairs[k]]["crc"] != sb[k]["crc"]]
-    same_crc = [k for k in common if sa[pairs[k]]["crc"] == sb[k]["crc"]]
-    changed_crc.sort(key=lambda k: -abs(sb[k]["uncomp"] - sa[pairs[k]]["uncomp"]))
+    changed_crc, same_crc = crc_changes(sa, sb, pairs)
 
     if args.parts:
-        requested = {p.strip(): set(canonical_keys(p.strip(), mapping))
+        requested = {p.strip(): set(canonical_keys(p.strip(), mapping, drawing=True))
                      for p in args.parts.split(",")}
         candidates = {key: set(canonical_keys(key, mapping)) for key in common}
         parts = [key for key, logical in candidates.items()
                  if any(logical & selected for selected in requested.values())]
-        missing = [name for name, selected in requested.items()
-                   if not any(selected & candidates[key] for key in parts)]
+        available = set().union(*(candidates[key] for key in parts))
+        missing = {name: sorted(selected - available) for name, selected in requested.items()
+                   if selected - available}
         if missing:
-            ap.error(f"requested parts are not paired in both bundles: {sorted(missing)}")
+            ap.error(f"requested parts are not paired in both bundles: {missing}")
     elif args.top:
         parts = changed_crc[:args.top]
     else:
@@ -445,30 +645,31 @@ def main():
     print(f"\n{args.tag_a} vs {args.tag_b}: {len(common)} common parts; "
           f"analyzing {len(parts)}: {', '.join(parts)}\n")
 
-    for base in parts:
-        base_a, base_b = pairs[base], base
-        # fetch the two STEP + two STL members for this part, tracking which
-        # (sub-folder) are present in BOTH bundles -- an analysis whose input is
-        # missing from either side must be skipped, never run against a stale
-        # cache file left by an earlier part.
+    def compare(base_a, base_b):
+        # Track each exact format on BOTH sides. A configured STL without STEP
+        # still receives a mesh verdict, never a boolean using stale/bare STEP.
         present = {"step": True, "stl": True}
+        physical = {}
         for sub, ext in (("step", ".step"), ("stl", ".stl")):
-            for tag, url, cd, actual in (
-                (args.tag_a, ua, ca, base_a), (args.tag_b, ub, cb, base_b),
+            for side, tag, url, cd, actual in (
+                ("old", args.tag_a, ua, ca, base_a), ("new", args.tag_b, ub, cb, base_b),
             ):
-                e = member(cd, sub, actual, ext)
-                if e is None:
+                resolved = artifact_member(cd, sub, actual, ext, mapping)
+                if resolved is None:
                     print(f"  !! {tag}: missing {sub}/{actual}{ext}")
                     present[sub] = False
                     continue
-                extract(url, e, CACHE / tag / f"{actual}{ext}")
+                entry, physical_base = resolved
+                physical[sub, side] = physical_base
+                extract(url, entry, CACHE / tag / f"{physical_base}{ext}")
 
-        print(f"### {base}")
+        print(f"### {base_b} <- {base_a}")
         if not present["stl"]:
             print("  (3c) mesh:    SKIPPED (member missing from a bundle)")
         else:
             try:
-                md = mesh_deviation(args.tag_a, args.tag_b, base_a, base_b)
+                md = mesh_deviation(args.tag_a, args.tag_b,
+                                    physical["stl", "old"], physical["stl", "new"])
                 verdict = ("IDENTICAL (within mesh tol)"
                            if md["hausdorff_mm"] < 1e-3 else "CHANGED")
                 print(f"  (3c) mesh:    ~Hausdorff={md['hausdorff_mm']:.4f} mm  "
@@ -487,7 +688,8 @@ def main():
             print("  (3b) solid:   SKIPPED (member missing from a bundle)")
         elif not args.no_boolean:
             try:
-                bc = boolean_cut(args.tag_a, args.tag_b, base_a, base_b)
+                bc = boolean_cut(args.tag_a, args.tag_b,
+                                 physical["step", "old"], physical["step", "new"])
                 eq = bc["removed"] < 1e-3 and bc["added"] < 1e-3
                 print(f"  (3b) solid:   removed={bc['removed']:.2f} mm^3  "
                       f"added={bc['added']:.2f} mm^3  net={bc['net']:+.2f} mm^3 "
@@ -497,6 +699,10 @@ def main():
             except Exception as ex:
                 print(f"  (3b) solid:   FAILED ({ex})")
         print()
+
+    for base in parts:
+        for previous in pairs[base]:
+            compare(previous, base)
 
 
 if __name__ == "__main__":

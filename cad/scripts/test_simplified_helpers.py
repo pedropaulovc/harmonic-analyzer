@@ -781,9 +781,26 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
     return drawing, adapter, seen
 
 
-def _cluster_facts(drawing) -> SimpleNamespace:
-    return SimpleNamespace(
-        clusters={cluster: frozenset() for cluster in drawing.CLUSTER_SHEETS}, instances=[]
+def _cluster_facts(drawing):
+    """A nonempty census for every cluster, with distinct shared-screw roles."""
+    screw_stem = "sh-vn-fillister-screw-90280a108"
+    instances = [
+        drawing.Instance(
+            "dt-cylinder-gear-shaft-3", "dt-cylinder-gear-shaft", (0.0, 100.0, 0.0)
+        ),
+        drawing.Instance("dt-crankshaft-7", "dt-crankshaft", (0.0, 100.0, 0.0)),
+        # Native allocation is deliberately unrelated to the role-local ordinal.
+        drawing.Instance(
+            f"{screw_stem}__SwingStopScrew-9", screw_stem, (0.0, 100.0, 0.0),
+            role="SwingStopScrew:1",
+        ),
+        drawing.Instance(
+            f"{screw_stem}__FootScrew-42", screw_stem, (0.0, 100.0, 0.0),
+            role="FootScrew:1",
+        ),
+    ]
+    return drawing.SourceFacts(
+        instances, {instance.name: ASSEMBLY_VIEW_CONFIGURATION for instance in instances}
     )
 
 
@@ -807,7 +824,8 @@ def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
     view = drawing._place_cluster_view(adapter, cluster)
     facts = _cluster_facts(drawing)
     scale = drawing._fit_cluster_view(adapter, cluster, view, facts)
-    drawing._balloon_cluster_sheet(adapter, cluster, view, facts, scale, bom_name="BOM", items={})
+    items = {stem: str(index) for index, stem in enumerate(facts.components, start=1)}
+    drawing._balloon_cluster_sheet(adapter, cluster, view, facts, scale, bom_name="BOM", items=items)
 
     assert scale == preferred
     assert [event for event, _configuration, _explode in seen] == [
@@ -869,12 +887,14 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
     exploded_at_bom: list[int] = []
     views_at_bom: list[FakeView] = []
 
-    def insert_bom(_adapter, _view, _facts) -> tuple[str, dict[str, str]]:
+    def insert_bom(_adapter, _view, facts) -> tuple[str, dict[str, str]]:
         fake = adapter.currentModel
         exploded_at_bom.append(sum(view.IsExploded() for view in fake.views))
         views_at_bom.extend(fake.views)
         fake.bom_inserted = True
-        return "BOM", {}
+        return "BOM", {
+            stem: str(index) for index, stem in enumerate(facts.components, start=1)
+        }
 
     def full_detail(_adapter) -> tuple[float, float]:
         reference(drawing.FULL_DETAIL_SHEET, "*Right", (1.0, 1.0), ViewRole.FULL_DETAIL)

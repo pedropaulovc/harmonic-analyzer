@@ -23,9 +23,9 @@ from __future__ import annotations
 import math
 
 import mg_output_fixture_geom as _geom
-from _mcmaster_91882a221 import PITCH as SCREW_PITCH
-from _mcmaster_91882a221 import SHANK_DIA as SCREW_DIA
-from _mcmaster_91882a221 import SHANK_LEN as SCREW_SHANK_LEN
+from sh_vn_thumb_screw_spec import PITCH as SCREW_PITCH
+from sh_vn_thumb_screw_spec import SHANK_DIA as SCREW_DIA
+from sh_vn_thumb_screw_spec import SHANK_LEN as SCREW_SHANK_LEN
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from mg_magnifying_vertical_rod_geom import ROD_STOCK_DIA_LOW
 from mg_output_fixture_geom import (

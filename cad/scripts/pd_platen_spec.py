@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import printed_band_mm
-from _mcmaster_90114a511 import HEAD_H as FILLISTER_HEAD_H
+from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
 PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2

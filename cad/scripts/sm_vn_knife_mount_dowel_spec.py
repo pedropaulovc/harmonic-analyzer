@@ -38,6 +38,7 @@ from _mcmaster_98381a473 import (
     DOWEL_SIZE,
     MM_PER_IN,
 )
+from _supplier_pin_data import SupplierPinReference
 
 SKU = "98381A473"
 DIA, LENGTH = DOWEL_SIZE  # 3.175 x 19.05
@@ -139,3 +140,16 @@ if PRESS_ENGAGEMENT_D_MIN < PRESS_ENGAGEMENT_MIN_D:
         f"knife-mount dowel grips {PRESS_ENGAGEMENT_D_MIN:.2f} D in the block,"
         f" under {PRESS_ENGAGEMENT_MIN_D} D"
     )
+
+# McMaster engineering drawing inspected 2026-10-19; supplier information
+# only. Installation/finished controls above are intentionally unchanged.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="in",
+    diameter_mm=DIA,
+    length_mm=LENGTH,
+    diameter_nominal=0.1250,
+    diameter_precision=4,
+    length_precision=2,
+    diameter_band=(0.0001, 0.0003),
+)

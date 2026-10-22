@@ -1,0 +1,17 @@
+sh-vn-chain-link:
+  title: "ANSI #25 Roller Chain Link"
+  number: MHA-SH-VN-50
+  stock_name: Steel Roller Chain, ANSI Number 25, Single Strand
+  supplier: McMaster-Carr
+  supplier_skus: [6261K171]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 6261K171
+  finish: as supplied; supplier states no coating
+  # Installed members, not purchased chains; stock is sold by the foot.
+  quantity: 67
+  default_configuration: InnerLink
+  configuration_quantities:
+    InnerLink: 34
+    OuterLink: 33
+  tolerance_class: machined_block
+  process: purchased

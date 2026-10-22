@@ -27,7 +27,7 @@ import fr_harmonic_base_spec as base
 from frame_column_stations import COLUMN_X
 from mg_wheel_bar_geom import BAR_LENGTH, BAR_SIDE, WHEEL_BAR_X0, WHEEL_BAR_Y
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
-from pn_vn_pen_wire_geom import WIRE_X
+from sh_vn_music_wire_pen_geom import WIRE_X
 
 ASM_NAME = "ha-harmonic-analyzer"
 SOURCE_CONFIGURATION = "Default"

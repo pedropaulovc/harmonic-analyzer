@@ -26,7 +26,7 @@ flip_invert:
   # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
   - reducer disc axial
 allowed_free_stems:
-  - pd-vn-fillister-screw
+  - sh-vn-brass-fillister-screw
   - pd-vn-platen-clip-screw  # MHA-PD-VN-65 clip screws ride the platen
   - pd-guide-lock
   - pd-vn-guide-lock-screw  # MHA-PD-VN-60 lock screws ride the platen (R9-31)

@@ -20,24 +20,32 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from functools import wraps
 
 from _appearance import POLISHED_STEEL
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _supplier_pin_model import author_supplier_dowel_references
 from diagnostics.diag_build_98381A473 import build_98381A473
-from sm_vn_knife_mount_dowel_spec import SKU
+from sm_vn_knife_mount_dowel_spec import SKU, SUPPLIER_REFERENCE
 
 PART_NAME = "sm-vn-knife-mount-dowel"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
+@wraps(build_98381A473)
+async def _build_pin_with_supplier_references(adapter, truth=None):
+    await build_98381A473(adapter, truth)
+    await author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
+
+
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_98381A473),),
+        components=(StockComponent(sku=SKU, author=_build_pin_with_supplier_references),),
         material=MATERIAL,
         color=POLISHED_STEEL,
         screw_axis_planes=("Front Plane", "Right Plane"),

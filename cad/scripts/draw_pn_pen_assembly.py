@@ -33,9 +33,10 @@ import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
-import pn_vn_pen_wire_geom as wire
+import sh_vn_music_wire_pen_geom as wire
 from _check import check
 from _com import _early_bound
+from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_balloons import (
     BalloonAnchor,
@@ -60,7 +61,11 @@ from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -304,7 +309,13 @@ EXPLODED_ISO_CENTER = (
 # Largest first: the sheet scale, then smaller only if the ring overflows.
 EXPLODED_SCALES = ((1.0, 2.0), (2.0, 5.0), (1.0, 3.0))
 
-BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
+WIRE_ROW = f"sh-vn-music-wire--{wire.CONFIGURATION}"
+BOM_ROW_KEYS = {stem: WIRE_ROW if stem == spec.WIRE else stem for stem in spec.BOM_ORDER}
+BOM_QUANTITIES = {BOM_ROW_KEYS[stem]: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
+BOM_COMPONENT_IDENTITIES = {
+    BOM_ROW_KEYS[stem]: (stem, wire.CONFIGURATION if stem == spec.WIRE else None)
+    for stem in spec.BOM_ORDER
+}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
@@ -317,7 +328,7 @@ PART_ROWS = {
     "pn-vn-pen-rod-set-screw": _config.parts("pn-vn-pen-rod-set-screw"),
     "pn-pen-adjust-screw": _config.parts("pn-pen-adjust-screw"),
     "pn-vn-pen-adjust-nut": _config.parts("pn-vn-pen-adjust-nut"),
-    "pn-vn-pen-wire": _config.parts("pn-vn-pen-wire"),
+    WIRE_ROW: _config.parts("sh-vn-music-wire"),
     "pn-vn-hanger-screw": _config.parts("pn-vn-hanger-screw"),
     "pn-vn-pen-hanger-nut": _config.parts("pn-vn-pen-hanger-nut"),
     "pn-vn-pen-hanger-jam-nut": _config.parts("pn-vn-pen-hanger-jam-nut"),
@@ -331,11 +342,8 @@ BOM_SKUS = {
     or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = {BOM_ROW_KEYS[stem]: text for stem, text in notes.BOM_DESCRIPTIONS.items()}
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
-BOM_NORMALIZED_ALIASES = {
-    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
-}
 # Every family is one separated body on the exploded view: each balloon walks
 # its own part for a visible edge, except two pinned off the stack the stud,
 # its jam nut and the rod's top make in the pictorial. There the three walked
@@ -388,7 +396,8 @@ BALLOON_ANCHORS = {
             -_OCTANT_X * _HEAD_R * math.sqrt(0.5),
         )
     ),
-    spec.WIRE: BalloonAnchor(
+    WIRE_ROW: BalloonAnchor(
+        instance="@PenWire:1",
         point_mm=(
             -_OCTANT_Z * _WIRE_R * math.sqrt(0.5),
             wire.WIRE_LEN,
@@ -594,11 +603,20 @@ def _validate_source(source_model: Any) -> None:
         names = tuple(assembly.GetExplodedViewNames2(owner) or ())
         if names != (wanted,):
             raise RuntimeError(f"pen {owner} exploded views {names!r} != {(wanted,)!r}")
+    component_reference_names(
+        source_model, {"@PenWire:1": (spec.WIRE, wire.CONFIGURATION)}
+    )
     counts: dict[str, int] = {}
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
         stem = _component_stem(component)
-        counts[stem] = counts.get(stem, 0) + 1
+        if stem == spec.WIRE:
+            selected = component_identity(component)
+            expected = (spec.WIRE, wire.CONFIGURATION)
+            if selected != expected:
+                raise RuntimeError(f"pen wire member {selected!r} != {expected!r}")
+        row_key = BOM_ROW_KEYS.get(stem, stem)
+        counts[row_key] = counts.get(row_key, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
         if any(
@@ -1012,14 +1030,18 @@ _INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
-    """Every displayed BOM cell, header row first."""
-    return tuple(
-        tuple(
-            str(table.DisplayedText(row, column) or "").strip()
-            for column in range(int(table.ColumnCount))
+    """Every physical BOM cell, header row first, with visible native rows."""
+    contents = []
+    for row in range(int(table.RowCount)):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"pen BOM physical row {row} is not proven visible")
+        contents.append(
+            tuple(
+                str(table.DisplayedText2(row, column, True) or "").strip()
+                for column in range(int(table.ColumnCount))
+            )
         )
-        for row in range(int(table.RowCount))
-    )
+    return tuple(contents)
 
 
 def _bom_column(
@@ -1060,10 +1082,10 @@ def _place_exploded_caption(adapter: Any, table: Any, scale: tuple[float, float]
 
 
 def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers, prove identities/descriptions/quantities and the
-    item numbers the steps cite, add the registry's VENDOR SKU column after
-    DESCRIPTION; return (stem, item number) in BOM order. Material and finish
-    remain on component drawings."""
+    """Prove associative Numbers, native identities, descriptions, quantities and
+    the item numbers the steps cite; add the registry's VENDOR SKU column after
+    DESCRIPTION and return (row key, item number) in BOM order. Material and
+    finish remain on component drawings."""
     table = _early_bound(table, "ITableAnnotation")
     contents = _bom_cells(table)
     rows = len(contents)
@@ -1087,11 +1109,13 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     quantity_column = _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY.")
 
     actual: dict[str, tuple[int, str, str, str]] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[part_column].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in actual:
-            raise RuntimeError(f"pen BOM repeats component family {stem!r}")
+    identities = bom_row_identities(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    )
+    for stem, row_index in identities.items():
+        row = contents[row_index]
         actual[stem] = (
             row_index,
             row[item_column],
@@ -1104,7 +1128,7 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
         )
     # The sequence and checks cite these item numbers (notes.ITEM).
     numbering = {stem: values[1] for stem, values in actual.items()}
-    expected_numbering = {stem: str(notes.ITEM[stem]) for stem in BOM_COMPONENTS}
+    expected_numbering = {BOM_ROW_KEYS[stem]: str(notes.ITEM[stem]) for stem in spec.BOM_ORDER}
     if numbering != expected_numbering:
         raise RuntimeError(
             f"pen BOM item numbers {numbering!r} != {expected_numbering!r}"
@@ -1112,9 +1136,10 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
-            if not table.IsCellTextEditable(row_index, part_column):
-                raise RuntimeError(f"pen BOM part-number cell for {stem!r} is locked")
-            table.SetText2(row_index, part_column, False, number)
+            raise RuntimeError(
+                f"pen BOM Number for {stem!r} is "
+                f"{contents[row_index][part_column]!r}, expected {number!r}"
+            )
         if description != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(
                 f"pen BOM description mismatch for {stem!r}: {description!r}"
@@ -1134,12 +1159,12 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     ):
         raise RuntimeError("pen BOM refused the VENDOR SKU column")
     column = description_column + 1
-    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, False):
+    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, True):
         raise RuntimeError("pen BOM VENDOR SKU column title did not set")
     for stem, (row_index, *_rest) in actual.items():
         if not table.IsCellTextEditable(row_index, column):
             raise RuntimeError(f"pen BOM VENDOR SKU cell for {stem!r} is locked")
-        table.SetText2(row_index, column, False, BOM_SKUS[stem])
+        table.SetText2(row_index, column, True, BOM_SKUS[stem])
 
     header = _bom_cells(table)[0]
     widths = {
@@ -1161,6 +1186,13 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             raise RuntimeError(f"pen BOM {key} column width did not persist")
     for row in range(rows):
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    before_rebuild = validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="pen",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("pen BOM rebuild failed")
     settled = _bom_cells(table)
@@ -1171,6 +1203,16 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
                 raise RuntimeError(
                     f"pen BOM {key} for {stem!r} reads {applied!r}, expected {text!r}"
                 )
+    if validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="pen",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    ) != before_rebuild:
+        raise RuntimeError(
+            "pen native BOM membership/quantities changed during rebuild"
+        )
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
@@ -1248,7 +1290,8 @@ def _make_explode_readable(
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    row; returns the check that proves every balloon after the last rebuild."""
+    row; returns the check that proves the BOM and balloons after the last rebuild.
+    """
     label = "pen exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -1272,10 +1315,19 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
         identity_aliases=BOM_IDENTITY_ALIASES,
-        configuration_grouping="same-part",
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        configuration_grouping="same-name",
         label="pen",
     )
     items = _validate_bom(adapter, table)
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="pen",
+        expected_rows=1 + len(BOM_COMPONENTS),
+        occurrence_quantities=True,
+    )
     restore = _make_explode_readable(exploded, configuration, label=label)
     try:
         landings = add_component_bom_balloons(
@@ -1302,7 +1354,22 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     for name, trail in notes.EXPLODE_TRAILS.items():
         _add_explode_trail(adapter, exploded, trail, label=f"pen {name} explode trail")
     _place_exploded_caption(adapter, table, scale)
-    return lambda: assert_balloon_landings(adapter, landings)
+
+    def settled() -> None:
+        retained = validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label="pen",
+            expected_rows=1 + len(BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        if retained != bom_snapshot:
+            raise RuntimeError(
+                "pen native BOM membership/quantities changed after placement"
+            )
+        assert_balloon_landings(adapter, landings)
+
+    return settled
 
 
 # --- sheet 3 ----------------------------------------------------------------------

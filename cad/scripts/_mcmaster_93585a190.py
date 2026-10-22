@@ -22,3 +22,29 @@ RUNOUT_DRAFT_DEG = 45.0
 
 H_SHARP = PITCH * math.sqrt(3.0) / 2.0
 ROOT_R = MAJOR_R - 0.75 * H_SHARP  # 2.350111
+
+# McMaster engineering drawing inspected 2026-10-19; sizes over knurl crests.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260702/07425126/"
+    "93585A190_Stainless%20Steel%20High-Profile%20Knurled-Head%20Thumb%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -LENGTH, "vertical"),
+    ("SupplierHeadHeight", HEAD_H, "vertical"),
+    ("SupplierHeadDiameter", 2.0 * HEAD_R, "horizontal"),
+    ("SupplierThreadDiameter", 2.0 * MAJOR_R, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (MAJOR_R, 0.0),
+    "SupplierHeadHeight": (-HEAD_R, 0.0),
+    "SupplierHeadDiameter": (-HEAD_R, 0.0),
+    "SupplierThreadDiameter": (-MAJOR_R, -LENGTH / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierHeadHeight": (1, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierThreadDiameter": (2, "diameter", None, '1/4"-20'),
+}

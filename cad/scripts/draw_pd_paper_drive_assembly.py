@@ -28,8 +28,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import json
 import math
-from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -45,6 +45,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _chain as chain
 from _check import check
 from _com import _com_invoke, _early_bound
+from _component_references import component_identity
+from sh_vn_chain_link_spec import (
+    INNER_LINK_BOM_DESCRIPTION,
+    INNER_LINK_CONFIGURATION,
+    OUTER_LINK_BOM_DESCRIPTION,
+    OUTER_LINK_CONFIGURATION,
+)
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
@@ -77,7 +84,15 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import insert_bom_table
+from _drawing_tables import (
+    BomSnapshot,
+    _bom_column_hidden,
+    _bom_physical_columns,
+    _set_bom_column_hidden,
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
@@ -134,6 +149,9 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+# Native balloon membership is independent of the simplified rendered reference.
+BOM_CONFIGURATION = "Default"
 
 SHEET_NAMES = (
     "ASSEMBLED VIEWS",
@@ -216,9 +234,10 @@ TRANSGEAR_CAPTION_XY = (0.222, 0.082)
 # view only. The largest ladder scale whose ring fits beside the isometric's
 # (inner_view_scale): the same run read the view 57.3 mm wide at 2:3, a 91.3
 # mm ring in the 76.3 mm left of the isometric's ring at x 355; the v40 sheet
-# 2 printed it at 1:3, 34.5 mm wide. Every ladder scale is
-# at most 1:2, so the view references the simplified configuration whichever
-# it takes (apply_view_configuration), and no rescale switches it.
+# 2 printed it at 1:3, 34.5 mm wide. Every ladder scale requests the simplified
+# configuration at creation. Native2537 read Default after the later view
+# operations; their individual effects are unmeasured. Check the actual view
+# against the BOM immediately before ballooning rather than infer it from scale.
 INNER_VIEW_ORIENTATION = "*Right"
 INNER_SCALE_LADDER = ((1.0, 2.0), (1.0, 3.0))
 if any(
@@ -473,18 +492,18 @@ BOM_PART_NUMBERS = {
     "pd-support-bar": _config.parts("pd-support-bar")["number"],
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front")["number"],
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back")["number"],
-    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["number"],
+    "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["number"],
     "pd-platen": _config.parts("pd-platen")["number"],
     "pd-platen-rack": _config.parts("pd-platen-rack")["number"],
     "pd-platen-guide": _config.parts("pd-platen-guide")["number"],
     "pd-guide-lock": _config.parts("pd-guide-lock")["number"],
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
-    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["number"],
+    "sh-vn-brass-fillister-screw": _config.parts("sh-vn-brass-fillister-screw")["number"],
     "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["number"],
     "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["number"],
-    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["number"],
-    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["number"],
+    "sh-vn-chain-link--InnerLink": _config.parts("sh-vn-chain-link")["number"],
+    "sh-vn-chain-link--OuterLink": _config.parts("sh-vn-chain-link")["number"],
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")["number"],
     "pd-transgear-removable": _config.parts("pd-transgear-removable")["number"],
     "pd-transgear-arm": _config.parts("pd-transgear-arm")["number"],
@@ -498,7 +517,7 @@ BOM_PART_NUMBERS = {
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["number"],
     "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")["number"],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["number"],
-    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")["number"],
+    "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
     "pd-transgear-pin": _config.parts("pd-transgear-pin")["number"],
     "pd-transgear-rear-bushing": _config.parts("pd-transgear-rear-bushing")["number"],
@@ -516,14 +535,25 @@ BOM_PART_NUMBERS = {
     "pd-transgear-knob-cup": _config.parts("pd-transgear-knob-cup")["number"],
     "pd-vn-transgear-knob-cup-pin": _config.parts("pd-vn-transgear-knob-cup-pin")["number"],
 }
+# Logical rows retain member identity even though both print one purchase Number.
+BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    key: (key, None) for key in BOM_PART_NUMBERS
+}
+BOM_COMPONENT_IDENTITIES.update(
+    {
+        "sh-vn-chain-link--InnerLink": ("sh-vn-chain-link", INNER_LINK_CONFIGURATION),
+        "sh-vn-chain-link--OuterLink": ("sh-vn-chain-link", OUTER_LINK_CONFIGURATION),
+        "sh-vn-brass-fillister-screw": ("sh-vn-brass-fillister-screw", "Default"),
+        "sh-vn-clamp-screw": ("sh-vn-clamp-screw", "Default"),
+        "sh-vn-fillister-screw-90280a108": ("sh-vn-fillister-screw-90280a108", "Default"),
+    }
+)
 # A purchased part's registry SKU, printed in its description.
 _SKU = {
-    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["supplier_skus"][0],
-    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["supplier_skus"][0],
+    "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["supplier_skus"][0],
+    "sh-vn-brass-fillister-screw": _config.parts("sh-vn-brass-fillister-screw")["supplier_skus"][0],
     "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["supplier_skus"][0],
     "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["supplier_skus"][0],
-    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["supplier_skus"][0],
-    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["supplier_skus"][0],
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")[
         "supplier_skus"
     ][0],
@@ -541,7 +571,7 @@ _SKU = {
         "supplier_skus"
     ][0],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["supplier_skus"][0],
-    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")[
+    "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
@@ -555,12 +585,13 @@ _SKU = {
         0
     ],
 }
-# The description column is drawing wording; a purchased part names its SKU.
+# Assembly-specific wording stays here. Shared chain descriptions follow the
+# native member spec, whose model-owned BOM text can override a written cell.
 BOM_DESCRIPTIONS = {
     "pd-support-bar": "PAPER-DRIVE SUPPORT BAR",
     "sh-column-clamp-front": "COLUMN CLAMP, FRONT",
     "sh-column-clamp-back": "COLUMN CLAMP, BACK",
-    "pd-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-clamp-screw']}",
+    "sh-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-clamp-screw']}",
     "pd-platen": "PLATEN",
     "pd-platen-rack": (
         f"PLATEN RACK + BACKER, {feed_pinion.DIAMETRAL_PITCH:g}DP "
@@ -570,13 +601,13 @@ BOM_DESCRIPTIONS = {
     "pd-guide-lock": "PLATEN GUIDE LOCK",
     "pd-platen-clip": "PLATEN PAPER CLIP",
     "pd-platen-paper": "PLATEN PAPER",
-    "pd-vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['pd-vn-fillister-screw']}",
+    "sh-vn-brass-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['sh-vn-brass-fillister-screw']}",
     "pd-vn-platen-clip-screw": (
         f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-platen-clip-screw']}"
     ),
     "pd-vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-guide-lock-screw']}",
-    "pd-vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['pd-vn-chain-inner-link']}",
-    "pd-vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['pd-vn-chain-outer-link']}",
+    "sh-vn-chain-link--InnerLink": INNER_LINK_BOM_DESCRIPTION,
+    "sh-vn-chain-link--OuterLink": OUTER_LINK_BOM_DESCRIPTION,
     "pd-vn-chain-connecting-link": (
         f"ANSI #25 CONN. LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}"
     ),
@@ -601,8 +632,8 @@ BOM_DESCRIPTIONS = {
     ),
     "pd-vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['pd-vn-transgear-pivot-shim']}",
     "pd-vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['pd-vn-transgear-latch-pin']}",
-    "pd-vn-latch-hook-bracket-screw": (
-        f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-latch-hook-bracket-screw']}"
+    "sh-vn-fillister-screw-90280a108": (
+        f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-fillister-screw-90280a108']}"
     ),
     "pd-latch-hook": "LATCH HOOK",
     "pd-transgear-pin": "TRANSGEAR PIN",
@@ -648,9 +679,6 @@ _LONG = sorted(
 )
 if _LONG:
     raise AssertionError(f"paper-drive BOM descriptions wrap: {_LONG}")
-BOM_NORMALIZED_ALIASES = {
-    number.casefold(): stem for stem, number in BOM_PART_NUMBERS.items()
-}
 
 # The transgear instances the contract inserts (instance ``<stem>-<n>``), each
 # count read from the geometry that holds its holes: sheet 2 shows and
@@ -666,7 +694,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-pivot-spring": spring.COUNT,
     "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
-    "pd-vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
+    "sh-vn-fillister-screw-90280a108": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
@@ -689,8 +717,8 @@ TRANSGEAR_QUANTITIES = {
 # inner link at each end, and the connecting link closes the loop as its last
 # outer link.
 CHAIN_QUANTITIES = {
-    "pd-vn-chain-inner-link": chain.LINK_COUNT // 2,
-    "pd-vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+    "sh-vn-chain-link--InnerLink": chain.LINK_COUNT // 2,
+    "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
@@ -970,8 +998,8 @@ def _uncross_ring(
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
 ASSEMBLED_BALLOON_ANCHORS = {
-    "pd-vn-chain-inner-link": BalloonAnchor(),
-    "pd-vn-chain-outer-link": BalloonAnchor(),
+    "sh-vn-chain-link--InnerLink": BalloonAnchor(instance="@InnerLink:1"),
+    "sh-vn-chain-link--OuterLink": BalloonAnchor(instance="@OuterLink:1"),
     "pd-vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
@@ -1205,7 +1233,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "bar-clamped": (
             f"CLAMP THE {_N['pd-support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
-            f"ARC, WITH THE {_N['pd-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
+            f"ARC, WITH THE {_N['sh-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
             f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
             # Rule 19 fit-up for the slotted west pair (owner ruling
             # 2026-10-15, #1471 option A): the round pair locates.  Named by
@@ -1224,7 +1252,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "guides-screwed": (
             f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['pd-platen-guide']} GUIDES TO "
-            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['pd-vn-fillister-screw']} SCREWS "
+            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['sh-vn-brass-fillister-screw']} SCREWS "
             "FROM THE FRONT, HEADS IN THE COUNTERBORES."
         ),
         "clips-fitted": (
@@ -1361,8 +1389,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "latch-hook-fitted": (
             f"SCREW THE {_N['pd-latch-hook']} HOOK'S BASE TO THE BAR'S BACK FACE "
-            f"WITH {TRANSGEAR_QUANTITIES['pd-vn-latch-hook-bracket-screw']} "
-            f"{_N['pd-vn-latch-hook-bracket-screw']} SCREWS, ARM HANGING DOWN; ITS "
+            f"WITH {TRANSGEAR_QUANTITIES['sh-vn-fillister-screw-90280a108']} "
+            f"{_N['sh-vn-fillister-screw-90280a108']} SCREWS, ARM HANGING DOWN; ITS "
             "PIN HOLE IS NOT YET DRILLED."
         ),
         "hanger-meshed": (
@@ -1470,8 +1498,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
-            f"{CHAIN_QUANTITIES['pd-vn-chain-inner-link']} {_N['pd-vn-chain-inner-link']} INNER "
-            f"AND {CHAIN_QUANTITIES['pd-vn-chain-outer-link']} {_N['pd-vn-chain-outer-link']} "
+            f"{CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} {_N['sh-vn-chain-link--InnerLink']} INNER "
+            f"AND {CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} {_N['sh-vn-chain-link--OuterLink']} "
             f"OUTER LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
             f"JOIN THE ENDS WITH THE {_N['pd-vn-chain-connecting-link']} #25 CONNECTING "
             f"LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}, ITS CLIP'S CLOSED END "
@@ -1673,15 +1701,27 @@ def _place_sheet_note(
 
 
 def _source_family_counts(model: Any) -> Counter[str]:
-    """Top-level component count per referenced part file stem."""
+    """Count physical file/member identities, not colliding printed Numbers."""
     assembly = _early_bound(model, "IAssemblyDoc")
     counts: Counter[str] = Counter()
+    seen_names: set[str] = set()
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
-        path = str(component.GetPathName() or "")
-        if not path:
-            raise RuntimeError(f"component {component.Name2!r} has no referenced path")
-        counts[Path(path).stem.casefold()] += 1
+        name = str(component.Name2)
+        if name in seen_names:
+            raise RuntimeError(f"paper-drive repeats native component {name!r}")
+        seen_names.add(name)
+        stem, configuration = component_identity(component)
+        matches = [
+            key for key, (native_stem, member) in BOM_COMPONENT_IDENTITIES.items()
+            if stem == native_stem and (member is None or configuration == member)
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"paper-drive component {name!r} has no unique BOM identity: "
+                f"{(stem, configuration)!r}"
+            )
+        counts[matches[0]] += 1
     if set(counts) != set(BOM_PART_NUMBERS):
         raise RuntimeError(
             f"paper-drive families {sorted(counts)!r} != BOM {sorted(BOM_PART_NUMBERS)!r}"
@@ -1721,10 +1761,100 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
 
 
+def _set_bom_column_widths(
+    table: Any, widths: Sequence[tuple[int, float]],
+) -> None:
+    """Author widths only while physical and legacy column indices agree."""
+    physical = _bom_physical_columns(table, label="paper-drive widths")
+    visible = int(table.ColumnCount)
+    if (
+        len(physical) != visible + 1
+        or physical[-1] != (201, True)
+        or any(hidden or kind == 201 for kind, hidden in physical[:-1])
+    ):
+        raise RuntimeError("paper-drive BOM widths need one hidden trailing native column")
+    native_column = len(physical) - 1
+    original_hidden = _bom_column_hidden(table, native_column, label="paper-drive widths")
+    if original_hidden is not True:
+        raise RuntimeError("paper-drive BOM native column hidden state is not proven")
+    if (
+        not widths
+        or any(type(column) is not int or not 0 <= column < visible for column, _width in widths)
+        or len({column for column, _width in widths}) != len(widths)
+        or any(not math.isfinite(width) or width <= 0.0 for _column, width in widths)
+    ):
+        raise ValueError("paper-drive BOM width targets must be distinct visible columns")
+
+    # Keep the existing 118 mm native-key width for this production canary.
+    # Native2507 disproved the hidden201 row-minimum cause: Qty was hidden instead.
+    targets = (*widths, (native_column, BOM_COLUMN_WIDTHS["description"]))
+
+    def column_record(index: int, include_hidden: bool) -> tuple[Any, Any, Any]:
+        return (
+            table.GetColumnType3(index, include_hidden),
+            table.GetColumnTitle2(index, include_hidden),
+            table.DisplayedText2(0, index, include_hidden),
+        )
+
+    original_records = tuple(column_record(index, True) for index in range(len(physical)))
+    all_visible = tuple((kind, False) for kind, _hidden in physical)
+
+    def prove_all_visible() -> None:
+        if _bom_physical_columns(table, label="paper-drive visible widths") != all_visible:
+            raise RuntimeError("paper-drive BOM column visibility/order changed during width setup")
+        for index, expected in enumerate(original_records):
+            if column_record(index, True) != expected or column_record(index, False) != expected:
+                raise RuntimeError(
+                    f"paper-drive BOM physical/legacy column identity disagrees at {index}"
+                )
+
+    primary_error: BaseException | None = None
+    try:
+        # Width indices remain unversioned: author only in the all-visible window.
+        _set_bom_column_hidden(table, native_column, False, label="paper-drive widths")
+        prove_all_visible()
+        expected_widths = [float(table.GetColumnWidth(index)) for index in range(len(physical))]
+        if any(not math.isfinite(width) or width <= 0.0 for width in expected_widths):
+            raise RuntimeError("paper-drive BOM all-visible baseline widths are invalid")
+        for column, width in targets:
+            returned = float(table.SetColumnWidth(column, width, 0))
+            if not math.isfinite(returned) or abs(returned - width) > 1e-6:
+                raise RuntimeError(f"paper-drive BOM column {column} width was refused")
+            expected_widths[column] = width
+            actual_widths = tuple(
+                float(table.GetColumnWidth(index)) for index in range(len(physical))
+            )
+            if any(
+                not math.isfinite(actual) or abs(actual - expected) > 1e-6
+                for actual, expected in zip(actual_widths, expected_widths, strict=True)
+            ):
+                raise RuntimeError(
+                    f"paper-drive BOM column {column} width readback or native key width changed"
+                )
+        prove_all_visible()
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            # Also restore if exposing the native column raised after taking effect.
+            _set_bom_column_hidden(
+                table, native_column, original_hidden, label="paper-drive restored widths"
+            )
+            if _bom_physical_columns(table, label="paper-drive restored widths") != physical:
+                raise RuntimeError("paper-drive BOM native column hidden state was not restored")
+            if tuple(column_record(index, True) for index in range(len(physical))) != original_records:
+                raise RuntimeError("paper-drive BOM column identities changed while restoring visibility")
+        except BaseException as error:
+            if primary_error is None:
+                raise
+            primary_error.add_note(f"paper-drive BOM width visibility restoration also failed: {error!r}")
+
+
 def _validate_bom(
-    adapter: Any, table: Any, counts: Counter[str]
+    adapter: Any, table: Any, counts: Counter[str], *, configuration: str
 ) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers, prove identities/quantities; return (stem, item)."""
+    """Prove native row identities, associative Numbers and actual quantities."""
     table = _early_bound(table, "ITableAnnotation")
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
@@ -1732,9 +1862,13 @@ def _validate_bom(
         raise RuntimeError(
             f"paper-drive BOM is {rows}x{columns}; expected {len(BOM_PART_NUMBERS) + 1} rows"
         )
+    if int(table.TotalRowCount) != rows or any(
+        table.RowHidden(row) is not False for row in range(rows)
+    ):
+        raise RuntimeError("paper-drive BOM has hidden or unreadable physical rows")
     contents = tuple(
         tuple(
-            str(table.DisplayedText(row, column) or "").strip()
+            str(table.DisplayedText2(row, column, True) or "").strip()
             for column in range(columns)
         )
         for row in range(rows)
@@ -1753,27 +1887,23 @@ def _validate_bom(
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
-    for column, width in (
-        (item_column, BOM_COLUMN_WIDTHS["item"]),
-        (part_column, BOM_COLUMN_WIDTHS["part"]),
-        (description_column, BOM_COLUMN_WIDTHS["description"]),
-        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
-    ):
-        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
-            raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
+    _set_bom_column_widths(
+        table,
+        (
+            (item_column, BOM_COLUMN_WIDTHS["item"]),
+            (part_column, BOM_COLUMN_WIDTHS["part"]),
+            (description_column, BOM_COLUMN_WIDTHS["description"]),
+            (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
+        ),
+    )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[part_column].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in actual:
-            raise RuntimeError(f"paper-drive BOM repeats component family {stem!r}")
-        actual[stem] = (
-            row_index,
-            row[item_column],
-            row[description_column],
-            row[quantity_column],
-        )
+    native_rows = bom_row_identities(
+        table, configuration=configuration, component_identities=BOM_COMPONENT_IDENTITIES
+    )
+    for stem, row_index in native_rows.items():
+        row = contents[row_index]
+        actual[stem] = (row_index, row[item_column], row[description_column], row[quantity_column])
     if set(actual) != set(BOM_PART_NUMBERS):
         raise RuntimeError(
             f"paper-drive BOM identities {sorted(actual)!r} != {sorted(BOM_PART_NUMBERS)!r}"
@@ -1786,11 +1916,10 @@ def _validate_bom(
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
-            if not table.IsCellTextEditable(row_index, part_column):
-                raise RuntimeError(
-                    f"paper-drive BOM part-number cell for {stem!r} is locked"
-                )
-            table.SetText2(row_index, part_column, False, number)
+            raise RuntimeError(
+                f"paper-drive associative Number for {stem!r} reads "
+                f"{contents[row_index][part_column]!r}, expected {number!r}"
+            )
         if description != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(f"paper-drive BOM description mismatch for {stem!r}")
         if quantity != str(counts[stem]):
@@ -1800,14 +1929,56 @@ def _validate_bom(
             )
     for row in range(rows):
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
-    if not adapter.currentModel.EditRebuild3():
+    rebuilt = adapter.currentModel.EditRebuild3()
+    if not rebuilt:
         raise RuntimeError("paper-drive BOM rebuild failed")
+    if int(table.RowCount) != rows or int(table.ColumnCount) != columns:
+        raise RuntimeError("paper-drive BOM dimensions changed during its final rebuild")
+    if int(table.TotalRowCount) != rows or any(
+        table.RowHidden(row) is not False for row in range(rows)
+    ):
+        raise RuntimeError("paper-drive BOM physical row visibility changed during its final rebuild")
+    bom_feature = _early_bound(table, "IBomTableAnnotation").BomFeature
+    if bom_feature is None:
+        raise RuntimeError("paper-drive BOM lost its native feature")
+    bom_feature = _early_bound(bom_feature, "IBomFeature")
+    grouping = int(bom_feature.PartConfigurationGrouping)
+    one_item = bool(bom_feature.DisplayAsOneItem)
+    if grouping != 3 or one_item:
+        raise RuntimeError(
+            "paper-drive BOM configuration grouping changed during its final rebuild: "
+            f"grouping={grouping}, one_item={one_item}"
+        )
+    final_native_rows = bom_row_identities(
+        table, configuration=configuration, component_identities=BOM_COMPONENT_IDENTITIES
+    )
+    if final_native_rows != native_rows:
+        raise RuntimeError(
+            "paper-drive BOM native associations changed during its final rebuild: "
+            f"{native_rows!r} -> {final_native_rows!r}"
+        )
     for stem, (row_index, *_rest) in actual.items():
-        applied = str(table.DisplayedText(row_index, part_column) or "").strip()
+        applied = str(table.DisplayedText2(row_index, part_column, True) or "").strip()
         if applied != BOM_PART_NUMBERS[stem]:
             raise RuntimeError(
                 f"paper-drive BOM part number for {stem!r} reads {applied!r}"
             )
+        final_row = tuple(
+            str(table.DisplayedText2(row_index, column, True) or "").strip()
+            for column in range(columns)
+        )
+        if final_row != contents[row_index]:
+            raise RuntimeError(
+                f"paper-drive BOM row for {stem!r} changed during its final rebuild: "
+                f"{contents[row_index]!r} -> {final_row!r}"
+            )
+    validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="paper-drive",
+        expected_rows=len(BOM_PART_NUMBERS) + 1,
+        occurrence_quantities=True,
+    )
     return tuple((stem, actual[stem][1]) for stem in BOM_PART_NUMBERS)
 
 
@@ -1861,13 +2032,172 @@ def bom_split_row(row_heights: Sequence[float], header_count: int) -> int:
     return min(candidates)[1]
 
 
+def _bom_piece_grid_bounds(
+    annotation: Any, *, row_heights: Sequence[float], piece: int
+) -> tuple[float, float, float, float]:
+    """Prove this fixed four-column piece from its actual displayed grid."""
+    tolerance = 1e-7
+    evidence: dict[str, Any] = {
+        "piece": piece, "expected_rows": len(row_heights),
+        "encoding": "GetLineAtIndex3: metadata[0:4], startXYZ[4:7], endXYZ[7:10]",
+        "coordinate_contract": "untransformed sheet metres; native anchor and row readback checked",
+        "lines": [],
+    }
+    try:
+        if not 2 <= len(row_heights) <= 44 or any(
+            not math.isfinite(height) or height <= 0.0 for height in row_heights
+        ):
+            raise RuntimeError("paper-drive BOM displayed grid native row heights are unreadable")
+        evidence["native_row_heights_m"] = tuple(row_heights)
+        position = tuple(float(value) for value in annotation.GetPosition())
+        evidence["native_annotation_position_m"] = tuple(
+            value if math.isfinite(value) else repr(value) for value in position
+        )
+        if (
+            len(position) != 3 or any(not math.isfinite(value) for value in position)
+            or abs(position[2]) > tolerance
+        ):
+            raise RuntimeError(f"paper-drive BOM position unreadable: {position!r}")
+        raw_display = annotation.GetDisplayData()
+        if raw_display is None:
+            raise RuntimeError("paper-drive BOM displayed grid display data is unavailable")
+        display = _early_bound(raw_display, "IDisplayData")
+        count = display.GetLineCount()
+        evidence["line_count"] = count
+        if type(count) is not int or not 1 <= count <= 1024:
+            raise RuntimeError("paper-drive BOM displayed grid line count is unsupported")
+        horizontal: list[tuple[float, float, float]] = []
+        vertical: list[tuple[float, float, float]] = []
+        zero_length = []
+        for index in range(count):
+            raw_line = display.GetLineAtIndex3(index)
+            try:
+                if len(raw_line) != 10:
+                    raise ValueError("native line record length is not ten")
+                values = tuple(float(value) for value in raw_line)
+            except (TypeError, ValueError, OverflowError) as error:
+                evidence["malformed_line"] = {"index": index, "raw": repr(raw_line)[:512]}
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid line {index} is not a ten-value record"
+                ) from error
+            evidence["lines"].append(tuple(
+                value if math.isfinite(value) else repr(value) for value in values
+            ))
+            if any(not math.isfinite(value) for value in values):
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid line {index} has non-finite values"
+                )
+            start, end = values[4:7], values[7:10]
+            if start == end:
+                zero_length.append(index)
+                continue
+            if abs(start[2]) > tolerance or abs(end[2]) > tolerance:
+                raise RuntimeError("paper-drive BOM displayed grid has non-sheet Z coordinates")
+            dx, dy = abs(start[0] - end[0]), abs(start[1] - end[1])
+            if dx <= tolerance and dy <= tolerance:
+                raise RuntimeError("paper-drive BOM displayed grid contains an ambiguous short nonzero line")
+            if dy <= tolerance:
+                horizontal.append((start[1], min(start[0], end[0]), max(start[0], end[0])))
+            elif dx <= tolerance:
+                vertical.append((start[0], min(start[1], end[1]), max(start[1], end[1])))
+            else:
+                raise RuntimeError("paper-drive BOM displayed grid has unsupported non-axis-aligned geometry")
+        evidence["zero_length_line_indices"] = zero_length
+
+        def coordinates(values: list[float]) -> tuple[float, ...]:
+            representatives: list[float] = []
+            for value in sorted(values):
+                # Each cluster stays anchored to its first observed coordinate.
+                if not representatives or value - representatives[-1] > tolerance:
+                    representatives.append(value)
+            return tuple(representatives)
+
+        xs = coordinates([coordinate for coordinate, _start, _end in vertical])
+        ys = coordinates([coordinate for coordinate, _start, _end in horizontal])
+        evidence["x_boundaries_m"], evidence["y_boundaries_m"] = xs, ys
+        if len(xs) != 5 or len(ys) != len(row_heights) + 1:
+            raise RuntimeError(
+                "paper-drive BOM displayed grid boundary counts are "
+                f"{len(xs)}x{len(ys)}; expected 5x{len(row_heights) + 1}"
+            )
+
+        def prove_coverage(
+            segments: list[tuple[float, float, float]],
+            boundaries: tuple[float, ...], lower: float, upper: float, direction: str,
+        ) -> None:
+            if any(
+                start < lower - tolerance or end > upper + tolerance
+                for _coordinate, start, end in segments
+            ):
+                raise RuntimeError(
+                    f"paper-drive BOM displayed grid has outlying {direction} boundary geometry"
+                )
+            for boundary in boundaries:
+                reached = lower
+                for start, end in sorted(
+                    (start, end) for coordinate, start, end in segments
+                    if abs(coordinate - boundary) <= tolerance
+                ):
+                    if start > reached + tolerance:
+                        break
+                    reached = max(reached, end)
+                if reached < upper - tolerance:
+                    raise RuntimeError(
+                        f"paper-drive BOM displayed grid has incomplete {direction} boundary coverage"
+                    )
+
+        prove_coverage(horizontal, ys, xs[0], xs[-1], "horizontal")
+        prove_coverage(vertical, xs, ys[0], ys[-1], "vertical")
+        widths = tuple(right - left for left, right in zip(xs, xs[1:]))
+        heights = tuple(
+            ys[index + 1] - ys[index] for index in range(len(ys) - 2, -1, -1)
+        )
+        bounds = (xs[0], ys[0], xs[-1], ys[-1])
+        evidence.update({
+            "bounds_m": bounds, "column_widths_m": widths, "row_heights_m": heights,
+        })
+        if any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(widths, BOM_COLUMN_WIDTHS.values(), strict=True)
+        ):
+            raise RuntimeError("paper-drive BOM displayed grid column widths changed")
+        if any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(heights, row_heights, strict=True)
+        ):
+            raise RuntimeError(
+                "paper-drive BOM displayed grid row heights disagree with native split rows"
+            )
+        if abs(bounds[0] - position[0]) > 1e-6 or abs(bounds[3] - position[1]) > 1e-6:
+            raise RuntimeError("paper-drive BOM displayed grid does not match its native annotation anchor")
+        return bounds
+    except Exception as error:
+        evidence["error"] = f"{type(error).__name__}: {error}"[:512]
+        raise
+    finally:
+        try:
+            _telemetry.info("drawing.pd_bom_grid " + json.dumps(evidence, separators=(",", ":")))
+        except Exception:
+            pass  # Native geometry failures must survive observational logging.
+
+
 def _assert_bom_pieces(
-    pieces: Sequence[Any], *, header_count: int, total_rows: int
+    pieces: Sequence[Any], *, header_count: int, total_rows: int,
+    configuration: str | None = None,
+    expected_snapshot: BomSnapshot | None = None,
 ) -> None:
     """Read split ranges and physical extents; every logical data row survives."""
+    if len(pieces) != 2:
+        raise RuntimeError("paper-drive BOM split needs exactly two native pieces")
     membership: Counter[int] = Counter()
     findings = []
-    for index, raw in enumerate(pieces):
+    validated_pieces = []
+    if expected_snapshot is not None and (
+        configuration is None
+        or tuple(row[0] for row in expected_snapshot) != tuple(range(header_count, total_rows))
+    ):
+        raise RuntimeError("paper-drive BOM validated snapshot has invalid row coverage")
+    for raw in pieces:
         piece = _early_bound(raw, "ITableAnnotation")
         info = tuple(piece.GetSplitInformation(0, 0, 0, 0))
         if len(info) != 5:
@@ -1875,21 +2205,46 @@ def _assert_bom_pieces(
         direction, _index, count, start, end = (int(value) for value in info)
         if direction != 1 or not (0 <= start <= end < total_rows):
             raise RuntimeError(f"paper-drive BOM split range invalid: {info!r}")
-        membership.update(range(max(start, header_count), end + 1))
-        rows = sorted({*range(header_count), *range(start, end + 1)})
-        height = sum(float(piece.GetRowHeight(row)) for row in rows)
-        width = sum(
-            float(piece.GetColumnWidth(column))
-            for column in range(int(piece.ColumnCount))
+        data_rows = tuple(range(max(start, header_count), end + 1))
+        membership.update(data_rows)
+        validated_pieces.append((piece, (direction, _index, count, start, end), data_rows))
+    if membership != Counter(range(header_count, total_rows)):
+        raise RuntimeError("paper-drive BOM split: split pieces omit or repeat logical data rows")
+    for index, (piece, info, data_rows) in enumerate(validated_pieces):
+        _direction, _native_index, count, start, end = info
+        _telemetry.event(
+            "drawing.bom_piece_row_range", piece=index + 1,
+            split_information=info, configuration=configuration,
         )
-        annotation = _early_bound(piece.GetAnnotation(), "IAnnotation")
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if len(position) != 3:
-            raise RuntimeError(f"paper-drive BOM position unreadable: {position!r}")
-        violations = bom_extent_violations((position[0], position[1]), width, height)
+        if configuration is not None:
+            current = validate_bom_number_property(
+                piece,
+                configuration=configuration,
+                label=f"paper-drive split BOM piece {index + 1}",
+                row_indices=data_rows,
+                occurrence_quantities=True,
+            )
+            if expected_snapshot is not None and current != tuple(
+                row for row in expected_snapshot if row[0] in data_rows
+            ):
+                raise RuntimeError(
+                    "paper-drive split BOM native membership or quantities changed"
+                )
+        rows = sorted({*range(header_count), *range(start, end + 1)})
+        row_heights = tuple(float(piece.GetRowHeight(row)) for row in rows)
+        raw_annotation = piece.GetAnnotation()
+        if raw_annotation is None:
+            raise RuntimeError("paper-drive BOM split annotation is unavailable")
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        left, bottom, right, top = _bom_piece_grid_bounds(
+            annotation, row_heights=row_heights, piece=index + 1
+        )
+        anchor = (left, top)
+        width, height = right - left, top - bottom
+        violations = bom_extent_violations(anchor, width, height)
         expected_anchor = (BOM_ANCHOR, BOM_SECOND_ANCHOR)[index]
         if any(
-            abs(position[axis] - expected_anchor[axis]) > 1e-6
+            abs(anchor[axis] - expected_anchor[axis]) > 1e-6
             for axis in range(2)
         ):
             violations.append("table moved outside its assigned column")
@@ -1897,18 +2252,19 @@ def _assert_bom_pieces(
             violations.append("table column widths changed after splitting")
         _telemetry.event(
             "drawing.bom_piece", piece=index + 1, split_count=count, split_range=(start, end),
-            anchor_mm=(position[0] * 1000, position[1] * 1000),
+            anchor_mm=(anchor[0] * 1000, anchor[1] * 1000),
             width_mm=width * 1000, height_mm=height * 1000,
             violations=tuple(violations),
         )
         findings.extend(violations)
-    if membership != Counter(range(header_count, total_rows)):
-        findings.append("split pieces omit or repeat logical data rows")
     if findings:
         raise RuntimeError("paper-drive BOM split: " + "; ".join(findings))
 
 
-def _split_bom(adapter: Any, table: Any) -> tuple[Any, Any]:
+def _split_bom(
+    adapter: Any, table: Any, *, configuration: str | None = None,
+    expected_snapshot: BomSnapshot | None = None,
+) -> tuple[Any, Any]:
     """Keep one native logical parts list, displayed as two complete pieces."""
     table = _early_bound(table, "ITableAnnotation")
     header_count = int(table.GetHeaderCount())
@@ -1924,7 +2280,11 @@ def _split_bom(adapter: Any, table: Any) -> tuple[Any, Any]:
         raise RuntimeError("paper-drive BOM second piece refused its position")
     rebuild_drawing(adapter, label="paper-drive BOM split")
     pieces = (table, second)
-    _assert_bom_pieces(pieces, header_count=header_count, total_rows=total_rows)
+    _assert_bom_pieces(
+        pieces, header_count=header_count, total_rows=total_rows,
+        configuration=configuration,
+        expected_snapshot=expected_snapshot,
+    )
     return pieces
 
 
@@ -2153,6 +2513,7 @@ def _balloon_collar_on_its_rear_rim(
         view_name(adapter, view)
     ):
         raise RuntimeError(f"{label}: failed to activate the collar's balloon view")
+    _assert_bom_balloon_configuration(view, label=label)
     return _create_component_bom_balloon(
         adapter,
         view,
@@ -2165,12 +2526,35 @@ def _balloon_collar_on_its_rear_rim(
     )
 
 
+def _assert_bom_balloon_configuration(view: Any, *, label: str) -> None:
+    """Read actual post-operation membership; never coerce a view to fit the BOM."""
+    actual = _early_bound(view, "IView").ReferencedConfiguration
+    if actual != BOM_CONFIGURATION:
+        raise RuntimeError(
+            f"{label}: balloon view configuration {actual!r}, expected {BOM_CONFIGURATION!r}"
+        )
+
+
+def _assert_bom_balloon_items(
+    landings: Sequence[BalloonLanding], items: dict[str, str],
+) -> None:
+    """Re-read every native balloon after the final rebuild, including repeated stems."""
+    for landing in landings:
+        actual = str(_early_bound(landing.note, "INote").GetBomBalloonText(True) or "").strip()
+        expected = items[landing.stem]
+        if actual != expected:
+            raise RuntimeError(
+                f"{landing.label}: settled {landing.stem} ({landing.instance}) "
+                f"resolved item {actual}, expected {expected}"
+            )
+
+
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
-) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any]]:
+) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
     """BOM of the whole drive; the transgear isometric and the inner view
     between them balloon every transgear family once. Returns landings,
-    the logical table, its (stem: item) numbers and the two native pieces."""
+    the logical table, its (stem: item) numbers, pieces and validated snapshot."""
     _activate_sheet(adapter, SHEET_NAMES[5])
     reference = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_CENTER,
@@ -2196,11 +2580,18 @@ def _place_bom_sheet(
         anchor_xy=BOM_ANCHOR,
         expected_components=tuple(BOM_PART_NUMBERS),
         descriptions=BOM_DESCRIPTIONS,
-        identity_aliases={number: stem for stem, number in BOM_PART_NUMBERS.items()},
-        configuration_grouping="same-part",
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        configuration_grouping="same-name",
+        configuration=BOM_CONFIGURATION,
         label="paper-drive",
     )
-    items = dict(_validate_bom(adapter, table, counts))
+    bom_configuration = BOM_CONFIGURATION
+    items = dict(
+        _validate_bom(
+            adapter, table, counts, configuration=bom_configuration
+        )
+    )
     _activate_sheet(adapter, SHEET_NAMES[1])
     label = "transgear isometric"
     view = place_view(
@@ -2224,16 +2615,28 @@ def _place_bom_sheet(
     apply_view_configuration(adapter, inner, label=inner_label)
     _isolate_instances(adapter, inner, INNER_INSTANCES, label=inner_label)
     _link_view_to_bom(inner, table, label=inner_label)
-    if dict(_validate_bom(adapter, table, counts)) != items:
+    if dict(
+        _validate_bom(adapter, table, counts, configuration=bom_configuration)
+    ) != items:
         raise RuntimeError(
             "paper-drive BOM items moved when the transgear views were isolated"
         )
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=bom_configuration,
+        label="paper-drive pre-split BOM",
+        expected_rows=len(BOM_PART_NUMBERS) + 1,
+        occurrence_quantities=True,
+    )
     _activate_sheet(adapter, SHEET_NAMES[5])
-    pieces = _split_bom(adapter, table)
+    pieces = _split_bom(
+        adapter, table, configuration=bom_configuration,
+        expected_snapshot=bom_snapshot,
+    )
     _activate_sheet(adapter, SHEET_NAMES[1])
     # Both rings fit before any balloon exists. The isometric is centred in
-    # the field's height, then the inner view is fitted beside it. Every
-    # ladder scale keeps the configuration just applied.
+    # the field's height, then the inner view is fitted beside it. Requested
+    # creation policy is not proof of the actual post-operation configuration.
     _shift_view(
         adapter, view, transgear_view_shift(_view_outline(view)), label=f"{label} ring fit"
     )
@@ -2246,6 +2649,7 @@ def _place_bom_sheet(
     _shift_view(adapter, inner, shift, label=f"{inner_label} ring fit")
     iso_items, inner_items = transgear_balloon_items(items)
     iso_label = "paper-drive transgear BOM coverage"
+    _assert_bom_balloon_configuration(view, label=iso_label)
     landings = add_component_bom_balloons(
         adapter,
         view,
@@ -2262,6 +2666,7 @@ def _place_bom_sheet(
     # The collar balloons after the batch, so its balloon cannot cover a
     # point the batch hit-tests; then all of the view's balloons re-ring.
     balloons_label = "paper-drive transgear inner BOM coverage"
+    _assert_bom_balloon_configuration(inner, label=balloons_label)
     inner_landings = add_component_bom_balloons(
         adapter,
         inner,
@@ -2302,7 +2707,7 @@ def _place_bom_sheet(
         ),
         label="inner-parts caption",
     )
-    return landings, table, items, pieces
+    return landings, table, items, pieces, bom_snapshot
 
 
 def _pivot_sheet_points(
@@ -2635,6 +3040,7 @@ def _balloon_assembled_sheet(
     """The chain and the spare T18 on sheet 1's isometric."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     _link_view_to_bom(iso, table, label="sheet 1 isometric")
+    _assert_bom_balloon_configuration(iso, label="paper-drive sheet 1 BOM coverage")
     return add_component_bom_balloons(
         adapter,
         iso,
@@ -2672,6 +3078,7 @@ def _place_exploded_sheet(
     shift = ring_fit_shift(outline, EXPLODED_RING_LIMITS, name=label)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     _link_view_to_bom(view, table, label=label)
+    _assert_bom_balloon_configuration(view, label="paper-drive platen BOM coverage")
     landings = add_component_bom_balloons(
         adapter,
         view,
@@ -2752,7 +3159,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _validate_persisted_explode(adapter.currentModel)
     _create_sheets(adapter)
     iso = _place_assembled_sheet(adapter)
-    landings, table, items, pieces = _place_bom_sheet(adapter, counts)
+    landings, table, items, pieces, bom_snapshot = _place_bom_sheet(adapter, counts)
     _place_pivot_view(adapter, items)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
@@ -2770,9 +3177,12 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales=SHEET_SCALES,
         settled_checks=(
             lambda: assert_balloon_landings(adapter, landings),
+            lambda: _assert_bom_balloon_items(landings, items),
             lambda: _assert_bom_pieces(
                 pieces, header_count=int(table.GetHeaderCount()),
                 total_rows=len(BOM_PART_NUMBERS) + 1,
+                configuration=BOM_CONFIGURATION,
+                expected_snapshot=bom_snapshot,
             ),
         ),
     )

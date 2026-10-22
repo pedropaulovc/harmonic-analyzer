@@ -10,7 +10,12 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const fail = message => { throw new Error(`Current native identity inputs: ${message}`) }
 const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right)
 const sorted = rows => rows.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
-const identity = row => ({ parent: row.parent ?? null, stem: row.stem, number: row.number })
+const identity = row => ({
+  parent: row.parent ?? null, stem: row.stem, number: row.number,
+  priorStem: row.priorStem ?? row.prior_stem ?? null,
+  priorNumber: row.priorNumber ?? row.prior_number ?? null,
+  configuration: row.configuration ?? null, role: row.role ?? null,
+})
 const archivedOnly = new Set([
   'vn-transgear-collar-cross-pin/pd-paper-drive/pd-vn-transgear-collar-cross-pin',
   'vn-latch-hook-rivet/pd-paper-drive/pd-vn-latch-hook-rivet',
@@ -63,6 +68,17 @@ export function validateCurrentNativeIdentityProjection(table, cadMap, archivedM
     sourceStem: row.sourceStem, sourceNumber: row.sourceNumber, kind: row.kind ?? 'part', identities: sorted(row.identities.map(identity)),
   })))
   if (!equal(actual, expected)) fail('current projection entries differ from the frozen current CAD map')
+  if (table.occurrenceNamespace !== 'archive-role-local'
+    || cadMap.rules?.occurrence_namespace !== table.occurrenceNamespace) fail('occurrence namespace differs from the current CAD map')
+  const groups = sorted(cadMap.shared_vendor_groups.map(row => ({
+    stem: row.stem, number: row.number, supplier: row.supplier, supplierSku: row.supplier_sku,
+    configurations: row.configurations, neutralExportConfiguration: row.neutral_export_configuration,
+  })))
+  if (!equal(sorted(table.sharedVendors.map(row => ({ ...row }))), groups)) fail('shared vendor members differ from the current CAD map')
+  const sourceFiles = sorted(cadMap.current_source_files.map(row => ({
+    currentPath: row.current_path, sourcePath: row.source_path, configuration: row.configuration, role: row.role,
+  })))
+  if (!equal(sorted(table.sourceFiles.map(row => ({ ...row }))), sourceFiles)) fail('current source files differ from the current CAD map')
   const aliases = sorted(cadMap.historical_current_aliases.map(row => ({ sourceStem: row.old_stem, stem: row.prior_current_stem })))
   if (!equal(sorted(table.archivedAliases.map(row => ({ sourceStem: row.sourceStem, stem: row.stem }))), aliases)) fail('historical aliases differ from the current CAD map')
   for (const row of cadMap.historical_current_aliases) {

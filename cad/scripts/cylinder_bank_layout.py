@@ -42,7 +42,7 @@ import math
 
 import _config
 import dt_arbor_pedestal_spec as _pedestal
-import _mcmaster_91375a106 as _screw
+import sh_vn_arbor_set_screw_spec as _screw
 import ch_connecting_rod_spec as _rod
 import dt_vn_cylinder_bank_spring_spec as _spring
 import dt_cylinder_gear_shaft_spec as _shaft

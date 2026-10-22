@@ -33,8 +33,10 @@ def grouped_model(monkeypatch):
         "MHA-DT-00",
         "MHA-CH-06-TL-20",
         "MHA-CH-06-TL-00",
-        "MHA-FR-VN-50",
-        "MHA-DT-VN-50",
+        "MHA-SH-VN-50",
+        "MHA-SH-VN-51",
+        "MHA-SH-VN-56",
+        "MHA-SH-VN-57",
         "MHA-PD-VN-99",
         "MHA-CH-06-TL-VN-50",
         "MHA-CH-06-TL-VN-99",
@@ -74,6 +76,9 @@ def test_current_family_numbers_are_stamped_on_every_configuration(
         "MHA-FR-VN-00",
         "MHA-CH-06-TL-VN-49",
         "MHA-FR-VN-100",
+        "MHA-SH-VN-49",
+        "MHA-SH-VN-050",
+        "MHA-SH-VN-100",
         "MHA-CH-6-TL-20",
         "MHA-CH-06-TL-2",
         "MHA-DT-03-T006",
@@ -98,33 +103,115 @@ def test_noncurrent_or_nonfamily_numbers_fail_before_native_access(
     assert all(vars(configuration) == {} for configuration in configurations.values())
 
 
-def test_bom_family_aliases_keep_equal_vendor_serials_in_distinct_parents():
+def test_bom_aliases_preserve_distinct_current_stock_identities():
     from _drawing_tables import _bom_identity_map
 
     families = (
-        "fr-vn-fillister-screw",
-        "dt-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
+        "dt-vn-cone-lock-knob",
         "ch-rocker-arm-tl-vn-oblique-rail",
     )
-    numbers = ("MHA-FR-VN-50", "MHA-DT-VN-50", "MHA-CH-06-TL-VN-50")
+    numbers = ("MHA-SH-VN-51", "MHA-DT-VN-51", "MHA-CH-06-TL-VN-50")
     aliases = dict(zip(numbers, families, strict=True))
     identities = _bom_identity_map(families, aliases)
     assert len(identities) == 2 * len(families)
     for number, family in aliases.items():
         assert identities[number.lower()] == family
         assert identities[family] == family
-    assert "mha-vn-50" not in identities
-    assert "vn-fillister-screw" not in identities
+    assert "mha-vn-51" not in identities
+    assert "vn-brass-fillister-screw" not in identities
 
 
-def test_parent_scoped_bom_number_still_cannot_alias_two_families():
+def test_shared_purchase_number_alone_cannot_disambiguate_configured_rows():
     from _drawing_tables import _bom_identity_map
 
     with pytest.raises(ValueError, match="maps to both"):
         _bom_identity_map(
-            ("fr-vn-fillister-screw", "dt-vn-fillister-screw"),
+            ("sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"),
             {
-                "MHA-FR-VN-50": "fr-vn-fillister-screw",
-                " mha-fr-vn-50 ": "dt-vn-fillister-screw",
+                "MHA-SH-VN-50": "sh-vn-chain-link--InnerLink",
+                " mha-sh-vn-50 ": "sh-vn-chain-link--OuterLink",
             },
         )
+
+
+@pytest.mark.parametrize(
+    ("stem", "number", "members"),
+    [
+        (
+            "sh-vn-chain-link", "MHA-SH-VN-50",
+            (("InnerLink", 34), ("OuterLink", 33)),
+        ),
+        (
+            "sh-vn-music-wire", "MHA-SH-VN-56",
+            (("LeverWire", 1), ("PenWire", 1)),
+        ),
+        (
+            "sh-vn-clamping-kit-hardware", "MHA-SH-VN-57",
+            (("HoldDownStud", 4), ("TNut", 4), ("FlangeNut", 4)),
+        ),
+    ],
+)
+def test_native_bom_rows_preserve_repeated_purchase_numbers_and_member_quantities(
+    monkeypatch, stem, number, members,
+):
+    import _component_references as references
+    import _drawing_tables as tables
+
+    monkeypatch.setattr(references, "_early_bound", lambda raw, _interface: raw)
+    monkeypatch.setattr(
+        tables._sw_type_info, "early_bound_or_flag",
+        lambda raw, _interface, *_methods: raw,
+    )
+
+    def component(native_stem, member):
+        return SimpleNamespace(
+            GetPathName=lambda: f"C:/cad/{native_stem}.SLDPRT",
+            ReferencedConfiguration=f"{member} Simplified",
+        )
+
+    contents = [("ITEM", "NUMBER", "QTY")]
+    components = {}
+    identities = {}
+    expected_rows = {}
+    # Native row order need not follow the logical member declaration order.
+    for member, quantity in reversed(members):
+        logical = f"{stem}--{member}"
+        row = len(contents)
+        contents.append((str(row), number, str(quantity)))
+        components[row] = tuple(component(stem, member) for _ in range(quantity))
+        identities[logical] = (stem, member)
+        expected_rows[logical] = row
+    transgear = "pd-transgear-removable"
+    row = len(contents)
+    contents.append((str(row), "MHA-PD-04", "3"))
+    components[row] = tuple(
+        component(transgear, member) for member in ("T12", "T24", "T18")
+    )
+    identities[transgear] = (transgear, None)
+    expected_rows[transgear] = row
+    calls = []
+
+    def native_components(row, configuration):
+        calls.append((row, configuration))
+        return components[row]
+
+    table = SimpleNamespace(
+        RowCount=len(contents),
+        GetComponents2=native_components,
+        Text2=lambda row, column: contents[row][column],
+    )
+    actual = tables.bom_row_identities(
+        table, configuration="Default", component_identities=identities,
+    )
+
+    assert actual == expected_rows
+    assert calls == [(row, "Default") for row in range(1, len(contents))]
+    assert {
+        table.Text2(actual[f"{stem}--{member}"], 1) for member, _quantity in members
+    } == {number}
+    assert {
+        member: int(table.Text2(actual[f"{stem}--{member}"], 2))
+        for member, _quantity in members
+    } == dict(members)
+    assert int(table.Text2(actual[transgear], 2)) == 3

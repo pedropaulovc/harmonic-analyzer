@@ -75,8 +75,8 @@ test('current capture projection leaves archived native source records and numer
   const before = structuredClone(track)
   const current = await normalizeCurrentTrackAssemblies(track, { webRoot })
   assert.deepEqual(current.anchors.map(anchor => anchor.partPath), [
-    'ha-harmonic-analyzer/mg-magnifier/mg-vn-thumb-screw-1',
-    'ha-harmonic-analyzer/ms-measuring-stick/ms-vn-thumb-screw-1',
+    'ha-harmonic-analyzer/mg-magnifier/sh-vn-thumb-screw-1',
+    'ha-harmonic-analyzer/ms-measuring-stick/sh-vn-thumb-screw-1',
   ])
   assert.strictEqual(current.source, track.source)
   assert.strictEqual(current.model, track.model)

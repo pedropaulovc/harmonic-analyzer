@@ -374,6 +374,32 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     ordinary_saved_states = {}
     repaired_names = ("ch-channel", "sm-summing")
     proofs = {name: tmp_path / f".{name}.massprops.sha" for name in repaired_names}
+    # Independent native readback records: HA's shared members live under their
+    # owning subassemblies, and native indices are not role-local ordinals.
+    shared_members = (
+        (
+            "dt-drive-train-1", "FootScrew",
+            "sh-vn-fillister-screw-90280a108", "Default", 1,
+        ),
+        (
+            "dt-drive-train-1", "SwingStopScrew",
+            "sh-vn-fillister-screw-90280a108", "Default", 1,
+        ),
+        ("pd-paper-drive-1", "InnerLink", "sh-vn-chain-link", "InnerLink", 34),
+        ("pd-paper-drive-1", "OuterLink", "sh-vn-chain-link", "OuterLink", 33),
+        ("mg-magnifier-1", "LeverWire", "sh-vn-music-wire", "LeverWire", 1),
+        ("pn-pen-1", "PenWire", "sh-vn-music-wire", "PenWire", 1),
+    )
+    ha_components = tuple(
+        SimpleNamespace(
+            Name2=f"{scope}/native-occurrence-{100 * group + ordinal + 70}",
+            ComponentReference=f"{role}:{ordinal}",
+            ReferencedConfiguration=configuration,
+            GetPathName=lambda stem=stem: str(tmp_path / f"{stem}.SLDPRT"),
+        )
+        for group, (scope, role, stem, configuration, count) in enumerate(shared_members)
+        for ordinal in range(1, count + 1)
+    )
     files = {}
     for name in (*repaired_names, "ha-harmonic-analyzer"):
         path = tmp_path / f"{name}.SLDASM"
@@ -390,6 +416,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             stuck=set(),
             saved_flag=None,
             repaired=name not in repaired_names,
+            components=ha_components if name == "ha-harmonic-analyzer" else (),
         )
     for proof in proofs.values():
         proof.write_text("stale-proof\n", encoding="utf-8")
@@ -403,6 +430,10 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             self.persisted = True
             self.repaired = file.repaired
             self.closed = False
+
+        def GetComponents(self, top_level):
+            assert top_level is False
+            return self.file.components
 
         def GetCustomInfoValue(self, _configuration, property_name):
             return {

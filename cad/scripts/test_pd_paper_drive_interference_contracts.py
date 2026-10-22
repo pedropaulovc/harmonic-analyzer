@@ -16,7 +16,7 @@ import pytest
 import _chain
 import _holes
 import _interference_contracts
-import pd_vn_latch_hook_bracket_screw_spec as bracket_screw
+import pd_latch_hook_bracket_screw_spec as bracket_screw
 import pd_latch_hook_geometry as hook
 import pd_rack_pinion_spec as disc
 import pd_support_bar_spec as bar
@@ -95,7 +95,7 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
         bracket_screw.ENGAGEMENT_NOMINAL,
     )
     for n in (1, 2):
-        pair = _pair(f"pd-vn-latch-hook-bracket-screw-{n}", "pd-support-bar-1")
+        pair = _pair(f"sh-vn-fillister-screw-90280a108-{n}", "pd-support-bar-1")
         assert allowed[pair] == pytest.approx(limit)
 
 

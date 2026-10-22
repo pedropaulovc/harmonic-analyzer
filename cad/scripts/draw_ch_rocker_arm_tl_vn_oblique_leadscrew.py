@@ -48,6 +48,7 @@ from _drawing_common import (
 )
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import _show_hidden_owners
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import property_link
@@ -57,6 +58,10 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
+from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _supplier_screw_dimensions import annotate_supplier_screw
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
+import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as supplier
 import _telemetry
 from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
     DIMENSION_CONTROLS,
@@ -106,6 +111,15 @@ MAIN_CENTER = (0.195, 0.160)
 # from the right border, its outline spans y 0.081 .. 0.251, between the
 # title block's top (0.0651) and the top border (0.2667).
 ISO_CENTER = (0.390, 0.166)
+# An independent zero-body supplier gauge inset fits between the two clock
+# sections. It does not refit, replace or dimension the installed screw.
+SUPPLIER_STOCK_CENTER = (0.190, 0.243)
+SUPPLIER_STOCK_SCALE = (1, 10)
+SUPPLIER_STOCK_FIELD = (0.135, 0.208, 0.245, 0.265)
+SUPPLIER_STOCK_CAPTION_XY = (0.140, 0.222)
+SUPPLIER_STOCK_CAPTION = (
+    "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
+)
 # Model station s (mm from the near end) on the main view's sheet x.
 NEAR_END_X = MAIN_CENTER[0] - SCREW_SHEET_LENGTH / 2.0
 
@@ -894,6 +908,85 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
     return annotations
 
 
+def _add_supplier_stock_inset(adapter: Any):
+    """Import isolated source gauges, never a fictitious as-bought solid."""
+    view = _early_bound(
+        place_view(
+            adapter,
+            str(SOURCE),
+            "*Front",
+            *SUPPLIER_STOCK_CENTER,
+            scale=SUPPLIER_STOCK_SCALE,
+        ),
+        "IView",
+    )
+    view.ReferencedConfiguration = supplier.SUPPLIER_STOCK_CONFIGURATION
+    if str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("leadscrew stock gauges reference the installed solid")
+    view.UseSheetScale = 0
+    view.ScaleRatio = double_array(SUPPLIER_STOCK_SCALE)
+    set_hidden_lines_removed(adapter, view)
+    rebuild_drawing(adapter, label="leadscrew supplier stock configuration")
+    owner = FEATURE_BY_PLANE["Front"]
+    shown = _show_hidden_owners(
+        adapter, view, (owner,), view_label="leadscrew supplier stock gauges"
+    )
+    if shown != [owner]:
+        raise RuntimeError("leadscrew supplier stock sketch is not saved hidden")
+    rebuild_drawing(adapter, label="show leadscrew supplier stock gauges")
+    _center_view(
+        adapter.currentModel, view, SUPPLIER_STOCK_CENTER, "supplier stock gauges"
+    )
+    checks = []
+    annotate_supplier_screw(
+        adapter,
+        {"*Front": view},
+        dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        formats=supplier.SUPPLIER_REFERENCE_FORMATS,
+        starts=supplier.SUPPLIER_REFERENCE_STARTS,
+        units=supplier.SUPPLIER_REFERENCE_UNITS,
+        settled_checks=checks,
+    )
+    draw = _early_bound(adapter.currentModel, "IDrawingDoc")
+    draw.ActivateView("")
+    if not draw.GetEditSheet() or draw.ActiveDrawingView is not None:
+        raise RuntimeError("cannot restore sheet context for supplier stock caption")
+    note = add_note(
+        adapter, SUPPLIER_STOCK_CAPTION, *SUPPLIER_STOCK_CAPTION_XY
+    )
+    if note is None:
+        raise RuntimeError("cannot add leadscrew supplier stock caption")
+
+    def settled() -> None:
+        for check_source in checks:
+            check_source()
+        if (
+            str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
+            or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE
+            or view.UseSheetScale != 0
+        ):
+            raise RuntimeError("leadscrew supplier stock configuration/scale changed")
+        assert_supplier_view_fits(
+            adapter,
+            view,
+            SUPPLIER_STOCK_FIELD,
+            label="leadscrew nominal supplier stock gauges",
+        )
+        caption = _early_bound(note, "INote")
+        annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
+        if (
+            str(caption.GetText() or "").replace("\r", "") != SUPPLIER_STOCK_CAPTION
+            or int(annotation.OwnerType) != 1
+            or not _inside(
+                _box(caption.GetExtent(), label="supplier stock caption", kind="note"),
+                SUPPLIER_STOCK_FIELD,
+            )
+        ):
+            raise RuntimeError("leadscrew supplier stock caption changed or left its field")
+
+    return settled
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -976,12 +1069,14 @@ async def build(adapter: Any) -> dict[str, str]:
     callout = str(_early_bound(thread, "INote").GetText() or "")
     if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
         raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
+    supplier_stock_check = _add_supplier_stock_inset(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=PDF_TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(supplier_stock_check,),
     )
 
 

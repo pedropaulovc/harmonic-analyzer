@@ -21,7 +21,7 @@ A few millimetres of summing-lever travel become a few centimetres of pen travel
 | `mg-magnifying-bracket` | TODO | TODO | TODO |
 | `mg-magnifying-clamp` | TODO | TODO | TODO |
 | `mg-magnifying-vertical-rod` | TODO | TODO | TODO |
-| `mg-vn-lever-wire` | 1 | purchased | 0.031" (0.79 mm) ASTM A228 music wire (McMaster 9666K56), cut from the coil |
+| `sh-vn-music-wire` (`LeverWire` configuration) | 1 | purchased | 0.031" (0.79 mm) ASTM A228 music wire (McMaster 9666K56), cut from the coil |
 | `mg-wheel-axle` | TODO | TODO | TODO |
 | `mg-wheel-axle-spacer` | 1 | brass | Ø11.11 mm (7/16") round bar |
 | `mg-wheel-bar` | TODO | TODO | TODO |

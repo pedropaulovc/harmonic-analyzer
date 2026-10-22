@@ -6,19 +6,25 @@ without re-keying ordinary part annotations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from itertools import product
 import math
-from pathlib import Path
+from pathlib import PureWindowsPath
 import re
 import sys
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 from _com import _bind, _com_invoke, _early_bound
+from _component_references import (
+    REFERENCE_IDENTITIES,
+    member_configuration,
+    semantic_reference_identity,
+)
 from _drawing_attachment import _assert_leader_lands
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_common import rebuild_drawing
@@ -470,8 +476,9 @@ class BalloonAnchor:
     ``point_mm`` is in the part's own millimetres, so view scale, placement
     and explode distance do not move it. ``instance`` pins the instance it is
     on by its full component path (``IComponent2.Name2``: ``dt-cone-gear-2``, or
-    ``sub-1/dt-cone-gear-2`` inside a sub-assembly); ``None`` means the
-    lowest-named instance the view shows (:func:`_shown_instances`).
+    ``sub-1/dt-cone-gear-2`` inside a sub-assembly), or a checked shared-member
+    semantic selector such as ``@InnerLink:1``. ``None`` means the lowest-named
+    instance the view shows (:func:`_shown_instances`).
 
     ``point_mm=None`` walks the part's own body instead
     (:func:`_select_balloon_anchor`), for a family no single point claims,
@@ -530,22 +537,60 @@ def _component_path(adapter: Any, component: Any) -> str:
 def _component_leaf(
     adapter: Any, drawing_component: Any, *, visible: bool = True
 ) -> _ComponentLeaf:
-    """Read one leaf drawing component's model component and identities."""
+    """Read identities from the drawing occurrence's bound ``IComponent2``.
+
+    Call ``GetPathName`` through the bound interface and propagate read failures.
+    A shared reference also needs a readable, non-empty ``Name2`` before its
+    parent scope can be determined.
+    """
     component = adapter._attempt(
         lambda dc=drawing_component: dc.Component, default=None
     )
+    native = _early_bound(component, "IComponent2")
     path = ""
+    configuration = ""
+    reference = ""
     if component is not None:
-        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+        path = native.GetPathName() or ""
+        configuration = str(
+            adapter._attempt(lambda: native.ReferencedConfiguration, default="") or ""
+        )
+        reference = str(
+            adapter._attempt(lambda: native.ComponentReference, default="") or ""
+        )
     name = str(drawing_component.Name or "")
-    identities = frozenset(
-        {
-            Path(str(path)).stem.casefold(),
-            _instance_name(name).casefold(),
-        }
+    referenced = reference.split(":", 1)[0] in REFERENCE_IDENTITIES
+    native_path = (
+        str(native.Name2 or "").replace("\\", "/")
+        if referenced
+        else _component_path(adapter, component)
     )
+    if referenced and not native_path:
+        raise RuntimeError(
+            f"drawing occurrence {name!r}: reference {reference!r} "
+            "has no native occurrence path"
+        )
+    stem = PureWindowsPath(str(path)).stem.casefold()
+    identities = {stem, _instance_name(name).casefold()} - {""}
+    member = member_configuration(configuration)
+    if stem and member:
+        identities.add(f"{stem}--{member}".casefold())
+    if referenced:
+        expected = semantic_reference_identity(f"@{reference}")
+        if (stem, member) != expected:
+            raise RuntimeError(
+                f"drawing occurrence {native_path!r}: reference {reference!r} "
+                f"requires {expected!r}, not {(stem, member)!r}"
+            )
+        parent, separator, _leaf = native_path.rpartition("/")
+        semantic = f"{parent}/@{reference}" if separator else f"@{reference}"
+        identities.add(semantic.casefold())
     return _ComponentLeaf(
-        name=name, component=component, identities=identities, visible=visible
+        name=name,
+        component=component,
+        identities=frozenset(identities),
+        visible=visible,
+        path=native_path,
     )
 
 
@@ -555,10 +600,12 @@ def _stems_matching(identities: frozenset[str], stems: frozenset[str]) -> set[st
         stem
         for stem in stems
         if any(
-            identity == stem
+            identity == stem.casefold()
             or (
-                identity.startswith(f"{stem}-")
-                and identity.removeprefix(f"{stem}-").isdigit()
+                "--" not in stem
+                and "@" not in stem
+                and identity.startswith(f"{stem.casefold()}-")
+                and identity.removeprefix(f"{stem.casefold()}-").isdigit()
             )
             for identity in identities
         )
@@ -601,7 +648,7 @@ def _view_component_leaves(
         if children:
             continue
         leaf = _component_leaf(adapter, drawing_component, visible=shown)
-        leaves.append(replace(leaf, path=_component_path(adapter, leaf.component)))
+        leaves.append(leaf)
     _span_scan_attrs(leaves=len(leaves))
     return tuple(leaves)
 
@@ -681,9 +728,19 @@ def _shown_instances(
         if leaf.visible and leaf.component is not None and leaf.path
     ]
     if anchor.instance is not None:
-        shown = [
-            leaf for leaf in shown if leaf.path.casefold() == anchor.instance.casefold()
-        ]
+        selector = anchor.instance.replace("\\", "/")
+        if semantic_reference_identity(selector) is not None:
+            bound = [leaf for leaf in leaves if selector.casefold() in leaf.identities]
+            if len(bound) != 1:
+                raise RuntimeError(
+                    f"{label}: semantic balloon instance {selector!r} "
+                    f"matches {len(bound)} native occurrences"
+                )
+            shown = [leaf for leaf in shown if leaf is bound[0]]
+        else:
+            shown = [
+                leaf for leaf in shown if leaf.path.casefold() == selector.casefold()
+            ]
     if not shown:
         pinned = f" {anchor.instance}" if anchor.instance else ""
         raise RuntimeError(

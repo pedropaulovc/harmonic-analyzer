@@ -37,7 +37,7 @@ import math
 
 import pn_pen_carriage_geom
 import pn_pen_rod_spec
-import mg_vn_lever_wire_geom
+import sh_vn_music_wire_lever_geom
 from build_mg_magnifying_bracket import ARM_HALF_X, ARM_Y, COLLAR_OD
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
@@ -95,11 +95,11 @@ LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.08 N
 LEVER_GROUP_ARM_X = 160.0
 
 COLLAR = BRACKET_ORIGIN
-HOOK = (mg_vn_lever_wire_geom.HOOK_X, mg_vn_lever_wire_geom.HOOK_Y, mg_vn_lever_wire_geom.HOOK_Z)
+HOOK = (sh_vn_music_wire_lever_geom.HOOK_X, sh_vn_music_wire_lever_geom.HOOK_Y, sh_vn_music_wire_lever_geom.HOOK_Z)
 _wx, _wy, _wz = (
     e - s
     for e, s in zip(
-        mg_vn_lever_wire_geom.WIRE_END, mg_vn_lever_wire_geom.WIRE_START, strict=True
+        sh_vn_music_wire_lever_geom.WIRE_END, sh_vn_music_wire_lever_geom.WIRE_START, strict=True
     )
 )
 _wl = math.sqrt(_wx * _wx + _wy * _wy + _wz * _wz)

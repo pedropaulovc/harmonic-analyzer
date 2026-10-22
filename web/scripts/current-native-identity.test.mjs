@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   CURRENT_NATIVE_IDENTITY_MAP_SHA256, CURRENT_NATIVE_IDENTITY_PROJECTION,
-  projectCurrentNativePath, projectCurrentNativeNumber,
+  projectCurrentNativePath, projectCurrentNativeNumber, requireCurrentNativeOccurrenceNamespace,
   projectCurrentNativeMetadata, projectCurrentNativeDocument, validateCurrentNativeIdentityTable,
 } from '../current-native-identity.mjs'
 import { validateCurrentNativeIdentityInputs, validateCurrentNativeIdentityProjection } from './current-native-identity-inputs.mjs'
@@ -45,6 +45,154 @@ const retiredTooling = [
   new_identities: [{ stem: `${parent}-tl-${tool}`, number: `MHA-${category}-TL-${sequence}` }],
   status: 'retired',
 })))
+
+// Independent behavioral expectations, not values copied out of the projection table.
+const sharedCases = [
+  ['pd-paper-drive', 'vn-chain-inner-link', 'MHA-VN-002', 'pd-vn-chain-inner-link', 'MHA-PD-VN-50',
+    'sh-vn-chain-link', 'sh-vn-chain-link--InnerLink', 'MHA-SH-VN-50', 'InnerLink', 'InnerLink'],
+  ['pd-paper-drive', 'vn-chain-outer-link', 'MHA-VN-003', 'pd-vn-chain-outer-link', 'MHA-PD-VN-51',
+    'sh-vn-chain-link', 'sh-vn-chain-link--OuterLink', 'MHA-SH-VN-50', 'OuterLink', 'OuterLink'],
+  ...[
+    ['dt-drive-train', 'dt-vn-fillister-screw', 'MHA-DT-VN-50'],
+    ['fr-frame', 'fr-vn-fillister-screw', 'MHA-FR-VN-50'],
+    ['pd-paper-drive', 'pd-vn-fillister-screw', 'MHA-PD-VN-52'],
+  ].map(([parent, priorStem, priorNumber]) => [parent, 'vn-fillister-screw', 'MHA-VN-006', priorStem, priorNumber,
+    'sh-vn-brass-fillister-screw', 'sh-vn-brass-fillister-screw', 'MHA-SH-VN-51', 'Default', 'FillisterScrew']),
+  ['dt-drive-train', 'vn-foot-screw', 'MHA-VN-020', 'dt-vn-foot-screw', 'MHA-DT-VN-58',
+    'sh-vn-fillister-screw-90280a108', 'sh-vn-fillister-screw-90280a108__FootScrew', 'MHA-SH-VN-52', 'Default', 'FootScrew'],
+  ['dt-drive-train', 'vn-swing-stop-screw', 'MHA-VN-015', 'dt-vn-swing-stop-screw', 'MHA-DT-VN-53',
+    'sh-vn-fillister-screw-90280a108', 'sh-vn-fillister-screw-90280a108__SwingStopScrew', 'MHA-SH-VN-52', 'Default', 'SwingStopScrew'],
+  ['pd-paper-drive', 'vn-latch-hook-bracket-screw', 'MHA-VN-043', 'pd-vn-latch-hook-bracket-screw', 'MHA-PD-VN-59',
+    'sh-vn-fillister-screw-90280a108', 'sh-vn-fillister-screw-90280a108', 'MHA-SH-VN-52', 'Default', 'LatchHookBracketScrew'],
+  ...[
+    ['mg-magnifier', 'mg-vn-clamp-screw', 'MHA-MG-VN-51'],
+    ['pd-paper-drive', 'pd-vn-clamp-screw', 'MHA-PD-VN-53'],
+  ].map(([parent, priorStem, priorNumber]) => [parent, 'vn-clamp-screw', 'MHA-VN-021', priorStem, priorNumber,
+    'sh-vn-clamp-screw', 'sh-vn-clamp-screw', 'MHA-SH-VN-53', 'Default', 'ClampScrew']),
+  ...[
+    ['ch-channel', 'ch-vn-arbor-set-screw', 'MHA-CH-VN-53'],
+    ['dt-drive-train', 'dt-vn-arbor-set-screw', 'MHA-DT-VN-64'],
+  ].map(([parent, priorStem, priorNumber]) => [parent, 'vn-arbor-set-screw', 'MHA-VN-034', priorStem, priorNumber,
+    'sh-vn-arbor-set-screw', 'sh-vn-arbor-set-screw', 'MHA-SH-VN-54', 'Default', 'ArborSetScrew']),
+  ...[
+    ['mg-magnifier', 'mg-vn-thumb-screw', 'MHA-MG-VN-50'],
+    ['ms-measuring-stick', 'ms-vn-thumb-screw', 'MHA-MS-VN-50'],
+  ].map(([parent, priorStem, priorNumber]) => [parent, 'vn-thumb-screw', 'MHA-VN-011', priorStem, priorNumber,
+    'sh-vn-thumb-screw', 'sh-vn-thumb-screw', 'MHA-SH-VN-55', 'Default', 'ThumbScrew']),
+  ['mg-magnifier', 'mg-lever-wire', 'MHA-MG-009', 'mg-vn-lever-wire', 'MHA-MG-VN-56',
+    'sh-vn-music-wire', 'sh-vn-music-wire--LeverWire', 'MHA-SH-VN-56', 'LeverWire', 'LeverWire'],
+  ['pn-pen', 'pn-pen-wire', 'MHA-PN-006', 'pn-vn-pen-wire', 'MHA-PN-VN-57',
+    'sh-vn-music-wire', 'sh-vn-music-wire--PenWire', 'MHA-SH-VN-56', 'PenWire', 'PenWire'],
+  ...[
+    ['hold-down-stud', 'MHA-CH-006-TL-38', 'MHA-CH-06-TL-VN-58', 'HoldDownStud'],
+    ['t-nut', 'MHA-CH-006-TL-39', 'MHA-CH-06-TL-VN-59', 'TNut'],
+    ['flange-nut', 'MHA-CH-006-TL-40', 'MHA-CH-06-TL-VN-60', 'FlangeNut'],
+  ].map(([member, sourceNumber, priorNumber, configuration]) => [
+    'ch-rocker-arm-tl-oblique-jig', `ch-rocker-arm-tl-oblique-${member}`, sourceNumber,
+    `ch-rocker-arm-tl-vn-oblique-${member}`, priorNumber, 'sh-vn-clamping-kit-hardware',
+    `sh-vn-clamping-kit-hardware--${configuration}`, 'MHA-SH-VN-57', configuration, configuration]),
+].map(([parent, sourceStem, sourceNumber, priorStem, priorNumber, stem, occurrenceStem, number, configuration, role]) =>
+  ({ parent, sourceStem, sourceNumber, priorStem, priorNumber, stem, occurrenceStem, number, configuration, role }))
+
+test('all eight shared targets retain each of the nineteen exact member and role identities', () => {
+  assert.equal(table.schemaVersion, 1)
+  assert.equal(table.occurrenceNamespace, 'archive-role-local')
+  assert.equal(sharedCases.length, 19)
+  assert.equal(new Set(sharedCases.map(row => row.stem)).size, 8)
+  const expectedGroups = [...new Set(sharedCases.map(row => row.stem))].map(stem => {
+    const members = sharedCases.filter(row => row.stem === stem)
+    return [stem, members[0].number, [...new Set(members.map(row => row.configuration))].sort()]
+  }).sort()
+  assert.deepEqual(table.sharedVendors.map(row => [row.stem, row.number, [...row.configurations].sort()]).sort(), expectedGroups)
+  assert.equal(CURRENT_NATIVE_IDENTITY_PROJECTION.occurrenceNamespace, 'archive-role-local')
+  for (const row of sharedCases) {
+    for (const source of [row.sourceStem, row.priorStem]) {
+      const expected = path(row.parent, `${row.occurrenceStem}-1`)
+      assert.equal(projectCurrentNativePath(path(row.parent, `${source}-1`)), expected)
+      assert.equal(projectCurrentNativePath(expected), expected)
+    }
+    for (const [number, stem] of [[row.sourceNumber, row.sourceStem], [row.priorNumber, row.priorStem],
+      [row.number, row.occurrenceStem], [row.number, `${row.occurrenceStem}-1`]]) {
+      assert.equal(projectCurrentNativeNumber(number, stem, row.parent), row.number)
+    }
+  }
+  assert.throws(() => projectCurrentNativeNumber('MHA-SH-VN-52', 'sh-vn-fillister-screw-90280a108', 'dt-drive-train'),
+    /no unique immediate parent/)
+  assert.throws(() => projectCurrentNativeNumber('MHA-SH-VN-50', 'sh-vn-chain-link', 'pd-paper-drive'),
+    /no unique immediate parent/)
+})
+
+test('all five Default shared groups preserve native variant suffixes on repeated projection', () => {
+  const defaults = sharedCases.filter(row => row.configuration === 'Default')
+  assert.equal(new Set(defaults.map(row => row.stem)).size, 5)
+  for (const row of defaults) for (const variant of ['T006', 'Installed']) {
+    const expected = path(row.parent, `${row.occurrenceStem}--${variant}-7@upper`)
+    for (const source of [row.sourceStem, row.priorStem]) {
+      const current = projectCurrentNativePath(path(row.parent, `${source}--${variant}-7@upper`))
+      assert.equal(current, expected)
+      assert.equal(projectCurrentNativePath(current), expected)
+      assert.equal(projectCurrentNativePath(expected), expected)
+    }
+  }
+})
+
+test('logical member selectors remain case-sensitive rather than accepting physical filename spelling', () => {
+  const exact = path('pd-paper-drive', 'sh-vn-chain-link--InnerLink-1')
+  assert.equal(projectCurrentNativePath(exact), exact)
+  assert.throws(() => projectCurrentNativePath(path('pd-paper-drive', 'sh-vn-chain-link--innerlink-1')),
+    /no unique immediate parent/)
+  assert.throws(() => projectCurrentNativeNumber('MHA-SH-VN-50', 'sh-vn-chain-link--innerlink', 'pd-paper-drive'),
+    /no unique immediate parent/)
+})
+
+test('role-local archive paths cannot be used as rebuilt native occurrence addresses', () => {
+  const archived = path('dt-drive-train', 'vn-foot-screw-1')
+  requireCurrentNativeOccurrenceNamespace('archive-role-local')
+  assert.equal(projectCurrentNativePath(archived, 'archive-role-local'),
+    path('dt-drive-train', 'sh-vn-fillister-screw-90280a108__FootScrew-1'))
+  for (const namespace of ['rebuilt-native', '', null, undefined]) {
+    assert.throws(() => requireCurrentNativeOccurrenceNamespace(namespace), /namespace/i)
+    if (namespace !== undefined) {
+      assert.throws(() => projectCurrentNativePath(archived, namespace), /namespace/i)
+      assert.throws(() => projectCurrentNativePath('Camera', namespace), /namespace/i)
+    }
+  }
+})
+
+test('node namespace preflight rejects rebuilt-native extras before changing any source node', () => {
+  for (const boundary of ['extras', 'nativeIdentity']) {
+    const matrix = [-0, 1, 0, 1]
+    const sourceExtras = { nativePath: path('dt-drive-train', 'vn-foot-screw-1') }
+    const rejectedExtras = boundary === 'extras'
+      ? { occurrenceNamespace: 'rebuilt-native' }
+      : { nativeIdentity: { stem: 'vn-swing-stop-screw', occurrenceNamespace: 'rebuilt-native' } }
+    const document = { nodes: [
+      { name: 'ha-harmonic-analyzer', children: [1] },
+      { name: 'dt-drive-train', children: [2, 3] },
+      { name: 'vn-foot-screw-1', matrix, extras: sourceExtras },
+      { name: 'vn-swing-stop-screw-1', extras: rejectedExtras },
+    ] }
+    const before = structuredClone(document)
+    assert.throws(() => projectCurrentNativeDocument(document), /namespace/i)
+    assert.deepEqual(document, before)
+    assert.equal(document.nodes[2].name, 'vn-foot-screw-1')
+    assert.strictEqual(document.nodes[2].extras, sourceExtras)
+    assert.strictEqual(document.nodes[2].matrix, matrix)
+    assert.ok(Object.is(matrix[0], -0))
+  }
+})
+
+test('metadata and glTF namespace declarations also refuse unchecked rebuilt-native linking', () => {
+  const oldPath = path('dt-drive-train', 'vn-foot-screw-1')
+  assert.throws(() => projectCurrentNativeMetadata({ occurrenceNamespace: 'rebuilt-native', partPath: oldPath }), /namespace/i)
+  assert.throws(() => projectCurrentNativeDocument({ nodes: [] }, 'rebuilt-native'), /namespace/i)
+  for (const container of ['extras', 'asset']) {
+    const document = { nodes: [] }
+    if (container === 'extras') document.extras = { occurrenceNamespace: 'rebuilt-native' }
+    else document.asset = { version: '2.0', extras: { occurrenceNamespace: 'rebuilt-native' } }
+    assert.throws(() => projectCurrentNativeDocument(document), /namespace/i)
+  }
+})
 
 test('current table pins exact historical/current source maps and a distinct semantic projection digest', async () => {
   assert.equal(sha256(JSON.stringify(table)), CURRENT_NATIVE_IDENTITY_MAP_SHA256)
@@ -145,6 +293,15 @@ test('every active projected row equals CAD and historical-only occurrences stay
   const addedHistorical = structuredClone(table)
   addedHistorical.archiveOnlyVendors.push({ ...addedHistorical.archiveOnlyVendors[0] })
   assert.throws(() => validateCurrentNativeIdentityProjection(addedHistorical, cadMap), /exactly the three historical/)
+  for (const field of ['configuration', 'role', 'priorStem', 'priorNumber']) {
+    const changed = structuredClone(table)
+    changed.machineVendors.find(row => row.sourceStem === 'vn-chain-inner-link').identities[0][field] += 'Changed'
+    assert.throws(() => validateCurrentNativeIdentityProjection(changed, cadMap), /projection entries differ/, field)
+  }
+  const changedCad = structuredClone(cadMap)
+  changedCad.parts_and_assemblies.find(row => row.old_stem === 'vn-chain-inner-link')
+    .new_identities[0].configuration = 'OuterLink'
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, changedCad), /projection entries differ/)
 })
 
 test('retired tooling keeps exactly its frozen old/current reservations without a current Number lookup', () => {
@@ -190,10 +347,27 @@ test('retired stems and Numbers cannot reappear through active rows, aliases or 
   assert.throws(() => validateCurrentNativeIdentityProjection(table, duplicate), /colliding retired identity/)
 })
 
-test('target collisions and conflicting source Numbers are rejected while target stems may be scoped to different parents', async t => {
-  const duplicate = structuredClone(table)
-  duplicate.machineVendors[0].identities.push({ ...duplicate.machineVendors[0].identities[0] })
-  await assert.rejects(() => isolatedProjection(t, duplicate), /colliding current identity/)
+test('shared targets permit consistent many-to-one rows but reject duplicate source contexts and undeclared semantics', async t => {
+  for (const sourceStem of ['vn-boss-hook', 'vn-chain-inner-link']) {
+    const duplicate = structuredClone(table)
+    const source = duplicate.machineVendors.find(row => row.sourceStem === sourceStem)
+    source.identities.push({ ...source.identities[0] })
+    await assert.rejects(() => isolatedProjection(t, duplicate), /colliding current identity/)
+  }
+  const converged = structuredClone(table)
+  const original = converged.machineVendors.find(row => row.sourceStem === 'vn-chain-inner-link')
+  const alias = structuredClone(original)
+  alias.sourceStem = 'vn-test-shared-inner-link'
+  alias.identities[0].priorStem = 'pd-vn-test-shared-inner-link'
+  converged.machineVendors.push(alias)
+  const accepted = await isolatedProjection(t, converged)
+  assert.equal(accepted.projectCurrentNativePath(path('pd-paper-drive', 'vn-test-shared-inner-link-1')),
+    path('pd-paper-drive', 'sh-vn-chain-link--InnerLink-1'))
+  for (const [field, value] of [['number', 'MHA-SH-VN-99'], ['configuration', 'UnknownMember'], ['role', 'OuterLink']]) {
+    const changed = structuredClone(converged)
+    changed.machineVendors.at(-1).identities[0][field] = value
+    await assert.rejects(() => isolatedProjection(t, changed), /conflict|inconsistent|configuration|shared|collid/i)
+  }
   const conflict = structuredClone(table), first = conflict.machineVendors[0]
   conflict.nativeIdentities.push({ sourceStem: first.sourceStem, sourceNumber: 'MHA-VN-999',
     identities: [{ parent: 'test-parent', stem: 'test-vn-conflict', number: 'MHA-TEST-VN-50' }] })
@@ -205,16 +379,10 @@ test('target collisions and conflicting source Numbers are rejected while target
     path('different-parent', `${scopedFirst.identities[0].stem}-1`))
 })
 
-test('all split vendors resolve by their immediate parent rather than one arbitrary global rename', () => {
-  for (const [stem, parents] of [
-    ['fillister-screw', ['fr-frame', 'dt-drive-train', 'pd-paper-drive']],
-    ['clamp-screw', ['mg-magnifier', 'pd-paper-drive']],
-    ['arbor-set-screw', ['ch-channel', 'dt-drive-train']],
-    ['thumb-screw', ['mg-magnifier', 'ms-measuring-stick']],
-  ]) for (const parent of parents) {
-    const result = path(parent, `${parent.slice(0, 2)}-vn-${stem}-1`)
-    assert.equal(projectCurrentNativePath(path(parent, `vn-${stem}-1`)), result)
-    assert.equal(projectCurrentNativePath(result), result)
+test('shared vendors still resolve by their immediate parent and reject unsupported consumers', () => {
+  for (const row of sharedCases) {
+    assert.equal(projectCurrentNativePath(path(row.parent, `${row.sourceStem}-7`)),
+      path(row.parent, `${row.occurrenceStem}-7`))
   }
   assert.throws(() => projectCurrentNativePath(path('pn-pen', 'vn-fillister-screw-1')), /no unique immediate parent/)
   assert.throws(() => projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw'), /no unique immediate parent/)
@@ -224,12 +392,15 @@ test('two-digit Numbers preserve geometry/configuration qualifiers and purchased
   assert.equal(projectCurrentNativeNumber('MHA-DT-003-T006', 'dt-cone-gear'), 'MHA-DT-03-T006')
   assert.equal(projectCurrentNativeNumber('MHA-HA-000', 'ha-harmonic-analyzer'), 'MHA-HA-00')
   assert.equal(projectCurrentNativeNumber('MHA-CH-006-TL-30', 'ch-rocker-arm-tl-oblique-rail', 'ch-rocker-arm-tl-oblique-jig'), 'MHA-CH-06-TL-VN-50')
-  assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'fr-frame'), 'MHA-FR-VN-50')
-  assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'pd-paper-drive'), 'MHA-PD-VN-52')
-  assert.equal(projectCurrentNativeNumber('MHA-MG-009', 'mg-lever-wire', 'mg-magnifier'), 'MHA-MG-VN-56')
+  assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'fr-frame'), 'MHA-SH-VN-51')
+  assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'pd-paper-drive'), 'MHA-SH-VN-51')
+  assert.equal(projectCurrentNativeNumber('MHA-MG-009', 'mg-lever-wire', 'mg-magnifier'), 'MHA-SH-VN-56')
   assert.throws(() => projectCurrentNativeNumber('MHA-DT-003-T06', 'dt-cone-gear'), /does not identify/)
   assert.equal(projectCurrentNativePath(path('ch-channel', 'vn-channel-spring-installed-stretch00-20')), path('ch-channel', 'ch-vn-channel-spring-installed-stretch00-20'))
-  assert.equal(projectCurrentNativePath(path('mg-magnifier', 'mg-lever-wire--T006-1@upper')), path('mg-magnifier', 'mg-vn-lever-wire--T006-1@upper'))
+  assert.equal(projectCurrentNativePath(path('dt-drive-train', 'dt-cone-gear--T006-1@upper')),
+    path('dt-drive-train', 'dt-cone-gear--T006-1@upper'))
+  assert.equal(projectCurrentNativePath(path('mg-magnifier', 'mg-lever-wire--T006-1@upper')),
+    path('mg-magnifier', 'sh-vn-music-wire--LeverWire--T006-1@upper'))
 })
 
 test('all 457 archived native paths project uniquely without moving geometry across parents', () => {
@@ -244,6 +415,7 @@ test('all 457 archived native paths project uniquely without moving geometry acr
     assert.ok(!current.path.includes('/vn-'), current.path)
     assert.strictEqual(current.world, original.world)
     assert.equal(current.sourcePath, original.sourcePath)
+    assert.deepEqual({ ...current, path: original.path }, original)
     assert.equal(projectCurrentNativePath(current.path), current.path)
   }
   const oldPedestal = inventory.inventory.filter(row => /\/ch-channel\/vn-pedestal-hold-down-screw-/.test(row.path))
@@ -252,6 +424,16 @@ test('all 457 archived native paths project uniquely without moving geometry acr
   assert.equal(projectCurrentNativeNumber('MHA-VN-032', 'vn-pedestal-hold-down-screw', 'ch-channel'), null)
   assert.equal(projectCurrentNativeNumber('MHA-VN-032', 'vn-pedestal-hold-down-screw', 'dt-drive-train'), 'MHA-DT-VN-62')
   assert.equal(projectCurrentNativeNumber('MHA-VN-037', 'vn-transgear-collar-cross-pin', 'pd-paper-drive'), null)
+  for (const [source, expected] of [
+    ['dt-drive-train/vn-foot-screw-1', 'dt-drive-train/sh-vn-fillister-screw-90280a108__FootScrew-1'],
+    ['dt-drive-train/vn-swing-stop-screw-1', 'dt-drive-train/sh-vn-fillister-screw-90280a108__SwingStopScrew-1'],
+    ['pd-paper-drive/vn-chain-inner-link-1', 'pd-paper-drive/sh-vn-chain-link--InnerLink-1'],
+    ['pd-paper-drive/vn-chain-outer-link-1', 'pd-paper-drive/sh-vn-chain-link--OuterLink-1'],
+  ]) {
+    const index = inventory.inventory.findIndex(row => row.path === `ha-harmonic-analyzer/${source}`)
+    assert.notEqual(index, -1)
+    assert.equal(projected.inventory[index].path, `ha-harmonic-analyzer/${expected}`)
+  }
 })
 
 test('metadata ingestion changes qualified identity values/keys, never archived filenames, URLs or numeric arrays', () => {
@@ -259,7 +441,7 @@ test('metadata ingestion changes qualified identity values/keys, never archived 
   const numeric = [-0, 1.2345678901234567, 3]
   const source = { sourceFile: 'cad/scripts/build_vn_clamp_screw.py', url: 'https://example.test/v39/vn-clamp-screw',
     sha256: inventory.source.sha256, partPath: oldPath, matrices: { [oldPath]: numeric }, prose: `Archive component ${oldPath}` }
-  const projected = projectCurrentNativeMetadata(source), currentPath = path('pd-paper-drive', 'pd-vn-clamp-screw-3')
+  const projected = projectCurrentNativeMetadata(source), currentPath = path('pd-paper-drive', 'sh-vn-clamp-screw-3')
   assert.equal(projected.partPath, currentPath)
   assert.strictEqual(projected.matrices[currentPath], numeric)
   assert.ok(Object.is(projected.matrices[currentPath][0], -0))
@@ -285,20 +467,54 @@ test('parsed GLTF projection changes only declared native identity, retaining al
     } },
   ], meshes, accessors: [{ count: 1 }], buffers: [{ byteLength: 12 }] }
   projectCurrentNativeDocument(document)
-  const part = document.nodes[2], currentPath = path('dt-drive-train', 'dt-vn-fillister-screw-1')
-  assert.equal(part.name, 'dt-vn-fillister-screw-1')
+  const part = document.nodes[2], currentPath = path('dt-drive-train', 'sh-vn-brass-fillister-screw-1')
+  assert.equal(part.name, 'sh-vn-brass-fillister-screw-1')
   assert.equal(part.extras.nativePath, currentPath)
   assert.deepEqual(part.extras.nativePaths, [currentPath])
   assert.equal(part.extras.annotation, oldPath)
   assert.deepEqual(part.extras.nativeIdentity, {
-    stem: 'dt-vn-fillister-screw', underscore: 'dt_vn_fillister_screw', name: 'dt-vn-fillister-screw-1', number: 'MHA-DT-VN-50',
-    builder: 'cad/scripts/build_dt_vn_fillister_screw.py', registry: 'cad/config/parts/dt-vn-fillister-screw.yaml', note: oldPath,
+    stem: 'sh-vn-brass-fillister-screw', underscore: 'sh_vn_brass_fillister_screw', name: 'sh-vn-brass-fillister-screw-1', number: 'MHA-SH-VN-51',
+    builder: 'cad/scripts/build_sh_vn_brass_fillister_screw.py', registry: 'cad/config/parts/sh-vn-brass-fillister-screw.yaml', note: oldPath,
+    configuration: 'Default', role: 'FillisterScrew', semanticReference: 'FillisterScrew:1',
+    occurrenceNamespace: 'archive-role-local',
   })
   assert.strictEqual(part.matrix, matrix)
   assert.strictEqual(document.meshes, meshes)
   assert.ok(Object.is(part.matrix[0], -0))
   assert.deepEqual(document.accessors, [{ count: 1 }])
   assert.deepEqual(document.buffers, [{ byteLength: 12 }])
+})
+
+test('every shared glTF member declares configuration and semantic role without changing geometry references', () => {
+  for (const row of sharedCases) {
+    const matrix = [-0, 0.125, 1, 0], translation = [1, 2, 3], rotation = [0, 0, 0, 1], scale = [1, 1, 1]
+    const meshes = [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }]
+    const accessors = [{ count: 3 }], materials = [{ name: 'original' }], buffers = [{ byteLength: 36 }]
+    const oldPath = path(row.parent, `${row.sourceStem}-7`)
+    const document = { nodes: [
+      { name: 'ha-harmonic-analyzer', children: [1] }, { name: row.parent, children: [2] },
+      { name: `${row.sourceStem}-7`, mesh: 0, matrix, translation, rotation, scale, extras: {
+        nativePath: oldPath, nativeIdentity: { stem: row.sourceStem, number: row.sourceNumber },
+        annotation: oldPath,
+      } },
+    ], meshes, accessors, materials, buffers }
+    projectCurrentNativeDocument(document)
+    const part = document.nodes[2]
+    assert.equal(part.name, `${row.occurrenceStem}-7`)
+    assert.equal(part.extras.nativePath, path(row.parent, `${row.occurrenceStem}-7`))
+    assert.deepEqual(part.extras.nativeIdentity, {
+      stem: row.stem, number: row.number, configuration: row.configuration, role: row.role,
+      semanticReference: `${row.role}:7`, occurrenceNamespace: 'archive-role-local',
+    })
+    assert.equal(part.extras.annotation, oldPath)
+    assert.equal(part.mesh, 0)
+    for (const [key, original] of Object.entries({ matrix, translation, rotation, scale })) assert.strictEqual(part[key], original)
+    for (const [key, original] of Object.entries({ meshes, accessors, materials, buffers })) assert.strictEqual(document[key], original)
+    assert.ok(Object.is(part.matrix[0], -0))
+    projectCurrentNativeDocument(document)
+    assert.equal(part.name, `${row.occurrenceStem}-7`)
+    assert.equal(part.extras.nativeIdentity.semanticReference, `${row.role}:7`)
+  }
 })
 
 test('archive-only displayed identities do not advertise fabricated live registry or builder files', () => {
@@ -330,7 +546,7 @@ test('archive-only displayed identities do not advertise fabricated live registr
 test('declared child identity resolves against the projected immediate parent, not the archived parent name', async t => {
   const fixtureTable = structuredClone(table)
   fixtureTable.machineVendors.find(row => row.sourceStem === 'vn-fillister-screw').identities.push({
-    parent: 'mg-vn-lever-wire', stem: 'mg-vn-fillister-screw', number: 'MHA-MG-VN-99',
+    parent: 'sh-vn-music-wire', stem: 'mg-vn-fillister-screw', number: 'MHA-MG-VN-99',
   })
   const projection = await isolatedProjection(t, fixtureTable)
   const document = { nodes: [
@@ -340,7 +556,7 @@ test('declared child identity resolves against the projected immediate parent, n
     { name: 'vn-fillister-screw-1', extras: { nativeIdentity: { stem: 'vn-fillister-screw', number: 'MHA-VN-006' } } },
   ] }
   projection.projectCurrentNativeDocument(document)
-  assert.equal(document.nodes[2].name, 'mg-vn-lever-wire-1')
+  assert.equal(document.nodes[2].name, 'sh-vn-music-wire--LeverWire-1')
   assert.equal(document.nodes[3].name, 'mg-vn-fillister-screw-1')
   assert.equal(document.nodes[3].extras.nativeIdentity.number, 'MHA-MG-VN-99')
 })

@@ -16,7 +16,7 @@ from dt_drive_train_steps import step_ref
 import fr_harmonic_base_fasteners
 import fr_harmonic_base_spec
 from dt_vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
-from dt_vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
+from dt_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
 
 
 def test_all_eighteen_deck_seats_are_native_through_taps_at_the_retained_stations() -> None:
@@ -212,8 +212,8 @@ def test_cone_lock_preserves_both_stock_poses_in_the_finite_receiver() -> None:
 
 
 def test_stop_head_seats_on_the_base_inside_the_platform_edge() -> None:
-    import dt_vn_foot_screw_spec as foot
-    import dt_vn_swing_stop_screw_spec as stop
+    import sh_vn_fillister_screw_90280a108_spec as foot
+    import dt_swing_stop_screw_spec as stop
 
     material = part.THROUGH_SEAT_MATERIAL["StopSeat"][0]
     fr_harmonic_base_fasteners.require_stop_seat_fit(
@@ -235,7 +235,7 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
     """The four #4-40 taps sit under the plate's corner holes carried through
     its mount transform (nameplate_spec), cut from the deck the plate lies on."""
     import fr_nameplate_spec
-    from _mcmaster_90114a511 import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
+    from sh_vn_brass_fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
     from build_fr_nameplate import SCREW_HOLE_DIA
 
     assert part.NAMEPLATE_SEAT_SPEC.kind == "tapped_bottoming"

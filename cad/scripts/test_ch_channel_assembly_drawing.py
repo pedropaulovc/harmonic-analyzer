@@ -282,7 +282,7 @@ def test_each_step_block_fits_the_field_right_of_its_bank_view() -> None:
     )
     assert "TIGHTEN" not in rocker
     assert "TIGHTEN" in lever and "STAKE" in lever
-    assert _config.parts("ch-vn-arbor-set-screw")["number"] not in lever
+    assert _config.parts("sh-vn-arbor-set-screw")["number"] not in lever
 
 
 def test_the_package_sheets_and_settings_contract() -> None:
@@ -1117,14 +1117,14 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
 
 
 def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
-    """User, 2026-10-10: one MHA-CH-VN-53 down each ear's apex tap onto the
+    """User, 2026-10-10: one MHA-SH-VN-54 down each ear's apex tap onto the
     plain shaft's flat, once the shaft is set. The preload is accepted before
     (machinist review, PR #1605: a failed check after staking could not be
     re-set). The step prints the bracket spec's engagement fact from the
     spec, never typed."""
     import ch_pivot_bracket_spec as bracket_spec
 
-    set_screw = _config.parts("ch-vn-arbor-set-screw")["number"]
+    set_screw = _config.parts("sh-vn-arbor-set-screw")["number"]
     key = "set-screws-driven"
     number = steps.step_number(key)
     assert steps.step_number("shaft-set") < number
@@ -1181,7 +1181,7 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     bracket spec's, and the screws' thread its apex tap's."""
     import _interference_contracts as ic
     import ch_pivot_bracket_spec as bracket_spec
-    import _mcmaster_91375a106 as screw_spec
+    import sh_vn_arbor_set_screw_spec as screw_spec
 
     assert ic.PIVOT_EAR_APEX_AND_BORE == (
         bracket_spec.APEX_ABOVE_BORE,
@@ -1190,5 +1190,16 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     assert screw_spec.THREAD == bracket_spec.SET_SCREW_THREAD
     pairs = ic.allowed_interference_pairs("ch-channel")
     for n in (1, 2):
-        pair = frozenset((f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
+        pair = frozenset((f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT
+
+
+def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() -> None:
+    stem = "sh-vn-arbor-set-screw"
+    assert drawing.explode.BRACKET_SET_SCREW == stem
+    assert drawing.BOM_QUANTITIES[stem] == 2
+    assert drawing.BOM_PART_NUMBERS[stem] == "MHA-SH-VN-54"
+    assert drawing.BOM_SKUS[stem] == "91375A106"
+    seeds = assembly_contract("ch-channel").flip_invert
+    assert {f"sh vn arbor set screw datum {axis}" for axis in "xyz"} <= seeds
+    assert not any(seed.startswith("ch vn arbor set screw datum ") for seed in seeds)

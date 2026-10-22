@@ -1,6 +1,7 @@
 """Purchased fastener identities used by the production CAD fleet.
 
-Part stems identify distinct direct-parent machine/BOM and native models.
+Part stems identify canonical machine/BOM and native models; supplier SKUs
+shared by several consumers have one Shared vendor identity.
 ``stock_name`` and ``skus`` identify the supplier's hardware represented by each
 generated SLDPRT (McMaster-Carr unless ``supplier`` names another);
 ``material`` is the SOLIDWORKS library material used for production rendering
@@ -35,14 +36,8 @@ def _stock(
 FASTENERS: dict[str, PurchasedFastenerSpec] = {
     # #743: C45 alloy cup point, black oxide -- it bites the spotted steel
     # arbor where an 18-8 (B80) cup would not.
-    "ch-vn-arbor-set-screw": _stock(
-        "ch-vn-arbor-set-screw",
-        "Alloy Steel Cup-Tip Set Screw",
-        "91375A106",
-        material="Alloy Steel",
-    ),
-    "dt-vn-arbor-set-screw": _stock(
-        "dt-vn-arbor-set-screw",
+    "sh-vn-arbor-set-screw": _stock(
+        "sh-vn-arbor-set-screw",
         "Alloy Steel Cup-Tip Set Screw",
         "91375A106",
         material="Alloy Steel",
@@ -55,13 +50,8 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91375A942",
         material="Alloy Steel",
     ),
-    "mg-vn-clamp-screw": _stock(
-        "mg-vn-clamp-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A201",
-    ),
-    "pd-vn-clamp-screw": _stock(
-        "pd-vn-clamp-screw",
+    "sh-vn-clamp-screw": _stock(
+        "sh-vn-clamp-screw",
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A201",
     ),
@@ -101,26 +91,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A434",
         material="Alloy Steel",
     ),
-    "dt-vn-fillister-screw": _stock(
-        "dt-vn-fillister-screw",
+    "sh-vn-brass-fillister-screw": _stock(
+        "sh-vn-brass-fillister-screw",
         "Brass Fillister Head Slotted Screw",
         "90114A511",
         material="Brass",
     ),
-    "fr-vn-fillister-screw": _stock(
-        "fr-vn-fillister-screw",
-        "Brass Fillister Head Slotted Screw",
-        "90114A511",
-        material="Brass",
-    ),
-    "pd-vn-fillister-screw": _stock(
-        "pd-vn-fillister-screw",
-        "Brass Fillister Head Slotted Screw",
-        "90114A511",
-        material="Brass",
-    ),
-    "dt-vn-foot-screw": _stock(
-        "dt-vn-foot-screw",
+    "sh-vn-fillister-screw-90280a108": _stock(
+        "sh-vn-fillister-screw-90280a108",
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
     ),
@@ -133,11 +111,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "18-8 Stainless Steel Pan Head Slotted Screw",
         "91792A108",
         material="AISI 304",
-    ),
-    "pd-vn-latch-hook-bracket-screw": _stock(
-        "pd-vn-latch-hook-bracket-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A108",
     ),
     "mg-vn-magnifying-bracket-screw": _stock(
         "mg-vn-magnifying-bracket-screw",
@@ -279,18 +252,8 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A203",
     ),
-    "dt-vn-swing-stop-screw": _stock(
-        "dt-vn-swing-stop-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A108",
-    ),
-    "mg-vn-thumb-screw": _stock(
-        "mg-vn-thumb-screw",
-        "Steel Raised Knurled-Head Thumb Screw",
-        "91882A221",
-    ),
-    "ms-vn-thumb-screw": _stock(
-        "ms-vn-thumb-screw",
+    "sh-vn-thumb-screw": _stock(
+        "sh-vn-thumb-screw",
         "Steel Raised Knurled-Head Thumb Screw",
         "91882A221",
     ),

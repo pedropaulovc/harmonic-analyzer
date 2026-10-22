@@ -103,3 +103,48 @@ PURCHASED_STOCK_NOTE = "\n".join((
 ))
 
 
+# --- Supplier engineering drawing references -----------------------------------
+# Drawing/source evidence is retained out of tree under SupplierScrewsB.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/172E7CCB/"
+    "91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20ScrewsX.GIF"
+)
+# The current solid has no physical station matching the supplier's HEAD_H:
+# its cone meets the major at depth (HEAD_DIA-THREAD_MAJOR)/2/tan(41 deg),
+# whereas the source STEP's neck/thread-start station is BEVEL_H below the
+# bevel top. Do not dimension that source head height onto the current solid.
+# The source STEP also has a different underhead fillet; this port changes
+# neither transition nor any other solid/installed geometry.
+# Stock length is an isolated construction witness, not the installed span.
+# The supplier prints only the 8-32 designation, not a numeric major diameter.
+# This extra carrier is explicitly the current model's basic nominal thread
+# size, not a supplier-printed dimension or a helical-surface measurement.
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierStockLength": "left",
+    "SupplierCrownHeight": "right",
+    "SupplierNominalThreadMajor": "bottom",
+}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierStockLength", -STOCK_LENGTH, "vertical"),
+    ("SupplierCrownHeight", CROWN_H, "vertical"),
+    ("SupplierHeadAngle", HEAD_ANGLE_DEG, "angle"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
+    ("SupplierNominalThreadMajor", THREAD_MAJOR, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierStockLength": (-HEAD_DIA, 0.0),
+    "SupplierCrownHeight": (HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadAngle": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierNominalThreadMajor": (-THREAD_MAJOR / 2.0, -CUT_LENGTH / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierStockLength": (0, "length", None, "AS-SUPPLIED STOCK LENGTH"),
+    "SupplierCrownHeight": (3, "length", None, None),
+    "SupplierHeadAngle": (0, "angle", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierNominalThreadMajor": (
+        3, "diameter", None, "8-32\nNOMINAL THREAD SIZE"
+    ),
+}

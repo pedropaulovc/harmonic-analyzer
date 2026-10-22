@@ -22,17 +22,130 @@ the nominal chain.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import _config
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import dt_post_mount_stack as mount_stack
 from _fit_deviations import deviations
-from _msc_40923906 import FILLISTER_SIZE
+from _msc_40923906 import (
+    FILLISTER_SIZE,
+    SupplierSize,
+    SUPPLIER_HEAD_OD,
+    SUPPLIER_HEAD_HEIGHT,
+    SUPPLIER_STRAIGHT_SKIRT,
+    SUPPLIER_SLOT_WIDTH,
+    SUPPLIER_SLOT_DEPTH,
+    SUPPLIER_STOCK_LENGTH,
+    SUPPLIER_THREAD_LENGTH,
+    SUPPLIER_THREAD,
+    SUPPLIER_PRECISION as SUPPLIER_PRECISION,
+    SUPPLIER_SOURCE as SUPPLIER_SOURCE,
+)
 
 SKU = "40923906"
 THREAD = platform.POST_MOUNT_SPEC.size
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
+
+# Source evidence: C:/src/dt-logs/vn-supplier-dimensions-20261019/
+# msc-40923906-supplied.png and msc-fit-reconciliation.md. The historical
+# comparison SVG's BEFORE column describes this unchanged solid; its proposed
+# AFTER geometry is not authorized by this reference-only port.
+#
+# Current catalogue-family recipe: skirt .189600 in (4.815840 mm), slot width
+# .055890 in (1.419606 mm), depth .083835 in (2.129409 mm), near-full-shank
+# threading with under-head runout. These are outside the source's skirt/slot
+# bands and are NOT relabelled with supplier limits on the installed surfaces.
+# Head OD .414, height .237 and original length 4.000 match source upper limits.
+SUPPLIER_STOCK_CONFIGURATION = "SupplierMaxLimitEnvelope"
+SUPPLIER_STOCK_FEATURE = "SupplierMaxLimitProfile"
+SUPPLIER_STOCK_TITLE = (
+    "SUPPLIER MAXIMUM-LIMIT ENVELOPE\n"
+    "NOT INSTALLED / NO SOLID GEOMETRY"
+)
+SUPPLIER_STOCK_NOTE = (
+    "UPPER-LIMIT CORNER, NOT A SUPPLIER NOMINAL.\n"
+    "CROWN CURVATURE / SHANK BAND UNSPECIFIED.\n"
+    "FINISHED CUT / FIT CONTROLS REMAIN ON SHEET 1."
+)
+SUPPLIER_MODEL_NOTE = (
+    "CURRENT SOLID HAS DIFFERENT SKIRT / SLOT / FULL-SHANK THREAD.\n"
+    "SOURCE LIMITS APPLY ONLY TO THE SEPARATE SHEET-2 DIAGRAM."
+)
+_R = SUPPLIER_HEAD_OD.envelope_mm / 2.0
+_H = SUPPLIER_HEAD_HEIGHT.envelope_mm
+_S = SUPPLIER_STRAIGHT_SKIRT.envelope_mm
+_W = SUPPLIER_SLOT_WIDTH.envelope_mm / 2.0
+_D = SUPPLIER_SLOT_DEPTH.envelope_mm
+_L = SUPPLIER_STOCK_LENGTH.envelope_mm
+_T = SUPPLIER_THREAD_LENGTH.envelope_mm
+# Thread identity supplies a major envelope, NOT an unspecified shank band.
+_r = THREAD_DIA_MM / 2.0
+# One connected slot-plane bounding profile, not a guessed crown or fake body.
+# Every supplier dimension attaches to the diagram's actual profile vertices.
+SUPPLIER_PROFILE_MM = (
+    (0.0, _R), (-_S, _R), (-_H, _R), (-_H, _W),
+    (-_H + _D, _W), (-_H + _D, -_W), (-_H, -_W),
+    (-_H, -_R), (-_S, -_R), (0.0, -_R), (0.0, -_r),
+    (_L - _T, -_r), (_L, -_r), (_L, _r), (_L - _T, _r), (0.0, _r),
+)
+SUPPLIER_PROFILE_SECTIONS = ((1, 8), (11, 14))
+
+
+@dataclass(frozen=True)
+class SupplierProfileDimension:
+    name: str
+    source: SupplierSize | None
+    vertices: tuple[int, int]
+    native_type: int
+    presentation: str = "length"
+    callout: str | None = None
+    nominal_mm: float | None = None
+
+    @property
+    def expected_mm(self) -> float:
+        if self.source is not None:
+            return self.source.envelope_mm
+        if self.nominal_mm is None:
+            raise ValueError(f"{self.name}: reference has no source extent or nominal size")
+        return self.nominal_mm
+
+    @property
+    def deviations_mm(self) -> tuple[float, float] | None:
+        return None if self.source is None else self.source.deviations_mm
+
+
+SUPPLIER_PROFILE_DIMENSIONS = (
+    SupplierProfileDimension("SupplierHeadOD", SUPPLIER_HEAD_OD, (2, 7), 12, "diameter"),
+    SupplierProfileDimension("SupplierHeadHeight", SUPPLIER_HEAD_HEIGHT, (0, 2), 11),
+    SupplierProfileDimension("SupplierStraightSkirt", SUPPLIER_STRAIGHT_SKIRT, (0, 1), 11),
+    SupplierProfileDimension("SupplierSlotWidth", SUPPLIER_SLOT_WIDTH, (4, 5), 12),
+    SupplierProfileDimension("SupplierSlotDepth", SUPPLIER_SLOT_DEPTH, (3, 4), 11),
+    SupplierProfileDimension(
+        "SupplierStockLength", SUPPLIER_STOCK_LENGTH, (15, 13), 11,
+        callout="AS-SUPPLIED UNDER-HEAD LENGTH",
+    ),
+    SupplierProfileDimension(
+        "SupplierThreadLength", SUPPLIER_THREAD_LENGTH, (14, 13), 11,
+        callout="FACTORY PARTIAL THREAD",
+    ),
+)
+# Extra nominal-designation carrier, NOT an eighth printed source size/band.
+# The diagram's distal end spans the existing 1/4-inch nominal major envelope;
+# this reference measures those diagram vertices, never the installed helix.
+SUPPLIER_THREAD_MAJOR_DIMENSION = SupplierProfileDimension(
+    "SupplierThreadMajor", None, (12, 13), 12, "diameter",
+    callout=f"NOMINAL THREAD MAJOR\n{SUPPLIER_THREAD}\nNOT A SOURCE DIAMETER BAND",
+    nominal_mm=THREAD_DIA_MM,
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    *SUPPLIER_PROFILE_DIMENSIONS,
+    SUPPLIER_THREAD_MAJOR_DIMENSION,
+)
+SUPPLIER_STOCK_DIMENSIONS = {
+    SUPPLIER_STOCK_FEATURE: {row.name for row in SUPPLIER_REFERENCE_DIMENSIONS}
+}
 
 # Head seated on the MHA-DT-05 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
@@ -75,7 +188,7 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH,)
+REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH, SUPPLIER_STOCK_FEATURE)
 # Which view claims which marked dimension: the 1:1 Front view carries only
 # the cut length; the break is claimed only by the cropped 10:1 tip view.
 FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}

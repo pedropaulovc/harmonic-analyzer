@@ -10,7 +10,7 @@ bracket and the two rivets:
 
 * the BASE lies flat on the MHA-PD-07 support bar's back face (machine z
   -129.4) in the bar's lock-free band (y 299.2..307.2) and takes the two
-  MHA-PD-VN-59 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
+  MHA-SH-VN-52 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
   y 303.234);
 * at the base's +X end a 90 deg bend (inside R1.2) raises the EAR rearward
   (+Z) in the machine YZ plane, x 76.8305..77.6305, to z -113.9;

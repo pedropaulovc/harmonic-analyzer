@@ -5,7 +5,7 @@ DOWN from the finished deck, not drilling/thread-depth requirements. The native
 builder independently reads those intervals back before and after cutting.
 Horizontal frame cross taps retain their original blind manufacturing contract.
 Swing-stop receiver validation and its platform thickness allowance live here;
-the screw's pure stock limits and inspection data remain in its vendor spec.
+the screw's sourced stock limits and inspection data remain in its application spec.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass
 
 import _config
-import dt_vn_swing_stop_screw_spec as stop_stock
+import dt_swing_stop_screw_spec as stop_stock
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS

@@ -128,6 +128,329 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
     }
 
 
+# Explicit expected paths: deriving the expectation from the production inventory
+# would hide a dropped member or an accidental bare-name alias.
+_SHARED_MEMBERS = {
+    "sh_vn_chain_link": (
+        ("InnerLink", "sh-vn-chain-link", "sh-vn-chain-link--innerlink"),
+        ("OuterLink", "sh-vn-chain-link--outerlink", "sh-vn-chain-link--outerlink"),
+    ),
+    "sh_vn_clamping_kit_hardware": (
+        ("HoldDownStud", "sh-vn-clamping-kit-hardware",
+         "sh-vn-clamping-kit-hardware--holddownstud"),
+        ("TNut", "sh-vn-clamping-kit-hardware--tnut", "sh-vn-clamping-kit-hardware--tnut"),
+        ("FlangeNut", "sh-vn-clamping-kit-hardware--flangenut",
+         "sh-vn-clamping-kit-hardware--flangenut"),
+    ),
+    "sh_vn_music_wire": (
+        ("LeverWire", "sh-vn-music-wire", "sh-vn-music-wire--leverwire"),
+        ("PenWire", "sh-vn-music-wire--penwire", "sh-vn-music-wire--penwire"),
+    ),
+}
+
+
+def _shared_release_fixture(tmp_path: Path, monkeypatch):
+    """Real registry, paths and certificates; only external seat work is faked."""
+    import _part_configuration_exports as members
+    import export_features
+    import features_bound
+
+    root = tmp_path / "cad" / "out"
+    for name in ("STEP", "STL", "PNG", "SLDPRT", "SLDASM", "GLTF", "BOXES", "FEATURES"):
+        monkeypatch.setattr(export_models, f"OUT_{name}", root / name.lower())
+    monkeypatch.setattr(export_models, "REPO", tmp_path)
+    monkeypatch.setattr(export_models, "NEUTRAL_MANIFEST", root / "reports/release-neutral.json")
+    monkeypatch.setattr(export_models, "COLORS", root / "stl/colors.json")
+    monkeypatch.setattr(export_models, "SRC_DIGESTS", root / "stl/export-src.json")
+    monkeypatch.setattr(export_models, "part_stems", lambda: list(_SHARED_MEMBERS))
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ())
+    monkeypatch.setattr(features_bound, "stage_feature_steps", lambda *_args: [])
+    monkeypatch.setattr(export_models, "_exporter_digest", lambda: "fixture-exporter")
+    monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
+    monkeypatch.setattr(export_models, "src_digest", lambda _path: "fixture-recipe")
+    monkeypatch.setattr(export_models, "load_src_digests", lambda: {
+        stem.replace("_", "-"): "fixture-recipe" for stem in _SHARED_MEMBERS
+    })
+    monkeypatch.setattr(export_models, "load_colors", lambda: {})
+    monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: {})
+    monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
+    monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
+    # Redirect the helper's default root without replacing its path/validation API.
+    monkeypatch.setattr(members, "__file__", str(tmp_path / "cad/scripts/_part_configuration_exports.py"))
+    expected = {}
+    owned = {}
+    for stem, configurations in _SHARED_MEMBERS.items():
+        dashed = stem.replace("_", "-")
+        native = root / "sldprt" / f"{dashed}.SLDPRT"
+        native.parent.mkdir(parents=True, exist_ok=True)
+        native.write_bytes(f"native:{stem}".encode())
+        identity = hashlib.sha256(native.read_bytes()).hexdigest()
+        (native.parent / f".{dashed}.execution").write_text(identity, encoding="utf-8")
+        records = {}
+        for configuration, neutral, mesh in configurations:
+            records[configuration] = {}
+            for kind, relative in (
+                ("step", f"step/{neutral}.STEP"),
+                ("png", f"png/{neutral}/{neutral}_isometric.png"),
+                ("stl", f"stl/{mesh}.STL"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                payload = f"{stem}:{configuration}:{kind}".encode()
+                path.write_bytes(payload)
+                expected[relative] = path
+                if kind != "stl":
+                    owned[path] = payload
+                    records[configuration][kind] = {
+                        "path": relative, "bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+        certificate = members.configuration_manifest_path(stem, root)
+        certificate.parent.mkdir(parents=True, exist_ok=True)
+        certificate.write_text(json.dumps({
+            "schema": "harmonic-analyzer/part-member-neutral@1",
+            "source": f"sldprt/{dashed}.SLDPRT",
+            "execution_identity": identity,
+            "default_configuration": configurations[0][0],
+            "configurations": records,
+        }), encoding="utf-8")
+    return root, expected, owned
+
+
+def test_shared_release_inventory_requires_all_seven_members_without_scenes(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _root, expected, _owned = _shared_release_fixture(tmp_path, monkeypatch)
+
+    inventory = export_models._release_inventory(list(_SHARED_MEMBERS), [], {}, set())
+
+    assert inventory == expected
+    assert len([name for name in inventory if name.startswith("step/")]) == 7
+    assert len([name for name in inventory if name.startswith("png/")]) == 7
+    assert len([name for name in inventory if name.startswith("stl/")]) == 7
+    for stem, configurations in _SHARED_MEMBERS.items():
+        dashed = stem.replace("_", "-")
+        assert f"stl/{dashed}.STL" not in inventory
+        default, neutral, mesh = configurations[0]
+        assert default != "Default"
+        assert neutral == dashed
+        assert mesh != dashed
+
+
+def _shared_scene_meshes():
+    return {
+        stem.replace("_", "-"): [(configuration, mesh) for configuration, _neutral, mesh in entries]
+        for stem, entries in _SHARED_MEMBERS.items()
+    }
+
+
+def test_shared_neutral_certificate_and_stage_include_unseen_members(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _root, expected, _owned = _shared_release_fixture(tmp_path, monkeypatch)
+    scene_meshes = _shared_scene_meshes()
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: scene_meshes)
+    digests = export_models.load_src_digests()
+    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
+                    for _configuration, mesh in entries})
+    export_models.write_release_neutral_manifest(
+        list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+    )
+    manifest = json.loads(export_models.NEUTRAL_MANIFEST.read_text(encoding="utf-8"))
+    assert set(manifest["files"]) == set(expected)
+    assert manifest["part_configurations"] == {
+        stem.replace("_", "-"): {
+            configuration: {
+                "step": f"step/{neutral}.STEP",
+                "stl": f"stl/{mesh}.STL",
+                "png": f"png/{neutral}/{neutral}_isometric.png",
+            }
+            for configuration, neutral, mesh in entries
+        }
+        for stem, entries in _SHARED_MEMBERS.items()
+    }
+
+    stage = tmp_path / "stage"
+    facts = export_models.stage_release_neutral(stage)
+
+    assert facts == {
+        "documents": 3,
+        "parts": 3,
+        "assemblies": 0,
+        "steps": 7,
+        "stls": 7,
+        "pngs": 7,
+        "views": 1,
+        "config_meshes": 7,
+    }
+    for relative, source in expected.items():
+        assert (stage / relative).read_bytes() == source.read_bytes()
+
+
+@pytest.mark.parametrize("kind", ["step", "png", "stl"])
+def test_shared_neutral_certification_refuses_unseen_missing_member(
+    tmp_path: Path, monkeypatch, kind: str,
+) -> None:
+    _root, expected, _owned = _shared_release_fixture(tmp_path, monkeypatch)
+    scene_meshes = _shared_scene_meshes()
+    digests = export_models.load_src_digests()
+    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
+                    for _configuration, mesh in entries})
+    missing = next(path for relative, path in expected.items()
+                   if relative.startswith(f"{kind}/") and "--penwire" in relative)
+    missing.unlink()
+
+    with pytest.raises(RuntimeError):
+        export_models.write_release_neutral_manifest(
+            list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+        )
+    assert not export_models.NEUTRAL_MANIFEST.exists()
+
+
+def test_shared_neutral_certification_refuses_missing_scene_member_coverage(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _shared_release_fixture(tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError):
+        export_models.write_release_neutral_manifest(
+            list(_SHARED_MEMBERS), [], {}, set(), {}, export_models.load_src_digests(),
+        )
+    assert not export_models.NEUTRAL_MANIFEST.exists()
+
+
+@pytest.mark.parametrize("kind", ["step", "png", "stl"])
+@pytest.mark.parametrize("fault", ["missing", "same-size-corruption"])
+def test_release_stage_refuses_changed_nondefault_shared_member(
+    tmp_path: Path, monkeypatch, kind: str, fault: str,
+) -> None:
+    _root, expected, _owned = _shared_release_fixture(tmp_path, monkeypatch)
+    scene_meshes = _shared_scene_meshes()
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: scene_meshes)
+    digests = export_models.load_src_digests()
+    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
+                    for _configuration, mesh in entries})
+    export_models.write_release_neutral_manifest(
+        list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+    )
+    path = next(path for relative, path in expected.items()
+                if relative.startswith(f"{kind}/") and "--penwire" in relative)
+    if fault == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"x" * path.stat().st_size)
+
+    with pytest.raises(RuntimeError):
+        export_models.stage_release_neutral(tmp_path / "stage")
+
+
+def test_forced_full_export_preserves_part_owned_member_bytes(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    root, expected, owned = _shared_release_fixture(tmp_path, monkeypatch)
+    certificates = {
+        path: path.read_bytes() for path in (root / "reports/part-neutral").glob("*.json")
+    }
+
+    class Doc:
+        def __init__(self, native):
+            configurations = _SHARED_MEMBERS[native.stem.replace("-", "_")]
+            self.names = [entry[0] for entry in configurations]
+            self.ConfigurationManager = SimpleNamespace(
+                ActiveConfiguration=SimpleNamespace(Name=self.names[0]),
+            )
+
+        def ShowConfiguration2(self, configuration):
+            assert configuration in self.names
+            self.ConfigurationManager.ActiveConfiguration.Name = configuration
+            return True
+
+        def ForceRebuild3(self, _top_only):
+            return True
+
+        def EditRebuild3(self):
+            return True
+
+        def SaveAs3(self, filename, _version, _options):
+            path = Path(filename)
+            assert path.suffix == ".STL", "full exporter must not regenerate member STEP"
+            path.write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+            return 1
+
+    class Adapter:
+        swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
+        currentModel = None
+
+        async def open_model(self, filename):
+            self.currentModel = Doc(Path(filename))
+            return SimpleNamespace(is_success=True, data=None)
+
+        def _attempt(self, call, default=None):
+            return call()
+
+    async def forbid_render(*_args):
+        raise AssertionError("full exporter must not regenerate part-owned member PNG")
+
+    monkeypatch.setattr(export_models, "export_build_png", forbid_render)
+    monkeypatch.setattr(
+        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
+
+    assert export_models.main() == 0
+
+    for path, payload in {**owned, **certificates}.items():
+        assert path.read_bytes() == payload
+    assert all(path.is_file() for path in expected.values())
+
+
+@pytest.mark.parametrize("stem", list(_SHARED_MEMBERS))
+@pytest.mark.parametrize(
+    "fault",
+    ["missing-certificate", "stale-execution", "corrupt-certificate",
+     "missing-step", "corrupt-step", "missing-png", "corrupt-png"],
+)
+def test_forced_export_refuses_invalid_member_before_any_export_work(
+    tmp_path: Path, monkeypatch, stem: str, fault: str,
+) -> None:
+    import _part_configuration_exports as members
+    import features_bound
+
+    root, _expected, owned = _shared_release_fixture(tmp_path, monkeypatch)
+    certificate = members.configuration_manifest_path(stem, root)
+    if fault == "missing-certificate":
+        certificate.unlink()
+    elif fault == "stale-execution":
+        (root / "sldprt" / f".{stem.replace('_', '-')}.execution").write_text(
+            "f" * 64, encoding="utf-8",
+        )
+    elif fault == "corrupt-certificate":
+        certificate.write_text("{", encoding="utf-8")
+    else:
+        kind = fault.split("-")[1]
+        # Non-default member catches implementations validating only bare files.
+        path = members.configuration_export_paths(stem, root)[_SHARED_MEMBERS[stem][-1][0]][kind]
+        if fault.startswith("missing"):
+            path.unlink()
+        else:
+            path.write_bytes(b"x" * path.stat().st_size)
+    remaining = {path: path.read_bytes() for path in owned if path.exists()}
+
+    def forbid_work(*_args):
+        raise AssertionError("invalid member certificate must fail before export work")
+
+    monkeypatch.setattr(features_bound, "stage_feature_steps", forbid_work)
+    monkeypatch.setattr(export_models, "run_build", forbid_work)
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
+
+    with pytest.raises(RuntimeError):
+        export_models.main()
+
+    assert not export_models.NEUTRAL_MANIFEST.exists()
+    for path, payload in remaining.items():
+        assert path.read_bytes() == payload
+
+
 def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
     scene = tmp_path / "scene.json"
     scene.write_text(

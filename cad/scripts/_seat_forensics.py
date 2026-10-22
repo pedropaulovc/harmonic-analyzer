@@ -47,6 +47,7 @@ import json
 import math
 import os
 import re
+import shutil
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -1753,8 +1754,9 @@ def capture_com_failure(
     sketch: Any | None = None,
     expected_points: int | None = None,
     exc_type: type[BaseException] = RuntimeError,
-    exception: Exception | None = None,
+    exception: BaseException | None = None,
     sheet_png: bool = False,
+    retained_artifacts: Mapping[str, Path] | None = None,
     **context: Any,
 ) -> NoReturn:
     """Capture the seat's state behind a COM call that returned ``None``, then raise.
@@ -1816,7 +1818,13 @@ def capture_com_failure(
     ``adapter=None`` explicitly selects NO-FOLLOW-UP-COM capture. Use it after
     a server fault when only previously observed caller context is safe to
     retain (for example, comtypes Pack-and-Go document cleanup). It captures
-    those context values, a non-COM desktop image and the report only; it never
+    those context values, a non-COM desktop image and the report only, plus
+    explicitly supplied ``retained_artifacts`` (slddrw/pdf/png/layout_json).
+    These are diagnostic copies of existing files, never native exports or
+    approved outputs. Their generation is unproven: a file may predate this
+    attempt. Pre-copy size and modification time are recorded, not treated as
+    proof of current-run export. Missing files are recorded, not manufactured. No source
+    SLDPRT is accepted and no existing file is overwritten. This path never
     attaches an adapter, reads the document or invokes a COM export. An unreadable
     desktop/report still cannot replace the supplied original exception.
     """
@@ -1872,6 +1880,46 @@ def capture_com_failure(
                 _capture_step(
                     report, "seat_image", lambda: _save_seat_image(adapter, out_dir, slug)
                 )
+            for kind, existing in (retained_artifacts or {}).items():
+
+                def retain(
+                    kind: str = kind, existing: Path = existing
+                ) -> dict[str, Any]:
+                    suffix = {
+                        "slddrw": ".slddrw",
+                        "pdf": ".pdf",
+                        "png": ".png",
+                        "layout_json": ".json",
+                    }.get(kind)
+                    existing = Path(existing).resolve()
+                    if suffix is None or existing.suffix.lower() != suffix:
+                        raise ValueError(
+                            f"not a known drawing output: {kind}: {existing}"
+                        )
+                    if not existing.is_file():
+                        return {"source": str(existing), "status": "missing"}
+                    before_copy = existing.stat()
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    target = out_dir / f"{slug}-retained-{kind}{suffix}"
+                    # Exclusive creation also refuses stale capture collisions;
+                    # unlike a native SaveAs, this cannot persist a referenced part.
+                    with (
+                        existing.open("rb") as source,
+                        target.open("xb") as destination,
+                    ):
+                        shutil.copyfileobj(source, destination)
+                    return {
+                        "source": str(existing),
+                        "path": str(target),
+                        "bytes": target.stat().st_size,
+                        "source_bytes_before_copy": before_copy.st_size,
+                        "source_mtime_ns_before_copy": before_copy.st_mtime_ns,
+                        "generation": "unproven",
+                        "status": "retained_diagnostic",
+                    }
+
+                step = f"retained_{kind}"
+                _capture_step(report, step, retain)
             _capture_step(report, "artefacts", lambda: _write_failure_report(out_dir, report))
     except Exception as exc:  # noqa: BLE001 - see guarantee 1
         report["capture_aborted"] = f"{type(exc).__name__}: {exc}"
@@ -1886,6 +1934,14 @@ def capture_com_failure(
                 "capture": json.dumps(report, default=str, sort_keys=True),
             },
         )
+    if retained_artifacts is not None and exception is not None:
+        for step, result in report.items():
+            if isinstance(result, dict) and "capture_error" in result:
+                exception.add_note(
+                    f"{step} capture also failed: {result['capture_error']}"
+                )
+        if "capture_aborted" in report:
+            exception.add_note(f"capture also failed: {report['capture_aborted']}")
     raise exception if exception is not None else exc_type(message)
 
 

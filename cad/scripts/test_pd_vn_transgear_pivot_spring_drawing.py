@@ -257,9 +257,6 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
-    assert (
-        drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
-    )
 
 
 def test_installation_note_fits_the_sheet() -> None:

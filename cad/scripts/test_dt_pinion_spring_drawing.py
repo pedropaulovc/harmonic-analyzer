@@ -269,9 +269,9 @@ def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> No
 
 
 def test_screw_head_still_bears_on_the_shortened_wing() -> None:
-    from dt_vn_foot_screw_spec import HEAD_DIA
+    from sh_vn_fillister_screw_90280a108_spec import HEAD_DIA
 
-    # The pad's working contact is the MHA-DT-VN-58 foot screw's head clamping it;
+    # The pad's working contact is the MHA-SH-VN-52 foot screw's head clamping it;
     # past the strip's forward edge the head lands on the wing.  At the worst
     # case (wing short, the hole nearest the strip edge) the head's rim stays
     # well inside the wing's edge.

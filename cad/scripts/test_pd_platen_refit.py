@@ -17,7 +17,7 @@ import _recording_geometry as paper_geometry
 import paper_drive_geom as feed_geometry
 import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
-import _mcmaster_90114a511 as fillister
+import sh_vn_brass_fillister_screw_spec as fillister
 import pd_vn_platen_clip_screw_spec as clip_screw
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations

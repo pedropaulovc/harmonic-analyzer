@@ -104,11 +104,26 @@ def camera_axes(az_deg, el_deg, roll_deg=0.0):
 
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     focus = cam.get("frame_components") or []
+    namespace = cam.get("occurrenceNamespace")
+    if focus and (
+        namespace not in (None, "native-name2")
+        or any(not isinstance(selector, str) or "archive-role-local" in selector.lower()
+               for selector in focus)
+        or (namespace is None and any(
+            re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
+            for selector in focus
+        ))
+    ):
+        raise ValueError("cross-namespace occurrence request cannot frame raw native Name2 boxes")
     target = None
     zoom = float(cam.get("zoom") or 1.0)
     if focus and boxes:
-        pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
-        hits = [b for n, b in boxes if any(p.fullmatch(n.split("/")[-1].lower()) for p in pats)]
+        if namespace == "native-name2":
+            # Explicit raw evidence only: no alias, member, leaf or index rewrite.
+            hits = [box for name, box in boxes if name in focus]
+        else:
+            pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
+            hits = [b for n, b in boxes if any(p.fullmatch(n.split("/")[-1].lower()) for p in pats)]
         if hits:
             lo = tuple(min(b[i] for b in hits) for i in range(3))
             hi = tuple(max(b[i + 3] for b in hits) for i in range(3))
@@ -164,6 +179,7 @@ def normalize_camera(cam: dict) -> dict:
         "target_mm": cam.get("target_mm"),
         "perspective": persp,
         "frame_components": cam.get("frame_components"),
+        "occurrenceNamespace": cam.get("occurrenceNamespace"),
     }
 
 
@@ -395,42 +411,67 @@ def resolve_glb(model: str, explicit: str | None, fetch: bool, tag: str | None) 
 
 
 def release_member(member: str, tag: str | None) -> Path:
-    """Extract a paired historical/current member, retaining its actual basename."""
-    from release_diff import load_identity_map, paired_keys
+    """Resolve an explicit actual artifact, or a uniquely projected source."""
+    from release_diff import canonical_keys, load_identity_map, paired_keys
+
+    if not isinstance(member, str) or "archive-role-local" in member.lower():
+        raise ValueError(f"cross-namespace occurrence request is not a release artifact: {member!r}")
+    requested = Path(member)
+    if len(requested.parts) != 2 or requested.is_absolute() or ".." in requested.parts:
+        raise ValueError(f"cross-namespace occurrence request is not a release artifact: {member!r}")
+    mapping = load_identity_map()
+    drawing = requested.suffix.lower() == ".pdf"
+    canonical_keys(requested.stem, mapping, drawing=drawing)
+
+    def unique_source(names):
+        pairs = paired_keys((Path(name).stem for name in names), [requested.stem],
+                            mapping, drawing=drawing)
+        sources = pairs.get(requested.stem, ())
+        # A literal physical source key is caller-supplied identity context,
+        # not a preference among converged aliases. The complete inventory has
+        # already been validated, including case-insensitive duplicate rejection.
+        exact = next((name for name in names
+                      if Path(name).stem.lower() == requested.stem.lower()), None)
+        if exact is not None:
+            return exact
+        if len(sources) > 1:
+            raise ValueError(f"ambiguous prior identity for {member!r}: {sources!r}")
+        return next((name for name in names if sources and Path(name).stem == sources[0]), None)
 
     tag = tag or _gh(["release", "view", "--json", "tagName", "-q", ".tagName"]).strip()
     cache = CAD_OUT / "release-cache" / tag
-    requested = Path(member)
-    mapping = load_identity_map()
-    cached = [
-        path for path in (cache / requested.parent).glob("*")
-        if path.is_file() and path.suffix.lower() == requested.suffix.lower()
-    ]
-    pairs = paired_keys((path.stem for path in cached), [requested.stem], mapping)
-    if requested.stem in pairs:
-        return next(path for path in cached if path.stem == pairs[requested.stem])
-    cache.mkdir(parents=True, exist_ok=True)
-    asset = _gh(["release", "view", tag, "--json", "assets",
-                 "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()
-    if not asset:
-        raise SystemExit(f"release {tag}: no bundle .zip asset found")
-    bundle = cache / asset
-    if not bundle.exists():
-        _gh(["release", "download", tag, "-p", asset, "--dir", str(cache), "--clobber"])
+    bundles = [path for path in cache.glob("*.zip") if "logs" not in path.name.lower()]
+    if len(bundles) > 1:
+        raise ValueError(f"ambiguous cached release bundles: {bundles!r}")
+    if bundles:
+        # Always use the complete inventory, not whichever clone was extracted
+        # first by an earlier request.
+        bundle = bundles[0]
+    else:
+        cached = [path for path in (cache / requested.parent).glob("*")
+                  if path.is_file() and path.suffix.lower() == requested.suffix.lower()]
+        actual = unique_source(cached)
+        if actual is not None and Path(actual).stem.lower() == requested.stem.lower():
+            return actual
+        # An extracted alias is not a complete inventory. Fetch the bundle
+        # before deciding whether a projected request has a unique source.
+        cache.mkdir(parents=True, exist_ok=True)
+        asset = _gh(["release", "view", tag, "--json", "assets",
+                     "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()
+        if not asset:
+            raise SystemExit(f"release {tag}: no bundle .zip asset found")
+        bundle = cache / asset
+        if not bundle.exists():
+            _gh(["release", "download", tag, "-p", asset, "--dir", str(cache), "--clobber"])
     with zipfile.ZipFile(bundle) as zf:
-        members = [
-            name for name in zf.namelist()
-            if Path(name).parent.as_posix().lower() == requested.parent.as_posix().lower()
-            and Path(name).suffix.lower() == requested.suffix.lower()
-        ]
-        pairs = paired_keys((Path(name).stem for name in members), [requested.stem], mapping)
-        matches = [name for name in members
-                   if requested.stem in pairs and Path(name).stem == pairs[requested.stem]]
-        if not matches:
+        members = [name for name in zf.namelist()
+                   if Path(name).parent.as_posix().lower() == requested.parent.as_posix().lower()
+                   and Path(name).suffix.lower() == requested.suffix.lower()]
+        actual = unique_source(members)
+        if actual is None:
             raise SystemExit(
                 f"release {tag} bundles no {member} identity member. "
                 f"Build locally (doit export) or pass --boxes/--glb.")
-        actual = matches[0]
         dest = cache / actual
         if not dest.exists():
             zf.extract(actual, cache)

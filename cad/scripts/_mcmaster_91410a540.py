@@ -30,3 +30,30 @@ SQUARE_SET_SCREW_SIZE = (
     SQ_CUP_RIM_R,
     SQ_CHAMFER_DEG,
 )
+
+# McMaster engineering drawing inspected 2026-10-19; head widths/heights
+# print fractional inches and the shank sizes decimal inches.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/9342C49D/"
+    "91410A540_Steel%20Square-Head%20Cup-Point%20Set%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -SHANK_LEN, "vertical"),
+    ("SupplierHeadHeight", HEAD_H, "vertical"),
+    ("SupplierHeadWidth", HEAD_AF, "horizontal"),
+    ("SupplierThreadDiameter", SHANK_DIA, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (SHANK_DIA / 2.0, 0.0),
+    "SupplierHeadHeight": (-HEAD_AF / 2.0, 0.0),
+    "SupplierHeadWidth": (-HEAD_AF / 2.0, 0.0),
+    "SupplierThreadDiameter": (-SHANK_DIA / 2.0, -SHANK_LEN / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadWidth": "Top"}
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierHeadHeight": (0, "length", 16, None),
+    "SupplierHeadWidth": (0, "length", 4, None),
+    "SupplierThreadDiameter": (2, "diameter", None, '1/4"-20'),
+}

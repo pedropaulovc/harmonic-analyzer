@@ -11,7 +11,7 @@ the drawing data.
 
 #1559 owner ruling: the clamp is a VERTICAL length of stock 7/16 in hex brass.
 The Ø6 lever (MHA-MG-03) passes through it across the corners; the knurled
-thumb screw (MHA-MG-VN-50) enters the top face on the hex axis and pinches the
+thumb screw (MHA-SH-VN-55) enters the top face on the hex axis and pinches the
 lever; the vertical rod (MHA-MG-04) screws into a blind tap in the bottom face
 on the same axis and seats on its shoulder (``mg_rod_clamp_joint``), so the
 thumb screw, the rod and the wire hook below all lie in one plane with the

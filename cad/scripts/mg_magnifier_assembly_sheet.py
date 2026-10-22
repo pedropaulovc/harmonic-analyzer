@@ -11,17 +11,17 @@ does not rebuild the magnifier assembly. No SolidWorks.
 from __future__ import annotations
 
 import mg_magnifier_assembly_steps as _steps
-import _mcmaster_90280a201 as _clamp_screw
+import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
 from _inch_fraction import inch_fraction
-from _mcmaster_91882a221 import SHANK_LEN as _THUMB_SHANK_LEN
-from _mcmaster_91882a221 import THREAD as _THUMB_THREAD
+from sh_vn_thumb_screw_spec import SHANK_LEN as _THUMB_SHANK_LEN
+from sh_vn_thumb_screw_spec import THREAD as _THUMB_THREAD
 from mg_magnifier_assembly_spec import (
     ENDSHAKE_DIMENSION,
     FEATURE,
     PRESS_GAUGE_DIMENSION,
 )
-from mg_vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
+from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 
 # The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
 # import (the builder marks the banded ones, DIMENSION_TOLERANCES).
@@ -32,7 +32,7 @@ DRAWING_NUMBER = _steps.DRAWING_NUMBER
 WHEEL_BAR = "mg-wheel-bar"
 CLAMP_FRONT = "sh-column-clamp-front"
 CLAMP_BACK = "sh-column-clamp-back"
-CLAMP_SCREW = "mg-vn-clamp-screw"
+CLAMP_SCREW = "sh-vn-clamp-screw"
 AXLE = "mg-wheel-axle"
 SPACER = "mg-wheel-axle-spacer"
 BACK_WASHER = "mg-vn-wheel-axle-back-washer"
@@ -44,10 +44,10 @@ LEVER = "mg-magnifying-lever"
 BRACKET = "mg-magnifying-bracket"
 BRACKET_SCREW = "mg-vn-magnifying-bracket-screw"
 CLAMP = "mg-magnifying-clamp"
-THUMB_SCREW = "mg-vn-thumb-screw"
+THUMB_SCREW = "sh-vn-thumb-screw"
 ROD = "mg-magnifying-vertical-rod"
 FIXTURE = "mg-output-fixture"
-WIRE = "mg-vn-lever-wire"
+WIRE = "sh-vn-music-wire"
 # Wheel group, then lever group, then the wire: the order the steps fit them.
 BOM_ORDER = (
     AXLE,
@@ -110,7 +110,7 @@ BOM_DESCRIPTIONS = {
     ),
     ROD: "VERTICAL ROD",
     FIXTURE: "OUTPUT FIXTURE",
-    WIRE: f"LEVER WIRE, DIA {_WIRE_DIA:.1f}",
+    WIRE: _WIRE_BOM_DESCRIPTION,
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
@@ -129,7 +129,7 @@ STEP_TEXT = {
     ),
     _steps.COLUMN_CLAMP_STARTED_KEY: (
         "FIT THE MHA-SH-01 FRONT AND MHA-SH-02 BACK COLUMN CLAMPS BEHIND THE "
-        "BAR; START BOTH MHA-MG-VN-51 SCREWS THROUGH THE BAR AND THE FRONT CLAMP "
+        "BAR; START BOTH MHA-SH-VN-53 SCREWS THROUGH THE BAR AND THE FRONT CLAMP "
         "INTO THE BACK CLAMP, LOOSE. MHA-HA-00 SETS THE BAR ON THE FRONT "
         "COLUMN AND TIGHTENS THEM."
     ),
@@ -159,32 +159,33 @@ STEP_TEXT = {
     _steps.CLAMP_SET_KEY: (
         "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS FREE END, THE END "
         "NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); TIGHTEN ITS "
-        "MHA-MG-VN-50 THUMB SCREW BY HAND."
+        "MHA-SH-VN-55 THUMB SCREW BY HAND."
     ),
     # #1559: the rod is retained by its own thread, seated on its shoulder.
     _steps.FIXTURE_SET_KEY: (
         "PASS THE MHA-MG-04 ROD'S THREADED END UP THROUGH THE MHA-MG-06 "
         "FIXTURE; SCREW IT INTO THE CLAMP'S BOTTOM TAP BY HAND UNTIL ITS "
         "SHOULDER SEATS. SET THE FIXTURE AT THE FIXTURE DROP (SHEET 1), SPIGOT "
-        "TOWARD THE BRACKET; TIGHTEN ITS MHA-MG-VN-50 THUMB SCREW BY HAND."
+        "TOWARD THE BRACKET; TIGHTEN ITS MHA-SH-VN-55 THUMB SCREW BY HAND."
     ),
     # Machinist review r3: the step must name how the upper end is secured
     # and the state the wire is tied in. The upper end takes the tie-1
     # method; the state is the rest pose the wire run is derived at
-    # (mg_vn_lever_wire_geom), which MHA-HA-00 sets as every channel amplitude
+    # (sh_vn_music_wire_lever_geom), which MHA-HA-00 sets as every channel amplitude
     # at zero with the plate top level (its pen wire is tied in the same
     # state), with TIE 1 at 6 o'clock (mg_wheel_group.LEVER_WIRE_WRAP_DEG).
     _steps.WIRE_HOOKED_KEY: (
         "AFTER MHA-HA-00 HAS CLAMPED THE BAR AND SCREWED THE BRACKET TO THE "
-        "SUMMING LEVER: LAY THE MHA-MG-VN-56 LEVER WIRE ONCE ROUND THE FIXTURE'S "
-        "SPIGOT GROOVE, TWIST THE END BACK ON THE WIRE AT LEAST THREE TURNS "
-        "AND TRIM THE TAIL; THE WIRE LEAVES THE GROOVE AT ITS FRONT."
+        "SUMMING LEVER: HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 "
+        "OUTPUT FIXTURE SPIGOT GROOVE; LAY IT ONCE ROUND THE GROOVE, TWIST THE "
+        "END BACK ON THE WIRE AT LEAST THREE TURNS AND TRIM THE TAIL; "
+        "THE WIRE LEAVES THE GROOVE AT ITS FRONT."
     ),
     _steps.WIRE_TIED_KEY: (
         "WITH EVERY CHANNEL AMPLITUDE AT ZERO AND THE MHA-SM-03 PLATE TOP "
         "LEVEL (MHA-HA-00), TURN THE WHEEL TO BRING TIE 1, THE AXIAL HOLE IN "
         "THE WHEEL BOSS, TO 6 O'CLOCK SEEN FROM THE FRONT. LEAD THE WIRE DOWN "
-        "TO THE DRUM'S RIGHT SIDE; WRAP IT CLOCKWISE DOWN THE DRUM TO TIE 1; "
+        "TO THE DRUM'S RIGHT SIDE; WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM TO TIE 1; "
         "PASS IT THROUGH TAUT, TWIST THE TAIL BACK ON ITSELF AT LEAST THREE "
         "TURNS AND TRIM THE TAIL."
     ),

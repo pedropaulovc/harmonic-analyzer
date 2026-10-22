@@ -19,18 +19,81 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _appearance import POLISHED_STEEL
+from _com import _early_bound
+from _drawing_precision import _named_dimension
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _part_save import save_part_and_images
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _supplier_pin_model import _cylinder_radii_mm
+from _supplier_screw_reference import add_supplier_reference_sketch
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from ch_rocker_arm_tl_vn_oblique_cl_dowel_spec import SKU
 from diagnostics.diag_build_91595A452 import build_91595A452
+import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as part
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-cl-dowel"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
+
+
+async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
+    # Independent solid readback: nominal carriers are not physical proof.
+    # The crowned/chamfered and domed ends remain exactly as authored.
+    radii = _cylinder_radii_mm(adapter.currentModel, 1, label=part.SKU)
+    if not math.isclose(2.0 * max(radii), part.DIA, rel_tol=0.0, abs_tol=1e-6):
+        raise RuntimeError(f"{part.SKU}: supplier nominal OD differs from the real cylinder")
+    await add_supplier_reference_sketch(
+        adapter, part.SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=part.SUPPLIER_REFERENCE_STARTS,
+        planes=part.SUPPLIER_REFERENCE_PLANES,
+    )
+    for name, (lower, upper) in part.SUPPLIER_REFERENCE_TOLERANCES_MM.items():
+        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
+        set_dimension_bilateral_tolerance(adapter, feature, name, lower, upper)
+    for name, value, _orientation in part.SUPPLIER_REFERENCE_DIMENSIONS:
+        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
+        display, native = _named_dimension(adapter, feature, name)
+        precision, presentation, denominator, callout = part.SUPPLIER_REFERENCE_FORMATS[name]
+        if denominator is not None or presentation not in ("length", "diameter"):
+            raise ValueError(f"{name}: unexpected supplier dowel presentation")
+        if int(display.Type2) not in (2, 11, 12) or not math.isclose(
+            float(native.SystemValue) * 1000.0, abs(value),
+            rel_tol=0.0, abs_tol=1e-5,
+        ):
+            raise RuntimeError(f"{name}: supplier nominal carrier type/value changed")
+        # Model-owned source ink, not the drawing-view-owned formatter.
+        if display.SetUnits2(False, 0, 1, 0, False, 0) != 0:
+            raise RuntimeError(f"{name}: supplier millimetre units rejected")
+        banded = name in part.SUPPLIER_REFERENCE_TOLERANCES_MM
+        if display.SetPrecision3(precision, -1, precision if banded else -1, -1) != 0:
+            raise RuntimeError(f"{name}: supplier source precision rejected")
+        prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
+        display.ShowParenthesis = False
+        display.SetText(1, prefix)
+        display.SetText(2, " mm)")
+        display.SetText(4, callout or "")
+        if (
+            display.GetUseDocUnits()
+            or int(display.GetUnits()) != 0
+            or int(display.GetFractionBase()) != 1
+            or int(display.GetPrimaryPrecision2()) != precision
+            or display.ShowParenthesis
+            or display.GetOverride()
+            or not display.ShowDimensionValue
+            or str(display.GetText(1) or "") != prefix
+            or str(display.GetText(2) or "") != " mm)"
+            or str(display.GetText(4) or "") != (callout or "")
+            or (banded and int(display.GetPrimaryTolPrecision2()) != precision)
+            or (not banded and int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0)
+        ):
+            raise RuntimeError(f"{name}: supplier source presentation did not persist")
+    return await save_part_and_images(adapter, part_name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -41,6 +104,7 @@ async def build(adapter) -> dict[str, str]:
         material=MATERIAL,
         color=POLISHED_STEEL,
         screw_axis_planes=("Front Plane", "Right Plane"),
+        save_unthreaded_part=_save_supplier_part,
     )
 
 

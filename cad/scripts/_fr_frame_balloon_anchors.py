@@ -66,7 +66,9 @@ FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "fr-vn-lag-screw": BalloonAnchor(instance="fr-vn-lag-screw-2"),
     "fr-top-frame": BalloonAnchor(),
     "fr-nameplate": BalloonAnchor(),
-    "fr-vn-fillister-screw": BalloonAnchor(instance="fr-vn-fillister-screw-2"),
+    "sh-vn-brass-fillister-screw": BalloonAnchor(
+        instance="sh-vn-brass-fillister-screw-2"
+    ),
     "fr-vn-frame-cross-screw": BalloonAnchor(),
     "fr-vn-gooseneck-set-screw": BalloonAnchor(),
 }

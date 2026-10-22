@@ -14,7 +14,12 @@ from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, view_name
 
 from _com import _early_bound
-from _drawing_attachment import _LEADER_SIDE_SMART, _assert_attached_to
+from _drawing_attachment import (
+    _LEADER_SIDE_SMART,
+    _assert_attached_to,
+    _assert_leader_lands,
+    _is_same_attachment,
+)
 from _drawing_common import rebuild_drawing
 from _drawing_notes import property_link
 from _drawing_selection import _select_edge, _select_view_entity
@@ -88,6 +93,7 @@ def add_attached_note(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     attached_to: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach one literal arrowed note to a drawing-view entity.
 
@@ -97,11 +103,59 @@ def add_attached_note(
     ``attached_to`` is the identified model entity a sheet-point pick must
     resolve to: the pick sets where the arrow lands, and the build fails if
     it attached anything else.
+    ``leader_attach_xy`` sets a direct entity's selection point BEFORE note
+    insertion. Moving an existing attached note's endpoint can detach it;
+    this path instead preserves and verifies the selected entity throughout.
     """
+    landing = None
+    if leader_attach_xy is not None:
+        landing = tuple(float(value) for value in leader_attach_xy)
+        if (
+            entity is None
+            or len(landing) != 2
+            or not all(math.isfinite(value) for value in landing)
+        ):
+            raise ValueError(
+                f"attached-note landing requires a direct entity and finite XY ({label})"
+            )
     target = _select_view_entity(
         adapter, view, entity_type, entity_xy, label=label, entity=entity
     )
     draw = adapter.currentModel
+    expected = attached_to if attached_to is not None else entity
+    if landing is not None:
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        count = int(manager.GetSelectedObjectCount2(-1))
+        selected = manager.GetSelectedObject6(1, -1) if count == 1 else None
+        if count != 1 or not _is_same_attachment(
+            adapter, selected, expected, entity_type.upper()
+        ):
+            raise RuntimeError(
+                f"attached-note selection changed before landing ({label}): count={count}"
+            )
+        if manager.SetSelectionPoint2(1, -1, landing[0], landing[1], 0.0) is not True:
+            raise RuntimeError(f"failed to set attached-note selection point ({label})")
+        actual = tuple(
+            float(value) for value in manager.GetSelectionPoint2(1, -1) or ()
+        )
+        requested = (*landing, 0.0)
+        if (
+            len(actual) != 3
+            or not all(math.isfinite(value) for value in actual)
+            or math.dist(actual, requested) > 1e-8
+        ):
+            raise RuntimeError(
+                f"attached-note selection point did not persist ({label}): "
+                f"actual={actual!r}, requested={requested!r}"
+            )
+        count = int(manager.GetSelectedObjectCount2(-1))
+        selected = manager.GetSelectedObject6(1, -1) if count == 1 else None
+        if count != 1 or not _is_same_attachment(
+            adapter, selected, expected, entity_type.upper()
+        ):
+            raise RuntimeError(
+                f"attached-note selection changed after landing ({label}): count={count}"
+            )
     note = draw.InsertNote(text)
     if note is None:
         raise RuntimeError(f"failed to insert attached note ({label})")
@@ -122,6 +176,10 @@ def add_attached_note(
         "IsDangling",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
+        if landing is not None:
+            raise RuntimeError(
+                f"native attached note lost its initial entity ({label})"
+            )
         if not annotation.SetAttachedEntities(dispatch_array([target])):
             raise RuntimeError(f"failed to attach note ({label})")
     status = annotation.SetLeader3(1, 0, True, False, False, False)
@@ -135,15 +193,27 @@ def add_attached_note(
         or int(annotation.GetLeaderCount()) != 1
     ):
         raise RuntimeError(f"attached note lacks one arrow ({label})")
-    if attached_to is not None:
+    attachment = expected if landing is not None else attached_to
+    if attachment is not None:
         _assert_attached_to(
             adapter,
             annotation,
-            attached_to,
+            attachment,
             entity_type=entity_type,
             what="attached note",
             label=label,
         )
+    if landing is not None:
+        points = tuple(
+            float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ()
+        )
+        if (
+            len(points) < 6
+            or len(points) % 3
+            or not all(math.isfinite(value) for value in points)
+        ):
+            raise RuntimeError(f"attached-note leader is unreadable ({label})")
+        _assert_leader_lands(annotation, landing, what="attached note", label=label)
     draw.ClearSelection2(True)
     return note
 

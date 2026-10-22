@@ -42,6 +42,8 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import ensure_fully_defined
 from _sketch_circle import define_circle
+from _supplier_screw_reference import add_supplier_reference_sketch
+import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as supplier
 from ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec import (
     BODY_VOLUME_MM3,
     DRAWING_NOTES,
@@ -108,6 +110,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    await add_supplier_reference_sketch(
+        adapter,
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=supplier.SUPPLIER_REFERENCE_STARTS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+    )
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, SAVED_PROPERTIES)

@@ -19,20 +19,20 @@ recipes:
 | 3606T118 | `dt-vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | `ch-rocker-arm-tl-vn-oblique-bearing` (MHA-CH-06-TL-VN-52; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
-| 6261K108 | `pd-vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
-| 6261K171 | `pd-vn-chain-inner-link`, `pd-vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
+| 6261K108 | `pd-vn-chain-connecting-link` (installed clearance stand-in; separate native supplier reference diagram) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
+| 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` installed configurations; separate family reference diagram) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
 | 90114A124 | `ms-vn-stop-plate-screw`; `pd-vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
-| 90114A511 | `dt-vn-fillister-screw`, `fr-vn-fillister-screw`, `pd-vn-fillister-screw` | Brass Fillister Head Slotted Screw |
+| 90114A511 | `sh-vn-brass-fillister-screw` (MHA-SH-VN-51; shared by dt, fr and pd) | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
-| 90280A108 | `dt-vn-foot-screw`, `dt-vn-swing-stop-screw`, `pd-vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `dt-vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `dt-vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
-| 90280A201 | `mg-vn-clamp-screw`, `pd-vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `sh-vn-clamp-screw` (MHA-SH-VN-53; shared by mg and pd) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `dt-vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `fr-vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90480A009 | `pn-vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
@@ -54,7 +54,7 @@ recipes:
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A105 | `pn-vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91375A106 | `ch-vn-arbor-set-screw`, `dt-vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
+| 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch and dt) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `fr-vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
@@ -70,7 +70,7 @@ recipes:
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 92314A253 | `sm-vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
-| 91882A221 | `mg-vn-thumb-screw`, `ms-vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
+| 91882A221 | `sh-vn-thumb-screw` (MHA-SH-VN-55; shared by mg and ms) | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `dt-vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `fr-vn-tube-frame-cap` | Metal Round Cap |
 | 92671A005 | `mg-vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
@@ -87,7 +87,7 @@ recipes:
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 93600A189 | `pd-vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
-| 9666K56 | `mg-vn-lever-wire`, `pn-vn-pen-wire` (cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
+| 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -102,8 +102,8 @@ recipes:
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
-The cone-lock and swing-stop selections follow `cad/scripts/build_dt_vn_cone_lock_knob.py`
-and `cad/scripts/build_dt_vn_swing_stop_screw.py`.
+The cone-lock selection follows `cad/scripts/build_dt_vn_cone_lock_knob.py`; the
+swing-stop selection rationale lives in `cad/scripts/dt_swing_stop_screw_spec.py`, and the shared 90280A108 screw it selects is built by `cad/scripts/build_sh_vn_fillister_screw_90280a108.py` (the swing-stop's placement is applied in its `dt-drive-train` occurrence).
 
 Oblique trammel jig shop-fixture hardware (MHA-CH-06-TL-VN-52/53 and
 TL-VN-61 to TL-VN-69), modelled as purchased parts so the jig assembly can run
@@ -423,7 +423,7 @@ Live catalog verification on October 11, 2026:
   states no dimensional tolerances. Brass matches the book photograph's
   brass clip screws, so the same-size 18-8 stainless 91794A077 (then MHA-MG-VN-53's
   stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
-  found live. The #4-40 brass fillister 90114A511 of MHA-DT-VN-50, MHA-FR-VN-50 and MHA-PD-VN-52 is
+  found live. The #4-40 brass fillister 90114A511 of MHA-SH-VN-51 (then MHA-DT-VN-50, MHA-FR-VN-50 and MHA-PD-VN-52) is
   rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
   and it stays selected for the other fleet deployments. Through the 0.8 mm
   clip sheet the 6.35 mm shank leaves 5.55 mm of engagement in the platen's
@@ -621,7 +621,7 @@ Catalog specifications checked on September 10, 2026:
   (`cad/out/reference/92240A540-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39`.
-- [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-DT-VN-64 and MHA-CH-VN-53
+- [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-SH-VN-54 (then MHA-DT-VN-64 and MHA-CH-VN-53)
   (#743; since 2026-10-10 also one in each MHA-CH-08 pivot-bracket ear's
   apex, on the rocker pivot shaft's flat), is a black-oxide alloy steel hex
   socket cup-point set screw:
@@ -947,7 +947,7 @@ Catalog specifications checked on September 10, 2026:
   native proof and sheet review before they are reported verified.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
-  R9-31 (September 30, 2026): these screws ride the platen, and the MHA-PD-VN-52
+  R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)
   fillister head there sweeps into the transgear hanger arm, so they alone
   take a button head with the same 1/4 in shank. The product page was read
   in a headless browser on September 30, 2026: black-oxide alloy steel button
@@ -1280,7 +1280,7 @@ Catalog specifications checked on September 10, 2026:
   MHA-PN-04 pen rod's top. Both pages were read live in a browser on
   October 13, 2026. 91375A105 is an alloy steel cup-tip set screw, black
   oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
-  ASME B18.3 / ASTM F912; it is the MHA-CH-VN-53 and MHA-DT-VN-64 91375A106 cut 1/16 in shorter,
+  ASME B18.3 / ASTM F912; it is the MHA-SH-VN-54 (then MHA-CH-VN-53 and MHA-DT-VN-64) 91375A106 cut 1/16 in shorter,
   so `diag_build_91375A105.py` imports every length-independent law from the
   vendor-verified `diag_build_91375A106.py` and changes only the length and
   helix height. 92671A115 is a brass hex nut, standard profile, 0-80 UNF
@@ -1334,18 +1334,25 @@ Catalog specifications checked on September 10, 2026:
   `diag_build_90760A140.py` extrudes the hexagon with a plain bore at the
   #10-24 basic major, so it is catalogue-only.
 - [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
-  wires, `mg-vn-lever-wire` (MHA-MG-VN-56) and `pn-vn-pen-wire` (MHA-PN-VN-57), both
-  cut from one coil. Their end terminations, wraps and developed cut lengths
-  are not yet modelled, so both sheets stay DO NOT RELEASE. Read live
+  wires, the `LeverWire` and `PenWire` configurations of `sh-vn-music-wire`
+  (MHA-SH-VN-56; `mg-vn-lever-wire` MHA-MG-VN-56 and `pn-vn-pen-wire`
+  MHA-PN-VN-57 until 2026-10-20), both cut from one coil. Their end
+  terminations, wraps and developed cut lengths
+  are not yet modelled, so both sheets of the package stay DO NOT RELEASE. Read live
   on October 14, 2026: lubricated 1080 spring steel music wire, ASTM A228,
   cold drawn, spring temper, phosphate coated, 261,000 psi tensile, diameter
   0.031 in with -0.001/+0.001 in tolerance, 110 ft in a 1/4 lb coil;
   straightness is not rated. The models keep the Ø0.8 design nominal, which
   lies inside that 0.762-0.813 band (`_mcmaster_9666k56.py`, asserted by
-  `mg_vn_lever_wire_geom.py` and `pn_vn_pen_wire_geom.py`). 8907K32, the same wire
+  `sh_vn_music_wire_lever_geom.py` and `sh_vn_music_wire_pen_geom.py`). 8907K32, the same wire
   in 1 ft straight lengths, was rejected: the lever wire's straight rest run
   alone is about 353, longer than 304.8. McMaster offers no metric 0.8 music
   wire. No vendor solid is used; the wire is a plain cylinder.
+  The supplier drawing's exact .0310-in nominal is shown separately as a
+  .7874-mm model-owned construction circle in zero-body `SUPPLIER_REFERENCE`.
+  It does not dimension either installed .8-mm cylinder. Both sheets retain
+  their configuration-qualified native `Depth@Wire` straight-run references;
+  package length is ordering metadata, not a developed cut length.
 - [90114A124](https://www.mcmaster.com/90114A124/)
   (`ms-vn-stop-plate-screw`, MHA-MS-VN-51, two) retains the MHA-MS-03 plate
   on MHA-MS-02. The product table and 2-D PDF were read live on October 9,
@@ -1369,16 +1376,20 @@ Catalog specifications checked on September 10, 2026:
   and the ring. Both product pages were read on September 29, 2026. 3606T118 is
   unfinished brass bead chain, trade size 3, 3/32 in beads, 20 lbf, not for
   lifting. 3606T811 is the brass loop link that joins the cut ends into a loop.
-  McMaster publishes no CAD for either item, and no dimension beyond the bead
-  diameter. The 3.2426 mm pitch is the trade-size-3 average of 94 beads per foot
-  (Ball Chain Mfg. and Frank Winne size charts). The link's 9 mm length is the
-  listed #3 connector size, and its proportions (domed capsule, crimps, a side
-  mouth over each dome narrower than a bead, rod slot along the top) are read
-  off McMaster's 3606T811 photograph. The rod and the link's wall and openings are assumptions named in
-  `dt_vn_keeper_chain_spec.py`, so neither part has a replica gate.
+  The October 19 source audit found no engineering drawing/CAD for either
+  item and no numeric supplier size beyond the bead diameter. The sheet
+  imports the exact 3/32-in native diameter driving `SeedProfile`, not the
+  smaller sphere/rod intersection circle. The 3.2426-mm pitch is a trade-size-3
+  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts),
+  not a McMaster manufacturing dimension. The 9-mm generic capsule, rod, wall,
+  crimps and mouths are project clearance assumptions in
+  `dt_vn_keeper_chain_spec.py`, not verified dimensions of 3606T811's pictured
+  loop link. Its supplier numeric coverage correctly remains empty.
 
-- [6261K171](https://www.mcmaster.com/6261K171/) (`pd-vn-chain-inner-link`,
-  MHA-PD-VN-50, and `pd-vn-chain-outer-link`, MHA-PD-VN-51) and
+- [6261K171](https://www.mcmaster.com/6261K171/) (`sh-vn-chain-link`,
+  MHA-SH-VN-50, in its `InnerLink` and `OuterLink` configurations; the
+  parent-scoped `pd-vn-chain-inner-link` MHA-PD-VN-50 and
+  `pd-vn-chain-outer-link` MHA-PD-VN-51 until 2026-10-20) and
   [6261K108](https://www.mcmaster.com/6261K108/) (`pd-vn-chain-connecting-link`,
   MHA-PD-VN-66) are
   the paper-drive chain between the T12 and T24 MHA-PD-09 sprockets. Both
@@ -1386,13 +1397,90 @@ Catalog specifications checked on September 10, 2026:
   strand, ANSI 25, 1/4 in pitch, 0.130 in roller diameter, 1/8 in roller width
   and 140 lb working load; neither states a grade, plate size or coating.
   6261K171 is sold by the foot. The selected 68-pitch loop (17 in) is cut from
-  2 ft with an inner link at each end. This gives 34 inner and 33 outer links;
+  2 ft with an inner link at each end. This gives 34 inner and 33 outer links,
+  the `InnerLink` and `OuterLink` configuration quantities of one purchased chain;
   6261K108, the connecting link, closes the loop as its last outer link. The
-  cut is the only modification, so all three identities stay vendor (`-vn-`) parts
+  cut is the only modification, so both identities stay vendor (`-vn-`) parts
   (`cad/docs/subsystem-identities.md`). The modelled links are the clearance
-  stand-ins in `_chain.py`, not vendor replicas. McMaster offers CAD for both
-  items, but none was downloaded and no replica equivalence is claimed. Evidence:
-  `C:/src/dt-logs/chain-links/mcmaster-skus.md`.
+  stand-ins in `_chain.py`, not vendor replicas. An October 19 source audit
+  inspected the supplier native/STEP files without adding their solids to the
+  project. The 6261K171 page's engineering graphic is an eleven-foot
+  **6261K401 family example**, not a drawing of the two-foot purchase.
+  [6261K171-6261K281](https://www.mcmaster.com/6261K171-6261K281/) is the verified
+  **one-foot** native/STEP selection used only for the same-family pitch and
+  cross-sections. Its exact pin is 2.2987 mm (.0905 in), displayed .091 in;
+  rounded ink is not exact geometry. Zero-body `SUPPLIER_REFERENCE` contains
+  hidden construction-only pitch/pin/roller/width diagrams, not revised
+  installed pins or bushes. The connector additionally has its own .030-in
+  plate and .335-in overall-pin references; `FOR ROLLER` references are
+  application gauges, not rollers physically present on the connector.
+  The shared chain sheet shelves roller-width text off its native dimension
+  line and reserves a taller geometry lane for the nominal diagrams; fitting
+  still selects an existing standard scale from the actual source curves.
+  Original member geometry, path axes, quantities, export identities and the
+  two-foot cut instructions are retained. Evidence and immutable source hashes:
+  `C:/src/dt-logs/vn-supplier-dimensions-20261019/SupplierSpringsChains/chain-audit.md`.
+
+### Tooling-only oblique-trammel source references (2026-10-21)
+
+The fourteen current `ch-rocker-arm-tl-vn-oblique-*` targets below now import
+model-owned supplier references. Live Firecrawl product fetches returned HTTP
+200 for every McMaster SKU and Olander 4C50BHCA; the exact McMaster engineering
+`X.GIF` drawings were downloaded from those pages. This supersedes the earlier
+login-wall observations above for source access, not their historical CAD or
+replica-gate provenance. No supplier models or engineering images are tracked.
+
+| target suffix | exact current SKU | primary size coverage |
+|---|---|---|
+| `rail-screw` | [91251A197](https://www.mcmaster.com/91251A197/) | 0.750-in length; 0.270-in head diameter, 0.164-in height; 0.1640-in major; 9/64-in drive |
+| `bracket-screw` | [91251A196](https://www.mcmaster.com/91251A196/) | 0.625-in length; same published head, major and drive as the rail screw |
+| `block-screw` | [91251A188](https://www.mcmaster.com/91251A188/) | 1.875-in length; 0.875-in minimum thread length; 0.270/0.164-in head; 0.164-in major; 9/64-in drive |
+| `carriage-screw` | [91290A168](https://www.mcmaster.com/91290A168/) | M4 x 0.7; 20-mm length; 7-mm head diameter, 4-mm height; 3-mm drive |
+| `kp08-screw` | [91251A150](https://www.mcmaster.com/91251A150/) | 0.625-in length; 0.226/0.138-in head; 0.1380-in major; 7/64-in drive |
+| `nut-screw` | [Olander 4C50BHCA](https://www.olander.com/items/4C50BHCA) | #4-40 x 1/2 in; head diameter 0.201–0.213 in, height 0.051–0.059 in; published 0.063-in drive |
+| `riser-screw` | [91771A112](https://www.mcmaster.com/91771A112/) | 0.625-in overall length; 0.212-in head diameter, 0.067-in height; 0.112-in major; 82-degree head; Phillips No. 1 designation |
+| `clamp-screw` | [91251A541](https://www.mcmaster.com/91251A541/) | 0.875-in length; 0.375/0.2500-in head; 0.2500-in major; 3/16-in drive |
+| `lever-screw` | [91251A583](https://www.mcmaster.com/91251A583/) | 1.000-in length; 15/32-in head diameter, 5/16-in height (drawn 0.469/0.313); 0.3125-in major; 1/4-in drive |
+| `cl-dowel` | [91595A452](https://www.mcmaster.com/91595A452/) | nominal 6.000-mm diameter, +0.004/+0.012 mm; 20-mm tip-to-tip length |
+| `block-washer` | [91812A215](https://www.mcmaster.com/91812A215/) | 0.170-in ID, 0.300-in OD, 0.080–0.100-in thickness interval |
+| `lever-washer` | [91812A230](https://www.mcmaster.com/91812A230/) | 0.340-in ID, 0.530-in OD, 0.070–0.090-in thickness interval |
+| `leadscrew` | ZYLtech HW-SC-T8x2-600 | 600-mm purchased length, 8-mm nominal major diameter, 2-mm pitch; single-start right-hand Tr8x2 |
+| `leadscrew-nut` | ZYLtech HW-SC-T8x2-NUT | 22/10.2-mm flange/body diameters; four 3.5-mm holes on 16-mm PCD; 1.5/3.5/10-mm axial spans |
+
+Both ZYLtech identities were confirmed by live primary-page variant selection:
+the [pre-cut screw page](https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/)
+displays `HW-SC-T8x2-600` after selecting 600 mm, and the
+[replacement-nut page](https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/)
+displays `HW-SC-T8x2-NUT` after selecting T8x2. The screw kit's current front
+and side engineering images supply the regular nut's dimensions. The
+replacement page also contains unrelated larger/inch-size gallery drawings;
+their R12, 3.30-mm hole and inch-size data were not applied to this T8x2 nut.
+
+The dowel's crowned/domed ends have no end circles: its length is an explicit
+nominal tip-to-tip construction witness, not an invented rim measurement.
+Washer drawings preserve the maximum-thickness plain-annulus representations;
+their source intervals do not assert modelled split pairs, cams or serrations,
+and the existing receipt/pair-package caveat remains. The nut's plain 6-mm
+thread-minor bore is a modelling contract, not an unpublished supplier size.
+No standard-only socket depths, Phillips-recess dimensions, nut bore limits,
+or omitted edge details were promoted to supplier evidence.
+
+The screw's `SUPPLIER_REFERENCE_STOCK` configuration contains only native
+construction gauges for the purchased length, nominal major and pitch. Its
+separately labelled drawing inset is not a replacement solid, helix or
+manufacturing control. The installed 410-mm cut length and five flats retain
+their existing native fabrication dimensions. All fourteen targets retain
+their prior solids, materials and installation geometry.
+
+Raw primary responses, current-variant selections, source engineering images,
+URLs, scrape IDs, retrieval errors and immutable SHA-256 hashes are preserved
+outside the repository at
+`C:/src/dt-logs/vn-supplier-dimensions-20261021/tooling-vn-primary/`.
+`manifest.json`, `drawing-downloads.json`, the two ZYLtech image manifests and
+`mcmaster-skus.md` distinguish sources used from mixed-gallery images rejected.
+The Firecrawl 2-D-PDF interaction timed out at the transport layer; no PDF URL
+was guessed, and the exact primary engineering GIFs supplied the evidence.
+Native execution/rendering is not claimed by this source record.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
@@ -1402,10 +1490,159 @@ opened read-only and NEVER saved or modified; everything derived from them
 ## Reference drawings
 
 Each production part identity above has a registered `drawing:`
-task, including identities that share a supplier SKU. The sheets show front,
-top, right and isometric views, with the stock description and ordering SKU.
-They are purchased-part identification sheets; their general tolerance and
-edge-break notes do not apply.
+task, including identities that share a supplier SKU. Most identification
+sheets use front, top, right and isometric views with stock and ordering data.
+Supplier dimensions are associative native reference annotations, never typed
+numeric replacements. When the installed clearance model differs from the
+catalogue, explicitly labelled construction-only stock/application diagrams
+live in zero-body `SUPPLIER_REFERENCE*` configurations; original installed
+members and their export identities are unchanged. Music-wire sheets retain
+both straight-run `Depth` references and their DO NOT RELEASE limitations.
+These are purchased-part reference sheets; general fabrication tolerance and
+edge-break notes do not apply to supplier references.
+Extension-spring free/maximum inside-hook spans and coil/wire sizes use
+explicitly nominal construction diagrams, not new free/extended solid variants.
+Disc-spring stock diagrams separate ID/OD, free-height envelopes and nominal
+strip gauges from compressed-height/deflection/shaft application gauges.
+Neither diagram asserts an unmodelled loaded shape or a force derived from
+the installed stand-in.
+
+Creating these diagram configurations rebuilds each original member before
+recording its preservation baseline. The native guard requires identical
+solid/sheet-body counts and face counts and compares all twelve mass-property
+values with unchanged tolerances through an order-independent, one-to-one body
+correspondence. Ambiguous non-equivalent correspondences fail closed; failures
+retain both complete native record sets. Feature suppression is resolved afresh
+by unique name/type after configuration changes, not through retained COM
+proxies. Cleanup is restricted to the construction insertion's owned features,
+never automatic configuration-comment folders. Body-Delete ownership retains
+both known names until rename readback succeeds, so a committed rename followed
+by a transient read failure still permits original-member restoration.
+
+Sketch-only supplier views fit actual native construction curves, not the
+drawing view's padded `GetOutline` rectangle. Before fitting, the shared capture
+reader maps native sketch coordinates through the actual rigid sketch inverse
+into immutable model-metre points. Each later bounds read projects those points
+through the current, refreshed native view frame; complete circles use exact
+projected ellipse extrema. One-dimensional projections are valid. Partial arcs,
+blocks, text and explicit user-point ink refuse rather than being omitted.
+Capture proves error-free named source features, actual requested configuration,
+zero solid/sheet bodies, unsuppressed model-hidden construction owners and
+drawing correspondences. It does not infer drawing visibility from a
+corresponding feature's `Visible` property.
+The spring/chain path makes one capture pass per source configuration, then
+restores the original configuration, body counts, dirty/read-only state and
+drawing context before fitting. It never switches or rebuilds the source during
+fitting, dimension placement or final settled checks. Captures are bound to the
+actual source document/path/configuration and view, with no live-sketch fallback;
+the drawing path performs no source geometry mutations after capture.
+Existing drawing-qualified sketch showing and native dimension import remain
+the presentation path. Native farm renders and visual comparison with the
+supplier reference qualify the resulting sheet, independently of the source
+geometry capture. Native dimension association, value, visibility and
+annotation-containment checks remain mandatory.
+Native centre crosses on supplier circles are legitimate reference aids. The
+existing centre-mark pass turns off template extension lines before fitting and
+again after scale selection, rather than rejecting those marks.
+Source parts are opened with the native silent/read-only option, with actual
+read-only state and path identity checked; a resident writable source is refused.
+Only clean source documents are captured, without saving or clearing their
+flags. The capture/preparation phase must remain clean. After capture, the known
+imported-dimension text/precision presentation stage may dirty the in-memory
+source without changing its geometry. That expected dirty bit is not treated as
+a geometry-change signal. Read-only state remains mandatory through drawing
+save, and a source-part SHA-256 check before opening and after drawing
+finalization rejects any persisted source-byte change. Existing build teardown
+discards document changes without saving. Restoration failures are recorded
+separately from any primary capture failure.
+Read-only source acquisition and each whole-file hash have aggregate timing
+spans, `drawing.purchased_source_open` and `drawing.purchased_source_hash`;
+there is no per-chunk instrumentation. Measure their cost from native traces,
+not source-only tests.
+
+Native clamp run `f6635a090` isolated the transition to the legacy
+`IModelDoc2.SaveAs3` drawing save: the same source part was read-only before
+the save and writable afterward, with changed bytes and unchanged native
+identities. Read-only acquisition alone is therefore not a persistence
+guarantee. Generic purchased-sheet checkpoints observe live document state
+and SHA around setup, presentation, saves and close, and refuse drift.
+Failure capture copies existing exports with unproven generation; it performs
+no additional COM save or export.
+
+The vendored drawing helper uses `IModelDocExtension.SaveAs3` with
+`(path, 0, 1, None, None, 0, 0)` and its `(ok, errors, warnings)` result,
+following the [existing template-maintenance positive control](../../scripts/maintain_drawing_templates.py).
+It requires success, zero errors and a fresh output file; warnings are logged.
+The read-only, identity and source-hash guards remain unchanged. The template
+control is not source-preservation proof for purchased drawings with loaded
+parts; the next native canary must verify their source state and bytes.
+
+The [native presentation-save receipt](../../docs/pipeline/evidence/vm2-datum-placement/probes/rack-source-save-callout/receipt.json)
+records `SetText` dirtying the source part and drawing `SaveAs3` persisting
+changed source bytes while the measured dimension and tolerance stayed
+unchanged. That is presentation persistence, not evidence of a geometry change.
+
+Installed pictorials retain their native-outline guards. Standard scales,
+reserved cells and final native dimension/note-ink containment are unchanged.
+
+Supplier source ownership uses documented `IDisplayDimension.GetDimension2`
+and the fully qualified model-dimension identity, not cross-context COM wrapper
+equality. That identity must match the referenced model's named `Parameter` and
+a dimension enumerated from the intended source feature. Within the source
+context, the named parameter and enumerated feature member must compare
+`IsSame == 1`. Cross-context `IsSame == 2` is diagnostic only; source-annotation
+mapping into the view is not required. Actual drawing/view annotation ownership
+remains checked. Model-import validation does not require imported point wrappers
+to compare equal to source or `GetCorresponding()` wrappers: native MSC imports
+return distinct contexts even when the source dimension association is intact.
+Coordinates and local point IDs are not substitute ownership proofs. Callers
+with a separately proven mapped-attachment contract retain their stricter
+same-kind member inventory and one-to-one native correspondence checks.
+The MSC head crop's actual circle frame and entire footprint are checked before
+`Crop2` consumes the selected profile. Settled validation checks native crop
+state, view binding/frame and annotation containment; `IView.GetSketch()` is not
+required to expose the consumed profile afterwards.
+These associative references may be nominal supplier gauges; source membership
+does not make a reference line or circle a physical finished edge.
+Source path/configuration, annotation ownership/type/count, final value,
+dangling/override, inventory and layout guards remain in force. Source-only
+regressions do not by themselves qualify this COM behavior on a native seat.
+
+Generic purchased-view fitting refreshes native display geometry at each
+candidate scale and after centering. Only the validated post-refresh outline
+selects the scale and proves containment; an unavailable or invalid pre-refresh
+diagnostic snapshot cannot reject valid refreshed geometry. Custom geometry
+readers retain ownership of their refresh. Standard scales and the settled
+native-extent, centering and containment guards remain mandatory.
+
+The thumb-screw sheet keeps axial dimensions on physical finished-face rims
+and diameters on their model-owned source-circle references. Place complete
+native lines with `OffsetText` disabled first, then compare each axial
+label's measured native width with its witness/arrow span. Enable text-only
+offset only where that ink cannot fit with clearance; with the current
+metrics, thread length stays centered at 4:1 but needs a shelf at 2:1.
+Snapshot all three axial dimensions, not just the shelved ones. Reacquire
+witness stations, arrow tips and current line/arrow reach after toggling text
+mode, after placement and at final readback; smart-arrow flips do not permit
+the physical stations to move.
+
+Diameter text uses measured native geometry too. Center the collar label
+between its classified horizontal witnesses, with at least 2 mm of settled
+clearance to each. Put the two-row thread-diameter label below the lower
+collar witness, then recompute the outer collar line's X from the thread
+label's actual right edge. Text shelves and these outside moves target
+2.2 mm of clearance, including a 0.2-mm settling allowance. The collar X
+proof reads the classified native dimension line, not the annotation anchor.
+The current pre-fit budget is intended to allow a natural 4:1 view, not
+promise 5:1; actual native fitting still selects the scale.
+
+The thumb guards reuse `_Reader`/`_dump_annotation`, including native
+leaders, and run the complete `audit_dump` gating predicates with live view
+geometry rather than a reduced list of overlap finders. Source, native
+position and actual-ink checks remain mandatory, including text/line,
+arrow/text and dimension-extension-at-text refusals. Source-only checks do
+not establish a native visual pass or guaranteed scale; the scoped native
+sheet and final shared audit still need qualification.
 
 For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
 `cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,

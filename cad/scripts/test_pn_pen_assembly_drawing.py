@@ -135,8 +135,10 @@ def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
 
 
 def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> None:
-    assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
-    assert set(drawing.BALLOON_ANCHORS) == set(spec.BOM_ORDER)
+    assert drawing.BOM_COMPONENTS == tuple(
+        drawing.BOM_ROW_KEYS[stem] for stem in spec.BOM_ORDER
+    )
+    assert set(drawing.BALLOON_ANCHORS) == set(drawing.BOM_COMPONENTS)
     assert [notes.ITEM[stem] for stem in spec.BOM_ORDER] == list(
         range(1, len(spec.BOM_ORDER) + 1)
     )
@@ -149,6 +151,372 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
     )
     assert drawing.BOM_SKUS[spec.HANGER] == drawing.MADE_PART_SKU
     assert drawing.BOM_SKUS[spec.HANGER_JAM_NUT] != drawing.MADE_PART_SKU
+
+
+class _PenBomTable:
+    """Native column state, including the retained zero-width part-number key."""
+
+    def __init__(self, cells, column_types, components):
+        self.cells = cells
+        self.column_types = column_types
+        self.hidden = [False] * (len(column_types) - 1) + [True]
+        self.widths = [0.02] * (len(column_types) - 1) + [0.0]
+        self.heights = {}
+        self.row_hidden = {}
+        self.text_writes = []
+        self.title_writes = []
+        self.number_property = "Number"
+        self.GetComponents2 = components
+
+    @property
+    def RowCount(self):
+        return len(self.cells)
+
+    @property
+    def TotalRowCount(self):
+        return self.RowCount
+
+    def RowHidden(self, row):
+        if not 0 <= row < self.TotalRowCount:
+            raise IndexError(row)
+        return self.row_hidden.get(row, False)
+
+    @property
+    def ColumnCount(self):
+        return self.hidden.count(False)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.column_types)
+
+    def _physical_column(self, column, include_hidden=True):
+        columns = [
+            index for index, hidden in enumerate(self.hidden)
+            if include_hidden or not hidden
+        ]
+        return columns[column] if 0 <= column < len(columns) else None
+
+    def GetColumnType3(self, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        return (-1, None, 0) if physical is None else self.column_types[physical]
+
+    def ColumnHidden(self, column):
+        # Visibility PROPERTY indices are 1-based; storage remains physical.
+        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
+
+    def GetColumnWidth(self, column):
+        physical = self._physical_column(column, False)
+        return self.widths[physical] if physical is not None else 0.0
+
+    def GetColumnTitle2(self, column, include_hidden):
+        return self.DisplayedText2(0, column, include_hidden)
+
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            return ""
+        if physical < len(self.cells[row]):
+            return self.cells[row][physical]
+        return "PART NUMBER" if row == 0 else self.cells[row][1]
+
+    def DisplayedText(self, row, column):
+        return self.DisplayedText2(row, column, False)
+
+    def GetColumnCustomProperty(self, column):
+        if not 0 <= column < len(self.column_types):
+            return ""
+        if column == 1 and self.column_types[column][0] == 204:
+            return self.number_property
+        return ""
+
+    def InsertColumn2(self, _where, after, title, _width):
+        if _where != 3 or not 0 <= after < len(self.column_types):
+            return False
+        column = after + 1
+        for row, contents in enumerate(self.cells):
+            contents.insert(column, title if row == 0 else "")
+        self.column_types.insert(column, (204, "", 0))
+        self.hidden.insert(column, False)
+        self.widths.insert(column, 0.02)
+        return True
+
+    def SetColumnTitle2(self, column, title, include_hidden):
+        self.title_writes.append((column, title, include_hidden))
+        physical = self._physical_column(column, include_hidden)
+        if physical is None or physical >= len(self.cells[0]):
+            return False
+        self.cells[0][physical] = title
+        return True
+
+    def IsCellTextEditable(self, row, column):
+        return 0 < row < self.RowCount and (
+            self.GetColumnTitle2(column, True) == drawing.BOM_SKU_TITLE
+        )
+
+    def SetText2(self, row, column, include_hidden, text):
+        self.text_writes.append((row, column, include_hidden, text))
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            raise IndexError(column)
+        if not self.IsCellTextEditable(row, column):
+            raise AssertionError("Number cells must stay natively property-linked")
+        self.cells[row][physical] = text
+
+    def SetColumnWidth(self, column, width, _options):
+        physical = self._physical_column(column, False)
+        if physical is None:
+            raise IndexError(column)
+        self.widths[physical] = width
+        return width
+
+    def SetRowHeight(self, row, height, _options):
+        self.heights[row] = height
+        return height
+
+
+@pytest.mark.parametrize("hidden", (True, None, 0, 1, ""))
+@pytest.mark.parametrize("row", (0, 1))
+def test_bom_cells_requires_exact_visible_row_before_physical_text(hidden, row) -> None:
+    reads = []
+    table = SimpleNamespace(
+        RowCount=2,
+        ColumnCount=1,
+        RowHidden=lambda index: hidden if index == row else False,
+        DisplayedText2=lambda *args: reads.append(args) or "TEXT",
+    )
+    with pytest.raises(RuntimeError):
+        drawing._bom_cells(table)
+    assert reads == ([(0, 0, True)] if row == 1 else [])
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "native-column",
+        "number-column",
+        "number-property",
+        "visible-prefix",
+        "displayed-number",
+        "member",
+        "quantity",
+        "hidden-row",
+        "unreadable-row",
+    ),
+)
+def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_skus(
+    monkeypatch, fault
+) -> None:
+    import _com
+    import _component_references
+    import _drawing_tables
+    from _test_stubbed_build import stub_seat
+
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _component_references, "_early_bound", lambda value, _interface: value
+    )
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+    configuration = "Default Simplified"
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "VENDOR SKU", "QTY."]]
+    members = []
+    for item, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+        number = drawing.BOM_PART_NUMBERS[stem]
+        physical, member = drawing.BOM_COMPONENT_IDENTITIES[stem]
+        cells.append(
+            [
+                str(item),
+                number,
+                drawing.BOM_DESCRIPTIONS[stem],
+                "-",
+                str(drawing.BOM_QUANTITIES[stem]),
+            ]
+        )
+        document = SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property, number=number: number
+        )
+        members.append(
+            SimpleNamespace(
+                Name2=f"{stem}-1",
+                GetPathName=lambda physical=physical: f"C:/native/{physical}.SLDPRT",
+                ReferencedConfiguration=f"{member or 'Default'} Simplified",
+                GetModelDoc2=lambda document=document: document,
+            )
+        )
+    # SKU insertion shifted the retained native key from column 4 to column 5.
+    column_types = [
+        (202, "", 0),
+        (204, '$PRP:"Number"', 0),
+        (204, "", 0),
+        (204, "", 0),
+        (203, "", 0),
+        (201, "", 0),
+    ]
+    native_reads = []
+
+    def components(row, owner):
+        native_reads.append((row, owner))
+        return (members[row - 1],) * drawing.BOM_QUANTITIES[
+            drawing.BOM_COMPONENTS[row - 1]
+        ]
+
+    table = _PenBomTable(cells, column_types, components)
+    hidden = table.hidden
+    seat = stub_seat(
+        monkeypatch,
+        drawing,
+        keep=("_place_exploded_sheet", "validate_bom_number_property"),
+    )
+    seat.apply_view_configuration.return_value = configuration
+    seat._fit_exploded.return_value = drawing.SHEET_SCALE
+    seat.insert_bom_table.return_value = table
+    seat._validate_bom.return_value = tuple(
+        (stem, str(item)) for item, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+    )
+    seat._make_explode_readable.return_value = lambda: None
+    seat.add_component_bom_balloons.return_value = (
+        (object(),) * sum(drawing.BOM_QUANTITIES.values())
+    )
+    settled = drawing._place_exploded_sheet(object())
+    expected_reads = [(row, configuration) for row in range(1, len(cells))]
+    assert native_reads == expected_reads
+    native_reads.clear()
+    settled()
+    assert native_reads == expected_reads
+
+    # These changes model drift during the final rebuild, after BOM placement.
+    if fault == "native-column":
+        column_types[-1] = (204, "", 0)
+    elif fault == "number-column":
+        column_types[1] = (201, "", 0)
+    elif fault == "number-property":
+        table.number_property = "Description"
+    elif fault == "visible-prefix":
+        hidden[3] = True
+    elif fault == "displayed-number":
+        cells[1][1] = "UNLINKED"
+    elif fault == "quantity":
+        cells[1][4] = str(int(cells[1][4]) + 1)
+    elif fault == "hidden-row":
+        table.row_hidden[1] = True
+    elif fault == "unreadable-row":
+        table.row_hidden[1] = None
+    else:
+        members[0].ReferencedConfiguration = "OtherMember Simplified"
+    with pytest.raises(RuntimeError):
+        settled()
+    seat.insert_bom_table.assert_called_once()
+    seat._validate_bom.assert_called_once()
+    seat.assert_balloon_landings.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "fault", (None, "quantity", "native-count", "same-number-member", "number-property")
+)
+def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
+    monkeypatch, fault
+) -> None:
+    import _com
+    import _component_references
+    import _drawing_tables
+
+    for module in (_com, _component_references, drawing):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+    native_rows = []
+    for item, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+        number = drawing.BOM_PART_NUMBERS[stem]
+        physical, member = drawing.BOM_COMPONENT_IDENTITIES[stem]
+        quantity = drawing.BOM_QUANTITIES[stem]
+        cells.append(
+            [str(item), number, drawing.BOM_DESCRIPTIONS[stem], str(quantity)]
+        )
+        document = SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property, number=number: number
+        )
+        native_rows.append(
+            tuple(
+                SimpleNamespace(
+                    Name2=f"{stem}-{index + 1}",
+                    ReferencedConfiguration=f"{member or 'Default'} Simplified",
+                    GetPathName=lambda physical=physical: (
+                        f"C:/native/{physical}.SLDPRT"
+                    ),
+                    GetModelDoc2=lambda document=document: document,
+                )
+                for index in range(quantity)
+            )
+        )
+    column_types = [
+        (202, "", 0), (204, '$PRP:"Number"', 0), (204, "", 0),
+        (203, "", 0), (201, "", 0),
+    ]
+
+    table = _PenBomTable(
+        cells, column_types, lambda row, _owner: native_rows[row - 1]
+    )
+    if fault == "number-property":
+        table.number_property = "Description"
+    rebuilds = []
+
+    def rebuild():
+        rebuilds.append(True)
+        if fault == "quantity":
+            cells[1][4] = str(int(cells[1][4]) + 1)
+        elif fault == "native-count":
+            native_rows[0] = native_rows[0][:-1]
+        elif fault == "same-number-member":
+            wire_row = drawing.BOM_COMPONENTS.index(drawing.BOM_ROW_KEYS[spec.WIRE])
+            native_rows[wire_row][0].ReferencedConfiguration = "LeverWire Simplified"
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    if fault is None:
+        assert drawing._validate_bom(adapter, table) == tuple(
+            (stem, str(item)) for item, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        )
+        assert table.DisplayedText2(0, 4, True) == "QTY."
+        assert table.DisplayedText(0, 4) == "QTY."
+        assert table.GetColumnType3(4, True)[0] == 203
+        assert table.GetColumnType3(4, False)[0] == 203
+        assert table.ColumnHidden(6) is True
+        assert table.ColumnHidden(5) is False
+        proof = drawing.validate_bom_number_property(
+            table,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            label="pen",
+            expected_rows=1 + len(drawing.BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        assert [(row, number, quantity) for row, _members, number, quantity in proof] == [
+            (row, drawing.BOM_PART_NUMBERS[stem], str(drawing.BOM_QUANTITIES[stem]))
+            for row, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        ]
+        for row, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+            assert table.DisplayedText2(row, 4, True) == str(drawing.BOM_QUANTITIES[stem])
+            assert table.DisplayedText2(row, 3, True) == drawing.BOM_SKUS[stem]
+            assert table.DisplayedText2(row, 4, False) == str(
+                drawing.BOM_QUANTITIES[stem]
+            )
+            assert table.DisplayedText2(row, 1, False) == drawing.BOM_PART_NUMBERS[stem]
+        assert table.title_writes == [(3, drawing.BOM_SKU_TITLE, True)]
+        assert table.text_writes == [
+            (row, 3, True, drawing.BOM_SKUS[stem])
+            for row, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        ]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._validate_bom(adapter, table)
+    assert rebuilds == ([] if fault == "number-property" else [True])
+    assert cells[0].count(drawing.BOM_SKU_TITLE) == 1
 
 
 @pytest.mark.parametrize(
@@ -221,6 +589,80 @@ def test_exploded_caption_refuses_unreadable_bom_geometry(
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     with pytest.raises(RuntimeError, match="unreadable geometry"):
         drawing._place_exploded_caption(None, table, (1.0, 2.0))
+
+
+def test_builder_inserts_all_ordinary_riders_through_real_parameter_validation(
+    monkeypatch, tmp_path
+) -> None:
+    """Keep build + place_component real; stub only the native seat operations."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from pydantic import ValidationError
+
+    import _assembly
+    from _test_stubbed_build import stub_seat
+
+    seat = stub_seat(
+        monkeypatch, builder, keep=("build", "place_component", "euler_from_rows")
+    )
+    seat.component_origin.return_value = list(builder.PEN_ROD_POS)
+    seat.assembly_title_properties.return_value = {}
+    seat.save_assembly_and_images.return_value = {"sldasm": "offline-pen.SLDASM"}
+    for stem in spec.BOM_ORDER:
+        (tmp_path / f"{stem}.SLDPRT").touch()
+    monkeypatch.setattr(_assembly, "OUT_SLDPRT", tmp_path)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_assembly, "assert_component_placed", lambda *_args: None)
+    monkeypatch.setattr(_assembly, "_ledger_record", lambda *_args: None)
+    monkeypatch.setattr(
+        _assembly, "set_component_reference", lambda _adapter, name, *_args, **_kwargs: name
+    )
+
+    class Adapter:
+        def __init__(self):
+            self.components = {}
+            self.currentModel = SimpleNamespace(GetComponentByName=self.components.get)
+
+        async def create_assembly(self):
+            return SimpleNamespace(is_success=True, data={}, error=None)
+
+        async def insert_component(self, parameters):
+            # The REAL place_component constructs InsertComponentParameters
+            # before this backend is entered. Invalid configuration=None must
+            # never create a native occurrence here.
+            stem = Path(parameters.file_path).stem
+            name = f"{stem}-{len(self.components) + 1}"
+            self.components[name] = SimpleNamespace(
+                stem=stem,
+                Name2=name,
+                ReferencedConfiguration=parameters.configuration or "Default",
+                position=tuple(parameters.position),
+            )
+            return SimpleNamespace(
+                is_success=True, data={"name": name, "fixed": True}, error=None
+            )
+
+    adapter = Adapter()
+    result = asyncio.run(builder.build(adapter))
+    assert result == {"sldasm": "offline-pen.SLDASM"}
+    ordinary_riders = {stem: tuple(position) for stem, position, _rows in builder.RIDERS if stem != spec.WIRE}
+    accepted = [component for component in adapter.components.values() if component.stem in ordinary_riders]
+    assert len(accepted) == len(ordinary_riders) == 7
+    assert {component.stem: component.position for component in accepted} == ordinary_riders
+    assert {component.ReferencedConfiguration for component in accepted} == {"Default"}
+    assert len(adapter.components) == sum(spec.QUANTITIES.values()) == 13
+
+    before = set(adapter.components)
+    stem, position, rows = next(rider for rider in builder.RIDERS if rider[0] != spec.WIRE)
+    with pytest.raises(ValidationError, match="configuration"):
+        asyncio.run(
+            _assembly.place_component(
+                adapter, stem, list(position), builder.euler_from_rows(rows), rows,
+                ground=False, configuration=None,
+            )
+        )
+    assert set(adapter.components) == before
 
 
 def test_explode_names_match_the_builder() -> None:
@@ -321,7 +763,7 @@ def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
     assert moves[1] > 0.0
     assert moves[0] * sz + moves[2] * -sx < 0.0
     assert moves[0] * -sx + moves[2] * -sz == 0.0
-    assert drawing.BALLOON_ANCHORS[spec.WIRE].point_mm is not None
+    assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm is not None
 
 
 def test_explode_module_qualifies_for_the_explode_tier() -> None:

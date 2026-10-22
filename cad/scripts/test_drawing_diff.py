@@ -165,46 +165,57 @@ def test_added_removed_pdfs_and_pages_are_classified_separately(tmp_path: Path) 
     assert all(page["image"] is None for page in facts["pages"] if page["status"] == "unchanged")
 
 
-@pytest.mark.parametrize(("prior", "targets"), [
-    ("vn-fillister-screw", ["dt-vn-fillister-screw", "fr-vn-fillister-screw", "pd-vn-fillister-screw"]),
-    ("vn-clamp-screw", ["mg-vn-clamp-screw", "pd-vn-clamp-screw"]),
-    ("vn-arbor-set-screw", ["ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"]),
-    ("vn-thumb-screw", ["mg-vn-thumb-screw", "ms-vn-thumb-screw"]),
+@pytest.mark.parametrize(("target", "sources"), [
+    ("sh-vn-brass-fillister-screw", ["dt-vn-fillister-screw", "fr-vn-fillister-screw", "pd-vn-fillister-screw"]),
+    ("sh-vn-fillister-screw-90280a108", ["dt-vn-foot-screw", "dt-vn-swing-stop-screw", "pd-vn-latch-hook-bracket-screw"]),
+    ("sh-vn-clamp-screw", ["mg-vn-clamp-screw", "pd-vn-clamp-screw"]),
+    ("sh-vn-arbor-set-screw", ["ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"]),
+    ("sh-vn-thumb-screw", ["mg-vn-thumb-screw", "ms-vn-thumb-screw"]),
+    ("sh-vn-chain-link", ["pd-vn-chain-inner-link", "pd-vn-chain-outer-link"]),
+    ("sh-vn-music-wire", ["mg-vn-lever-wire", "pn-vn-pen-wire"]),
+    ("sh-vn-clamping-kit-hardware", [
+        "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
+        "ch-rocker-arm-tl-vn-oblique-t-nut",
+        "ch-rocker-arm-tl-vn-oblique-flange-nut",
+    ]),
 ])
-@pytest.mark.parametrize("archived", [False, True])
 @pytest.mark.parametrize("directory", ["", "purchased/"])
-def test_vendor_drawings_pair_every_clone_with_the_same_prior_pdf(
-    tmp_path: Path, prior: str, targets: list[str], archived: bool, directory: str
+def test_shared_drawings_compare_every_historical_clone_and_member(
+    tmp_path: Path, target: str, sources: list[str], directory: str
 ) -> None:
-    source = prior.removeprefix("vn-") if archived else prior
-    old_name = f"{directory}{source}.pdf"
-    old = _pdf(tmp_path / "old" / old_name, [_square(20, 20)])
-    source_bytes = old.read_bytes()
-    for target in targets:
-        new = tmp_path / "new" / f"{directory}{target}.pdf"
-        new.parent.mkdir(parents=True, exist_ok=True)
-        new.write_bytes(source_bytes)
+    source_bytes = {}
+    for source in sources:
+        old_name = f"{directory}{source}.pdf"
+        old = _pdf(tmp_path / "old" / old_name, [_square(20, 20)])
+        source_bytes[old_name] = old.read_bytes()
+    new_name = f"{directory}{target}.pdf"
+    new = tmp_path / "new" / new_name
+    new.parent.mkdir(parents=True)
+    new.write_bytes(next(iter(source_bytes.values())))
 
     facts = _compare(tmp_path)
 
-    expected = {f"{directory}{target}.pdf": old_name for target in targets}
+    expected = {new_name: sorted(source_bytes)}
+    assert facts["schema_version"] == 2
     assert facts["renamed_drawings"] == expected
-    assert facts["unchanged_drawings"] == sorted(expected)
+    assert facts["unchanged_drawings"] == [new_name]
     assert facts["added_drawings"] == facts["removed_drawings"] == facts["changed_drawings"] == []
-    assert facts["page_counts"] == {"changed": 0, "added": 0, "removed": 0, "unchanged": len(targets)}
-    assert {page["drawing"] for page in facts["pages"]} == set(expected)
-    assert {page["old_drawing"] for page in facts["pages"]} == {old_name}
-    assert {page["new_drawing"] for page in facts["pages"]} == set(expected)
-    assert old.read_bytes() == source_bytes
+    assert facts["page_counts"] == {"changed": 0, "added": 0, "removed": 0, "unchanged": len(sources)}
+    assert {page["old_drawing"] for page in facts["pages"]} == set(source_bytes)
+    assert {page["new_drawing"] for page in facts["pages"]} == {new_name}
+    for old_name, content in source_bytes.items():
+        assert (tmp_path / "old" / old_name).read_bytes() == content
     with ZipFile(facts["asset_path"]) as archive:
         assert json.loads(archive.read("summary.json"))["renamed_drawings"] == expected
         assert not any(name.startswith("images/") for name in archive.namelist())
 
 
 @pytest.mark.parametrize(("prior", "current"), [
-    ("lever-wire", "mg-vn-lever-wire"),
-    ("mg-lever-wire", "mg-vn-lever-wire"),
-    ("pn-pen-wire", "pn-vn-pen-wire"),
+    ("fillister-screw", "sh-vn-brass-fillister-screw"),
+    ("vn-fillister-screw", "sh-vn-brass-fillister-screw"),
+    ("lever-wire", "sh-vn-music-wire"),
+    ("mg-lever-wire", "sh-vn-music-wire"),
+    ("pn-pen-wire", "sh-vn-music-wire"),
     ("vn-pen-marker", "pn-vn-pen-marker"),
     ("ch-rocker-arm-tl-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
     ("channel-spring-installed-stretch07", "ch-vn-channel-spring-installed-stretch07"),
@@ -220,62 +231,72 @@ def test_archived_alias_tooling_and_qualified_drawings_keep_their_prior_pdf(
 
     facts = _compare(tmp_path)
 
-    assert facts["renamed_drawings"] == {f"{current}.pdf": f"{prior}.pdf"}
+    assert facts["renamed_drawings"] == {f"{current}.pdf": [f"{prior}.pdf"]}
     assert facts["unchanged_drawings"] == [f"{current}.pdf"]
     assert facts["changed_drawings"] == facts["added_drawings"] == facts["removed_drawings"] == []
 
 
-def test_split_drawing_changes_do_not_hide_or_change_other_clones(tmp_path: Path) -> None:
+def test_changed_historical_clones_are_not_hidden_by_an_equal_candidate(tmp_path: Path) -> None:
     common = _square(20, 20)
-    _pdf(tmp_path / "old/vn-fillister-screw.pdf", [common])
-    _pdf(tmp_path / "new/dt-vn-fillister-screw.pdf", [common])
-    _pdf(tmp_path / "new/fr-vn-fillister-screw.pdf", [common + _square(60, 60)])
-    _pdf(tmp_path / "new/pd-vn-fillister-screw.pdf", [common])
+    _pdf(tmp_path / "old/dt-vn-fillister-screw.pdf", [common])
+    _pdf(tmp_path / "old/fr-vn-fillister-screw.pdf", [common + _square(60, 60)])
+    _pdf(tmp_path / "old/pd-vn-fillister-screw.pdf", [common + _square(100, 100)])
+    target = "sh-vn-brass-fillister-screw.pdf"
+    _pdf(tmp_path / "new" / target, [common])
 
     facts = _compare(tmp_path)
 
-    assert facts["changed_drawings"] == ["fr-vn-fillister-screw.pdf"]
-    assert facts["unchanged_drawings"] == ["dt-vn-fillister-screw.pdf", "pd-vn-fillister-screw.pdf"]
+    assert facts["changed_drawings"] == [target]
+    assert facts["unchanged_drawings"] == []
     assert facts["added_drawings"] == facts["removed_drawings"] == []
-    assert len(facts["renamed_drawings"]) == 3
-    assert facts["page_counts"] == {"changed": 1, "added": 0, "removed": 0, "unchanged": 2}
-    assert facts["images"] == ["images/fr-vn-fillister-screw.pdf/page-0001.png"]
-    assert _has_color(_pixels(facts), (0, 96, 224))
+    assert facts["renamed_drawings"] == {target: [
+        "dt-vn-fillister-screw.pdf", "fr-vn-fillister-screw.pdf", "pd-vn-fillister-screw.pdf",
+    ]}
+    assert facts["page_counts"] == {"changed": 2, "added": 0, "removed": 0, "unchanged": 1}
+    assert facts["images"] == [
+        f"images/{target}/from/fr-vn-fillister-screw.pdf/page-0001.png",
+        f"images/{target}/from/pd-vn-fillister-screw.pdf/page-0001.png",
+    ]
+    assert _has_color(_pixels(facts), (220, 32, 32))
+    with ZipFile(facts["asset_path"]) as archive:
+        assert len([name for name in archive.namelist() if name.startswith("images/")]) == 2
 
 
-def test_current_drawings_pair_by_own_clone_and_configuration_only(tmp_path: Path) -> None:
+def test_current_drawings_keep_exact_default_installed_and_t006_separation(tmp_path: Path) -> None:
     common = _square(20, 20)
-    _pdf(tmp_path / "old/dt-vn-fillister-screw.pdf", [common])
-    _pdf(tmp_path / "new/dt-vn-fillister-screw.pdf", [common])
-    _pdf(tmp_path / "new/fr-vn-fillister-screw.pdf", [common])
+    _pdf(tmp_path / "old/sh-vn-brass-fillister-screw.pdf", [common])
+    _pdf(tmp_path / "new/sh-vn-brass-fillister-screw.pdf", [common])
+    _pdf(tmp_path / "new/sh-vn-brass-fillister-screw--installed.pdf", [common])
     _pdf(tmp_path / "old/dt-cone-gear--t006.pdf", [common])
     _pdf(tmp_path / "new/dt-cone-gear--t024.pdf", [common])
 
     facts = _compare(tmp_path)
 
     assert facts["renamed_drawings"] == {}
-    assert facts["unchanged_drawings"] == ["dt-vn-fillister-screw.pdf"]
-    assert facts["added_drawings"] == ["dt-cone-gear--t024.pdf", "fr-vn-fillister-screw.pdf"]
+    assert facts["unchanged_drawings"] == ["sh-vn-brass-fillister-screw.pdf"]
+    assert facts["added_drawings"] == [
+        "dt-cone-gear--t024.pdf", "sh-vn-brass-fillister-screw--installed.pdf",
+    ]
     assert facts["removed_drawings"] == ["dt-cone-gear--t006.pdf"]
     assert facts["changed_drawings"] == []
 
 
 def test_drawing_identity_pairing_does_not_flatten_relative_directories(tmp_path: Path) -> None:
     _pdf(tmp_path / "old/left/vn-thumb-screw.pdf", [_square(20, 20)])
-    _pdf(tmp_path / "new/right/mg-vn-thumb-screw.pdf", [_square(20, 20)])
+    _pdf(tmp_path / "new/right/sh-vn-thumb-screw.pdf", [_square(20, 20)])
 
     facts = _compare(tmp_path)
 
     assert facts["renamed_drawings"] == {}
-    assert facts["added_drawings"] == ["right/mg-vn-thumb-screw.pdf"]
+    assert facts["added_drawings"] == ["right/sh-vn-thumb-screw.pdf"]
     assert facts["removed_drawings"] == ["left/vn-thumb-screw.pdf"]
     assert facts["unchanged_drawings"] == facts["changed_drawings"] == []
 
 
-def test_overlapping_drawing_aliases_are_rejected_without_replacing_archive(tmp_path: Path) -> None:
-    _pdf(tmp_path / "old/vn-fillister-screw.pdf", [_square(20, 20)])
-    _pdf(tmp_path / "old/dt-vn-fillister-screw.pdf", [_square(20, 20)])
-    _pdf(tmp_path / "new/dt-vn-fillister-screw.pdf", [_square(20, 20)])
+def test_conflicting_nonshared_drawing_aliases_do_not_replace_archive(tmp_path: Path) -> None:
+    _pdf(tmp_path / "old/cone-gear--t006.pdf", [_square(20, 20)])
+    _pdf(tmp_path / "old/dt-cone-gear--t006.pdf", [_square(20, 20)])
+    _pdf(tmp_path / "new/dt-cone-gear--t006.pdf", [_square(20, 20)])
     destination = tmp_path / "drawing-diff.zip"
     destination.write_bytes(b"previous successful archive")
 

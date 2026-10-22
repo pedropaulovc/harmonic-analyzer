@@ -20,7 +20,7 @@ Everything else hangs off this. Build it first, and build it square.
 | `fr-top-frame` | TODO | TODO | TODO |
 | `pd-support-bar` | TODO | TODO | TODO |
 | `fr-rocker-arm-support` | TODO | TODO | TODO |
-| `dt-vn-foot-screw` | TODO | TODO | TODO |
+| `sh-vn-fillister-screw-90280a108` (foot screw role) | TODO | TODO | TODO |
 | `ch-vn-frame-side-screw` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}

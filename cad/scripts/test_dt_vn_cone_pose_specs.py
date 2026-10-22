@@ -20,12 +20,12 @@ SCRIPTS = Path(__file__).resolve().parent
 PURE_SPECS = (
     "dt_vn_cone_pivot_screw_spec",
     "dt_vn_cone_lock_knob_spec",
-    "dt_vn_swing_stop_screw_spec",
+    "dt_swing_stop_screw_spec",
     "_mcmaster_94025a164",
-    "dt_vn_foot_screw_spec",
-    "_mcmaster_90114a511",
-    "_mcmaster_90280a201",
-    "_mcmaster_91375a106",
+    "sh_vn_fillister_screw_90280a108_spec",
+    "sh_vn_brass_fillister_screw_spec",
+    "sh_vn_clamp_screw_spec",
+    "sh_vn_arbor_set_screw_spec",
     "pd_vn_transgear_latch_pin_spec",
 )
 NATIVE_ROOTS = frozenset({
@@ -225,7 +225,7 @@ def test_the_native_cup_recipe_draws_the_spec_tip_radius() -> None:
 
 
 def test_same_sku_fillister_row_has_one_pure_authority() -> None:
-    stop = _pure_spec("dt_vn_swing_stop_screw_spec")
+    stop = _pure_spec("dt_swing_stop_screw_spec")
     for name, expected in {
         "SHANK_DIA": 2.8448,
         "SHANK_LEN": 9.525,
@@ -237,13 +237,12 @@ def test_same_sku_fillister_row_has_one_pure_authority() -> None:
         "CONTACT_DIA": 4.6482,
     }.items():
         assert getattr(stop, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
-    vendor = _pure_spec("_mcmaster_90280a108")
+    vendor = _pure_spec("sh_vn_fillister_screw_90280a108_spec")
     assert len(vendor.FILLISTER_SIZE) == 5
     # Every same-SKU reader holds the vendor row itself, not a copy.
     for consumer in (
-        "dt_vn_swing_stop_screw_spec",
-        "dt_vn_foot_screw_spec",
-        "pd_vn_latch_hook_bracket_screw_spec",
+        "dt_swing_stop_screw_spec",
+        "pd_latch_hook_bracket_screw_spec",
     ):
         assert _pure_spec(consumer).FILLISTER_SIZE is vendor.FILLISTER_SIZE
 
@@ -270,7 +269,7 @@ def test_public_nominals_and_unknown_supplier_grades_are_not_conflated() -> None
     pivot = _pure_spec("dt_vn_cone_pivot_screw_spec")
     lock = _pure_spec("dt_vn_cone_lock_knob_spec")
     lock_vendor = _pure_spec("_mcmaster_93585a190")
-    stop = _pure_spec("dt_vn_swing_stop_screw_spec")
+    stop = _pure_spec("dt_swing_stop_screw_spec")
     cup = _pure_spec("_mcmaster_94025a164")
     assert pivot.HEAD_H == pivot.HEAD_T
     assert pivot.THREAD_TAIL_LEN == pivot.THREAD_LEN
@@ -325,7 +324,7 @@ def test_adjuster_thread_limits_are_qualified_separately_from_its_cup() -> None:
 
 
 def test_stop_thread_limits_are_separate_from_its_nominal_profile() -> None:
-    stop = _pure_spec("dt_vn_swing_stop_screw_spec")
+    stop = _pure_spec("dt_swing_stop_screw_spec")
     assert stop.THREAD == "#4-40"
     assert stop.THREAD_CLASS == "2A"
     assert "https://www.mcmaster.com/90280A108/" in stop.THREAD_FIT_SOURCE
@@ -338,7 +337,7 @@ def test_stop_thread_limits_are_separate_from_its_nominal_profile() -> None:
 
 
 def test_stop_standard_envelopes_are_sourced_without_changing_native_nominals() -> None:
-    stop = _pure_spec("dt_vn_swing_stop_screw_spec")
+    stop = _pure_spec("dt_swing_stop_screw_spec")
     fit = _pure_spec("_fit_deviations")
     assert stop.STOCK_STANDARD == "ASME B18.6.3"
     assert "Machinery's%20Handbook" in stop.HEAD_LIMITS_SOURCE
@@ -377,7 +376,7 @@ def test_stop_standard_envelopes_are_sourced_without_changing_native_nominals() 
 
 
 def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check() -> None:
-    stop = _pure_spec("dt_vn_swing_stop_screw_spec")
+    stop = _pure_spec("dt_swing_stop_screw_spec")
     holes = _pure_spec("_hole_spec")
     assert stop.MIN_USEFUL_ENGAGEMENT_MM == 4.27
     assert "Functional installation inspection" in stop.MIN_USEFUL_ENGAGEMENT_SOURCE

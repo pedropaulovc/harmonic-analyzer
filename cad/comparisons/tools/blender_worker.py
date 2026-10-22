@@ -148,6 +148,9 @@ def build_assembly(job):
     objs = []
     for comp in components:
         key = comp.get("mesh") or comp["part"]
+        if (not isinstance(key, str) or "archive-role-local" in key.lower()
+                or re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", key)):
+            raise ValueError(f"occurrence request is not an assembly mesh key: {key!r}")
         if key not in meshes:
             seed = import_stl(parts_dir / f"{key}.STL")
             meshes[key] = seed.data
@@ -167,11 +170,26 @@ def build_assembly(job):
 
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     focus = cam.get("frame_components") or []
+    namespace = cam.get("occurrenceNamespace")
+    if focus and (
+        namespace not in (None, "native-name2")
+        or any(not isinstance(selector, str) or "archive-role-local" in selector.lower()
+               for selector in focus)
+        or (namespace is None and any(
+            re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
+            for selector in focus
+        ))
+    ):
+        raise ValueError("cross-namespace occurrence request cannot frame raw native Name2 boxes")
     target = None
     zoom = float(cam.get("zoom") or 1.0)
     if focus and boxes:
-        pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
-        hits = [b for n, b in boxes if any(p.fullmatch(n.split("/")[-1].lower()) for p in pats)]
+        if namespace == "native-name2":
+            # Explicit raw evidence only: no alias, member, leaf or index rewrite.
+            hits = [box for name, box in boxes if name in focus]
+        else:
+            pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
+            hits = [b for n, b in boxes if any(p.fullmatch(n.split("/")[-1].lower()) for p in pats)]
         if hits:
             lo = tuple(min(b[i] for b in hits) for i in range(3))
             hi = tuple(max(b[i + 3] for b in hits) for i in range(3))

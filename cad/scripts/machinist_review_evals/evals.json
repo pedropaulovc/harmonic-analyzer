@@ -2808,7 +2808,7 @@
     {
       "id": 41,
       "name": "mg-lever-wire-rules",
-      "package": "mg_vn_lever_wire",
+      "package": "sh_vn_music_wire",
       "kind": "part",
       "release": "v40",
       "release_pdf": "mg-lever-wire.pdf",

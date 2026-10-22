@@ -55,6 +55,7 @@ from typing import Any
 
 from _chain import CRANK_PITCH_R, loop_point_tangent
 from _check import check, log
+from _component_references import bind_component_selectors
 from _paths import OUT_SLDASM
 from _session import run_build
 from _assembly import (
@@ -424,15 +425,17 @@ async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
     ``move_component``, ForceRebuild3, and report whether a DIFFERENT link moved (the
     Dynamic linkage flowing the loop). SolidWorks has no sprocket->chain coupling
     (researched), so this is a scripted demonstration of the Dynamic pattern's own
-    mobility -- failure is reported, not raised."""
+    mobility -- mechanical drive failure is reported, not raised. Missing or
+    incorrect native member references remain hard identity failures."""
     from solidworks_mcp.adapters.base import MoveComponentParameters
+    # Resolve before the best-effort motion block: bad native identity is not
+    # evidence of SolidWorks' lack of sprocket-to-chain coupling.
+    names = bind_component_selectors(
+        adapter.currentModel, ("@InnerLink:1", "@InnerLink:18")
+    )
+    seed = names["@InnerLink:1"]
+    probe = names["@InnerLink:18"]
     try:
-        links = sorted(n for n in component_names(adapter)
-                       if n.startswith(("pd-vn-chain-inner-link", "pd-vn-chain-outer-link")))
-        if len(links) < 3:
-            return False
-        seed = links[0]                       # the pattern's seed link
-        probe = links[len(links) // 2]        # a link far around the loop
         before = component_origin(adapter, probe)
         # Chain surface travel on the selected crank pitch circle (_chain reads the
         # #25 pitch radius from pd_transgear_removable_spec).

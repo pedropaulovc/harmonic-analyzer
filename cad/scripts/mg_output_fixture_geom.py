@@ -26,7 +26,7 @@ the groove root with its running clearance.
 
 Installed pose: ``Ry(180 deg + FIXTURE_YAW_DEG)`` about the vertical rod, so
 local +X runs back through the spigot toward the bracket and the hook lands
-on the lever wire's start (``mg_vn_lever_wire_geom.WIRE_START``). Option A1
+on the lever wire's start (``sh_vn_music_wire_lever_geom.WIRE_START``). Option A1
 (#1559, the true plumb plane of ch30 p.4): the rod axis sits in the drum's
 wire lane and the hook lies in the rod's own plane (dz = 0), so the lever
 wire runs coplanar with the drum lane.
@@ -114,7 +114,7 @@ HOOK_LOCAL = (GROOVE_X, 0.0, HOOK_RADIAL_OFFSET)
 
 # --- Installed pose (magnifier frame) -------------------------------------------
 FIXTURE_AXIS_Y = 919.7  # the hex axis's height on the vertical rod
-# The vertical rod's axis: the drum's wire lane (mg_vn_lever_wire_geom.DRUM_END_Z,
+# The vertical rod's axis: the drum's wire lane (sh_vn_music_wire_lever_geom.DRUM_END_Z,
 # asserted equal there). A literal, so this part's recipe closure stays free of
 # the wheel and paper modules.
 VROD_Z = -173.51

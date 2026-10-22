@@ -102,12 +102,22 @@ Current part and assembly identities follow
 [`cad/docs/subsystem-identities.md`](cad/docs/subsystem-identities.md).
 Per-part and per-assembly registry files own frozen two-digit
 `MHA-<CATEGORY>-<NN>` Numbers and prefixed stems. Assembly drawings use `00`;
-fabricated part families start at `01`. A vendor part takes its direct parent
-assembly's prefix plus `vn` and is numbered from `50` within that parent:
-`dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. Use prefixed underscore stems in task
-selections and prefixed dashed stems in filenames. Historical measurements,
-releases and bench records retain their original identifiers; use the
-migration table to find the current model.
+fabricated part families start at `01`. A vendor part with one installed form
+used by one assembly takes that parent's prefix plus `vn` and is numbered from
+`50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. SH means
+Shared: one native model per supplier-qualified SKU. A SKU qualifies as Shared
+when more than one assembly uses it directly, or when its installed members
+take more than one modelled form even inside one assembly (the chain's inner
+and outer links, the clamping kit's stud, T-nut and flange nut). It is one
+shared `sh-vn-<name>` native model, registry row and drawing package,
+`MHA-SH-VN-NN` from `50`; every consumer references it, and the differing
+members are named configurations of that one model, never separate
+identities. Do not create per-parent copies of a shared SKU, and
+do not add compatibility aliases for the retired parent-scoped identities. Use
+prefixed underscore stems in task selections and prefixed dashed stems in
+filenames. Historical measurements, releases and bench records retain their
+original identifiers; use the migration and shared-vendor transition tables to
+find the current model and configuration.
 
 Historical plans stay unchanged as provenance, but their opening notice must say
 that they are not current status or schedule and must link to the project.

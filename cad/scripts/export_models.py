@@ -58,6 +58,17 @@ It never touches the global STEP/STL/PNG, colour, source-digest or release-neutr
 Full export requires every enrolled bundle to exist and validate before copying
 any STEP. Missing or unbound bundles fail loudly; run the corresponding
 ``package:features:<stem>`` tasks first. Full export never regenerates their manifests.
+
+Heterogeneous purchased parts declare ``configuration_quantities`` and
+``default_configuration`` in their registry row. Their changed ``part:<stem>``
+task owns all member STEP/PNG files and an execution-bound ``reports/part-neutral``
+certificate. First members InnerLink, LeverWire and HoldDownStud use bare physical
+STEP/PNG names; remaining members use the same lowercase ``--configuration`` suffix
+as scene STL keys. Bare files never represent the whole SKU. Full export consumes
+these exact bytes even under ``--force``; missing/stale bytes require rebuilding
+their part task, not another export producer. All seven member STLs remain
+scene-driven and are mandatory release inventory. No aggregate export is needed
+to qualify the changed parts' STEP/PNG outputs.
 """
 
 from __future__ import annotations
@@ -82,15 +93,17 @@ from _com import _early_bound, _read_member  # noqa: E402
 from _part_save import set_isometric_view  # noqa: E402
 from _paths import CAD_ROOT  # noqa: E402
 from _preferences import (
-    PREF_STL_QUALITY,
-    PREF_STL_UNITS,
-    TOGGLE_STL_BINARY,
-    TOGGLE_STL_NO_TRANSLATE,
-    TOGGLE_STL_ONE_FILE,
-    TOGGLE_STL_SHOW_INFO,
+    STL_EXPORT_PREFERENCES,
     PreferenceSpec,
     enforce_preferences,
 )  # noqa: E402
+from _part_configuration_exports import (  # noqa: E402
+    configuration_export_paths,
+    member_configurations,
+    mesh_key,
+    step_export_preferences,
+    validate_member_exports,
+)
 from _session import run_build  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 import _config  # noqa: E402
@@ -121,7 +134,7 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
 NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
-NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
+NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@4"
 TOP_ASSEMBLY = "ha-harmonic-analyzer"
 
 # Comparison gallery, produced separately from the exported STLs by
@@ -135,20 +148,6 @@ COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
 GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
 GALLERY_STAMP = CAD_ROOT / "out" / "reports" / "comparison-gallery.json"
 
-# swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
-# live in _preferences (shared with the part-build STL export); STEP is export-only.
-PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
-# Face names are the prechips face-set contract (_export_feature_faces). The
-# STEP writer carries IPartDoc::SetEntityName names into the ADVANCED_FACE
-# labels with face/edge properties on (FileSaveAsSTEPOptions "Export face/edge
-# properties"); step_face_sets re-reads every named STEP, so a seat that drops
-# the names fails the export instead of shipping 'NONE'. Split periodic is ON,
-# the AP214 representation v38 shipped (its rocker-arm pivot bore is two Ø6.5
-# cylinder halves). Every named STEP is checked for both bore patches; a writer
-# that labels only one half fails rather than shipping an incomplete face set.
-# STEP face ordinals are local to one file.
-TOGGLE_STEP_SPLIT_PERIODIC = 396   # swStepExportSplitPeriodic
-TOGGLE_STEP_FACE_EDGE_PROPS = 397  # swStepExportFaceEdgeProps
 
 # Workbench-friendly equivalents of the SolidWorks material appearances
 # actually used by the build scripts (see _appearance.apply_material).
@@ -179,17 +178,11 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 # next run captured the stranded value as "the original" and restored it forever.
 # Nothing downstream wants any other value, so the state is asserted at the start
 # of the export and deliberately left in place. See _preferences.enforce_preferences.
+STEP_EXPORT_PREFERENCES = step_export_preferences()
 EXPORT_PREFERENCES = PreferenceSpec(
     label="neutral-export",
-    integers={PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0},
-    toggles={
-        TOGGLE_STL_BINARY: True,
-        TOGGLE_STL_ONE_FILE: True,
-        TOGGLE_STL_NO_TRANSLATE: True,
-        TOGGLE_STL_SHOW_INFO: False,
-        TOGGLE_STEP_SPLIT_PERIODIC: True,
-        TOGGLE_STEP_FACE_EDGE_PROPS: True,
-    },
+    integers={**STL_EXPORT_PREFERENCES.integers, **STEP_EXPORT_PREFERENCES.integers},
+    toggles={**STL_EXPORT_PREFERENCES.toggles, **STEP_EXPORT_PREFERENCES.toggles},
 )
 SW_SAVE_OPTS = 1 | 8  # swSaveAsOptions_Silent | AvoidRebuildOnSave
 
@@ -318,18 +311,6 @@ def comp_rgb(comp: Any) -> tuple[float, float, float] | None:
         return None
 
 
-def _safe_cfg(name: str) -> str:
-    return "".join(c if c.isalnum() else "-" for c in name.strip().lower()).strip("-")
-
-
-def mesh_key(stem: str, cfg: str) -> str:
-    """STL cache key: configured components get their own mesh per config
-    (e.g. the 20 cone gears are one part with 20 tooth-count configs).
-    Separator is a double dash — SolidWorks SaveAs3 rejects '@' in file
-    names (swFileSaveError 8, swFileNameContainsAtSign)."""
-    if not cfg or cfg.lower() == "default":
-        return stem
-    return f"{stem}--{_safe_cfg(cfg)}"
 
 
 def comp_xform(comp: Any) -> list[float] | None:
@@ -616,16 +597,26 @@ def _release_inventory(
     feature_stems = set(_feature_stems())
     for stem in parts:
         dashed = stem.replace("_", "-")
+        members = configuration_export_paths(stem, OUT_STEP.parent)
         files[f"step/{dashed}.STEP"] = OUT_STEP / f"{dashed}.STEP"
         if stem.replace("-", "_") in feature_stems:
             from export_features import configuration_step_paths  # noqa: PLC0415
 
             for scoped in configuration_step_paths(stem).values():
                 files[f"step/{scoped.name}"] = OUT_STEP / scoped.name
-        files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
+        if not members:
+            files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
         files[f"png/{dashed}/{dashed}_isometric.png"] = (
             OUT_PNG / dashed / f"{dashed}_isometric.png"
         )
+        # These member paths are required independently of scene coverage. Missing
+        # configured STL coverage must fail certification, never silently vanish.
+        for paths in members.values():
+            step, stl, png = paths["step"], paths["stl"], paths["png"]
+            files[f"step/{step.name}"] = OUT_STEP / step.name
+            files[f"stl/{stl.name}"] = OUT_STL / stl.name
+            png_relative = png.relative_to(OUT_STEP.parent / "png")
+            files[f"png/{png_relative.as_posix()}"] = OUT_PNG / png_relative
     for stem in assemblies:
         dashed = stem.replace("_", "-")
         files[f"gltf/{dashed}.glb"] = OUT_GLTF / f"{dashed}.glb"
@@ -639,6 +630,31 @@ def _release_inventory(
         dashed = stem.replace("_", "-")
         files[f"boxes/{dashed}.json"] = OUT_BOXES / f"{dashed}.json"
     return dict(sorted(files.items()))
+
+
+def _release_member_inventory(parts: list[str]) -> dict[str, dict[str, dict[str, str]]]:
+    """Explicit logical member to physical format paths, including bare defaults."""
+    return {
+        stem.replace("_", "-"): {
+            configuration: {
+                kind: path.relative_to(OUT_STEP.parent).as_posix()
+                for kind, path in paths.items()
+            }
+            for configuration, paths in members.items()
+        }
+        for stem in parts if (members := configuration_export_paths(stem, OUT_STEP.parent))
+    }
+
+
+def _require_member_scene_coverage(
+    parts: list[str], scene_meshes: dict[str, list[tuple[str, str]]],
+) -> None:
+    for stem, members in _release_member_inventory(parts).items():
+        expected = {(configuration, Path(paths["stl"]).stem)
+                    for configuration, paths in members.items()}
+        missing = expected - set(scene_meshes.get(stem, []))
+        if missing:
+            raise RuntimeError(f"release member scene coverage missing: {stem}: {sorted(missing)}")
 
 
 def _release_sources(
@@ -681,6 +697,9 @@ def write_release_neutral_manifest(
     set is complete and unchanged.  PNGs are the render outputs owned by the
     corresponding build tasks.
     """
+    _require_member_scene_coverage(parts, scene_meshes)
+    for stem in parts:
+        validate_member_exports(stem, OUT_STEP.parent)
     sources = _release_sources(parts, assemblies, scene_meshes)
     source_records: dict[str, str] = {}
     for dashed, source in sources.items():
@@ -720,6 +739,7 @@ def write_release_neutral_manifest(
         "exporter": _exporter_digest(),
         "sources": source_records,
         "files": file_records,
+        "part_configurations": _release_member_inventory(parts),
     }
     NEUTRAL_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     temporary = NEUTRAL_MANIFEST.with_suffix(".json.partial")
@@ -801,6 +821,9 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
     # composed from it (the old manifest-only subset predated the GLB export).
     scene_assemblies = set(assemblies)
     scene_meshes = all_scene_part_meshes(scene_assemblies)
+    _require_member_scene_coverage(parts, scene_meshes)
+    if manifest.get("part_configurations", {}) != _release_member_inventory(parts):
+        raise RuntimeError("release neutral member inventory drifted; rerun doit export")
     cfg_meshes = {
         stem: [(cfg, mesh) for cfg, mesh in entries if mesh != stem]
         for stem, entries in scene_meshes.items()
@@ -831,7 +854,9 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
         "documents": len(expected_sources),
         "parts": len(parts),
         "assemblies": len(assemblies),
-        "pngs": len(parts) + len(assemblies),
+        "steps": sum(name.startswith("step/") for name in expected_files),
+        "stls": sum(name.startswith("stl/") for name in expected_files),
+        "pngs": sum(name.startswith("png/") for name in expected_files),
         "views": 1,
         "config_meshes": sum(len(entries) for entries in cfg_meshes.values()),
     }
@@ -1080,6 +1105,8 @@ def validated_outputs(
     for m in parts:
         d = m.replace("_", "-")
         out |= {OUT_STL / f"{d}.STL", OUT_STEP / f"{d}.STEP"}
+        for paths in configuration_export_paths(m, OUT_STEP.parent).values():
+            out.update(paths.values())
     scene_assemblies = set(assemblies) if scene_assemblies is None else scene_assemblies
     for m in assemblies:
         d = m.replace("_", "-")
@@ -1176,6 +1203,9 @@ def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> boo
     run that cannot import dodo), where ``_source_changed`` compares only the STL mtime;
     there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
     but a stale STEP is not treated as fresh (codex review)."""
+    if member_configurations(stem):
+        validate_member_exports(stem, OUT_STEP.parent)
+        return part_stl_stale(stem, stem, colors, digests)
     step = OUT_STEP / f"{stem}.STEP"
     if not _nonempty(step) or part_stl_stale(stem, stem, colors, digests):
         return True
@@ -1624,11 +1654,24 @@ def main() -> int:
 
     from features_bound import stage_feature_steps  # noqa: PLC0415
 
+    parts = part_stems()
+    member_parts = {
+        stem.replace("_", "-"): names
+        for stem in parts if (names := member_configurations(stem))
+    }
+    # Part tasks are the only producers of these STEP/PNG bytes. Validate their
+    # execution-bound certificates before even staging feature-bundle outputs.
+    member_outputs = {
+        path.resolve() for stem in member_parts
+        for path in validate_member_exports(stem, OUT_STEP.parent)
+    }
+
     # Read and validate all producer bundles before writing any neutral output.
     # These exact snapshots own the enrolled STEP bytes, even under --force.
     feature_steps = {
         path.resolve() for path in stage_feature_steps(OUT_FEATURES.parent, OUT_STEP)
     }
+    producer_outputs = feature_steps | member_outputs
 
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
     # mtime-gated undeclared targets regenerate through the current logic, not just the
@@ -1648,11 +1691,10 @@ def main() -> int:
     certified_drift: dict[Path, bool] = {}
 
     def neutral_changed(path: Path) -> bool:
-        if path.resolve() in feature_steps:
-            return False  # Already validated against its authoritative bundle.
+        if path.resolve() in producer_outputs:
+            return False  # Already validated against its authoritative producer.
         return _certified_output_changed(path, certified, certified_drift)
 
-    parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
     # Every assembly is scene-bearing (boxes/scene JSON + composed GLB) — the
     # comparison manifest no longer scopes which assemblies get a scene.
@@ -1685,7 +1727,7 @@ def main() -> int:
 
     missing_part_png = {
         stem.replace("_", "-") for stem in parts
-        if _png_needs_export(
+        if stem.replace("_", "-") not in member_parts and _png_needs_export(
             OUT_PNG / stem.replace("_", "-")
             / f"{stem.replace('_', '-')}_isometric.png",
             force,
@@ -1804,9 +1846,14 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 render_cfg = _active_configuration(doc)
+                if stem in member_parts:
+                    render_cfg = member_parts[stem][0]
+                    _switch_configuration(adapter, doc, stem, render_cfg)
+                    if _active_configuration(doc) != render_cfg:
+                        raise RuntimeError(f"{stem}: canonical member activation failed")
                 if stem in default_stale:
                     for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
-                        if out.resolve() not in feature_steps:
+                        if out.resolve() not in producer_outputs:
                             _save_as(doc, out)
                         log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                     colors[stem] = doc_rgb(doc)

@@ -1,4 +1,4 @@
-r"""Shared builder for the three roller-chain link parts (book ch. 23/30).
+r"""Shared authoring for configured chain members and the connecting link.
 
 A roller chain is alternating INNER links (2 inner plates + 2 bushings) and
 OUTER links (2 outer plates + 2 pins). Both are an obround side-plate pair
@@ -12,42 +12,32 @@ Axis2 at the x=P station -- are the chain pattern's PathLink1/PathLink2 (their
 spacing IS the pattern pitch). See _chain.py for the clearance rationale (all
 gaps >= 0.25 mm; the links float as disconnected multibody solids).
 
-All three links are bought: McMaster-Carr ANSI #25 roller chain cut to the
-loop's pitch count with an inner link at each end, closed by one connecting
-link (the OUTER-link stand-in; its spring clip is not modelled). Each part
-stamps its registry stock identity and a one-line note for its
-purchased-part reference sheet (``_purchased_part_drawing``).
+InnerLink and OuterLink are configurations of one McMaster-Carr ANSI #25
+chain part, cut to the loop's pitch count with an inner link at each end.
+A separately purchased connecting link closes it (the OUTER-link stand-in;
+its spring clip is not modelled). The two native purchase identities carry
+their registry stock data and member-specific reference-sheet notes.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import _config
 
-from _chain import (
-    BUSH_BORE_R,
-    BUSH_HALF_LEN,
-    INNER_PLATE_HOLE_R,
-    INNER_PLATE_Z,
-    LINK_COUNT,
-    LINK_PITCH,
-    OUTER_PLATE_HOLE_R,
-    OUTER_PLATE_Z,
-    PIN_HALF_LEN,
-    PIN_R,
-    PLATE_HALF_H,
-    PLATE_THICK,
-    ROLLER_R,
-)
+import sh_vn_chain_link_spec as chain_spec
+from _chain import LINK_COUNT, LINK_PITCH, PLATE_HALF_H, PLATE_THICK
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
 from _drawing_marks import apply_drawing_properties
 from _extrude import extrude_at_offset
+from _feature_tree import feature_name_by_type
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
+from _rebuild import active_configuration_name
 from _saved_part_guard import require_saved_drawing_properties
 from _sketch import ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
@@ -56,13 +46,10 @@ from _visibility import blank_reference_geometry
 import _telemetry
 
 _ROWS = {
-    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link"),
-    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link"),
+    "sh-vn-chain-link": _config.parts("sh-vn-chain-link"),
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link"),
 }
-(CHAIN_SKU,) = _ROWS["pd-vn-chain-inner-link"]["supplier_skus"]
-if _ROWS["pd-vn-chain-outer-link"]["supplier_skus"] != [CHAIN_SKU]:
-    raise AssertionError("outer links come only in the cut roller chain")
+(CHAIN_SKU,) = _ROWS["sh-vn-chain-link"]["supplier_skus"]
 (CONNECTING_LINK_SKU,) = _ROWS["pd-vn-chain-connecting-link"]["supplier_skus"]
 # Inner links per loop; the cut chain holds one outer link fewer, and the
 # connecting link closes the loop as the last outer link.
@@ -72,12 +59,12 @@ CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
 # One line each: the purchased sheet reserves ~0.21 m for the note. The
 # connecting link's clip orientation is an assembly fact (MHA-PD-00 step).
 DRAWING_NOTES = {
-    "pd-vn-chain-inner-link": (
+    chain_spec.INNER_LINK_CONFIGURATION: (
         f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
         f"{LINKS_PER_KIND - 1} OUTER LINKS; {CONNECTING_LINK_SKU} CLOSES "
         f"{LINK_COUNT} PITCHES."
     ),
-    "pd-vn-chain-outer-link": (
+    chain_spec.OUTER_LINK_CONFIGURATION: (
         f"{LINKS_PER_KIND - 1} PER LOOP, ALL IN THE CUT {CHAIN_SKU} CHAIN."
     ),
     "pd-vn-chain-connecting-link": (
@@ -172,6 +159,79 @@ async def _sketch_round_bodies(adapter: Any, outer_r: float, bore_r: float | Non
     check("exit_sketch bodies", await adapter.exit_sketch())
 
 
+async def author_link_references(adapter: Any) -> None:
+    """The unchanged two pin-station axes shared by every member."""
+    from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
+
+    station_plane = check(
+        "create_plane @ x=P",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=LINK_PITCH
+            )
+        ),
+    )
+    station_plane_name = getattr(station_plane, "name", station_plane)
+    for label, second_plane in (("Axis1", "Right Plane"), ("Axis2", station_plane_name)):
+        axis = check(
+            f"create_axis {label}",
+            await adapter.create_axis(
+                CreateAxisParameters(mode="two_planes", planes=["Top Plane", second_plane])
+            ),
+        )
+        if axis.name != label:
+            raise RuntimeError(f"pin-station axis is {axis.name!r}, expected {label!r}")
+    blank_reference_geometry(
+        adapter,
+        ((station_plane_name, "PLANE"), ("Axis1", "AXIS"), ("Axis2", "AXIS")),
+    )
+
+
+async def author_link_geometry(
+    adapter: Any,
+    *,
+    plate_z: float,
+    plate_hole_r: float,
+    body_outer_r: float,
+    body_bore_r: float | None,
+    body_half_len: float,
+) -> tuple[str, ...]:
+    """Author the existing plate/bushing-or-pin shape in the active member.
+
+    Return sketches before their owning bosses so member suppression can run
+    in reverse dependency order. The physical geometry is the legacy recipe.
+    """
+    features: list[str] = []
+    for sign in (1.0, -1.0):
+        await _sketch_plate(adapter, plate_hole_r)
+        features.append(feature_name_by_type(adapter, "ProfileFeature"))
+        z_lo = sign * plate_z - PLATE_THICK / 2.0
+        features.append(extrude_at_offset(adapter, PLATE_THICK, z_lo))
+    await _sketch_round_bodies(adapter, body_outer_r, body_bore_r)
+    features.append(feature_name_by_type(adapter, "ProfileFeature"))
+    features.append(extrude_at_offset(adapter, 2.0 * body_half_len, -body_half_len))
+    _gate_volume(
+        await _volume(adapter), plate_hole_r, body_outer_r, body_bore_r, body_half_len
+    )
+    return tuple(features)
+
+
+async def _run_before_save(
+    adapter: Any, before_save: Callable[[Any], Awaitable[None]]
+) -> None:
+    """A supplier diagram must return to the canonical installed state."""
+    model = adapter.currentModel
+    installed = active_configuration_name(adapter, model)
+    if not installed:
+        raise RuntimeError("chain reference callback has no installed configuration")
+    await before_save(adapter)
+    if (
+        int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
+        or active_configuration_name(adapter) != installed
+    ):
+        raise RuntimeError("chain reference callback changed the installed state")
+
+
 async def build_link(
     adapter: Any,
     *,
@@ -182,55 +242,19 @@ async def build_link(
     body_outer_r: float,
     body_bore_r: float | None,
     body_half_len: float,
+    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
-
+    """Build the separately purchased connecting link with the same authoring."""
     check("create_part", await adapter.create_part())
-
-    # Offset plane at the x=P pin station (Right Plane normal is +X, so a
-    # positive offset steps +P); created first so the axes name as Axis1/Axis2.
-    station_plane = check(
-        "create_plane @ x=P",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=LINK_PITCH
-            )
-        ),
-    )
-    station_plane_name = getattr(station_plane, "name", station_plane)
-
-    # Two side plates, mirror-paired across the chain mid-plane.
-    for sign in (1.0, -1.0):
-        await _sketch_plate(adapter, plate_hole_r)
-        z_lo = sign * plate_z - PLATE_THICK / 2.0
-        extrude_at_offset(adapter, PLATE_THICK, z_lo)
-
-    # Two round bodies (bushings or pins), centred on the mid-plane.
-    await _sketch_round_bodies(adapter, body_outer_r, body_bore_r)
-    extrude_at_offset(adapter, 2.0 * body_half_len, -body_half_len)
-
-    _gate_volume(
-        await _volume(adapter), plate_hole_r, body_outer_r, body_bore_r, body_half_len
-    )
-
-    # Path-link axes (chain pattern PathLink1/PathLink2): Z lines through the
-    # two pin stations, named Axis1 (x=0, Top x Right) and Axis2 (x=P,
-    # Top x the station plane). Two-plane intersection is the proven recipe.
-    for label, second_plane in (("Axis1", "Right Plane"), ("Axis2", station_plane_name)):
-        axis = check(
-            f"create_axis {label}",
-            await adapter.create_axis(
-                CreateAxisParameters(mode="two_planes", planes=["Top Plane", second_plane])
-            ),
-        )
-        if axis.name != label:
-            raise RuntimeError(f"pin-station axis is {axis.name!r}, expected {label!r}")
-    # Hidden, still selectable by name for the chain pattern's path links.
-    blank_reference_geometry(
+    await author_link_references(adapter)
+    await author_link_geometry(
         adapter,
-        ((station_plane_name, "PLANE"), ("Axis1", "AXIS"), ("Axis2", "AXIS")),
+        plate_z=plate_z,
+        plate_hole_r=plate_hole_r,
+        body_outer_r=body_outer_r,
+        body_bore_r=body_bore_r,
+        body_half_len=body_half_len,
     )
-
     await apply_material(adapter, material)
     await apply_color(adapter, BAR_STEEL)
     apply_custom_properties(adapter, stock_properties(part_name))
@@ -238,6 +262,8 @@ async def build_link(
         adapter, part_name, {"Manufacturing Notes": DRAWING_NOTES[part_name]}
     )
     await report_mass_properties(adapter)
+    if before_save is not None:
+        await _run_before_save(adapter, before_save)
     artefacts = await save_part_and_images(adapter, part_name)
     require_saved_drawing_properties(adapter, DRAWING_PROPERTIES)
     return artefacts
@@ -245,7 +271,10 @@ async def build_link(
 
 async def _volume(adapter: Any) -> float:
     res = await adapter.get_mass_properties()
-    return float(res.data.volume) if res.is_success else float("nan")
+    volume = float(check("chain member mass properties", res).volume)
+    if not math.isfinite(volume):
+        raise RuntimeError(f"chain member volume is not finite: {volume!r}")
+    return volume
 
 
 def _gate_volume(
@@ -266,20 +295,5 @@ def _gate_volume(
         raise RuntimeError(f"link volume {vol:.2f} != {expected:.2f}")
 
 
-INNER_LINK = dict(
-    plate_z=INNER_PLATE_Z,
-    plate_hole_r=INNER_PLATE_HOLE_R,
-    body_outer_r=ROLLER_R,
-    body_bore_r=BUSH_BORE_R,
-    body_half_len=BUSH_HALF_LEN,
-)
-OUTER_LINK = dict(
-    plate_z=OUTER_PLATE_Z,
-    plate_hole_r=OUTER_PLATE_HOLE_R,
-    body_outer_r=PIN_R,
-    body_bore_r=None,
-    body_half_len=PIN_HALF_LEN,
-)
-# The connecting link is modelled as the outer-link stand-in: the same
-# plates and pins at the same pitch, without the vendor's spring clip.
-CONNECTING_LINK = dict(OUTER_LINK)
+# The distinct connecting-link SKU retains the outer envelope without the clip.
+CONNECTING_LINK = dict(chain_spec.OUTER_LINK)

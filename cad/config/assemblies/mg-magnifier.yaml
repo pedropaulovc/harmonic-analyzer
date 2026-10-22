@@ -22,7 +22,7 @@ flip_invert:
   - mag lever depth @npn
   - mag lever knife line across @npn
 allowed_free_stems:
-  - mg-vn-lever-wire
+  - sh-vn-music-wire
   - mg-magnifying-bracket
   - mg-magnifying-clamp
   - mg-magnifying-lever
@@ -31,14 +31,14 @@ allowed_free_stems:
   - mg-wheel-drum
   - mg-output-fixture
   - mg-vn-magnifying-bracket-screw
-  - mg-vn-thumb-screw
+  - sh-vn-thumb-screw
 # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
 # wheel must read under-constrained WITH them, else the coupling died -- and
 # so must the lock-mated bracket (it AFFIXES the rod to the rocking summing
 # bar; a regression to grounded re-creates the collar clipping, codex #201).
 # The steel collar/lever joint is a press, held by the press alone (#1570);
 # press the collar onto the rod held near its end, never column-load the lever.
-# mg-vn-thumb-screw instances ride this chain: clamp first, output fixture second.
+# sh-vn-thumb-screw instances ride this chain: clamp first, output fixture second.
 # The clamp's thumb screw pinches the lever; the vertical rod screws into the
 # clamp's bottom tap and seats on its shoulder (#1559). Lever, thumb screw,
 # rod, fixture hook and drum wire lane share one plumb plane (option A1).
@@ -46,7 +46,7 @@ allowed_free_stems:
 required_free_stems:
   - mg-magnifying-lever
   - mg-magnifying-wheel
-  - mg-vn-lever-wire
+  - sh-vn-music-wire
   - mg-magnifying-bracket
 # The freed lever knife-rock + the articulated lever-wire's swing/spin; the
 # wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).

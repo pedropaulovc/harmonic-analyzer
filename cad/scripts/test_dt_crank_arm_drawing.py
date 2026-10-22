@@ -159,7 +159,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:
     import dt_crank_pin_eye_spec as eye
-    import _mcmaster_90114a511 as screw
+    import sh_vn_brass_fillister_screw_spec as screw
 
     wire_front = drive.EYE_Z - eye.WIRE_DIA / 2.0
     wire_back = drive.EYE_Z + eye.WIRE_DIA / 2.0

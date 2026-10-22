@@ -12,7 +12,7 @@ others:
   the base (the root of every assembly) would rebuild on each engraving edit;
 * ``build_fr_frame_assembly`` -- the mount transform (``MOUNT_POS`` /
   ``MOUNT_EULER`` / ``MOUNT_ROWS``, formerly its own ``NAMEPLATE_*``) and the
-  screw stations it drops the four ``fr-vn-fillister-screw`` components onto.
+  screw stations it drops the four ``sh-vn-brass-fillister-screw`` components onto.
 
 Mount transform (user ruling 2026-10-09; ch. 26 p.71 and ch. 30 p002/p003/p006):
 the brass plate's outline IS the traced DXF outer edge, uniformly enlarged to
@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import math
 
-import _mcmaster_90114a511 as _screw
+import sh_vn_brass_fillister_screw_spec as _screw
 from _printed_tolerance import printed_deviations
 
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---

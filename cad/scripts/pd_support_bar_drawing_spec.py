@@ -56,14 +56,16 @@ CLAMP_CBORE_DEPTH_PLACES = 2
 # The round counterbores' native callout prints its Ø at the document's two
 # places, under the title block's DRILLED HOLES row.
 CLAMP_HOLE_CALLOUT_PLACES = 2
-# The west clamp slots (build_pd_support_bar, owner ruling 2026-10-15 option
-# A): the width is the round hole's, carrying its drilled +0.10/-0 at .XX;
-# the travel and the counterbore's width and travel print .XXX, the places
-# whose title-block band still closes the slots' worst-case column span and
-# keeps the screw head inside the counterbore
-# (build_pd_support_bar.clamp_slot_closure_margin, clamp_slot_head_clearance).
+# The west slots' runs still need .XXX to close the column-pitch stack.
+# Their counterbore width instead carries explicit asymmetric limits: retain
+# the proven 8.37 mm minimum for the head's full-float envelope, while allowing
+# the ordinary .XX upper deviation. A symmetric .XX band would let the width
+# fall to 7.99 mm and foul the head; .XXX on both sides needlessly limits the
+# maximum. Geometry and the runs remain unchanged.
 CLAMP_SLOT_WIDTH_PLACES = 2
 CLAMP_SLOT_PLACES = 3
+CLAMP_SLOT_CBORE_WIDTH_PLACES = 2
+CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.13, 0.51)
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
@@ -103,9 +105,10 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
         "ClampSlotTravel": CLAMP_SLOT_PLACES,
     },
-    "ClampSlotCboreProfile": dict.fromkeys(
-        ("ClampSlotCboreWidth", "ClampSlotCboreTravel"), CLAMP_SLOT_PLACES
-    ),
+    "ClampSlotCboreProfile": {
+        "ClampSlotCboreWidth": CLAMP_SLOT_CBORE_WIDTH_PLACES,
+        "ClampSlotCboreTravel": CLAMP_SLOT_PLACES,
+    },
     "ClampSlotCounterbores": {"ClampSlotCboreDepth": CLAMP_CBORE_DEPTH_PLACES},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -119,7 +122,7 @@ _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 _HOOK_TAPS = "MHA-PD-14 HOOK TAPS"
 DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-11\nHANGS ON IT",
-    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-PD-VN-59 SCREW TIPS",
+    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-SH-VN-52 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
     "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
@@ -142,11 +145,11 @@ DIMENSION_CALLOUTS = {
     # screws land in (build_pd_support_bar.clamp_slot_closure_margin), so
     # their limits and stations set how much they take up (the r6 machinist
     # read "take up" as licence to loosen them); the counterbore's width and
-    # run hold the MHA-PD-VN-53 head (clamp_slot_head_clearance). Short lines:
+    # run hold the MHA-SH-VN-53 head (clamp_slot_head_clearance). Short lines:
     # detail C is 2:1 in a corner.
     "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-02 TAKE-UP",
-    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-PD-VN-53",
-    "ClampSlotCboreDepth": "MHA-PD-VN-53\nHEADS BELOW\nSLIDE FACE",
+    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-SH-VN-53",
+    "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.
 DIMENSION_PREFIXES = {
@@ -158,7 +161,7 @@ DIMENSION_PREFIXES = {
 # the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
 # sink, and why the depth has a floor (the heads' worst case stays sub-flush).
 CLAMP_TAP_MATE = "LOCATE TO MHA-SH-02 TAPS"
-CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-PD-VN-53 HEADS BELOW SLIDE FACE"
+CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
 # across the front face (build_pd_support_bar; pd_platen_guide_spec's own

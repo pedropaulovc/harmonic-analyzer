@@ -3,7 +3,7 @@ r"""Reproduction script: ms-measuring-stick.SLDASM (MHA-MS-00).
 The ch16 measuring stick with its stop clamped at the 2.0 mark (user-approved
 re-derivation, 2026-10-09; sketch stop_rederive_v2): the graduated bar
 ms-stick, the brass block ms-stop-block, its cover ms-stop-plate, two brass
-#2-56 ms-vn-stop-plate-screw fillisters and one #4-40 ms-vn-thumb-screw.
+#2-56 ms-vn-stop-plate-screw fillisters and one #4-40 sh-vn-thumb-screw.
 
 Authored thumbscrew-up (+Y), with the block below the stick: the stop's part
 frame is turned halfway about the stick's X axis. Every pose is
@@ -371,7 +371,7 @@ async def build(adapter) -> dict[str, str]:
     await _place_fixed(adapter, "ms-stick", spec.STICK_ORIGIN, spec.STICK_ROWS)
     # The stop thumbscrew points down onto the stick's plain face.
     thumbscrew = await _place_fixed(
-        adapter, "ms-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS
+        adapter, "sh-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS
     )
     # The cover plate screws into the block: heads on the cover's outer face,
     # threads in the #2-56 blind taps (MHA-MS-00 step 4).

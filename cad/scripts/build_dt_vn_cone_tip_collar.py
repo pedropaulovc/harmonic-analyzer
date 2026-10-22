@@ -59,7 +59,7 @@ COLLAR_FEATURES = (
     "MountFlat", "SetScrewTap",
     "TapRootPlane", "TapRootGauge",
 )
-SCREW_FEATURES = ("SetScrew", "HexSocket")
+SCREW_FEATURES = ("SetScrew", "HexSocket", "SocketAFReference")
 
 
 def _plane(adapter, name, offset, *, base="Top Plane"):
@@ -253,6 +253,29 @@ async def _screw(adapter, jobs):
     name_last_feature(adapter, "HexSocket")
 
 
+async def _socket_af_reference(adapter, jobs):
+    """Dimension the existing socket's flat spacing without touching its cut."""
+    a, y = spec.SET_SCREW_SOCKET_AF / 2.0, spec.TAP_STATION
+    check("stock socket AF reference", await adapter.create_sketch("SocketFace"))
+    set_sketch_direct_db(adapter, True)
+    line = check("stock socket AF envelope", await adapter.add_centerline(-a, y, a, y))
+    set_sketch_direct_db(adapter, False)
+    check("socket AF horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
+    dims = SketchDims()
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
+        spec.SET_SCREW_SOCKET_AF, "stock socket across flats",
+    )
+    dims.record("SocketAF")
+    await anchor_point_to_origin(adapter, f"{line}.start", -a, y, "stock socket AF location")
+    dims.record("SocketAFStart")
+    dims.record("SocketAFAxisStation")
+    await ensure_fully_defined(adapter, "stock socket AF reference")
+    check("exit stock socket AF reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "SocketAFReference")
+    jobs.extend(dims.apply(adapter, "SocketAFReference"))
+
+
 def _activate_configuration(adapter, name):
     """Read native state before switching: already-active SW2026 can return False."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -323,6 +346,7 @@ async def build(adapter) -> dict[str, str]:
     jobs = []
     await _ring(adapter, jobs)
     await _screw(adapter, jobs)
+    await _socket_af_reference(adapter, jobs)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -344,6 +368,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
+    # The separate purchased-screw marks do not alter collar manufacturing ink.
+    for feature, names in spec.SET_SCREW_SUPPLIER_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(adapter, PART_NAME, {
         "Description": spec.BOM_DESCRIPTION,
         "Manufacturing Notes": spec.DRAWING_NOTES,
@@ -351,6 +378,7 @@ async def build(adapter) -> dict[str, str]:
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
         "Radial Tap View Note": spec.RADIAL_TAP_VIEW_NOTE,
         "Bore View Note": spec.BORE_VIEW_NOTE,
+        "Supplier Reference Title": spec.SET_SCREW_SUPPLIER_TITLE,
     })
     _manufacturing_configurations(adapter)
     _configuration_bom_identity(adapter)
@@ -365,6 +393,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
     _activate_configuration(adapter, "Default")
     blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
+    blank_sketch_feature(model, _feature_by_name(adapter, "SocketAFReference"), "stock socket AF reference")
     blank_reference_geometry(adapter, (
         ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),
         ("TapRootPlane", "PLANE"),

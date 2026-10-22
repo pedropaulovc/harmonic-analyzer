@@ -33,8 +33,9 @@ import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
-import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as flange_nut
+import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
+import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
@@ -47,13 +48,16 @@ import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_vn_oblique_t_nut_spec as t_nut
+import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 
 BUILDER = Path(__file__).with_name("build_ch_rocker_arm_tl_oblique_jig_assembly.py")
 JIG = "ch_rocker_arm_tl_oblique_jig"
-PART_STEMS = {stem.replace("-", "_") for stem in spec.BOM_ORDER}
+PART_STEMS = {
+    physical.replace("-", "_")
+    for physical, _configuration in spec.COMPONENT_IDENTITIES.values()
+}
 # Each screw family and its fastener-table row (count, callout, engagement).
 SCREW_ROWS = {
     spec.RAIL_SCREW: fasteners.RAIL_TO_BAR,
@@ -431,9 +435,8 @@ def test_plan_tags_name_the_pass_holes_rails_and_origin() -> None:
     assert tags["SPINDLE ORIGIN: X 0, Y 0"].tip[:2] == (0.0, 0.0)
 
 
-def _builder_parts() -> tuple[str, ...]:
-    """The builder's literal ``_PARTS``: the build graph resolves the jig's
-    part sources from these strings, so they must be the spec's families."""
+def _builder_parts() -> tuple[tuple[str, str], ...]:
+    """Literal (physical producer, logical family) rows, never derived filenames."""
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and [
@@ -444,7 +447,11 @@ def _builder_parts() -> tuple[str, ...]:
 
 
 def test_builder_places_exactly_the_inventory() -> None:
-    assert _builder_parts() == spec.BOM_ORDER
+    manifest = _builder_parts()
+    assert tuple(family for _physical, family in manifest) == spec.BOM_ORDER
+    assert tuple(physical for physical, _family in manifest) == tuple(
+        spec.COMPONENT_IDENTITIES[family][0] for family in spec.BOM_ORDER
+    )
     assert sorted(spec.BOM_ORDER) == sorted(spec.QUANTITIES) == sorted(spec.PLACEMENTS)
     assert {stem: len(spec.PLACEMENTS[stem]) for stem in spec.BOM_ORDER} == (
         spec.QUANTITIES
@@ -489,26 +496,150 @@ def test_builder_places_exactly_the_inventory() -> None:
     assert spec.QUANTITIES[spec.HOLD_DOWN_STUD] == fasteners.HOLD_DOWN_STUD_COUNT
     for stem, row in SCREW_ROWS.items():
         assert spec.QUANTITIES[stem] == row.count, stem
-    # TL-20 is one part in one configuration: no placement names one.
-    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
-    assert not [
-        node
-        for node in ast.walk(tree)
-        if (
-            isinstance(node, ast.Call)
-            and getattr(node.func, "id", None) == "place_component"
-            and any(keyword.arg == "configuration" for keyword in node.keywords)
-        )
-        or (
-            isinstance(node, ast.Dict)
-            and any(
-                isinstance(key, ast.Constant) and key.value == "configuration"
-                for key in node.keys
-            )
-        )
-    ]
+    # TL-20 remains unconfigured; heterogeneous kit members must be explicit.
+    assert spec.COMPONENT_IDENTITIES[spec.BASE_BAR] == (spec.BASE_BAR, None)
+    assert spec.KIT_IDENTITIES == {
+        spec.HOLD_DOWN_STUD: ("sh-vn-clamping-kit-hardware", "HoldDownStud"),
+        spec.T_NUT: ("sh-vn-clamping-kit-hardware", "TNut"),
+        spec.FLANGE_NUT: ("sh-vn-clamping-kit-hardware", "FlangeNut"),
+    }
     assert set(bg.references_of(JIG)) == PART_STEMS
-    assert len(PART_STEMS) == 31
+    assert len(manifest) == len(spec.BOM_ORDER) == 31
+    assert len(PART_STEMS) == 29
+
+
+@pytest.mark.parametrize("source_kind", ("all", "batch-only", "single-only"))
+def test_actual_builder_sources_resolve_every_physical_producer(source_kind) -> None:
+    """Exercise the real source analyzer, including each insertion path alone."""
+    source = BUILDER.read_text(encoding="utf-8")
+    expected = frozenset(physical for physical, _family in _builder_parts())
+    if source_kind != "all":
+        excluded = (
+            "place_component" if source_kind == "batch-only"
+            else "place_components_batch"
+        )
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == excluded
+            ):
+                node.func.id = "_excluded_source_sink"
+        source = ast.unparse(tree)
+    assert bg._AssemblySources(source).collect() == expected
+    assert len(expected) == 29
+
+
+def test_kit_selectors_are_role_local_not_native_instance_indices() -> None:
+    assert spec.instance_name(spec.BASE_BAR, 0) == spec.BASE_BAR + "-1"
+    assert spec.KIT_COMPONENT_REFERENCES == {
+        f"@{configuration}:{index}": (physical, configuration)
+        for physical, configuration in spec.KIT_IDENTITIES.values()
+        for index in range(1, 5)
+    }
+    for family, (physical, configuration) in spec.KIT_IDENTITIES.items():
+        assert spec.QUANTITIES[family] == 4
+        assert spec.component_family(physical, configuration) == family
+    with pytest.raises(ValueError, match="no unique family"):
+        spec.component_family(spec.CLAMPING_KIT, "Default")
+
+
+@pytest.fixture
+def kit_placement_scene(monkeypatch):
+    import build_ch_rocker_arm_tl_oblique_jig_assembly as builder
+    import _component_references as references
+
+    components, batches = [], []
+    model = types.SimpleNamespace(GetComponents=lambda _top_only: tuple(reversed(components)))
+    adapter = types.SimpleNamespace(currentModel=model)
+
+    async def batch(_adapter, rows, *, label):
+        assert _adapter is adapter
+        batches.append((label, rows))
+        names = []
+        for suffix, row in zip((41, 7, 103, 28), rows, strict=True):
+            name = f"{row['part']}-{suffix + 200 * len(batches)}"
+            components.append(types.SimpleNamespace(
+                Name2=name,
+                ComponentReference=row["component_reference"],
+                ReferencedConfiguration=row["configuration"],
+                GetPathName=lambda part=row["part"]: f"C:/native/{part}.SLDPRT",
+            ))
+            names.append(name)
+        return names
+
+    async def individual(*_args, **_kwargs):
+        raise AssertionError("each kit member's four occurrences must remain batched")
+
+    monkeypatch.setattr(builder, "place_components_batch", batch)
+    monkeypatch.setattr(builder, "place_component", individual)
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
+    return builder, adapter, components, batches
+
+
+def _place_kit(scene):
+    import asyncio
+
+    builder, adapter, _components, _batches = scene
+    names = {}
+    for family, (physical, _configuration) in spec.KIT_IDENTITIES.items():
+        names.update(asyncio.run(builder._place_family(adapter, physical, family)))
+    return names
+
+
+def test_builder_batches_each_member_with_explicit_native_identity(kit_placement_scene):
+    builder, adapter, _components, batches = kit_placement_scene
+    names = _place_kit(kit_placement_scene)
+    assert len(names) == 12
+    for family, rows in batches:
+        physical, configuration = spec.KIT_IDENTITIES[family]
+        assert len(rows) == 4
+        for index, row in enumerate(rows):
+            origin, rotation = spec.PLACEMENTS[family][index]
+            assert row == {
+                "part": physical,
+                "position": list(origin),
+                "rows": [list(axis) for axis in rotation],
+                "ground": True,
+                "configuration": configuration,
+                "component_reference": f"{configuration}:{index + 1}",
+            }
+        offset = 200 * (list(spec.KIT_IDENTITIES).index(family) + 1)
+        assert names[f"@{configuration}:1"] == f"{physical}-{41 + offset}"
+        assert names[f"@{configuration}:4"] == f"{physical}-{28 + offset}"
+    builder._verify_kit_references(adapter, names)
+
+
+@pytest.mark.parametrize("fault", ("missing", "wrong-member", "duplicate-reference", "renamed"))
+def test_final_kit_reference_readback_refuses_drift(kit_placement_scene, fault):
+    builder, adapter, components, _batches = kit_placement_scene
+    names = _place_kit(kit_placement_scene)
+    if fault == "missing":
+        components.pop()
+    elif fault == "wrong-member":
+        components[-1].ReferencedConfiguration = "HoldDownStud"
+    elif fault == "duplicate-reference":
+        components[-1].ComponentReference = components[-2].ComponentReference
+    else:
+        components[-1].Name2 = "unexpected-new-name-901"
+    with pytest.raises(RuntimeError):
+        builder._verify_kit_references(adapter, names)
+
+
+def test_save_rechecks_kit_references_after_its_final_solve():
+    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
+    [save] = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "save_assembly_and_images"
+    ]
+    [gate] = [keyword.value for keyword in save.keywords if keyword.arg == "solved_gates"]
+    assert isinstance(gate, ast.Lambda)
+    assert isinstance(gate.body, ast.Call)
+    assert isinstance(gate.body.func, ast.Name)
+    assert gate.body.func.id == "_verify_kit_references"
 
 
 def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
@@ -670,15 +801,20 @@ def test_interference_contracts_are_the_press_fits_and_threads() -> None:
         pytest.approx(1.10 * dowel)
     )
     inserted = (*SCREW_ROWS, spec.HOLD_DOWN_STUD, spec.LEADSCREW_NUT, spec.BEARING)
+    occurrences = {
+        spec.instance_name(family, index): (family, index)
+        for family, count in spec.QUANTITIES.items()
+        for index in range(count)
+    }
     for pair in pairs:
         if pair == hub or spec.CL_DOWEL + "-1" in pair:
             continue
-        (insert,) = [n for n in pair if n.rsplit("-", 1)[0] in inserted]
+        (insert,) = [name for name in pair if occurrences[name][0] in inserted]
         (receiver,) = pair - {insert}
-        stem, number = insert.rsplit("-", 1)
-        receiving, _number = receiver.rsplit("-", 1)
+        stem, index = occurrences[insert]
+        receiving, _receiver_index = occurrences[receiver]
         # Each pair names the receiving instance the insert actually sits in.
-        origin = spec.PLACEMENTS[stem][int(number) - 1][0]
+        origin = spec.PLACEMENTS[stem][index][0]
         reach = [math.dist(origin, placed) for placed, _r in spec.PLACEMENTS[receiving]]
         assert receiver == spec.instance_name(receiving, reach.index(min(reach)))
     counts: dict[str, int] = {}
@@ -700,14 +836,33 @@ def test_bom_rows_name_every_made_and_bought_item() -> None:
     }
 
 
+def test_kit_bom_descriptions_use_native_member_authority() -> None:
+    for family, member in (
+        (spec.HOLD_DOWN_STUD, hold_down_stud),
+        (spec.T_NUT, t_nut),
+        (spec.FLANGE_NUT, flange_nut),
+    ):
+        assert spec.BOM_DESCRIPTIONS[family] == member.BOM_DESCRIPTION
+
+
 def test_bom_follows_the_part_registry() -> None:
     prefix = spec.DRAWING_NUMBER.rsplit("-", 1)[0] + "-"
-    rows = {stem: _config.parts(stem) for stem in spec.BOM_ORDER}
+    rows = {
+        family: _config.parts(physical)
+        for family, (physical, _configuration) in spec.COMPONENT_IDENTITIES.items()
+    }
     numbers = [rows[stem]["number"] for stem in spec.BOM_ORDER]
     for stem, number in zip(spec.BOM_ORDER, numbers, strict=True):
         row = rows[stem]
-        assert row["quantity"] == spec.QUANTITIES[stem], stem
-        assert (row["process"] == "purchased") == number.startswith(prefix + "VN-"), stem
+        _physical, configuration = spec.COMPONENT_IDENTITIES[stem]
+        quantity = (
+            row["configuration_quantities"][configuration]
+            if configuration is not None else row["quantity"]
+        )
+        assert quantity == spec.QUANTITIES[stem], stem
+        assert (row["process"] == "purchased") == number.startswith(
+            (prefix + "VN-", "MHA-SH-VN-")
+        ), stem
         # The registry owns each bought item's source: no supplier or SKU
         # leaks into the BOM text.
         description = spec.BOM_DESCRIPTIONS[stem].casefold()
@@ -717,6 +872,9 @@ def test_bom_follows_the_part_registry() -> None:
 
 def test_jig_is_a_shop_fixture_outside_the_machine_tree() -> None:
     assert bg.is_shop_fixture(JIG)
+    shared_kit = _config.parts(spec.CLAMPING_KIT)
+    assert shared_kit["usage_scope"] == "tooling"
+    assert bg.is_shop_fixture(spec.CLAMPING_KIT.replace("-", "_"))
     assert JIG in bg.ASSEMBLY_ORDER and JIG not in bg.MACHINE_ASSEMBLIES
     assert bg.ASSEMBLY_ORDER[-1] == "ha_harmonic_analyzer"
     reachable, frontier = set(), ["ha_harmonic_analyzer"]

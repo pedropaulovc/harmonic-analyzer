@@ -15,20 +15,20 @@ The screws, and the small parts that do not belong anywhere else.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `dt-vn-fillister-screw`, `fr-vn-fillister-screw`, `pd-vn-fillister-screw` | TODO | TODO | TODO |
+| `sh-vn-brass-fillister-screw` (shared by the drive train, frame and paper drive) | TODO | TODO | TODO |
 | `pd-vn-guide-lock-screw` | TODO | TODO | TODO |
 | `dt-vn-slotted-screw` | TODO | TODO | TODO |
-| `mg-vn-thumb-screw`, `ms-vn-thumb-screw` | TODO | TODO | TODO |
+| `sh-vn-thumb-screw` (shared by the magnifier and measuring stick) | TODO | TODO | TODO |
 | `fr-vn-lag-screw` | TODO | TODO | TODO |
 | `pn-vn-hanger-screw` | TODO | TODO | TODO |
-| `mg-vn-clamp-screw`, `pd-vn-clamp-screw` | TODO | TODO | TODO |
+| `sh-vn-clamp-screw` (shared by the magnifier and paper drive) | TODO | TODO | TODO |
 | `pd-vn-transgear-arm-plate-screw` | TODO | TODO | TODO |
 | `pd-vn-transgear-pivot-screw` | TODO | TODO | TODO |
 | `pd-vn-transgear-pivot-spring` | TODO | TODO | TODO |
 | `dt-vn-cylinder-bank-spring` | TODO | TODO | TODO |
 | `ch-vn-rocker-bank-spring` | TODO | TODO | TODO |
 | `pd-vn-transgear-latch-pin` | TODO | TODO | TODO |
-| `pd-vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
+| `sh-vn-fillister-screw-90280a108` (latch-hook screw role; shared with the drive train's foot and swing-stop screws) | TODO | TODO | TODO |
 | `pd-vn-transgear-disc-screw` | TODO | TODO | TODO |
 | `pd-vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
 | `pd-vn-transgear-knob-cup-pin` | TODO | TODO | TODO |

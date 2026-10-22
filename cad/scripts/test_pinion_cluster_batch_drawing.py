@@ -264,8 +264,9 @@ def _expected_numbered_pairs(
     return {
         frozenset(
             (
-                f"{first_stem}-{number}",
-                f"{second_stem}-{number if second_number is None else second_number}",
+                f"{first_stem}{'' if first_stem.endswith(':') else '-'}{number}",
+                f"{second_stem}{'' if second_stem.endswith(':') else '-'}"
+                f"{number if second_number is None else second_number}",
             )
         ): limit
         for number in numbers
@@ -277,7 +278,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     clamp_receivers = {1: 2, 2: 2, 3: 1, 4: 1}
     for screw_number, back_number in clamp_receivers.items():
         pair = frozenset(
-            (f"pd-vn-clamp-screw-{screw_number}", f"sh-column-clamp-back-{back_number}")
+            (f"sh-vn-clamp-screw-{screw_number}", f"sh-column-clamp-back-{back_number}")
         )
         assert paper_drive[pair] == pytest.approx(39.87518418692443)
 
@@ -296,7 +297,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     }
     for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
         pair = frozenset(
-            (f"pd-vn-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
+            (f"sh-vn-brass-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(limit)
     # R9-31: the lock-plate screws are MHA-PD-VN-60 slotted pan heads, not
@@ -361,7 +362,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
             # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
             frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
-            frozenset(("dt-vn-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
+            frozenset(("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
             # MHA-DT-32 #4-40 major 2.845 in the #43 tap drill 2.261: 6.5 of
@@ -384,7 +385,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # #743 Q3: MHA-DT-VN-64 #4-40 x 1/4 in each pedestal crown tap (the
             # _hole_spec major 2.845 in the #43 tap drill, over its length).
             **_expected_numbered_pairs(
-                "dt-vn-arbor-set-screw",
+                "sh-vn-arbor-set-screw",
                 range(1, 3),
                 "dt-arbor-pedestal",
                 2.845,
@@ -438,7 +439,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 6.35, 5.105, 12.85
             ),
             **_expected_numbered_pairs(
-                "fr-vn-fillister-screw",
+                "sh-vn-brass-fillister-screw",
                 range(1, 5),
                 "fr-harmonic-base",
                 2.8448,
@@ -448,14 +449,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         },
         "mg-magnifier": {
             **_expected_numbered_pairs(
-                "mg-vn-clamp-screw",
+                "sh-vn-clamp-screw",
                 range(1, 3),
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
                 4.35,
             ),
-            frozenset(("mg-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
+            frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
                 2.8448, 2.261, 5.9
             ),
             # #1559: the vertical rod's #4-40 end (2.845 major) in the clamp's
@@ -468,7 +469,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
                 4.7625, 4.7371, 9.0
             ),
-            frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
+            frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
                 2.8448, 2.261, 10.1
             ),
             frozenset(
@@ -536,7 +537,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         },
         "pd-paper-drive": {
             **_expected_numbered_pairs(
-                "pd-vn-clamp-screw",
+                "sh-vn-clamp-screw",
                 range(1, 3),
                 "sh-column-clamp-back",
                 4.1656,
@@ -545,7 +546,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             **_expected_numbered_pairs(
-                "pd-vn-clamp-screw",
+                "sh-vn-clamp-screw",
                 range(3, 5),
                 "sh-column-clamp-back",
                 4.1656,
@@ -562,7 +563,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 5.55,
             ),
             **_expected_numbered_pairs(
-                "pd-vn-fillister-screw",
+                "sh-vn-brass-fillister-screw",
                 range(1, 11, 2),
                 "pd-platen-guide",
                 2.8448,
@@ -570,7 +571,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 5.4178,
             ),
             **_expected_numbered_pairs(
-                "pd-vn-fillister-screw",
+                "sh-vn-brass-fillister-screw",
                 range(2, 11, 2),
                 "pd-platen-guide",
                 2.8448,
@@ -611,7 +612,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.1656, 3.454, 7.9562
             ),
             **_expected_numbered_pairs(
-                "pd-vn-latch-hook-bracket-screw",
+                "sh-vn-fillister-screw-90280a108",
                 range(1, 3),
                 "pd-support-bar",
                 2.8448,
@@ -721,7 +722,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 12.7,
             ),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/dt-vn-swing-stop-screw",
+                "dt-drive-train-1/@SwingStopScrew:",
                 range(1, 2),
                 "fr-frame-1/fr-harmonic-base",
                 2.8448,  # the foot screw's #4-40 SKU, seated full length
@@ -737,7 +738,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 dt_vn_slotted_screw_spec.SHANK_LEN - dt_pinion_pivot_block_geometry.BLOCK_HEIGHT,
             ),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/dt-vn-foot-screw",
+                "dt-drive-train-1/@FootScrew:",
                 range(1, 2),
                 "fr-frame-1/fr-harmonic-base",
                 2.8448,
@@ -777,7 +778,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # The new magnifier joints are also checked across the top assembly.
     # Qualify the independent leaf oracles instead of duplicating their budgets.
     for pair in (
-        frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")),
+        frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")),
         frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
         frozenset(("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")),
     ):
@@ -860,7 +861,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             },
             **{
                 frozenset(
-                    (f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
+                    (f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
                 ): _annulus_limit(
                     2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
                 )
@@ -881,3 +882,37 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         }
     )
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}
+
+
+def test_converged_stock_uses_distinct_semantic_base_joint_pairs() -> None:
+    allowed = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    base = "fr-frame-1/fr-harmonic-base-1"
+    foot = frozenset(("dt-drive-train-1/@FootScrew:1", base))
+    stop = frozenset(("dt-drive-train-1/@SwingStopScrew:1", base))
+    assert foot != stop
+    assert allowed[foot] == pytest.approx(_annulus_limit(2.8448, 2.261, 8.725))
+    assert stop in allowed
+    assert not any(
+        "sh-vn-fillister-screw-90280a108-" in name
+        for pair in allowed
+        for name in pair
+    )
+
+
+def test_kit_fit_pairs_keep_member_roles_and_four_physical_instances() -> None:
+    allowed = _interference_contracts.allowed_interference_pairs(
+        "ch-rocker-arm-tl-oblique-jig"
+    )
+    kit = {
+        pair: limit
+        for pair, limit in allowed.items()
+        if any(name.startswith("@HoldDownStud:") for name in pair)
+    }
+    assert len(kit) == 8
+    for number in range(1, 5):
+        for role, triple in (
+            ("TNut", _interference_contracts.JIG_T_NUT_THREAD),
+            ("FlangeNut", _interference_contracts.JIG_FLANGE_NUT_THREAD),
+        ):
+            pair = frozenset((f"@HoldDownStud:{number}", f"@{role}:{number}"))
+            assert kit[pair] == pytest.approx(_annulus_limit(*triple))

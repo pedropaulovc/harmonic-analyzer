@@ -48,7 +48,7 @@ from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _printed_tolerance import printed_deviations
-from _mcmaster_90114a511 import SHANK_LEN as FILLISTER_SHANK_LEN
+from sh_vn_brass_fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
 from pd_platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS

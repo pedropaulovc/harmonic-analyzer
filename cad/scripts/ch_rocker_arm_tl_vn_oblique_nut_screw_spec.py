@@ -58,3 +58,44 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     raise AssertionError(
         f"{SKU}: major {DIMS.major_dia}, the row's thread is {ROW.major_mm}"
     )
+
+# Exact-current Olander product table read 2026-10-21; not its McMaster xref.
+# Hidden nominal source references, not physical-edge/replica assertions.
+# Head bands are supplied three-place limits, owned by new model carriers.
+# The .063 hex table entry is rounded ink for the unchanged native 1/16;
+# neither the solid nor the carrier is changed to a fictitious .063 hex.
+# No numeric major diameter or socket depth is given by this source.
+SUPPLIER_PRODUCT_URL = "https://www.olander.com/items/4C50BHCA"
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -DIMS.length, "vertical"),
+    ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
+    ("SupplierHeadHeight", DIMS.head_h, "vertical"),
+    ("SupplierDriveWidth", DIMS.hex_af, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
+    "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
+    "SupplierDriveWidth": (-DIMS.hex_af / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {
+    "SupplierHeadDiameter": "Top",
+    "SupplierDriveWidth": "Top",
+}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierHeadHeight": "left",
+    "SupplierDriveWidth": "bottom",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (0, "length", 2, "4-40"),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierDriveWidth": (3, "length", None, None),
+}
+# Absolute source limits in inches, not stock-recipe tolerances or fit bands.
+SUPPLIER_REFERENCE_LIMITS_IN = {
+    "SupplierHeadDiameter": (0.201, 0.213),
+    "SupplierHeadHeight": (0.051, 0.059),
+}

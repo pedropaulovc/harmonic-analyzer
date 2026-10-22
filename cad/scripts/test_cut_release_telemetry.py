@@ -43,6 +43,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         "schema": export_models.NEUTRAL_SCHEMA,
         "exporter": "exporter-v1",
         "sources": {"sample-part": "part-v1", "sample-assembly": "assembly-v1"},
+        "part_configurations": {},
         "files": {
             "step/sample-part.STEP": {
                 "source": step.relative_to(tmp_path).as_posix(), "bytes": step.stat().st_size,
@@ -87,7 +88,9 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         "documents": 2,
         "parts": 1,
         "assemblies": 1,
-        "pngs": 2,
+        "steps": 1,
+        "stls": 0,
+        "pngs": 0,
         "views": 1,
         "config_meshes": 0,
     }

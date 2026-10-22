@@ -55,12 +55,12 @@ flip_invert:
   - ch vn rocker bank spring datum x
   - ch vn rocker bank spring datum y
   - ch vn rocker bank spring datum z
-  # User 2026-10-10: the MHA-CH-VN-53 apex set screws, datum-located IDENTITY
+  # User 2026-10-10: the MHA-SH-VN-54 apex set screws, datum-located IDENTITY
   # in the bracket loop's wake [INFERENCE: same learned side as every other
   # IDENTITY datum-located channel part; confirm on the farm build].
-  - ch vn arbor set screw datum x
-  - ch vn arbor set screw datum y
-  - ch vn arbor set screw datum z
+  - sh vn arbor set screw datum x
+  - sh vn arbor set screw datum y
+  - sh vn arbor set screw datum z
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod

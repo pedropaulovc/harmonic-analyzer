@@ -25,9 +25,9 @@ What it does, in order:
      SolidWorks revision, the referenced-document count, the per-drawing
      members). Here those directories are COPIED in, and the complete
      recipe-keyed neutral set produced by the prerequisite ``export`` task is
-     validated and staged: AP214 STEP for every part, fine binary STL for every
-     part/assembly plus distinct configurations, and the build-owned isometric
-     PNG for every document. Also copies the millimetre
+     validated and staged: AP214 STEP for parts, declared shared purchased members
+     and feature configurations; fine binary STL for parts and scene configurations;
+     and the build-owned isometric PNGs. Also copies the millimetre
      scene graph (``cad/out/boxes/ha-harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
      The independently produced feature bundles are checked for the same face
@@ -1187,8 +1187,8 @@ def bundle(
     facts["size_mb"] = zip_path.stat().st_size / 1e6
     log(
         f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
-        f"solidworks/ + {facts['parts']} part STEP+STL + {facts['assemblies']} "
-        f"assembly glTF (+{facts['config_meshes']} per-config STLs) + "
+        f"solidworks/ + {facts['steps']} STEP + {facts['stls']} STL + "
+        f"{facts['assemblies']} assembly glTF + "
         f"{facts['pngs']} PNGs + boxes/"
     )
     return zip_path, facts
@@ -1273,10 +1273,12 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"rebuilding -- with or without SolidWorks:\n\n"
         f"- `solidworks/` -- native Pack-and-Go ({facts['native_documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
-        f"- `step/` -- AP214 STEP for {facts['parts']} parts; `stl/` fine binary "
-        f"STL (mm) for all {facts['parts']} parts "
-        f"plus {facts['config_meshes']} per-configuration STLs (cone gears / "
-        f"transgears)\n"
+        f"- `step/` -- {facts['steps']} AP214 STEP files, including declared shared "
+        f"purchased members and feature configurations; a bare part filename "
+        f"represents its default export member, not every member of a shared SKU\n"
+        f"- `stl/` -- {facts['stls']} fine binary STL files (mm), including "
+        f"declared shared purchased members and scene configurations "
+        f"(cone gears / transgears)\n"
         f"- `gltf/` -- glTF binary (.glb) for all {facts['assemblies']} assemblies "
         f"(metre units, per-component named nodes, appearance materials): drop "
         f"`{TOP_ASSEMBLY}.glb` into any glTF viewer\n"
@@ -1624,9 +1626,8 @@ def main() -> int:
             _telemetry.info(f"version: {version}")
             _telemetry.info(
                 f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-                f"{facts['parts']} parts x STEP+STL + {facts['assemblies']} "
-                f"assembly glTF (+{facts['config_meshes']} "
-                f"per-config) + {facts['pngs']} PNGs + boxes/"
+                f"{facts['steps']} STEP + {facts['stls']} STL + "
+                f"{facts['assemblies']} assembly glTF + {facts['pngs']} PNGs + boxes/"
             )
             _telemetry.info(f"drawings: {facts['drawing_diff']['asset_path']}")
             _telemetry.info(f"log:     {log_path}")

@@ -85,7 +85,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("back washer off", ("mg-vn-wheel-axle-back-washer",), "z", -65.0),
     ExplodeStep("spacer off", ("mg-wheel-axle-spacer",), "z", -57.0),
     # The column clamp: the screws forward out of the bar, the arcs rearward.
-    ExplodeStep("clamp screws forward", ("mg-vn-clamp-screw",), "z", -45.0),
+    ExplodeStep("clamp screws forward", ("sh-vn-clamp-screw",), "z", -45.0),
     ExplodeStep(
         "clamp arcs rearward",
         ("sh-column-clamp-front", "sh-column-clamp-back"),
@@ -96,10 +96,10 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # Lever group: the clamp's thumb screw up, the rod down out of the clamp
     # with the fixture still on it, the fixture's screw out of its spigot, the
     # bracket off the lever's east end and its screws forward off the flange.
-    ExplodeStep("clamp thumb screw up", ("mg-vn-thumb-screw:1",), "y", 25.0),
+    ExplodeStep("clamp thumb screw up", ("sh-vn-thumb-screw:1",), "y", 25.0),
     ExplodeStep(
         "rod and fixture down",
-        ("mg-magnifying-vertical-rod", "mg-output-fixture", "mg-vn-thumb-screw:2"),
+        ("mg-magnifying-vertical-rod", "mg-output-fixture", "sh-vn-thumb-screw:2"),
         "y",
         -45.0,
     ),
@@ -108,13 +108,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # it in two world steps; one -X step left it 8 mm off its tap's line.
     ExplodeStep(
         "fixture screw out",
-        ("mg-vn-thumb-screw:2",),
+        ("sh-vn-thumb-screw:2",),
         "x",
         -FIXTURE_SCREW_TRAVEL * math.cos(FIXTURE_YAW_RAD),
     ),
     ExplodeStep(
         "fixture screw out, back",
-        ("mg-vn-thumb-screw:2",),
+        ("sh-vn-thumb-screw:2",),
         "z",
         FIXTURE_SCREW_TRAVEL * math.sin(FIXTURE_YAW_RAD),
     ),
@@ -136,7 +136,7 @@ WHEEL_GROUP_STEMS = frozenset(
         "mg-wheel-bar",
         "sh-column-clamp-front",
         "sh-column-clamp-back",
-        "mg-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         "mg-wheel-axle",
         "mg-wheel-axle-spacer",
         "mg-vn-wheel-axle-back-washer",
@@ -152,13 +152,13 @@ LEVER_GROUP_STEMS = frozenset(
         "mg-magnifying-bracket",
         "mg-vn-magnifying-bracket-screw",
         "mg-magnifying-clamp",
-        "mg-vn-thumb-screw",
+        "sh-vn-thumb-screw",
         "mg-magnifying-vertical-rod",
         "mg-output-fixture",
     }
 )
 # Shown on the finished isometric only: it spans both groups.
-WIRE_STEM = "mg-vn-lever-wire"
+WIRE_STEM = "sh-vn-music-wire"
 SHOWN_STEMS = WHEEL_GROUP_STEMS | LEVER_GROUP_STEMS | {WIRE_STEM}
 _moved = {member_stem(member) for step in EXPLODE_STEPS for member in step.members}
 if not _moved <= WHEEL_GROUP_STEMS | LEVER_GROUP_STEMS:

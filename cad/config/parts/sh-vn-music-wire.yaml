@@ -1,0 +1,18 @@
+sh-vn-music-wire:
+  title: Music Wire
+  number: MHA-SH-VN-56
+  stock_name: Music Wire, 0.031 in, 1/4 lb Coil (Cut to Length)
+  supplier: McMaster-Carr
+  supplier_skus: [9666K56]
+  material: ASTM A228 music wire
+  material_specification: "ASTM A228 music wire, 0.031 in; McMaster-Carr 9666K56"
+  finish: phosphate coated, as supplied
+  # Installed wire forms, not purchased coils.
+  quantity: 2
+  default_configuration: LeverWire
+  configuration_quantities:
+    LeverWire: 1
+    PenWire: 1
+  tolerance_class: machined_block
+  process: purchased
+  # DO NOT RELEASE: terminations, wraps and developed cut lengths are not modelled.

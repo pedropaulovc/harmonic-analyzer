@@ -681,6 +681,8 @@ def test_release_notes_report_native_count_and_enrolled_travelers(
         "documents": 99,
         "sw_revision": "35",
         "parts": 99,
+        "steps": 99,
+        "stls": 121,
         "assemblies": 8,
         "config_meshes": 22,
         "pngs": 107,
@@ -696,6 +698,33 @@ def test_release_notes_report_native_count_and_enrolled_travelers(
     assert ("- `travelers/`" in notes) == bool(travelers)
     for path in travelers:
         assert f"`{path}`" in notes
+
+
+def test_release_notes_count_shared_member_files_not_part_documents() -> None:
+    # Three shared purchased part documents declare seven members. Their STEP
+    # inventory has four extra files, and every STL is member-qualified rather
+    # than adding a bare STL for each part.
+    facts = {
+        "native_documents": 3,
+        "sw_revision": "35",
+        "parts": 3,
+        "assemblies": 0,
+        "steps": 7,
+        "stls": 7,
+        "config_meshes": 7,
+        "pngs": 7,
+        "comparisons": {"pairs": 0, "mean_score": None},
+        "size_mb": 1.0,
+    }
+
+    notes = cut_release.release_notes("v42", facts)
+
+    assert "`step/` -- 7 AP214 STEP files" in notes
+    assert "`stl/` -- 7 fine binary STL files (mm)" in notes
+    assert "declared shared purchased members and feature configurations" in notes
+    assert "not every member of a shared SKU" in notes
+    assert "STL for all 3 parts" not in notes
+    assert "plus 7 per-configuration STLs" not in notes
 
 
 def _byte_record(path: Path) -> dict:
@@ -965,6 +994,8 @@ def prepared_readme_release(
         "native_documents": 137,
         "sw_revision": "35",
         "parts": 99,
+        "steps": 99,
+        "stls": 121,
         "assemblies": 8,
         "config_meshes": 22,
         "pngs": 107,

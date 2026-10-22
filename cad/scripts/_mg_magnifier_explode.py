@@ -25,6 +25,8 @@ import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _component_references import component_reference_names
+from sh_vn_music_wire_lever_geom import CONFIGURATION as LEVER_WIRE_CONFIGURATION
 from _simplified_names import simplified_name
 from mg_magnifier_explode_spec import (
     EXPLODED_VIEW_NAME,
@@ -140,6 +142,9 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(
             f"{view_name}: {configuration_name} unexpectedly contains exploded views"
         )
+    component_reference_names(
+        model, {"@LeverWire:1": ("sh-vn-music-wire", LEVER_WIRE_CONFIGURATION)}
+    )
 
     components = tuple(
         _early_bound(component, "IComponent2")

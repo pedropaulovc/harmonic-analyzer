@@ -16,7 +16,6 @@ import dt_cone_gear_spec as gears
 import dt_vn_cone_tip_collar_spec as spec
 import dt_tip_collar_air as air
 import _native_tip_collar_air as native_air
-from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _printed_tolerance import printed_band_mm
 from _test_stock_recipes import discovered_recipes
@@ -241,29 +240,6 @@ def test_manufacturing_configs_restore_the_installed_parent(monkeypatch):
     assert {name for config, name in suppressions if config == "SetScrew"} == set(part.COLLAR_FEATURES)
 
 
-def test_native_marks_and_single_sheet_collar_drawing():
-    sheet = DRAWINGS_BY_NAME["dt_vn_cone_tip_collar"]
-    assert drawing.SPEC is sheet
-    assert sheet.artifact_stem == part.PART_NAME
-    assert sheet.script == Path(drawing.__file__).resolve()
-    assert drawing.SHEET_SCALE == (4, 1)
-    assert not hasattr(drawing, "SHEET_NAMES")
-    assert set(spec.DRAWING_DIMENSIONS) == set(spec.DRAWING_PRECISION)
-    for feature, names in spec.DRAWING_DIMENSIONS.items():
-        assert names == set(spec.DRAWING_PRECISION[feature])
-    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BORE_KEEP) == {
-        "CollarDia", "NoseDia", "BoreDia", "FlatDistance",
-        "CollarWidth", "NoseLength", "ShoulderRadius",
-    }
-    assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
-    assert drawing.TAP_SCALE == spec.RADIAL_TAP_VIEW_SCALE
-    assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
-    # The stock screw has no sheet, no datums and no geometric controls.
-    for retired in ("PART_DATUMS", "GEOMETRIC_CONTROLS", "SCREW_NOTES"):
-        assert not hasattr(spec, retired)
-    assert spec.DRAWING_NOTES == "3/4 STEEL BAR STOCK OK."
-    assert "94355A213" not in spec.DRAWING_NOTES
-    assert "SNUG 94355A213 SET SCREW ON D-FLAT, THEN REMOVE LEAF." in spec.INSTALLATION_NOTES
 
 
 @pytest.mark.parametrize("refuse", [False, True])
@@ -333,6 +309,8 @@ class _Sheet:
             GetAnnotations=lambda: self.views["Drawing View3"],
             GetDisplayDimensions=lambda: self.callouts,
         )
+        self.sheet_view.GetNextView = lambda: self.tap_view
+        self.tap_view.GetNextView = lambda: None
 
     def _note(self, name, text):
         note = SimpleNamespace(GetType=lambda: 6, OwnerType=1, GetName=lambda: name)
@@ -342,6 +320,12 @@ class _Sheet:
 
     def GetViews(self):
         return [[self.sheet_view, self.tap_view]]
+
+    def ActivateSheet(self, name):
+        return name == drawing.SHEET_NAMES[0]
+
+    def GetFirstView(self):
+        return self.sheet_view
 
     def ClearSelection2(self, _all):
         self.selected = None
@@ -803,3 +787,67 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
     assert bore_low - land_high > 0.0
     # The longest line the notes box has printed (the old supply line).
     assert max(map(len, lines)) <= 55
+
+
+def test_final_stock_set_screw_references_accept_an_unlabelled_native_length(monkeypatch):
+    from _supplier_dimensions import _presentation
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "_sheet_notes", lambda *_args: {"title": ("", object())})
+    monkeypatch.setattr(drawing, "_note_text", lambda _annotation: spec.SET_SCREW_SUPPLIER_TITLE)
+    monkeypatch.setattr(
+        drawing, "_is_same_attachment",
+        lambda _adapter, actual, expected, _kind: actual is expected,
+    )
+    views = [
+        SimpleNamespace(Name=name, ReferencedConfiguration="SetScrew", displays=[])
+        for name in ("side", "end", "iso")
+    ]
+    for view in views:
+        view.GetDisplayDimensions = lambda view=view: tuple(view.displays)
+    monkeypatch.setattr(drawing, "_sheet_views", lambda *_args: [object(), *views])
+    identities = {}
+    owners = {
+        name: feature
+        for feature, names in spec.SET_SCREW_SUPPLIER_DIMENSIONS.items()
+        for name in names
+    }
+    for name in spec.SET_SCREW_SUPPLIER_SIZES_MM:
+        view = views[1] if name == "SocketAF" else views[0]
+        entities = (object(), object())
+        annotation = SimpleNamespace(
+            name=name, Owner=view,
+            GetAttachedEntities3=lambda entities=entities: entities,
+            GetAttachedEntityTypes=lambda: (1, 1),
+        )
+        native = SimpleNamespace(
+            FullName=f"{name}@{owners[name]}@stock", Tolerance=SimpleNamespace(Type=0),
+        )
+        display = SimpleNamespace(
+            GetAnnotation=lambda annotation=annotation: annotation,
+            GetDimension2=lambda _index, native=native: native,
+        )
+        view.displays.append(display)
+        identities[name] = (native.FullName, view.Name, entities, (1, 1))
+    checked = {}
+
+    def check_presentation(_adapter, _display, **options):
+        # Execute the real presentation validator: an empty callout is invalid,
+        # while no below-text is the intended native length presentation.
+        options = dict(options)
+        options.pop("expected_degrees", None)
+        options.setdefault("fraction_denominator", None)
+        _presentation(**options)
+        checked[options["label"]] = options["callout"]
+
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", check_presentation)
+    drawing._assert_stock_references(
+        SimpleNamespace(), {"title"}, identities, {"side", "end", "iso"},
+    )
+    assert checked == {
+        "stock set-screw ScrewLength": None,
+        "stock set-screw ScrewMajorDia": spec.SET_SCREW_THREAD,
+        "stock set-screw SocketAF": "HEX SOCKET AF",
+    }

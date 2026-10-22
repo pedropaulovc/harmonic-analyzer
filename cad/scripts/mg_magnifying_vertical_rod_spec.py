@@ -131,7 +131,7 @@ RELIEF_ROOTS_CALLOUT = "2X"
 
 # The fixture's thumb-screw seat (owner ruling 2026-10-17; drawing-guidelines.md
 # rule 6, a static seat that locates, Ra 3.2). MHA-MG-06's axial #4-40 knurled
-# thumb screw (MHA-MG-VN-50) locks the fixture to the rod, and the operator sets
+# thumb screw (MHA-SH-VN-55) locks the fixture to the rod, and the operator sets
 # the fixture anywhere along the body (ch. 20 p. 46: "sliding a fixture up and
 # down on the vertical rod"). Its tip reaches from where the fixture's top hex
 # corner meets MHA-MG-02's bottom face down to where its bore reaches the

@@ -8,7 +8,7 @@ canonical installed part and the assembly's no-render length variants.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
 
 import _config
@@ -16,9 +16,10 @@ import _telemetry
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
+from _com import _early_bound
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
-from _rebuild import force_rebuild
+from _rebuild import active_configuration_name, force_rebuild
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _stock_fastener import _blank_recipe_references
 from diagnostics.diag_build_9432K31 import build_9432K31
@@ -41,6 +42,7 @@ async def build_spring(
     *,
     views: Iterable[str] | None = None,
     drawing_properties: Mapping[str, str] | None = None,
+    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
     """Build and save one 9432K31 at a catalogue inside-hook length.
 
@@ -65,6 +67,14 @@ async def build_spring(
     if drawing_properties is not None:
         clear_dimensions_for_drawing(adapter)
         apply_drawing_properties(adapter, part_name, drawing_properties)
+
+    if before_save is not None:
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        configuration = active_configuration_name(adapter, model)
+        await before_save(adapter)
+        if (int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
+                or active_configuration_name(adapter, model) != configuration):
+            raise RuntimeError(f"{part_name}: before_save changed the installed document/configuration")
 
     await report_mass_properties(adapter)
     if views is None:
