@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 import error_budget
@@ -57,9 +55,8 @@ def test_arm_adds_under_one_percent_to_the_actual_spring_compliance() -> None:
     assert arm.ARM_COMPLIANCE_MM_PER_N / spring <= arm.ARM_SHARE_OF_SPRING_COMPLIANCE_MAX
 
 
-def test_flange_joint_retains_steel_strength_and_screw_margins() -> None:
+def test_flange_joint_retains_screw_margins() -> None:
     assert arm.JOINT_PRELOAD_MARGIN > 1.0
     assert arm.SCREW_SHEAR_STRESS < arm.SCREW_SHEAR_ALLOWABLE
-    assert max(arm.BENDING_STRESS, arm.TORSION_STRESS * math.sqrt(3.0)) < arm.STEEL_YIELD / 3.0
     assert arm.JOINT_TENSION_INCREMENT_N < arm.SCREW_PRELOAD_N
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA

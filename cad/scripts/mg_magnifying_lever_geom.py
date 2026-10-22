@@ -52,11 +52,11 @@ def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:
 def operating_clamp_radius_band() -> tuple[float, float, float]:
     """Conservative component travel for published capacity and setup.
 
-    Station is the actual bottom rod/tap axis at its seat. The required
-    finished tap wall puts that point INSIDE the clamp. The received 15 MAX
-    transverse envelope covers the full height, so either bore end is at
-    most 15 from that station, regardless of stock/tap centring. Do not divide
-    the envelope by two or add another locating-error allowance to it.
+    Station is the actual bottom rod/tap axis at its seat. A complete standard
+    tapped hole with the ordinary policy wall floor puts that point INSIDE
+    the finished body. The derived full-height HEX envelope bounds either
+    bore end from that station without assuming centring. Do not divide it
+    by two or add another locating-error allowance to it.
 
     The shortest rod/longest threaded extent owns the earliest plain-body
     boundary; that extent already includes incomplete root runout. The
@@ -73,14 +73,14 @@ def operating_clamp_radius_band() -> tuple[float, float, float]:
         THREAD_LENGTH,
         THREAD_LENGTH_TOL,
     )
-    from mg_magnifying_clamp_geom import STOCK_WIDTH_MAX, WALL_TARGET
+    from mg_magnifying_clamp_geom import STOCK_ENVELOPE_MAX, WALL_FLOOR
 
-    if STOCK_WIDTH_MAX <= 0.0 or WALL_TARGET <= 0.0:
-        raise AssertionError("MG travel needs a bounded finished clamp with its tap axis inside")
+    if STOCK_ENVELOPE_MAX <= 0.0 or WALL_FLOOR <= 0.0:
+        raise AssertionError("MG travel needs a bounded finished hex with its tap axis inside")
     earliest_runout = ROD_LENGTH - ROD_LENGTH_TOL - (THREAD_LENGTH + THREAD_LENGTH_TOL)
     earliest_bracket = BRACKET_LOCAL_X - (NECK_THICKNESS + NECK_THICKNESS_TOL) / 2.0
-    nearest_station = min(earliest_runout, earliest_bracket) - STOCK_WIDTH_MAX
-    farthest_station = (ROD_DIA + ROD_DIA_BAND[0]) / 2.0 + STOCK_WIDTH_MAX
+    nearest_station = min(earliest_runout, earliest_bracket) - STOCK_ENVELOPE_MAX
+    farthest_station = (ROD_DIA + ROD_DIA_BAND[0]) / 2.0 + STOCK_ENVELOPE_MAX
     band = (
         KNIFE_LOCAL_X - nearest_station,
         KNIFE_LOCAL_X - CLAMP_LOCAL_X,

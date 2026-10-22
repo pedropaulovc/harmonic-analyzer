@@ -3,16 +3,16 @@ r"""MHA-MG-02 magnifying clamp: the drawing contract shared by part and sheet.
 PURE DATA, no SolidWorks/COM imports.  The shape is
 ``mg_magnifying_clamp_geom``'s (the assembly, the error budget and the web
 export read that module, not this one); this module owns the printed contract:
-the nominal walls, explicit finished acceptance, native dimensional bands,
-plug-tap reach and sheet text. A required finished minimum is not presented
-as a computed certificate for unconstrained supplied-stock form.
+the nominal walls, ordinary native dimensional bands, plug-tap reach and
+sheet text. The ordinary HEX size and default drawn angles govern all
+three opposed-flat pairs over the full length.
 
 The heights run from the bottom shoulder-seat face. An actual diagonal-flat
 distance and a location from the SAME actual Z flat locate each tap entry.
 The bore uses that common Z-flat baseline and its own bottom-seat height.
-Finished 2.0 MIN wall acceptance and a 15.00 MAX full-length transverse stock
-envelope are explicit requirements, not perfect-hex or Rule #1 assumptions
-for as-supplied STOCK.
+There is no separate finished 2 MIN wall or 15 MAX envelope requirement.
+Rule 17's 2 mm target and 1.5 mm floor are engineering checks; ordinary HEX
+acceptance is not a certificate for unconstrained as-supplied stock.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BORE_FULL_ANGULAR,
+    BORE_TO_FLAT_WALL_WORST,
     DRILL_WANDER_DEG,
     EDGE_BREAK,
     HEIGHT_PLACES,
@@ -38,12 +39,13 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     ROD_TAP_DRILL_POINT,
     ROD_TAP_FLOOR_WALL_WORST,
     THUMB_ENGAGEMENT_WORST,
-    STOCK_WIDTH_MAX,
+    STOCK_ENVELOPE_MAX,
     THUMB_TAP_DRILL_DEPTH,
     THUMB_TAP_LENGTH,
     THUMB_TAP_SPEC,
     TOP_TO_BORE,
     WALL_TARGET,
+    WALL_FLOOR,
     TAP_TO_BORE_ENTRY_Z_MAX,
 )
 from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
@@ -73,27 +75,24 @@ _DEPTH_BAND = printed_band_mm(HOLE_DEPTH_PLACES)  # 0.51 on both taps' depths
 _LEVER_BORE_R_MIN = LEVER_BORE_DIA / 2.0
 _LEVER_BORE_R_MAX = (LEVER_BORE_DIA + drilled_oversize_mm()) / 2.0
 _DRILL_R_MAX = (ROD_TAP_DRILL_DIA + drilled_oversize_mm()) / 2.0
-# A tap cuts up to 0.05 over the basic major: half of it on a wall.
+# Normal-shop cutting allowance for plug-reach arithmetic, not an ASME
+# maximum internal-root limit or a custom thread inspection requirement.
 _TAP_OVERSIZE_R = 0.025
 _THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
 
 
-# Finished-wall acceptance protects actual sidewalls and blind floors,
-# excluding only the shown hole entries/exits and top-tap/bore intersection.
-# The drill-point floor is additionally bounded by the native dimensions.
+# Realistic drill run-off is additional to the ordinary entry locations.
+# Standard thread roots retain the same shop-cut allowance below; it is not
+# an ASME maximum-major guarantee or a new finished-wall inspection note.
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
 
 
-# --- Independent finished acceptance versus derived dimensional bounds -------
-# These are inspection thresholds for actual remaining material, including
-# outer-face drift and hole wander; they are NOT calculated stock certificates.
-FINISHED_NET_WALL_MINIMUMS = {
-    "lever bore to outer faces": WALL_TARGET,
-    "rod-tap thread to outer faces": WALL_TARGET,
-    "thumb-screw tap thread to outer faces": WALL_TARGET,
-}
-# Only the blind drill-point floor has a dimensional worst-bound here.
+# --- Derived dimensional walls, judged against the policy FLOOR --------------
 DERIVED_WALL_BOUNDS: dict[str, tuple[float, float]] = {
+    "lever bore to the nonintersecting flats": (
+        HEX_AF / 2.0 - LEVER_BORE_DIA / 2.0,
+        BORE_TO_FLAT_WALL_WORST,
+    ),
     "rod-tap drill point to the lever bore": (
         LEVER_BORE_Y
         - LEVER_BORE_DIA / 2.0
@@ -103,10 +102,10 @@ DERIVED_WALL_BOUNDS: dict[str, tuple[float, float]] = {
     ),
 }
 for _name, (_nominal, _worst) in DERIVED_WALL_BOUNDS.items():
-    if _worst < WALL_TARGET - 1e-9:
+    if _worst < WALL_FLOOR - 1e-9:
         raise AssertionError(
             f"MHA-MG-02 {_name} wall {_worst:.3f} at the printed worst case is "
-            f"under {WALL_TARGET}"
+            f"under the {WALL_FLOOR} policy floor"
         )
 
 
@@ -183,8 +182,8 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # --- Marked model dimensions and the places the model authors on them --------
 # Five ordinary native location measurements remain authoritative even when
 # the three common-flat values print as one explicitly grouped dimension.
-# The native AF dimension owns receiving size; a global note owns supplied
-# stock form. The actual bore's callout owns finished net-wall acceptance.
+# The native HEX size applies to the complete ordinary hex profile; the
+# drawing adds no bespoke receiving-envelope or finished-wall inspection.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HexProfile": {"HexAf": HEX_AF_PLACES},
     "Block": {"Height": HEIGHT_PLACES},
@@ -215,14 +214,8 @@ GROUPED_HIDDEN_DIMENSIONS = frozenset(Z_FLAT_DIMENSIONS[1:])
 VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMENSIONS
 
 # --- Sheet text ----------------------------------------------------------------
-# Process, mate and finished-wall acceptance belong to the actual bore diameter.
-WALL_NOTE = "\n".join((
-    f"{WALL_TARGET:.1f} MIN FINISHED NET WALL",
-    "AND BLIND FLOOR; EXCEPT ONLY",
-    "SHOWN HOLE ENTRIES/EXITS AND",
-    "TOP-TAP/BORE INTERSECTION",
-))
-LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", WALL_NOTE))
+# Process and mate belong to the actual bore diameter.
+LEVER_BORE_CALLOUT = "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-MG-VN-50"
 ROD_TAP_PROCESS = "TAP"
@@ -234,15 +227,10 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
-STOCK_AF_CALLOUT = "1/2 HEX STOCK; FLATS AS SUPPLIED"
+# Native model-owned prefix: one HEX size, all three opposed-flat pairs.
+HEX_AF_PREFIX = "HEX "
 # The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
 SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
-# Independent full-height form acceptance for complete-bore/plain-body travel.
-DRAWING_NOTES = "\n".join((
-    f"TRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX",
-    "OVER FULL HEIGHT; FOR MHA-MG-03",
-    "PLAIN-BODY CLAMP TRAVEL",
-))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # --- Section hatch ----------------------------------------------------------------

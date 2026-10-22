@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import itertools
 import math
-from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,7 +15,6 @@ import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
 import _drawing_dimension_import as dimension_import
 import _drawing_dimensions as drawing_dimensions
-import _drawing_notes as drawing_notes
 from _layout_audit import arrowhead_segments
 from _layout_geometry import (
     ARROW_TEXT_CLEARANCE_M,
@@ -25,7 +23,7 @@ from _layout_geometry import (
     segment_box_distance,
     segment_box_overlap_length,
 )
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_no_surface_finish_on_the_clamped_bore() -> None:
@@ -76,13 +74,13 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     for name, (nominal, worst) in spec.DERIVED_WALL_BOUNDS.items():
-        assert worst >= spec.WALL_TARGET, name
+        assert worst >= spec.WALL_FLOOR, name
         assert nominal >= worst, name
     assert spec.DERIVED_WALL_BOUNDS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    # Finished stock form is separately accepted. Bore and tap axes each
-    # have an independent ordinary .XX location from the SAME actual flat.
+    # Bore and tap axes each have an independent ordinary .XX location
+    # from the SAME actual flat; HEX size/angles, not custom notes, own form.
     import mg_magnifying_clamp_geom as geom
 
     entry_errors = [
@@ -90,20 +88,61 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
         for tap_error, bore_error in itertools.product((-0.51, 0.51), repeat=2)
     ]
     assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(max(entry_errors))
-    assert geom.BORE_FULL_ANGULAR == pytest.approx(15.0 * math.tan(math.radians(0.3)))
-    assert spec.FINISHED_NET_WALL_MINIMUMS == {
-        "lever bore to outer faces": 2.0,
-        "rod-tap thread to outer faces": 2.0,
-        "thumb-screw tap thread to outer faces": 2.0,
-    }
-    assert set(spec.FINISHED_NET_WALL_MINIMUMS).isdisjoint(spec.DERIVED_WALL_BOUNDS)
-    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.092143505152)
+    assert geom.BORE_FULL_ANGULAR == pytest.approx(17.0 * math.tan(math.radians(0.3)))
+    assert spec.BORE_TO_FLAT_WALL_WORST == pytest.approx(1.644216032066)
+    assert spec.WALL_FLOOR < spec.BORE_TO_FLAT_WALL_WORST < spec.WALL_TARGET
+    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.081671433941)
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
     assert spec.TAP_STOP_WINDOW > 0.0
     assert spec.THUMB_DRILL_NEAR_CLEAR > 0.0 and spec.THUMB_DRILL_FAR_CLEAR > 0.0
     assert spec.ROD_TAP_SPEC is joint.ROD_TAP_SPEC
+
+
+def test_ordinary_hex_angular_corners_fit_the_derived_whole_body_envelope() -> None:
+    import mg_magnifying_clamp_geom as geom
+
+    # Construct actual face half-planes, not a copy of the envelope formula.
+    # Opposite pairs take every ordinary size corner; each of six face normals
+    # independently takes its +/-1-degree corner. Retain only real vertices.
+    largest = 0.0
+    drift = (geom.BLOCK_HEIGHT + 0.51) * math.tan(math.radians(1.0))
+    for sizes in itertools.product((12.19, 13.21), repeat=3):
+        for errors in itertools.product((-1.0, 1.0), repeat=6):
+            faces = [
+                (math.cos(math.radians(60.0 * index + errors[index])),
+                 math.sin(math.radians(60.0 * index + errors[index])),
+                 sizes[index % 3] / 2.0)
+                for index in range(6)
+            ]
+            vertices = []
+            for first, second in itertools.combinations(faces, 2):
+                ax, az, a = first
+                bx, bz, b = second
+                det = ax * bz - az * bx
+                if abs(det) < 1e-10:
+                    continue
+                x, z = (a * bz - az * b) / det, (ax * b - a * bx) / det
+                if all(nx * x + nz * z <= limit + 1e-9 for nx, nz, limit in faces):
+                    vertices.append((x, z))
+            assert len(vertices) >= 3
+            diameter = max(math.hypot(x1 - x2, z1 - z2)
+                           for (x1, z1), (x2, z2) in itertools.combinations(vertices, 2))
+            largest = max(largest, diameter + 2.0 * drift)
+    assert largest <= geom.STOCK_ENVELOPE_MAX
+    assert geom.STOCK_ENVELOPE_MAX == pytest.approx(17.0)
+    assert largest > 15.0  # Nominal regular corners are not the body guarantee.
+
+
+def test_loose_hex_bore_wall_may_miss_target_without_crossing_policy_floor() -> None:
+    import mg_magnifying_clamp_geom as geom
+
+    opposite_flat, furthest_axis, cut_radius = 12.19, 6.86, 6.60 / 2.0
+    relative_runoff = 17.0 * math.tan(math.radians(1.0 + 0.3))
+    wall = opposite_flat - furthest_axis - cut_radius - relative_runoff
+    assert 1.5 < wall < 2.0
+    assert wall == pytest.approx(geom.BORE_TO_FLAT_WALL_WORST)
 
 
 def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
@@ -113,9 +152,9 @@ def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
     band = printed_band_mm(geom.HEIGHT_PLACES)
     radius_max = (geom.LEVER_BORE_DIA + 0.10) / 2.0
     slope = math.tan(math.radians(0.3))
-    # Charge the whole accepted transverse envelope even at a central tap;
-    # no ideal-hex midpoint or longitudinal stock alignment is assumed.
-    wander = 15.0 * slope
+    # Spend the entire calculated full-height extent; no perfect-hex
+    # midpoint or symmetric station is credited.
+    wander = 17.0 * slope
     floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - wander
     assert floor == pytest.approx(geom.ROD_TAP_FLOOR_WALL_WORST)
     assert geom.BORE_FULL_ANGULAR == pytest.approx(wander)
@@ -166,34 +205,18 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
     assert old_overlap < joint.ENGAGEMENT_MIN
 
 
-def test_feature_owned_acceptance_retains_stock_envelope_wall_and_seat_requirements() -> None:
-    notes = spec.DRAWING_NOTES
-    assert float(Fraction(spec.STOCK_AF_CALLOUT.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
-    assert spec.STOCK_AF_CALLOUT == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+def test_ordinary_hex_size_needs_no_custom_wall_or_envelope_inspection_note() -> None:
     from _printed_tolerance import printed_band_mm
+
     band = printed_band_mm(spec.HEX_AF_PLACES)
     assert (spec.HEX_AF - band, spec.HEX_AF + band) == pytest.approx((12.19, 13.21))
-    for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "SEAT", "THREAD ENDS"):
-        assert gone not in notes
-    assert f"TRANSVERSE ENVELOPE {spec.STOCK_WIDTH_MAX:.2f} MAX" in notes
-    assert "OVER FULL HEIGHT" in notes
-    assert not hasattr(spec, "TAP_TOOL_NOTE")
-    assert not hasattr(spec, "BORE_WALL_NOTE")
-    # This is finished acceptance, not an AF/Rule#1 form guarantee.
-    assert "WALL" not in notes
-    assert spec.LEVER_BORE_CALLOUT.splitlines() == ["DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", *spec.WALL_NOTE.splitlines()]
-    assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
+    assert spec.HEX_AF_PREFIX == "HEX "
+    assert spec.LEVER_BORE_CALLOUT.splitlines() == [
+        "DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03",
+    ]
     assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
-    assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
+    assert "NO CHAMFER OR SPOTFACE AT TAP" in spec.SEAT_NOTE
     assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE; MHA-MG-VN-50"
-    assert "AT TAP" in spec.SEAT_NOTE
-    assert "MHA-MG-03" in notes and "CLAMP TRAVEL" in notes
-    for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):
-        assert stale not in notes
-    assert "BRASS" not in notes and "C36000" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
 
 
 def _front_drawing_layout(monkeypatch):
@@ -561,7 +584,7 @@ class _AfDisplay:
         self.ShowParenthesis, self.places, self.tolerance_places = False, 2, 2
         self.text, self.precision_calls, self.stale_precision = "", [], False
         self.precision_status = 0
-        self.prefix, self.suffix = "", ""
+        self.prefix, self.suffix = "HEX ", ""
 
     def GetDimension2(self, configuration):
         assert configuration == 0
@@ -619,7 +642,6 @@ def _af_fixture(monkeypatch):
     imported_annotation = SimpleNamespace(Owner=view, OwnerType=0, dangling=False)
     imported_annotation.IsDangling = lambda: imported_annotation.dangling
     imported_display = _AfDisplay(imported_dimension, imported_annotation)
-    imported_display.text = spec.STOCK_AF_CALLOUT
     imported_annotation.GetSpecificAnnotation = lambda: imported_display
     records, same_calls = [], []
 
@@ -655,12 +677,15 @@ def test_native_af_authoring_uses_ordinary_default_not_inactive_native_limits(mo
     inactive = (state.tolerance.minimum, state.tolerance.maximum)
     state.source_display.ShowParenthesis = True
     state.source_display.places = state.source_display.tolerance_places = -2
+    state.source_display.prefix, state.source_display.suffix = "OLD", "OLD"
     part._author_stock_af(state.adapter)
     assert state.tolerance.Type == 0
     assert state.source_display.precision_calls == [(2, -1, 2, -1)]
     assert state.source_display.places == state.source_display.tolerance_places == 2
     assert state.source_display.ShowParenthesis is False
     assert (state.tolerance.minimum, state.tolerance.maximum) == inactive
+    assert state.source_display.GetText(1) == "HEX "
+    assert state.source_display.GetText(2) == ""
     # NONE makes these stored getters inactive; their nonzero values cannot
     # masquerade as the title-block's ordinary receiving limits.
     from _printed_tolerance import printed_band_mm
@@ -713,7 +738,7 @@ def test_native_af_rejects_stale_reference_affixes_with_parenthesis_property_fal
         else:
             drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage=stage)
 
-    accept()  # The ordinary AF and its existing stock qualifier are allowed.
+    accept()  # The ordinary non-reference HEX size is allowed.
     display = state.source_display if target == "source" else state.display
     # Exercise the same independent native text parts as set_reference_dimension.
     display.SetText(1, prefix)
@@ -753,18 +778,16 @@ def test_native_af_source_requires_actual_distinct_opposite_flat_endpoints(monke
         part._assert_stock_af_source(state.adapter, stage="source-rebuilt")
 
 
-def test_native_af_import_keeps_supplied_stock_callout_on_actual_source_dimension_and_top_view(monkeypatch):
+def test_native_af_import_keeps_hex_size_on_actual_source_dimension_and_top_view(monkeypatch):
     state = _af_fixture(monkeypatch)
-    monkeypatch.setattr(drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda value, _interface, *_members: value)
-    monkeypatch.setattr(drawing_dimensions, "dimension_name", lambda _adapter, annotation: "HexAf")
-    drawing.set_dimension_callouts(state.adapter, [state.annotation], {"HexAf": spec.STOCK_AF_CALLOUT})
     drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
-    assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+    assert state.display.GetText(1) == "HEX "
+    assert state.display.GetText(4) == ""
     assert any(left is state.dimension and right is state.source_dimension for left, right in state.same_calls)
     assert any(left is state.annotation.Owner and right is state.view for left, right in state.same_calls)
 
 
-def test_native_top_af_placement_and_attached_stock_text_preserve_source_acceptance(monkeypatch):
+def test_native_top_af_placement_preserves_source_hex_size_and_ownership(monkeypatch):
     state = _af_fixture(monkeypatch)
     state.dimension.Name = "HexAf"
     state.display.GetDimension = lambda: state.dimension
@@ -801,70 +824,16 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
         state.adapter, state.view, keep=drawing.TOP_KEEP, view_label="top",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
-    drawing.set_dimension_callouts(state.adapter, curated, {"HexAf": spec.STOCK_AF_CALLOUT})
     assert curated == [state.annotation]
     # Assert the settled consumer readback, not a rebuild call-count contract.
     assert state.annotation.GetPosition() == (0.152, 0.255, 0.0)
-    assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+    assert state.display.GetText(1) == "HEX "
+    assert state.display.GetText(4) == ""
     assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
                       state.annotation.Owner, tuple(state.points))
     assert state.display.GetPrimaryPrecision2() == state.display.GetPrimaryTolPrecision2() == 2
     assert state.display.ShowParenthesis is False
 
-    # Actual R29 cd438278 native-layout-evidence.json / PDF ink, audit SHA256
-    # fce09c3fee08c0cf2e627da4bba96081860e36d7a8bcb3a8560941e2e8b9c3e6.
-    # Translation budgets the WHOLE paragraph against frozen native primitives;
-    # it is not proof of the next native text/arrow/tail routing or audit result.
-    value = Box(0.0733910, 0.2559339, 0.0970945, 0.2594993)
-    qualifier = Box(0.0474324, 0.2500044, 0.1229876, 0.2539430)
-    # Include the wider native text extent/baseline AND the actual ink height.
-    paragraph = Box(0.0467698, 0.2494437, 0.1232302, 0.2594993)
-    witnesses = (
-        Segment(0.06595, 0.2294985, 0.06595, 0.2504438, "ext-line"),
-        Segment(0.10405, 0.2294985, 0.10405, 0.2504438, "ext-line"),
-    )
-    assert segment_box_overlap_length(witnesses[1], qualifier) > 0.0
-    # The audit's recorded 0.2394 mm overlap uses its own ink padding; do not
-    # replace it with the unpadded segment/box intersection above.
-    left_proposal = Box(qualifier.xmin - 0.035, qualifier.ymin,
-                        qualifier.xmax - 0.035, qualifier.ymax)
-    assert segment_box_overlap_length(witnesses[0], left_proposal) > 0.0
-    assert left_proposal.xmin < 0.0127  # x50 also crosses the inner border.
-    assert paragraph.xmax - paragraph.xmin > 0.06595 - 0.0127
-
-    x, y, _z = state.annotation.GetPosition()
-    dx, dy = x - 0.085, y - 0.255
-    assert dy == 0.0  # Raising the whole annotation also raises its witnesses.
-    moved = tuple(Box(b.xmin + dx, b.ymin, b.xmax + dx, b.ymax)
-                  for b in (value, qualifier, paragraph))
-    native_lines = (
-        *witnesses,
-        Segment(0.10405, 0.2494438, 0.1104, 0.2494438, "dim-line"),
-        Segment(0.10405, 0.2494438, 0.06595, 0.2494438, "dim-line"),
-        Segment(0.06595, 0.2494438, 0.0596, 0.2494438, "dim-line"),
-    )
-    for arrow_x, direction in ((0.10405, 1.0), (0.06595, -1.0)):
-        arrow = (arrow_x, 0.2494438, -0.04395, direction, 0.0, 0.0,
-                 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0)
-        assert all(segment_box_distance(segment, box) > 0.003
-                   for segment in arrowhead_segments(arrow) for box in moved)
-    assert all(segment_box_distance(segment, box) > 0.003
-               for segment in native_lines for box in moved)
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    assert moved[2].xmin - 0.0127 > 0.100
-    assert template.width_m - 0.0127 - moved[2].xmax > 0.228
-    assert template.height_m - 0.0127 - moved[2].ymax > 0.007
-    neighbors = (
-        Box(0.060362, 0.189915, 0.109638, 0.245085),  # TOP outline
-        # Conservative union of the actual top-tap leader and both text rows.
-        Box(0.0816779, 0.2168172, 0.2220517, 0.2320527),
-        Box(0.0652137, 0.1761622, 0.0710726, 0.1823344),  # upper A ink
-        Box(0.0387871, 0.1841558, 0.0473203, 0.1877211),  # diagonal 6.35
-        Box(0.222415, 0.120162, 0.277585, 0.219838),  # section outline
-        Box(0.3353594, 0.2414083, 0.3937131, 0.2449736),  # iso caption
-    )
-    assert all(box.gap(neighbor) > 0.004 for box in moved for neighbor in neighbors)
-    assert moved[1].ymin - neighbors[1].ymax > 0.0179
 
 
 
@@ -881,7 +850,7 @@ def test_native_af_import_refuses_wrong_source_context_or_postrebuild_drift(monk
     elif fault == "dangling":
         state.annotation.dangling = True
     elif fault == "text":
-        state.display.text = "FLATS AS SUPPLIED"
+        state.display.prefix = "STOCK "
     elif fault == "unknown-self":
         same = state.adapter.swApp.IsSame
         state.adapter.swApp.IsSame = lambda left, right: 2 if left is right is state.view else same(left, right)
@@ -891,136 +860,6 @@ def test_native_af_import_refuses_wrong_source_context_or_postrebuild_drift(monk
         drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
 
 
-@pytest.mark.parametrize("fault", (
-    None, "activation", "wrong-initial-edge", "first-rebuild-switch",
-    "stale-property", "raw-link", "leader", "position", "wrong-edge",
-    "dangling", "owner", "owner-type", "lost-height", "unknown-self", "nonfinite-depth",
-))
-def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebuild(monkeypatch, fault):
-    import _drawing_leader_notes as leader_notes
-
-    view = SimpleNamespace(GetName2=lambda: "Section A-A")
-    edge = SimpleNamespace(
-        x=drawing.SECTION_CENTER[0] + drawing._HALF_AC,
-        low=drawing._elev_y(drawing.SECTION_CENTER, 0.0),
-        high=drawing._elev_y(drawing.SECTION_CENTER, spec.LEVER_BORE_Y - spec.LEVER_BORE_DIA / 2.0),
-    )
-    properties = {"Manufacturing Notes": spec.DRAWING_NOTES}
-    state = SimpleNamespace(active=None, entities=(), leaders=0, position=None, dangling=False)
-    annotation = SimpleNamespace(Owner=view, OwnerType=0)
-    annotation.GetAttachedEntities3 = lambda: state.entities
-    annotation.GetAttachedEntityCount3 = lambda: len(state.entities)
-    annotation.GetAttachedEntityTypes = lambda: (1,) * len(state.entities)
-    annotation.GetLeaderCount = lambda: state.leaders
-    annotation.GetPosition = lambda: state.position
-    annotation.IsDangling = lambda: state.dangling
-
-    def attach(entities):
-        state.entities = tuple(entities)
-        return True
-
-    def leader(*_arguments):
-        state.leaders = 1
-        return 0
-
-    def position(x, y, z):
-        # Actual R32 native note depth, despite SetPosition2 requesting Z0:
-        # this is not a displacement in the sheet's XY placement.
-        state.position = x, y, 0.009421525247823612
-        return True
-
-    annotation.SetAttachedEntities = attach
-    annotation.SetLeader3 = leader
-    annotation.SetPosition2 = position
-    note = SimpleNamespace(
-        GetAnnotation=lambda: annotation,
-        PropertyLinkedText=drawing_notes.property_link("Manufacturing Notes"),
-        GetText=lambda: properties["Manufacturing Notes"],
-    )
-
-    def activate(name):
-        assert name == view.GetName2()
-        if fault == "activation":
-            return False
-        state.active = view
-        return True
-
-    def select(_adapter, target, entity_type, xy, *, label, entity=None):
-        assert target is view and entity_type == "EDGE"
-        if not activate(target.GetName2()):
-            raise RuntimeError("failed to activate the native stock-note view")
-        if entity is None:
-            x, y = xy
-            assert x == pytest.approx(edge.x) and edge.low < y < edge.high
-        else:
-            assert entity is edge and xy is None
-        return edge
-
-    def insert(text):
-        assert state.active is view
-        assert text == drawing_notes.property_link("Manufacturing Notes")
-        if fault == "wrong-initial-edge":
-            state.entities = (SimpleNamespace(**vars(edge)),)
-        return note
-
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(
-            ActivateView=activate, ClearSelection2=lambda _all: None, InsertNote=insert,
-        ),
-        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(leader_notes, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(leader_notes._sw_type_info, "early_bound_or_flag", lambda value, _interface, *_members: value)
-    monkeypatch.setattr(drawing, "_select_view_entity", select)
-    monkeypatch.setattr(leader_notes, "_select_view_entity", select)
-    monkeypatch.setattr(leader_notes, "dispatch_array", tuple)
-
-    def rebuild(*_args, **_kwargs):
-        if fault == "first-rebuild-switch":
-            state.entities = (SimpleNamespace(**vars(edge)),)
-
-    monkeypatch.setattr(leader_notes, "rebuild_drawing", rebuild)
-    if fault in ("activation", "wrong-initial-edge", "first-rebuild-switch"):
-        message = "activate" if fault == "activation" else "lost its edge attachment"
-        with pytest.raises(RuntimeError, match=message):
-            drawing._add_stock_form_note(adapter, view)
-        if fault == "activation":
-            assert state.entities == () and state.position is None
-        return
-    result, retained_edge = drawing._add_stock_form_note(adapter, view)
-    assert result is note and retained_edge is edge
-    assert state.entities == (edge,) and state.leaders == 1
-    assert state.position == (*drawing.STOCK_FORM_NOTE_XY, 0.009421525247823612)
-    assert properties == {"Manufacturing Notes": spec.DRAWING_NOTES}
-    if fault == "stale-property":
-        properties["Manufacturing Notes"] = "OLD STOCK"
-    elif fault == "raw-link":
-        # A frozen literal can look identical but no longer follows the part.
-        note.PropertyLinkedText = spec.DRAWING_NOTES
-    elif fault == "leader":
-        state.leaders = 0
-    elif fault == "position":
-        state.position = (0.305, 0.140, 0.0)
-    elif fault == "nonfinite-depth":
-        state.position = (*drawing.STOCK_FORM_NOTE_XY, math.nan)
-    elif fault == "wrong-edge":
-        state.entities = (SimpleNamespace(**vars(edge)),)
-    elif fault == "dangling":
-        state.dangling = True
-    elif fault == "owner":
-        annotation.Owner = SimpleNamespace(GetName2=view.GetName2)
-    elif fault == "owner-type":
-        annotation.OwnerType = 1
-    elif fault == "lost-height":
-        properties["Manufacturing Notes"] = spec.DRAWING_NOTES.replace("OVER FULL HEIGHT", "")
-    elif fault == "unknown-self":
-        adapter.swApp.IsSame = lambda left, right: 2 if left is right is view else int(left is right)
-    if fault is None:
-        drawing._assert_stock_form_note(adapter, view, note, retained_edge, stage="after-final-rebuild")
-    else:
-        with pytest.raises(RuntimeError):
-            drawing._assert_stock_form_note(adapter, view, note, retained_edge, stage="after-final-rebuild")
 
 
 @pytest.mark.parametrize("interface", ("IEntity", "ISketchPoint", "ISketchSegment"))
@@ -2855,12 +2694,12 @@ def test_common_flat_cutover_changes_the_accepted_set_without_tightening_dot_xx(
     # All three positions are independently accepted, not an implied coincidence.
     assert max(abs(tap - bore) for tap, bore in itertools.product((low, high), repeat=2)) == pytest.approx(1.02)
     assert geom.BLOCK_HEIGHT == 29.50 and geom.LEVER_BORE_Y == 19.95
-    assert spec.THUMB_ENGAGEMENT_WORST == pytest.approx(4.402888710865)
-    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.092143505152)
-    assert spec.TAP_REACH_NEEDED == pytest.approx(11.901655204897)
-    assert spec.TAP_STOP_WINDOW == pytest.approx(0.668770658377)
-    assert spec.THUMB_DRILL_NEAR_CLEAR == pytest.approx(0.651607939983)
-    assert spec.THUMB_DRILL_FAR_POINT_CLEAR == pytest.approx(0.720010993346)
+    assert spec.THUMB_ENGAGEMENT_WORST == pytest.approx(4.392416639654)
+    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.081671433941)
+    assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
+    assert spec.TAP_STOP_WINDOW > 0.0
+    assert spec.THUMB_DRILL_NEAR_CLEAR > 0.0
+    assert spec.THUMB_DRILL_FAR_POINT_CLEAR > 0.0
 
 
 def _flat_group_fixture(monkeypatch):

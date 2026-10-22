@@ -260,8 +260,8 @@ def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
 def _layout_linear_annotations(
     adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any,
 ) -> None:
-    """Place the five reviewed text blocks from native ink, then guard neighbours."""
-    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NeckToFootSide")
+    """Place reviewed text from native witnesses, then guard neighbours."""
+    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide", "NeckToFootSide")
     # Retain the actual drawing-created edge dimension instead of rediscovering
     # it through the model-item name lookup that failed in R32.
     local_display = _early_bound(_early_bound(lateral_location, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
@@ -296,16 +296,20 @@ def _layout_linear_annotations(
             left_foot - 0.004 - (before["MountingY0"].text[2] - before["MountingY0"].text[0]),
             max(max(line.y0, line.y1) for line in before["MountingY0"].leader) + 0.0022,
         ),
+        "TapFromSide": (
+            max(line.x0 for line in verticals("TapFromSide")) + 0.004,
+            before["TapFromSide"].text[1],
+        ),
     }
     for name, target in targets.items():
         annotation = by_name[name]
         display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         display.CenterText = False
-        if name in ("NeckThickness", "MountingY0"):
+        if name in ("NeckThickness", "MountingY0", "TapFromSide"):
             # Jog the text outside its witnesses without dragging a native
             # dimension/extension line through the shorter unqualified value.
             display.OffsetText = True
-        if display.CenterText is not False or (name in ("NeckThickness", "MountingY0") and display.OffsetText is not True):
+        if display.CenterText is not False or (name in ("NeckThickness", "MountingY0", "TapFromSide") and display.OffsetText is not True):
             raise RuntimeError(f"{name}: native text placement mode did not persist")
         for _attempt in range(3):
             ink = _dimension_layout_ink(adapter, annotation, label=name)
@@ -376,7 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open threaded bracket source", await adapter.open_model(str(SOURCE)))
     properties = read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Isometric View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout)
-    stamp_drawing_summary(adapter, drawing, {0: "Magnifying Bracket Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "blued 1018 simple L bracket; quarter-inch through thread", 4: "Generated from the project-owned ASME B drawing standard"})
+    stamp_drawing_summary(adapter, drawing, {0: "Magnifying Bracket Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "blued low-carbon-steel L bracket; quarter-inch through thread", 4: "Generated from the project-owned ASME B drawing standard"})
     front = place_view(adapter, str(SOURCE), "*Top", *FRONT_CENTER, scale=SHEET_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Front", *BOTTOM_CENTER, scale=SHEET_SCALE)
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SHEET_SCALE)

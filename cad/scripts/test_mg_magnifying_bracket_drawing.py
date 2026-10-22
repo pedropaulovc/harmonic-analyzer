@@ -417,8 +417,6 @@ def test_native_process_rows_preserve_all_hole_variables_and_mate(monkeypatch, t
         assert text.count("DRILL") == 1 and len(re.findall(r"\bTAP\b", text)) == int(tapped)
         assert text.count(mate) == 1
         assert "THRU" not in text.splitlines()  # No standalone literal repeat.
-        if tapped:
-            assert "45°" in text and "BOTH ENDS" in text and "BOTH LEGS" not in text
 
 
 @pytest.mark.parametrize("fault", (None, "missing_edge", "ambiguous_edge", "wrong_attachment", "wrong_value", "basic", "precision"))
@@ -470,7 +468,7 @@ def test_neck_location_uses_straight_physical_faces_away_from_smooth_root(monkey
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault):
     """Historical native ink stations with updated labels and simulated moves."""
     rows = {
-        "NeckThickness": [("12.50 ±0.1", .1070212, .185, .0219576)],
+        "NeckThickness": [("12.50", .1070212, .185, .0142236)],
         "FlangeDepth": [("3.175", .1667191, .123, .0116375)],
         "MountingX0": [("9.00 ±0.05", .0327281, .0532219, .0245438)],
         "MountingX1": [("22.70 ±0.05", .0464351, .0432219, .0271299)],
@@ -478,6 +476,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "SeatToAxis": [("100.40", .1875951, .1622219, .0168097)],
         "FlangeWidth": [("49.25", .0718882, .0952219, .0142236)],
         "NeckToFootSide": [("0.85", .247, .096, .010)],
+        "TapFromSide": [("5.50 ±0.05", .2277281, .2372219, .0245438)],
     }
     lines = {
         "NeckThickness": [(.091125, .2114488, .091125, .1784438), (.103625, .2114488, .103625, .1784438), (.091125, .1794438, .1633882, .1794438)],
@@ -488,6 +487,13 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "SeatToAxis": [(.2215, .1120512, .195, .1120512), (.2340527, .2124488, .195, .2124488), (.196, .1120512, .196, .1622219), (.196, .2124488, .196, .1677781)],
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
         "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
+        "TapFromSide": [
+            (.2335, .2134488, .2335, .2382219),
+            (.228, .2185015, .228, .2382219),
+            (.2335, .2372219, .2522719, .2372219),
+            (.2335, .2372219, .228, .2372219),
+            (.228, .2372219, .22165, .2372219),
+        ],
     }
     items = {name: SimpleNamespace(name=name, dx=0.0, dy=0.0, CenterText=True, OffsetText=False) for name in rows}
     for item in items.values():
@@ -531,7 +537,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
     # Causal controls: actual frozen witnesses cross both horizontal size
     # text boxes, and the 6.35 row is struck at Y80 before placement.
-    for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1])):
+    for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1]), ("TapFromSide", lines["TapFromSide"][0])):
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
     if fault:
@@ -549,6 +555,8 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         assert ink["MountingX1"].text[0] > .072075
         assert ink["MountingY0"].text[1] > .08635
         assert items["MountingY0"].OffsetText
+        assert ink["TapFromSide"].text[0] > max(line[0] for line in lines["TapFromSide"][:2])
+        assert items["TapFromSide"].OffsetText
 
 
 

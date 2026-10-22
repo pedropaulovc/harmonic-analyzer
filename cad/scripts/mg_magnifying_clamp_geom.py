@@ -40,15 +40,25 @@ from mg_rod_clamp_joint import (
 
 MM_PER_IN = 25.4
 
-# --- stock: 1/2 in hex brass bar, flats as supplied --------------------------
-HEX_AF = 0.5 * MM_PER_IN  # 12.70 across flats
-# Ordinary .XX receiving acceptance, owned by the native non-reference AF.
-# The separate 2 MIN finished walls and 15 MAX full-height form reject bad
-# dimensional corners; this band alone is not an all-corners wall certificate.
+# --- stock: ordinary 1/2 in HEX, all three opposed-flat pairs ---------------
+HEX_AF = 0.5 * MM_PER_IN  # 12.70 across flats, ordinary .XX acceptance
 HEX_AC = HEX_AF / math.cos(math.radians(30.0))  # nominal 14.6647 across corners
-# Explicit receiving envelope, measured over the entire finished stock length.
-# This is not inferred from exact 60-degree normals or from Rule #1 for STOCK.
-STOCK_WIDTH_MAX = 15.0
+BLOCK_HEIGHT = 29.50
+HEIGHT_PLACES = 2
+_HEIGHT_BAND = printed_band_mm(HEIGHT_PLACES)
+_HEX_AF_BAND = printed_band_mm(2)
+_HEX_ANGLE = math.radians(angular_band_deg())
+# The ordinary HEX size applies over the full length, not to unconstrained
+# "flats as supplied". Bound adjacent normals, opposite-face angular error
+# and full-height drift without assuming exact 60-degree faces or centring:
+# D cos(30+a) <= AFmax + 2 Hmax tan(a) + D sin(a).
+# Round OUT to a shop-sized calculation bound; this is not a printed limit
+# or an additional receiving inspection requirement.
+STOCK_ENVELOPE_MAX = math.ceil(
+    (HEX_AF + _HEX_AF_BAND + 2.0 * (BLOCK_HEIGHT + _HEIGHT_BAND) * math.tan(_HEX_ANGLE))
+    / (math.cos(math.radians(30.0) + _HEX_ANGLE) - math.sin(_HEX_ANGLE))
+    * 20.0
+) / 20.0
 # The block's extent ALONG THE LEVER: the bore runs corner to corner, so this
 # is the across-corners width. error_budget.clamp_radius_band and the web
 # mechanics export read it under this name.
@@ -64,7 +74,7 @@ LOCATION_BAND = printed_band_mm(LOCATION_PLACES)
 LOCATION_FROM_FLAT = round(HEX_AF / 2.0, LOCATION_PLACES)
 DRILL_WANDER_DEG = 0.3
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
-BORE_FULL_ANGULAR = STOCK_WIDTH_MAX * _DRILL_SLOPE
+BORE_FULL_ANGULAR = STOCK_ENVELOPE_MAX * _DRILL_SLOPE
 # Bore and both tap entry axes use ONE actual Z-flat baseline at .XX.
 # Two independent ordinary ±0.51 locations bound their relative offset by
 # 1.02; diameter variation does not enter a center-to-center location.
@@ -76,9 +86,16 @@ TAP_TO_BORE_ENTRY_Z_MAX = 2.0 * LOCATION_BAND
 
 
 # --- heights from the bottom face (two-place prints, the .XX band) -----------
-HEIGHT_PLACES = 2
-_HEIGHT_BAND = printed_band_mm(HEIGHT_PLACES)
 WALL_TARGET = 2.0
+WALL_FLOOR = 1.5
+# The opposite flat, maximum independent location, bore size and relative
+# flat/drill angle give the limiting nonintersecting wall. The ordinary
+# dimensional corner misses the 2 mm TARGET but remains above the 1.5 floor.
+BORE_TO_FLAT_WALL_WORST = (
+    HEX_AF - _HEX_AF_BAND - (LOCATION_FROM_FLAT + LOCATION_BAND)
+    - _LEVER_BORE_R_MAX
+    - STOCK_ENVELOPE_MAX * math.tan(math.radians(angular_band_deg() + DRILL_WANDER_DEG))
+)
 ROD_TAP_DRILL_DIA = blind_cut_dia_mm(ROD_TAP_SPEC)
 ROD_TAP_DRILL_POINT = (
     (ROD_TAP_DRILL_DIA + drilled_oversize_mm()) / 2.0 / math.tan(math.radians(59.0))
@@ -99,7 +116,6 @@ ROD_TAP_FLOOR_WALL_WORST = (
 # FULL engagement is the intersection of the actual male and female intervals,
 # not just female wall length. The stock screw's finite flat tip and 0.75P
 # chamfer consume thread above its contact with the rod.
-BLOCK_HEIGHT = 29.50
 TOP_TO_BORE = BLOCK_HEIGHT - LEVER_BORE_Y
 EDGE_BREAK = 0.25  # title block edge break at the tap mouth
 # Conservatively add the general angular band to drill angular run-off.
@@ -137,10 +153,9 @@ THUMB_TAP_SPEC = HoleSpec(
 )
 
 # --- import-time geometry guards ---------------------------------------------
-if ROD_TAP_FLOOR_WALL_WORST < WALL_TARGET - 1e-9:
+if min(BORE_TO_FLAT_WALL_WORST, ROD_TAP_FLOOR_WALL_WORST) < WALL_FLOOR - 1e-9:
     raise AssertionError(
-        f"MHA-MG-02 rod-tap floor under the lever bore {ROD_TAP_FLOOR_WALL_WORST:.3f} "
-        f"at worst, under {WALL_TARGET}"
+        "MHA-MG-02 ordinary hex/bore bands lose the 1.5 mm wall floor"
     )
 if THUMB_ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
     raise AssertionError(

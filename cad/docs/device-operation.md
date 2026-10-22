@@ -113,19 +113,21 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 ### Model travel, published capacity and as-made fit-up
 
 `mg_magnifying_lever_geom.operating_clamp_radius_band()` is the source for the
-current **81.81 / 165.0 / 196.825 mm** minimum / built / maximum distances from
+current **83.81 / 165.0 / 194.825 mm** minimum / built / maximum distances from
 the knife axis to the clamp's bottom-rod/tap axis. The built pose and actual
 part geometry have not moved. The component upper bound is not the setup
 limit: `READOUT.md` still caps this procedure at the built 165 mm station.
 
-The full **15 mm one-sided** clamp envelope starts at the actual tap axis
-inside the finished block; do not assume a centred ±7.5 mm envelope. The
-earliest accepted plain-to-runout boundary is
+The full **17 mm one-sided calculated body bound** starts at the actual tap
+axis inside the finished block; do not assume a centred ±8.5 mm envelope.
+This comes from ordinary HEX size and default drawn angles over the full
+height, not a separate printed receiving limit or unconstrained supplied stock.
+The earliest accepted plain-to-runout boundary is
 $(167.5-0.8)-(18+0.51)=148.19$ mm in lever coordinates. Thus the conservative
-minimum radius is $215-148.19+15=81.81$ mm; the bracket near face is an
+minimum radius is $215-148.19+17=83.81$ mm; the bracket near face is an
 additional lower stop, but the runout limit is stricter. At the free end the
 complete bore must remain on cylindrical plain stock beyond the hemisphere,
-so the maximum is $215-(D_{\max}/2+15)=196.825$ mm. These are component
+so the maximum is $215-(D_{\max}/2+17)=194.825$ mm. These are component
 interval bounds, **not a native all-machine clearance or articulation proof**.
 
 Before setting the clamp, verify the **as-made sliding bore clearance** against

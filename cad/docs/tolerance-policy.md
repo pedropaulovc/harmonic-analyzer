@@ -151,7 +151,7 @@ flowchart LR
     e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
     e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
-    e8["common-mode gain: calibrated out<br/>component range 81.81 / 165 / 196.825 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
+    e8["common-mode gain: calibrated out<br/>component range 83.81 / 165 / 194.825 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
     e9["reading ±0.075 mm<br/>crank index ±8°<br/>terms from current report"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
@@ -456,7 +456,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    gain, including the magnifier setting, so the magnifier is reset per trial to bring the
    k = 0 term to the full stroke. Its finite range is the conservative component
    band from `mg_magnifying_lever_geom.operating_clamp_radius_band()`: currently
-   **81.81 / 165.0 / 196.825 mm** minimum / built / maximum knife-to-clamp-axis
+   **83.81 / 165.0 / 194.825 mm** minimum / built / maximum knife-to-clamp-axis
    radii, with this procedure capped at the built **165 mm**. It runs on the
    wire's moment arm, not station radius: the output fixture's hook is toward
    the knife and the wire leans toward the wheel. Read capacity from the
@@ -659,21 +659,24 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   **Nominal model travel** is `clamp_radius_band(block_depth)`, for visualization
   and export only. **Published component operating bounds** come from the
   no-argument `operating_clamp_radius_band()`, currently
-  **81.81 / 165.0 / 196.825 mm** from knife to clamp/bottom-rod axis.
+  **83.81 / 165.0 / 194.825 mm** from knife to clamp/bottom-rod axis.
   **As-made fit-up** may admit more travel after inspection, but that extra
   travel is not advertised as capacity. No physical model pose or part
   geometry changes with this conservative capacity policy.
 
   The accepted earliest unthreaded root is
-  $(167.5-0.8)-(18+0.51)=148.19$ mm. Use the **full 15 mm one-sided clamp
-  envelope** from the actual tap axis inside finished stock, never ±7.5 mm
-  symmetry: $R_{\min}=215-148.19+15=81.81$ mm. The bracket near face is an
+  $(167.5-0.8)-(18+0.51)=148.19$ mm. Use the **full 17 mm one-sided calculated
+  body bound** from the actual interior tap axis, never ±8.5 mm symmetry:
+  $R_{\min}=215-148.19+17=83.81$ mm. The bracket near face is an
   additional lower stop, but runout is stricter. At the free end keep the
   complete bore on cylindrical plain body beyond the hemisphere:
-  $R_{\max}=215-(D_{\max}/2+15)=196.825$ mm. The nominal model's X149.50
+  $R_{\max}=215-(D_{\max}/2+17)=194.825$ mm. The nominal model's X149.50
   thread-root boundary is not the earliest accepted root and earns no capacity
   credit. These are conservative **component intervals**, not native
   all-machine kinematic clearance.
+  The derived bound includes ordinary HEX size on all three opposed-flat pairs
+  and default drawn angles over the full height. It is not a separate printed
+  envelope inspection or a guarantee for unconstrained as-supplied form.
 
   What the pen sees is `error_budget.wire_moment_arm`, resolved from the same
   signed hook offset and wire tangent as the built run, not the clamp radius.
