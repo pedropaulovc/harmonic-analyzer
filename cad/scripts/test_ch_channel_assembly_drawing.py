@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import re
 
+from types import SimpleNamespace
+from unittest.mock import Mock
 import _buildgraph
 from _assembly_contract import assembly_contract
 import _config
@@ -668,6 +670,251 @@ def test_caption_refuses_native_extent_entering_title_block(
     table = _CaptionTable((0.006,), (0.205, top + 0.020, 0.0))
     with pytest.raises(RuntimeError, match="title block"):
         drawing._assert_exploded_caption(object(), table, note)
+
+
+@pytest.fixture
+def split_balloon_sheet(monkeypatch):
+    """Run sheet orchestration, not COM; synthetic landings prove no native ink."""
+    from _drawing_balloons import BalloonLanding
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=Mock(return_value=True)))
+    main_view, detail_b, detail_c, table, caption = (object() for _ in range(5))
+    # Deliberately decouple native BOM item numbers, row order and creation
+    # order. The split must forward validated (stem, item) pairs unchanged.
+    items = tuple(
+        (stem, str(index))
+        for index, stem in enumerate(reversed(drawing.BOM_COMPONENTS), start=1)
+    )
+    north = {stem: f"channel/{stem}-north" for stem in drawing.BOM_COMPONENTS}
+    state = SimpleNamespace(
+        adapter=adapter,
+        main_view=main_view,
+        detail_c=detail_c,
+        table=table,
+        caption=caption,
+        items=items,
+        north=north,
+        unproven=None,
+        omit=None,
+        created=[],
+    )
+
+    def balloons(adapter, view, *, items, anchors, **kwargs):
+        result = []
+        for stem, item in reversed(items):
+            if stem == state.omit:
+                continue
+            # Opaque notes deliberately expose no leader-tip setters.
+            note = object()
+            landing = BalloonLanding(
+                stem=stem,
+                instance=anchors[stem].instance,
+                note=note,
+                sheet_xy=(
+                    (0.392, 0.170)
+                    if view is detail_c and stem != state.unproven
+                    else None
+                ),
+                label=f"synthetic {stem} item {item}",
+            )
+            result.append(landing)
+            state.created.append(landing)
+        return result
+
+    for name in (
+        "_activate_sheet",
+        "set_high_quality_shaded_with_edges",
+        "set_view_exploded_state",
+        "_center_view_outline",
+        "_assert_view_on_sheet",
+        "_mark_exploded_details",
+        "_add_north_end_trail",
+    ):
+        monkeypatch.setattr(drawing, name, Mock())
+    replacements = {
+        "place_view": Mock(return_value=main_view),
+        "apply_view_configuration": Mock(return_value=drawing.ASSEMBLY_VIEW_CONFIGURATION),
+        "insert_bom_table": Mock(return_value=table),
+        "_validate_bom": Mock(return_value=items),
+        "_bom_vertical_limits": Mock(return_value=(0.125, drawing.BOM_ANCHOR[1])),
+        "_add_note_block": Mock(return_value=caption),
+        "_exploded_detail": Mock(
+            side_effect=lambda adapter, detail: (
+                detail_c if detail is drawing.NORTH_KEEPER_DETAIL else detail_b
+            )
+        ),
+        "add_component_bom_balloons": Mock(side_effect=balloons),
+        "position_bom_balloon": Mock(),
+        "assert_balloon_landings": Mock(),
+        "_assert_exploded_caption": Mock(),
+    }
+    for name, replacement in replacements.items():
+        monkeypatch.setattr(drawing, name, replacement)
+    return state
+
+
+def test_keeper_balloon_split_preserves_validated_identities_and_north_instances(
+    split_balloon_sheet,
+) -> None:
+    state = split_balloon_sheet
+    drawing._place_exploded_sheet(state.adapter, state.north)
+    drawing._validate_bom.assert_called_once_with(state.adapter, state.table)
+    calls = drawing.add_component_bom_balloons.call_args_list
+    assert len(calls) == 2
+    main, keeper = calls
+    keeper_stems = {
+        drawing.explode.KEEPER,
+        drawing.explode.KEEPER_FOOT_SCREW,
+        drawing.explode.KEEPER_SET_SCREW,
+    }
+    assert main.args == (state.adapter, state.main_view)
+    assert keeper.args == (state.adapter, state.detail_c)
+    assert len(main.kwargs["items"]) == 16
+    assert len(keeper.kwargs["items"]) == 3
+    for call, stems in (
+        (main, set(drawing.BOM_COMPONENTS) - keeper_stems),
+        (keeper, keeper_stems),
+    ):
+        expected = tuple(row for row in state.items if row[0] in stems)
+        assert tuple(call.kwargs["items"]) == expected
+        assert all(actual is row for actual, row in zip(call.kwargs["items"], expected))
+        assert set(call.kwargs["anchors"]) == stems
+        for stem, anchor in call.kwargs["anchors"].items():
+            assert anchor.instance == state.north[stem]
+            assert anchor.point_mm == (
+                drawing.BRACKET_BALLOON_POINT_MM if stem == drawing.explode.BRACKET else None
+            )
+    combined = (*main.kwargs["items"], *keeper.kwargs["items"])
+    assert len(combined) == len(set(combined)) == 19
+    assert set(combined) == set(state.items)
+    assert [call.args[1] for call in drawing._exploded_detail.call_args_list] == list(
+        drawing.EXPLODED_DETAILS
+    )
+    assert drawing.insert_bom_table.call_args.kwargs["expected_components"] == drawing.BOM_COMPONENTS
+
+
+def test_keeper_circles_move_by_validated_item_not_landing_creation_order(
+    split_balloon_sheet,
+) -> None:
+    state = split_balloon_sheet
+    drawing._place_exploded_sheet(state.adapter, state.north)
+    expected = {
+        item: drawing.KEEPER_BALLOON_POSITIONS[stem]
+        for stem, item in state.items
+        if stem in drawing.KEEPER_BALLOON_POSITIONS
+    }
+    calls = drawing.position_bom_balloon.call_args_list
+    assert len(calls) == 3
+    assert {call.kwargs["item_number"]: call.kwargs["position_xy"] for call in calls} == expected
+    keeper_notes = {
+        landing.note
+        for landing in state.created
+        if landing.stem in drawing.KEEPER_BALLOON_POSITIONS
+    }
+    for call in calls:
+        assert call.args[0] is state.adapter
+        assert set(call.args[1]) == keeper_notes
+        assert len(call.args[1]) == 3
+
+
+@pytest.mark.parametrize(
+    "stem",
+    [drawing.explode.KEEPER, drawing.explode.KEEPER_FOOT_SCREW, drawing.explode.KEEPER_SET_SCREW],
+)
+def test_detail_c_refuses_each_unproven_listed_edge_before_moving_circles(
+    split_balloon_sheet, stem,
+) -> None:
+    state = split_balloon_sheet
+    state.unproven = stem
+    with pytest.raises(RuntimeError, match="DETAIL C.*unproven"):
+        drawing._place_exploded_sheet(state.adapter, state.north)
+    drawing.position_bom_balloon.assert_not_called()
+
+
+@pytest.mark.parametrize("stem", [drawing.explode.BRACKET, drawing.explode.KEEPER])
+def test_split_balloon_sheet_refuses_a_missing_main_or_detail_landing(
+    split_balloon_sheet, stem,
+) -> None:
+    state = split_balloon_sheet
+    state.omit = stem
+    with pytest.raises(RuntimeError, match="18 balloons"):
+        drawing._place_exploded_sheet(state.adapter, state.north)
+
+
+@pytest.mark.parametrize("failure", [None, "balloon", "caption"])
+def test_split_balloon_settled_check_retains_all_nineteen_and_caption(
+    split_balloon_sheet, failure,
+) -> None:
+    state = split_balloon_sheet
+    settled = drawing._place_exploded_sheet(state.adapter, state.north)
+    drawing.assert_balloon_landings.reset_mock()
+    drawing._assert_exploded_caption.reset_mock()
+    if failure is not None:
+        guard = (
+            drawing.assert_balloon_landings
+            if failure == "balloon"
+            else drawing._assert_exploded_caption
+        )
+        guard.side_effect = RuntimeError(f"settled {failure} changed")
+        with pytest.raises(RuntimeError, match=f"settled {failure} changed"):
+            settled()
+    else:
+        settled()
+    drawing.assert_balloon_landings.assert_called_once()
+    adapter, landings = drawing.assert_balloon_landings.call_args.args
+    assert adapter is state.adapter
+    assert len(landings) == 19
+    assert {id(landing) for landing in landings} == {id(landing) for landing in state.created}
+    if failure != "balloon":
+        drawing._assert_exploded_caption.assert_called_once_with(
+            state.adapter, state.table, state.caption
+        )
+
+
+def test_exploded_detail_returns_the_placed_cropped_labelled_view(monkeypatch) -> None:
+    adapter, view = object(), object()
+    place = Mock(return_value=view)
+    crop, activate, note = Mock(), Mock(), Mock(return_value=object())
+    monkeypatch.setattr(drawing, "_placed_bank_view", place)
+    monkeypatch.setattr(drawing, "_crop", crop)
+    monkeypatch.setattr(drawing, "_activate_view", activate)
+    monkeypatch.setattr(drawing, "add_note", note)
+    detail = drawing.NORTH_KEEPER_DETAIL
+    assert drawing._exploded_detail(adapter, detail) is view
+    place.assert_called_once_with(adapter, detail)
+    crop.assert_called_once_with(adapter, view, detail)
+    activate.assert_called_once_with(adapter, view, label=detail.title)
+    note.assert_called_once_with(adapter, detail.label_text, *detail.crop_label_xy)
+
+
+def test_keeper_circle_requests_clear_border_bom_and_existing_caption_fields() -> None:
+    """Design envelopes only: final native circles, leaders and ink still need proof."""
+    positions = drawing.KEEPER_BALLOON_POSITIONS
+    assert positions == {
+        drawing.explode.KEEPER: (0.411, 0.162),
+        drawing.explode.KEEPER_FOOT_SCREW: (0.371, 0.185),
+        drawing.explode.KEEPER_SET_SCREW: (0.411, 0.190),
+    }
+    radius = drawing.BALLOON_MAX_RADIUS
+    bom_right = drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values())
+    nominal_bottom = drawing.BOM_ANCHOR[1] - (len(drawing.BOM_COMPONENTS) + 1) * drawing.BOM_ROW_HEIGHT
+    caption_top = drawing.exploded_caption_xy(nominal_bottom)[1]
+    detail_c = drawing.NORTH_KEEPER_DETAIL
+    bracket = drawing.NORTH_BRACKET_DETAIL
+    bracket_label_bottom = bracket.crop_label_xy[1] - len(bracket.label_text.splitlines()) * NOTE_LINE_PITCH
+    for x, y in positions.values():
+        drawing._assert_box_on_sheet(
+            (x - radius, y - radius, x + radius, y + radius), label="keeper circle request"
+        )
+        assert x - radius > bom_right + 0.002
+        assert y - radius > max(caption_top, detail_c.crop_label_xy[1]) + 0.004
+        assert y + radius < bracket_label_bottom - 0.004
+    circles = list(positions.values())
+    for index, circle in enumerate(circles):
+        for other in circles[index + 1:]:
+            assert math.dist(circle, other) > 2.0 * radius + 0.004
+    assert "NORTH-MOST" in drawing.EXPLODED_CAPTION
+    assert "KEEPER HARDWARE: DETAIL C" in drawing.EXPLODED_CAPTION
 
 
 def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
