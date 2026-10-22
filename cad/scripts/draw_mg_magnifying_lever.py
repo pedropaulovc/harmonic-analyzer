@@ -53,8 +53,8 @@ DETAIL_CENTER = (0.310, 0.190)
 DETAIL_SCALE = (3, 1)
 DETAIL_FOCUS = (0.156, 0.0, 0.0)
 DETAIL_RADIUS_MM = 12.5
-# Four thread/shape rows fit between the native length witnesses. The upper
-# lane keeps the descending leader outside the mate text and below the 18 line.
+# Four native callout rows wrap BRACKET below its mate ID between the length
+# witnesses. Their actual font, leader and clearance still require native audit.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
 # keep the qualifier above the screw-seat note and below the free-end note.
@@ -256,10 +256,10 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
     count = int(native.GetCThreadCount())
     thread = _early_bound(native.GetFirstCThread(), "ICThread")
     if count != 1 or thread is None or thread.GetNext() is not None:
-        raise RuntimeError(f"lever front needs one native cosmetic-thread seed, reported {count}")
+        raise RuntimeError(f"lever Detail A needs one native cosmetic-thread seed, reported {count}")
     note = _early_bound(thread.ThreadCallout, "INote")
     if note is None:
-        raise RuntimeError("lever front cosmetic thread has no native drawing callout note")
+        raise RuntimeError("lever Detail A cosmetic thread has no native drawing callout note")
     original = str(note.GetText() or "")
     if " ".join(original.split()) != " ".join(THREAD_CALLOUT.split()):
         raise RuntimeError(f"unexpected native lever thread callout: {original!r}")
@@ -288,10 +288,10 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
         if result != 1:
             raise RuntimeError(f"native lever {label} identity comparison unsupported: self={result} ({identity_field})")
     try:
-        owner_to_front = int(app.IsSame(owner, native)) if owner_type == 0 else None
+        owner_to_detail = int(app.IsSame(owner, native)) if owner_type == 0 else None
     except Exception as exc:
-        raise RuntimeError(f"native lever ISldWorks.IsSame reader before.owner_to_front failed: {exc}") from exc
-    if owner_type == 0 and owner_to_front != 1:
+        raise RuntimeError(f"native lever ISldWorks.IsSame reader before.owner_to_detail failed: {exc}") from exc
+    if owner_type == 0 and owner_to_detail != 1:
         raise RuntimeError("native lever thread callout belongs to another drawing view")
     # R8 INote readback canonicalizes line endings to CRLF. Preserve every row
     # and space; send and compare the same native payload, not normalized text.
@@ -304,7 +304,7 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
             "text": original, "owner_type": owner_type, "owner_present": True,
             "attached_count": entity_count, "attached_types": entity_types,
             "entities_reported": len(entities), "dangling": dangling,
-            "self_comparisons": self_comparisons, "owner_to_front": owner_to_front,
+            "self_comparisons": self_comparisons, "owner_to_detail": owner_to_detail,
         },
         "after": {},
     }
