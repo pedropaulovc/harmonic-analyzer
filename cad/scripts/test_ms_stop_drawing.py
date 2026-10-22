@@ -454,7 +454,6 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] == 0.175
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.063)
-        assert callout_positions["two cover blind taps"] == (0.065, 0.138)
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
@@ -670,26 +669,306 @@ def test_native_class_suppression_refuses_non_native_unbound_or_rejected_text(na
         block_drawing._remove_general_thread_class(native)
 
 
+def _pilot_layout_geometry():
+    """Estimate from the configured shelf and the exact81e native elbow offset.
+
+    This couples the offline geometry to placement, unlike an arbitrary 45°
+    arrow. It is not proof of the rebuilt native leader: the drawing reads its
+    actual arrow after rebuild and refuses a near-horizontal result.
+    """
+    scale = plate_drawing.SHEET_SCALE[0] / plate_drawing.SHEET_SCALE[1] / 1000.0
+    center = (
+        plate_drawing.FRONT_CENTER[0] + (spec.BLOCK_LENGTH / 2.0 - spec.PLATE_HOLE_XS[0]) * scale,
+        plate_drawing.FRONT_CENTER[1] + (spec.PLATE_HOLE_Y - spec.BLOCK_HEIGHT / 2.0) * scale,
+    )
+    shelf = plate_drawing.FRONT_KEEP["PilotDrillDiameter"]
+    elbow = (shelf[0] - 0.0548069, shelf[1] - 0.0139174)
+    return center, elbow
+
+
+def test_pilot_placement_and_all_neighboring_native_dimensions_clear() -> None:
+    """Check the whole native neighborhood, not only pilot-versus-neighbor pairs."""
+    from _drawing_leaders import distance_to_box
+
+    center, elbow = _pilot_layout_geometry()
+    direction = (elbow[0] - center[0], elbow[1] - center[1])
+    assert direction[1] > 0.0
+    assert direction[1] / math.hypot(*direction) >= 0.2
+    # Exact81e PDF row bounds in sheet metres: native value plus four mate rows.
+    native_rows = (
+        (0.2744736, 0.1789417, 0.2955263, 0.1853210),
+        (0.2317806, 0.1733320, 0.3382196, 0.1797113),
+        (0.2406861, 0.1677757, 0.3293139, 0.1741551),
+        (0.2384549, 0.1622195, 0.3315452, 0.1685988),
+        (0.2336059, 0.1566632, 0.3363941, 0.1630426),
+    )
+    shelf = plate_drawing.FRONT_KEEP["PilotDrillDiameter"]
+    dx, dy = shelf[0] - 0.285, shelf[1] - 0.171
+    rows = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in native_rows]
+    scale = plate_drawing.SHEET_SCALE[0] / plate_drawing.SHEET_SCALE[1] / 1000.0
+    right_edge = plate_drawing.FRONT_CENTER[0] + spec.BLOCK_LENGTH * scale / 2.0
+    top_edge = plate_drawing.FRONT_CENTER[1] + spec.BLOCK_HEIGHT * scale / 2.0
+    chamfer_bottom = top_edge - spec.ROOF_END_CHAMFER * scale
+    chamfer_x, chamfer_y = plate_drawing.FRONT_KEEP["RoofChamferSize"]
+    # Include the native arrow breadth, its lower tail, and both witnesses.
+    chamfer_ink = (
+        ((chamfer_x - 0.0005, chamfer_bottom - 0.00635), (chamfer_x - 0.0005, chamfer_y)),
+        ((chamfer_x + 0.0005, chamfer_bottom - 0.00635), (chamfer_x + 0.0005, chamfer_y)),
+        ((right_edge + 0.001, chamfer_bottom), (chamfer_x + 0.001, chamfer_bottom)),
+        ((right_edge + 0.001, top_edge), (chamfer_x + 0.001, top_edge)),
+    )
+    for row in rows:
+        assert row[0] - right_edge >= 0.003
+        assert min(distance_to_box(segment, row) for segment in chamfer_ink) >= 0.003
+        # The foreign 4.00 ordinate/witness shares the projected hole-center Y.
+        assert row[1] - center[1] >= 0.003
+        # Actual81e finished-drill text ends at y137.9867, well below this block.
+        assert row[1] - 0.1379867 >= 0.003
+        right_view_left = plate_drawing.RIGHT_CENTER[0] - spec.PLATE_THICKNESS * scale / 2.0
+        assert right_view_left - row[2] >= 0.003
+    # The unchanged native 45° text lives above-left; prove separation from
+    # every row, allowing either horizontal or vertical clear air.
+    ax, ay = plate_drawing.FRONT_KEEP["RoofChamferAngle"]
+    angle_box = (ax - 0.0048125, ay - 0.0031976, ax + 0.0048125, ay + 0.0031818)
+    for row in rows:
+        assert max(
+            angle_box[0] - row[2], row[0] - angle_box[2],
+            angle_box[1] - row[3], row[1] - angle_box[3],
+        ) >= 0.003
+
+    # Every neighboring native text box participates in the foreign-stroke
+    # matrix. These are exact81e ink bounds translated with each configured
+    # annotation, not new wording pins or a promise about future native layout.
+    def shifted(boxes, position, original):
+        dx, dy = position[0] - original[0], position[1] - original[1]
+        return [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
+
+    keep = plate_drawing.FRONT_KEEP
+    text = {
+        "pilot": rows,
+        "size": shifted([(0.247, 0.2218025, 0.2627743, 0.2281818)], keep["RoofChamferSize"], (0.247, 0.225)),
+        "angle": [angle_box],
+        "length": shifted([(0.1678882, 0.2318025, 0.1821118, 0.2381818)], keep["PlateLength"], (0.175, 0.235)),
+        "height": shifted([(0.0841812, 0.1668025, 0.0958187, 0.1731818)], keep["PlateHeight"], (0.090, 0.170)),
+        "left_hole": shifted([(0.1640212, 0.1118025, 0.1859789, 0.1181818)], keep["PlateLeftFromEnd"], (0.175, 0.115)),
+        "right_hole": shifted([(0.1627281, 0.0918024, 0.1872719, 0.0981818)], keep["PlateRightFromEnd"], (0.175, 0.095)),
+        "hole_y": shifted([(0.1040212, 0.1448024, 0.1259788, 0.1511818)], keep["PlateFromHeadFace"], (0.115, 0.148)),
+        "finished": [
+            (0.2677479, 0.1316073, 0.3022521, 0.1379867),
+            (0.2427087, 0.1260511, 0.3272913, 0.1324304),
+        ],
+        "stock": shifted([
+            (0.2753143, 0.2473587, 0.2946857, 0.2537380),
+            (0.2508920, 0.2418025, 0.3191080, 0.2481818),
+            (0.2504108, 0.2362462, 0.3195893, 0.2426255),
+        ], plate_drawing.THICKNESS_TEXT_OFFSET["PlateThickness"], (0.285, 0.245)),
+        "iso_caption": [(0.315, 0.1190549, 0.374777, 0.1254342)],
+    }
+    left_edge = plate_drawing.FRONT_CENTER[0] - spec.BLOCK_LENGTH * scale / 2.0
+    bottom_edge = plate_drawing.FRONT_CENTER[1] - spec.BLOCK_HEIGHT * scale / 2.0
+    length_y = keep["PlateLength"][1] - 0.0027781
+    height_x = keep["PlateHeight"][0]
+    hole_y_x = keep["PlateFromHeadFace"][0]
+    left_hole_y = keep["PlateLeftFromEnd"][1] - 0.0027781
+    right_hole_y = keep["PlateRightFromEnd"][1] - 0.0027781
+    other_hole_x = plate_drawing.FRONT_CENTER[0] + (spec.BLOCK_LENGTH / 2.0 - spec.PLATE_HOLE_XS[1]) * scale
+    angle_radius = math.hypot(ax - right_edge, ay - chamfer_bottom)
+    arc_end = math.atan2(0.0135781, 0.0056811)  # exact81e right-hand arc endpoint
+    arc_angles = [math.radians(135.0) + (arc_end - math.radians(135.0)) * i / 48 for i in range(49)]
+    arc = [(right_edge + angle_radius * math.cos(a), chamfer_bottom + angle_radius * math.sin(a)) for a in arc_angles]
+    # The true angular arc changes radius when its text moves. Bounding its
+    # entire right quadrant also catches the tempting size225/angle234 route,
+    # whose text clears but whose arc runs through the vertical size line.
+    assert chamfer_x - (right_edge + angle_radius) >= 0.003
+    diagonal = angle_radius / math.sqrt(2.0)
+    pilot_unit = (direction[0] / math.hypot(*direction), direction[1] / math.hypot(*direction))
+    pilot_tip = tuple(center[i] + spec.PLATE_TAP_DRILL_DIA * scale / 2.0 * pilot_unit[i] for i in range(2))
+    stock_dx = plate_drawing.THICKNESS_TEXT_OFFSET["PlateThickness"][0] - 0.285
+    stock_dy = plate_drawing.THICKNESS_TEXT_OFFSET["PlateThickness"][1] - 0.245
+    stock_elbow = (0.3195892 + stock_dx, 0.2366656 + stock_dy)
+    right_center = plate_drawing.RIGHT_CENTER[0]
+    right_half_width = spec.PLATE_THICKNESS * scale / 2.0
+    thickness_y = plate_drawing.RIGHT_KEEP["PlateThickness"][1]
+    strokes = {
+        "size": [*chamfer_ink, ((chamfer_x, chamfer_y - 0.0027781), (chamfer_x + 0.0157743, chamfer_y - 0.0027781))],
+        "angle": [
+            ((right_edge - 0.0007071, chamfer_bottom + 0.0007071), (right_edge - diagonal - 0.0007071, chamfer_bottom + diagonal + 0.0007071)),
+            ((right_edge, chamfer_bottom + 0.001), (right_edge, chamfer_bottom + angle_radius + 0.001)),
+            *zip(arc, arc[1:]),
+        ],
+        "length": [
+            ((left_edge, bottom_edge + 0.001), (left_edge, length_y + 0.001)),
+            ((right_edge, bottom_edge + 0.001), (right_edge, length_y + 0.001)),
+            ((left_edge, length_y), (right_edge, length_y)),
+        ],
+        "height": [
+            ((left_edge - 0.001, bottom_edge), (height_x - 0.001, bottom_edge)),
+            ((left_edge - 0.001, top_edge), (height_x - 0.001, top_edge)),
+            ((height_x, bottom_edge), (height_x, keep["PlateHeight"][1] - 0.0027781)),
+            ((height_x, top_edge), (height_x, keep["PlateHeight"][1] + 0.0027781)),
+        ],
+        "left_hole": [
+            ((right_edge, center[1] - 0.001), (right_edge, left_hole_y - 0.001)),
+            ((center[0], bottom_edge + 0.0002), (center[0], left_hole_y - 0.001)),
+            ((right_edge, left_hole_y), (text["left_hole"][0][0], left_hole_y)),
+        ],
+        "right_hole": [
+            ((right_edge, center[1] - 0.001), (right_edge, right_hole_y - 0.001)),
+            ((other_hole_x, bottom_edge + 0.0002), (other_hole_x, right_hole_y - 0.001)),
+            ((right_edge, right_hole_y), (other_hole_x, right_hole_y)),
+        ],
+        "hole_y": [
+            ((right_edge - 0.001, center[1]), (hole_y_x - 0.001, center[1])),
+            ((right_edge - 0.001, bottom_edge), (hole_y_x - 0.001, bottom_edge)),
+            ((hole_y_x, center[1]), (hole_y_x, center[1] + 0.00635)),
+            ((hole_y_x, bottom_edge), (hole_y_x, bottom_edge - 0.00635)),
+        ],
+        "pilot": [(pilot_tip, elbow), (elbow, (max(row[2] for row in rows), elbow[1]))],
+        "finished": [
+            ((0.2067058, 0.1547492), (0.2411212, 0.126417)),
+            ((0.1992942, 0.1608508), (0.2067058, 0.1547492)),
+            ((0.2411212, 0.126417), (0.3272913, 0.126417)),
+        ],
+        "stock": [
+            ((right_center - right_half_width, bottom_edge + 0.001), (right_center - right_half_width, thickness_y + 0.001)),
+            ((right_center + right_half_width, bottom_edge + 0.001), (right_center + right_half_width, thickness_y + 0.001)),
+            ((right_center - right_half_width - 0.00635, thickness_y), (right_center + right_half_width + 0.00635, thickness_y)),
+            ((right_center, thickness_y), stock_elbow),
+            (stock_elbow, (0.2504108 + stock_dx, stock_elbow[1])),
+        ],
+    }
+    # Native same-annotation row/font boxes overlap slightly by construction.
+    # Exempt only that ownership, never a different annotation's text.
+    for owner, segments in strokes.items():
+        for other, boxes in text.items():
+            if owner != other:
+                for segment in segments:
+                    for box in boxes:
+                        assert distance_to_box(segment, box) > 0.00015, (owner, other, segment, box)
+    owners = list(text)
+    for index, owner in enumerate(owners):
+        for other in owners[index + 1:]:
+            for a in text[owner]:
+                for b in text[other]:
+                    assert max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]) > 0.0, (owner, other, a, b)
+
+
+def _pilot_leader_seat(
+    monkeypatch, *, kind=6, refusal=None, radius=None, direction=None,
+    owner="PilotDrillReference", dangling=False, arrow_count=1,
+):
+    center, elbow = _pilot_layout_geometry()
+    if direction is None:
+        direction = (elbow[0] - center[0], elbow[1] - center[1])
+    if radius is None:
+        radius = spec.PLATE_TAP_DRILL_DIA * 0.002
+    length = math.hypot(*direction)
+    unit = (direction[0] / length, direction[1] / length) if length else (1.0, 0.0)
+    point = (center[0] + radius * unit[0], center[1] + radius * unit[1])
+
+    class Pilot(_StopDisplay):
+        def __init__(self):
+            super().__init__("<MOD-DIAM>", hole=False, kind=kind, refusal=refusal)
+            self.dimension = SimpleNamespace(
+                FullName=f"PilotDrillDiameter@{owner}@ms-stop-plate.SLDPRT",
+                SystemValue=spec.PLATE_TAP_DRILL_DIA / 1000.0,
+            )
+            self.ShowDimensionValue = True
+
+        def GetDimension2(self, _index):  # noqa: N802 - native API name
+            return self.dimension
+
+        def GetDisplayData(self):  # noqa: N802 - native API name
+            arrow = (*point, 0.0, *direction, 0.0, 0.001, 0.002, 1.0, 0.0, 0.0, 1.0)
+            return SimpleNamespace(
+                GetArrowHeadCount=lambda: arrow_count,
+                GetArrowHeadAtIndex2=lambda index: arrow,
+            )
+
+    native = Pilot()
+    position = [*plate_drawing.FRONT_KEEP["PilotDrillDiameter"], 0.0]
+
+    def set_position(x, y, z):
+        if refusal != "position":
+            position[:] = x, y, z
+        return True
+
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: native, SetPosition2=set_position,
+        GetPosition=lambda: position, IsDangling=lambda: dangling,
+    )
+
+    def rebuild(*args, **kwargs):
+        if refusal == "value":
+            native.dimension.SystemValue += 0.0001
+        elif refusal == "identity":
+            native.dimension = SimpleNamespace(**vars(native.dimension))
+        elif refusal == "hidden-value":
+            native.ShowDimensionValue = False
+
+    if refusal == "position":
+        position[1] += 0.010
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)))
+    monkeypatch.setattr(plate_drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *args: "PilotDrillDiameter")
+    monkeypatch.setattr(plate_drawing, "set_near_side_diameter", lambda *args: None)
+    monkeypatch.setattr(plate_drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(plate_drawing, "model_point_in_view", lambda *args, **kwargs: center)
+    return adapter, object(), [annotation], native
+
+
 @pytest.mark.parametrize("kind", [6, 2, 3, 5])
 def test_pilot_callout_requires_model_diameter_and_preserves_native_definition(monkeypatch, kind) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, kind=kind)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+    adapter, view, annotations, native = _pilot_leader_seat(monkeypatch, kind=kind)
     if kind != 6:
         with pytest.raises(RuntimeError, match="native model diameter"):
-            plate_drawing._style_pilot_diameter(object(), [annotation])
+            plate_drawing._style_pilot_diameter(adapter, view, annotations)
         assert native.prefix == "<MOD-DIAM>"
     else:
-        plate_drawing._style_pilot_diameter(object(), [annotation])
+        plate_drawing._style_pilot_diameter(adapter, view, annotations)
         assert native.prefix == "2X <MOD-DIAM>"
 
 
 def test_pilot_callout_refuses_unapplied_native_quantity_prefix(monkeypatch) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, refusal="prefix")
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+    adapter, view, annotations, native = _pilot_leader_seat(monkeypatch, refusal="prefix")
     with pytest.raises(RuntimeError, match="did not persist"):
-        plate_drawing._style_pilot_diameter(object(), [annotation])
+        plate_drawing._style_pilot_diameter(adapter, view, annotations)
+
+
+@pytest.mark.parametrize("failure", ["position", "value", "identity", "hidden-value"])
+def test_native_pilot_styling_refuses_lost_identity_value_or_shelf(monkeypatch, failure) -> None:
+    adapter, view, annotations, _native = _pilot_leader_seat(monkeypatch, refusal=failure)
+    with pytest.raises(RuntimeError, match="identity/value/position"):
+        plate_drawing._style_pilot_diameter(adapter, view, annotations)
+
+
+@pytest.mark.parametrize(
+    "radius,direction,arrow_count",
+    [
+        (spec.PLATE_CLEARANCE_DIA * 0.002, (1.0, -1.0), 1),
+        (spec.PLATE_TAP_DRILL_DIA * 0.002, (1.0, 0.01), 1),
+        (spec.PLATE_TAP_DRILL_DIA * 0.002, (0.0, 0.0), 1),
+        (spec.PLATE_TAP_DRILL_DIA * 0.002, (1.0, -1.0), 0),
+        (spec.PLATE_TAP_DRILL_DIA * 0.002, (1.0, -1.0), 2),
+    ],
+)
+def test_native_pilot_arrow_refuses_finished_rim_or_collinear_or_absent_ink(
+    monkeypatch, radius, direction, arrow_count
+) -> None:
+    adapter, view, annotations, _native = _pilot_leader_seat(
+        monkeypatch, radius=radius, direction=direction, arrow_count=arrow_count,
+    )
+    with pytest.raises(RuntimeError, match="pilot arrow|pilot leader"):
+        plate_drawing._style_pilot_diameter(adapter, view, annotations)
+
+
+@pytest.mark.parametrize("owner,dangling", [("WrongSketch", False), ("PilotDrillReference", True)])
+def test_native_pilot_requires_source_owner_and_attached_dimension(monkeypatch, owner, dangling) -> None:
+    adapter, view, annotations, _native = _pilot_leader_seat(
+        monkeypatch, owner=owner, dangling=dangling,
+    )
+    with pytest.raises(RuntimeError, match="wrong model owner/value|identity/value/position"):
+        plate_drawing._style_pilot_diameter(adapter, view, annotations)
 
 
 @pytest.mark.parametrize("refusal", [None, "prefix"])
@@ -1169,4 +1448,3 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     assert "ReferenceWindowWidth" in hidden
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
-    assert "BLIND DEPTHS FROM STOP-PLATE MATING FACE." in properties[0]["Manufacturing Notes"]

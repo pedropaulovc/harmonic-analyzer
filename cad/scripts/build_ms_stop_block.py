@@ -164,7 +164,6 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(adapter, PART_NAME, {
-        "Manufacturing Notes": spec.BLOCK_DRAWING_NOTES,
         "Mating Face Note": spec.BLOCK_MATING_FACE_NOTE,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })

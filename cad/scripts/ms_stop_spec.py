@@ -148,8 +148,6 @@ PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAng
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
-# Matched-pair identification belongs on each hole callout, not a general note.
-BLOCK_DRAWING_NOTES = f"BLIND DEPTHS FROM {BLOCK_MATING_FACE_NOTE}."
 HOLE_CALLOUT_PRECISION = 2
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
 

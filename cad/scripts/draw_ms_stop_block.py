@@ -79,6 +79,9 @@ BOTTOM_KEEP = {
 # controlled rebate sizes retain free sliding clearance with the screw backed off.
 DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
+    # The source depth bounds the blind #2-56 drill-point back wall (1.594 mm
+    # worst case); changing its general band to .X would breach 1.5 mm.
+    "BlockDepth": "BLIND #2-56 TAPS\nBACK WALL",
     "WindowWidth": f"SLIDES ON\nMS-STICK {_config.parts('ms-stick')['number']}",
     "WindowHeight": f"SLIDES ON\nMS-STICK\n{_config.parts('ms-stick')['number']}",
 }
@@ -189,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.138),
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.132),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
@@ -230,7 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,

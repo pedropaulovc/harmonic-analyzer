@@ -17,6 +17,7 @@ Separate native chamfer size and angle retain their model-owned precision.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -32,10 +33,12 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -61,9 +64,10 @@ FRONT_KEEP = {
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
-    # Right-edge witnesses are at X217; the chamfer arrow ends at Y187.85.
-    # The pilot block is right/down of both, with the finished drill below it.
-    "PilotDrillDiameter": (0.285, 0.171),
+    # The 81e native elbow was 54.8069 mm left and 13.9174 mm below
+    # its text anchor. This lane clears the original chamfer dimensions
+    # and raises that elbow above the 4.00 witness; native readback decides.
+    "PilotDrillDiameter": (0.274, 0.176),
 }
 RIGHT_KEEP = {"PlateThickness": (RIGHT_CENTER[0], 0.225)}
 THICKNESS_TEXT_OFFSET = {"PlateThickness": (0.285, 0.245)}
@@ -83,8 +87,8 @@ DIMENSION_CALLOUTS = {
 }
 
 
-def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the model diameter's leader on the concentric, earlier pilot step."""
+def _style_pilot_diameter(adapter: Any, view: Any, annotations: list[Any]) -> None:
+    """Keep a live native pilot dimension with one angled arrow on its own rim."""
     annotation = next(
         item for item in annotations
         if dimension_name(adapter, item) == "PilotDrillDiameter"
@@ -93,6 +97,14 @@ def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     native = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if int(native.Type2) != 6:  # swDiameterDimension
         raise RuntimeError("match-drill pilot is not a native model diameter")
+    dimension = _early_bound(native.GetDimension2(0), "IDimension")
+    original_name = str(dimension.FullName)
+    original_value = float(dimension.SystemValue)
+    if (
+        original_name.split("@")[:2] != ["PilotDrillDiameter", "PilotDrillReference"]
+        or not math.isclose(original_value * 1000.0, part.PLATE_TAP_DRILL_DIA, abs_tol=1e-8)
+    ):
+        raise RuntimeError(f"pilot dimension has wrong model owner/value: {original_name}, {original_value}")
     # The importer shows this construction circle inside the opened clearance.
     # Both steps identify this same hole pair; their separate native dimensions
     # retain the pilot model value and the finished Hole Wizard value.
@@ -101,6 +113,55 @@ def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     native.SetText(1, prefix)
     if str(native.GetText(5) or "") != prefix:
         raise RuntimeError("native pilot quantity prefix did not persist")
+    # Native display styling, not IAnnotation's unsupported endpoint setters.
+    # Keep the imported model dimension and let SolidWorks solve its own leader.
+    set_near_side_diameter(annotation, "stop-plate match-drill pilot")
+    x, y = FRONT_KEEP["PilotDrillDiameter"]
+    if not annotation.SetPosition2(x, y, 0.0):
+        raise RuntimeError("failed to position the native pilot shelf")
+    rebuild_drawing(adapter, label="stop-plate pilot leader")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    current = _early_bound(native.GetDimension2(0), "IDimension")
+    if (
+        len(position) != 3
+        or math.dist(position, (x, y, 0.0)) > 1e-5
+        or int(adapter.swApp.IsSame(dimension, current)) != 1
+        or str(current.FullName) != original_name
+        or not math.isclose(float(current.SystemValue), original_value, abs_tol=1e-12)
+        or not bool(native.ShowDimensionValue)
+        or bool(annotation.IsDangling())
+    ):
+        raise RuntimeError(f"pilot dimension identity/value/position did not persist: {original_name}, {position}")
+    center = model_point_in_view(
+        adapter, view, (part.PLATE_HOLE_XS[0] / 1000.0, part.PLATE_HOLE_Y / 1000.0, 0.0),
+        label="pilot construction-circle center",
+    )
+    scale = SHEET_SCALE[0] / SHEET_SCALE[1] / 2000.0
+    pilot_radius = part.PLATE_TAP_DRILL_DIA * scale
+    finished_radius = part.PLATE_CLEARANCE_DIA * scale
+    # A quarter of the native rims' separation discriminates the two carriers;
+    # this is paper-ink checking, not a new hole-size or position tolerance.
+    radius_air = abs(finished_radius - pilot_radius) / 4.0
+    data = _early_bound(native.GetDisplayData(), "IDisplayData")
+    arrows = [
+        tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
+        for index in range(int(data.GetArrowHeadCount()))
+    ]
+    if len(arrows) != 1 or len(arrows[0]) < 6 or not all(map(math.isfinite, arrows[0])):
+        raise RuntimeError(f"pilot leader has no single readable arrow: {arrows!r}")
+    arrow = arrows[0]
+    radius = math.dist(arrow[:2], center)
+    direction_length = math.hypot(arrow[3], arrow[4])
+    if (
+        abs(radius - pilot_radius) > radius_air
+        or direction_length == 0.0
+        or abs(arrow[4]) / direction_length < 0.2
+    ):
+        raise RuntimeError(
+            "pilot arrow misses its sketch circle or overlays the hole-height witness: "
+            f"center={center!r}, pilot_radius={pilot_radius}, "
+            f"finished_radius={finished_radius}, arrows={arrows!r}"
+        )
 
 
 def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
@@ -150,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     offset_dimension_text(adapter, annotations, THICKNESS_TEXT_OFFSET)
-    _style_pilot_diameter(adapter, annotations)
+    _style_pilot_diameter(adapter, front, annotations)
     _style_plate_chamfer(adapter, annotations)
     edge = model_point_in_view(
         adapter, front, (
