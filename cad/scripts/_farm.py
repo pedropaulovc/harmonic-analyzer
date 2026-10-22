@@ -527,7 +527,11 @@ async def _reserved_leaf_status(handle, key: LeafKey) -> LeafStatus:
 
 
 def producer_build(display_name: str):
-    """Register the parent producer before scheduling or cache checks."""
+    """Register the parent producer before scheduling or cache checks.
+
+    Call finish(True) only after the runner returns zero with workers joined.
+    Failed or missing explicit completion retains owned requests without a scan.
+    """
     return _ProducerBuild(_display_name(display_name))
 
 
@@ -547,7 +551,8 @@ class _ProducerBuild:
         self._stop = threading.Event()
         self._failure: BaseException | None = None
         self._executing = False
-        self._reason = "finished"
+        # Only finish(True) proves the runner's zero-success completion.
+        self._reason = "failed"
         self._previous_id: str | None = None
         self._previous_requests: str | None = None
         self._owned_requests: tempfile.TemporaryDirectory[str] | None = None
@@ -636,6 +641,14 @@ class _ProducerBuild:
             # cannot close the race before a worker's first publishing marker.
             message = (
                 "Farm requests retained after a primary build exception or interrupt; "
+                f"publisher cleanup cannot be inferred; owned directory: {owned.name}"
+            )
+        elif self._reason != "finished":
+            # Runner.run_all also converts InvalidTask into a nonzero return
+            # after run_tasks skipped its joins. Missing explicit success is
+            # likewise not proof that workers can no longer publish.
+            message = (
+                "Farm requests retained without an explicit successful runner outcome; "
                 f"publisher cleanup cannot be inferred; owned directory: {owned.name}"
             )
         else:

@@ -729,14 +729,19 @@ storage, and leaves the shared receipt nonterminal.
 
 The launcher's requests root remains launcher-owned. An attended direct build
 without an inherited requests root owns a temporary root for its producer/action
-worker lifetime. Any primary exception or interrupt retains that owned requests
+worker lifetime. Any primary exception, interrupt, nonzero runner result or
+completion without an explicit zero-success outcome retains that owned requests
 root without scanning or deleting it: doit may still have unjoined processes or
-threads that have not reached their preparation lock yet. A missing receipt is
-not cleanup evidence on this path. The original failure receives a note and a
-warning naming the retained root; it is not replaced by a secondary cleanup fault.
+threads that have not reached their preparation lock yet, even when it converts
+`InvalidTask` to return code 2 instead of raising. A missing receipt is not
+cleanup evidence on these paths. Existing failures retain their outcome and
+receive a warning naming the retained root; primary exceptions also receive a
+note and are not replaced by a secondary cleanup fault.
 
-After ordinary joined completion, cleanup requires canonical, matching-build
-terminal preparation receipts and nonblocking free locks. Nonterminal, corrupt,
+Only explicit zero-success, joined runner completion permits cleanup. The normal
+doit process and thread paths join their workers before returning. Cleanup then
+requires canonical, matching-build terminal preparation receipts and nonblocking
+free locks. Nonterminal, corrupt,
 unreadable, mismatched, unknown or aliased preparation entries retain the root.
 An otherwise successful build still fails loudly when retention is required or
 directory cleanup fails. Inherited launcher-owned roots are never deleted here.

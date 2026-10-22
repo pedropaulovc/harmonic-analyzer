@@ -682,8 +682,10 @@ def _assert_requests_cleanup_report(
     if cleanup_attempted:
         assert "PermissionError" in message
         assert "possible residue" in message
-    else:
+    elif primary is not None:
         assert "primary build exception or interrupt" in message
+    else:
+        assert "without an explicit successful runner outcome" in message
     if primary is not None:
         assert primary.__notes__ == [message]
         assert "synthetic cleanup detail" not in str(primary)
@@ -729,20 +731,28 @@ def test_registration_primary_retains_owned_requests_without_cleanup(
     )
 
 
-def test_failed_finish_keeps_nonzero_outcome_and_reports_owned_requests_residue(
-    boundary, requests_cleanup_failure,
+@pytest.mark.parametrize("result", [1, 2, 7])
+def test_failed_finish_keeps_nonzero_outcome_without_probe_or_cleanup(
+    boundary, requests_cleanup_failure, monkeypatch, result,
 ):
-    ownership = _farm.producer_build("Nonzero outcome cleanup regression")
+    ownership = _farm.producer_build("Nonzero outcome retention regression")
+
+    def forbidden_probe(*_args):
+        raise AssertionError("nonzero-result teardown inspected a possibly active publisher")
+
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden_probe)
 
     def finish_failed_build():
         with ownership:
             requests_cleanup_failure.arm(ownership)
             ownership.finish(False)
-            return 7
+            return result
 
-    assert finish_failed_build() == 7
+    assert finish_failed_build() == result
     assert boundary.close_reasons == ["failed"]
-    _assert_requests_cleanup_report(ownership, requests_cleanup_failure)
+    _assert_requests_cleanup_report(
+        ownership, requests_cleanup_failure, cleanup_attempted=False,
+    )
 
 
 def test_successful_finish_refuses_unconfirmed_owned_requests_cleanup(
@@ -1191,10 +1201,191 @@ def owned_requests(boundary, monkeypatch, tmp_path):
             cleanup()
 
 
+def _run_owned_invalidtask_retention(boundary, owned_requests, monkeypatch, tmp_path):
+    """Real Run/MThreadRunner dispatch fails with live, pre-marker owned workers."""
+    from io import StringIO
+
+    from doit.cmd_base import TaskLoader2
+    from doit.cmd_run import Run
+    from doit.reporter import ConsoleReporter
+    from doit.runner import MThreadRunner
+    from doit.task import DelayedLoader, Task
+    from filelock import FileLock
+
+    entered = threading.Event()
+    release = threading.Event()
+    workers, joins, scans, finishes, owners, dispatch = [], [], [], [], [], []
+    original_child = MThreadRunner.Child
+    original_producer = _farm.producer_build
+    output = StringIO()
+    reporter = ConsoleReporter(output, {"failure_verbosity": 0})
+
+    class OwnedWorker(original_child):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            workers.append((self, kwargs["args"][0]))
+
+        def join(self, *args, **kwargs):
+            joins.append(self.name)
+            return super().join(*args, **kwargs)
+
+    def producer(label):
+        owner = original_producer(label)
+        original_finish = owner.finish
+
+        def finish(success):
+            finishes.append(success)
+            original_finish(success)
+
+        monkeypatch.setattr(owner, "finish", finish)
+        owners.append(owner)
+        return owner
+
+    def blocked_action():
+        entered.set()
+        assert release.wait(WAIT_S), "owned action was not released within its bound"
+
+    def completed_action():
+        assert entered.wait(WAIT_S), "owned action did not reach its pre-marker gate"
+
+    def invalid_delayed():
+        assert entered.is_set()
+        assert len(workers) == 2
+        assert all(worker.is_alive() for worker, _queue in workers)
+        assert list(owned_requests.root.iterdir()) == []
+        dispatch.append("real delayed generator returned invalid actions")
+
+        def forbidden_cleanup():
+            owned_requests.cleanup_calls.append(owned_requests.root)
+            raise AssertionError("nonzero-result teardown attempted owned-root cleanup")
+
+        monkeypatch.setattr(owned_requests.owned, "cleanup", forbidden_cleanup)
+        # generate_tasks -> Task.check_attr raises the installed doit InvalidTask.
+        # MRunner.run_tasks has already started both workers at this point.
+        return {"actions": 17}
+
+    def forbidden_scan(*_args, **_kwargs):
+        scans.append("quiescence")
+        raise AssertionError("nonzero-result teardown inspected owned requests")
+
+    def forbidden_lock(*_args, **_kwargs):
+        scans.append("lock")
+        raise AssertionError("nonzero-result teardown probed a preparation lock")
+
+    monkeypatch.setattr(MThreadRunner, "Child", staticmethod(OwnedWorker))
+    monkeypatch.setattr(_farm, "producer_build", producer)
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden_scan)
+    monkeypatch.setattr(FileLock, "acquire", forbidden_lock)
+    monkeypatch.setattr(build, "_farm_preflight", lambda **_kwargs: None)
+    command = build._farm_command(Run, "Owned InvalidTask retention regression")(
+        task_loader=TaskLoader2(),
+    )
+    command.task_list = [
+        Task("owned-blocker", [blocked_action], io={"capture": False}),
+        Task("completed", [completed_action], io={"capture": False}),
+        Task("invalid-late", None, loader=DelayedLoader(
+            invalid_delayed, executed="completed",
+        )),
+    ]
+    command.sel_tasks = ["owned-blocker", "invalid-late"]
+    command.dep_manager = Dependency(JsonDB, str(tmp_path / "owned-invalidtask-deps.json"))
+    try:
+        result = command._execute(
+            outfile=output, reporter=reporter, num_process=2, par_type="thread",
+        )
+        root = owned_requests.root
+        record = {
+            "actual_exit": result,
+            "forwarded_finish": list(finishes),
+            "owned_root": str(root),
+            "root_retained": root.is_dir(),
+            "root_entries_at_return": sorted(path.name for path in root.iterdir()),
+            "preparation_marker_present": (root / "preparation").exists(),
+            "scan_calls": list(scans),
+            "cleanup_calls": [str(path) for path in owned_requests.cleanup_calls],
+            "dispatch": list(dispatch),
+            "runtime_errors": list(reporter.runtime_errors),
+            "doit_output": output.getvalue(),
+            "workers_alive_at_return": [worker.is_alive() for worker, _queue in workers],
+            "doit_join_calls": list(joins),
+            "producer_thread_quiescent": not owners[0]._thread.is_alive(),
+            "close_reasons": list(boundary.close_reasons),
+            "warnings": [message for message, _attributes in owned_requests.warnings],
+        }
+    finally:
+        # InvalidTask skips doit's joins and does not stop its thread workers.
+        # Release only our action and send sentinels to only our captured queues.
+        release.set()
+        for _worker, job_queue in workers:
+            job_queue.put(None)
+        for worker, _queue in workers:
+            if worker.ident is not None:
+                threading.Thread.join(worker, timeout=WAIT_S)
+        owned_requests.worker_evidence = [
+            {"name": worker.name, "ident": worker.ident, "alive": worker.is_alive()}
+            for worker, _queue in workers
+        ]
+        owned_requests.doit_output = output.getvalue()
+        assert all(not worker["alive"] for worker in owned_requests.worker_evidence)
+        command.dep_manager.close()
+
+    record["owned_workers_quiescent"] = all(
+        not worker.is_alive() for worker, _queue in workers
+    )
+    record["owned_workers"] = owned_requests.worker_evidence
+    assert record["actual_exit"] == 2
+    assert record["forwarded_finish"] == [False]
+    assert record["dispatch"] == ["real delayed generator returned invalid actions"]
+    assert len(record["runtime_errors"]) == 1
+    assert "invalid-late" in record["runtime_errors"][0]
+    assert "actions" in record["runtime_errors"][0]
+    assert record["workers_alive_at_return"] == [True, True]
+    assert record["doit_join_calls"] == []
+    assert record["producer_thread_quiescent"]
+    assert record["root_retained"]
+    assert record["root_entries_at_return"] == []
+    assert not record["preparation_marker_present"]
+    assert record["scan_calls"] == record["cleanup_calls"] == []
+    assert record["close_reasons"] == ["failed"]
+    assert len(record["warnings"]) == 1
+    assert str(root) in record["warnings"][0]
+    assert owners[0]._owned_requests is owned_requests.owned
+    assert _farm.os.environ["HARMONIC_FARM_BUILD_ID"] == BUILD
+    assert "HARMONIC_FARM_REQUESTS" not in _farm.os.environ
+    assert boundary.publication_calls == boundary.requests == boundary.interrupts == []
+    return record
+
+
+def test_real_doit_invalidtask_result_retains_empty_owned_root_without_inspection(
+    boundary, owned_requests, monkeypatch, tmp_path,
+):
+    _run_owned_invalidtask_retention(boundary, owned_requests, monkeypatch, tmp_path)
+
+
+def test_missing_explicit_finish_retains_empty_owned_root_without_inspection(
+    boundary, owned_requests, monkeypatch,
+):
+    ownership = _farm.producer_build("Missing explicit runner outcome")
+
+    def forbidden_probe(*_args):
+        raise AssertionError("unknown runner outcome inspected owned requests")
+
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden_probe)
+    with ownership:
+        root = owned_requests.root
+        assert list(root.iterdir()) == []
+    assert ownership._owned_requests is owned_requests.owned
+    assert root.is_dir()
+    assert owned_requests.cleanup_calls == []
+    assert boundary.close_reasons == ["failed"]
+    assert len(owned_requests.warnings) == 1
+    assert str(root) in owned_requests.warnings[0][0]
+
+
 @pytest.mark.parametrize("evidence", [
     "succeeded", "failed", "empty", "free-lock", "receipt-staging", "lock-staging",
 ])
-def test_normal_return_cleans_terminal_receipts_and_free_lock_evidence(
+def test_successful_finish_cleans_terminal_receipts_and_free_lock_evidence(
     boundary, owned_requests, evidence,
 ):
     ownership = _farm.producer_build("Normal receipt cleanup")
@@ -1218,7 +1409,8 @@ def test_normal_return_cleans_terminal_receipts_and_free_lock_evidence(
                 path.with_name(f"{path.name}.123.{'b' * 32}.tmp").write_text(
                     "{partial", encoding="utf-8",
                 )
-        ownership.finish(evidence != "failed")
+        # A handled failed receipt can be terminal evidence for a zero runner.
+        ownership.finish(True)
     assert owned_requests.cleanup_calls == [root]
     assert ownership._owned_requests is None
     assert not root.exists()
@@ -1321,15 +1513,32 @@ def test_successful_return_retains_unsafe_preparation_and_fails_loud(
             holder.release()
 
 
-def test_failed_finish_retains_publishing_receipt_without_changing_nonzero_result(
-    boundary, owned_requests,
+@pytest.mark.parametrize("evidence", ["empty", "succeeded", "failed", "publishing"])
+def test_failed_finish_retains_all_receipt_states_without_probe_or_result_change(
+    boundary, owned_requests, monkeypatch, evidence,
 ):
-    boundary.publication_error = build.PoolProcessCleanupError("synthetic unconfirmed child")
+    if evidence == "publishing":
+        boundary.publication_error = build.PoolProcessCleanupError("synthetic unconfirmed child")
+    elif evidence == "failed":
+        boundary.publication_error = build.FarmPreflightError("synthetic terminal failure")
     ownership = _farm.producer_build("Generic failed action outcome")
+    scans = []
+
+    def forbidden_probe(*_args):
+        scans.append(True)
+        raise AssertionError("nonzero-result teardown inspected preparation evidence")
+
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden_probe)
 
     def failed_build():
         with ownership:
-            with pytest.raises(build.PoolProcessCleanupError):
+            if evidence in {"failed", "publishing"}:
+                expected_error = (
+                    build.PoolProcessCleanupError if evidence == "publishing" else RuntimeError
+                )
+                with pytest.raises(expected_error):
+                    _farm.run_leaf(TASK, KEY)
+            elif evidence == "succeeded":
                 _farm.run_leaf(TASK, KEY)
             ownership.finish(False)
             return 7
@@ -1337,8 +1546,13 @@ def test_failed_finish_retains_publishing_receipt_without_changing_nonzero_resul
     assert failed_build() == 7
     assert owned_requests.cleanup_calls == []
     assert owned_requests.root.is_dir()
-    path = next((owned_requests.root / "preparation").glob("*.json"))
-    assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
+    assert scans == []
+    receipts = list((owned_requests.root / "preparation").glob("*.json"))
+    if evidence == "empty":
+        assert receipts == []
+    else:
+        assert len(receipts) == 1
+        assert json.loads(receipts[0].read_text(encoding="utf-8"))["state"] == evidence
     assert len(owned_requests.warnings) == 1
     assert boundary.close_reasons == ["failed"]
 
