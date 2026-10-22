@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
 import error_budget
@@ -38,6 +40,23 @@ def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:
     assert (fx, fy) == pytest.approx(arm.WIRE_DIR[:2])
     assert mz == pytest.approx(arm.HOOK_DX * fy - arm.HOOK_DY * fx)
     assert arm.joint_load(2.0, 3.0) == pytest.approx(tuple(2.0 * a + 3.0 * b for a, b in zip(arm.joint_load(1.0, 0.0), arm.joint_load(0.0, 1.0))))
+
+
+def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> None:
+    free_tip_offsets = [
+        length - thickness / 2.0 - projection
+        for length, thickness, projection in itertools.product(
+            (thread.ROD_LENGTH - thread.ROD_LENGTH_TOL, thread.ROD_LENGTH + thread.ROD_LENGTH_TOL),
+            (thread.NECK_THICKNESS - thread.NECK_THICKNESS_TOL, thread.NECK_THICKNESS + thread.NECK_THICKNESS_TOL),
+            (lever.THREAD_PROJECTION - lever.THREAD_PROJECTION_TOL, lever.THREAD_PROJECTION + lever.THREAD_PROJECTION_TOL),
+        )
+    ]
+    farthest_tip = max(free_tip_offsets)
+    assert farthest_tip == pytest.approx(161.565)
+    assert arm.LEVER_GROUP_ARM_X == pytest.approx(farthest_tip)
+    # The former fixed-tip arm misses an accepted fitted rod by 1.565 mm.
+    assert farthest_tip > thread.ROD_LENGTH - thread.NECK_THICKNESS / 2.0 - lever.THREAD_PROJECTION
+    assert arm.joint_load(0.0, 1.0) == pytest.approx((0.0, -1.0, -farthest_tip))
 
 
 def test_deflection_grows_with_span_and_respects_superposition() -> None:

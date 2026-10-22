@@ -38,7 +38,13 @@ import math
 import pn_pen_carriage_geom
 import pn_pen_rod_spec
 import sh_vn_music_wire_lever_geom
-from mg_lever_thread_joint import NECK_THICKNESS, NOSE_R, ROD_DIA as LEVER_ROD_DIA
+from mg_lever_thread_joint import (
+    NECK_THICKNESS,
+    NECK_THICKNESS_TOL,
+    NOSE_R,
+    ROD_DIA as LEVER_ROD_DIA,
+    ROD_LENGTH_TOL,
+)
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
     SCREW_MACHINE_X,
@@ -49,7 +55,11 @@ from magnifying_bracket_joint_layout import (
 )
 from mg_magnifying_clamp_geom import BLOCK_HEIGHT as CLAMP_HEIGHT
 from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
-from mg_magnifying_lever_geom import ROD_LENGTH as LEVER_ROD_LENGTH
+from mg_magnifying_lever_geom import (
+    ROD_LENGTH as LEVER_ROD_LENGTH,
+    THREAD_PROJECTION,
+    THREAD_PROJECTION_TOL,
+)
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_LENGTH as VROD_LENGTH
 from mg_magnifying_wheel_geom import WIRE_RATIO
@@ -90,9 +100,14 @@ _FIXTURE_G = _HEX_AREA * FIXTURE_HEX_AF**2 * FIXTURE_LENGTH * BRASS_G_PER_MM3  #
 _THUMB_SCREWS_G = 2.0 * 3.0  # two 91882A221 knurled #4-40, generous
 LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G
 LEVER_GROUP_N = LEVER_GROUP_G * G
-# Every gram placed at the farthest station, the lever's free tip (machine x
-# 200, the lever spanning x 32.5..200 with the threaded neck at x 40): 160 mm.
-LEVER_GROUP_ARM_X = 160.0
+# Every gram is conservatively placed at the farthest accepted free tip.
+# The fitted projection fixes the threaded end relative to the neck; the
+# longest rod, thinnest neck and smallest projection maximize this gravity arm.
+LEVER_GROUP_ARM_X = (
+    LEVER_ROD_LENGTH + ROD_LENGTH_TOL
+    - (NECK_THICKNESS - NECK_THICKNESS_TOL) / 2.0
+    - (THREAD_PROJECTION - THREAD_PROJECTION_TOL)
+)
 
 NECK = BRACKET_ORIGIN
 HOOK = (sh_vn_music_wire_lever_geom.HOOK_X, sh_vn_music_wire_lever_geom.HOOK_Y, sh_vn_music_wire_lever_geom.HOOK_Z)

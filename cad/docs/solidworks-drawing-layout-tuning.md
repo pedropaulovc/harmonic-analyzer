@@ -1571,9 +1571,9 @@ ordinary`.XXX`±0.13: worst #2-56 full engagement3.305 exceeds3.2766 with only
 0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that joint.
 The blued material is generic low-carbon steel, matching the existing native
 Plain Carbon Steel assignment. The arm check uses assumed E200GPa/G79GPa for
-compliance and conservatively bounds factor-three simultaneous bending/torsion
-von Mises demand at about27.360MPa; this is not a guaranteed370MPa yield or
-certified grade/temper.
+compliance and reports factor-three simultaneous bending/torsion von Mises demand
+using the fitted-band maximum gravity arm. That calculated demand is not a
+certified grade/temper or a guaranteed material yield.
 
 Keep the assembly's complete thread-projection qualifier attached to that native
 dimension when wrapping or repositioning it. R16 exported successfully while
@@ -1991,11 +1991,11 @@ No alloy or temper substitution is authorized by this geometry change.
 
 The user explicitly retained generic low-carbon steel with the blued finish,
 not a named certified grade. `error_budget.py` consumes the bracket load
-audit in both JSON and human-readable reports: the simultaneous bending and
-torsion demand for a factor of three is about27.360MPa, while verified yield
-and verified yield safety factor are unavailable. This is a calculated
-procurement demand, not a material-data acceptance gate or a demonstrated
-safety factor. Its elastic/shear moduli are stated model assumptions.
+audit in both JSON and human-readable reports: simultaneous bending and torsion
+demand for a factor of three uses the fitted-band maximum gravity arm, while
+verified yield and verified yield safety factor are unavailable. This is a
+calculated procurement demand, not a material-data acceptance gate or a
+demonstrated safety factor. Its elastic/shear moduli are stated model assumptions.
 
 Keep a mounting-face caption beside the view it describes, clear of its
 native hole leader and coordinate witnesses. Distribute short controls
