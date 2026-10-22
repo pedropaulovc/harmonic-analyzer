@@ -44,6 +44,7 @@ from types import SimpleNamespace  # noqa: E402
 import pytest  # noqa: E402
 
 import _drawing_projection  # noqa: E402
+from _drawing_balloons import _ComponentLeaf  # noqa: E402
 import _telemetry  # noqa: E402
 
 GET_MATH_UTILITY = (132, 0, 1, (9, 0), ())
@@ -875,8 +876,10 @@ def test_an_inset_edge_read_back_off_target_fails_the_sheet(monkeypatch) -> None
 class _RayModel:
     """A referenced assembly whose one body answers scripted ray hits.
 
-    ``hits`` are ``(ray, kind, part xyz, entity)``; the readback lists them
-    nine doubles per hit, in order, with the entity per hit alongside.
+    ``components`` are the view's drawing-component leaves (a hidden one is
+    not shown); ``hits`` are ``(ray, kind, part xyz, entity)``, and the
+    readback lists them nine doubles per hit, in order, with the entity per
+    hit alongside.
     """
 
     def __init__(self, components, hits) -> None:
@@ -885,8 +888,17 @@ class _RayModel:
         self.Extension = self
         self.casts = []
 
-    def GetComponents(self, _top):  # noqa: N802
-        return list(self.components)
+    def leaves(self):
+        return [
+            _ComponentLeaf(
+                name=component.Name2,
+                component=component,
+                identities=frozenset({component.stem}),
+                visible=not component.IsSuppressed(),
+                path=f"fr-frame-1/{component.Name2}",
+            )
+            for component in self.components
+        ]
 
     def RayIntersections(self, bodies, starts, vectors, options, radius, offset, flag):  # noqa: N802
         self.casts.append((list(bodies), list(starts), list(vectors), options, radius, offset, flag))
@@ -905,6 +917,7 @@ class _RayModel:
 def _ray_component(stem, name, values, *, top_part_y=0.0, suppressed=False):
     component = _Full(values)
     component.Name2 = name
+    component.stem = stem
     component.GetPathName = lambda: f"C:/out/{stem}.SLDPRT"
     component.IsSuppressed = lambda: suppressed
     body = SimpleNamespace(
@@ -919,6 +932,9 @@ def _ray_adapter(monkeypatch, model):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "dispatch_array", list)
     monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(
+        drawing, "_view_component_leaves", lambda _adapter, _view, label: model.leaves()
+    )
 
     def attempt(call, default=None):
         try:
@@ -955,7 +971,7 @@ def test_inset_rays_go_down_machine_y_through_each_station_and_keep_the_highest_
         adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=INSET_STATIONS
     )
 
-    assert name == "fr-nameplate-1"
+    assert name == "fr-frame-1/fr-nameplate-1"
     assert rays == [
         ("fr-nameplate-1:top", pytest.approx(0.0523)),
         None,
@@ -991,7 +1007,7 @@ def test_inset_rays_need_exactly_one_shown_instance_with_a_body(monkeypatch) -> 
     bodiless = _ray_component("fr-nameplate", "fr-nameplate-1", values)
     bodiless.GetBodies3 = lambda _kind: (None, None)
     adapter, view = _ray_adapter(monkeypatch, _RayModel([bodiless], []))
-    with pytest.raises(RuntimeError, match="'fr-nameplate-1' resolves no solid body"):
+    with pytest.raises(RuntimeError, match="'fr-frame-1/fr-nameplate-1' resolves no solid body"):
         drawing._inset_edge_rays(
             adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,)
         )

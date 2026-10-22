@@ -36,6 +36,7 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
+    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
@@ -737,10 +738,15 @@ def _inset_edge_rays(
     """The edge of ``stem`` the plan section draws on machine x ``target_mm``, per station.
 
     One ``IModelDocExtension::RayIntersections`` call per solid body of the
-    stem's one shown instance, read from the view's referenced assembly (on
+    stem's one shown instance. The instance is the view's own drawing
+    component (``_view_component_leaves``), not the referenced assembly's:
+    an edge mapped through the assembly's component measured 4.0 and then
+    DANGLED once the sheet rebuilt (runs 20261022T180853435Z and
+    20261022T194220151Z, printed in the dangling colour), while the balloons
+    the same view tree anchors through their drawing component hold. (On
     this section ``IView::GetVisibleComponents`` returns no component, r4
     run 20261015T024651004Z, and ``GetVisibleEntities2`` no edge, r5 run
-    20261015T042140629Z). Each station casts a ray down machine -y through
+    20261015T042140629Z.) Each station casts a ray down machine -y through
     ``(target x, z)`` from above the body, so the first edge it reports is
     the highest level edge on that x: the outline the section draws there
     (the plate's top face over its underside, the deck end's chamfer over the
@@ -752,19 +758,17 @@ def _inset_edge_rays(
     ``None``.
     """
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-    assembly = _early_bound(model, "IAssemblyDoc")
     shown = [
-        component
-        for raw in assembly.GetComponents(True) or ()
-        for component in (_early_bound(raw, "IComponent2"),)
-        if _component_stem(component) == stem and not bool(component.IsSuppressed())
+        leaf
+        for leaf in _view_component_leaves(adapter, view, label="nameplate inset")
+        if leaf.visible and leaf.component is not None and stem in leaf.identities
     ]
     if len(shown) != 1:
         raise RuntimeError(
             f"nameplate inset: {len(shown)} shown {stem} instances, expected one"
         )
-    component = shown[0]
-    name = str(component.Name2)
+    component = _early_bound(shown[0].component, "IComponent2")
+    name = shown[0].path or str(component.Name2)
     result = adapter._attempt(
         lambda: component.GetBodies3(_SW_SOLID_BODY), default=None
     )
@@ -1981,7 +1985,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _, top_section = _create_joint_sections(adapter, front)
-    _add_nameplate_inset_dimension(adapter, top_section)
+    inset = _add_nameplate_inset_dimension(adapter, top_section)
 
     _add_note_block(
         adapter,
@@ -2068,7 +2072,28 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         (0.300, 0.074),
         label="assembly isometric caption",
     )
-    return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
+
+    def settled() -> None:
+        _assert_frame_balloons_settled(adapter, landings, proof)
+        _assert_inset_dimension_settled(inset)
+
+    return settled
+
+
+def _assert_inset_dimension_settled(display: Any) -> None:
+    """After the last rebuild, the inset dimension must still be attached.
+
+    ``IsDangling`` read False straight after ``AddDimension2`` on run
+    20261022T194220151Z, and the printed dimension was dangling anyway: the
+    references die when the section regenerates, so the proof is this one,
+    after the final rebuild.
+    """
+    dangling, types = _dimension_attachment(display)
+    if dangling:
+        raise RuntimeError(
+            f"nameplate end inset dangles after the final rebuild (attached entity types {types})"
+        )
+    _telemetry.event("drawing.inset_dimension_settled", dangling=dangling, types=types)
 
 
 async def build(adapter: Any) -> dict[str, str]:
