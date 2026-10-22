@@ -6,7 +6,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name, place_view, set_view_position, view_name,
@@ -24,11 +24,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import add_property_linked_note, property_link
+from _drawing_physical_head_height import assert_native_physical_head_height
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
@@ -311,122 +312,18 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
 def _assert_physical_head_height(
     adapter: Any, front: Any, display: Any, entities: tuple[Any, Any] | None = None
 ) -> float:
-    """Prove the native value/attachments; settled/saved callers rescan stations."""
+    """Rescan physical stations and prove fresh native value, ownership and geometry."""
     if entities is None:
         entities = _head_height_entities(adapter, front)
-    if display is None:
-        raise RuntimeError("SupplierHeadHeight: native display dimension is null")
-    snapshot = {}
-    stage = "display_bind"
-    reason = "native metadata snapshot failed"
-    try:
-        display = _early_bound(display, "IDisplayDimension")
-        stage = "annotation"
-        raw_annotation = display.GetAnnotation()
-        if raw_annotation is None:
-            reason = "native dimension has no annotation"
-            raise RuntimeError(reason)
-        stage = "annotation_bind"
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        stage = "application_bind"
-        app = _early_bound(adapter.swApp, "ISldWorks")
-        stage = "type2"
-        snapshot["type2"] = int(display.Type2)
-        stage = "attached_count"
-        snapshot["attached_count"] = int(annotation.GetAttachedEntityCount3())
-        stage = "attached_entities"
-        attached = annotation.GetAttachedEntities3()
-        attached_length = 0 if attached is None else len(attached)
-        snapshot["attached_length"] = attached_length
-        attached_slots = tuple(attached[index] for index in range(min(attached_length, 4)))
-        snapshot["attached_nulls"] = tuple(item is None for item in attached_slots)
-        stage = "attached_types"
-        raw_kinds = annotation.GetAttachedEntityTypes()
-        snapshot["kinds_length"] = 0 if raw_kinds is None else len(raw_kinds)
-        snapshot["kinds"] = tuple(
-            int(raw_kinds[index]) for index in range(min(snapshot["kinds_length"], 4))
-        )
-        stage = "dangling"
-        snapshot["dangling"] = bool(annotation.IsDangling())
-        stage = "owner_type"
-        snapshot["owner_type"] = int(annotation.OwnerType)
-        stage = "owner"
-        owner = annotation.Owner
-        snapshot["owner_null"] = owner is None
-        stage = "owner_same"
-        snapshot["owner_same"] = None if owner is None else int(app.IsSame(owner, front))
-    except Exception as exc:
-        snapshot["failure_probe_error"] = {
-            "stage": stage, "type": type(exc).__name__, "message": str(exc)[:500],
-        }
-        _telemetry.event("drawing.stud_head_height_native_refusal", reason=reason, **snapshot)
-        raise RuntimeError(f"SupplierHeadHeight: {reason}; native_snapshot={snapshot!r}") from exc
-
-    def refuse(reason: str) -> NoReturn:
-        # Refusal-only native evidence: never infer orientation or relax Type2.
-        stage = "native_dimension"
-        try:
-            native = display.GetDimension2(0)
-            snapshot["native_dimension_null"] = native is None
-            stage = "system_value"
-            snapshot["system_value"] = (
-                None if native is None else _early_bound(native, "IDimension").SystemValue
-            )
-            stage = "attachment_same"
-            snapshot["attachment_same"] = tuple(
-                tuple(
-                    None if item is None or expected is None else int(app.IsSame(item, expected))
-                    for expected in entities[:2]
-                )
-                for item in attached_slots[:2]
-            )
-            stage = "display_data"
-            raw_data = annotation.GetDisplayData()
-            snapshot["display_data_null"] = raw_data is None
-            snapshot["arrow_count"] = None
-            arrows = []
-            snapshot["arrow_heads"] = arrows
-            if raw_data is not None:
-                data = _early_bound(raw_data, "IDisplayData")
-                stage = "arrow_count"
-                arrow_count = int(data.GetArrowHeadCount())
-                snapshot["arrow_count"] = arrow_count
-                for index in range(min(arrow_count, 4)):
-                    stage = f"arrow_head_{index}"
-                    arrow = data.GetArrowHeadAtIndex2(index)
-                    arrows.append(
-                        None if arrow is None else tuple(
-                            float(arrow[slot]) for slot in range(min(len(arrow), 12))
-                        )
-                    )
-        except Exception as exc:
-            snapshot["failure_probe_error"] = {
-                "stage": stage, "type": type(exc).__name__, "message": str(exc)[:500],
-            }
-            _telemetry.event("drawing.stud_head_height_native_refusal", reason=reason, **snapshot)
-            raise RuntimeError(
-                f"SupplierHeadHeight: {reason}; native_snapshot={snapshot!r}"
-            ) from exc
-        _telemetry.event("drawing.stud_head_height_native_refusal", reason=reason, **snapshot)
-        raise RuntimeError(f"SupplierHeadHeight: {reason}; native_snapshot={snapshot!r}")
-
-    if snapshot["type2"] != 12:  # swVertLinearDimension; Type2=2 is not accepted.
-        refuse("expected vertical dimension Type2=12")
-    if snapshot["owner_type"] != 0 or snapshot["owner_null"] or snapshot["owner_same"] != 1:
-        refuse("expected exact front-view owner (OwnerType=0, IsSame=1)")
-    if (
-        snapshot["attached_count"] != 2 or snapshot["attached_length"] != 2
-        or snapshot["kinds_length"] != 2
-        or snapshot["kinds"] != (1, 1)  # swSelEDGES, never silhouettes or vertices
-        or any(snapshot["attached_nulls"]) or snapshot["dangling"]
-    ):
-        refuse("expected two nonnull actual edge attachments, not dangling")
-    try:
-        return assert_dimension_measures(
-            adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
-        )
-    except RuntimeError as exc:
-        refuse(str(exc))
+    bearing_mm, top_mm = _head_height_points_mm()
+    return assert_native_physical_head_height(
+        adapter, front, display, entities=entities,
+        points_m=(
+            tuple(value / 1000 for value in bearing_mm),
+            tuple(value / 1000 for value in top_mm),
+        ),
+        expected_mm=HEAD_H, label="SupplierHeadHeight",
+    )
 
 
 @_telemetry.traced("drawing.stud_head_height_add")

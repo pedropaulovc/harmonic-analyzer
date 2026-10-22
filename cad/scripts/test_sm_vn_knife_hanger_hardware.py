@@ -18,6 +18,7 @@ import pytest
 
 import _config
 import _drawing_edge_dimensions as edge_dimensions
+import _drawing_physical_head_height as physical_head_height
 import _supplier_dimensions as supplier_dimensions
 import _mcmaster_92314a253 as bolt_catalogue
 import _stock_trim_drawing as trim_drawing
@@ -1222,7 +1223,7 @@ def _stud_height_case(monkeypatch):
     )
     front = SimpleNamespace(
         name="FinishedFront", ReferencedConfiguration="Default",
-        GetDisplayMode2=lambda: 2,
+        GetDisplayMode2=lambda: 2, ScaleDecimal=2.0,
     )
     case.front = front
     bearing_point, top_point = bolt_drawing._head_height_points_mm()
@@ -1293,7 +1294,19 @@ def _stud_height_case(monkeypatch):
     annotation.GetAttachedEntityTypes = lambda: annotation.kinds
     annotation.GetAttachedEntityCount3 = lambda: annotation.count
     annotation.IsDangling = lambda: annotation.dangling
-    annotation.GetDisplayData = lambda: None
+    station_ys = tuple(
+        point[1] / 1000 * front.ScaleDecimal + 0.1
+        for point in (bearing_point, top_point)
+    )
+    case.arrows = [
+        (0.2, y, 0.0, 0.0, sign, 0.0, 0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for y, sign in zip(station_ys, (1.0, -1.0), strict=True)
+    ]
+    case.display_data = SimpleNamespace(
+        GetArrowHeadCount=lambda: len(case.arrows),
+        GetArrowHeadAtIndex2=lambda index: case.arrows[index],
+    )
+    annotation.GetDisplayData = lambda: case.display_data
     native = SimpleNamespace(
         SystemValue=bolt.HEAD_H / 1000,
         FullName="SupplierHeadHeight@FinishedFront@Drawing",
@@ -1302,7 +1315,7 @@ def _stud_height_case(monkeypatch):
     settings = bolt.SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"]
     case.native = native
     case.display = SimpleNamespace(
-        Type2=12, GetDimension2=lambda _index: native,
+        Type2=2, GetDimension2=lambda _index: native,
         GetAnnotation=lambda: annotation, ShowParenthesis=False, ShowDimensionValue=True,
         GetUseDocUnits=lambda: False,
         GetUnits=lambda: 3 if settings["units"] == "in" else 0,
@@ -1356,10 +1369,16 @@ def _stud_height_case(monkeypatch):
 
     def project(_adapter, view, points, *, label):
         case.projections.append((view, points, label))
-        return [(point[0] + 0.1, point[1] + 0.1) for point in points]
+        return [
+            (point[0] * view.ScaleDecimal + 0.1,
+             point[1] * view.ScaleDecimal + 0.1)
+            for point in points
+        ]
 
     monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_head_height, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_head_height, "model_points_in_view", project)
     monkeypatch.setattr(
         edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, _kind, *_members: value,
@@ -1497,7 +1516,8 @@ def test_stud_head_height_creates_native_vertical_dimension_with_strict_edge_rea
         for point in bolt_drawing._head_height_points_mm()
     ]
     assert case.selection_points == [
-        (index, -1, point[0] + 0.1, point[1] + 0.1, 0.0)
+        (index, -1, point[0] * case.front.ScaleDecimal + 0.1,
+         point[1] * case.front.ScaleDecimal + 0.1, 0.0)
         for index, point in enumerate(projected, start=1)
     ]
 
@@ -1528,7 +1548,7 @@ def test_stud_head_height_refuses_selection_and_creation_failures_without_fallba
 @pytest.mark.parametrize(
     "fault",
     ("value", "attachments", "kinds", "count", "extra", "missing",
-     "dangling", "not_vertical", "linear_type2", "missing_native", "owner",
+     "dangling", "not_vertical", "vertical_type12", "missing_native", "owner",
      "owner_type", "owner_null", "owner_unknown", "kinds_extra", "attached_empty",
      "kinds_empty"),
 )
@@ -1552,8 +1572,8 @@ def test_stud_head_height_proves_native_measurement_and_actual_attachments_at_bo
         case.annotation.dangling = True
     elif fault == "not_vertical":
         case.display.Type2 = 11
-    elif fault == "linear_type2":
-        case.display.Type2 = 2
+    elif fault == "vertical_type12":
+        case.display.Type2 = 12
     elif fault == "missing_native":
         case.display.GetDimension2 = lambda _index: None
     elif fault == "owner":
@@ -1593,165 +1613,59 @@ def test_stud_head_height_missing_native_handles_have_precise_refusals(monkeypat
         )
 
 
-def test_stud_head_height_refusal_reports_every_actual_native_field_once(monkeypatch):
+def test_stud_head_height_linear_native_vertical_proof_uses_exact_model_stations(monkeypatch):
     case = _stud_height_case(monkeypatch)
-    calls = []
-    case.display.Type2 = 2
-    case.annotation.count = 7
-    case.annotation.attached = [case.bearing, None]
-    case.annotation.kinds = (1, 46)
-    case.annotation.dangling = True
-    case.annotation.OwnerType = 9
-    case.app.IsSame = lambda _first, _second: 2
-    for name in (
-        "GetAttachedEntityCount3", "GetAttachedEntities3", "GetAttachedEntityTypes",
-        "IsDangling",
-    ):
-        original = getattr(case.annotation, name)
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    assert case.display.Type2 == 2
+    assert len(case.scans) == 1
+    assert tuple(case.projections[0][1]) == tuple(
+        tuple(value / 1000 for value in point)
+        for point in bolt_drawing._head_height_points_mm()
+    )
+    assert any(
+        name == "drawing.physical_head_height_native_proof" for name, _ in case.events
+    )
+    # A reversed exact physical EDGE bijection remains valid.
+    case.annotation.attached.reverse()
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    assert len(case.scans) == 2
 
-        def counted(original=original, name=name):
-            calls.append(name)
-            return original()
 
-        setattr(case.annotation, name, counted)
-    with pytest.raises(RuntimeError, match="Type2=12") as error:
+def test_stud_head_height_refusal_reports_canonical_native_metadata(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.display.Type2 = 12
+    with pytest.raises(RuntimeError, match="native_snapshot=") as error:
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
         )
-    refusal = next(
+    receipt = next(
         fields for name, fields in case.events
-        if name == "drawing.stud_head_height_native_refusal"
+        if name == "drawing.physical_head_height_native_refusal"
     )
-    expected_snapshot = {
-        "type2": 2, "attached_count": 7, "attached_length": 2,
-        "kinds_length": 2, "kinds": (1, 46), "attached_nulls": (False, True),
-        "dangling": True, "owner_type": 9, "owner_null": False, "owner_same": 2,
+    expected = {
+        "type2": 12, "attached_count": 2, "attached_length": 2,
+        "kinds_length": 2, "kinds": (1, 1), "attached_nulls": (False, False),
+        "dangling": False, "owner_type": 0, "owner_null": False, "owner_same": 1,
     }
-    assert {key: refusal[key] for key in expected_snapshot} == expected_snapshot
-    assert refusal["native_dimension_null"] is False
-    assert refusal["system_value"] == case.native.SystemValue
-    assert refusal["attachment_same"] == ((2, 2), (None, None))
-    assert refusal["display_data_null"] is True
-    assert refusal["arrow_count"] is None
-    assert refusal["arrow_heads"] == []
-    for key, value in refusal.items():
-        if key != "reason":
-            assert f"{key!r}: {value!r}" in str(error.value)
-    assert sorted(calls) == sorted((
-        "GetAttachedEntityCount3", "GetAttachedEntities3", "GetAttachedEntityTypes",
-        "IsDangling",
-    ))
+    assert {key: receipt[key] for key in expected} == expected
+    for key, value in expected.items():
+        assert f"{key!r}: {value!r}" in str(error.value)
 
 
-def test_stud_head_height_refusal_bounds_malformed_arrays_and_raw_arrows(monkeypatch):
+@pytest.mark.parametrize("getter", ["GetAnnotation", "GetAttachedEntityCount3", "GetDisplayData"])
+def test_stud_head_height_native_errors_retain_cause_and_visible_stage(monkeypatch, getter):
     case = _stud_height_case(monkeypatch)
-
-    class BoundedArray:
-        def __len__(self):
-            return 1000
-
-        def __getitem__(self, index):
-            assert 0 <= index < 4
-            return case.bearing if index % 2 == 0 else None
-
-    class BoundedKinds:
-        def __len__(self):
-            return 1000
-
-        def __getitem__(self, index):
-            assert 0 <= index < 4
-            return 1
-
-    arrow_calls = []
-
-    def arrow(index):
-        arrow_calls.append(index)
-        return tuple(range(20))
-
-    case.annotation.attached = BoundedArray()
-    case.annotation.kinds = BoundedKinds()
-    case.annotation.GetDisplayData = lambda: SimpleNamespace(
-        GetArrowHeadCount=lambda: 1000, GetArrowHeadAtIndex2=arrow,
-    )
-    with pytest.raises(RuntimeError, match="actual edge attachments") as error:
-        bolt_drawing._assert_physical_head_height(
-            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
-        )
-    refusal = next(
-        fields for name, fields in case.events
-        if name == "drawing.stud_head_height_native_refusal"
-    )
-    assert refusal["attached_length"] == refusal["kinds_length"] == 1000
-    assert refusal["attached_nulls"] == (False, True, False, True)
-    assert refusal["kinds"] == (1, 1, 1, 1)
-    assert refusal["attachment_same"] == ((1, 0), (None, None))
-    assert refusal["arrow_count"] == 1000
-    assert refusal["arrow_heads"] == [tuple(float(n) for n in range(12))] * 4
-    assert arrow_calls == [0, 1, 2, 3]
-    assert "'arrow_count': 1000" in str(error.value)
-
-
-@pytest.mark.parametrize("fault", [None, "value", "attachments", "native"])
-def test_stud_head_height_shared_proof_keeps_receipt_and_good_path_skips_extra_calls(
-    monkeypatch, fault
-):
-    case = _stud_height_case(monkeypatch)
-    extra_calls = []
-    case.annotation.GetDisplayData = lambda: extra_calls.append("display_data")
-    if fault == "value":
-        case.native.SystemValue -= 0.0001
-    elif fault == "attachments":
-        case.annotation.attached[1] = case.rear
-    elif fault == "native":
-        case.display.GetDimension2 = lambda _index: None
-    if fault is None:
-        assert bolt_drawing._assert_physical_head_height(
-            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
-        ) == pytest.approx(bolt.HEAD_H)
-        assert extra_calls == []
-    else:
-        with pytest.raises(RuntimeError, match="native_snapshot=") as error:
-            bolt_drawing._assert_physical_head_height(
-                case.adapter, case.front, case.display, entities=(case.bearing, case.top)
-            )
-        assert isinstance(error.value.__context__, RuntimeError)
-        assert extra_calls == ["display_data"]
-
-
-def test_stud_head_height_null_owner_and_null_arrows_are_evidence_not_fallbacks(monkeypatch):
-    case = _stud_height_case(monkeypatch)
-    case.annotation.Owner = None
-    comparisons = []
-    case.app.IsSame = lambda first, second: comparisons.append((first, second)) or 1
-    case.annotation.GetDisplayData = lambda: SimpleNamespace(
-        GetArrowHeadCount=lambda: 1, GetArrowHeadAtIndex2=lambda _index: None,
-    )
-    with pytest.raises(RuntimeError, match="exact front-view owner") as error:
-        bolt_drawing._assert_physical_head_height(
-            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
-        )
-    assert "'owner_null': True" in str(error.value)
-    assert "'owner_same': None" in str(error.value)
-    assert "'arrow_heads': [None]" in str(error.value)
-    assert comparisons == [
-        (case.bearing, case.bearing), (case.bearing, case.top),
-        (case.top, case.bearing), (case.top, case.top),
-    ]
-
-
-@pytest.mark.parametrize("stage", ["metadata", "refusal"])
-def test_stud_head_height_native_diagnostic_errors_are_not_swallowed(monkeypatch, stage):
-    case = _stud_height_case(monkeypatch)
-    failure = OSError("native metadata read failed")
+    failure = OSError("native read failed")
 
     def fail():
         raise failure
 
-    if stage == "metadata":
-        case.annotation.GetAttachedEntityCount3 = fail
-    else:
-        case.display.Type2 = 2
-        case.annotation.GetDisplayData = fail
+    target = case.display if getter == "GetAnnotation" else case.annotation
+    setattr(target, getter, fail)
     with pytest.raises(RuntimeError, match="native_snapshot=") as error:
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
@@ -1759,45 +1673,125 @@ def test_stud_head_height_native_diagnostic_errors_are_not_swallowed(monkeypatch
     assert error.value.__cause__ is failure
     receipt = next(
         fields for name, fields in case.events
-        if name == "drawing.stud_head_height_native_refusal"
+        if name == "drawing.physical_head_height_native_refusal"
     )
-    assert receipt["type2"] == (12 if stage == "metadata" else 2)
-    assert receipt["failure_probe_error"] == {
-        "stage": "attached_count" if stage == "metadata" else "display_data",
-        "type": "OSError", "message": "native metadata read failed",
-    }
-    assert "'failure_probe_error':" in str(error.value)
-    assert receipt["reason"] == (
-        "native metadata snapshot failed" if stage == "metadata"
-        else "expected vertical dimension Type2=12"
-    )
+    assert receipt["failure_error_type"] == "OSError"
+    assert receipt["failure_error"] == "native read failed"
+    assert receipt["failure_stage"]
 
 
-def test_stud_head_height_annotation_read_failure_retains_initial_snapshot_and_cause(monkeypatch):
-    case = _stud_height_case(monkeypatch)
-    failure = OSError("native GetAnnotation failed")
+_STUD_SPATIAL_FAULTS = (
+    "type12", "missing_data", "arrow_count", "null_arrow", "short_arrow", "long_arrow",
+    "nonfinite_arrow", "horizontal", "diagonal", "zero", "same_sign", "different_x",
+    "tip_z", "translated", "wrong_span", "zero_scale", "nonfinite_scale",
+    "wrong_scale", "projection", "projection_count", "nonfinite_projection",
+    "attachment", "duplicate_attachment", "value", "null_value", "nonfinite_value",
+)
 
-    def fail():
-        raise failure
 
-    case.display.GetAnnotation = fail
-    with pytest.raises(RuntimeError, match="native metadata snapshot failed") as error:
-        bolt_drawing._assert_physical_head_height(
-            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
-        )
-    assert error.value.__cause__ is failure
-    receipt = next(
-        fields for name, fields in case.events
-        if name == "drawing.stud_head_height_native_refusal"
-    )
-    assert receipt == {
-        "reason": "native metadata snapshot failed",
-        "failure_probe_error": {
-            "stage": "annotation", "type": "OSError", "message": "native GetAnnotation failed",
-        },
-    }
-    assert "'failure_probe_error':" in str(error.value)
-    assert "'stage': 'annotation'" in str(error.value)
+def _corrupt_stud_native_proof(case, monkeypatch, fault):
+    def change_arrow(index, slot, value):
+        record = list(case.arrows[index])
+        record[slot] = value
+        case.arrows[index] = tuple(record)
+
+    if fault == "type12":
+        case.display.Type2 = 12
+    elif fault == "missing_data":
+        case.annotation.GetDisplayData = lambda: None
+    elif fault == "arrow_count":
+        case.arrows.pop()
+    elif fault == "null_arrow":
+        case.arrows[0] = None
+    elif fault == "short_arrow":
+        case.arrows[0] = case.arrows[0][:-1]
+    elif fault == "long_arrow":
+        case.arrows[0] = (*case.arrows[0], 0.0)
+    elif fault == "nonfinite_arrow":
+        change_arrow(0, 7, float("nan"))
+    elif fault == "horizontal":
+        for index, sign in enumerate((1.0, -1.0)):
+            change_arrow(index, 3, sign)
+            change_arrow(index, 4, 0.0)
+    elif fault == "diagonal":
+        change_arrow(0, 3, 0.1)
+    elif fault == "zero":
+        change_arrow(0, 4, 0.0)
+    elif fault == "same_sign":
+        change_arrow(1, 4, 1.0)
+    elif fault == "different_x":
+        change_arrow(0, 0, case.arrows[0][0] + 0.001)
+    elif fault == "tip_z":
+        change_arrow(0, 2, 0.001)
+    elif fault == "translated":
+        for index in range(2):
+            change_arrow(index, 1, case.arrows[index][1] + 0.001)
+    elif fault == "wrong_span":
+        change_arrow(1, 1, case.arrows[1][1] + 0.001)
+    elif fault == "zero_scale":
+        case.front.ScaleDecimal = 0.0
+    elif fault == "nonfinite_scale":
+        case.front.ScaleDecimal = float("nan")
+    elif fault == "wrong_scale":
+        case.front.ScaleDecimal = 3.0
+    elif fault in ("projection", "projection_count", "nonfinite_projection"):
+        original = physical_head_height.model_points_in_view
+
+        def project(*args, **kwargs):
+            points = list(original(*args, **kwargs))
+            if fault == "projection":
+                return [(x, y + 0.001) for x, y in points]
+            if fault == "projection_count":
+                return points[:1]
+            return [(float("nan"), points[0][1]), points[1]]
+
+        monkeypatch.setattr(physical_head_height, "model_points_in_view", project)
+    elif fault == "attachment":
+        case.annotation.attached[1] = case.rear
+    elif fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "duplicate_attachment":
+        case.annotation.attached[1] = case.bearing
+    elif fault == "null_value":
+        case.native.SystemValue = None
+    elif fault == "nonfinite_value":
+        case.native.SystemValue = float("nan")
+    else:
+        raise AssertionError(f"unknown native proof fault: {fault}")
+
+
+@pytest.mark.parametrize("phase", ["created", "settled", "saved"])
+@pytest.mark.parametrize("fault", _STUD_SPATIAL_FAULTS)
+def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_height_case(monkeypatch)
+    # Prove valid data first, then mutate it: no cached proof may survive settle/reopen.
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    _corrupt_stud_native_proof(case, monkeypatch, fault)
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        if phase == "created":
+            bolt_drawing._add_physical_head_height(
+                case.adapter, case.front, (0.218, 0.216)
+            )
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_head_height(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
 
 
 def _settled_stud_height_case(monkeypatch):

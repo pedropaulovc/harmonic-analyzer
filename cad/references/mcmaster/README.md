@@ -897,6 +897,11 @@ Catalog specifications checked on September 10, 2026:
   `HEAD_H` are checked at insertion, after settling and from the reopened
   read-only saved drawing. These are native model-reference checks, not new
   supplier tolerances or proof that a catalogue-only depiction is vendor CAD.
+  The shared native-height proof requires drawing dimension type 2
+  (`swLinearDimension`) **and** two finite, opposing vertical native arrows.
+  Their witness stations must match the fresh physical-edge projection and
+  their span must equal `HEAD_H` times the native view scale; the type code
+  alone cannot establish verticality.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1085,6 +1090,13 @@ Catalog specifications checked on September 10, 2026:
   after settling and on the reopened read-only saved drawing. Interior face
   points are not reliable drawing-edge picks, even when their projection
   crosses the apparent rim.
+  The shared `_drawing_physical_head_height.py` proof requires type 2
+  (`swLinearDimension`), not a type-12-or-type-2 alternative, and independently
+  proves verticality from both native arrows, projected physical stations and
+  the native view scale. Its `1e-8 m` sheet-position bound inherits the exact
+  physical-edge pick precision; it is not fitted to a rendered result.
+  The separate native-height tolerance remains `1e-5 mm`. All of these checks
+  run afresh at insertion, after settling and after reopening the saved file.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

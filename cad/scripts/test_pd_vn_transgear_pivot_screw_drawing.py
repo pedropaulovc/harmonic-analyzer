@@ -587,11 +587,13 @@ class _HeadRim:
 def _physical_head_fixture(monkeypatch):
     """Real recipe/shared measurement logic over explicitly bounded no-COM doubles."""
     import _drawing_edge_dimensions as edge_dimensions
+    import _drawing_physical_head_height as physical_height
     from _drawing_edges import ViewEdge, ViewEdges
 
     selection = _HeadSelection()
     front = SimpleNamespace(
         name="FinishedFront", mode=2, ReferencedConfiguration="Default", dimensions=[],
+        ScaleDecimal=4.0,
     )
     front.GetDisplayMode2 = lambda: front.mode
     front.GetDisplayDimensions = lambda: tuple(front.dimensions)
@@ -609,7 +611,16 @@ def _physical_head_fixture(monkeypatch):
     annotation.GetAttachedEntityTypes = lambda: annotation.kinds
     annotation.GetAttachedEntityCount3 = lambda: annotation.count
     annotation.IsDangling = lambda: annotation.dangling
-    annotation.GetDisplayData = lambda: None
+    arrows = [
+        (0.224, 0.190 + 4 * point[1], 0.0, 0.0, direction, 0.0,
+         0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for point, direction in zip(drawing._head_height_points(), (1.0, -1.0), strict=True)
+    ]
+    display_data = SimpleNamespace(
+        GetArrowHeadCount=lambda: len(arrows),
+        GetArrowHeadAtIndex2=lambda index: arrows[index],
+    )
+    annotation.GetDisplayData = lambda: display_data
     tolerance = SimpleNamespace(Type=0)
     native = SimpleNamespace(
         SystemValue=screw.HEAD_H / 1000, FullName="D2@FinishedFront", Tolerance=tolerance,
@@ -617,7 +628,7 @@ def _physical_head_fixture(monkeypatch):
     presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"]
     texts = {1: "(", 2: " in)", 4: presentation.get("callout", "")}
     display = SimpleNamespace(
-        Type2=12, ShowDimensionValue=True, ShowParenthesis=False,
+        Type2=2, ShowDimensionValue=True, ShowParenthesis=False,
         GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
         GetUseDocUnits=lambda: False, GetUnits=lambda: 3,
         GetPrimaryPrecision2=lambda: presentation["precision"],
@@ -634,6 +645,7 @@ def _physical_head_fixture(monkeypatch):
         bearing=bearing, top=top, annotation=annotation, display=display, native=native,
         model=model, texts=texts, tolerance=tolerance, activate_result=True,
         create_result=display, scans=[], projections=[], events=[], additions=[],
+        arrows=arrows, display_data=display_data,
     )
     model.ActivateView = lambda name: (
         selection.calls.append(("activate", name)) or state.activate_result
@@ -663,6 +675,7 @@ def _physical_head_fixture(monkeypatch):
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_height, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, _kind, *_members: value,
@@ -670,6 +683,7 @@ def _physical_head_fixture(monkeypatch):
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(drawing, "scan_view_edges", scan)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(physical_height, "model_points_in_view", project)
     monkeypatch.setattr(
         _telemetry, "event", lambda name, **fields: state.events.append((name, fields))
     )
@@ -857,19 +871,19 @@ def test_physical_head_height_refuses_bad_native_selection_and_creation(
     ("null_value", "no measured native value"),
     ("wrong_attachment", "named entities"),
     ("same_attachment", "named entities"),
-    ("null_attachment", "named entities"),
-    ("extra_attachment", "two EDGE attachments"),
-    ("attachment_count", "two EDGE attachments"),
-    ("attachment_type", "two EDGE attachments"),
-    ("dangling", "named entities"),
+    ("null_attachment", "two nonnull actual edge attachments"),
+    ("extra_attachment", "two nonnull actual edge attachments"),
+    ("attachment_count", "two nonnull actual edge attachments"),
+    ("attachment_type", "two nonnull actual edge attachments"),
+    ("dangling", "two nonnull actual edge attachments"),
     ("missing_native", "no native model dimension"),
-    ("dimension_type", "not vertical"),
-    ("linear_dimension_type", "not vertical"),
-    ("unknown_owner", "exact front view"),
+    ("dimension_type", "expected linear dimension Type2=2"),
+    ("legacy_vertical_dimension_type", "expected linear dimension Type2=2"),
+    ("unknown_owner", "exact front-view owner"),
     ("malformed_kinds", "int"),
-    ("owner_type", "exact front view"),
-    ("missing_owner", "exact front view"),
-    ("wrong_owner", "exact front view"),
+    ("owner_type", "exact front-view owner"),
+    ("missing_owner", "exact front-view owner"),
+    ("wrong_owner", "exact front-view owner"),
 ))
 def test_physical_head_height_proves_creation_and_settled_native_state(
     monkeypatch, phase, fault, message,
@@ -899,8 +913,8 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
         state.display.GetDimension2 = lambda _index: None
     elif fault == "dimension_type":
         state.display.Type2 = 11
-    elif fault == "linear_dimension_type":
-        state.display.Type2 = 2
+    elif fault == "legacy_vertical_dimension_type":
+        state.display.Type2 = 12
     elif fault == "unknown_owner":
         state.adapter.swApp.IsSame = lambda first, second: (
             2 if first is state.annotation.Owner and second is state.front
@@ -921,30 +935,35 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
             drawing._assert_physical_head_height(state.adapter, state.front, state.display)
     assert not state.selection.selected
     evidence = state.events[-1]
-    assert evidence[0] == "drawing.pivot_head_height_refusal"
+    assert evidence[0] == "drawing.physical_head_height_native_refusal"
     for field in (
-        "type2", "count_api", "attached_len", "kinds_len", "kinds",
-        "attached_nulls", "dangling", "owner_type", "owner_null", "owner_is_same",
-        "native_dimension_null", "system_value", "attachment_is_same",
-        "display_data_null", "arrow_count", "arrows",
+        "type2", "attached_count", "attached_length", "kinds_length", "kinds",
+        "attached_nulls", "dangling", "owner_type", "owner_null", "owner_same",
     ):
         assert field in evidence[1]
         assert f"'{field}':" in str(refusal.value)
 
 
-def test_physical_head_height_valid_snapshot_returns_exact_height_without_failure_probes(
+def test_physical_head_height_valid_linear_type_requires_native_spatial_proof(
     monkeypatch,
 ) -> None:
     state = _physical_head_fixture(monkeypatch)
-
-    def forbidden():
-        raise AssertionError("Refusal-only display data must not be read on success")
-
-    state.annotation.GetDisplayData = forbidden
     assert drawing._assert_physical_head_height(
         state.adapter, state.front, state.display, entities=(state.bearing, state.top),
     ) == screw.HEAD_H
-    assert not state.events
+    assert state.events[-1][0] == "drawing.physical_head_height_native_proof"
+    assert state.projections[-1][1] == drawing._head_height_points()
+    assert not state.scans  # Explicit creation pair does not trigger a second scan.
+
+
+def test_physical_head_height_accepts_exact_edge_bijection_in_reverse_order(monkeypatch) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.annotation.attached.reverse()
+    assert drawing._assert_physical_head_height(
+        state.adapter, state.front, state.display,
+    ) == screw.HEAD_H
+    assert len(state.scans) == 1
+    assert state.events[-1][0] == "drawing.physical_head_height_native_proof"
 
 
 @pytest.mark.parametrize("missing", ("display", "annotation", "attached", "kinds"))
@@ -965,19 +984,17 @@ def test_physical_head_height_missing_metadata_has_precise_snapshot(monkeypatch,
         )
     evidence = state.events[-1][1]
     if missing == "display":
-        assert "missing native display dimension" in str(refusal.value)
+        assert "native display dimension is null" in str(refusal.value)
         assert evidence["display_null"] is True
     elif missing == "annotation":
-        assert "missing native annotation" in str(refusal.value)
+        assert "native dimension has no annotation" in str(refusal.value)
         assert evidence["annotation_null"] is True
     else:
-        assert "expected two EDGE attachments" in str(refusal.value)
-        assert evidence["attached_len" if missing == "attached" else "kinds_len"] == 0
+        assert "expected two nonnull actual edge attachments" in str(refusal.value)
+        assert evidence["attached_length" if missing == "attached" else "kinds_length"] == 0
 
 
-def test_physical_head_height_refusal_bounds_metadata_and_rendered_arrow_evidence(
-    monkeypatch,
-) -> None:
+def test_physical_head_height_refusal_bounds_native_metadata(monkeypatch) -> None:
     state = _physical_head_fixture(monkeypatch)
     reads = []
 
@@ -998,28 +1015,17 @@ def test_physical_head_height_refusal_bounds_metadata_and_rendered_arrow_evidenc
 
     state.annotation.GetAttachedEntities3 = lambda: BoundedNativeArray("attached", 200, state.top)
     state.annotation.GetAttachedEntityTypes = lambda: BoundedNativeArray("kinds", 300, 46)
-    arrows = []
-    state.annotation.GetDisplayData = lambda: SimpleNamespace(
-        GetArrowHeadCount=lambda: 100,
-        GetArrowHeadAtIndex2=lambda index: arrows.append(index) or tuple(range(20)),
-    )
-    with pytest.raises(RuntimeError, match="expected two EDGE attachments") as refusal:
+    state.display.Type2 = 2
+    with pytest.raises(RuntimeError, match="expected two nonnull actual edge attachments") as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
     evidence = state.events[-1][1]
-    assert evidence["attached_len"] == 200
-    assert evidence["kinds_len"] == 300
+    assert evidence["attached_length"] == 200
+    assert evidence["kinds_length"] == 300
     assert evidence["kinds"] == (46,) * 4
     assert evidence["attached_nulls"] == (False,) * 4
     assert reads == [(name, index) for name in ("attached", "kinds") for index in range(4)]
-    assert evidence["native_dimension_null"] is False
-    assert evidence["system_value"] == screw.HEAD_H / 1000
-    assert evidence["attachment_is_same"] == ((0, 1), (0, 1))
-    assert evidence["display_data_null"] is False
-    assert evidence["arrow_count"] == 100
-    assert arrows == list(range(4))
-    assert evidence["arrows"] == (tuple(range(12)),) * 4
     assert f"native_snapshot={evidence}" in str(refusal.value)
 
 
@@ -1031,15 +1037,15 @@ def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypat
         raise RuntimeError("native display data failed")
 
     state.annotation.GetDisplayData = broken_display_data
-    with pytest.raises(RuntimeError, match="not vertical.*native_snapshot=") as refusal:
+    with pytest.raises(RuntimeError, match="native display data failed.*native_snapshot=") as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
     assert str(refusal.value.__cause__) == "native display data failed"
-    assert state.events[-1][1]["failure_probe_error"] == "native display data failed"
+    assert state.events[-1][1]["failure_error"] == "native display data failed"
 
 
-@pytest.mark.parametrize("phase", ("metadata", "probe"))
+@pytest.mark.parametrize("phase", ("metadata", "display_data"))
 @pytest.mark.parametrize("error_type", (Exception, OSError))
 def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
     monkeypatch, phase, error_type,
@@ -1061,8 +1067,8 @@ def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
         )
     assert refusal.value.__cause__ is error
     evidence = state.events[-1][1]
-    assert evidence["count_api"] == 2
-    assert evidence["attached_len"] == 2
+    assert evidence["attached_count"] == 2
+    assert evidence["attached_length"] == 2
     assert evidence["kinds"] == (1, 1)
     if phase == "metadata":
         assert evidence["failure_stage"] == "IsDangling"
@@ -1070,16 +1076,15 @@ def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
         assert evidence["failure_error"] == "native transport failed"
         assert evidence["dangling"] is None
     else:
-        assert "not vertical" in str(refusal.value)
-        assert evidence["failure_probe_stage"] == "GetDisplayData"
-        assert evidence["failure_probe_error_type"] == error_type.__name__
-        assert evidence["failure_probe_error"] == "native transport failed"
-        assert evidence["owner_is_same"] == 1
+        assert evidence["failure_stage"] == "GetDisplayData"
+        assert evidence["failure_error_type"] == error_type.__name__
+        assert evidence["failure_error"] == "native transport failed"
+        assert evidence["owner_same"] == 1
 
 
 def test_physical_head_height_refusal_reads_each_native_metadata_getter_once(monkeypatch) -> None:
     state = _physical_head_fixture(monkeypatch)
-    state.display.Type2 = 2
+    state.display.Type2 = 12
     calls = []
     for name in (
         "GetAttachedEntities3", "GetAttachedEntityTypes", "GetAttachedEntityCount3", "IsDangling",
@@ -1091,16 +1096,16 @@ def test_physical_head_height_refusal_reads_each_native_metadata_getter_once(mon
             return original()
 
         monkeypatch.setattr(state.annotation, name, read_once)
-    with pytest.raises(RuntimeError, match="not vertical"):
+    with pytest.raises(RuntimeError, match="expected linear dimension Type2=2"):
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
     assert len(calls) == 4
     assert len(set(calls)) == 4
     evidence = state.events[-1][1]
-    assert evidence["type2"] == 2
-    assert evidence["owner_is_same"] == 1
-    assert evidence["count_api"] == 2
+    assert evidence["type2"] == 12
+    assert evidence["owner_same"] == 1
+    assert evidence["attached_count"] == 2
 
 
 def test_physical_head_height_malformed_attachment_array_is_not_silently_accepted(
@@ -1113,8 +1118,8 @@ def test_physical_head_height_malformed_attachment_array_is_not_silently_accepte
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
     assert isinstance(refusal.value.__cause__, TypeError)
-    assert state.events[-1][1]["attached_len"] is None
-    assert state.events[-1][1]["count_api"] == 2
+    assert state.events[-1][1]["attached_length"] is None
+    assert state.events[-1][1]["attached_count"] == 2
 
 
 def test_supplier_references_route_only_head_height_through_physical_api(monkeypatch) -> None:
@@ -1271,12 +1276,12 @@ def test_saved_head_height_reopens_read_only_rescans_proves_and_closes(
     ("sheet_activation", "activate saved sheet"),
     ("missing_native", "saved display has no native dimension"),
     ("orphan_display", "saved display has no native dimension"),
-    ("dimension_type", "not vertical"),
-    ("owner_type", "exact front view"),
-    ("same_named_wrong_owner", "exact front view"),
+    ("dimension_type", "expected linear dimension Type2=2"),
+    ("owner_type", "exact front-view owner"),
+    ("same_named_wrong_owner", "exact front-view owner"),
     ("wrong_value", "measures"),
     ("wrong_attachment", "named entities"),
-    ("wrong_type_attachment", "two EDGE attachments"),
+    ("wrong_type_attachment", "two nonnull actual edge attachments"),
     ("changed_geometry", "top physical rim"),
     ("lost_hlr", "hidden-lines-removed"),
     ("format", "presentation"),
@@ -1584,11 +1589,90 @@ def test_physical_head_height_bounds_arc_evidence_without_hiding_the_nearest_mat
     assert top_evidence["candidates"][0]["nearest_m"] == drawing._head_height_points()[1]
 
 
-@pytest.mark.parametrize("dimension_type", (0, 2, 6, 11))
-def test_physical_head_height_refuses_every_nonvertical_native_type(
+@pytest.mark.parametrize("dimension_type", (0, 6, 11, 12))
+def test_physical_head_height_refuses_every_nonlinear_native_type(
     monkeypatch, dimension_type,
 ) -> None:
     state = _physical_head_fixture(monkeypatch)
     state.display.Type2 = dimension_type
-    with pytest.raises(RuntimeError, match="not vertical"):
+    with pytest.raises(RuntimeError, match="expected linear dimension Type2=2"):
         drawing._assert_physical_head_height(state.adapter, state.front, state.display)
+
+
+@pytest.mark.parametrize("phase", ("creation", "settled", "saved"))
+@pytest.mark.parametrize("fault", (
+    "horizontal", "diagonal", "zero_direction", "same_sign", "wrong_span",
+    "translated_tips", "different_x", "nonzero_z", "null_display_data",
+    "missing_display_data", "null_arrow", "short_arrow", "long_arrow",
+    "nonfinite_arrow", "wrong_arrow_count", "wrong_scale", "zero_scale",
+    "nonfinite_scale", "wrong_projection", "null_projection",
+    "wrong_attachment", "wrong_value", "legacy_type",
+))
+def test_physical_head_height_spatial_proof_is_fresh_at_every_boundary(
+    monkeypatch, tmp_path, phase, fault,
+) -> None:
+    import _drawing_physical_head_height as physical_height
+
+    state = _saved_head_fixture(monkeypatch, tmp_path)
+    if phase != "creation":
+        drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
+    if fault in ("horizontal", "diagonal", "zero_direction", "same_sign"):
+        direction = {
+            "horizontal": (1.0, 0.0, 0.0),
+            "diagonal": (0.1, 1.0, 0.0),
+            "zero_direction": (0.0, 0.0, 0.0),
+            "same_sign": (0.0, -1.0, 0.0),
+        }[fault]
+        state.arrows[0] = (*state.arrows[0][:3], *direction, *state.arrows[0][6:])
+    elif fault in ("wrong_span", "translated_tips", "different_x", "nonzero_z"):
+        for index in range(2 if fault == "translated_tips" else 1):
+            arrow = list(state.arrows[index])
+            coordinate = {"different_x": 0, "nonzero_z": 2}.get(fault, 1)
+            arrow[coordinate] += 0.001
+            state.arrows[index] = tuple(arrow)
+    elif fault == "null_display_data":
+        state.annotation.GetDisplayData = lambda: None
+    elif fault == "missing_display_data":
+        del state.annotation.GetDisplayData
+    elif fault == "null_arrow":
+        state.arrows[0] = None
+    elif fault == "short_arrow":
+        state.arrows[0] = state.arrows[0][:-1]
+    elif fault == "long_arrow":
+        state.arrows[0] = (*state.arrows[0], 0.0)
+    elif fault == "nonfinite_arrow":
+        state.arrows[0] = (float("nan"), *state.arrows[0][1:])
+    elif fault == "wrong_arrow_count":
+        state.arrows.append(state.arrows[0])
+    elif fault in ("wrong_scale", "zero_scale", "nonfinite_scale"):
+        state.front.ScaleDecimal = {
+            "wrong_scale": 2.0, "zero_scale": 0.0, "nonfinite_scale": float("nan"),
+        }[fault]
+    elif fault in ("wrong_projection", "null_projection"):
+        monkeypatch.setattr(
+            physical_height, "model_points_in_view",
+            lambda *_args, **_kwargs: (
+                None if fault == "null_projection" else ((0.1, 0.1), (0.1, 0.2))
+            ),
+        )
+    elif fault == "wrong_attachment":
+        state.annotation.attached[1] = object()
+    elif fault == "wrong_value":
+        state.native.SystemValue -= screw.HEAD_CHAMFER / 1000
+    elif fault == "legacy_type":
+        state.display.Type2 = 12
+
+    with pytest.raises(RuntimeError, match="native_snapshot="):
+        if phase == "creation":
+            drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
+        elif phase == "settled":
+            drawing._assert_physical_head_height(state.adapter, state.front, state.display)
+        else:
+            drawing._assert_saved_physical_head_height(
+                state.adapter, state.identities, state.configurations,
+            )
+    assert state.events[-1][0] == "drawing.physical_head_height_native_refusal"
+    assert not state.selection.selected
+    if phase == "saved":
+        assert state.closes == [state.path.name]
+        assert state.adapter.currentModel is state.previous
