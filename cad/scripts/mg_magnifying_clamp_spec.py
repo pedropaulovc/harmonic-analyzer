@@ -29,7 +29,6 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     HEIGHT_PLACES,
     HEX_AC,
     HEX_AF,
-    HEX_AF_BAND,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     LOCATION_BAND,
@@ -63,7 +62,7 @@ from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
 
 
 # --- Places each printed dimension carries ----------------------------------
-# The native, non-reference AF dimension owns the selected receiving band.
+# The native, non-reference AF uses the ordinary title-block .XX band.
 HEX_AF_PLACES = 2
 # The drilled lever bore uses .XX and the DRILLED HOLES +0.10/0 row.
 LEVER_BORE_DIA_PLACES = 2
@@ -79,9 +78,9 @@ _TAP_OVERSIZE_R = 0.025
 _THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
 
 
-# Finished-wall acceptance applies throughout each hole/tap, independently
-# of raw-stock drift. The drill-point floor is additionally bounded directly
-# by the native bore-height/drill-depth bands.
+# Finished-wall acceptance protects actual sidewalls and blind floors,
+# excluding only the shown hole entries/exits and top-tap/bore intersection.
+# The drill-point floor is additionally bounded by the native dimensions.
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
 
 
@@ -217,9 +216,13 @@ VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMEN
 
 # --- Sheet text ----------------------------------------------------------------
 # Process, mate and finished-wall acceptance belong to the actual bore diameter.
-WALL_NOTE = f"{WALL_TARGET:.1f} MIN FINISHED NET WALL\nBORE/TAPS/OUTER FACES, FULL DEPTH"
+WALL_NOTE = "\n".join((
+    f"{WALL_TARGET:.1f} MIN FINISHED NET WALL",
+    "AND BLIND FLOOR; EXCEPT ONLY",
+    "SHOWN HOLE ENTRIES/EXITS AND",
+    "TOP-TAP/BORE INTERSECTION",
+))
 LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", WALL_NOTE))
-HEIGHT_CALLOUT = "CONTROLS TOP-TAP WALL"
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-MG-VN-50"
 ROD_TAP_PROCESS = "TAP"
@@ -234,8 +237,12 @@ TAP_CALLOUT_PRECISION = {
 STOCK_AF_CALLOUT = "1/2 HEX STOCK; FLATS AS SUPPLIED"
 # The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
 SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
-# Independent receiving-form acceptance, not a nominal regular-hex deduction.
-DRAWING_NOTES = f"AS-SUPPLIED STOCK FORM ACCEPTANCE\nTRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX OVER FULL HEIGHT"
+# Independent full-height form acceptance for complete-bore/plain-body travel.
+DRAWING_NOTES = "\n".join((
+    f"TRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX",
+    "OVER FULL HEIGHT; FOR MHA-MG-03",
+    "PLAIN-BODY CLAMP TRAVEL",
+))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # --- Section hatch ----------------------------------------------------------------

@@ -42,9 +42,9 @@ MM_PER_IN = 25.4
 
 # --- stock: 1/2 in hex brass bar, flats as supplied --------------------------
 HEX_AF = 0.5 * MM_PER_IN  # 12.70 across flats
-# Selected-stock receiving acceptance, explicitly owned by the native,
-# non-reference AF dimension; generic "Brass" supplies no stock-form certificate.
-HEX_AF_BAND = 0.13
+# Ordinary .XX receiving acceptance, owned by the native non-reference AF.
+# The separate 2 MIN finished walls and 15 MAX full-height form reject bad
+# dimensional corners; this band alone is not an all-corners wall certificate.
 HEX_AC = HEX_AF / math.cos(math.radians(30.0))  # nominal 14.6647 across corners
 # Explicit receiving envelope, measured over the entire finished stock length.
 # This is not inferred from exact 60-degree normals or from Rule #1 for STOCK.

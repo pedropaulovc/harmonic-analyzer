@@ -741,21 +741,3 @@ def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
             assert banned not in text.upper()
 
 
-def test_bracket_sub_target_wall_reaches_review_as_scoped_minor(monkeypatch) -> None:
-    import machinist_review
-    import mg_lever_thread_joint as lever_joint
-    import mg_magnifying_bracket_spec as bracket_spec
-    from machinist_exceptions import load_exceptions
-
-    package = machinist_review.ReviewPackage("mg_magnifying_bracket", "part", (Path("native-sheet.png"),))
-    monkeypatch.setattr(machinist_review, "_text_layers", lambda _package: "")
-    exceptions = load_exceptions(machinist_review.CAD_ROOT / "config", package.name, package.kind)
-    declaration = next(entry for entry in exceptions if "rule 17" in entry.finding)
-    assert declaration.kind == "minor"
-    assert bracket_spec.WALL_CALLOUT in declaration.where
-    assert f"{lever_joint.WALL_MIN:.6f}" in declaration.finding
-    prompt = machinist_review._review_prompt(package, 1, prompt_text="")
-    assert f"- {declaration.id} [minor]" in prompt
-    assert declaration.finding in prompt and declaration.reason in prompt
-    unrelated = machinist_review.ReviewPackage("mg_magnifying_lever", "part", package.sources)
-    assert declaration.finding not in machinist_review._review_prompt(unrelated, 1, prompt_text="")

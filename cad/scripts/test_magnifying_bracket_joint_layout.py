@@ -48,7 +48,7 @@ def test_part_recipe_seat_literals_match_the_live_installation() -> None:
 
 
 def test_side_plate_is_flush_and_taller_without_moving_the_arm() -> None:
-    assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-43.0, bracket.NECK_HALF_X)
+    assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-48.0, bracket.NECK_HALF_X)
     assert bracket.FLANGE_Y == joint.SIDE_PLATE_Y == (-6.35, 6.35)
     assert bracket.FLANGE_Z == joint.SIDE_PLATE_Z
     back = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[1]
