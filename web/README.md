@@ -202,15 +202,23 @@ immediate assembly parent (`dt-vn-fillister-screw`, `MHA-DT-VN-50`); the same
 archived vendor may resolve differently under FR, DT or PD. Tooling nests that
 scope (`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
 The projection table pins the exact current `../cad/config/current-identity-map.json`
-bytes; Node source authority also compares every active mapping row against it.
+bytes; Node source authority compares its active rows only with that map's
+`parts_and_assemblies`. The 18 standalone tooling families retired on 2026-10-21
+are absent from the current projection and current Number lookup. Their complete
+prior/current stem and Number pairs remain in `retired_identities`, marked
+`retired`, as permanent reservations and historical release-comparison inputs.
+`release_diff.py` intentionally reads both collections; this does not restore a
+registry, builder, drawing or current API alias. Authority validation rejects
+active/reserved stem or Number collisions and any retired part registry.
 Both CAD maps use Git `-text` attributes because their raw-byte hashes must
 survive Windows `core.autocrlf` checkouts. Fixture copies preserve those bytes;
 raw-map checks never normalize newlines or accept a platform-specific pin.
 The current-source executed-input closure also requires independent live-consumer
 seals for the current map and its Node authority helper at build and publication;
 these supplement rather than replace raw-map authentication.
-The table's three historical-only occurrences remain separate, with no current Number,
-registry or builder path. They identify archived geometry, not invented CAD parts.
+The table's three historical-only vendor occurrences remain separate and unchanged,
+with no current Number, registry or builder path. They identify archived machine
+geometry, not invented CAD parts; retired standalone tooling is not added to them.
 Browser loading verifies the current table's semantic digest before projecting
 the already byte-verified model's names and declared identity extras. Archived
 GLB bytes, source names, hashes, URLs, inventory matrices and measured geometry

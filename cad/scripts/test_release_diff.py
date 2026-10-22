@@ -58,7 +58,7 @@ def test_all_archived_identities_compose_through_the_current_authority():
     historical = json.loads(HISTORICAL_IDENTITY_MAP.read_text(encoding="utf-8"))
     current_targets = {
         row["old_stem"]: tuple(identity["stem"] for identity in row["new_identities"])
-        for row in current["parts_and_assemblies"]
+        for row in current["parts_and_assemblies"] + current.get("retired_identities", [])
     }
     current_targets.update({
         row["old_stem"]: (row["current_stem"],)
@@ -126,6 +126,113 @@ def test_tooling_vendor_identity_pairs_without_changing_configuration():
     mapping = load_identity_map()
     assert paired_keys([prior], [current], mapping) == {current: prior}
     assert paired_keys([current], [current], mapping) == {current: current}
+
+
+@pytest.mark.parametrize("qualifier", ["", "--installed", "--t006", "-stretch07"])
+def test_retired_tooling_family_pairs_without_an_active_identity(qualifier):
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    stem = "dt-cone-pivot-post-tl-bond-cradle"
+    assert all(row["old_stem"] != stem for row in payload["parts_and_assemblies"])
+    retired = next(row for row in payload["retired_identities"] if row["old_stem"] == stem)
+    assert retired["status"] == "retired"
+    assert retired["old_number"] == "MHA-DT-005-TL-01"
+    assert retired["new_identities"] == [{"stem": stem, "number": "MHA-DT-05-TL-01"}]
+    current_bytes = IDENTITY_MAP.read_bytes()
+    historical_bytes = HISTORICAL_IDENTITY_MAP.read_bytes()
+    mapping = load_identity_map()
+    assert paired_keys([stem + qualifier], [stem + qualifier], mapping) == {
+        stem + qualifier: stem + qualifier,
+    }
+    assert IDENTITY_MAP.read_bytes() == current_bytes
+    assert HISTORICAL_IDENTITY_MAP.read_bytes() == historical_bytes
+
+
+@pytest.mark.parametrize("qualifier", ["", "--installed", "--t006", "-stretch07"])
+@pytest.mark.parametrize("archived", [False, True])
+def test_archived_and_prior_tooling_compose_through_retired_rows(tmp_path, archived, qualifier):
+    # A historical-map fixture exercises composition even for tooling introduced
+    # after the repository's sealed cutover, without changing that sealed map.
+    stem = "dt-cone-pivot-post-tl-bond-cradle"
+    archived_stem = "cone-pivot-post-bond-cradle"
+    current = tmp_path / "current.json"
+    historical = tmp_path / "historical.json"
+    current.write_text(json.dumps({
+        "schema_version": 1,
+        "parts_and_assemblies": [
+            {"old_stem": "active-prior", "new_identities": [{"stem": "active-target"}]},
+        ],
+        "retired_identities": [{
+            "old_stem": stem,
+            "old_number": "MHA-DT-005-TL-01",
+            "new_identities": [{"stem": stem, "number": "MHA-DT-05-TL-01"}],
+            "status": "retired",
+        }],
+    }), encoding="utf-8")
+    historical.write_text(json.dumps({
+        "schema_version": 2,
+        "identities": [{"old_stem": archived_stem, "new_stem": stem}],
+    }), encoding="utf-8")
+    source = (archived_stem if archived else stem) + qualifier
+    target = stem + qualifier
+    mapping = load_identity_map(current, historical)
+    assert paired_keys([source], [target], mapping) == {target: source}
+    assert canonical_keys(source, mapping) == (target,)
+    assert mapping["active-prior"] == ("active-target",)
+
+
+@pytest.mark.parametrize("collision", [
+    "prior-stem", "target-stem", "prior-number", "target-number",
+    "repeated-target-stem", "repeated-target-number", "empty-targets",
+])
+def test_active_and_retired_identity_reservations_reject_collisions(tmp_path, collision):
+    active = {
+        "old_stem": "active-prior",
+        "old_number": "MHA-DT-005-TL-01",
+        "new_identities": [{"stem": "active-target", "number": "MHA-DT-05-TL-01"}],
+    }
+    retired = {
+        "old_stem": "retired-prior",
+        "old_number": "MHA-DT-005-TL-02",
+        "new_identities": [{"stem": "retired-target", "number": "MHA-DT-05-TL-02"}],
+        "status": "retired",
+    }
+    if collision == "prior-stem":
+        retired["old_stem"] = active["old_stem"]
+    elif collision == "target-stem":
+        retired["new_identities"][0]["stem"] = active["new_identities"][0]["stem"]
+    elif collision == "prior-number":
+        retired["old_number"] = active["old_number"]
+    elif collision == "target-number":
+        retired["new_identities"][0]["number"] = active["new_identities"][0]["number"]
+    elif collision == "repeated-target-stem":
+        retired["new_identities"].append({"stem": "retired-target", "number": "MHA-DT-05-TL-03"})
+    elif collision == "repeated-target-number":
+        retired["new_identities"].append({"stem": "retired-clone", "number": "MHA-DT-05-TL-02"})
+    else:
+        retired["new_identities"] = []
+    current = tmp_path / "current.json"
+    historical = tmp_path / "historical.json"
+    current.write_text(json.dumps({
+        "schema_version": 1,
+        "parts_and_assemblies": [active],
+        "retired_identities": [retired],
+    }), encoding="utf-8")
+    historical.write_text(json.dumps({"schema_version": 2, "identities": []}), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate"):
+        load_identity_map(current, historical)
+
+
+def test_minimal_identity_map_does_not_require_retirement_or_numbers(tmp_path):
+    current = tmp_path / "current.json"
+    historical = tmp_path / "historical.json"
+    current.write_text(json.dumps({
+        "schema_version": 1,
+        "parts_and_assemblies": [
+            {"old_stem": "active-prior", "new_identities": [{"stem": "active-target"}]},
+        ],
+    }), encoding="utf-8")
+    historical.write_text(json.dumps({"schema_version": 2, "identities": []}), encoding="utf-8")
+    assert load_identity_map(current, historical) == {"active-prior": ("active-target",)}
 
 
 def test_pairs_preserve_released_configurations_and_missing_variants():

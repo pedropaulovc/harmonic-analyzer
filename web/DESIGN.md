@@ -113,9 +113,15 @@ through the immediate parent, never one arbitrary global rename.
 The browser verifies the imported table's semantic digest before its glTF
 `beforeRoot` identity projection. Node current-source authority re-reads and
 hashes the real historical map, current projection table and current CAD map,
-then compares all active mapping contents; three explicitly historical-only
-occurrences are excluded from active inventory and expose null current Number,
-registry and builder fields. Their exact archived source lookup remains available.
+then compares all active mapping contents with `parts_and_assemblies`. The 18
+standalone tooling families retired on 2026-10-21 are not current projection
+entries or current Number lookups. Their full prior/current identity pairs stay
+in the CAD map's `retired_identities` as historical release-pairing and permanent
+Number reservations, not live CAD aliases. Authority validation rejects
+active/retired stem and Number collisions and reappearing retired registries.
+Three explicitly historical-only vendor occurrences remain separate from this
+retirement collection: they expose null current Number, registry and builder
+fields, while their exact archived source lookup remains available.
 Raw model/evidence digests remain archival; runtime track comparison instead uses
 the digest of the current projected metadata. No identity projection refits,
 recomputes or regenerates geometry.
