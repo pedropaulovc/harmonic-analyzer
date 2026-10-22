@@ -1833,37 +1833,23 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _activate_sheet(adapter, sheet_name)
         source_step(f"{label} balloon sheet activation")
-        # TODO(#1667): Restore disabled wheel/lever groups only after the linked
-        # fix is validated; remove MB-1667-MG and this TODO with restoration.
-        # landings += add_component_bom_balloons(
-        #     adapter,
-        #     view,
-        #     items=balloon_items(items, stems),
-        #     anchors=BALLOON_ANCHORS,
-        #     label=f"magnifier {label} BOM coverage",
-        #     margin=BALLOON_MARGIN,
-        #     explode_offsets=_view_source_explode_offsets(
-        #         view, offsets_by_configuration, label=label
-        #     ),
-        # )
-    # Preserve the finished-wire partial balloon path.
-    landings += add_component_bom_balloons(
-        adapter,
-        finished,
-        items=balloon_items(items, frozenset({explode.WIRE_STEM})),
-        anchors=BALLOON_ANCHORS,
-        label=f"magnifier {FINISHED_LABEL} BOM coverage",
-        margin=BALLOON_MARGIN,
-        explode_offsets=_view_source_explode_offsets(
-            finished, offsets_by_configuration, label=FINISHED_LABEL
-        ),
-    )
-    source_step(f"{FINISHED_LABEL} balloons")
-    # if len(landings) != len(BOM_COMPONENTS):
-    #     raise RuntimeError(
-    #         f"magnifier package carries {len(landings)} balloons, expected one per "
-    #         f"BOM row ({len(BOM_COMPONENTS)})"
-    #     )
+        landings += add_component_bom_balloons(
+            adapter,
+            view,
+            items=balloon_items(items, stems),
+            anchors=BALLOON_ANCHORS,
+            label=f"magnifier {label} BOM coverage",
+            margin=BALLOON_MARGIN,
+            explode_offsets=_view_source_explode_offsets(
+                view, offsets_by_configuration, label=label
+            ),
+        )
+        source_step(f"{label} balloons")
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"magnifier package carries {len(landings)} balloons, expected one per "
+            f"BOM row ({len(BOM_COMPONENTS)})"
+        )
     (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
     _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
     source_step(f"{FINISHED_LABEL} wire balloon placement")

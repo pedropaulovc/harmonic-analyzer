@@ -14,10 +14,7 @@ the claim checkable instead of argued, and fail loud when a change breaks it:
 3. Inertness: the inert module makes no COM mutator call (a Save/Set/Add/Insert/
    Create/Edit/Select/... verb, which covers custom-property and dimension
    writes) except three pinned ones, reached only after the artefact is
-   settled -- or, for ``PRE_SAVE_EXPORTS`` (a pick-miss screenshot), only the
-   two that export a file and write nothing into the model. A separately pinned
-   IMathUtility.CreatePoint allocates only a local math object, not document
-   content. It stores no attribute on a foreign object, and nothing reachable
+   settled. It stores no attribute on a foreign object, and nothing reachable
    from its PRE-SAVE read-only entry points reaches a document/seat mutator.
 4. Direction: an inert module imports no tracked local module except through
    pinned attribute reads.
@@ -71,14 +68,6 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # and session, then raises the pick's own failure. It never returns, but a
     # caller can catch the RuntimeError and retry; draw_rocker_arm does so.
     ("_drawing_selection.py", "_select_view_entity"): frozenset({"capture_pick_miss"}),
-    # A frozen balloon anchor: the drawing's pick state read after its picks
-    # (PRE-save; rule 3 proves it reads only); screenshots at EVERY miss, while
-    # the pick is still zoomed on it (a later pick may heal it, so this runs
-    # PRE-save too: PRE_SAVE_EXPORTS proves it writes only its own files); and
-    # after the last miss the same window read, then raise.
-    ("_drawing_balloons.py", "_select_balloon_anchor"): frozenset(
-        {"drawing_pick_state", "capture_pick_miss", "capture_pick_screens"}
-    ),
     # PRE-save, after the sheet is fitted: records the window the drawing's
     # coordinate picks hit-test in.  Rule 3 proves it reads only.
     ("_drawing_common.py", "new_project_drawing"): frozenset({"record_drawing_display"}),
@@ -106,29 +95,18 @@ PINNED_MUTATORS = {
 }
 # Functions holding a pinned document/seat mutator, and the only in-module roots
 # that may reach them. capture_com_failure always raises; teardown_seat runs after
-# the build returned; capture_pick_screens is a PRE_SAVE_EXPORTS root.
+# the build returned.
 MUTATOR_ROOTS = {
-    "_save_failure_document": {"capture_com_failure", "capture_pick_screens"},
-    "_save_seat_image": {"capture_com_failure", "capture_pick_screens"},
+    "_save_failure_document": {"capture_com_failure"},
+    "_save_seat_image": {"capture_com_failure"},
     "release_seat_working_directory": {"teardown_seat"},
 }
-# Entry points that run BEFORE the artefact is saved yet reach a pinned writer,
-# and the writers each may reach. Allowed because those writers only EXPORT:
-# SaveBMP writes an image of the current view, and every SaveAs3 in
-# _save_failure_document passes swSaveAsOptions_Copy, so the live document
-# keeps its path and content (test_pre_save_exports_write_nothing_into_the_model).
-PRE_SAVE_EXPORTS = {
-    "capture_pick_screens": frozenset({"_save_seat_image", "_save_failure_document"}),
-}
-_SAVE_AS_OPTIONS_COPY = 2  # swSaveAsOptions_e.swSaveAsOptions_Copy
 # Entry points that run BEFORE an artefact is saved: nothing they reach may mutate.
 PRE_SAVE = {
     "record_authoring_context",
     "record_seat_provenance",
     "note_seats_before_connect",
     "record_drawing_display",
-    "drawing_pick_state",
-    "_zoomed_pick_state",
 }
 # ctypes structures and prototypes the module builds itself.
 LOCAL_ATTRIBUTE_STORES = {"cb", "argtypes", "restype"}
@@ -199,109 +177,6 @@ def _reachable(tree: ast.Module, roots: set[str]) -> set[str]:
         seen.add(name)
         frontier.extend(_referenced(functions[name], set(functions)) - seen)
     return seen
-
-
-def _is_local_math_allocation(tree: ast.Module, call: ast.Call) -> bool:
-    """Exempt one source shape, not a CreatePoint spelling or inferred type.
-
-    The producer/binding/allocation must be consecutive in a top-level try,
-    after the typed application setup. All bindings of the protected names
-    are accounted for, even in nested scopes; unsupported rewrites fail closed.
-    """
-    if not (
-        isinstance(call.func, ast.Attribute)
-        and call.func.attr == "CreatePoint"
-        and isinstance(call.func.value, ast.Name)
-        and call.func.value.id == "utility"
-    ):
-        return False
-    function = _functions(tree).get("_zoomed_pick_state")
-    if not isinstance(function, ast.FunctionDef):
-        return False
-
-    def same(node: ast.AST, source: str) -> bool:
-        return ast.dump(node) == ast.dump(ast.parse(source).body[0])
-
-    setup = [
-        node
-        for node in function.body
-        if same(node, "app = view = transform = None")
-    ]
-    app_tries = [
-        node
-        for node in function.body
-        if isinstance(node, ast.Try)
-        and node.body
-        and same(node.body[0], "app = _com._early_bound(adapter.swApp, 'ISldWorks')")
-    ]
-    if len(setup) != 1 or len(app_tries) != 1:
-        return False
-    app_try = app_tries[0]
-    expected = ast.parse(
-        "import pythoncom\n"
-        "from win32com.client import VARIANT\n"
-        "utility = app.GetMathUtility()\n"
-        "if utility is None:\n"
-        "    raise RuntimeError('ISldWorks.GetMathUtility returned None')\n"
-        "utility = _com._early_bound(utility, 'IMathUtility')\n"
-        "point = utility.CreatePoint(\n"
-        "    VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [xy[0], xy[1], 0.0]))\n"
-    ).body
-    for block in function.body:
-        if not isinstance(block, ast.Try):
-            continue
-        if not (
-            function.body.index(setup[0])
-            < function.body.index(app_try)
-            < function.body.index(block)
-        ):
-            continue
-        for index in range(len(block.body) - len(expected) + 1):
-            sequence = block.body[index : index + len(expected)]
-            if [ast.dump(node) for node in sequence] != [
-                ast.dump(node) for node in expected
-            ]:
-                continue
-            if sequence[-1].value is not call:
-                continue
-            protected = {"app", "utility", "_com", "pythoncom", "VARIANT"}
-            allowed_stores = {
-                id(node)
-                for statement in (setup[0], app_try.body[0], sequence[2], sequence[4])
-                for node in ast.walk(statement)
-                if isinstance(node, ast.Name)
-                and isinstance(node.ctx, ast.Store)
-                and node.id in protected
-            }
-            allowed_imports = {id(sequence[0].names[0]), id(sequence[1].names[0])}
-            for node in ast.walk(function):
-                if (
-                    isinstance(node, ast.Name)
-                    and node.id in protected
-                    and isinstance(node.ctx, (ast.Store, ast.Del))
-                    and id(node) not in allowed_stores
-                ):
-                    return False
-                # These bindings have no Name(Store): do not let a parameter,
-                # import, exception target, pattern or nested def replace COM.
-                if isinstance(node, ast.arg) and node.arg in protected:
-                    return False
-                if isinstance(node, ast.alias):
-                    bound = node.asname or node.name.split(".")[0]
-                    if bound in protected and id(node) not in allowed_imports:
-                        return False
-                if isinstance(
-                    node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.ExceptHandler)
-                ) and node.name in protected:
-                    return False
-                if isinstance(node, (ast.Global, ast.Nonlocal)) and protected & set(node.names):
-                    return False
-                if isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name in protected:
-                    return False
-                if isinstance(node, ast.MatchMapping) and node.rest in protected:
-                    return False
-            return True
-    return False
 
 
 def test_the_inert_set_is_not_empty_and_exists():
@@ -404,11 +279,9 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
         ):
             owner = owners.get(id(node), "<module>")
             pair = (owner, node.func.attr)
-            local_math = _is_local_math_allocation(tree, node)
-            if pair not in PINNED_MUTATORS and not local_math:
+            if pair not in PINNED_MUTATORS:
                 violations.append(f"{where}: {owner}() calls COM mutator {node.func.attr}")
-            if not local_math:
-                holders.setdefault(owner, set()).add(node.func.attr)
+            holders.setdefault(owner, set()).add(node.func.attr)
         elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
             if node.attr not in LOCAL_ATTRIBUTE_STORES:
                 violations.append(f"{where}: stores .{node.attr} on another object")
@@ -461,96 +334,6 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
     assert not violations, "\n".join(violations)
 
 
-def _or_of_constants(node: ast.AST, constants: dict[str, ast.AST]) -> int:
-    """The value of an ``int | int | NAME`` expression of module constants."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, int):
-        return node.value
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _or_of_constants(node.left, constants) | _or_of_constants(
-            node.right, constants
-        )
-    if isinstance(node, ast.Name) and node.id in constants:
-        return _or_of_constants(constants[node.id], constants)
-    raise ValueError(f"not a constant bit set: {ast.unparse(node)}")
-
-
-def _export_violations(tree: ast.Module) -> list[str]:
-    """Rule 3 for PRE_SAVE_EXPORTS: each reaches only its listed writers, and
-    those writers' COM calls only export (SaveBMP; SaveAs3 with the Copy bit)."""
-    functions = _functions(tree)
-    constants = {
-        target.id: node.value
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        for target in node.targets
-        if isinstance(target, ast.Name)
-    }
-    violations: list[str] = []
-    for root, writers in PRE_SAVE_EXPORTS.items():
-        if root not in functions:
-            continue
-        reached = _reachable(tree, {root}) & set(MUTATOR_ROOTS)
-        if reached - writers:
-            violations.append(
-                f"pre-save export {root}() reaches {sorted(reached - writers)}"
-            )
-        for writer in sorted(reached & writers):
-            for node in ast.walk(functions[writer]):
-                if not (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and MUTATOR.match(node.func.attr)
-                ):
-                    continue
-                verb = node.func.attr
-                if verb == "SaveBMP":
-                    continue
-                if verb != "SaveAs3" or len(node.args) < 3:
-                    violations.append(
-                        f"{writer}() calls {verb} with no proven Copy option"
-                    )
-                    continue
-                try:
-                    options = _or_of_constants(node.args[2], constants)
-                except ValueError as exc:
-                    violations.append(f"{writer}() SaveAs3 options: {exc}")
-                    continue
-                if not options & _SAVE_AS_OPTIONS_COPY:
-                    violations.append(
-                        f"{writer}() SaveAs3 options {options} lack swSaveAsOptions_Copy"
-                    )
-    return violations
-
-
-def test_pre_save_exports_write_nothing_into_the_model():
-    defined = {name for path in INERT.values() for name in _functions(_tree(path))}
-    assert set(PRE_SAVE_EXPORTS) <= defined, sorted(set(PRE_SAVE_EXPORTS) - defined)
-    assert not set(PRE_SAVE_EXPORTS) & (PRE_SAVE | TERMINAL | PINNED_TERMINALS)
-    violations = [
-        violation
-        for path in INERT.values()
-        for violation in _export_violations(_tree(path))
-    ]
-    assert not violations, "\n".join(violations)
-
-
-def test_pre_save_export_rule_rejects_a_writing_save():
-    """Negative control: a SaveAs3 without the Copy bit, or a reach into a
-    writer the export is not listed for, fails the rule."""
-    tree = ast.parse(
-        "_SILENT = 1\n"
-        "def _save_failure_document(model, target):\n"
-        "    model.SaveAs3(target, 0, _SILENT)\n"
-        "def release_seat_working_directory(sw):\n"
-        "    sw.SetCurrentWorkingDirectory('x')\n"
-        "def capture_pick_screens(model, sw):\n"
-        "    _save_failure_document(model, 'x.pdf')\n"
-        "    release_seat_working_directory(sw)\n"
-    )
-    assert _export_violations(tree) == [
-        "pre-save export capture_pick_screens() reaches ['release_seat_working_directory']",
-        "_save_failure_document() SaveAs3 options 1 lack swSaveAsOptions_Copy",
-    ]
 
 
 @pytest.mark.parametrize("name", sorted(INERT))
@@ -592,7 +375,7 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
         "import _part_save\n"
         "def stamp(model):\n"
         "    model.Extension.CustomPropertyManager('').Add3('Generator', 30, 'x', 2)\n"
-        "def _zoomed_pick_state(math):\n"
+        "def allocate_line(math):\n"
         "    math.CreateLine()\n"
         "def other_owner(math):\n"
         "    math.CreatePoint((0.0, 0.0, 0.0))\n"
@@ -615,108 +398,6 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
         test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
     with pytest.raises(AssertionError, match="save_part_and_images"):
         test_rule4_inert_module_reads_tracked_code_only_through_pinned_names("_fake_inert")
-    # Positive control: the real typed producer, explicit binding and one
-    # SAFEARRAY(double) allocation, including when it is a PRE_SAVE root.
-    source = (
-        "def _zoomed_pick_state(adapter, xy):\n"
-        "    app = view = transform = None\n"
-        "    try:\n"
-        "        app = _com._early_bound(adapter.swApp, 'ISldWorks')\n"
-        "    except Exception:\n"
-        "        pass\n"
-        "    try:\n"
-        "        import pythoncom\n"
-        "        from win32com.client import VARIANT\n"
-        "        utility = app.GetMathUtility()\n"
-        "        if utility is None:\n"
-        "            raise RuntimeError('ISldWorks.GetMathUtility returned None')\n"
-        "        utility = _com._early_bound(utility, 'IMathUtility')\n"
-        "        point = utility.CreatePoint(\n"
-        "            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [xy[0], xy[1], 0.0]))\n"
-        "    except Exception:\n"
-        "        pass\n"
-    )
-    fake.write_text(source, encoding="utf-8")
-    test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
-    # Every variant still contains CreatePoint in the exempt function. Neither
-    # another receiver nor an unsupported binding/control-flow shape is safe.
-    for unsafe in (
-        "def _zoomed_pick_state(adapter):\n"
-        "    adapter.currentModel.SketchManager.CreatePoint(0.0, 0.0, 0.0)\n",
-        source.replace(
-            "def _zoomed_pick_state(adapter, xy):",
-            "def _zoomed_pick_state(adapter, xy, utility):",
-        ),
-        source.replace(
-            "    try:\n        import pythoncom",
-            "    app = adapter.currentModel.SketchManager\n"
-            "    try:\n        import pythoncom",
-        ),
-        source.replace(
-            "    try:\n        import pythoncom",
-            "    import other_module as utility\n"
-            "    try:\n        import pythoncom",
-        ),
-        source.replace(
-            "    try:\n        import pythoncom",
-            "    try:\n"
-            "        pass\n"
-            "    except Exception as utility:\n"
-            "        pass\n"
-            "    try:\n        import pythoncom",
-        ),
-        source.replace(
-            "utility.CreatePoint(",
-            "adapter.currentModel.SketchManager.CreatePoint(",
-        ),
-        source.replace(
-            "        point = utility.CreatePoint(",
-            "        utility = adapter.currentModel.SketchManager\n"
-            "        point = utility.CreatePoint(",
-        ),
-        source.replace(
-            "    try:\n        import pythoncom",
-            "    utility = adapter.currentModel.SketchManager\n"
-            "    try:\n        import pythoncom",
-        ),
-        source.replace(
-            "        point = utility.CreatePoint(",
-            "        utility, other = adapter.currentModel.SketchManager, None\n"
-            "        point = utility.CreatePoint(",
-        ),
-        source.replace(
-            "        point = utility.CreatePoint(",
-            "        utility += adapter.currentModel.SketchManager\n"
-            "        point = utility.CreatePoint(",
-        ),
-        source.replace(
-            "        point = utility.CreatePoint(",
-            "        (utility := adapter.currentModel.SketchManager)\n"
-            "        point = utility.CreatePoint(",
-        ),
-        source.replace(
-            "        utility = _com._early_bound(utility, 'IMathUtility')",
-            "        if xy:\n"
-            "            utility = _com._early_bound(utility, 'IMathUtility')",
-        ),
-        source.replace("app.GetMathUtility()", "adapter.currentModel.SketchManager"),
-        source.replace("'ISldWorks'", "'IModelDoc2'"),
-        source.replace("'IMathUtility'", "'ISketchManager'"),
-        source.replace("pythoncom.VT_R8", "pythoncom.VT_DISPATCH"),
-        source.replace("[xy[0], xy[1], 0.0]", "adapter.currentModel"),
-        source.replace("[xy[0], xy[1], 0.0]))", "[xy[0], xy[1], 0.0]), 1)"),
-        source.replace(
-            "VARIANT(pythoncom.VT_ARRAY", "ArrayDataIn=VARIANT(pythoncom.VT_ARRAY"
-        ),
-        source.replace(
-            "        point = utility.CreatePoint(",
-            "        utility.CreatePoint(0.0, 0.0, 0.0)\n"
-            "        point = utility.CreatePoint(",
-        ),
-    ):
-        fake.write_text(unsafe, encoding="utf-8")
-        with pytest.raises(AssertionError, match="calls COM mutator CreatePoint"):
-            test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
 
 
 def test_rule2_rejects_a_geometry_path_call(tmp_path):

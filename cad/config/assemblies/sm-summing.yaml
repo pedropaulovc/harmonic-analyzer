@@ -45,8 +45,3 @@ machinist_exceptions:
     where: "sheet 3 step 7 and check 3: MHA-SM-04 clamping the upper loop of MHA-SM-VN-51 to the MHA-SM-01 plug face, tightened"
     finding: "threaded joint under operating load without a lock (rule 23)"
     reason: "owner ruling 2026-09-21: the upper eye is a static clamp, not a swivel. The head's preload clamps the loop to the plug face so it cannot rotate, the spring flexes in its coils below the clamp, and no operating torque reaches the screw axis, so the joint is a static clamp that needs no lock (joint_retention.py sm-summing/gooseneck-spring-screw, STATIC_CLAMP). Check 3 is the acceptance (owner-accepted)"
-  - id: "MB-1667-SM"
-    kind: "accept"
-    where: "sheet 2 summing exploded view: BOM items 1-10, only the balloon group disabled by #1795"
-    finding: "missing BOM-to-part item balloons from that disabled group (rule 22); absence of those same balloons elsewhere in the package is the same known omission"
-    reason: "Owner decision 2026-10-21 accepts the existing #1795 bypass temporarily while #1667 is root-caused. This does not accept wrong owners, wrong item numbers, dangling or otherwise defective present balloons, new unrelated omissions, or other assembly findings. Restore only after the linked #1667 fix is validated; remove MB-1667-SM and its TODO(#1667) with that restoration."

@@ -47,9 +47,9 @@ from _check import check
 from _com import _early_bound
 import _config
 from _drawing_balloons import (
-    # BalloonAnchor,
-    # add_component_bom_balloons,
-    # assert_balloon_landings,
+    BalloonAnchor,
+    add_component_bom_balloons,
+    assert_balloon_landings,
     isolate_drawing_view_components,
 )
 from _drawing_common import (
@@ -1356,10 +1356,9 @@ def _place_assembled_sheet(adapter: Any) -> None:
 def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
 ) -> Callable[[], None]:
-    """Place the exploded isometric and BOM; return its settled caption check.
-
-    Balloons are intentionally omitted pending deterministic placement (#1667).
-    """
+    """The exploded isometric, its BOM (with vendor SKU) and one balloon per
+    BOM row on the family's north-most instance; returns the check that proves
+    every balloon again after the last rebuild."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1388,29 +1387,26 @@ def _place_exploded_sheet(
         configuration_grouping="same-part",
         label="channel",
     )
-    _validate_bom(adapter, table)
-    # TODO(#1667): Restore this disabled group only after the linked fix is
-    # validated; remove MB-1667-CH and this TODO with restoration.
-    # items = _validate_bom(adapter, table)
-    # landings = add_component_bom_balloons(
-    #     adapter,
-    #     exploded,
-    #     items=items,
-    #     anchors={
-    #         stem: BalloonAnchor(
-    #             point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
-    #             instance=north_instances[stem],
-    #         )
-    #         for stem in BOM_COMPONENTS
-    #     },
-    #     label="channel exploded-view BOM coverage",
-    #     margin=BALLOON_MARGIN,
-    # )
-    # if len(landings) != len(BOM_COMPONENTS):
-    #     raise RuntimeError(
-    #         f"channel exploded view carries {len(landings)} balloons, "
-    #         f"expected one per BOM row ({len(BOM_COMPONENTS)})"
-    #     )
+    items = _validate_bom(adapter, table)
+    landings = add_component_bom_balloons(
+        adapter,
+        exploded,
+        items=items,
+        anchors={
+            stem: BalloonAnchor(
+                point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
+                instance=north_instances[stem],
+            )
+            for stem in BOM_COMPONENTS
+        },
+        label="channel exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"channel exploded view carries {len(landings)} balloons, "
+            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
+        )
     bom_bottom, _ = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -1432,7 +1428,7 @@ def _place_exploded_sheet(
     _assert_exploded_caption(adapter, table, caption)
 
     def settled() -> None:
-        # assert_balloon_landings(adapter, landings)
+        assert_balloon_landings(adapter, landings)
         _assert_exploded_caption(adapter, table, caption)
 
     return settled

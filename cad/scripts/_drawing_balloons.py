@@ -12,11 +12,9 @@ import math
 from pathlib import Path
 import re
 import sys
-import time
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
@@ -25,9 +23,9 @@ from _drawing_attachment import _assert_leader_lands
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_common import rebuild_drawing
 from _drawing_projection import model_points_in_view
-from _drawing_scan import _HIT_ZOOM_HALF, _span_scan_attrs, _zoomed_on
+from _drawing_ray_pick import RayPick, ViewRayCaster, _to_model
+from _drawing_scan import _span_scan_attrs
 from _drawing_selection import _activate_and_select_view, _select_view_entity
-import _seat_forensics
 import _telemetry
 
 
@@ -37,7 +35,7 @@ import _telemetry
 _BALLOON_CLEARANCE_M = 0.0015
 
 
-# A BOM balloon's leader lands on an edge the hit test proved drawn at the
+# A BOM balloon's leader lands on an edge the ray probe proved drawn at the
 # requested point, but the edges beside it can be closer than 1 mm: at 1:8 a
 # #4-40 screw head is 0.35 mm across on the sheet, and on run
 # 20260928T194845954Z-44f5de00de924735961d14f4aad40337 a 0.46 mm drift left
@@ -860,16 +858,15 @@ def _explode_offset(
     return (total[0], total[1], total[2])
 
 
-def _anchor_model_points(
+def _leaf_pose(
     adapter: Any,
     leaf: _ComponentLeaf,
-    points_m: Sequence[Sequence[float]],
     offsets: Mapping[str, tuple[float, float, float]],
     *,
-    stem: str,
     label: str,
-) -> list[tuple[float, float, float]]:
-    """Part-space points (metres) in the view's model space: transform, then explode."""
+) -> tuple[float, ...]:
+    """``leaf``'s pose as the view draws it: ``IMathTransform.ArrayData`` of
+    its component transform with the explode folded into the translation."""
     transform = adapter._attempt(
         lambda: _early_bound(leaf.component, "IComponent2").Transform2, default=None
     )
@@ -882,21 +879,32 @@ def _anchor_model_points(
         )
     )
     if len(values) < 13:
-        raise RuntimeError(f"{label}: {stem} instance {leaf.path} has no transform")
-    scale = values[12]
-    dx, dy, dz = _explode_offset(offsets, leaf.path)
-    return [
-        (
-            scale * (x * values[0] + y * values[3] + z * values[6]) + values[9] + dx,
-            scale * (x * values[1] + y * values[4] + z * values[7]) + values[10] + dy,
-            scale * (x * values[2] + y * values[5] + z * values[8]) + values[11] + dz,
-        )
-        for x, y, z in points_m
-    ]
+        raise RuntimeError(f"{label}: instance {leaf.path} has no transform")
+    offset = _explode_offset(offsets, leaf.path)
+    return (
+        *values[:9],
+        values[9] + offset[0],
+        values[10] + offset[1],
+        values[11] + offset[2],
+        *values[12:],
+    )
 
 
-# A walk hit-tests at most this many of its instance's extreme points, each a
-# zoomed sheet round trip.
+def _anchor_model_points(
+    adapter: Any,
+    leaf: _ComponentLeaf,
+    points_m: Sequence[Sequence[float]],
+    offsets: Mapping[str, tuple[float, float, float]],
+    *,
+    stem: str,
+    label: str,
+) -> list[tuple[float, float, float]]:
+    """Part-space points (metres) in the view's model space: transform, then explode."""
+    values = _leaf_pose(adapter, leaf, offsets, label=f"{label}: {stem}")
+    return [_to_model(values, point) for point in points_m]
+
+
+# A walk probes at most this many of its instance's extreme points.
 _WALK_POINTS_PER_INSTANCE = 12
 
 
@@ -908,7 +916,7 @@ _VISIBLE_EDGES_PER_INSTANCE = 128
 
 
 # Where along a listed edge's parameter range the fallback samples points to
-# hit-test: inside the edge, off the vertices it shares with its neighbours.
+# probe: inside the edge, off the vertices it shares with its neighbours.
 _EDGE_SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)
 
 
@@ -930,15 +938,17 @@ _WALK_DIRECTIONS: tuple[tuple[float, float, float], ...] = tuple(
 )
 
 
-AnchorMethod = Literal["frozen", "walk", "visible-edge", "shared-edge", "listed-edge"]
+AnchorMethod = Literal[
+    "frozen", "walk", "visible-edge", "listed-edge", "landed-listed-edge"
+]
 
 
 @dataclass(frozen=True)
 class _AnchorChoice:
     """The edge one family's balloon attaches to, where, and how it was found.
 
-    ``sheet_xy`` is the sheet point (metres) whose hit test returned ``edge``
-    as the instance's: the balloon's leader must end there. Selected by entity
+    ``sheet_xy`` is the sheet point (metres) the ray probe proved drawn as the
+    instance's ``edge``: the balloon's leader must end there. Selected by entity
     alone, SolidWorks picks its own point on the edge, which on a washer or a
     gear rim is often behind another part: on run
     20260928T194845954Z-44f5de00de924735961d14f4aad40337 the thrust washer's
@@ -1027,60 +1037,6 @@ def _entity_owner(adapter: Any, entity: Any) -> str:
     return _component_path(adapter, component)
 
 
-# A frozen anchor's zoomed pick that finds no ink is repeated this many times,
-# each after forcing the graphics window to redraw under the zoom. Misses
-# returned in 45-172 ms against 300-1264 ms for every hit (21 days, n=20/472),
-# as if the pick read a window that had not drawn the zoom; the same key and
-# sheet point hit on another seat (#1667). The span's per-pick attributes
-# measure whether the redraw heals it.
-_FROZEN_REDRAW_RETRIES = 2
-
-
-def _hit_test_edge(
-    adapter: Any,
-    sheet_xy: Sequence[float],
-    *,
-    redraw: bool = False,
-    observed: dict[str, Any] | None = None,
-    on_miss: Callable[[], None] | None = None,
-) -> tuple[Any, str]:
-    """Select the edge drawn at ``sheet_xy`` of the active view; return it and its owner.
-
-    The pick runs zoomed onto the point (:data:`_HIT_ZOOM_HALF`), so which
-    edge it returns does not depend on the seat's window size. In a drawing
-    the view is selected alongside the edge; the edge is last. The selection
-    is left in place for the caller to use or clear. ``redraw`` forces the
-    window to draw the zoom before the pick; ``observed`` receives the
-    zoomed view's ``Scale2`` (``None`` when unreadable). ``on_miss`` runs
-    when the pick selects nothing, while the window is still zoomed on it.
-    """
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
-        if redraw:
-            draw.GraphicsRedraw2()
-        if observed is not None:
-            observed["zoom_scale2"] = _view_scale2(draw)
-        selected = draw.Extension.SelectByID2(
-            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
-        )
-        if not selected and on_miss is not None:
-            on_miss()
-    if not selected:
-        return None, ""
-    manager = draw.SelectionManager
-    edge = manager.GetSelectedObject6(int(manager.GetSelectedObjectCount2(-1)), -1)
-    return edge, _entity_owner(adapter, edge)
-
-
-def _view_scale2(draw: Any) -> float | None:
-    """The active model view's ``Scale2``; ``None`` when it cannot be read."""
-    try:
-        return float(draw.ActiveView.Scale2)
-    except Exception:  # noqa: BLE001 - a telemetry read never fails the pick
-        return None
-
-
 def _visible_edge_points(
     adapter: Any, view: Any, leaf: _ComponentLeaf
 ) -> tuple[int, tuple[tuple[tuple[float, float, float], Any], ...]]:
@@ -1092,7 +1048,7 @@ def _visible_edge_points(
     a washer's rim listed as visible ran behind the gear for most of its
     length. So each listed edge gives points (``ICurve::Evaluate2`` at
     :data:`_EDGE_SAMPLE_FRACTIONS` of its range), each with the listed edge
-    it lies on, for the same hit test the walk runs, ranked by
+    it lies on, for the same ray probe the walk runs, ranked by
     :func:`_spread_order` since the array's order is undocumented. Counted
     first: an instance drawing more than :data:`_VISIBLE_EDGES_PER_INSTANCE`
     edges is not fetched at all. Part metres.
@@ -1124,255 +1080,132 @@ def _visible_edge_points(
     )
 
 
-@dataclass(frozen=True)
-class _PointHit:
-    """One hit-tested point: its index in the tried list, sheet point, the
-    edge the hit test returned and that edge's owner."""
-
-    index: int
-    xy: tuple[float, float]
-    edge: Any
-    owner: str
-
-
-def _scan_points(
-    adapter: Any,
-    view: Any,
-    leaf: _ComponentLeaf,
-    points: Sequence[tuple[float, float, float]],
-    offsets: Mapping[str, tuple[float, float, float]],
-    tried: list[tuple[float, float]],
-    *,
-    stem: str,
-    what: str,
-    label: str,
-) -> tuple[_PointHit | None, _PointHit | None]:
-    """Hit-test ``points`` (part metres) in order, stopping at the first
-    whose hit returns an edge of exactly ``leaf`` (the claimed point).
-    Also returns the first point that hit another part's edge on the way:
-    ink is drawn there, shared or in front."""
-    if not points:
-        return None, None
-    projected = model_points_in_view(
-        adapter,
-        view,
-        _anchor_model_points(adapter, leaf, points, offsets, stem=stem, label=label),
-        label=f"{label} {stem} {what}",
-        names=[f"{stem} {what} {index}" for index in range(len(points))],
-    )
-    shared = None
-    for index, xy in enumerate(projected):
-        tried.append(xy)
-        hit, owner = _hit_test_edge(adapter, xy)
-        found = _PointHit(index=index, xy=xy, edge=hit, owner=owner)
-        if owner.casefold() == leaf.path.casefold():
-            return found, shared
-        if hit is not None and shared is None:
-            shared = found
-    return None, shared
-
-
 def _mm_text(values: Sequence[float], scale: float = 1.0) -> str:
     return ",".join(f"{value * scale:.3f}" for value in values)
+
+
+def _first_visible(picks: Sequence[RayPick]) -> int | None:
+    return next((index for index, pick in enumerate(picks) if pick.visible), None)
+
+
+def _covered_text(picks: Sequence[RayPick]) -> str:
+    """Why each probed point is not the part's drawn ink, in probe order."""
+    return "; ".join(
+        "covered by " + ",".join(pick.covered_by) if pick.covered_by else "not on an edge"
+        for pick in picks
+    )
 
 
 @_telemetry.traced("drawing.pick_balloon_anchor", label_param="stem")
 def _select_balloon_anchor(
     adapter: Any,
     view: Any,
+    caster: ViewRayCaster,
     *,
     stem: str,
     anchor: BalloonAnchor,
     candidates: Sequence[_ComponentLeaf],
     offsets: Mapping[str, tuple[float, float, float]],
-    sheet_xy: tuple[float, float] | None,
     label: str,
 ) -> _AnchorChoice:
     """Find the edge ``stem``'s balloon attaches to, and the sheet point on it.
 
-    One hit test per balloon replaces fetching every visible edge of the
-    component and keeping ``edges[0]``: that array's order moved between
-    runs (harmonic-base's anchor walk took 17 shapes over 24 frame runs),
-    and the nameplate's 37,148 edges cost ~524 s a pick, most of it releasing
-    their COM proxies (#1079).
-
-    ``frozen``: hit-test at the anchor's projected ``sheet_xy``. An edge of
-    another instance in front of the point raises; the balloon never falls
-    back to some other edge. No edge at all is retried
-    :data:`_FROZEN_REDRAW_RETRIES` times after a forced redraw: a seat's
-    zoomed pick can miss ink another seat hits at the same point (#1667). Only
-    the instance's own ink passes. Each pick's outcome (``pickN``), time
-    (``pickN_ms``) and zoom (``pickN_scale2``) is on the span, and
-    ``picks`` lists the outcomes on the event. Every miss, healed or not, is
-    screenshotted while still zoomed on the point
-    (:func:`_seat_forensics.capture_pick_screens`); the files' paths under
-    ``failures/`` ride the span as ``pickN_<kind>``. When every pick misses,
-    :func:`_seat_forensics.capture_pick_miss` records them with the window
-    and the drawing's pick state, and raises.
-
-    ``walk`` (``anchor.point_mm is None``): hit-test the family's first
-    instance's body extreme points (:func:`_walk_points`), the instance
-    :func:`_shown_instances` put first (the pinned one when the anchor pins
-    it), and take the first point the hit test gives back to that exact
-    instance. Never a later instance: whether the first instance's points
-    are drawn or covered is a hit result, and a hit result must not choose
-    which part carries the item (the lag screw walked to lag-screw-2 after
-    lag-screw-1's points all hit other parts; that choice is now a pin). A
-    pin in its bore draws its outline on its neighbour's, so no extreme
-    point may be claimed: ``visible-edge`` then hit-tests points along the
-    edges of the same instance the view's hidden-line pass lists as drawn
-    (:func:`_visible_edge_points`) and takes the first it claims. When the
-    instance claims none but one of those points hits another part's edge,
-    the outline is shared ink: ``shared-edge`` attaches to the listed edge
-    that point lies on, landing there. When no point finds ink at all, the
-    part shows only where no hit test reaches it (cone-tip-bushing-1 sits
-    flush in the tip block's bore: none of 24 points hit any edge on runs
-    20260928T202401351Z and 20260928T203306681Z): ``listed-edge`` attaches
-    to the listed edge holding the first ranked point and lets SolidWorks
-    place the leader on it, the one landing no read-back can prove. No
-    listed edge fails the sheet, naming what was tried. Which method ran,
-    and where, is in the ``drawing.balloon_anchor`` event (``shared`` names
-    the other part).
-
-    Every other method returns the hit-tested sheet point, where the
-    balloon's leader is then made to land
+    Whether a point is drawn as its part's ink is decided by geometry
+    (:class:`ViewRayCaster`), never by the graphics window: the window's hit
+    test missed ink for hours at a time on one seat while every other seat
+    hit it (#1667). The chosen point is projected to the sheet once, where
+    the balloon's leader is then made to land
     (:func:`_create_component_bom_balloon`).
+
+    ``frozen``: the anchor's own point. Covered by another instance, or by
+    the part's own far side, or not on an edge of the instance, the sheet
+    fails naming which; the balloon never falls back to some other edge.
+
+    ``walk`` (``anchor.point_mm is None``): the family's first instance's
+    body extreme points (:func:`_walk_points`), the instance
+    :func:`_shown_instances` put first (the pinned one when the anchor pins
+    it), and the first one drawn. Never a later instance: whether the first
+    instance's points are drawn or covered is geometry, and geometry must
+    not choose which part carries the item (the lag screw walked to
+    lag-screw-2 after lag-screw-1's points were all covered; that choice is
+    now a pin). A pin in its bore has every extreme point covered or on a
+    face: ``visible-edge`` then probes points along the edges of the same
+    instance the view's hidden-line pass lists as drawn
+    (:func:`_visible_edge_points`) and takes the first drawn. When none is,
+    the part shows only where no probe reaches it (cone-tip-bushing-1 sits
+    flush in the tip block's bore): ``listed-edge`` attaches to the listed
+    edge holding the first ranked point and lets SolidWorks place the
+    leader on it, the one landing no read-back can prove. No listed edge
+    fails the sheet, naming what was tried. Which method ran, and where, is
+    in the ``drawing.balloon_anchor`` event.
     """
     first = candidates[0]
     instance = first.path
-    tried: list[tuple[float, float]] = []
     scan_attrs: dict[str, Any] = {}
     method: AnchorMethod
     if anchor.point_mm is not None:
-        if sheet_xy is None:
-            raise RuntimeError(f"{label}: {stem} frozen anchor was never projected")
-        where = f"sheet ({sheet_xy[0] * 1000.0:.2f}, {sheet_xy[1] * 1000.0:.2f}) mm"
-        picks: list[str] = []
-        pick_attrs: dict[str, Any] = {}
-        edge, owner = None, ""
-        for attempt in range(1, _FROZEN_REDRAW_RETRIES + 2):
-            observed: dict[str, Any] = {}
-            captured: dict[str, Any] = {}
-            started = time.perf_counter()
-            edge, owner = _hit_test_edge(
-                adapter,
-                sheet_xy,
-                redraw=attempt > 1,
-                observed=observed,
-                on_miss=lambda pick=attempt, into=captured: into.update(
-                    _seat_forensics.capture_pick_screens(
-                        adapter, f"{stem}-frozen-anchor-pick{pick}", sheet_xy=sheet_xy
-                    )
-                ),
-            )
-            elapsed_ms = round((time.perf_counter() - started) * 1000.0)
-            outcome = (
-                "miss"
-                if edge is None
-                else "hit"
-                if owner.casefold() == instance.casefold()
-                else "other"
-            )
-            picks.append(outcome)
-            pick_attrs[f"pick{attempt}"] = outcome
-            # The pick's own time, without the screenshots taken at its miss.
-            pick_attrs[f"pick{attempt}_ms"] = elapsed_ms - int(
-                captured.get("capture_ms", 0)
-            )
-            if observed["zoom_scale2"] is not None:
-                pick_attrs[f"pick{attempt}_scale2"] = observed["zoom_scale2"]
-            pick_attrs.update(
-                {f"pick{attempt}_{kind}": value for kind, value in captured.items()}
-            )
-            if edge is not None:
-                break
-        tried.append(sheet_xy)
-        pick_attrs.update(_seat_forensics.drawing_pick_state(adapter, view))
-        _span_scan_attrs(**pick_attrs)
-        if edge is None:
-            _seat_forensics.capture_pick_miss(
-                adapter,
-                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
-                f"no edge at {where} on {instance} in {len(picks)} picks, "
-                f"{len(picks) - 1} after a forced redraw",
-                view=view_name(adapter, view),
-                entity_type="EDGE",
-                sheet_xy=sheet_xy,
-                state=pick_attrs,
-            )
-        if owner.casefold() != instance.casefold():
-            adapter.currentModel.ClearSelection2(True)
-            raise RuntimeError(
-                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} at {where} "
-                f"selects an edge of {owner or 'no component'}, not {instance}"
-            )
-        method, point_mm = "frozen", tuple(anchor.point_mm)
-        scan_attrs = {"picks": ",".join(picks)}
-    else:
-        walk_points = _walk_points(adapter, first)
-        scan_attrs = {"extremes": len(walk_points)}
-        claimed, _ = _scan_points(
-            adapter,
-            view,
-            first,
-            walk_points,
-            offsets,
-            tried,
-            stem=stem,
-            what="walk",
-            label=label,
+        points: Sequence[tuple[float, float, float]] = (
+            tuple(value / 1000.0 for value in anchor.point_mm),
         )
-        if claimed is not None:
-            method, point, sheet_xy, edge = (
-                "walk",
-                walk_points[claimed.index],
-                claimed.xy,
-                claimed.edge,
+        what = "frozen"
+    else:
+        points = _walk_points(adapter, first)
+        scan_attrs["extremes"] = len(points)
+        what = "walk"
+    model_points = _anchor_model_points(
+        adapter, first, points, offsets, stem=stem, label=label
+    )
+    picks = caster.probe(
+        [(instance, point) for point in model_points], label=f"{label} {stem} {what}"
+    )
+    tried = len(picks)
+    chosen = _first_visible(picks)
+    if anchor.point_mm is not None:
+        if chosen is None:
+            raise RuntimeError(
+                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} on "
+                f"{instance} is not its drawn ink: {_covered_text(picks)}"
             )
+        method, point, edge = "frozen", points[0], picks[0].edges[0]
+    elif chosen is not None:
+        method, point, edge = "walk", points[chosen], picks[chosen].edges[0]
+    else:
+        walk_text = _covered_text(picks)
+        listed, edge_points = _visible_edge_points(adapter, view, first)
+        scan_attrs["visible"] = f"{first.path}={listed}"
+        points = [point for point, _edge in edge_points]
+        model_points = _anchor_model_points(
+            adapter, first, points, offsets, stem=stem, label=label
+        )
+        picks = caster.probe(
+            [(instance, point) for point in model_points], label=f"{label} {stem} edge"
+        )
+        tried += len(picks)
+        chosen = _first_visible(picks)
+        if chosen is not None:
+            method, point, edge = "visible-edge", points[chosen], picks[chosen].edges[0]
+        elif edge_points:
+            method, (point, edge) = "listed-edge", edge_points[0]
+            chosen = 0
         else:
-            adapter.currentModel.ClearSelection2(True)
-            listed, edge_points = _visible_edge_points(adapter, view, first)
-            scan_attrs["visible"] = f"{first.path}={listed}"
-            claimed, shared = _scan_points(
-                adapter,
-                view,
-                first,
-                [point for point, _edge in edge_points],
-                offsets,
-                tried,
-                stem=stem,
-                what="edge",
-                label=label,
+            raise RuntimeError(
+                f"{label}: {stem} has no verifiably visible edge: no probed point "
+                f"is drawn ink of {first.path}: {scan_attrs.get('extremes', 0)} body "
+                f"extreme points [{walk_text}], then {len(edge_points)} points along "
+                f"its {listed} listed visible edges (sampled when "
+                f"1-{_VISIBLE_EDGES_PER_INSTANCE})"
             )
-            if claimed is not None:
-                method, edge = "visible-edge", claimed.edge
-                point, sheet_xy = edge_points[claimed.index][0], claimed.xy
-            elif shared is not None:
-                method, (point, edge), sheet_xy = (
-                    "shared-edge",
-                    edge_points[shared.index],
-                    shared.xy,
-                )
-                scan_attrs["shared"] = shared.owner or "no component"
-            elif edge_points:
-                method, (point, edge) = "listed-edge", edge_points[0]
-                sheet_xy = tried[len(walk_points)]
-            else:
-                adapter.currentModel.ClearSelection2(True)
-                points_text = "; ".join(
-                    f"({x * 1000.0:.2f}, {y * 1000.0:.2f})" for x, y in tried
-                )
-                raise RuntimeError(
-                    f"{label}: {stem} has no verifiably visible edge: no hit test "
-                    f"found ink of {first.path} at sheet mm [{points_text}]: "
-                    f"{len(walk_points)} body extreme points, then "
-                    f"{len(edge_points)} points along its {listed} listed visible "
-                    f"edges (sampled when 1-{_VISIBLE_EDGES_PER_INSTANCE})"
-                )
-        point_mm = tuple(value * 1000.0 for value in point)
+    sheet_xy = model_points_in_view(
+        adapter,
+        view,
+        [model_points[chosen]],
+        label=f"{label} {stem} anchor",
+        names=[f"{stem} {method}"],
+    )[0]
+    point_mm = tuple(value * 1000.0 for value in point)
     # The span carries what profiling queries group by; the event is what a
     # run-to-run anchor diff compares (App Insights traces, this name).
-    _span_scan_attrs(instance=instance, method=method, tried=len(tried), **scan_attrs)
+    _span_scan_attrs(instance=instance, method=method, tried=tried, **scan_attrs)
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
@@ -1380,10 +1213,9 @@ def _select_balloon_anchor(
         method=method,
         point_mm=_mm_text(point_mm),
         sheet_mm=_mm_text(sheet_xy, 1000.0),
-        tried=len(tried),
+        tried=tried,
         **scan_attrs,
     )
-    adapter.currentModel.ClearSelection2(True)
     return _AnchorChoice(instance=instance, edge=edge, method=method, sheet_xy=sheet_xy)
 
 
@@ -1479,18 +1311,17 @@ def _create_component_bom_balloon(
 ) -> BalloonLanding:
     """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed.
 
-    The edge is selected by entity and the hit-tested sheet point made its
-    selection point (``ISelectionMgr.SetSelectionPoint2``), the landing
-    :func:`add_surface_finish` measured to 0.01 mm; without it SolidWorks
-    ends the leader at its own point on the edge (:class:`_AnchorChoice`).
-    A ``shared-edge`` or ``listed-edge`` edge is the model edge the view
-    listed, not a hit test's pick, so it is selected through the view. The
-    leader must then read back there; a ``listed-edge`` leader has no
-    proven point to land on, so SolidWorks places it.
+    The edge is selected by entity through the view and the proven sheet
+    point made its selection point (``ISelectionMgr.SetSelectionPoint2``),
+    the landing :func:`add_surface_finish` measured to 0.01 mm; without it
+    SolidWorks ends the leader at its own point on the edge
+    (:class:`_AnchorChoice`). A ``listed-edge`` or ``landed-listed-edge``
+    edge is the model edge the view listed, so it is selected through the
+    view. The leader must then read back there; a ``listed-edge`` leader has
+    no proven point to land on, so SolidWorks places it.
     """
     draw = adapter.currentModel
-    listed = choice.method in ("shared-edge", "listed-edge")
-    if listed:
+    if choice.method in ("listed-edge", "landed-listed-edge"):
         draw.ClearSelection2(True)
         if not _early_bound(view, "IView").SelectEntity(choice.edge, False):
             raise RuntimeError(
@@ -1597,46 +1428,29 @@ def add_component_bom_balloons(
         if explode_offsets is None
         else explode_offsets
     )
-    frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
-    projected = (
-        model_points_in_view(
-            adapter,
-            view,
-            [
-                _anchor_model_points(
-                    adapter,
-                    candidates[stem][0],
-                    [tuple(value / 1000.0 for value in anchors[stem].point_mm or ())],
-                    offsets,
-                    stem=stem,
-                    label=label,
-                )[0]
-                for stem in frozen
-            ],
-            label=f"{label} balloon anchors",
-            names=frozen,
-        )
-        if frozen
-        else []
-    )
-    sheet_points: dict[str, tuple[float, float]] = dict(zip(frozen, projected))
     draw = adapter.currentModel
     if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError(f"{label}: failed to activate the balloon view")
-    # A coordinate hit test reads the view's display geometry: make it current once.
+    # The listed-edge fallback reads the view's display geometry: make it current once.
     _early_bound(view, "IView").UpdateViewDisplayGeometry()
-    # Every anchor is hit-tested before the first balloon exists: a balloon
-    # dropped near its own anchor would otherwise sit on the next family's
-    # point and swallow its hit test.
+    caster = ViewRayCaster(
+        adapter,
+        view,
+        leaves,
+        lambda leaf: _leaf_pose(adapter, leaf, offsets, label=label),
+        label=label,
+    )
+    # Every anchor is resolved before the first balloon exists, so a family
+    # that cannot be ballooned fails the sheet with nothing half-placed.
     picks = [
         _select_balloon_anchor(
             adapter,
             view,
+            caster,
             stem=stem,
             anchor=anchors[stem],
             candidates=candidates[stem],
             offsets=offsets,
-            sheet_xy=sheet_points.get(stem),
             label=label,
         )
         for stem in stems

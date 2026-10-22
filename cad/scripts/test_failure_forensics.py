@@ -50,7 +50,6 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-import pythoncom
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.sdk._logs import LoggerProvider as SdkLoggerProvider
 from opentelemetry.sdk._logs.export import (
@@ -2926,9 +2925,9 @@ def test_a_pick_miss_writes_its_capture_under_failures(
     both on its event."""
     spans, _logs = capture_telemetry
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
-    message = "fr-harmonic-base frozen balloon anchor selects no edge in 3 picks"
+    message = "failed to select front_journal edge at sheet (0.15356, 0.14845)"
     with (
-        _telemetry.span("drawing.pick_balloon_anchor"),
+        _telemetry.span("drawing.surface_finish"),
         pytest.raises(RuntimeError) as raised,
     ):
         _seat_forensics.capture_pick_miss(
@@ -2937,7 +2936,6 @@ def test_a_pick_miss_writes_its_capture_under_failures(
             view="Drawing View9",
             entity_type="EDGE",
             sheet_xy=(0.15356, 0.14845),
-            state={"pick1": "miss", "pick1_desktop_png": "failures/x/desktop.png"},
         )
     assert str(raised.value) == message
     out = _failure_dir(tmp_path, "pick-miss-drawing-view9")
@@ -2947,7 +2945,11 @@ def test_a_pick_miss_writes_its_capture_under_failures(
         "pick-miss-drawing-view9-desktop.png",
     ]
     report = json.loads((out / "capture.json").read_text())
-    assert report["message"] == message and report["state"]["pick1"] == "miss"
+    assert report["message"] == message
+    assert report["sheet_xy"] == [0.15356, 0.14845]
+    assert report["seat"]["seat_pid"] == 4242
+    assert "display" in report
+    assert "state" not in report
     assert report["artefacts"] == {
         "desktop_png": f"{relative}/pick-miss-drawing-view9-desktop.png"
     }
@@ -2962,234 +2964,6 @@ def test_a_pick_miss_writes_its_capture_under_failures(
         event.attributes["desktop_png"]
         == f"{relative}/pick-miss-drawing-view9-desktop.png"
     )
-    assert event.attributes["pick1_desktop_png"] == "failures/x/desktop.png"
-
-
-@pytest.mark.parametrize(
-    ("filters", "transform_failure"),
-    [
-        (tuple(range(64)), None),
-        (None, None),
-        (tuple(range(65)), None),
-        (tuple(range(64)), "nonfinite"),
-        (tuple(range(64)), "wrong_length"),
-        (tuple(range(64)), "unreadable"),
-    ],
-)
-def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
-    tmp_path,
-    capture_telemetry,
-    monkeypatch,
-    strict_forensic_owners,
-    filters,
-    transform_failure,
-):
-    """Offline API-shaped doubles prove raw evidence survives before exports.
-
-    They do not prove runtime COM binding or native hit-test coordinates.
-    """
-    spans, _logs = capture_telemetry
-    monkeypatch.setattr(_seat_forensics, "_frame_hwnd", lambda adapter: 77)
-    model = _FailureDrawing(tmp_path, unsaved=True)
-    reads = []
-    transform_data = tuple(float(n) for n in range(16))
-    if transform_failure == "nonfinite":
-        transform_data = (float("nan"), *transform_data[1:])
-    elif transform_failure == "wrong_length":
-        transform_data = transform_data[:15]
-
-    class Transform:
-        _native_interfaces = ("IMathTransform",)
-
-        @property
-        def ArrayData(self):
-            reads.append("transform")
-            assert _fake_grab_screen.windows == [None, 77]
-            if transform_failure == "unreadable":
-                raise RuntimeError("transform RPC refused")
-            return transform_data
-
-        def __bool__(self):
-            raise AssertionError("VT_DISPATCH must be checked against None")
-
-    transform = Transform()
-
-    class Point:
-        _native_interfaces = ("IMathPoint",)
-
-        def MultiplyTransform(self, native_transform):
-            assert native_transform is transform
-            reads.append("multiply")
-            return self
-
-        @property
-        def ArrayData(self):
-            reads.append("point")
-            return (123.25, 456.5, 0.0)
-
-        def __bool__(self):
-            raise AssertionError("VT_DISPATCH must be checked against None")
-
-    class Math:
-        _native_interfaces = ("IMathUtility",)
-
-        def CreatePoint(self, coordinates):
-            assert coordinates.varianttype == pythoncom.VT_ARRAY | pythoncom.VT_R8
-            assert tuple(coordinates.value) == (0.15356, 0.14845, 0.0)
-            reads.append("create_point")
-            return Point()
-
-        def __bool__(self):
-            raise AssertionError("VT_DISPATCH must be checked against None")
-
-    class Seat(_Seat):
-        def GetSelectionFilters(self):
-            reads.append("filters")
-            return filters
-
-        def GetApplySelectionFilter(self):
-            reads.append("apply")
-            return False
-
-        def GetMathUtility(self):
-            reads.append("math")
-            return Math()
-
-    class View(_View):
-        @property
-        def Transform(self):
-            reads.append("view_transform")
-            return transform
-
-        def GetViewHWndx64(self):
-            reads.append("hwnd")
-            return 0x123456789
-
-        def HasPerspective(self):
-            reads.append("perspective")
-            return False
-
-    model.ActiveView = View()
-    original_bmp, original_pdf = model.SaveBMP, model.SaveAs3
-
-    def before_export():
-        assert _fake_grab_screen.windows == [None, 77]
-        assert reads.count("transform") == 1
-        assert reads.count("point") == (0 if transform_failure else 1)
-
-    def save_bmp(*args):
-        before_export()
-        return original_bmp(*args)
-
-    def save_pdf(*args):
-        before_export()
-        return original_pdf(*args)
-
-    monkeypatch.setattr(_FailureDrawing, "SaveBMP", lambda self, *args: save_bmp(*args))
-    monkeypatch.setattr(_FailureDrawing, "SaveAs3", lambda self, *args: save_pdf(*args))
-    label = "fr-harmonic-base-frozen-anchor-pick1"
-    with _telemetry.span("drawing.pick_balloon_anchor"):
-        captured = _seat_forensics.capture_pick_screens(
-            _Adapter(sw=Seat(), model=model), label, sheet_xy=(0.15356, 0.14845)
-        )
-    out = _failure_dir(tmp_path, label)
-    relative = f"failures/{label}/{out.name}"
-    state = captured["zoomed_pick_state"]
-    assert state["apply_selection_filter"] is False
-    assert state["view_scale2"] == 3.5
-    assert state["view_hwnd"] == 0x123456789
-    assert state["view_visible_box_px"] == [300, 40, 2000, 1200]
-    assert state["view_has_perspective"] is False
-    assert state["sheet_xy"] == [0.15356, 0.14845]
-    if transform_failure:
-        expected_error = {
-            "nonfinite": "finite",
-            "wrong_length": "array of 16",
-            "unreadable": "transform RPC refused",
-        }[transform_failure]
-        assert expected_error in state["view_transform_error"]
-        assert "view_transform" not in state
-        assert "sheet_point_view_px" not in state
-        assert "finite 16-value view_transform" in state["sheet_point_view_px_error"]
-        assert not {"math", "create_point", "multiply", "point"} & set(reads)
-    else:
-        assert state["view_transform"] == list(transform_data)
-        assert state["sheet_point_view_px"] == [123.25, 456.5, 0.0]
-    if filters is None:
-        assert state["selection_filters"] is None
-        assert "selection_filters_error" in state
-    elif len(filters) > 64:
-        assert "selection_filters_error" in state
-        assert state["selection_filters"] == list(filters[:64])
-        assert state["selection_filter_count"] == 65
-        assert state["selection_filters_truncated"] is True
-    else:
-        assert state["selection_filters"] == list(filters)
-        assert "selection_filters_error" not in state
-    assert all(reads.count(name) == 1 for name in set(reads))
-    report = json.loads((out / Path(captured["pick_state_report"]).name).read_text())
-    assert report == {"label": label, "zoomed_pick_state": state}
-    assert {
-        key: value for key, value in captured.items()
-        if key not in {"capture_ms", "zoomed_pick_state", "pick_state_report"}
-    } == {
-        "desktop_png": f"{relative}/{label}-desktop.png",
-        "window_png": f"{relative}/{label}-window.png",
-        "region_bmp": f"{relative}/{label}-region.bmp",
-        "sheet_pdf": f"{relative}/{label}-sheet.pdf",
-    }
-    assert _fake_grab_screen.windows == [None, 77]
-    assert model.bmp_saved == [(str(out / f"{label}-region.bmp"), 0, 0)]
-    assert model.saved == [
-        (str(out / f"{label}-sheet.pdf"), 0, _seat_forensics._SAVE_AS_SILENT_COPY)
-    ]
-    assert all(
-        (out / Path(path).name).is_file()
-        for key, path in captured.items()
-        if key not in {"capture_ms", "zoomed_pick_state"}
-    )
-    (event,) = [
-        e
-        for s in spans.get_finished_spans()
-        for e in s.events
-        if e.name == "drawing.pick_miss_capture"
-    ]
-    assert event.attributes["label"] == label
-    assert event.attributes["sheet_pdf"] == captured["sheet_pdf"]
-    assert json.loads(event.attributes["zoomed_pick_state"]) == state
-    assert event.attributes["pick_state_report"] == captured["pick_state_report"]
-
-
-def test_pick_screens_never_raise_and_name_each_file_they_could_not_write(
-    tmp_path, monkeypatch
-):
-    def refused(target, *, window=None):
-        raise OSError("screen grab failed")
-
-    monkeypatch.setattr(_seat_forensics, "_grab_screen", refused)
-    monkeypatch.setattr(_seat_forensics, "_frame_hwnd", lambda adapter: None)
-    adapter = _unmerged_profile(tmp_path)  # a part: no sheet to export
-    captured = _seat_forensics.capture_pick_screens(
-        adapter, "x-frozen-anchor-pick2", sheet_xy=(0.1, 0.2)
-    )
-    state = captured["zoomed_pick_state"]
-    for key in (
-        "selection_filters", "apply_selection_filter", "view_hwnd",
-        "view_transform", "view_has_perspective", "sheet_point_view_px",
-    ):
-        assert state[f"{key}_error"], key
-    assert state["sheet_xy"] == [0.1, 0.2]
-    assert state["view_scale2"] == 3.5
-    assert state["view_visible_box_px"] == [300, 40, 2000, 1200]
-    report_path = adapter.currentModel._root / captured["pick_state_report"]
-    assert json.loads(report_path.read_text())["zoomed_pick_state"] == state
-    assert captured["desktop_png_error"] == "OSError: screen grab failed"
-    assert captured["window_png_error"] == "OSError: screen grab failed"
-    assert captured["sheet_pdf_error"] == (
-        "RuntimeError: failure sheet PDF requires an active drawing"
-    )
-    assert captured["region_bmp"].endswith("/x-frozen-anchor-pick2-region.bmp")
-    assert adapter.currentModel.saved == []
 
 
 @pytest.mark.parametrize("pick_miss", [False, True], ids=["drawing_display", "pick_miss"])
