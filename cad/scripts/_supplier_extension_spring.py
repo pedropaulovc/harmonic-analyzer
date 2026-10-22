@@ -4,18 +4,17 @@ The hidden length chord is the supplier's inside-hook/inside-loop measurement
 in its +X frame, not an installed span or a bounding-box length. Circular
 references are the author's exact nominal coil envelope and wire section;
 they are not measurements inferred from the supplier display model's pitch.
+
+Drawing import and settled readback live in ``_supplier_spring_drawing``;
+these source gauges remain in the model-only part dependency closure.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from typing import Any
-
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _check import check
 from _com import _early_bound
-from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension
 from _drawing_tolerances import set_dimension_symmetric_tolerance
@@ -29,14 +28,6 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _supplier_dimensions import (
-    assert_supplier_reference_dimension,
-    supplier_reference_dimension,
-)
-from _supplier_spring_drawing import (
-    assert_supplier_configuration_value,
-    reacquire_supplier_dimensions,
-)
 from _supplier_spring_reference import (
     ReferenceState,
     SUPPLIER_FREE_CONFIGURATION,
@@ -202,159 +193,3 @@ async def add_extension_spring_references(
         ),
         body_count=body_count,
     )
-
-
-def prepare_extension_spring_diagrams(
-    adapter: Any,
-    views: Mapping[str, Any],
-    *,
-    reference_bounds: Callable[[str], tuple[float, float, float, float]],
-) -> tuple[Callable[[], None], ...]:
-    """Show only assigned construction gauges before native geometry fitting."""
-    if set(views) != {*SOURCE_FEATURES, "installed_iso"}:
-        raise RuntimeError(
-            "extension spring diagram needs free, section, maximum and installed views"
-        )
-    for key, names in SOURCE_FEATURES.items():
-        if set(_show_hidden_owners(adapter, views[key], names, view_label=key)) != set(
-            names
-        ):
-            raise RuntimeError(f"{key}: nominal supplier gauges must be saved hidden")
-    return ()
-
-
-def extension_spring_dimensions(
-    adapter: Any,
-    views: Mapping[str, Any],
-    *,
-    free_length_mm: float,
-    reference_bounds: Callable[[str], tuple[float, float, float, float]],
-    max_length_mm: float,
-    coil_od_mm: float,
-    wire_dia_mm: float,
-    precision: Mapping[str, int],
-    od_tolerance_mm: float | None = None,
-    od_tolerance_precision: int | None = None,
-) -> tuple[Callable[[], None], ...]:
-    """Import source sizes and reacquire every native dimension after final rebuild."""
-    rows_by_view = {
-        "free_front": (
-            (
-                FREE_LENGTH,
-                free_length_mm,
-                "length",
-                "STOCK FREE / INSIDE HOOKS OR LOOPS",
-            ),
-        ),
-        "free_right": (
-            (COIL_OD, coil_od_mm, "diameter", "NOMINAL STOCK COIL OD"),
-            (WIRE_DIA, wire_dia_mm, "diameter", "NOMINAL STOCK WIRE SECTION"),
-        ),
-        "max_front": (
-            (
-                MAX_LENGTH,
-                max_length_mm,
-                "length",
-                "STOCK MAXIMUM / INSIDE HOOKS OR LOOPS",
-            ),
-        ),
-    }
-    expected = {key: {} for key in views}
-    configurations = {
-        key: str(view.ReferencedConfiguration) for key, view in views.items()
-    }
-    required = {
-        "free_front": SUPPLIER_FREE_CONFIGURATION,
-        "free_right": SUPPLIER_FREE_CONFIGURATION,
-        "max_front": SUPPLIER_MAX_CONFIGURATION,
-    }
-    for key, configuration in required.items():
-        if configurations.get(key) != configuration:
-            raise RuntimeError(f"{key}: nominal supplier gauge has wrong configuration")
-    settings = {}
-    for key, rows in rows_by_view.items():
-        view = views[key]
-        xmin, ymin, xmax, ymax = reference_bounds(key)
-        positions = (
-            {
-                COIL_OD: (xmax + 0.006, ymax + 0.005),
-                WIRE_DIA: (xmax + 0.006, ymin - 0.009),
-            }
-            if key == "free_right"
-            else {rows[0][0]: ((xmin + xmax) / 2, ymax + 0.010)}
-        )
-        annotations = curate_view_dimensions(
-            adapter,
-            view,
-            keep=positions,
-            view_label=key,
-            dimensions_by_feature=DIMENSIONS_BY_FEATURE,
-        )
-        by_name = {
-            dimension_name(adapter, annotation): annotation
-            for annotation in annotations
-        }
-        if len(annotations) != len(positions) or set(by_name) != set(positions):
-            raise RuntimeError(
-                f"{key}: supplier reference inventory differs from source"
-            )
-        for name, value, presentation, callout in rows:
-            owner = next(
-                feature
-                for feature, names in DIMENSIONS_BY_FEATURE.items()
-                if name in names
-            )
-            expected[key][name] = owner
-            arguments = dict(
-                label=name,
-                units="in",
-                precision=precision[name],
-                expected_mm=value,
-                presentation=presentation,
-                callout=callout,
-                configuration=configurations[key],
-            )
-            supplier_reference_dimension(
-                adapter,
-                _early_bound(
-                    by_name[name].GetSpecificAnnotation(), "IDisplayDimension"
-                ),
-                **arguments,
-            )
-            settings[name] = (arguments, configurations[key])
-
-    def settled() -> None:
-        displays = reacquire_supplier_dimensions(
-            adapter,
-            views,
-            expected=expected,
-            configurations=configurations,
-        )
-        for name, (arguments, configuration) in settings.items():
-            display = displays[name]
-            # The shared assertion proves native dimension type before SI interpretation.
-            assert_supplier_reference_dimension(adapter, display, **arguments)
-            assert_supplier_configuration_value(
-                display,
-                configuration,
-                arguments["expected_mm"],
-                label=name,
-            )
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-            if name == COIL_OD and od_tolerance_mm is not None:
-                if (
-                    int(tolerance.Type) != 4
-                    or abs(float(tolerance.GetMinValue()) + od_tolerance_mm / 1000)
-                    > 1e-12
-                    or abs(float(tolerance.GetMaxValue()) - od_tolerance_mm / 1000)
-                    > 1e-12
-                    or int(display.GetPrimaryTolPrecision2()) != od_tolerance_precision
-                ):
-                    raise RuntimeError(
-                        "source supplier OD band changed after final rebuild"
-                    )
-            elif int(tolerance.Type) != 0:
-                raise RuntimeError(f"{name}: unprovided supplier tolerance appeared")
-
-    return (settled,)

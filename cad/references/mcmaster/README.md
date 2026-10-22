@@ -1502,6 +1502,10 @@ These are purchased-part reference sheets; general fabrication tolerance and
 edge-break notes do not apply to supplier references.
 Extension-spring free/maximum inside-hook spans and coil/wire sizes use
 explicitly nominal construction diagrams, not new free/extended solid variants.
+Their source gauge authoring stays in the model-only
+`_supplier_extension_spring` dependency closure. The existing
+`_supplier_spring_drawing` consumer owns drawing import, showing those gauges
+and final native annotation readback; part builds never import drawing adapters.
 Disc-spring stock diagrams separate ID/OD, free-height envelopes and nominal
 strip gauges from compressed-height/deflection/shaft application gauges.
 Neither diagram asserts an unmodelled loaded shape or a force derived from
