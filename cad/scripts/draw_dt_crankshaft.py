@@ -23,7 +23,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from typing import Any, Callable, Sequence
@@ -40,9 +39,9 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _com_invoke, _early_bound
+from _com import _early_bound
 from _drawing_annotation_extent import place_callout_clear
-from _drawing_attachment import _assert_attached_to, _is_same_attachment
+from _drawing_attachment import _assert_attached_to
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -63,7 +62,6 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import _project_through
 from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -844,468 +842,58 @@ def _far_end_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
-def _outboard_neck_failure_census(
-    adapter: Any, view: Any, *, strict_visible_matches: int
-) -> None:
-    """Temporary, read-only failure probe; never supplies a resolver candidate.
-
-    Keep native duplicates as separate occurrences. Geometry signatures only
-    shortlist IsSame calls, never establish identity or relax the real picker.
-    Raw invocation avoids generated-wrapper type-info/QI work on every field.
-    """
-    marker = "NECK_GEOMETRY_CENSUS_JSON="
-    report: dict[str, Any] = {
-        "schema": 1,
-        "marker": marker,
-        "strict_visible_matches": strict_visible_matches,
-        "units": {
-            "native_lengths": "m", "sheet_coordinates": "m",
-            "view_angle": "rad", "axes": "unitless",
-            "trim_parameters": "native curve parameters",
-            "face_boxes": "approximate model-space m; not identity evidence",
-        },
-        "expected": {
-            "source_path": str(SOURCE),
-            "collar_rear_mm": COLLAR_REAR,
-            "journal_start_mm": JOURNAL_START,
-            "neck_length_mm": JOURNAL_START - COLLAR_REAR,
-            "shaft_diameter_mm": SHAFT_DIA,
-            "journal_diameter_mm": JOURNAL_DIA,
-            "circle_center_m": [0.0, JOURNAL_START / 1000.0, 0.0],
-            "circle_axis": [0.0, 1.0, 0.0],
-            "circle_radius_m": SHAFT_DIA / 2000.0,
-            "position_radius_strict_tolerance_m": 1e-6,
-            "axis_strict_tolerance": 1e-9,
-        },
-        "body_enumeration": "GetBodies2(-1, False): all solid/sheet bodies, including hidden",
-        "signature_round_decimals_for_shortlisting_only": 12,
-        "bodies": [], "faces": [], "circles": [], "visible_components": [],
-        "projections": [],
-    }
-    error_count = 0
-
-    def primitive(value: Any, depth: int = 0) -> Any:
-        if value is None or isinstance(value, (str, bool, int)):
-            return value
-        if isinstance(value, float):
-            return value if math.isfinite(value) else {"nonfinite": repr(value)}
-        if isinstance(value, (tuple, list)) and depth < 3:
-            return [primitive(item, depth + 1) for item in value]
-        raise TypeError(f"non-primitive diagnostic value: {type(value).__name__}")
-
-    def read_field(
-        row: dict[str, Any], key: str, operation: Callable[[], Any],
-        encode: Callable[[Any], Any] = primitive,
-    ) -> Any:
-        nonlocal error_count
-        try:
-            value = operation()
-            row[key] = {"value": encode(value), "error": None}
-            return value
-        except Exception as exc:
-            error_count += 1
-            row[key] = {
-                "value": None,
-                "error": {"type": type(exc).__name__, "message": str(exc)},
-            }
-            return None
-
-    def invoke(obj: Any, interface: str, member: str, *args: Any) -> Any:
-        if obj is None:
-            raise RuntimeError(f"{interface}.{member}: parent interface is null/unreadable")
-        return _com_invoke(obj, interface, member, *args)
-
-    def presence(value: Any) -> Any:
-        return None if value is None else "present"
-
-    def handles(value: Any) -> Any:
-        return None if value is None else {
-            "count": len(value),
-            "null_indices": [index for index, item in enumerate(value) if item is None],
-        }
-
-    def numbers(value: Any) -> Any:
-        return None if value is None else tuple(float(item) for item in value)
-
-    def unavailable(reason: str) -> Any:
-        raise RuntimeError(reason)
-
-    point_cache: dict[tuple[float, ...], int] = {}
-
-    def point(row: dict[str, Any], name: str, xyz: Any) -> None:
-        def register() -> int:
-            values = numbers(xyz)
-            if values is None or len(values) != 3 or not all(map(math.isfinite, values)):
-                raise ValueError(f"{name}: no readable finite model-space XYZ")
-            if values not in point_cache:
-                point_cache[values] = len(report["projections"])
-                report["projections"].append({"model_m": list(values)})
-            return point_cache[values]
-
-        read_field(row.setdefault("projection_refs", {}), name, register)
-
-    circle_cache: dict[tuple[float, ...], int] = {}
-
-    def circle_record(params: Any, is_circle: Any) -> int:
-        valid = params is not None and len(params) == 7 and all(map(math.isfinite, params))
-        key = tuple(params) if valid else None
-        if key is not None and key in circle_cache:
-            return circle_cache[key]
-        row: dict[str, Any] = {
-            "id": len(report["circles"]), "raw_circle_params": primitive(params),
-            "predicates": {
-                "is_circle": is_circle,
-                "parameter_count_is_seven": None if params is None else len(params) == 7,
-                "all_parameters_finite": None if params is None else all(map(math.isfinite, params)),
-            },
-        }
-        for name, index, expected, tolerance, absolute_axis in (
-            ("center_x", 0, 0.0, 1e-6, False),
-            ("center_z", 2, 0.0, 1e-6, False),
-            ("station_y", 1, JOURNAL_START / 1000.0, 1e-6, False),
-            ("radius", 6, SHAFT_DIA / 2000.0, 1e-6, False),
-            ("axis_x", 3, 0.0, 1e-9, False),
-            ("axis_z", 5, 0.0, 1e-9, False),
-            ("absolute_axis_y", 4, 1.0, 1e-9, True),
-        ):
-            delta = None
-            if valid:
-                actual = abs(params[index]) if absolute_axis else params[index]
-                delta = actual - expected
-            row["predicates"][name] = {
-                "delta": delta, "absolute_delta": None if delta is None else abs(delta),
-                "strict_tolerance": tolerance,
-                "passes": None if delta is None else abs(delta) < tolerance,
-            }
-        row["matches_resolver"] = bool(
-            is_circle is True and valid
-            and all(
-                row["predicates"][name]["passes"] is True
-                for name in (
-                    "center_x", "center_z", "station_y", "radius",
-                    "axis_x", "axis_z", "absolute_axis_y",
-                )
-            )
-        )
-        point(row, "center", params[:3] if params is not None and len(params) >= 3 else None)
-        # Extrema of the supporting circle in each model coordinate, not a
-        # claim that an arc's trim contains them. FRONT's Z extrema show its span.
-        normal = None
-        if valid:
-            length = math.hypot(*params[3:6])
-            if length > 0.0:
-                normal = tuple(value / length for value in params[3:6])
-        for index, axis in enumerate("xyz"):
-            direction = None
-            if normal is not None:
-                radial = tuple(
-                    (1.0 if index == coordinate else 0.0) - normal[index] * normal[coordinate]
-                    for coordinate in range(3)
-                )
-                length = math.hypot(*radial)
-                if length > 0.0:
-                    direction = tuple(value / length for value in radial)
-            for sign, suffix in ((-1.0, "min"), (1.0, "max")):
-                name = f"supporting_circle_model_{axis}_{suffix}"
-                if direction is None:
-                    read_field(
-                        row.setdefault("projection_refs", {}), name,
-                        lambda: unavailable("unreadable circle/axis or degenerate radial extremum"),
-                    )
-                else:
-                    point(row, name, tuple(
-                        params[coordinate] + sign * params[6] * direction[coordinate]
-                        for coordinate in range(3)
-                    ))
-        report["circles"].append(row)
-        if key is not None:
-            circle_cache[key] = row["id"]
-        return row["id"]
-
-    def curve_geometry(row: dict[str, Any], curve: Any) -> None:
-        read_field(row, "curve_class", lambda: invoke(curve, "ICurve", "Identity"))
-        circular = read_field(row, "is_circle", lambda: invoke(curve, "ICurve", "IsCircle"))
-        linear = read_field(row, "is_line", lambda: invoke(curve, "ICurve", "IsLine"))
-        params = read_field(
-            row, "circle_params",
-            lambda: numbers(invoke(curve, "ICurve", "CircleParams")) if circular is True
-            else None if circular is False else unavailable("IsCircle unavailable"),
-        )
-        read_field(
-            row, "line_params",
-            lambda: numbers(invoke(curve, "ICurve", "LineParams")) if linear is True
-            else None if linear is False else unavailable("IsLine unavailable"),
-        )
-        row["circle_id"] = circle_record(params, circular) if circular is True else None
-
-    # Cache complete faces only after a native IsSame verdict. Approximate
-    # bounds merely shortlist; every returned adjacency slot remains in the dump.
-    face_candidates: dict[tuple[float, ...], list[tuple[Any, int]]] = {}
-
-    def face_record(slot: dict[str, Any], face: Any) -> None:
-        slot["face_present"] = face is not None
-        slot["face_id"] = None
-        if face is None:
-            return
-        bounds = read_field(slot, "box_m", lambda: numbers(invoke(face, "IFace2", "GetBox")))
-        key = None
-        if bounds is not None and len(bounds) == 6 and all(map(math.isfinite, bounds)):
-            key = tuple(round(value, 12) for value in bounds)
-        comparisons = slot["cache_identity_checks"] = []
-        for prior, face_id in face_candidates.get(key, ()):
-            comparison: dict[str, Any] = {"face_id": face_id}
-            comparisons.append(comparison)
-            same = read_field(
-                comparison, "is_same_raw",
-                lambda p=prior: invoke(adapter.swApp, "ISldWorks", "IsSame", face, p),
-            )
-            if type(same) is int and same == 1:
-                slot["face_id"] = face_id
-                return
-        row: dict[str, Any] = {"id": len(report["faces"]), "box_m": slot["box_m"]}
-        slot["face_id"] = row["id"]
-        report["faces"].append(row)
-        if key is not None:
-            face_candidates.setdefault(key, []).append((face, row["id"]))
-        read_field(row, "uv_bounds", lambda: numbers(invoke(face, "IFace2", "GetUVBounds")))
-        read_field(row, "area_m2", lambda: invoke(face, "IFace2", "GetArea"))
-        feature = read_field(
-            row, "feature", lambda: invoke(face, "IFace2", "GetFeature"), presence,
-        )
-        read_field(row, "oldest_owning_feature_name", lambda: invoke(feature, "IFeature", "Name"))
-        read_field(row, "feature_type", lambda: invoke(feature, "IFeature", "GetTypeName2"))
-        surface = read_field(
-            row, "surface", lambda: invoke(face, "IFace2", "GetSurface"), presence,
-        )
-        read_field(row, "surface_class", lambda: invoke(surface, "ISurface", "Identity"))
-        cylinder = read_field(row, "is_cylinder", lambda: invoke(surface, "ISurface", "IsCylinder"))
-        read_field(
-            row, "cylinder_params",
-            lambda: numbers(invoke(surface, "ISurface", "CylinderParams")) if cylinder is True
-            else None if cylinder is False else unavailable("IsCylinder unavailable"),
-        )
-
-    def adjacent_faces(row: dict[str, Any], edge: Any) -> None:
-        adjacent = read_field(
-            row, "native_adjacent_faces",
-            lambda: invoke(edge, "IEdge", "GetTwoAdjacentFaces2"), handles,
-        )
-        row["adjacent_faces"] = []
-        for index, face in enumerate(adjacent or ()):
-            slot: dict[str, Any] = {"slot": index}
-            row["adjacent_faces"].append(slot)
-            face_record(slot, face)
-
-    def edge_geometry(edge: Any, identity: str) -> dict[str, Any]:
-        row: dict[str, Any] = {"id": identity, "edge_present": edge is not None}
-        curve = read_field(row, "curve", lambda: invoke(edge, "IEdge", "GetCurve"), presence)
-        curve_geometry(row, curve)
-        # GetCurve MUST precede GetCurveParams2. Packed final doubles are kept
-        # raw (non-finite values are tagged), not decoded as guessed integers.
-        trim = read_field(
-            row, "trim_params",
-            lambda: numbers(invoke(edge, "IEdge", "GetCurveParams2")),
-        )
-        row["trim_u"] = None if trim is None or len(trim) < 8 else primitive(trim[6:8])
-        point(row, "trim_start", trim[:3] if trim is not None and len(trim) >= 6 else None)
-        point(row, "trim_end", trim[3:6] if trim is not None and len(trim) >= 6 else None)
-        for name, member in (("start", "GetStartVertex"), ("end", "GetEndVertex")):
-            vertex = read_field(
-                row, f"{name}_vertex", lambda m=member: invoke(edge, "IEdge", m), presence,
-            )
-            xyz = read_field(
-                row, f"{name}_vertex_m", lambda v=vertex: numbers(invoke(v, "IVertex", "GetPoint")),
-            )
-            point(row, f"{name}_vertex", xyz)
-        return row
-
-    def signature(row: dict[str, Any]) -> Any:
-        trim = row["trim_params"]["value"]
-        if trim is None or len(trim) < 6 or not all(isinstance(v, (int, float)) for v in trim[:6]):
-            return None
-        ends = tuple(sorted(tuple(round(v, 12) for v in trim[start:start + 3]) for start in (0, 3)))
-        params = row["circle_params"]["value"]
-        circular = row["is_circle"]["value"]
-        if circular is True:
-            if params is None or len(params) != 7 or not all(isinstance(v, (int, float)) for v in params):
-                return None
-            # Opposite normal signs describe the same supporting circle.
-            axis = params[3:6]
-            sense = next((1.0 if v > 0.0 else -1.0 for v in axis if abs(v) > 1e-12), 1.0)
-            geometry = tuple(round(v, 12) for v in (*params[:3], *(sense * v for v in axis), params[6]))
-        else:
-            geometry = None
-        return row["curve_class"]["value"], circular, geometry, ends
-
-    try:
-        state: dict[str, Any] = {}
-        report["front"] = state
-        for key, member in (
-            ("name", "GetName2"), ("orientation", "GetOrientationName"),
-            ("angle_rad", "Angle"), ("scale_ratio", "ScaleRatio"),
-            ("position_m", "Position"), ("display_state", "DisplayState"),
-            ("display_mode", "GetDisplayMode2"),
-            ("referenced_model_name", "GetReferencedModelName"),
-            ("referenced_configuration", "ReferencedConfiguration"),
-        ):
-            read_field(state, key, lambda m=member: invoke(view, "IView", m))
-        source: dict[str, Any] = {}
-        report["referenced_source"] = source
-        document = read_field(
-            source, "document", lambda: _early_bound(view, "IView").ReferencedDocument, presence,
-        )
-        read_field(source, "path", lambda: invoke(document, "IModelDoc2", "GetPathName"))
-        read_field(source, "title", lambda: invoke(document, "IModelDoc2", "GetTitle"))
-        read_field(source, "document_type", lambda: invoke(document, "IModelDoc2", "GetType"))
-        manager = read_field(
-            source, "configuration_manager",
-            lambda: invoke(document, "IModelDoc2", "ConfigurationManager"), presence,
-        )
-        configuration = read_field(
-            source, "active_configuration",
-            lambda: invoke(manager, "IConfigurationManager", "ActiveConfiguration"), presence,
-        )
-        read_field(source, "active_configuration_name", lambda: invoke(configuration, "IConfiguration", "Name"))
-        utility = read_field(
-            state, "math_utility",
-            lambda: invoke(adapter.swApp, "ISldWorks", "GetMathUtility"), presence,
-        )
-        transform = read_field(
-            state, "native_model_to_view_transform",
-            lambda: invoke(view, "IView", "ModelToViewTransform"), presence,
-        )
-        read_field(
-            state, "model_to_view_transform",
-            lambda: numbers(invoke(transform, "IMathTransform", "ArrayData")),
-        )
-        expected_points: dict[str, Any] = {}
-        report["expected_neck_boundary"] = expected_points
-        for station_name, station in (("collar_rear", COLLAR_REAR), ("journal_start", JOURNAL_START)):
-            for flank, z in (("axis", 0.0), ("lower", -SHAFT_DIA / 2000.0), ("upper", SHAFT_DIA / 2000.0)):
-                point(expected_points, f"{station_name}_{flank}", (0.0, station / 1000.0, z))
-        part = read_field(
-            source, "part_interface", lambda: _early_bound(document, "IPartDoc"), presence,
-        )
-        bodies = read_field(
-            source, "all_bodies",
-            lambda: invoke(part, "IPartDoc", "GetBodies2", -1, False), handles,
-        )
-        body_index: dict[Any, list[tuple[Any, dict[str, Any]]]] = {}
-        body_edges: list[dict[str, Any]] = []
-        for body_index_number, body in enumerate(bodies or ()):
-            body_row: dict[str, Any] = {"id": f"body/{body_index_number}", "edges": []}
-            report["bodies"].append(body_row)
-            read_field(body_row, "name", lambda b=body: invoke(b, "IBody2", "Name"))
-            read_field(body_row, "visible", lambda b=body: invoke(b, "IBody2", "Visible"))
-            read_field(body_row, "body_type", lambda b=body: invoke(b, "IBody2", "GetType"))
-            read_field(body_row, "box_m", lambda b=body: numbers(invoke(b, "IBody2", "GetBodyBox")))
-            edges = read_field(body_row, "native_edges", lambda b=body: invoke(b, "IBody2", "GetEdges"), handles)
-            for index, edge in enumerate(edges or ()):
-                row = edge_geometry(edge, f"{body_row['id']}/edge/{index}")
-                body_row["edges"].append(row)
-                body_edges.append(row)
-                adjacent_faces(row, edge)
-                key = signature(row)
-                if key is not None:
-                    body_index.setdefault(key, []).append((edge, row))
-        # This scan is deliberately direct: unlike the picker, an accessor
-        # exception must be distinguishable from a genuine null/empty result.
-        components = read_field(
-            state, "native_visible_components",
-            lambda: invoke(view, "IView", "GetVisibleComponents"), handles,
-        )
-        visible_edges: list[dict[str, Any]] = []
-        for component_index, component in enumerate(components or ()):
-            component_row: dict[str, Any] = {
-                "id": f"component/{component_index}", "edges": [], "silhouettes": [],
-            }
-            report["visible_components"].append(component_row)
-            for key, member in (
-                ("name", "Name2"), ("path", "GetPathName"),
-                ("referenced_configuration", "ReferencedConfiguration"),
-            ):
-                read_field(component_row, key, lambda m=member, c=component: invoke(c, "IComponent2", m))
-            for kind, field in ((1, "edges"), (4, "silhouettes")):
-                entities = read_field(
-                    component_row, f"native_kind_{kind}",
-                    lambda k=kind, c=component: invoke(view, "IView", "GetVisibleEntities2", c, k),
-                    handles,
-                )
-                for index, entity in enumerate(entities or ()):
-                    identity = f"{component_row['id']}/kind/{kind}/{index}"
-                    if kind == 1:
-                        row = edge_geometry(entity, identity)
-                        visible_edges.append(row)
-                        component_row[field].append(row)
-                        candidates = body_index.get(signature(row), ())
-                        row["body_identity_shortlist_count"] = len(candidates)
-                        row["body_identity_checks"] = []
-                        row["same_body_edge_ids"] = []
-                        for body_edge, body_row in candidates:
-                            comparison = {"body_edge_id": body_row["id"]}
-                            row["body_identity_checks"].append(comparison)
-                            same = read_field(
-                                comparison, "is_same_raw",
-                                lambda b=body_edge, e=entity: invoke(adapter.swApp, "ISldWorks", "IsSame", e, b),
-                            )
-                            if type(same) is int and same == 1:
-                                row["same_body_edge_ids"].append(body_row["id"])
-                        if row["same_body_edge_ids"]:
-                            row["adjacent_faces_from_body_edge_ids"] = list(row["same_body_edge_ids"])
-                        else:
-                            adjacent_faces(row, entity)
-                    else:
-                        row = {"id": identity, "silhouette_present": entity is not None}
-                        component_row[field].append(row)
-                        face = read_field(row, "owning_face", lambda e=entity: invoke(e, "ISilhouetteEdge", "GetFace"), presence)
-                        face_record(row, face)
-                        for name, member in (("start", "GetStartPoint"), ("end", "GetEndPoint")):
-                            native_point = read_field(
-                                row, f"{name}_point",
-                                lambda e=entity, m=member: invoke(e, "ISilhouetteEdge", m), presence,
-                            )
-                            xyz = read_field(
-                                row, f"{name}_model_m",
-                                lambda p=native_point: numbers(invoke(p, "IMathPoint", "ArrayData")),
-                            )
-                            point(row, name, xyz)
-        # One settled native projection frame for the complete batch, using
-        # the shared helper per point so one bad read cannot erase other points.
-        # Coordinate caching avoids reprojection of duplicate native geometry.
-        for index, projection in enumerate(report["projections"]):
-            read_field(
-                projection, "sheet_m",
-                lambda p=projection, i=index: _project_through(
-                    utility, transform, p["model_m"],
-                    label=f"collar-side neck census point {i}",
-                ) if utility is not None and transform is not None
-                else unavailable("native projection frame unavailable"),
-            )
-        for scope, rows in (("body", body_edges), ("visible", visible_edges)):
-            report[f"{scope}_circle_match_ids"] = [
-                row["id"] for row in rows
-                if row["circle_id"] is not None
-                and report["circles"][row["circle_id"]]["matches_resolver"]
-            ]
-            report[f"{scope}_circle_match_count"] = len(report[f"{scope}_circle_match_ids"])
-            report[f"{scope}_edge_occurrences"] = len(rows)
-    except Exception as exc:
-        report["census_error"] = {"type": type(exc).__name__, "message": str(exc)}
-    report["field_error_count"] = error_count
-    _telemetry.info(marker + json.dumps(report, separators=(",", ":"), allow_nan=False))
-
-
 def _outboard_neck_rim(adapter: Any, view: Any) -> Any:
     """Resolve the physical core rim where the collar-side neck meets the journal.
 
-    The same-sized right neck and dome-root circle are not this feature.
-    Select a true model circle visible edge-on in FRONT, never a projected
-    shoulder line or a coordinate hit-test.
+    Enumerate all solid/sheet bodies of FRONT's referenced part, not the
+    visible-edge list: the physical rim need not occur in that list. The
+    same-sized right neck and dome-root circle are not this feature.
+    The caller selects the exact model edge with IView.SelectEntity and
+    proves its source/view correspondence, never a silhouette or hit-test.
     """
+    try:
+        document = _early_bound(view, "IView").ReferencedDocument
+    except Exception as exc:
+        raise RuntimeError(
+            f"collar-side neck: failed to read FRONT referenced document: {exc}"
+        ) from exc
+    if document is None:
+        raise RuntimeError("collar-side neck: FRONT has no referenced document")
+    try:
+        document_type = _early_bound(document, "IModelDoc2").GetType()
+    except Exception as exc:
+        raise RuntimeError(
+            f"collar-side neck: failed to read referenced document type: {exc}"
+        ) from exc
+    if type(document_type) is not int or document_type != 1:  # swDocPART
+        raise RuntimeError(
+            f"collar-side neck: FRONT referenced document is not a part "
+            f"(type={document_type!r})"
+        )
+    try:
+        bodies = tuple(
+            _early_bound(document, "IPartDoc").GetBodies2(-1, False) or ()
+        )  # swAllBodies; include nonvisible solid/sheet bodies
+    except Exception as exc:
+        raise RuntimeError(
+            f"collar-side neck: failed to read referenced part bodies: {exc}"
+        ) from exc
+    if not bodies:
+        raise RuntimeError("collar-side neck: FRONT referenced part has no bodies")
     matches: list[Any] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = visible_component_entities(view, component, 1) or ()  # edges
+    for body_index, body in enumerate(bodies):
+        if body is None:
+            raise RuntimeError(f"collar-side neck: referenced body {body_index} is null")
+        try:
+            edges = tuple(_early_bound(body, "IBody2").GetEdges() or ())
+        except Exception as exc:
+            raise RuntimeError(
+                f"collar-side neck: failed to read referenced body {body_index} edges: {exc}"
+            ) from exc
+        if not edges:
+            raise RuntimeError(
+                f"collar-side neck: referenced body {body_index} has no edges"
+            )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -1326,22 +914,37 @@ def _outboard_neck_rim(adapter: Any, view: Any) -> Any:
             ):
                 matches.append(edge)
     if len(matches) != 1:
-        try:
-            _outboard_neck_failure_census(
-                adapter, view, strict_visible_matches=len(matches)
-            )
-        except Exception as exc:
-            # Even a diagnostic/telemetry failure must leave the original
-            # exact-one refusal authoritative.
-            _telemetry.event(
-                "drawing.neck_geometry_census_error",
-                error_type=type(exc).__name__, error=str(exc),
-            )
         raise RuntimeError(
-            f"collar-side neck: FRONT shows {len(matches)} physical core rims at "
-            f"journal start {JOURNAL_START}; expected exactly one"
+            f"collar-side neck: FRONT referenced part has {len(matches)} physical core "
+            f"rims at journal start {JOURNAL_START}; expected exactly one"
         )
     return matches[0]
+
+
+def _assert_outboard_neck_view_rim(
+    adapter: Any, side: Any, view_entity: Any, rim: Any, *, label: str
+) -> None:
+    """Prove the view edge's source identity and exact view-context roundtrip."""
+    view = _early_bound(side, "IView")
+    source = view.ReferencedDocument
+    if source is None or source == "":
+        raise RuntimeError(f"{label}: physical rim attachment has no referenced source")
+    model = _early_bound(source, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    # _native_axis_datum._validate_source_edge uses this documented mapping.
+    # IsSame is meaningful here only within one context: view/view or part/part.
+    canonical = extension.GetCorrespondingEntity2(view_entity)
+    if canonical is None:
+        raise RuntimeError(f"{label}: physical rim attachment has no source correspondence")
+    roundtrip = view.GetCorrespondingEntity(canonical)
+    if roundtrip is None or int(adapter.swApp.IsSame(roundtrip, view_entity)) != 1:
+        raise RuntimeError(
+            f"{label}: physical rim attachment source-to-view roundtrip is missing or different"
+        )
+    if int(adapter.swApp.IsSame(canonical, rim)) != 1:
+        raise RuntimeError(
+            f"{label}: physical rim attachment maps to a different source edge"
+        )
 
 
 def _native_neck_view_dimensions(side: Any, *, label: str) -> list[tuple[Any, Any, Any]]:
@@ -1476,17 +1079,17 @@ def _assert_outboard_neck_dimension(
     attached = tuple(annotation.GetAttachedEntities3() or ())
     count = int(annotation.GetAttachedEntityCount3())
     types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-    same = (
+    valid_attachment = (
         count == 1
         and len(attached) == 1
         and types == (1,)  # swSelEDGES
         and attached[0] is not None
-        and _is_same_attachment(adapter, attached[0], rim, "EDGE")
     )
-    if not same or annotation.IsDangling() is not False:
+    if not valid_attachment or annotation.IsDangling() is not False:
         raise RuntimeError(
             f"{label}: lost exact physical rim attachment: count={count}, types={types}"
         )
+    _assert_outboard_neck_view_rim(adapter, side, attached[0], rim, label=label)
     _assert_neck_arrow_landing(display, label=label)
     _telemetry.info(
         f"{label}: native diameter {full_name!r}, measured_mm={measured_mm}, "
@@ -1511,7 +1114,24 @@ def _add_outboard_neck_dimension(
     if type(right_driven_state) is not int or right_driven_state not in (1, 2):
         raise RuntimeError(f"{label}: unreadable original driven state {right_driven_state!r}")
     rim = _outboard_neck_rim(adapter, side)
-    _select_view_entity(adapter, side, "EDGE", None, label=label, entity=rim)
+    name = view_name(adapter, side)
+    if _early_bound(drawing_model, "IDrawingDoc").ActivateView(name) is not True:
+        raise RuntimeError(f"{label}: failed to activate drawing view {name!r}")
+    drawing_model.ClearSelection2(True)
+    # Official Dimension Edge in Drawing example and _supplier_pin_drawing
+    # use IView.SelectEntity for model-edge -> drawing-view selection.
+    if _early_bound(side, "IView").SelectEntity(rim, False) is not True:
+        raise RuntimeError(f"{label}: failed to select the physical rim in FRONT")
+    selection = _early_bound(drawing_model.SelectionManager, "ISelectionMgr")
+    count = selection.GetSelectedObjectCount2(-1)
+    if type(count) is not int or count != 1:
+        raise RuntimeError(f"{label}: selected {count!r} entities; expected exactly one")
+    selected = selection.GetSelectedObject6(1, -1)
+    if selected is None:
+        raise RuntimeError(f"{label}: selected physical rim has no view entity")
+    _assert_outboard_neck_view_rim(
+        adapter, side, selected, rim, label=f"{label} selection"
+    )
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
     display, status = extension.AddSpecificDimension(
         *OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0  # swDiameterDimension; out status

@@ -7,7 +7,7 @@ import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -891,6 +891,32 @@ def _neck_rim(**overrides) -> _CircleEdge:
     return _CircleEdge(centre, radius, **overrides)
 
 
+def _neck_front_fakes(
+    monkeypatch: pytest.MonkeyPatch,
+    body_edges: list[list[_CircleEdge]],
+    *,
+    visible_edges: list[_CircleEdge] | None = None,
+):
+    """Keep referenced-part topology independent of FRONT's visible kind-1 list."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing, "visible_component_entities", Mock(return_value=list(visible_edges or ()))
+    )
+    bodies = tuple(
+        SimpleNamespace(GetEdges=Mock(return_value=tuple(edges))) for edges in body_edges
+    )
+    document = SimpleNamespace(
+        GetType=Mock(return_value=1), GetBodies2=Mock(return_value=bodies)
+    )
+    view = SimpleNamespace(
+        ReferencedDocument=document, GetVisibleComponents=Mock(return_value=("dt-crankshaft",))
+    )
+    adapter = SimpleNamespace(
+        _attempt=Mock(side_effect=AssertionError("body access must not use _attempt"))
+    )
+    return adapter, view
+
+
 def test_collar_side_neck_resolves_the_physical_core_circle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -902,26 +928,141 @@ def test_collar_side_neck_resolves_the_physical_core_circle(
         _neck_rim(radius=spec.JOURNAL_DIA / 2.0),
         _neck_rim(circle=False),
     ]
-    adapter, side = _front_fakes(monkeypatch, [*distractors, rim])
+    adapter, side = _neck_front_fakes(
+        monkeypatch, [distractors[:2], [*distractors[2:], rim]], visible_edges=distractors
+    )
     assert drawing._outboard_neck_rim(adapter, side) is rim
+    side.ReferencedDocument.GetType.assert_called_once_with()
+    side.ReferencedDocument.GetBodies2.assert_called_once_with(-1, False)
+    for body in side.ReferencedDocument.GetBodies2.return_value:
+        body.GetEdges.assert_called_once_with()
+    side.GetVisibleComponents.assert_not_called()
+    drawing.visible_component_entities.assert_not_called()
+    adapter._attempt.assert_not_called()
 
 
 @pytest.mark.parametrize(
-    "edges",
+    "body_edges",
     [
-        [],
-        [_neck_rim(), _neck_rim()],
-        [_neck_rim(centre=(0.0, spec.JOURNAL_START + 0.01, 0.0))],
-        [_neck_rim(centre=(0.01, spec.JOURNAL_START, 0.0))],
-        [_neck_rim(radius=spec.JOURNAL_DIA / 2.0)],
+        [[_neck_rim(circle=False)]],
+        [[_neck_rim(), _neck_rim()]],
+        [[_neck_rim()], [_neck_rim()]],
+        [[_neck_rim(centre=(0.0, spec.JOURNAL_START + 0.01, 0.0))]],
+        [[_neck_rim(centre=(0.01, spec.JOURNAL_START, 0.0))]],
+        [[_neck_rim(radius=spec.JOURNAL_DIA / 2.0)]],
     ],
-    ids=["missing", "ambiguous", "wrong-station", "off-axis", "journal-rim"],
+    ids=["missing", "ambiguous-body", "ambiguous-bodies", "wrong-station", "off-axis", "journal-rim"],
 )
 def test_collar_side_neck_refuses_a_missing_or_ambiguous_physical_rim(
-    monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge],
+    monkeypatch: pytest.MonkeyPatch, body_edges: list[list[_CircleEdge]],
 ) -> None:
-    adapter, side = _front_fakes(monkeypatch, edges)
+    adapter, side = _neck_front_fakes(monkeypatch, body_edges)
     with pytest.raises(RuntimeError, match="expected exactly one"):
+        drawing._outboard_neck_rim(adapter, side)
+
+
+def test_collar_side_neck_does_not_substitute_a_visible_circle_for_body_topology(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, side = _neck_front_fakes(
+        monkeypatch, [[_neck_rim(centre=(0.0, spec.JOURNAL_END, 0.0))]],
+        visible_edges=[_neck_rim()],
+    )
+    with pytest.raises(RuntimeError, match="expected exactly one"):
+        drawing._outboard_neck_rim(adapter, side)
+    drawing.visible_component_entities.assert_not_called()
+
+
+def test_collar_side_neck_refuses_a_missing_referenced_document(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    side.ReferencedDocument = None
+    with pytest.raises(RuntimeError, match="FRONT has no referenced document"):
+        drawing._outboard_neck_rim(adapter, side)
+    adapter._attempt.assert_not_called()
+
+
+def test_collar_side_neck_preserves_a_referenced_document_access_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, _side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    failure = RuntimeError("native referenced-document access failed")
+
+    class UnreadableFront:
+        @property
+        def ReferencedDocument(self):
+            raise failure
+
+    with pytest.raises(RuntimeError, match="failed to read FRONT referenced document") as exc:
+        drawing._outboard_neck_rim(adapter, UnreadableFront())
+    assert exc.value.__cause__ is failure
+    adapter._attempt.assert_not_called()
+
+
+@pytest.mark.parametrize("document_type", [0, 2, 3, None, True, "1"])
+def test_collar_side_neck_requires_a_native_part_document(
+    monkeypatch: pytest.MonkeyPatch, document_type: object,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    side.ReferencedDocument.GetType.return_value = document_type
+    with pytest.raises(RuntimeError, match="referenced document is not a part"):
+        drawing._outboard_neck_rim(adapter, side)
+    side.ReferencedDocument.GetBodies2.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "stage, message",
+    [
+        ("type", "failed to read referenced document type"),
+        ("bodies", "failed to read referenced part bodies"),
+        ("edges", "failed to read referenced body 0 edges"),
+    ],
+)
+def test_collar_side_neck_preserves_native_topology_access_errors(
+    monkeypatch: pytest.MonkeyPatch, stage: str, message: str,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    document = side.ReferencedDocument
+    body = document.GetBodies2.return_value[0]
+    operation = {
+        "type": document.GetType, "bodies": document.GetBodies2, "edges": body.GetEdges
+    }[stage]
+    failure = RuntimeError(f"native {stage} access failed")
+    operation.side_effect = failure
+    with pytest.raises(RuntimeError, match=message) as exc:
+        drawing._outboard_neck_rim(adapter, side)
+    assert exc.value.__cause__ is failure
+    adapter._attempt.assert_not_called()
+
+
+@pytest.mark.parametrize("bodies", [None, ()])
+def test_collar_side_neck_refuses_a_referenced_part_without_bodies(
+    monkeypatch: pytest.MonkeyPatch, bodies: object,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    side.ReferencedDocument.GetBodies2.return_value = bodies
+    with pytest.raises(RuntimeError, match="FRONT referenced part has no bodies"):
+        drawing._outboard_neck_rim(adapter, side)
+
+
+def test_collar_side_neck_refuses_a_null_body_even_beside_a_matching_rim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()]])
+    document = side.ReferencedDocument
+    document.GetBodies2.return_value = (*document.GetBodies2.return_value, None)
+    with pytest.raises(RuntimeError, match="referenced body 1 is null"):
+        drawing._outboard_neck_rim(adapter, side)
+
+
+@pytest.mark.parametrize("edges", [None, ()])
+def test_collar_side_neck_refuses_a_body_without_readable_edges(
+    monkeypatch: pytest.MonkeyPatch, edges: object,
+) -> None:
+    adapter, side = _neck_front_fakes(monkeypatch, [[_neck_rim()], [_neck_rim(circle=False)]])
+    side.ReferencedDocument.GetBodies2.return_value[1].GetEdges.return_value = edges
+    with pytest.raises(RuntimeError, match="referenced body 1 has no edges"):
         drawing._outboard_neck_rim(adapter, side)
 
 
@@ -931,7 +1072,7 @@ def test_collar_side_neck_refuses_unreadable_circle_parameters(
 ) -> None:
     rim = _neck_rim()
     rim.curve.CircleParams = params
-    adapter, side = _front_fakes(monkeypatch, [rim])
+    adapter, side = _neck_front_fakes(monkeypatch, [[rim]])
     with pytest.raises(RuntimeError, match="unreadable circle"):
         drawing._outboard_neck_rim(adapter, side)
 
@@ -939,7 +1080,13 @@ def test_collar_side_neck_refuses_unreadable_circle_parameters(
 @pytest.fixture
 def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     rim = _neck_rim()
-    adapter, side = _front_fakes(monkeypatch, [rim])
+    adapter, side = _neck_front_fakes(monkeypatch, [[rim]])
+    view_rim = object()
+    canonical = Mock(side_effect=lambda entity: rim if entity is view_rim else None)
+    roundtrip = Mock(side_effect=lambda entity: view_rim if entity is rim else None)
+    side.ReferencedDocument.Extension = SimpleNamespace(GetCorrespondingEntity2=canonical)
+    side.GetCorrespondingEntity = roundtrip
+    side.SelectEntity = Mock(return_value=True)
     native = SimpleNamespace(
         SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=2,
         FullName="RD1@FRONT@Drawing1", Tolerance=SimpleNamespace(Type=0),
@@ -966,7 +1113,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     annotation = SimpleNamespace(
         name="RD1", GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=display),
-        GetAttachedEntities3=Mock(return_value=(rim,)),
+        GetAttachedEntities3=Mock(return_value=(view_rim,)),
         GetAttachedEntityCount3=Mock(return_value=1),
         GetAttachedEntityTypes=Mock(return_value=(1,)),
         IsDangling=Mock(return_value=False),
@@ -991,22 +1138,37 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     )
     unrelated_note = SimpleNamespace(GetType=Mock(return_value=6))
     side.GetAnnotations = Mock(return_value=(unrelated_note, right_annotation, annotation))
+    selection = SimpleNamespace(
+        GetSelectedObjectCount2=Mock(return_value=1),
+        GetSelectedObject6=Mock(return_value=view_rim),
+    )
     model = SimpleNamespace(
         Extension=SimpleNamespace(AddSpecificDimension=Mock(return_value=(display, 0))),
         ClearSelection2=Mock(),
+        ActivateView=Mock(return_value=True),
+        SelectionManager=selection,
         GraphicsRedraw2=Mock(),
     )
     adapter.currentModel = model
-    adapter.swApp = SimpleNamespace(IsSame=Mock(side_effect=lambda a, b: int(a is b)))
-    select, rebuild = Mock(), Mock()
+
+    def is_same(left, right):
+        if (left is rim and right is view_rim) or (left is view_rim and right is rim):
+            raise AssertionError("IsSame must not compare part and drawing-view contexts")
+        return int(left is right)
+
+    adapter.swApp = SimpleNamespace(IsSame=Mock(side_effect=is_same))
+    select = Mock(side_effect=AssertionError("body-rim selection must use IView.SelectEntity"))
+    rebuild = Mock()
     monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(drawing, "view_name", Mock(return_value="FRONT"))
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
     monkeypatch.setattr(drawing, "dimension_name", lambda adapter, item: item.name)
     return SimpleNamespace(
         adapter=adapter, side=side, rim=rim, native=native, display=display,
         annotation=annotation, right_native=right_native, right_display=right_display,
         right_texts=right_texts, right_annotation=right_annotation, texts=texts,
-        model=model, select=select, rebuild=rebuild,
+        model=model, select=select, rebuild=rebuild, selection=selection,
+        view_rim=view_rim, canonical=canonical, roundtrip=roundtrip,
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
         arrow_data=arrow_data, arrow_tip=arrow_tip,
     )
@@ -1017,11 +1179,25 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
 ) -> None:
     f = neck_dimension_fakes
     original_right = vars(f.right_native).copy()
+    trace = Mock()
+    for name, operation in (
+        ("activate", f.model.ActivateView), ("clear", f.model.ClearSelection2),
+        ("select", f.side.SelectEntity),
+        ("count", f.selection.GetSelectedObjectCount2),
+        ("read", f.selection.GetSelectedObject6),
+        ("canonical", f.canonical), ("roundtrip", f.roundtrip),
+        ("same", f.adapter.swApp.IsSame),
+    ):
+        trace.attach_mock(operation, name)
 
     def add(*args):
-        f.select.assert_called_once_with(
-            f.adapter, f.side, "EDGE", None, label="collar-side neck", entity=f.rim
-        )
+        assert trace.mock_calls == [
+            call.activate("FRONT"), call.clear(True), call.select(f.rim, False),
+            call.count(-1), call.read(1, -1), call.canonical(f.view_rim),
+            call.roundtrip(f.rim), call.same(f.view_rim, f.view_rim),
+            call.same(f.rim, f.rim),
+        ]
+        f.select.assert_not_called()
         return f.display, 0
 
     def rebuilt(*args, **kwargs):
@@ -1030,7 +1206,7 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
         f.display.SetPrecision3.assert_called_once_with(
             spec.DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
         )
-        f.model.ClearSelection2.assert_called_once_with(True)
+        assert f.model.ClearSelection2.call_args_list == [call(True), call(True)]
         f.annotation.GetAttachedEntities3.assert_not_called()
 
     f.model.Extension.AddSpecificDimension.side_effect = add
@@ -1040,6 +1216,9 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
         *drawing.OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0
     )
     f.rebuild.assert_called_once_with(f.adapter, label="collar-side neck")
+    drawing.view_name.assert_called_once_with(f.adapter, f.side)
+    f.canonical.assert_has_calls([call(f.view_rim), call(f.view_rim)])
+    f.roundtrip.assert_has_calls([call(f.rim), call(f.rim)])
     f.model.GraphicsRedraw2.assert_called_once_with()
     f.annotation.GetAttachedEntities3.assert_called_once_with()
     f.adapter.swApp.IsSame.assert_any_call(f.native, f.native)
@@ -1047,6 +1226,99 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
     assert f.native.SystemValue == spec.SHAFT_DIA / 1000.0
     assert vars(f.right_native) == original_right
     f.right_display.GetText.assert_any_call(3)  # old quantity explicitly re-read
+
+
+@pytest.mark.parametrize(
+    "target, member, result, message",
+    [
+        ("model", "ActivateView", False, "failed to activate drawing view"),
+        ("model", "ActivateView", None, "failed to activate drawing view"),
+        ("model", "ActivateView", 1, "failed to activate drawing view"),
+        ("side", "SelectEntity", False, "failed to select the physical rim"),
+        ("side", "SelectEntity", None, "failed to select the physical rim"),
+        ("side", "SelectEntity", 1, "failed to select the physical rim"),
+        ("selection", "GetSelectedObjectCount2", 0, "expected exactly one"),
+        ("selection", "GetSelectedObjectCount2", 2, "expected exactly one"),
+        ("selection", "GetSelectedObjectCount2", None, "expected exactly one"),
+        ("selection", "GetSelectedObjectCount2", True, "expected exactly one"),
+        ("selection", "GetSelectedObject6", None, "has no view entity"),
+    ],
+)
+def test_new_neck_refuses_unqualified_native_view_selection_before_api6(
+    neck_dimension_fakes: SimpleNamespace,
+    target: str, member: str, result: object, message: str,
+) -> None:
+    f = neck_dimension_fakes
+    getattr(getattr(f, target), member).return_value = result
+    with pytest.raises(RuntimeError, match=message):
+        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.canonical.assert_not_called()
+    f.display.SetPrecision3.assert_not_called()
+    f.rebuild.assert_not_called()
+    f.select.assert_not_called()
+    assert f.native.DrivenState == 2
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "before-api6", "after insertion rebuild", "final settling rebuild",
+        "after_drawing_save", "after_pdf_save",
+    ],
+)
+@pytest.mark.parametrize(
+    "failure, message",
+    [
+        ("canonical-missing", "no source correspondence"),
+        ("roundtrip-missing", "source-to-view roundtrip"),
+        ("roundtrip-wrong", "source-to-view roundtrip"),
+        ("canonical-wrong", "different source edge"),
+    ],
+)
+def test_neck_requires_exact_source_and_view_correspondence_at_every_phase(
+    neck_dimension_fakes: SimpleNamespace, phase: str, failure: str, message: str,
+) -> None:
+    f = neck_dimension_fakes
+    if failure == "canonical-missing":
+        f.canonical.side_effect = None
+        f.canonical.return_value = None
+    elif failure == "canonical-wrong":
+        # Identical circle parameters do not establish physical edge identity.
+        f.canonical.side_effect = None
+        f.canonical.return_value = _neck_rim()
+        f.roundtrip.side_effect = None
+        f.roundtrip.return_value = f.view_rim
+    else:
+        f.roundtrip.side_effect = None
+        f.roundtrip.return_value = None if failure == "roundtrip-missing" else object()
+    with pytest.raises(RuntimeError, match=message):
+        if phase == "before-api6":
+            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        else:
+            f.native.DrivenState = 1
+            f.display.ShowParenthesis = False
+            if phase in ("after_drawing_save", "after_pdf_save"):
+                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+            else:
+                drawing._assert_outboard_neck_dimension(
+                    f.adapter, f.side, f.native, 2, phase=phase
+                )
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.display.SetPrecision3.assert_not_called()
+    f.select.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["canonical", "roundtrip"])
+def test_neck_correspondence_access_errors_are_not_suppressed(
+    neck_dimension_fakes: SimpleNamespace, operation: str,
+) -> None:
+    f = neck_dimension_fakes
+    getattr(f, operation).side_effect = RuntimeError("native correspondence access failed")
+    with pytest.raises(RuntimeError, match="native correspondence access failed"):
+        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.select.assert_not_called()
 
 
 @pytest.mark.parametrize("status", [-1, 1, None, False])
@@ -1267,7 +1539,7 @@ def test_neck_rim_rejects_a_wrong_or_nonunit_axis(
     rim = _neck_rim()
     params = rim.curve.CircleParams
     rim.curve.CircleParams = (*params[:3], *axis, params[6])
-    adapter, side = _front_fakes(monkeypatch, [rim])
+    adapter, side = _neck_front_fakes(monkeypatch, [[rim]])
     with pytest.raises(RuntimeError, match="expected exactly one"):
         drawing._outboard_neck_rim(adapter, side)
 
@@ -1278,7 +1550,7 @@ def test_neck_rim_accepts_the_opposite_direction_of_the_same_axis(
     rim = _neck_rim()
     params = rim.curve.CircleParams
     rim.curve.CircleParams = (*params[:3], 0.0, -1.0, 0.0, params[6])
-    adapter, side = _front_fakes(monkeypatch, [rim])
+    adapter, side = _neck_front_fakes(monkeypatch, [[rim]])
     assert drawing._outboard_neck_rim(adapter, side) is rim
 
 

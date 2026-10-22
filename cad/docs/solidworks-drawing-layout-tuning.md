@@ -1675,10 +1675,22 @@ callout-above text is explicitly cleared and read back. Its value, precision,
 band and placement are not rewritten. The collar-side neck, between the
 collar's rear face and the left journal, gets a separate native drawing
 diameter measured from the actual core circle at `(0, JOURNAL_START, 0)`,
-radius `SHAFT_DIA / 2`. Resolve exactly one visible model `IEdge` by
-`ICurve.IsCircle` and `CircleParams`, then use the existing direct-entity
-selection pattern. A projected line or a same-sized circle on the right is
-not an equivalent attachment.
+radius `SHAFT_DIA / 2`. Resolve exactly one physical model `IEdge` from
+FRONT's referenced part's solid/sheet bodies, including hidden bodies, using
+the unchanged `ICurve.IsCircle` and `CircleParams` predicates. Membership in
+the visible kind-1 edge list is not a topology requirement. A projected line
+or a same-sized circle on the right is not an equivalent attachment.
+
+Select that referenced-part edge through the documented
+`IView.SelectEntity(rim, False)` drawing-view mapping, with view activation,
+selection count and non-null readback checks. Do not pass an underlying-part
+edge directly to `IEntity.Select4`: its active-document restriction is not
+overridden by assuming `ISelectData.View` maps across documents. Require the
+selected drawing entity to map through the verified source model's
+`IModelDocExtension.GetCorrespondingEntity2` to the exact resolved source
+edge, then round-trip through `IView.GetCorrespondingEntity` to the selected
+view entity. Compare native identity only within the same document context;
+same-radius geometry or a raw model-versus-view `IsSame` is not proof.
 
 `IModelDocExtension.AddSpecificDimension(..., 6, status)` requests
 `swDiameterDimension`; type 15 is a doubled linear distance, not a substitute.
@@ -1697,7 +1709,8 @@ FRONT. Match the captured native `IDimension` by its live `FullName` and
 `ISldWorks.IsSame`, not a pre-save selection-name string. Prove diameter
 type, actual unrounded size, driven state, places, read-only
 `IDimension.Tolerance.Type == swTolNONE` and the exact physical-edge
-attachment. Capture the original right-hand driven state and require it
+attachment through the same source/view correspondence proof. Capture the
+original right-hand driven state and require it
 unchanged (do not assume an imported reference sketch dimension is driving).
 Read back its value/places/band and empty quantity at the same boundaries.
 `GetLeaderCount` is diagnostic, not a note's one-leader contract. Callbacks
