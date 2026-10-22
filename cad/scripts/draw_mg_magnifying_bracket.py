@@ -298,7 +298,7 @@ def _layout_linear_annotations(
         ),
         "TapFromSide": (
             max(line.x0 for line in verticals("TapFromSide")) + 0.004,
-            before["TapFromSide"].text[1],
+            max(max(line.y0, line.y1) for line in before["TapFromSide"].leader) + 0.0022,
         ),
     }
     for name, target in targets.items():

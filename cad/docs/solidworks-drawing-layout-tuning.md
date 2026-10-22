@@ -1890,6 +1890,10 @@ For the unqualified12.50 thickness, jog its text beyond the outermost actual
 native vertical witness plus4mm and above the front outline. R33 reported an
 own-line crossing at the former qualified text's Xstation; the exact crossing
 segment was not captured. Keep the native line/arrow/neighbor checks strict.
+For `TapFromSide`, use the existing `MountingY0` two-axis jog pattern: text
+left4mm beyond the last vertical witness and bottom2.2mm above the measured
+pre-placement leader extent. R35 rejected an X-only jog. Requested positions
+do not prove the new native jog; retain the actual own-ink and neighbor guards.
 The earlier+10 option intersected the existing hex knife stub and was rejected.
 The knife mount's pre-existing0.6835 nominal axial air gap is not a2mm wall
 policy violation or permission to claim a full articulation clearance proof.
