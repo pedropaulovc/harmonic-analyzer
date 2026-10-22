@@ -206,10 +206,6 @@ pressing, joint acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) stay on 
 C2A and C4/C5 actual qualification; operation, pass changes, the complete
 installed stud contract (HD1–HD3), and machine acceptance remain on
 **CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
-The source-derived tooling-clearance table starts on sheet 11. Dedicated
-**TOOLING ACCEPTANCE n** sheets append as the complete instructions require,
-rather than occupying leftover reference-view paper. No original sheet is
-renumbered.
 
 C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
 With the actual pin/block/cap benched without bearings and the cap temporarily
@@ -268,12 +264,10 @@ motion bound; then safety-wire heads in pairs in the tightening direction.
 This is an engineering seating torque, not a minimum-preload or force
 certification, generic shop-qualified torque, or new approval claim.
 
-The source-derived intact-rigid bound includes both end uplift and tipping
-across the full carrier/handle width, not just small support-pin travel.
-The retained cap run/FIFO is immutable old-source API proof only, not
-current-geometry native validation. Captured geometry supplies no strength,
-bump-force or deflection certification. Installed toolholder/spindle clearance
-remains **UNVERIFIED** without actual measurement authority.
+The retainers address plate lift-off. They do not certify strength, bump force,
+deflection or installed toolholder/spindle clearance. Check the actual tool,
+workholding and intended travel before machining; capture is not permission
+to operate with an interference.
 
 The bearing purchase drawing MHA-CH-06-TL-VN-52 owns its receiving bands
 and intact full-circumference cylindrical OD-land inspection. Assembly C1
@@ -282,204 +276,22 @@ qualification with its support, and retains the ring-specific press
 sequence. A valid supplier dimensional authority tied to the actual
 identity can establish the catalogue bands; it does not replace the
 physical OD-land inspection. Both passes reuse the same physical support
-record. Generic width does not specify separate race widths, internal
-endplay, extracted-ring attitude or all-material captured containment.
-The former width/2 vertical midplane shield inference is removed.
-Primary plate capture remains independent of bearing friction and of
-that separate installed all-material certificate.
+record. Primary plate capture does not rely on bearing friction. The receiving
+checks do not certify every bearing component's motion during an upset.
 
-**Installed tooling acceptance is conditional on actual stopped travel.**
-Both guides need retained physical near/far limits and an inspected connected
-normal path; printed pass endpoints and screw commands are not those limits.
-The stopped-motion calculation covers both carriages, including free-guide
-motion and driven-guide backlash. It does not establish that stops have been
-made or installed. Actual installed travel/tooling evidence has not been
-supplied; the installation remains **UNVERIFIED**, not source-verified.
-
-The tooling table uses dedicated, numbered and linked acceptance sheets after
-the original ten. The source layout retains the instruction sheets' readable
-68-character columns and 4.525 mm line pitch. Whole paragraphs flow into
-additional pages rather than shrinking or truncating content. Each new sheet
-uses the real project template and reserves a lower-right, at least 60 mm-high
-model room plus its caption; the existing native 1:20/1:25/1:30 fitting path
-supplies a visible collapsed view for the live title-block property link.
-The BOM's unchanged 1:6 reference owns its whole right column. Existing
-instruction references, the finished 1:15 view and all native extent checks
-remain. Original sheets 1–10 and HD1–HD3 on sheet 10 left are unchanged.
-These are source layout provisions, not a claim that native rendering passed.
-
-For each physical support, `InstalledGuideTravelMeasurement` records actual
-3D reference-axis endpoints Q−/Q+, perpendicular datum-line error g, frame-angle
-excursion beta, and near/far TOTAL contact spreads tau. The virtual fixed-block
-datum is the bearing axis at the accepted carrier-seat height, transferred
-from existing machined end/side/top faces and actual bore/stack measurements;
-it is not the floating pin centre. Q bounds every reachable datum projection.
-With H=|Q+−Q−|, every station is in [0,H], every near contact in [0,tau_near]
-and every far contact in [H−tau_far,H]. beta is relative to one fixed block
-reference frame, not the nominal rail angle.
-g and beta bound continuous full travel, reversals and all rigid take-up,
-including transfer/inspection uncertainty, not merely endpoint samples.
-Two nonparallel face normals are needed to bound frame attitude, including yaw.
-`contact_span_basis` includes contact/reseat uncertainty and analytically
-bounded hidden retained-key float even when tightening hides it from gauging;
-`continuous_takeup_evidence` identifies the full-travel/take-up coverage.
-No nominal source angle, running clearance, stop window, g, beta or tau is a
-default or a new manufacturing cap.
-
-`InstalledStoppedTravelMeasurement.measurement_method` must name the actual
-reachable XYZ measurement and datum-transfer method. For example, overlapping
-indicator/height measurements on the existing faces can transfer local datum
-readings into a common table/spindle frame; include transfer uncertainty.
-DRO readings alone are not a prescribed method or proof that remote datums
-are reachable. Independently inspect each guide at both limits with the
-carrier removed. Then record one continuous seated, both-direction normal
-sweep for each inner/outer pass × used roughing/finishing mode, without branch
-reset or an earlier collision. NW first contact must be guide1-near or
-guide2-far; SE must be guide1-far or guide2-near. Other/secondary or uninspected
-contact cannot qualify. Endpoint intervals are actual **guide-1 stations**,
-not commands; they lie within its measured segment, NW upper < SE lower,
-and guide-1 contacts agree with the corresponding total tau. The identified
-setup/source and `normal_path_evidence` must cover these actual paths.
-
-The normal-gap matrix uses filled convex cartridge, head-pair or component
-envelopes and global extrema over their union (no bridge between distinct
-supports). The chosen axis separates the **whole group**, bridging holes and
-steps, not just a current radial/axial overlap. R is distance to the actual
-registered spindle axis and Z increases toward it:
-`gR=min(group R)-max(step R)`,
-`gZ=max(min(step Z)-max(group Z),min(group Z)-max(step Z))`.
-Each `NormalToolingGap` identifies its tool step and feed mode and covers BOTH
-complete physical normal paths in that mode, every tool revolution and the
-step's entire actual tip-Z range, from **deepest breakthrough through retract**.
-The complete noncutting-step census includes shank, holder and spindle
-features; intended flute contact waives none of them. One shared uncertainty
-bounds the MAX error/runout of all reported axes. These whole-set extrema are
-1-Lipschitz under the group displacement N; footprint-conditioned gaps are not
-interchangeable. Gauge with the spindle isolated and fixture normally seated.
-One strictly positive radial OR axial residual after uncertainty and N
-suffices; equality/shortfall cannot pass. Recheck after tool, depth or setup
-changes; preserve the actual step 6 cutting-axis register and reindicate if
-it changes.
-
-The local capture enclosure supplies S0, gamma0, bore bias alpha and Lmin.
-For measured guide axes e1/e2 and lengths H1/H2, put Ri=S0/2+gi and
-E=2(R1+R2). At all four independent endpoint differences V=Q2−Q1,
-and each axis r in {−e1,e2}, compute
-`theta=acos(clamp(r·V/|V|,-1,1))+asin((R1+R2)/|V|)`.
-Require R1+R2 < |V| and every theta < pi/2; then mu is the minimum cos(theta).
-These are rectangle corners, not four required assembled carrier poses.
-With sigma the maximum TOTAL tau, `D=(E+2*sigma)/mu` bounds the sum of both
-station changes to a point on the relevant measured normal path, including
-free-guide-limited endpoints. Set `M=(E+D)/2`, `a=min(2,(E+D)/Lmin)`,
-`gamma=min(pi,gamma0+2*max(beta1,beta2))`,
-`c=2*sin(gamma/2)/cos(alpha)+tan(alpha)*a`, and `F=min(2,hypot(a,c))`.
-Carrier-rigid points have `N=M+rho*F`; remote lever stock remains separate
-from near-cut carrier/riser and actual work/head moment arms remain required.
-The bound is intact rigid geometry, not strength, impact, deflection,
-clamp-slip or connection-failure certification, and never replaces C2A/C4/C5
-primary qualification.
-Printed bands enlarge the actual 3D moment arms. The support-line and actual
-**unit** bore vectors are body-fixed:
-their separation L and dot product k do not change. The relative-rotation
-bound includes bore-to-face bias conditioning; common installation pitch/roll
-and unequal support heights do not change Euclidean displacement. Carrier
-functional inspection uses a no-play expanding arbor and a two-axis
-**resultant** limit .05 over 10.50, including setup error, not .05 per axis.
-Top-view bore centres transfer to the actual underside plane by the printed
-`Tmax*tan(alpha)` bound; that pad enters support separation, made/head
-moment arms and the actual stock R.
-This inspection uses existing datums, not a new special metrology fixture.
-
-For guide-owned items define
-`base_i(H)=D+2*g_i+2*(guideR_i+H)*sin(min(beta_i,pi/2))`.
-Each actual `guide_envelope_radius_mm` and its basis enclose all normal filled
-guide-owned rigid/cartridge envelopes, fixed head pairs and the pin-seat
-point about the virtual block datum, for both passes/modes. Conforming made
-dimensions plus actual unknown purchased extents may supply that bound;
-there is no new size cap or requirement to remeasure every made part.
-The computation inflates rho by each item's entire local float H, including
-hidden fitted-retainer motion; a normal-only rho without this inflation is
-insufficient. The cartridge allowance is `max_i(base_i(Hmax)+Hmax)`, with Hmax
-the maximum pin/cap/fitted-retainer local motion. Secondary seat i uses
-`base_i(S0)+S0+actual_C5C_corner_sphere_i`. Wire head pairs use
-`max_i(base_i(0))+max(Lwire/2,Twire)+strand_diameter/2`.
-Guide-carried fixture items use `max_i(base_i(0))`; truly fixed fixture items
-alone have N=0.
-
-Ownership is mode-specific and exhaustive. In finishing the bracket, nut,
-nut screws and block fasteners travel with guide 1. In roughing the detached
-bracket/nut/nut screws belong to the fixed-axis drive; removed block screws
-and lock washers are off-fixture, not table-static material. Leadscrew and
-handwheel are fixed-axis drive items in both modes. Their allowance is the
-measured **total actual axial float**, including backlash and detached
-bracket/nut excursion, with `drive_float_evidence`; full normal rotations
-remain in their gap envelope. Unknown families cannot default to static.
-
-At step 12, caliper the actual head/washer cylinders about their carrier
-tap locations, in **carrier coordinates**: R is greatest in-plane reach
-about the normal through the tap at the carrier TOP, including washer float, eccentricity,
-tilt projection and allowed clocking. H is greatest normal distance
-above/below the carrier underside, bounded from stack lengths before
-fitting if hidden. The head moment arm is `sqrt((P+R)^2+H^2)`.
-The loaded **work/blank stack** has its own required R/H: R is greatest
-in-plane reach: take the MAX over BOTH active bore-pair TOP-face midpoints and both passes,
-located with a straightedge while the bores are accessible before step 9;
-H is greatest absolute normal distance from the carrier underside, every
-loaded layer included. Its moment arm is `sqrt((R+plane_pad)^2+H^2)`,
-without a HUB triangle overbound or stock-size cap. Keep the work rigidly
-clamped; stock slip is not certified. Flute contact does not waive any
-non-cutting tool-step check.
-
-The cartridge row uses the **filled convex outside envelope** of
-block/pin/cap/retainer. `ActualBearingEnclosureEvidence` must identify a
-real actual-profile analytical/physical containment proof for all material
-of both cartridges' bearings, full internal endplay **and** full captured
-outer-ring translation/tilt on both passes. Its exact envelope and matched
-support C2A/VN-52 references must agree with the primary records.
-There is no source-verified default, new manufacturing limit, or invented
-mandatory bench routine. A receiving caliper width/OD alone is not that
-proof. Missing/incomplete evidence leaves installed acceptance **UNVERIFIED**.
-The source census likewise leaves external bearing upset pairs unresolved;
-nominal vendor geometry is not actual all-material authority.
-
-Secondary gaps are from each normal **pin-seat point**. Before step 9,
-the whole filled exposed journal/seat envelope is an accessible conservative
-proxy if its centre is hidden. The complete C5C XYZ-box corner sphere
-encloses every coupled clock/endplay state, not one visible clocked cotter.
-
-Wire anchors are the **fixed screw heads**, not the floating cap; the heads
-travel with their guide. Gauge from each filled head-pair envelope and add
-the guide allowance above to `max(L/2,T)+D/2`: L bounds every free head-to-head
-**individual-strand centreline** arc, T every free-end centreline path from a secured head,
-and D the actual maximum single-wire diameter measured before forming.
-These contour bounds include all
-permitted feeding/sliding. Pre-twist branch lengths and final trimmed
-tails qualify only when they bound that feeding; original whole cut
-length is conservative for each uncertain L/T. Every loop and tail must
-be included, and unknown anchor/contour coverage cannot verify. This
-encloses bending of intact secured, unstretched wire, not connection
-failure. Normal C3C formed-route clearance remains a separate check.
-
-The source census no longer credits cap-carried wire or wire/channel
-contact as a cap stop. The cap-owned
+The safety wire is attached to the fixed screw heads, not carried by the
+floating cap, and wire contact is not a cap stop. The cap-owned
 `ch_rocker_arm_tl_oblique_cap_wire_clearance.require_wire_capture_geometry`
-encloses every cubic control hull and round section against the REAL open-mouth/
-groove/counterbore cut union throughout every captured cap pose. Its positive
-`surface_clearance` closes the corresponding source cap/wire separator and
-permits the fixed-wire/carrier plane separator; failure leaves external
-wire upset pairs unresolved. Authored placement guards prevent transferring
-that proof to displaced source wire/head/cap frames. This is the representative
-0/180 route, not a universal actual head-clock family. The wire/carrier
-plane separator likewise uses represented source geometry only. Actual
-C3C keeps the same authoritative .50 whole-route/tail normal recess below
-the actual cap top face, unforced; never loosen/over-torque heads to clock holes.
-Top-face recess or contour length alone cannot qualify the actual lateral
-formed route through full captured cap motion. No executable full-free-cap
-hand-sweep is claimed after the heads clamp the cap. Explicit
-`ActualWireCaptureEvidence` must identify the actual full-capture swept-void
-proof, its state/scope, real open-mouth/counterbore/groove envelope and every
-physical row's matched C2A support reference. Missing proof remains unverified;
-no invented bench routine or strength claim substitutes for it.
+checks the representative source route against the open-mouth, groove and
+counterbore cut union throughout captured cap motion. The assembly places
+that route at the fixed screw heads.
+
+The modeled 0/180-degree head route does not qualify every actual head clock.
+C3C requires the whole formed route and tails to remain at least .50 below
+the actual cap top face, unforced; never loosen or over-torque screws to clock
+their holes. That recess alone does not establish lateral clearance through
+captured cap motion. Qualify the actual route against the cap's cutouts without
+claiming that a clamped cap can be hand-swept through its full free motion.
 
 The representative VN-76 native sweep requires physical forward-tangent
 blends at every independently authored cubic-route join. In
@@ -497,44 +309,6 @@ export, not installed fit, locking strength or an independent body-validity
 inspection. The earlier `695c4b02eebe` run created the path but returned no
 sweep feature; correcting both its sharp joins and out-of-domain knots does
 not isolate which defect caused that failure.
-
-`source_tooling_clearance` retains the nominal-frame CAD prism diagnostic
-but cannot return an installed VERIFIED status. `installed_tooling_clearance`
-requires `InstalledNormalToolingMeasurement.travel`, exactly two actual guide
-records, exactly one sweep per pass × used mode, and a complete group ×
-(tool-step, mode) gap matrix. Its `tool_steps` are
-`InstalledToolStepMeasurement` records naming the step, mode, actual
-deepest-breakthrough-to-retract `tip_z_range_mm` and source, not a list of
-names. Actual guide-radius/basis and drive-float/evidence fields supplement
-the existing actual head/work/wire extents, four physical primary records,
-bearing all-material containment and actual wire swept-void proof.
-
-`_fitter_local_capture()` supplies `LocalCaptureMotion`;
-`_stopped_tooling_motion(travel, feed_modes)` computes `StoppedTravelMotion`
-(mu, E, sigma, D, M, F and local/guide bounds), with no nominal fallback.
-`fitter_tooling_motion_limits(motion)` supplies carrier/riser/locator and
-lever-stock bounds; `_normal_tooling_allowances(actual, primary, motion)`
-adds all remaining group allowances, outward-rounded to .001 mm.
-`_tooling_motion_groups(feed_mode)` owns the exhaustive per-mode BOM census.
-The drawing table gives source constants and actual-input formulas, not
-fabricated installed N values.
-
-Malformed numeric data raises `ValueError`. Missing evidence, incomplete
-coverage or unproved cones remain **UNVERIFIED**; known gap equality or
-shortfall is **POTENTIAL_CONFLICT**. With all independent prerequisites and
-a complete strictly positive matrix, the conditional result is
-**VERIFIED_GEOMETRY_ONLY**; there is no unconditional travel-design hold.
-Synthetic/CAD cases are never actual installed evidence, and no complete
-actual installation/tooling measurement has been supplied.
-
-A recognized normal-state witness whose best supplied radial/axial gap
-minus uncertainty is nonpositive remains **POTENTIAL_CONFLICT**, even if
-travel, guide-envelope basis, drive-float evidence or primary records are
-missing. In that case `min_clearance` is `None`: the full-upset allowance
-is unknown, not zero. `limiting_pair` and `authority` identify the measured
-normal witness. Unrecognized group, step or mode rows are not failure
-evidence, and a positive normal witness alone cannot verify the setup.
-
 
 ## Drawing package layout
 

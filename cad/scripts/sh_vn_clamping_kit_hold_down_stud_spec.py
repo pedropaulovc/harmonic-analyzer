@@ -107,7 +107,7 @@ DIMENSION_TOLERANCE_TYPES = {"FinishedLength": 0, "CutEndChamfer": 6}  # NONE / 
 # The drawing refreshes the angle text from the saved native chamfer definition;
 # these labels do not substitute typed values for the associated MAX driver.
 DIMENSION_CALLOUTS = {
-    "FinishedLength": "FINISHED CUT LENGTH;\nTITLE-BLOCK TOLERANCE;\nUPPER FREE END ONLY",
+    "FinishedLength": "FINISHED CUT LENGTH;\nUPPER FREE END ONLY",
     "CutEndChamfer": "CUT END",
 }
 STOCK_NOTE = f"{THREAD} X {STOCK_LENGTH} IN STUD STOCK; PM {SKU} KIT"
