@@ -41,11 +41,15 @@ import argparse
 import copy
 import functools
 import getopt
+import importlib.util
 import json
+import logging
 import os
 import subprocess
 import sys
+import tempfile
 import time
+import uuid
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
@@ -103,6 +107,12 @@ doit's own help follows. `build.py help run` shows the run options (-n, -a,
 
 class FarmPreflightError(Exception):
     """Why a farm run must stop before task actions; printed as ``farm: <reason>``."""
+
+
+class PoolProcessCleanupError(FarmPreflightError):
+    """The owned publisher tree may still write; keep its receipt nonterminal."""
+
+    cleanup_confirmed = False
 
 
 class CacheRefreshError(Exception):
@@ -452,7 +462,7 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
-                admitted, pool_identity = _require_leaf_admission(control)
+                admitted, pool_identity, preparation_readiness = _require_leaf_admission(control)
                 if pool_identity is None:
                     _farm_preflight()
                 else:
@@ -467,10 +477,13 @@ def _farm_command(command_class, display_name: str | None = None):
                 raise
             previous_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
             previous_agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY")
+            previous_readiness = os.environ.get("HARMONIC_FARM_PREPARATION_READINESS")
             if pool_identity is None:
                 os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
+                os.environ.pop("HARMONIC_FARM_PREPARATION_READINESS", None)
             else:
                 os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = pool_identity[0]
+                os.environ["HARMONIC_FARM_PREPARATION_READINESS"] = json.dumps(preparation_readiness)
             os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = json.dumps(admitted)
             try:
                 with _farm.producer_build(label) as producer:
@@ -495,6 +508,10 @@ def _farm_command(command_class, display_name: str | None = None):
                     os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
                 else:
                     os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = previous_agent_identity
+                if previous_readiness is None:
+                    os.environ.pop("HARMONIC_FARM_PREPARATION_READINESS", None)
+                else:
+                    os.environ["HARMONIC_FARM_PREPARATION_READINESS"] = previous_readiness
 
     return FarmCommand
 
@@ -634,8 +651,8 @@ def _pool_home() -> Path:
 
 def _require_leaf_admission(
     control: TaskControl,
-) -> tuple[list[str], tuple[str, str] | None]:
-    """Check would-be leaves, not local/aggregate tasks, against the selected pool."""
+) -> tuple[list[str], tuple[str, str] | None, object]:
+    """Check leaves and capture pure publisher readiness, without requiring it."""
     tasks = sorted(
         task.name
         for task in tasks_and_deps_iter(control.tasks, control.selected_tasks)
@@ -645,7 +662,7 @@ def _require_leaf_admission(
         )
     )
     if not tasks:
-        return [], None
+        return [], None, None
     pool = _pool_home().resolve()
     missing = [
         str(path.relative_to(pool))
@@ -660,23 +677,34 @@ def _require_leaf_admission(
     # Load the selected checkout's exact file in the pool's environment: its
     # namespace package must not lose to an unrelated installed ``agent`` package.
     program = (
-        "import importlib.util, json, sys\n"
+        "import importlib.util, json, sys, types\n"
         "from pathlib import Path\n"
         "pool = Path(sys.argv[1])\n"
+        "package = types.ModuleType('_harmonic_selected_pool')\n"
+        "package.__path__ = [str(pool / 'agent')]\n"
+        "sys.modules[package.__name__] = package\n"
         "def load(name, path):\n"
         "    spec = importlib.util.spec_from_file_location(name, path)\n"
         "    module = importlib.util.module_from_spec(spec)\n"
         "    sys.modules[spec.name] = module\n"
         "    spec.loader.exec_module(module)\n"
         "    return module\n"
-        "protocol = load('pool_protocol', pool / 'agent' / 'protocol.py')\n"
-        "contract = load('pool_contract', pool / 'agent' / 'contract.py')\n"
+        "protocol = load('_harmonic_selected_pool.protocol', pool / 'agent' / 'protocol.py')\n"
+        "contract = load('_harmonic_selected_pool.contract', pool / 'agent' / 'contract.py')\n"
+        "preparation_readiness = None\n"
+        "preparation_path = pool / 'agent' / 'preparation.py'\n"
+        "if preparation_path.is_file():\n"
+        "    preparation = load('_harmonic_selected_pool.preparation', preparation_path)\n"
+        "    probe = getattr(preparation, 'publisher_readiness', None)\n"
+        "    if probe is not None:\n"
+        "        preparation_readiness = probe()\n"
         "identity = protocol.agent_identity(pool / 'agent')\n"
         "tasks = json.load(sys.stdin)\n"
         "print(json.dumps({\n"
         "    'refused': [task for task in tasks if not protocol.leaf_admitted(task)],\n"
         "    'agent_identity': identity,\n"
         "    'agent_version': contract.agent_identity_tag(identity),\n"
+        "    'preparation_readiness': preparation_readiness,\n"
         "}))\n"
     )
     argv = [
@@ -738,10 +766,12 @@ def _require_leaf_admission(
                 for task in sorted(set(refused))
             )
         )
-    return tasks, (identity, version)
+    return tasks, (identity, version), response.get("preparation_readiness")
 
 
-def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def _pool_farm(
+    pool: Path, *args: str, timeout_s: float | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run one ``farm.py`` subcommand from the pool checkout, capturing stdout.
 
     stderr is inherited so the pool's own progress and diagnostics reach the
@@ -762,6 +792,8 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
     ]
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     try:
+        if timeout_s is not None:
+            return _bounded_pool_farm(pool, argv, env, timeout_s)
         return subprocess.run(
             argv, cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, text=True
         )
@@ -769,6 +801,104 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         raise FarmPreflightError(
             f"{args[0]} could not start ({argv[0]}): {exc}"
         ) from None
+
+
+def _pool_process_log(event: str, level: int = logging.INFO, **fields) -> None:
+    logging.getLogger(__name__).log(level, "pool publisher %s %s", event, fields)
+
+
+def _pool_process_tree(pool: Path):
+    """Load only this selected pool's stdlib ownership helper, never ``agent``."""
+    source = pool / "agent" / "process_tree.py"
+    name = f"_harmonic_selected_process_tree_{uuid.uuid4().hex}"
+    try:
+        spec = importlib.util.spec_from_file_location(name, source)
+        if spec is None or spec.loader is None:
+            raise FarmPreflightError(f"PoolHome {pool} cannot load its process ownership helper")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        tree_class = getattr(module, "ProcessTree", None)
+        if not isinstance(tree_class, type):
+            raise FarmPreflightError(f"PoolHome {pool} lacks required ProcessTree ownership API")
+        return tree_class(log=_pool_process_log)
+    except (ImportError, OSError) as error:
+        raise FarmPreflightError(
+            f"PoolHome {pool} cannot load its process ownership helper: {error}"
+        ) from error
+    finally:
+        sys.modules.pop(name, None)
+
+
+def _close_owned_pool_process(tree, process, *, adopted: bool) -> bool:
+    """Share one five-second cleanup budget, including a failed adoption."""
+    deadline = time.monotonic() + 5.0
+    if not adopted:
+        # Assignment can fail while the Windows child is still suspended and
+        # outside the Job Object. This handle is ours; never kill by name.
+        try:
+            process.kill()
+        except BaseException:
+            pass
+        try:
+            process.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except BaseException:
+            # Still ask the ownership helper: assignment may have succeeded
+            # before resume failed, so the Job Object can contain descendants.
+            pass
+    try:
+        return tree.terminate(
+            process, timeout_s=max(0.0, deadline - time.monotonic()),
+        )
+    except BaseException:
+        return False
+
+
+def _bounded_pool_farm(
+    pool: Path, argv: list[str], env: dict[str, str], timeout_s: float,
+) -> subprocess.CompletedProcess[str]:
+    # A pipe would make Windows post-kill communicate wait on inherited stdout
+    # in a descendant. The parent owns this seekable file and never drains pipes.
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+        tree = _pool_process_tree(pool)
+        process = None
+        adopted = False
+        try:
+            try:
+                process = subprocess.Popen(
+                    argv, cwd=REPO_ROOT, env=env, stdout=output, text=True,
+                    **tree.popen_options,
+                )
+                tree.adopt(process)
+                adopted = True
+                returncode = process.wait(timeout=timeout_s)
+            except BaseException as error:
+                if process is not None and not _close_owned_pool_process(
+                    tree, process, adopted=adopted,
+                ):
+                    raise PoolProcessCleanupError(
+                        "pool publisher cleanup could not confirm the owned process tree stopped"
+                    ) from error
+                if isinstance(error, subprocess.TimeoutExpired):
+                    raise FarmPreflightError(
+                        f"pool publisher exceeded its {timeout_s:g}s deadline; owned process tree stopped"
+                    ) from error
+                raise
+            else:
+                if not _close_owned_pool_process(tree, process, adopted=adopted):
+                    raise PoolProcessCleanupError(
+                        "pool publisher exited but its owned process tree did not stop"
+                    )
+                output.seek(0)
+                stdout = output.read()
+                return subprocess.CompletedProcess(argv, returncode, stdout)
+        finally:
+            try:
+                tree.close()
+            except BaseException as error:
+                raise PoolProcessCleanupError(
+                    "pool publisher ownership handle could not be closed safely"
+                ) from error
 
 
 def _dissenting_workers(reports: object, protocol: int) -> list[str]:

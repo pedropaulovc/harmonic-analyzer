@@ -1,4 +1,4 @@
-"""Offline CAD tests and selected execution regressions have real check:* coverage.
+"""Offline CAD tests and the farm execution regressions have real check:* coverage.
 
 ``dodo`` enrolls tests explicitly (plus the ``test_*_drawing.py`` glob), so a new
 test file that nobody enrolls passes in the local suite and never runs in a
@@ -11,6 +11,7 @@ that none of them collects, unless it is exempted below with a reason.
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 
 import pytest
@@ -18,12 +19,14 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS.parents[1]
 _SCAN_ANCHORS = frozenset({"test_check_gate_enrollment.py", "test_dodo_recipe.py"})
-# Retain the existing root regressions and add only selected execution.
 _ROOT_REGRESSIONS = frozenset(
     {
         "tests/test_saved_display_data.py",
         "tests/test_solidworks_launch_guard.py",
         "tests/test_selected_execution.py",
+        "tests/test_preparation_publication.py",
+        "tests/test_farm_mode.py",
+        "tests/test_farm_fifo_lifecycle.py",
     }
 )
 _REQUIRED_RECIPE_INPUTS = _ROOT_REGRESSIONS | {
@@ -36,6 +39,7 @@ _REQUIRED_RECIPE_INPUTS = _ROOT_REGRESSIONS | {
     "cad/scripts/_selected_execution.py",
     "cad/scripts/_buildgraph.py",
     "cad/scripts/_local_check.py",
+    "cad/scripts/test_artifact_cache.py",
 }
 
 # Test files that deliberately run in no check:* gate, each with its reason.
@@ -88,7 +92,7 @@ def _offline_test_names(pattern: str = "test_*.py") -> set[str]:
 
 
 def _collected_by_check_gates() -> dict[str, list[str]]:
-    """Test file -> gates that collect it, auditing selected recipe inputs too."""
+    """Test file -> gates that collect it, auditing indirect recipe inputs too."""
     collected: dict[str, list[str]] = {}
     dodo = _load_dodo()
     for task in dodo.task_check():
@@ -110,8 +114,8 @@ def _collected_by_check_gates() -> dict[str, list[str]]:
                 and path.suffix == ".py" and path.name.startswith("test_")
             ]
             assert set(root_tests) == _ROOT_REGRESSIONS, (
-                "check:recipe must retain baseline root tests and add only selected "
-                f"execution: {sorted(set(root_tests) ^ _ROOT_REGRESSIONS)}"
+                "check:recipe must retain baseline root tests and enroll farm "
+                f"execution/publication coverage: {sorted(set(root_tests) ^ _ROOT_REGRESSIONS)}"
             )
             assert len(root_tests) == len(_ROOT_REGRESSIONS), (
                 "check:recipe must collect each root regression exactly once"
@@ -119,9 +123,6 @@ def _collected_by_check_gates() -> dict[str, list[str]]:
             factory = SCRIPTS / "test_selected_factories.py"
             assert sum(Path(str(arg)).resolve() == factory for arg in cmd) == 1, (
                 "check:recipe must collect selected factory coverage exactly once"
-            )
-            assert str((REPO_ROOT / "tests" / "test_preparation_publication.py").resolve()) not in inputs, (
-                "selected execution must not depend on preparation/publication coverage"
             )
         for arg in cmd:
             path = Path(str(arg)).resolve()
@@ -175,3 +176,47 @@ def test_exemptions_name_real_uncollected_files() -> None:
 def test_enrollment_scan_rejects_empty_or_deeper_patterns(pattern) -> None:
     with pytest.raises(AssertionError, match="enrollment scan"):
         _offline_test_names(pattern)
+
+
+@pytest.mark.parametrize(
+    ("resource", "retained"),
+    [
+        (None, None),
+        (
+            "service.name=recipe,farm.execution=outer,vendor.raw=one%2Ctwo,"
+            " farm.execution =duplicate,malformed",
+            "service.name=recipe,vendor.raw=one%2Ctwo,malformed",
+        ),
+    ],
+)
+def test_collection_isolates_only_inherited_leaf_environment(
+    request, monkeypatch, resource, retained
+) -> None:
+    root_plugin = next(
+        plugin for plugin in request.config.pluginmanager.get_plugins()
+        if Path(getattr(plugin, "__file__", "") or "").resolve()
+        == REPO_ROOT / "conftest.py"
+    )
+    endpoints = (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    )
+    for endpoint in endpoints:
+        monkeypatch.setenv(endpoint, "https://production.invalid")
+    if resource is None:
+        monkeypatch.delenv("OTEL_RESOURCE_ATTRIBUTES", raising=False)
+    else:
+        monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", resource)
+
+    root_plugin._isolate_inherited_leaf_environment(monkeypatch)
+
+    assert all(os.environ[endpoint] == "" for endpoint in endpoints)
+    assert os.environ.get("OTEL_RESOURCE_ATTRIBUTES") == retained
+    import _artifact_cache
+
+    assert not _artifact_cache._farm_leaf_execution()
+    # Deliberately faked leaf-context tests may still opt in. This is a pure
+    # predicate check: no cache prewarm or backend/client is constructed here.
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=fake-test-leaf")
+    assert _artifact_cache._farm_leaf_execution()

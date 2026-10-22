@@ -670,9 +670,51 @@ their ordinary full-loader invocation; the new worker release and the explicitly
 selected `PoolHome` must match under existing fleet-identity admission before
 selective farm execution is available. No controller wire change is required.
 
-This staged feature leaves ordinary farm submission and lifecycle handling
-unchanged. It adds no preparation-publication API or publisher-configuration
-requirement; preparation transport is a separate change.
+### First-miss preparation and publisher ownership
+
+Use an updated, committed pool checkout at the existing `-PoolHome`, with the
+matching full agent identity deployed to the fleet. Remote misses require its
+preparation publisher/readiness API and `agent/process_tree.py`; there is no new
+producer package pin, adjacent-checkout fallback or automatic deployment. The
+existing admission subprocess reads readiness from that exact PoolHome. Missing
+preparation capability or configuration does not itself reject cache-hit-only
+work, but the first real remote miss refuses it clearly before that leaf connects
+or reserves capacity. Existing fleet admission and producer registration still
+apply to cache-hit-only builds.
+
+The first actual remote miss publishes the source/graph preparation once for the
+build, before leaf dispatch. A cache-hit-only build does not publish or eagerly
+export the graph. Producer registration and acknowledged lease still precede the
+doit scheduler; publication is lazy within that scheduler, not a new registration
+gate. Authentication, corrupt-artifact and publication errors surface rather than
+silently reverting to another preparation path.
+
+Spawned action processes coordinate through a `FileLock` and atomic receipts in
+`HARMONIC_FARM_REQUESTS/preparation/`. The key includes the full build, source and
+agent identities plus canonical repository and PoolHome roots. A successful
+receipt is reused across processes; a failed publication is shared without a
+fresh publisher retry in the same build. The receipt enters `publishing` before
+the CLI starts, so a crashed owner cannot be mistaken for a safe retry. The nested
+directory does not add preparation records to the launcher's root-level workflow
+request inventory.
+
+The publisher has a **900-second** deadline, one **five-second** owned-tree cleanup
+budget, and a **910-second** lock-wait bound. These are publisher bounds, not a
+deadline on the supervised build, a leaf-budget change or a change to FIFO grace.
+Every bridge return requires confirmation that its created process tree stopped,
+including normal zero/nonzero exits whose descendants may still hold stdout.
+Windows creates the helper suspended, assigns its Job Object before resuming it,
+and confirms the job is empty; POSIX confirms the owned root and process group.
+No process-name kill or pre-existing SOLIDWORKS seat is involved. Unconfirmed
+cleanup raises `PoolProcessCleanupError` and leaves the receipt nonterminal rather
+than publishing a shared failure while a possible writer remains.
+
+The launcher's requests root remains launcher-owned. An attended direct build
+without an inherited requests root owns a temporary root for its producer/action
+worker lifetime and removes only that root afterward. Preserve diagnostics for a
+failed or interrupted publication; do not edit/delete its receipt or lock to retry
+inside the same build. Establish that its owned publisher stopped before recovery
+through a fresh build identity.
 
 ### Interpreting selective execution measurements
 
@@ -692,6 +734,10 @@ For file-only comparison runs, pass explicit empty strings for
 re-enable default discovery; use a launcher that preserves empty child values.
 Existing COM-free `check:math` component measurements do not establish native
 output equivalence or the whole-farm **25% overhead-reduction target**.
+
+This retains JSON telemetry capture while preventing the default local OTLP
+endpoint from adding exporter timeout delays. An **11-second head** is also a
+target, not an established portfolio result.
 
 ### Parameters
 

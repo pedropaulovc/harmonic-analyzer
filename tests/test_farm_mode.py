@@ -114,6 +114,7 @@ def _undrifted_checkout(monkeypatch):
     # This suite owns Temporal behavior; preparation publication has its own
     # guarded boundary and singleflight regressions in test_preparation_publication.
     monkeypatch.setattr(_farm, "_ensure_preparation_published", lambda _request: None)
+    monkeypatch.setattr(_farm, "_require_preparation_readiness", lambda: None)
 
     class Producer:
         def __enter__(self):
@@ -814,7 +815,9 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
     monkeypatch.setattr(build, "_visibility_debt", lambda: None)
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
     monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    for key in FARM_ENV:
+    for key in (
+        *FARM_ENV, "HARMONIC_FARM_AGENT_IDENTITY", "HARMONIC_FARM_PREPARATION_READINESS",
+    ):
         monkeypatch.delenv(key, raising=False)
     return launched
 

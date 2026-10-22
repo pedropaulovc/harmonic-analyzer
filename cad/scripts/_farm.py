@@ -25,6 +25,7 @@ import json
 import os
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import unicodedata
@@ -545,6 +546,8 @@ class _ProducerBuild:
         self._executing = False
         self._reason = "finished"
         self._previous_id: str | None = None
+        self._previous_requests: str | None = None
+        self._owned_requests: tempfile.TemporaryDirectory[str] | None = None
         self._lease_deadline: float | None = None
         self._lease_wall: datetime | None = None
         self._thread = threading.Thread(
@@ -555,6 +558,12 @@ class _ProducerBuild:
         self._previous_id = os.environ.get("HARMONIC_FARM_BUILD_ID")
         os.environ["HARMONIC_FARM_BUILD_ID"] = self.build_id
         try:
+            self._previous_requests = os.environ.get("HARMONIC_FARM_REQUESTS")
+            if not self._previous_requests:
+                self._owned_requests = tempfile.TemporaryDirectory(
+                    prefix="harmonic-farm-requests-"
+                )
+                os.environ["HARMONIC_FARM_REQUESTS"] = self._owned_requests.name
             _record_build(self.build_id)
             self._thread.start()
             # Windows CPython 3.12/3.13 needs finite waits to deliver Ctrl-C.
@@ -606,6 +615,13 @@ class _ProducerBuild:
             os.environ.pop("HARMONIC_FARM_BUILD_ID", None)
         else:
             os.environ["HARMONIC_FARM_BUILD_ID"] = self._previous_id
+        if self._owned_requests is not None:
+            if self._previous_requests is None:
+                os.environ.pop("HARMONIC_FARM_REQUESTS", None)
+            else:
+                os.environ["HARMONIC_FARM_REQUESTS"] = self._previous_requests
+            self._owned_requests.cleanup()
+            self._owned_requests = None
 
     def _fail(self, exc: BaseException) -> None:
         if self._failure is None:
@@ -827,14 +843,20 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         return result
 
 
+def _atomic_json(path: Path, value: dict) -> None:
+    staging = path.with_name(f"{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
+    try:
+        staging.write_text(json.dumps(value), encoding="utf-8")
+        os.replace(staging, path)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
 def _record_json(name: str, value: dict) -> None:
     directory = os.environ.get("HARMONIC_FARM_REQUESTS")
     if not directory:
         return
-    path = Path(directory) / f"{name}.json"
-    staging = path.with_name(f"{name}.{os.getpid()}.tmp")
-    staging.write_text(json.dumps(value), encoding="utf-8")
-    os.replace(staging, path)
+    _atomic_json(Path(directory) / f"{name}.json", value)
 
 
 def _record_build(build_id: str) -> None:
@@ -898,10 +920,48 @@ def _display_name(label: str | None = None) -> str:
     return label
 
 
-_PREPARATION_LOCK = threading.Lock()
-_PREPARATION_PUBLICATIONS: dict[
-    tuple[str, Path, Path, str, str], Exception | None
-] = {}
+_PREPARATION_CAPABILITY = "preparation-publish-v1"
+_PREPARATION_PUBLISH_TIMEOUT_S = 15 * 60
+_PREPARATION_LOCK_TIMEOUT_S = _PREPARATION_PUBLISH_TIMEOUT_S + 10
+
+
+def _require_preparation_readiness() -> None:
+    """Refuse an unavailable publisher only when a real remote leaf is needed."""
+    from build import _pool_home
+
+    pool = _pool_home().resolve()
+    try:
+        readiness = json.loads(
+            os.environ.get("HARMONIC_FARM_PREPARATION_READINESS", "null")
+        )
+    except (ValueError, RecursionError):
+        readiness = None
+    if (
+        not isinstance(readiness, dict)
+        or readiness.get("capability") != _PREPARATION_CAPABILITY
+    ):
+        raise RuntimeError(
+            f"PoolHome {pool} requires an updated pool revision supporting "
+            "`preparation publish` and publisher readiness before remote dispatch"
+        )
+    if (
+        not isinstance(readiness.get("configured"), bool)
+        or not isinstance(readiness.get("configuration_error"), bool)
+    ):
+        raise RuntimeError(f"PoolHome {pool} returned invalid publisher readiness")
+    if readiness["configuration_error"]:
+        raise RuntimeError(
+            f"PoolHome {pool} has invalid preparation publisher configuration; "
+            "fix FARM_BOOTSTRAP_ACCOUNT or the pool configuration before remote dispatch"
+        )
+    if not readiness["configured"]:
+        raise RuntimeError(
+            f"PoolHome {pool} preparation publisher is not configured; set "
+            "FARM_BOOTSTRAP_ACCOUNT or bootstrap_account in the pool configuration "
+            "before remote dispatch"
+        )
+    if not isinstance(readiness.get("account"), str) or not readiness["account"].strip():
+        raise RuntimeError(f"PoolHome {pool} returned invalid publisher account readiness")
 
 
 def _publish_preparation(
@@ -921,6 +981,7 @@ def _publish_preparation(
         "--commit",
         commit,
         "--json",
+        timeout_s=_PREPARATION_PUBLISH_TIMEOUT_S,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -948,13 +1009,13 @@ def _publish_preparation(
 
 
 def _ensure_preparation_published(request: LeafRequest) -> None:
-    """Singleflight the first real remote leaf, including publication failures.
+    """Publish once across this build's action processes, or share its failure.
 
-    A spawned action process owns its own memo. Existing exact descriptors are
-    cheap hits in the pool publisher, not new graph exports. A failed publication
-    never becomes a cache miss or allows a later leaf in this build to dispatch.
+    The parent's existing requests directory owns these receipts and their OS
+    locks. A holder interrupted after starting publication leaves a marker that
+    fails closed; a later process must not launch a second publisher.
     """
-    from build import _pool_home
+    from build import PoolProcessCleanupError, _pool_home
 
     commit = request.commit
     agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY", "")
@@ -973,25 +1034,116 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
         )
     workspace = REPO_ROOT.resolve()
     pool = _pool_home().resolve()
-    key = (request.build_id, workspace, pool, commit, agent_identity)
-    with _PREPARATION_LOCK:
-        if key in _PREPARATION_PUBLICATIONS:
-            failure = _PREPARATION_PUBLICATIONS[key]
-            if failure is not None:
-                raise failure
-            return
+    directory = os.environ.get("HARMONIC_FARM_REQUESTS")
+    if not directory or not Path(directory).is_dir():
+        raise BuildOwnershipError(
+            "farm preparation publication has no parent-owned requests directory"
+        )
+    identity = {
+        "build_id": request.build_id,
+        "workspace": str(workspace),
+        "pool_home": str(pool),
+        "commit": commit,
+        "agent_identity_sha256": agent_identity,
+    }
+    digest = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    receipts = Path(directory) / "preparation"
+    receipts.mkdir(exist_ok=True)
+    path = receipts / f"{digest}.json"
+    from filelock import FileLock, Timeout
+
+    started = time.monotonic()
+    with _telemetry.span(
+        "farm.preparation", service=_telemetry.BUILD_INFRA_SERVICE,
+        build_id=request.build_id, commit=commit,
+    ) as sp:
         try:
-            _publish_preparation(pool, workspace, commit, agent_identity)
-        except Exception as exc:
-            _PREPARATION_PUBLICATIONS[key] = exc
-            raise
-        _PREPARATION_PUBLICATIONS[key] = None
+            with FileLock(str(path.with_suffix(".lock")), timeout=_PREPARATION_LOCK_TIMEOUT_S):
+                sp.set_attribute("lock_wait_ms", int((time.monotonic() - started) * 1000))
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except FileNotFoundError:
+                    receipt = None
+                else:
+                    try:
+                        receipt = json.loads(text)
+                    except (ValueError, RecursionError) as exc:
+                        raise RuntimeError(
+                            f"farm preparation publication receipt is corrupt: {path}"
+                        ) from exc
+                    if (
+                        not isinstance(receipt, dict)
+                        or receipt.get("identity") != identity
+                        or receipt.get("state") not in {"publishing", "succeeded", "failed"}
+                        or (
+                            receipt["state"] == "failed"
+                            and (
+                                not isinstance(receipt.get("error"), str)
+                                or not receipt["error"]
+                            )
+                        )
+                    ):
+                        raise RuntimeError(
+                            f"farm preparation publication receipt is invalid: {path}"
+                        )
+                if receipt is not None:
+                    sp.set_attribute("publication_state", receipt["state"])
+                    if receipt["state"] == "succeeded":
+                        return
+                    if receipt["state"] == "publishing":
+                        error = (
+                            "farm preparation publication was interrupted or owned "
+                            f"process cleanup is unconfirmed for build {request.build_id}; "
+                            "verify publisher cleanup before restarting the build"
+                        )
+                    else:
+                        error = receipt["error"]
+                    raise RuntimeError(error)
+                _atomic_json(path, {
+                    "identity": identity, "state": "publishing", "error": None,
+                })
+                publication_started = time.monotonic()
+                try:
+                    _publish_preparation(pool, workspace, commit, agent_identity)
+                except PoolProcessCleanupError:
+                    # The owned publisher may still be writing. Keep the
+                    # nonterminal marker; every observer must fail closed.
+                    sp.set_attribute("publication_state", "cleanup_unconfirmed")
+                    raise
+                except Exception as exc:
+                    error = (
+                        f"farm preparation publication failed for build "
+                        f"{request.build_id}: {exc}"
+                    )
+                    _atomic_json(path, {
+                        "identity": identity, "state": "failed", "error": error,
+                    })
+                    sp.set_attribute("publication_state", "failed")
+                    raise RuntimeError(error) from exc
+                finally:
+                    sp.set_attribute(
+                        "publication_ms",
+                        int((time.monotonic() - publication_started) * 1000),
+                    )
+                _atomic_json(path, {
+                    "identity": identity, "state": "succeeded", "error": None,
+                })
+                sp.set_attribute("publication_state", "succeeded")
+        except Timeout as exc:
+            raise RuntimeError(
+                f"farm preparation publication lock timed out after "
+                f"{_PREPARATION_LOCK_TIMEOUT_S}s for build {request.build_id} "
+                f"at PoolHome {pool}"
+            ) from exc
 
 
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     _display_name()
     if request.build_id != _required_build_id():
         raise BuildOwnershipError("leaf build ID does not match parent ownership")
+    _require_preparation_readiness()
     from temporalio.client import WorkflowFailureError
     from temporalio.exceptions import CancelledError
 

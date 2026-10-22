@@ -174,6 +174,29 @@ def _install_dodo_guard():
         _guard._guard_dodo(sys.modules["dodo"], _refuse)
 
 
+def _isolate_inherited_leaf_environment(monkeypatch):
+    """Test-created clients must not inherit the surrounding worker's context.
+
+    Existing runner telemetry is intentionally left configured. This is
+    collection-time environment isolation, not a general network sandbox;
+    tests may explicitly install their own fake-backend leaf context.
+    """
+    for endpoint in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        monkeypatch.setenv(endpoint, "")
+    resource = os.environ.get("OTEL_RESOURCE_ATTRIBUTES")
+    if resource is not None:
+        retained = []
+        for entry in resource.split(","):
+            key, separator, _value = entry.partition("=")
+            if not (separator and key.strip() == "farm.execution"):
+                retained.append(entry)
+        monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", ",".join(retained))
+
+
 def pytest_configure(config):
     """Isolate the test session from the machine it runs on.
 
@@ -200,6 +223,11 @@ def pytest_configure(config):
     the same refusals through ``tests/_child_guard/sitecustomize.py`` and
     exits on one, which fails the test that started it.
     """
+    # Fixtures are too late: collecting farm tests imports _farm and dynamic
+    # dodo loads can prewarm Azure under the enclosing worker's leaf marker.
+    inherited_leaf = pytest.MonkeyPatch()
+    config.add_cleanup(inherited_leaf.undo)
+    _isolate_inherited_leaf_environment(inherited_leaf)
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"

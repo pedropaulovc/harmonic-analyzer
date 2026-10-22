@@ -3598,8 +3598,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
-        # The selected execution loader is an offline, fenced root-level regression.
+        # Farm execution/publication contracts are offline, fenced regressions;
+        # keep their root-level files in the same explicit recipe gate.
         REPO_ROOT / "tests" / "test_selected_execution.py",
+        REPO_ROOT / "tests" / "test_preparation_publication.py",
+        REPO_ROOT / "tests" / "test_farm_mode.py",
+        REPO_ROOT / "tests" / "test_farm_fifo_lifecycle.py",
         # Which recorded-input changes may skip the insert/mate loop (the
         # explode tier), and the in-place explode re-authoring against fakes.
         SCRIPTS_DIR / "test_refresh_tier.py",
@@ -3946,6 +3950,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         {
             # Pytest discovers shared fixtures outside the import closure.
             str((REPO_ROOT / "conftest.py").resolve()),
+            # test_farm_mode launches this one nested pytest node by string;
+            # static module imports alone cannot discover that child input.
+            str((SCRIPTS_DIR / "test_artifact_cache.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),

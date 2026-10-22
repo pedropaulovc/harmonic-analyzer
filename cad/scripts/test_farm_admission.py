@@ -48,6 +48,8 @@ def admission(tmp_path, monkeypatch):
         "HARMONIC_FARM_LEAF_TIMEOUT_S",
         "HARMONIC_VERBOSITY",
         "HARMONIC_FARM_ADMITTED_LEAVES",
+        "HARMONIC_FARM_AGENT_IDENTITY",
+        "HARMONIC_FARM_PREPARATION_READINESS",
     ):
         # Track originally absent keys too: build.main writes executor state
         # directly, so a plain delenv on an absent key would not restore it.
@@ -98,7 +100,7 @@ def admission(tmp_path, monkeypatch):
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
 
-    def pool(name="selected-pool", accepted=(), protocol=None, identity="a" * 64):
+    def pool(name="selected-pool", accepted=(), protocol=None, identity="a" * 64, preparation=None):
         home = tmp_path / name
         package = home / "agent"
         package.mkdir(parents=True)
@@ -124,6 +126,8 @@ def admission(tmp_path, monkeypatch):
             )
         protocol += f"\ndef agent_identity(_directory):\n    return {identity!r}\n"
         (package / "protocol.py").write_text(protocol, encoding="utf-8")
+        if preparation is not None:
+            (package / "preparation.py").write_text(preparation, encoding="utf-8")
         monkeypatch.setenv("SOLIDWORKS_POOL_HOME", str(home))
         return home
 
@@ -635,9 +639,10 @@ def test_pool_identity_uses_existing_fleet_query_and_pool_canonical_tag(
         [Task("features:probe", [admission.action("features:probe")])],
         ["features:probe"],
     )
-    labels, identity = build._require_leaf_admission(control)
+    labels, identity, readiness = build._require_leaf_admission(control)
     assert labels == ["features:probe"]
     assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    assert readiness is None
     queries = []
 
     def agents(pool, *args):
@@ -707,9 +712,10 @@ def leaf_admitted(task):
         [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
         ["features:fixture-ok"],
     )
-    labels, identity = build._require_leaf_admission(control)
+    labels, identity, readiness = build._require_leaf_admission(control)
     assert labels == ["features:fixture-ok"]
     assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    assert readiness is None
     runtime = json.loads((home / "runtime.json").read_text(encoding="utf-8"))
     assert Path(runtime["cwd"]).resolve() == home.resolve()
     assert Path(runtime["prefix"]).resolve() == (home / ".venv").resolve()
@@ -895,3 +901,345 @@ def test_every_direct_dodo_dispatch_helper_has_an_admission_marker():
             and decorator.attr == "leaf_action"
             for decorator in helper.decorator_list
         ), f"{helper.name} dispatches a farm leaf but bypasses admission"
+
+
+@pytest.mark.parametrize("readiness", [
+    {"capability": "preparation-publish-v1", "configured": True,
+     "account": "fixturebootstrap", "configuration_error": False},
+    {"capability": "preparation-publish-v1", "configured": False,
+     "account": None, "configuration_error": False},
+    {"capability": "preparation-publish-v1", "configured": False,
+     "account": None, "configuration_error": True},
+])
+def test_admission_captures_pure_readiness_in_same_selected_pool_query(admission, readiness):
+    preparation = (
+        "import sys\n"
+        "from . import protocol\n"
+        "def publisher_readiness(*, account=None):\n"
+        "    assert protocol.agent_identity(None) == " + repr("a" * 64) + "\n"
+        "    assert not any(name == 'azure' or name.startswith('azure.') for name in sys.modules)\n"
+        "    return " + repr(readiness) + "\n"
+    )
+    home = admission.pool(accepted=["features:probe"], preparation=preparation)
+    control = build._validate_farm_selection(
+        [Task("features:probe", [admission.action("features:probe")])],
+        ["features:probe"],
+    )
+    labels, identity, actual_readiness = build._require_leaf_admission(control)
+    assert labels == ["features:probe"]
+    assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    assert actual_readiness == readiness
+    assert admission.queried(home) == ["features:probe"]
+    assert len(admission.calls) == 1
+    assert admission.events == []
+
+
+def test_preparation_module_without_readiness_api_is_explicitly_unknown(admission):
+    admission.pool(accepted=["features:probe"], preparation="OLD_PREPARATION_MODULE = True\n")
+    control = build._validate_farm_selection(
+        [Task("features:probe", [admission.action("features:probe")])],
+        ["features:probe"],
+    )
+    labels, identity, readiness = build._require_leaf_admission(control)
+    assert labels == ["features:probe"]
+    assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    assert readiness is None
+    assert len(admission.calls) == 1
+
+
+def test_unconfigured_readiness_does_not_block_nondispatching_leaf_action(
+    admission, monkeypatch,
+):
+    readiness = {
+        "capability": "preparation-publish-v1", "configured": False,
+        "account": None, "configuration_error": False,
+    }
+    previous = '{"previous":"readiness"}'
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", previous)
+    admission.pool(
+        accepted=["features:probe"],
+        preparation="def publisher_readiness(*, account=None):\n    return " + repr(readiness) + "\n",
+    )
+
+    @_farm.leaf_action
+    def restored_leaf():
+        assert json.loads(os.environ["HARMONIC_FARM_PREPARATION_READINESS"]) == readiness
+        admission.events.append("restored-without-dispatch")
+        return True
+
+    admission.install({"features:probe": {"actions": [restored_leaf]}})
+    assert admission.run("features:probe") == 0
+    assert "restored-without-dispatch" in admission.events
+    assert os.environ["HARMONIC_FARM_PREPARATION_READINESS"] == previous
+
+
+@pytest.fixture
+def bounded_pool_bridge(tmp_path, monkeypatch):
+    """Install inert ownership and Popen collaborators before every error path."""
+    state = SimpleNamespace(
+        pool=tmp_path / "pool", events=[], returncode=0, stdout='{"published":true}\n',
+        popen_error=None, adopt_error=None, wait_error=None, kill_error=None,
+        cleanup_wait_error=None, cleanup_wait_elapsed=0.0, clock=0.0,
+        termination=True, termination_error=None, termination_tail="", output=None,
+        close_error=None,
+    )
+
+    class OwnedProcess:
+        # Deliberately no PID: a live ownership helper must never see this fake.
+        def wait(self, *, timeout):
+            state.events.append(("wait", timeout))
+            if timeout == 900:
+                if state.wait_error is not None:
+                    raise state.wait_error
+            else:
+                state.clock += state.cleanup_wait_elapsed
+                if state.cleanup_wait_error is not None:
+                    raise state.cleanup_wait_error
+            return state.returncode
+
+        def kill(self):
+            state.events.append(("kill-owned-handle",))
+            if state.kill_error is not None:
+                raise state.kill_error
+
+    process = OwnedProcess()
+
+    class OwnedTree:
+        @property
+        def popen_options(self):
+            # Invalid for a live Popen: losing that mock must fail before spawn.
+            return {"ownership_test_only": True}
+
+        def adopt(self, adopted):
+            assert adopted is process
+            state.events.append(("adopt",))
+            if state.adopt_error is not None:
+                raise state.adopt_error
+
+        def terminate(self, adopted, *, timeout_s):
+            assert adopted is process
+            state.events.append(("terminate", timeout_s))
+            if state.termination_error is not None:
+                raise state.termination_error
+            if state.termination_tail:
+                state.output.write(state.termination_tail)
+            return state.termination
+
+        def close(self):
+            state.events.append(("close-tree",))
+            if state.close_error is not None:
+                raise state.close_error
+
+    tree = OwnedTree()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("bounded publisher used an unowned subprocess collaborator")
+
+    def popen(argv, **kwargs):
+        assert kwargs.pop("ownership_test_only") is True
+        assert kwargs["cwd"] == build.REPO_ROOT
+        assert "VIRTUAL_ENV" not in kwargs["env"]
+        assert kwargs["text"] is True
+        state.output = kwargs["stdout"]
+        assert state.output is not subprocess.PIPE
+        assert isinstance(state.output.fileno(), int)
+        state.events.append(("popen", list(argv)))
+        if state.popen_error is not None:
+            raise state.popen_error
+        state.output.write(state.stdout)
+        return process
+
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "unrelated-outer-venv"))
+    monkeypatch.setattr(build, "_pool_process_tree", lambda pool: tree)
+    monkeypatch.setattr(build.subprocess, "Popen", popen)
+    monkeypatch.setattr(build.subprocess, "run", forbidden)
+    state.process = process
+    state.tree = tree
+    return state
+
+
+@pytest.mark.parametrize("returncode", [0, 23])
+def test_bounded_pool_bridge_confirms_tree_before_returning_stdout(
+    bounded_pool_bridge, returncode,
+):
+    state = bounded_pool_bridge
+    state.returncode = returncode
+    state.termination_tail = "last-owned-descendant-output\n"
+    result = build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert result.returncode == returncode
+    assert result.stdout == state.stdout + state.termination_tail
+    names = [event[0] for event in state.events]
+    assert names == ["popen", "adopt", "wait", "terminate", "close-tree"]
+    cleanup = next(event for event in state.events if event[0] == "terminate")
+    assert 0 <= cleanup[1] <= 5
+    assert state.output.closed
+
+
+def test_publisher_timeout_becomes_terminal_only_after_confirmed_tree_cleanup(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.wait_error = subprocess.TimeoutExpired(["owned-publisher"], 900)
+    with pytest.raises(build.FarmPreflightError, match="900s deadline") as failure:
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert not isinstance(failure.value, build.PoolProcessCleanupError)
+    assert [event[0] for event in state.events] == [
+        "popen", "adopt", "wait", "terminate", "close-tree",
+    ]
+    assert state.output.closed
+
+
+@pytest.mark.parametrize("normal_exit", [False, True])
+def test_unconfirmed_owned_tree_cannot_return_or_report_completed_failure(
+    bounded_pool_bridge, normal_exit,
+):
+    state = bounded_pool_bridge
+    state.termination = False
+    state.returncode = 23
+    state.stdout = "not a publisher JSON result"
+    if not normal_exit:
+        state.wait_error = subprocess.TimeoutExpired(["owned-publisher"], 900)
+    with pytest.raises(build.PoolProcessCleanupError) as failure:
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert failure.value.cleanup_confirmed is False
+    assert state.events[-1] == ("close-tree",)
+    assert state.output.closed
+
+
+def test_failed_adoption_kills_only_created_handle_before_tree_cleanup(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.adopt_error = OSError("assignment failed while owned child remained suspended")
+    with pytest.raises(build.FarmPreflightError, match="assignment failed"):
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert [event[0] for event in state.events] == [
+        "popen", "adopt", "kill-owned-handle", "wait", "terminate", "close-tree",
+    ]
+    assert state.output.closed
+
+
+def test_adoption_cleanup_shares_one_five_second_budget(bounded_pool_bridge, monkeypatch):
+    state = bounded_pool_bridge
+    state.adopt_error = OSError("resume failed after assignment")
+    state.cleanup_wait_elapsed = 4.75
+    monkeypatch.setattr(build, "time", SimpleNamespace(monotonic=lambda: state.clock))
+    with pytest.raises(build.FarmPreflightError, match="resume failed"):
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    waits = [event[1] for event in state.events if event[0] == "wait"]
+    cleanup = next(event for event in state.events if event[0] == "terminate")
+    assert waits == [5.0]
+    assert cleanup[1] == 0.25
+
+
+def test_adoption_cleanup_still_uses_tree_if_owned_handle_kill_is_interrupted(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.adopt_error = OSError("assignment failed")
+    state.kill_error = KeyboardInterrupt()
+    state.termination = False
+    with pytest.raises(build.PoolProcessCleanupError):
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert [event[0] for event in state.events] == [
+        "popen", "adopt", "kill-owned-handle", "wait", "terminate", "close-tree",
+    ]
+
+
+def test_publisher_baseexception_confirms_owned_tree_before_propagating(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    interrupted = KeyboardInterrupt()
+    state.wait_error = interrupted
+    with pytest.raises(KeyboardInterrupt) as failure:
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert failure.value is interrupted
+    assert [event[0] for event in state.events] == [
+        "popen", "adopt", "wait", "terminate", "close-tree",
+    ]
+    assert state.output.closed
+
+
+def test_publisher_cleanup_exception_is_unconfirmed_not_terminal(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.wait_error = subprocess.TimeoutExpired(["owned-publisher"], 900)
+    state.termination_error = RuntimeError("ownership confirmation unavailable")
+    with pytest.raises(build.PoolProcessCleanupError):
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert state.events[-1] == ("close-tree",)
+    assert state.output.closed
+
+
+def test_failed_popen_closes_tree_without_claiming_a_created_process(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.popen_error = OSError("could not create owned child")
+    with pytest.raises(build.FarmPreflightError, match="could not create owned child"):
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert [event[0] for event in state.events] == ["popen", "close-tree"]
+    assert state.output.closed
+
+
+def test_default_pool_bridge_keeps_existing_run_contract(tmp_path, monkeypatch):
+    expected = subprocess.CompletedProcess(["fixture"], 0, "existing stdout")
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return expected
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("default bridge used bounded ownership machinery")
+
+    monkeypatch.setattr(build.subprocess, "run", run)
+    monkeypatch.setattr(build.subprocess, "Popen", forbidden)
+    monkeypatch.setattr(build, "_pool_process_tree", forbidden)
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "outer"))
+    assert build._pool_farm(tmp_path, "agents", "--json") is expected
+    assert len(calls) == 1
+    argv, options = calls[0]
+    assert argv[-2:] == ["agents", "--json"]
+    assert options["stdout"] == subprocess.PIPE and options["text"] is True
+    assert options["cwd"] == build.REPO_ROOT
+    assert "VIRTUAL_ENV" not in options["env"]
+    assert "timeout" not in options
+
+
+def test_process_tree_loads_exact_selected_file_without_cached_agent(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("cached foreign agent ownership helper was used")
+
+    monkeypatch.setitem(sys.modules, "agent.process_tree", SimpleNamespace(ProcessTree=forbidden))
+    baseline = {name for name in sys.modules if name.startswith("_harmonic_selected_process_tree_")}
+    for label in ("first-pool", "second-pool"):
+        pool = tmp_path / label
+        (pool / "agent").mkdir(parents=True)
+        (pool / "agent" / "process_tree.py").write_text(
+            "class ProcessTree:\n"
+            "    def __init__(self, *, log):\n"
+            "        self.log = log\n"
+            "        self.marker = " + repr(label) + "\n",
+            encoding="utf-8",
+        )
+        tree = build._pool_process_tree(pool)
+        assert tree.marker == label
+        assert tree.log is build._pool_process_log
+    assert {name for name in sys.modules if name.startswith("_harmonic_selected_process_tree_")} == baseline
+
+
+@pytest.mark.parametrize("missing", ["file", "class"])
+def test_bounded_bridge_refuses_missing_ownership_api_before_spawn(tmp_path, monkeypatch, missing):
+    if missing == "class":
+        (tmp_path / "agent").mkdir()
+        (tmp_path / "agent" / "process_tree.py").write_text("NOT_THE_REQUIRED_API = True\n")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("missing ownership API launched an unowned process")
+
+    monkeypatch.setattr(build.subprocess, "Popen", forbidden)
+    monkeypatch.setattr(build.subprocess, "run", forbidden)
+    with pytest.raises(build.FarmPreflightError, match="process ownership helper|ProcessTree"):
+        build._pool_farm(tmp_path, "preparation", "publish", timeout_s=900)
+
+
+def test_close_error_cannot_mask_unconfirmed_cleanup_as_terminal_failure(bounded_pool_bridge):
+    state = bounded_pool_bridge
+    state.wait_error = subprocess.TimeoutExpired(["owned-publisher"], 900)
+    state.termination = False
+    state.close_error = OSError("ownership handle close failed")
+    with pytest.raises(build.PoolProcessCleanupError, match="ownership handle") as failure:
+        build._pool_farm(state.pool, "preparation", "publish", timeout_s=900)
+    assert failure.value.cleanup_confirmed is False
+    assert state.output.closed
