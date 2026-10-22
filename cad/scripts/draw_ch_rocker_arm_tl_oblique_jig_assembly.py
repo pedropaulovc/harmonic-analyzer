@@ -110,6 +110,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _simplified_names import simplified_name
+from _layout_audit import display_box
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -2759,11 +2760,77 @@ def _orient_capture_section(adapter: Any, view: Any, axis: Sequence[float]) -> N
         raise RuntimeError("capture section: model axes did not orient right/up")
 
 
-def _capture_note_bounds(note: Any) -> tuple[float, float, float, float]:
+def _capture_note_extent(note: Any) -> tuple[float, float, float, float]:
     raw = tuple(float(v) for v in (_early_bound(note, "INote").GetExtent() or ()))
     if len(raw) != 6 or not all(math.isfinite(v) for v in raw) or raw[3] <= raw[0] or raw[4] <= raw[1]:
         raise RuntimeError("jig capture: unreadable native note extents")
     return raw[0], raw[1], raw[3], raw[4]
+
+
+def _capture_note_bounds(note: Any) -> tuple[float, float, float, float]:
+    """Native text only; GetExtent also encloses the attached leader."""
+    try:
+        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+        data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+        count = int(data.GetTextCount())
+    except Exception as exc:
+        raise RuntimeError(f"jig capture: unreadable native note text interface/count; {type(exc).__name__}: {exc}") from exc
+    runs = []
+    for index in range(count):
+        run = {"index": index}
+        for key, getter in (
+            ("t", "GetTextAtIndex"), ("w", "GetTextInBoxWidthAtIndex"),
+            ("h", "GetTextHeightAtIndex"), ("pos", "GetTextPositionAtIndex"),
+            ("ref", "GetTextRefPositionAtIndex"), ("ang", "GetTextAngleAtIndex"),
+        ):
+            try:
+                run[key] = getattr(data, getter)(index)
+            except Exception as exc:
+                run.setdefault("read_errors", []).append((key, f"{type(exc).__name__}: {exc}"))
+        runs.append(run)
+    texts = []
+    invalid = False
+    for run in runs:
+        text = run.get("t")
+        if isinstance(text, str) and not text.strip():
+            continue
+        if run.get("read_errors"):
+            invalid = True
+            continue
+        try:
+            if not isinstance(text, str):
+                raise ValueError("native text is not a string")
+            width, height = float(run["w"]), float(run["h"])
+            position = tuple(float(value) for value in run["pos"])
+            reference, angle = run["ref"], float(run["ang"])
+            if (
+                min(width, height) <= 0 or len(position) < 2
+                or not isinstance(reference, int) or isinstance(reference, bool) or reference not in range(6)
+                or not all(math.isfinite(value) for value in (width, height, angle, *position))
+            ):
+                raise ValueError("native text size, position, angle or reference is invalid")
+            # The kit's native swTextPosition_e anchor normalization, not a font-width estimate.
+            dx, dy = ((0, -height), (0, 0), (-width / 2, -height / 2),
+                      (-width, -height), (-width, 0), (-width / 2, -height))[reference]
+            cosine, sine = math.cos(angle), math.sin(angle)
+            texts.append({
+                "t": text, "w": width, "h": height, "ref": 1, "ang": angle,
+                "pos": (position[0] + dx * cosine - dy * sine,
+                        position[1] + dx * sine + dy * cosine, 0.0),
+            })
+        except Exception as exc:
+            invalid = True
+            run["validation_error"] = f"{type(exc).__name__}: {exc}"
+    if invalid or not texts:
+        raise RuntimeError(f"jig capture: unreadable native note text geometry; count={count}; runs={runs!r}")
+    try:
+        box = display_box({"texts": texts})
+        bounds = () if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
+        if len(bounds) != 4 or not all(math.isfinite(value) for value in bounds) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+            raise ValueError("native text box is missing or degenerate")
+    except Exception as exc:
+        raise RuntimeError(f"jig capture: unreadable native note text box; runs={runs!r}; {type(exc).__name__}: {exc}") from exc
+    return bounds
 
 
 def _capture_inside(box: Sequence[float], region: Sequence[float]) -> bool:
@@ -3141,67 +3208,77 @@ def _assert_capture_sheet(
         if len(captions) != 1:
             raise RuntimeError("jig capture: missing native linked section caption")
         notes.append((captions[0], _capture_note_bounds(captions[0]), "section caption"))
-    for i, (_note, box, owner_label) in enumerate(notes):
-        if not _capture_inside(box, CAPTURE_READING_REGION) or any(_capture_overlap(box, other[1]) for other in notes[i + 1:]):
-            rectangles = [
+    whole_bounds = tuple(_capture_note_extent(note) for note, _box, _label in notes)
+    def refuse_layout(reason: str) -> None:
+        rectangles = [
+            {
+                "index": j, "label": label, "bbox_m": bounds,
+                "whole_bbox_m": whole_bounds[j],
+                "field_gaps_m": (
+                    bounds[0] - CAPTURE_READING_REGION[0], bounds[1] - CAPTURE_READING_REGION[1],
+                    CAPTURE_READING_REGION[2] - bounds[2], CAPTURE_READING_REGION[3] - bounds[3],
+                ),
+                "whole_field_gaps_m": (
+                    whole_bounds[j][0] - CAPTURE_READING_REGION[0], whole_bounds[j][1] - CAPTURE_READING_REGION[1],
+                    CAPTURE_READING_REGION[2] - whole_bounds[j][2], CAPTURE_READING_REGION[3] - whole_bounds[j][3],
+                ),
+            }
+            for j, (_native_note, bounds, label) in enumerate(notes)
+        ]
+        view_outlines = []
+        for view_index, reading_view in enumerate(views[1:], 1):
+            try:
+                view_outlines.append({"view_index": view_index, "bbox_m": _view_outline(reading_view, label="jig capture")})
+            except Exception as exc:
+                view_outlines.append({"view_index": view_index, "error": f"{type(exc).__name__}: {exc}"})
+        layout = {
+            "field_m": CAPTURE_READING_REGION,
+            "rectangles": rectangles,
+            "outside": [j for j, (_native_note, bounds, _label) in enumerate(notes) if not _capture_inside(bounds, CAPTURE_READING_REGION)],
+            "whole_outside": [j for j, bounds in enumerate(whole_bounds) if not _capture_inside(bounds, CAPTURE_READING_REGION)],
+            "overlaps": [
                 {
-                    "index": j, "label": label, "bbox_m": bounds,
-                    "field_gaps_m": (
-                        bounds[0] - CAPTURE_READING_REGION[0], bounds[1] - CAPTURE_READING_REGION[1],
-                        CAPTURE_READING_REGION[2] - bounds[2], CAPTURE_READING_REGION[3] - bounds[3],
+                    "a": j, "b": k,
+                    "gaps_m": (
+                        max(bounds[0], other[1][0]) - min(bounds[2], other[1][2]),
+                        max(bounds[1], other[1][1]) - min(bounds[3], other[1][3]),
                     ),
                 }
-                for j, (_native_note, bounds, label) in enumerate(notes)
-            ]
-            view_outlines = []
-            for view_index, reading_view in enumerate(views[1:], 1):
-                try:
-                    view_outlines.append({"view_index": view_index, "bbox_m": _view_outline(reading_view, label="jig capture")})
-                except Exception as exc:
-                    view_outlines.append({"view_index": view_index, "error": f"{type(exc).__name__}: {exc}"})
-            layout = {
-                "field_m": CAPTURE_READING_REGION,
-                "rectangles": rectangles,
-                "outside": [j for j, (_native_note, bounds, _label) in enumerate(notes) if not _capture_inside(bounds, CAPTURE_READING_REGION)],
-                "overlaps": [
-                    {
-                        "a": j, "b": k,
-                        "gaps_m": (
-                            max(bounds[0], other[1][0]) - min(bounds[2], other[1][2]),
-                            max(bounds[1], other[1][1]) - min(bounds[3], other[1][3]),
-                        ),
-                    }
-                    for j, (_native_note, bounds, _label) in enumerate(notes)
-                    for k, other in enumerate(notes[j + 1:], j + 1)
-                    if _capture_overlap(bounds, other[1])
-                ],
-                "view_outlines": view_outlines,
-                "model_overlaps": [
-                    (rectangle["index"], outline["view_index"])
-                    for rectangle in rectangles for outline in view_outlines
-                    if "bbox_m" in outline and _capture_overlap(rectangle["bbox_m"], outline["bbox_m"])
-                ],
-                "leaders": [
-                    (segment.label, segment.kind, segment.x0, segment.y0, segment.x1, segment.y1)
-                    for segment in leaders
-                ],
-                "leader_label_crossings": [
-                    (j, rectangle["index"])
-                    for j, segment in enumerate(leaders) for rectangle in rectangles
-                    if segment.label != rectangle["label"] and _segment_crosses_box(segment, rectangle["bbox_m"], inset=0.0)
-                ],
-                "leader_crossings": [
-                    (crossing.a.label, crossing.b.label, crossing.x, crossing.y)
-                    for crossing in find_leader_leader_crossings(leaders)
-                ],
-            }
-            raise RuntimeError(f"jig capture: native captions/reading labels overlap or leave field; layout={layout!r}")
+                for j, (_native_note, bounds, _label) in enumerate(notes)
+                for k, other in enumerate(notes[j + 1:], j + 1)
+                if _capture_overlap(bounds, other[1])
+            ],
+            "view_outlines": view_outlines,
+            "model_overlaps": [
+                (rectangle["index"], outline["view_index"])
+                for rectangle in rectangles for outline in view_outlines
+                if "bbox_m" in outline and _capture_overlap(rectangle["bbox_m"], outline["bbox_m"])
+            ],
+            "leaders": [
+                (segment.label, segment.kind, segment.x0, segment.y0, segment.x1, segment.y1)
+                for segment in leaders
+            ],
+            "leader_label_crossings": [
+                (j, rectangle["index"])
+                for j, segment in enumerate(leaders) for rectangle in rectangles
+                if segment.label != rectangle["label"] and _segment_crosses_box(segment, rectangle["bbox_m"], inset=0.0)
+            ],
+            "leader_crossings": [
+                (crossing.a.label, crossing.b.label, crossing.x, crossing.y)
+                for crossing in find_leader_leader_crossings(leaders)
+            ],
+        }
+        raise RuntimeError(f"{reason}; layout={layout!r}")
+
+    for i, (_note, box, owner_label) in enumerate(notes):
+        if not _capture_inside(box, CAPTURE_READING_REGION) or not _capture_inside(whole_bounds[i], CAPTURE_READING_REGION) or any(_capture_overlap(box, other[1]) for other in notes[i + 1:]):
+            refuse_layout("jig capture: native captions/reading labels overlap or leave field")
         if any(_capture_overlap(box, _view_outline(view, label="jig capture")) for view in views[1:]):
-            raise RuntimeError("jig capture: native caption/reading label covers model geometry")
+            refuse_layout("jig capture: native caption/reading label covers model geometry")
         if any(segment.label != owner_label and _segment_crosses_box(segment, box, inset=0.0) for segment in leaders):
-            raise RuntimeError("jig capture: native reading leader crosses another label/caption")
+            refuse_layout("jig capture: native reading leader crosses another label/caption")
     if find_leader_leader_crossings(leaders):
-        raise RuntimeError("jig capture: reading-label leaders cross")
+        refuse_layout("jig capture: reading-label leaders cross")
     if landings:
         _assert_capture_coverage(landings, cluster.stems)
         native_balloons = tuple(note for note in (views[0].GetNotes() or ()) if note.IsBomBalloon())

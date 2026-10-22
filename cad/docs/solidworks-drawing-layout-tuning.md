@@ -275,13 +275,22 @@ comparison remain unchanged. Do not guess root names or reapply hiding.
 Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText`;
 raw dispatch can materialize that zero-argument member as a string. Keep the
 exact caption text and uniqueness checks rather than guessing callable forms.
-On a native caption/reading-label layout refusal, report all indexed note
-rectangles, outside-field entries and overlapping pairs, not only the first
+
+`INote.GetExtent` also encloses an attached leader; it is not a text-only box.
+For capture-label ink checks, use native `IDisplayData` text runs with positive
+finite widths/heights, positions, angles and all six text-reference anchors,
+following the kit's measured-text pattern and shared `display_box`. Missing or
+zero native width is a refusal with all run metadata, never a font-width estimate.
+Keep whole-note extent containment and the separate leader checks as well.
+
+On refusal at the four final layout guards, report all indexed glyph and
+whole-note rectangles, outside-field entries and overlapping pairs, not only the first
 conflict. Field gaps are left/bottom/right/top; pair gaps are horizontal/vertical,
 in metres, with negative values denoting overlap or field overrun. Include
 the existing leader segments/crossings and the three reading-view outlines
 (or their read errors), without masking the original refusal. Move labels only
 from measured bounds and neighboring clearances; do not relax layout guards.
+Earlier reading-field and other-view leader checks retain their fail-fast order.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture

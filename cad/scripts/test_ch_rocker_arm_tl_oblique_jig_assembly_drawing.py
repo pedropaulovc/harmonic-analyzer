@@ -2118,6 +2118,49 @@ class _CaptureViewSketch:
         return _InspectionTransform(scale, angle=self.angle, origin=origin)
 
 
+class _CaptureNativeTextData:
+    """Independent native glyph runs; never inferred from whole-note extents."""
+
+    def __init__(self, runs):
+        self.runs = runs
+
+    def _get(self, index, key):
+        value = self.runs[index][key]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def GetTextCount(self):
+        return len(self.runs)
+
+    def GetTextAtIndex(self, index):
+        return self._get(index, "t")
+
+    def GetTextInBoxWidthAtIndex(self, index):
+        return self._get(index, "w")
+
+    def GetTextHeightAtIndex(self, index):
+        return self._get(index, "h")
+
+    def GetTextPositionAtIndex(self, index):
+        return self._get(index, "pos")
+
+    def GetTextRefPositionAtIndex(self, index):
+        return self._get(index, "ref")
+
+    def GetTextAngleAtIndex(self, index):
+        return self._get(index, "ang")
+
+
+def _native_glyph_note(runs):
+    data = _CaptureNativeTextData(runs)
+    annotation = SimpleNamespace(GetDisplayData=lambda: data)
+    return SimpleNamespace(
+        GetAnnotation=lambda: annotation, display_data=data,
+        GetExtent=lambda: (0.08, 0.17, 0.0, 0.14, 0.23, 0.0),
+    )
+
+
 class _CaptureNativeDrawingComponent(SimpleNamespace):
     @property
     def Visible(self):
@@ -2511,6 +2554,18 @@ def native_property_package(monkeypatch, native_bom_bindings):
         annotation.SetPosition2 = set_position
         annotation.SetTextFormat = set_format
         annotation.GetLeaderPointsAtIndex = leader
+        def glyph_data():
+            height = format_.CharHeight
+            return _CaptureNativeTextData([
+                {
+                    "t": line, "w": len(line) * height * 0.55, "h": height * 1.2,
+                    "pos": (note.position[0], note.position[1] - index * height * 1.2, 0.0),
+                    "ref": 0, "ang": 0.0,
+                }
+                for index, line in enumerate(note.text.splitlines())
+            ])
+
+        annotation.GetDisplayData = glyph_data
         note.GetAnnotation = lambda: annotation
         note.GetExtent = extent
         note.GetText = lambda: note.text
@@ -4627,6 +4682,168 @@ def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
         settled[-1]()
 
 
+@pytest.mark.parametrize("reference", range(6))
+@pytest.mark.parametrize("angle_index", (0, 1))
+def test_capture_native_glyph_bounds_normalize_all_anchors_and_rotation(
+    native_bom_bindings, reference, angle_index,
+) -> None:
+    note = _native_glyph_note([{
+        "t": "INK", "w": 0.012, "h": 0.004, "pos": (0.100, 0.200, 0.0),
+        "ref": reference, "ang": angle_index * math.pi / 2.0,
+    }])
+    # Fixed measured rectangles, independently worked from the six native
+    # anchors; neither the whole-note extent nor production boxer supplies them.
+    expected = (
+        (
+            (0.100, 0.196, 0.112, 0.200),
+            (0.100, 0.200, 0.112, 0.204),
+            (0.094, 0.198, 0.106, 0.202),
+            (0.088, 0.196, 0.100, 0.200),
+            (0.088, 0.200, 0.100, 0.204),
+            (0.094, 0.196, 0.106, 0.200),
+        ),
+        (
+            (0.100, 0.200, 0.104, 0.212),
+            (0.096, 0.200, 0.100, 0.212),
+            (0.098, 0.194, 0.102, 0.206),
+            (0.100, 0.188, 0.104, 0.200),
+            (0.096, 0.188, 0.100, 0.200),
+            (0.100, 0.194, 0.104, 0.206),
+        ),
+    )[angle_index][reference]
+    assert drawing._capture_note_bounds(note) == pytest.approx(expected, abs=1e-12)
+    assert drawing._capture_note_extent(note) == (0.08, 0.17, 0.14, 0.23)
+
+
+@pytest.mark.parametrize("key, value", (
+    ("w", 0.0), ("w", math.inf), ("h", 0.0), ("h", math.nan),
+    ("pos", (0.1,)), ("pos", (0.1, math.nan)), ("ang", math.inf),
+    ("ref", -1), ("ref", 6), ("ref", 1.5), ("ref", True), ("t", None),
+))
+def test_capture_native_glyph_bounds_refuse_invalid_measurements_without_estimation(
+    native_bom_bindings, key, value,
+) -> None:
+    run = {
+        "t": "INK", "w": 0.012, "h": 0.004, "pos": (0.1, 0.2, 0.0),
+        "ref": 0, "ang": 0.0,
+    }
+    run[key] = value
+    note = _native_glyph_note([run])
+    with pytest.raises(RuntimeError, match="unreadable native note text geometry") as refusal:
+        drawing._capture_note_bounds(note)
+    message = str(refusal.value)
+    assert "count=1; runs=" in message
+    for field, native_value in run.items():
+        assert f"{field!r}: {native_value!r}" in message
+    assert "'validation_error':" in message
+    # A readable whole extent must never rescue invalid native glyph geometry.
+    assert drawing._capture_note_extent(note) == (0.08, 0.17, 0.14, 0.23)
+
+
+def test_capture_native_glyph_bounds_collect_every_run_and_getter_error(
+    native_bom_bindings,
+) -> None:
+    import ast
+
+    base = {
+        "t": "INK", "w": 0.012, "h": 0.004, "pos": (0.1, 0.2, 0.0),
+        "ref": 0, "ang": 0.0,
+    }
+    runs = [
+        {**base, "w": RuntimeError("width unavailable")},
+        {**base, "ref": 1.5},
+        {**base, "t": OSError("text unavailable"), "ang": ValueError("angle unavailable")},
+        {**base, "t": "LAST", "pos": (0.2, 0.3, 0.0)},
+    ]
+    with pytest.raises(RuntimeError, match="unreadable native note text geometry") as refusal:
+        drawing._capture_note_bounds(_native_glyph_note(runs))
+    assert "count=4;" in str(refusal.value)
+    evidence = ast.literal_eval(str(refusal.value).split("; runs=", 1)[1])
+    assert [row["index"] for row in evidence] == [0, 1, 2, 3]
+    assert evidence[0]["read_errors"] == [("w", "RuntimeError: width unavailable")]
+    assert evidence[2]["read_errors"] == [
+        ("t", "OSError: text unavailable"), ("ang", "ValueError: angle unavailable"),
+    ]
+    assert evidence[1]["validation_error"].startswith("ValueError:")
+    for index, run in enumerate(runs):
+        for key, value in run.items():
+            if not isinstance(value, Exception):
+                assert evidence[index][key] == value
+    assert evidence[3] == {"index": 3, **runs[3]}
+
+
+@pytest.mark.parametrize("channel", ("display", "count"))
+def test_capture_native_glyph_bounds_refuse_interface_and_count_errors(
+    native_bom_bindings, monkeypatch, channel,
+) -> None:
+    note = _native_glyph_note([])
+
+    def unavailable():
+        raise OSError("native text channel unavailable")
+
+    if channel == "display":
+        monkeypatch.setattr(note.GetAnnotation(), "GetDisplayData", unavailable)
+    else:
+        monkeypatch.setattr(note.display_data, "GetTextCount", unavailable)
+    with pytest.raises(RuntimeError, match="unreadable native note text interface/count") as refusal:
+        drawing._capture_note_bounds(note)
+    assert "OSError: native text channel unavailable" in str(refusal.value)
+
+
+@pytest.mark.parametrize("runs", (
+    [],
+    [{"t": " ", "w": 0.0, "h": 0.0, "pos": (0.1, 0.2), "ref": 0, "ang": 0.0}],
+))
+def test_capture_native_glyph_bounds_refuse_missing_ink(native_bom_bindings, runs):
+    with pytest.raises(RuntimeError, match="unreadable native note text geometry"):
+        drawing._capture_note_bounds(_native_glyph_note(runs))
+
+
+def test_capture_native_glyph_bounds_union_all_measured_runs(native_bom_bindings):
+    note = _native_glyph_note([
+        {"t": "FIRST", "w": 0.012, "h": 0.004, "pos": (0.1, 0.2), "ref": 1, "ang": 0.0},
+        {"t": "SECOND", "w": 0.008, "h": 0.003, "pos": (0.12, 0.19), "ref": 1, "ang": 0.0},
+        {"t": " ", "w": 0.0, "h": 0.0, "pos": (0.9, 0.9), "ref": 0, "ang": 0.0},
+    ])
+    assert drawing._capture_note_bounds(note) == pytest.approx((0.1, 0.19, 0.128, 0.204))
+
+
+@pytest.mark.parametrize("whole_outside", (False, True))
+def test_capture_settled_glyph_and_whole_extents_keep_distinct_authority(
+    native_property_package, monkeypatch, whole_outside,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    views = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    note = package.doc.attached_notes[0]
+    glyph = drawing._capture_note_bounds(note)
+    leader = note.GetAnnotation().GetLeaderPointsAtIndex(0)
+    whole = (
+        min(glyph[0], *leader[0::3]), min(glyph[1], *leader[1::3]),
+        max(glyph[2], *leader[0::3]), max(glyph[3], *leader[1::3]),
+    )
+    if whole_outside:
+        whole = (whole[0], drawing.CAPTURE_READING_REGION[1] - 0.001, *whole[2:])
+    monkeypatch.setattr(note, "GetExtent", lambda: (*whole[:2], 0.0, *whole[2:], 0.0))
+    outline = views[2].GetOutline()
+    assert _overlap(whole, outline)
+    assert not _overlap(glyph, outline)
+    assert drawing._capture_note_bounds(note) == glyph
+    assert drawing._capture_note_extent(note) == whole
+    if whole_outside:
+        import ast
+
+        with pytest.raises(RuntimeError, match="overlap or leave field") as refusal:
+            settled[-1]()
+        layout = ast.literal_eval(str(refusal.value).split("; layout=", 1)[1])
+        assert layout["outside"] == []
+        assert layout["whole_outside"] == [1]
+        assert layout["rectangles"][1]["bbox_m"] == glyph
+        assert layout["rectangles"][1]["whole_bbox_m"] == whole
+    else:
+        settled[-1]()
+
+
 def test_capture_section_hidden_channel_overrides_all_true_generated_flags(
     native_property_package,
 ) -> None:
@@ -4889,11 +5106,25 @@ def test_capture_layout_refusal_reports_all_native_caption_conflicts(
         next(note for note in main.notes if "<VLLABEL>" in note.PropertyLinkedText),
         next(note for note in bolt.notes if "<VLLABEL>" in note.PropertyLinkedText),
     )
+    def glyph_bounds(note):
+        # These fixture runs are independently measured upper-left,
+        # unrotated rectangles; direct anchor tests cover normalization.
+        boxes = []
+        for run in note.GetAnnotation().GetDisplayData().runs:
+            if run["t"].strip():
+                assert run["ref"] == 0 and run["ang"] == 0.0
+                x, y = run["pos"][:2]
+                boxes.append((x, y - run["h"], x + run["w"], y))
+        return (
+            min(box[0] for box in boxes), min(box[1] for box in boxes),
+            max(box[2] for box in boxes), max(box[3] for box in boxes),
+        )
+
     field = drawing.CAPTURE_READING_REGION
     if defect == "caption-overlaps":
-        first, second = (note.GetExtent() for note in package.doc.attached_notes[:2])
-        first_box = (first[0], first[1], first[3], first[4])
-        second_box = (second[0], second[1], second[3], second[4])
+        first_box, second_box = (
+            glyph_bounds(note) for note in package.doc.attached_notes[:2]
+        )
         caption_boxes = (first_box, second_box, first_box)
     else:
         left, bottom, right, top = field
@@ -4903,11 +5134,24 @@ def test_capture_layout_refusal_reports_all_native_caption_conflicts(
             (left + 0.005, top + 0.001, left + 0.009, top + 0.004),
         )
     for note, box in zip(captions, caption_boxes, strict=True):
-        # Independent native-shaped GetExtent evidence, not moved label
-        # positions or a patched production geometry/acceptance helper.
-        monkeypatch.setattr(
-            note, "GetExtent", lambda box=box: (*box[:2], 0.0, *box[2:], 0.0),
+        raw = note.GetExtent()
+        # Whole-note bounds independently enclose both the glyphs and the
+        # leader/other supplied extent; only glyphs govern overlap guards.
+        whole = (
+            min(raw[0], box[0]), min(raw[1], box[1]),
+            max(raw[3], box[2]), max(raw[4], box[3]),
         )
+        monkeypatch.setattr(
+            note, "GetExtent", lambda whole=whole: (*whole[:2], 0.0, *whole[2:], 0.0),
+        )
+        if defect == "caption-overlaps":
+            data = _CaptureNativeTextData([{
+                "t": note.GetText(), "w": box[2] - box[0], "h": box[3] - box[1],
+                "pos": (box[0], box[3], 0.0), "ref": 0, "ang": 0.0,
+            }])
+            monkeypatch.setattr(
+                note.GetAnnotation(), "GetDisplayData", lambda data=data: data,
+            )
     native_notes = [
         ("locator caption", captions[0]),
         *(
@@ -4922,12 +5166,18 @@ def test_capture_layout_refusal_reports_all_native_caption_conflicts(
     observed = []
     for index, (label, note) in enumerate(native_notes):
         raw = note.GetExtent()
-        box = (raw[0], raw[1], raw[3], raw[4])
+        whole = (raw[0], raw[1], raw[3], raw[4])
+        box = glyph_bounds(note)
         observed.append({
             "index": index, "label": label, "bbox_m": box,
+            "whole_bbox_m": whole,
             "field_gaps_m": (
                 box[0] - field[0], box[1] - field[1],
                 field[2] - box[2], field[3] - box[3],
+            ),
+            "whole_field_gaps_m": (
+                whole[0] - field[0], whole[1] - field[1],
+                field[2] - whole[2], field[3] - whole[3],
             ),
         })
     assert len(observed) == 17
@@ -4964,6 +5214,10 @@ def test_capture_layout_refusal_reports_all_native_caption_conflicts(
         rectangle["index"] for rectangle in observed
         if any(gap < 0.0 for gap in rectangle["field_gaps_m"])
     ]
+    assert layout["whole_outside"] == [
+        rectangle["index"] for rectangle in observed
+        if any(gap < 0.0 for gap in rectangle["whole_field_gaps_m"])
+    ]
     assert layout["overlaps"] == overlaps
     if defect == "caption-overlaps":
         assert {(0, 1), (0, 16), (1, 16), (2, 15)} <= {
@@ -4971,8 +5225,10 @@ def test_capture_layout_refusal_reports_all_native_caption_conflicts(
         }
         assert all(gap < 0.0 for pair in overlaps for gap in pair["gaps_m"])
         assert layout["outside"] == []
+        assert layout["whole_outside"] == []
     else:
-        assert layout["outside"] == [0, 15, 16]
+        assert layout["outside"] == []
+        assert layout["whole_outside"] == [0, 15, 16]
     assert layout["view_outlines"] == [
         {"view_index": index, "bbox_m": tuple(view.GetOutline())}
         for index, view in enumerate((locator, main, bolt), 1)
