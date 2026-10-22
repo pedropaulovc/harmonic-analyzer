@@ -65,6 +65,7 @@ async def build(adapter: Any) -> dict[str, str]:
     def assert_saved(target: Any, path: Path) -> None:
         if source_configuration is None:
             raise RuntimeError("supplier nut saved check has no authored source binding")
+        authored_checks.clear()  # Release closed drawing wrappers before reopening.
         assert_saved_supplier_nut_nominal(
             target, path, nominal_major_mm=supplier.SUPPLIER_NOMINAL_MAJOR_MM,
             source_path=SPEC.source, configuration=source_configuration,

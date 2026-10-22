@@ -156,6 +156,15 @@ def test_saved_readback_proves_fresh_front_chord_and_both_mapped_ends(saved_nut,
     assert not case.events, "saved proof must not emit per-entity events"
 
 
+def test_saved_readback_can_autoload_previously_closed_hidden_source(saved_nut):
+    case = saved_nut()
+    case.loaded_source = None
+    case.on_open = lambda: setattr(case, "loaded_source", case.model)
+    case.run()
+    assert case.closes and case.loaded_drawing is None
+    assert case.loaded_source is case.model
+
+
 def test_saved_readback_does_not_reuse_pre_save_display(saved_nut):
     case = saved_nut()
     stale = case.display
@@ -324,8 +333,11 @@ def test_saved_readback_runs_real_source_and_attachment_correspondence_proof(sav
             return native_same(left, right)
 
         case.adapter.swApp.IsSame = same
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as caught:
         case.run()
+    if defect != "chord-drift":
+        census = json.loads(str(caught.value).split(": ", 1)[1])
+        assert census["proven"] is False
     assert case.closes and case.loaded_drawing is None
 
 
@@ -463,8 +475,30 @@ def test_public_wrapper_rejects_noncallable_saved_check_before_source_or_native_
     assert not case.phases
 
 
+@pytest.mark.parametrize("kind", ["async", "non-none"])
+def test_public_wrapper_rejects_unexecuted_async_or_non_none_saved_check(public_saved_case, kind):
+    case = public_saved_case
+
+    async def asynchronous(_adapter, _path):
+        case.source.write_bytes(b"an asynchronous check must never be silently skipped")
+
+    def non_none(_adapter, _path):
+        return True
+
+    case.saved_state.callback = asynchronous if kind == "async" else non_none
+    with pytest.raises(TypeError, match="synchronous.*None"):
+        case.run()
+    assert case.source.read_bytes() == b"unchanged supplier bytes"
+
+
 def test_saved_readback_binds_adapter_to_newly_reopened_drawing(saved_nut):
     case = saved_nut()
+    case.adapter.currentModel = NS(closed_drawing=True)
+
+    def opening():
+        assert case.adapter.currentModel is None
+
+    case.on_open = opening
 
     def annotations():
         assert case.adapter.currentModel is case.drawing

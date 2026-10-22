@@ -188,7 +188,10 @@ def _assert_nominal_carrier(
         source_sketch=sketch, entities=attached, types=types,
     )
     if not correspondence["proven"]:
-        raise RuntimeError("supplier nut nominal-major attachment is not its view-mapped source endpoint")
+        raise RuntimeError(
+            "supplier nut nominal-major attachment is not its view-mapped source endpoint: "
+            + json.dumps(correspondence, sort_keys=True)
+        )
     return correspondence
 
 
@@ -216,22 +219,12 @@ def assert_saved_supplier_nut_nominal(
     app = _early_bound(adapter.swApp, "ISldWorks")
     if app.GetOpenDocumentByName(str(drawing_path)) is not None:
         raise RuntimeError("supplier nut saved drawing must be closed before readback")
-    source = app.GetOpenDocumentByName(str(source_path))
-    if source is None:
-        raise RuntimeError("supplier nut saved readback lost its immutable source part")
-    source = _early_bound(source, "IModelDoc2")
-    source_kind = source.GetType()
-    if (
-        type(source_kind) is not int or source_kind != 1
-        or Path(source.GetPathName()).resolve() != source_path
-        or source.IsOpenedReadOnly() is not True
-    ):
-        raise RuntimeError("supplier nut saved readback has the wrong source part")
     with drawing_path.open("rb") as stream:
         before_hash = hashlib.file_digest(stream, "sha256").hexdigest()
     primary: BaseException | None = None
     acquired: Any = None
     try:
+        adapter.currentModel = None  # Release the finalizer's closed drawing handle.
         # Strict _early_bound guarantees makepy: [out] I4 values ride the return
         # tuple. Explicit BYREF VARIANTs would remain unwritten in this binding.
         opened = app.OpenDoc6(str(drawing_path), 3, 1 | 2, "", 0, 0)
@@ -256,6 +249,18 @@ def assert_saved_supplier_nut_nominal(
         if type(identity) is not int or identity != 1:
             raise RuntimeError("supplier nut saved drawing lost its loaded native identity")
         adapter.currentModel = draw
+        # Closing a drawing can release hidden references; reopen before lookup.
+        source = app.GetOpenDocumentByName(str(source_path))
+        if source is None:
+            raise RuntimeError("supplier nut saved readback lost its immutable source part")
+        source = _early_bound(source, "IModelDoc2")
+        source_kind = source.GetType()
+        if (
+            type(source_kind) is not int or source_kind != 1
+            or Path(source.GetPathName()).resolve() != source_path
+            or source.IsOpenedReadOnly() is not True
+        ):
+            raise RuntimeError("supplier nut saved readback has the wrong source part")
         sheets = tuple(_early_bound(draw, "IDrawingDoc").GetViews() or ())
         if len(sheets) != 1:
             raise RuntimeError("supplier nut saved drawing must have one sheet")
