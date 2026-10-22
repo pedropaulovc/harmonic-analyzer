@@ -1587,6 +1587,19 @@ strings and Python function-object identity are not native behavior. Configured
 member export readers remain restricted to the requesting part's registry row,
 and drawing fixtures retain native note, hidden-line and stale-source refusals.
 
+Supplier screw construction keeps a welded witness's already fully constrained
+endpoints rather than adding a redundant origin anchor. Other witnesses still
+receive their normal origin controls; all retain exact final-frame readback and
+the complete sketch's fully-defined guard. Head angles use a native angular
+dimension between the two actual construction rays, with the text point mapped
+from their owning sketch plane, and require exact driving-angle readback.
+Purchased pin end-rim center-condition failures remain failures. Their existing
+failure path records the actual setter result, both condition readbacks, native
+dimension type/value and attachment types independently; unavailable readers are
+not measured empty inventories, and optional diagnostics cannot replace that
+guard's original exception. This instrumentation is not a native pin fix or
+proof that an edge-on rim supports a center arc condition.
+
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
 solid/sheet-body counts and face counts and compares all twelve mass-property

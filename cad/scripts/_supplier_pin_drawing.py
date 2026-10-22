@@ -222,8 +222,31 @@ def _supplier_length(
         raise RuntimeError(f"{label}: end-plane reference is not a native length")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     for index in (1, 2):
-        if dimension.SetArcEndCondition(index, 1) != 0:  # swArcEndConditionCenter
-            raise RuntimeError(f"{label}: cannot center native end-rim endpoint {index}")
+        status = dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+        if status != 0:
+            failure = RuntimeError(f"{label}: cannot center native end-rim endpoint {index}")
+            try:
+                fields = {"label": label, "endpoint": index, "setter_return": status}
+                readers = (
+                    ("arc_end_condition_1", lambda: dimension.GetArcEndCondition(1)),
+                    ("arc_end_condition_2", lambda: dimension.GetArcEndCondition(2)),
+                    ("display_dimension_type", lambda: display.Type2),
+                    ("native_value_m", lambda: dimension.SystemValue),
+                    ("attached_entity_types", lambda: _early_bound(
+                        display.GetAnnotation(), "IAnnotation"
+                    ).GetAttachedEntityTypes()),
+                )
+                for field, reader in readers:
+                    try:
+                        value = reader()
+                        fields[field] = value
+                        fields[f"{field}_state"] = "UNAVAILABLE_NULL" if value is None else "OBSERVED"
+                    except BaseException as error:
+                        fields[f"{field}_state"] = "UNAVAILABLE"
+                        fields[f"{field}_error_type"] = type(error).__name__
+                _telemetry.info("supplier pin arc-end condition refused", **fields)
+            finally:
+                raise failure
     display = supplier_reference_dimension(
         adapter, display, label=label, units=source.units,
         precision=source.length_precision, expected_mm=source.length_mm,
@@ -347,4 +370,4 @@ def add_supplier_spring_pin_dimensions(
             ("*Right", wall, wall_check), ("*Right", hole, hole_check),
         ],
         expected_count=4, label=source.sku,
-    )
+    )
