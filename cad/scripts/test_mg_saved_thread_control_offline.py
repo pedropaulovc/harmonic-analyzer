@@ -72,7 +72,7 @@ def load(name, path):
 
 
 class NoNativeImports(importlib.abc.MetaPathFinder):
-    prefixes = ("pythoncom", "pywintypes", "win32", "comtypes", "solidworks_mcp", "azure", "temporalio", "_artifact_cache", "_telemetry", "_watchdog", "_com", "draw_mg_magnifying_bracket")
+    prefixes = ("pythoncom", "pywintypes", "win32", "comtypes", "solidworks_mcp", "azure", "temporalio", "_artifact_cache", "_telemetry", "_watchdog", "_com", "_seat_forensics", "draw_mg_magnifying_bracket")
 
     def __init__(self):
         self.attempts = []
@@ -143,28 +143,200 @@ class Sheet:
 
 
 class SectionLabel:
-    def __init__(self, label):
-        self.label = label
+    def __init__(self, label, view):
+        self.label, self.view = label, view
+        self.native_identity = object()
+        self.cut_only = True
 
     def GetLabel(self):
         return self.label
 
+    def GetDisplayOnlySurfaceCut(self):
+        return self.cut_only
+
+    def SetDisplayOnlySurfaceCut(self, value):
+        if type(value) is not bool:
+            raise AssertionError("BOOL input required")
+        self.view.document.app.mutators.append(("cut", value, self.view.document.path))
+        self.view.document.app.on_write(self.view, "cut")
+        if not self.view.document.app.refuse_write:
+            self.cut_only = value
+            self.view.document.dirty = True
+        return None
+
 
 class View:
-    def __init__(self, part, sheet_name, section_label, *, sheet=False, base=False):
+    def __init__(self, part, sheet_name, section_label, *, sheet=False, base=False, document=None):
         self.part, self.sheet, self.base = part, sheet, base
+        self.document = document
+        self.native_identity = object()
         self.sheet_name, self.section_label = sheet_name, section_label
         self.Name = sheet_name if sheet else f"Section View {section_label}-{section_label}"
+        self._angle = math.pi / 2
+        self.cut = SectionLabel(section_label, self)
+        self.parent = None
+        self.Type = 2
+        self.ReferencedConfiguration = "Default"
+        self.ScaleDecimal = 3.0
+        self.Position = [0.3, 0.2]
+        self.updates = 0
+
+    @property
+    def Angle(self):
+        return self._angle
+
+    @Angle.setter
+    def Angle(self, value):
+        self.document.app.mutators.append(("angle", value, self.document.path))
+        self.document.app.on_write(self, "angle")
+        if not self.document.app.refuse_write:
+            self._angle = value
+            self.document.dirty = True
 
     def GetSection(self):
-        return None if self.sheet or self.base else SectionLabel(self.section_label)
+        return None if self.sheet or self.base else self.cut
 
     def GetBaseView(self):
-        return View(self.part, self.sheet_name, self.section_label, base=True)
+        if self.parent is None:
+            self.parent = View(self.part, self.sheet_name, self.section_label, base=True, document=self.document)
+        return self.parent
 
     @property
     def ReferencedDocument(self):
         return self.part
+
+    def IsBroken(self):
+        return False
+
+    def GetDisplayMode2(self):
+        return 2
+
+    def GetCThreadQuality(self):
+        return True
+
+    def GetUseParentDisplayMode(self):
+        return False
+
+    def GetFacettedHlrDisplay(self):
+        return False
+
+    def GetCThreads(self):
+        if self.part.scene.is_sm:
+            env = self.document.app.environment
+            if self.updates == 0:
+                env.diagnostic_calls += 1
+                self.document.app.events.append(("diagnostic", "BracketMountingTaps"))
+                env.before_diagnostic()
+            phase = "after_generation" if self.updates else "before_generation"
+            witness = env.sm_read(f"{phase}.threads")
+            if witness.get("present") is not True:
+                return None
+            return [DisplayThread(self, index) for index in range(env.sm_read(f"{phase}.thread_count"))]
+        self.document.app.on_read(self)
+        return [DisplayThread(self, 0)]
+
+    def UpdateViewDisplayGeometry(self):
+        self.updates += 1
+        self.document.app.generation.append(self.document.path)
+
+    @property
+    def ModelToViewTransform(self):
+        return module("transform", view=self, ArrayData=[1.,0.,0.,0.,1.,0.,0.,0.,1.,0.,0.,0.,self.ScaleDecimal,0.,0.,0.])
+
+
+class DisplayThread:
+    def __init__(self, view, index):
+        self.view, self.index = view, index
+
+    def GetAnnotation(self):
+        if self.view.part.scene.is_sm:
+            phase = "after_generation" if self.view.updates else "before_generation"
+            if self.view.document.app.environment.sm_read(f"{phase}.thread[{self.index}].annotation").get("present") is not True:
+                return None
+        return DisplayAnnotation(self.view, self.index)
+
+    def GetDisplayData(self):
+        return self.display("ICThread")
+
+    def display(self, channel):
+        if self.view.part.scene.is_sm:
+            phase = "after_generation" if self.view.updates else "before_generation"
+            if self.view.document.app.environment.sm_read(f"{phase}.thread[{self.index}].{channel}.display").get("present") is not True:
+                return None
+        return DisplayData(self.view, channel, self.index)
+
+
+class DisplayAnnotation(DisplayThread):
+    Visible, Layer = 1, ""
+
+    def IsDangling(self):
+        return False
+
+    def GetAttachedEntityTypes(self):
+        return ()
+
+    def GetAttachedEntities3(self):
+        return (self.view.part.scene.edge,)
+
+    def GetDisplayData(self):
+        return self.display("IAnnotation")
+
+
+class DisplayData:
+    def __init__(self, view, channel, index):
+        self.view, self.channel, self.index = view, channel, index
+
+    def count(self, kind):
+        phase = "after_generation" if self.view.updates else "before_generation"
+        key = f"{phase}.thread[{self.index}].{self.channel}.{kind}.count"
+        if self.view.part.scene.is_sm:
+            return self.view.document.app.environment.sm_read(key)
+        result = recorded_diagnostic("b0")["reads"][key]
+        result = self.view.document.app.count_fault(self.view, self.channel, kind, result)
+        if isinstance(result, BaseException):
+            trip(result)
+        return result
+
+    def GetLineCount(self):
+        return self.count("lines")
+
+    def GetPolyLineCount(self):
+        return self.count("polylines")
+
+    def GetArcCount(self):
+        result = self.count("arcs")
+        if self.view.part.scene.is_sm and self.view.updates and self.index == 3 and self.channel == "IAnnotation":
+            self.view.document.app.environment.after_diagnostic()
+        return result
+
+    def payload(self, kind, index):
+        if self.view.part.scene.is_sm:
+            phase = "after_generation" if self.view.updates else "before_generation"
+            return self.view.document.app.environment.sm_read(f"{phase}.thread[{self.index}].{self.channel}.{kind}[{index}]")
+        return self.view.document.app.payload(self.view, self.channel, kind, index)
+
+    def GetLineAtIndex2(self, index):
+        return self.payload("lines", index)
+
+    def GetPolylineAtIndex2(self, index):
+        return self.payload("polylines", index)
+
+    def GetArcAtIndex2(self, index):
+        return self.payload("arcs", index)
+
+
+class MathPoint:
+    def __init__(self, xyz):
+        self.ArrayData = list(xyz)
+
+    def MultiplyTransform(self, transform):
+        view = transform.view
+        x, y, z = self.ArrayData
+        # Synthetic orthogonal orientation puts model Z axis in view X.
+        u, v = z, y
+        c, s = math.cos(view.Angle), math.sin(view.Angle)
+        return MathPoint([view.Position[0] + view.ScaleDecimal*(c*u-s*v),
+                          view.Position[1] + view.ScaleDecimal*(s*u+c*v), x*view.ScaleDecimal])
 
 
 class SketchManager:
@@ -194,10 +366,11 @@ class Document:
         self.sketch_manager_error = None
         self.scene = None
         self.extra_views = []
+        self.view_rows = None
 
     @property
     def Extension(self):
-        return self.scene
+        return self.scene if self.kind == 1 else module("extension", GetUserPreferenceToggle=lambda *_args: True)
 
     def FirstFeature(self):
         return self.scene.wizard
@@ -236,8 +409,13 @@ class Document:
         return (self.sheet_name,)
 
     def GetViews(self):
-        return ((View(self.part, self.sheet_name, self.section_label, sheet=True),
-                 View(self.part, self.sheet_name, self.section_label), *self.extra_views),)
+        if self.view_rows is None:
+            self.view_rows = ((View(self.part, self.sheet_name, self.section_label, sheet=True, document=self),
+                               View(self.part, self.sheet_name, self.section_label, document=self)),)
+        return (tuple(self.view_rows[0]) + tuple(self.extra_views),)
+
+    def ViewZoomtofit2(self):
+        return None
 
     def Sheet(self, name):
         if name != self.sheet_name:
@@ -307,11 +485,8 @@ class SourceDefinition:
         self.values = {key.removeprefix("source."): value for key, value in values.items()
                        if key.startswith("source.") and isinstance(value, (str, int, float))}
         if cosmetic:
-            self.values = {"ApplyThread": 1, "BlindDepth": 0.0, "Diameter": 0.00635,
-                           "DiameterType": 0, "EndCondition": 1}
+            self.values = dict(recorded_source()["features"][33]["scalars"])
             if scene.is_sm:
-                # Synthetic child metadata: actual SM child values await the
-                # authorized census, unlike its recorded Wizard/display data.
                 self.values.update(ApplyThread=0, BlindDepth=0.00495, DiameterType=2, EndCondition=0)
 
     def __getattr__(self, name):
@@ -324,39 +499,13 @@ class SourceDefinition:
 
     @property
     def Edge(self):
-        self.scene.edge_reads += 1
-        if not self.cosmetic or not self.scene.accessed:
-            raise AssertionError("selected Edge only inside confirmed cosmetic access")
-        if self.scene.edge_error is not None:
-            trip(self.scene.edge_error)
-        return self.scene.selected_edge
+        raise AssertionError("selected-edge getter forbidden in representation experiment")
 
-    def AccessSelections(self, top_doc, component):
-        if not self.cosmetic or top_doc is not self.scene.document or component is not None:
-            raise AssertionError("wrong typed access or top document")
-        if top_doc.readonly is not False:
-            raise AssertionError("access on readonly document")
-        self.scene.access_calls += 1
-        self.scene.events.append("access")
-        if isinstance(self.scene.access_result, BaseException):
-            trip(self.scene.access_result)
-        if self.scene.access_result is True:
-            self.scene.accessed = True
-            self.scene.phase = "accessed"
-            top_doc.dirty = True
-        return self.scene.access_result
+    def AccessSelections(self, *_args):
+        raise AssertionError("source selection access forbidden")
 
     def ReleaseSelectionAccess(self):
-        self.scene.release_calls += 1
-        self.scene.events.append("release")
-        if not self.scene.accessed:
-            raise AssertionError("blind release forbidden")
-        if self.scene.release_error is not None:
-            trip(self.scene.release_error)
-        self.scene.accessed = False
-        self.scene.phase = "after"
-        self.scene.on_release()
-        return None
+        raise AssertionError("source release forbidden")
 
 
 class SourceFace(NativeObject):
@@ -514,6 +663,12 @@ class SourceScene:
         self.resolve_override = None
         self.on_release = lambda: None
 
+    def GetUserPreferenceToggle(self, *_args):
+        return True
+
+    def GetCorrespondingEntity2(self, _entity):
+        return None  # Actual B0 correspondence is NULL, never invent ownership.
+
     def GetPersistReference3(self, entity):
         key = next((key for key, known in self.references.items() if known is entity), None)
         if key is None:
@@ -539,7 +694,7 @@ class Application:
         self.first_override = DEFAULT
         self.next_overrides = {}
         self.readonly = {1: DEFAULT, 3: DEFAULT}
-        self.source_mode = "wizard_only"
+        self.source_mode = "cosmetic"
         self.scenes = []
         self.prepare_scene = lambda _scene: None
         self.sm_source_mode = "cosmetic"
@@ -557,6 +712,15 @@ class Application:
         self.open_warning = 0
         self.open_warnings = {}
         self.activation_calls = []
+        self.mutators, self.generation = [], []
+        self.on_write = lambda _view, _kind: None
+        self.on_read = lambda _view: None
+        self.refuse_write = False
+        self.count_fault = lambda _view, _channel, _kind, value: value
+        self.payload = lambda *_args: [0.,0.,0.,0.,0.3,0.2,0.,0.3,0.21,0.]
+
+    def GetMathUtility(self):
+        return module("math", CreatePoint=MathPoint)
 
     def __setattr__(self, name, value):
         if name in ("UserControl", "Visible", "UserControlBackground"):
@@ -607,9 +771,9 @@ class Application:
         if kind == 1 and self.documents:
             raise AssertionError("next pair opened before native emptiness")
         self.events.append(("OpenDoc6", Path(path).name))
-        expected_options = 1 if kind == 1 and "mg-magnifying-bracket" in path else 3
+        expected_options = 1 if kind == 3 and "mg-magnifying-bracket" in path else 3
         if (options, configuration, errors, warnings) != (expected_options, "", 0, 0):
-            raise AssertionError("fixed SM/S1 open contract changed")
+            raise AssertionError("fixed SM/R1/C1 open contract changed")
         readonly = bool(options & 2) if self.readonly[kind] is DEFAULT else self.readonly[kind]
         doc = Document(path, kind, readonly=readonly)
         doc.app = self
@@ -623,8 +787,8 @@ class Application:
         self.documents.append(doc)
         self.active = doc
         self.after_open(doc)
-        case = "s1" if "mg-magnifying-bracket" in path else "sm_positive"
-        return doc, 0, self.open_warnings.get((case, kind), self.open_warning if case == "s1" else 0)
+        case = "sm_positive" if "sm-summing-lever" in path else ("r1" if len(self.scenes) == 2 else "c1")
+        return doc, 0, self.open_warnings.get((case, kind), self.open_warning if case != "sm_positive" else 0)
 
     def ActivateDoc3(self, path, preferences, option, errors):
         self.activation_calls.append(path)
@@ -639,7 +803,7 @@ class Application:
             raise AssertionError("UserControl must be the final native close witness")
         if any(Path(doc.path).stem not in ("sm-summing-lever", "mg-magnifying-bracket", "mg-magnifying-bracket-native-thread")
                or type(doc.dirty) is not bool
-               or (doc.dirty and ("mg-magnifying-bracket" not in doc.path or "diagnostic-copies" not in doc.path))
+               or (doc.dirty and (doc.kind != 3 or doc.readonly is not False or "mg-magnifying-bracket" not in doc.path or "diagnostic-copies" not in doc.path))
                for doc in self.documents):
             raise AssertionError("CloseDoc could touch an unowned/unknown-dirty or dirty SM document")
         if self.close_error is not None:
@@ -705,6 +869,7 @@ class Adapter:
 class Environment:
     def __init__(self):
         self.app = Application()
+        self.app.environment = self
         self.adapter = Adapter(self.app)
         self.telemetry = Telemetry()
         self.watchdog_events = []
@@ -718,10 +883,19 @@ class Environment:
         self.blob_error = None
         self.blob_close_error = None
         self.before_diagnostic = lambda: None
-        self.diagnostic_result = lambda feature: recorded_diagnostic("sm_positive" if feature == "BracketMountingTaps" else "b0")
+        self.sm_diagnostic = recorded_diagnostic("sm_positive")
+        self.sm_reader_fault = lambda _key, value: value
+        self.sm_reader_calls = []
+        self.image_calls = []
         self.identity_override = None
         self.path_redirect = None
         self.copy_fs_attempts = []
+
+    def capture_image(self, path):
+        self.image_calls.append(str(path))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic offline image collaborator")
+        return str(path)
 
     def credential(self):
         self.blob_calls.append("ManagedIdentityCredential")
@@ -772,15 +946,13 @@ class Environment:
         self.cache_calls.append((key, outputs, label))
         return True
 
-    def diagnostic(self, _adapter, _section, *, feature_name):
-        expected = "BracketMountingTaps" if self.diagnostic_calls == 0 else "LeverTap"
-        if feature_name != expected:
-            raise AssertionError("wrong diagnostic feature/order")
-        self.diagnostic_calls += 1
-        self.app.events.append(("diagnostic", feature_name))
-        self.before_diagnostic()
-        self.after_diagnostic()
-        return self.diagnostic_result(feature_name)
+    def sm_read(self, key):
+        """Actual fixture values served through individually faultable native readers."""
+        self.sm_reader_calls.append(key)
+        value = self.sm_reader_fault(key, self.sm_diagnostic["reads"][key])
+        if isinstance(value, BaseException):
+            trip(value)
+        return value
 
     @contextmanager
     def installed(self):
@@ -800,7 +972,8 @@ class Environment:
                 "diagnostics": diagnostics,
                 "diagnostics._script_paths": module("diagnostics._script_paths"),
                 "win32com": win32, "win32com.client": client,
-                "_com": module("_com", _early_bound=lambda value, _kind: value),
+                "_com": module("_com", _early_bound=lambda value, _kind: value, double_array=lambda value: tuple(value)),
+                "_seat_forensics": module("_seat_forensics", _grab_screen=self.capture_image),
                 "_telemetry": self.telemetry,
                 "_watchdog": module("_watchdog", start=lambda: self.watchdog_events.append("start"), stop=self.stop),
                 "_artifact_cache": module("_artifact_cache", restore=self.restore, _restore_path=self.restore_path),
@@ -808,7 +981,6 @@ class Environment:
                 "azure.identity": module("azure.identity", ManagedIdentityCredential=self.credential),
                 "azure.storage": module("azure.storage", __path__=[]),
                 "azure.storage.blob": module("azure.storage.blob", ContainerClient=self.container),
-                "draw_mg_magnifying_bracket": module("draw_mg_magnifying_bracket", _mouth_thread_diagnostic=self.diagnostic),
                 "solidworks_mcp": module("solidworks_mcp", __path__=[]),
                 "solidworks_mcp.adapters": module("solidworks_mcp.adapters", __path__=[]),
                 "solidworks_mcp.adapters.pywin32_adapter": module("solidworks_mcp.adapters.pywin32_adapter", PyWin32Adapter=lambda _config: self.adapter),
@@ -839,7 +1011,7 @@ class Environment:
             # execute normally. Native behavioral dictionaries stay unmodified.
             for case in driver.CONTRACT["cases"]:
                 for kind in ("part", "drawing"):
-                    payload = b"offline captured drawing fixture" if case["case"] == "s1" and kind == "drawing" else f"{case['case']} {kind}".encode()
+                    payload = b"offline captured drawing fixture" if case["case"] != "sm_positive" and kind == "drawing" else f"{'sm' if case['case'] == 'sm_positive' else 'bracket'} {kind}".encode()
                     case[kind].update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
                     target = root / case[kind]["path"]
                     target.parent.mkdir(parents=True, exist_ok=True)
@@ -858,7 +1030,7 @@ class Environment:
                 for case in driver.CONTRACT["cases"]:
                     for kind in ("part", "drawing"):
                         if Path(path) == root / case[kind]["path"]:
-                            if case["case"] == "s1" and kind == "drawing":
+                            if case["case"] != "sm_positive" and kind == "drawing":
                                 return original_identity(path)
                             return {key: case[kind][key] for key in ("bytes", "sha256")}
                 return original_identity(path)
@@ -1089,9 +1261,10 @@ class OwnedControlSmoke(unittest.TestCase):
             code, report, captures = env.run_driver()
             self.assertEqual(code, 0)
             self.assertEqual(report["status"], "observed")
-            self.assertEqual(report["native_ship"], "NOT_EVALUATED")
-            self.assertEqual([row[1] for row in env.app.open_calls], [1, 3, 1, 3])
+            self.assertEqual(report["native_ship"], "NOT_SHIP")
+            self.assertEqual([row[1] for row in env.app.open_calls], [1, 3, 1, 3, 1, 3])
             self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT",
+                                                 "mg-magnifying-bracket-native-thread.SLDDRW", "mg-magnifying-bracket.SLDPRT",
                                                  "mg-magnifying-bracket-native-thread.SLDDRW", "mg-magnifying-bracket.SLDPRT"])
             self.assertEqual(env.app.documents, [])
             self.assertEqual(captures, [])
@@ -1101,7 +1274,8 @@ class OwnedControlSmoke(unittest.TestCase):
             env.app.auto_unload_part = True
             code, report, _ = env.run_driver()
             self.assertEqual(code, 0)
-            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "mg-magnifying-bracket-native-thread.SLDDRW"])
+            self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "mg-magnifying-bracket-native-thread.SLDDRW",
+                                                 "mg-magnifying-bracket-native-thread.SLDDRW"])
             self.assertEqual(report["cases"][0]["closures"][1]["status"], "already_unloaded")
             two_owned = report["cases"][0]["inventories"]["after_open_drawing"]
             self.assertEqual(two_owned["native_count_before"], 2)
@@ -1173,7 +1347,7 @@ class OwnedControlSmoke(unittest.TestCase):
                 self.assertEqual(len(captures), 1)
                 capture = captures[0]
                 self.assertEqual(capture["primary_failure"]["type"], exception_type.__name__)
-                self.assertEqual(capture["primary_failure"]["operation"], "collect")
+                self.assertEqual(capture["primary_failure"]["operation"], "after_generation.thread[3].IAnnotation.arcs.count")
                 self.assertEqual(capture["primary_failure"]["message"], "original interrupt")
                 self.assertTrue(any(frame["function"] == "interrupt_diagnostic" for frame in capture["primary_traceback"]["frames"]))
                 self.assertTrue(any(row["type"] == "ProbeError" for row in capture["errors"]))
@@ -1414,96 +1588,11 @@ class OwnedControlSmoke(unittest.TestCase):
                     self.assertEqual(len(initial_cleanup["documents"]), 2)
 
 
-    def test_two_pairs_have_independent_evidence_in_one_attached_callback(self):
-        with Environment().installed() as env:
-            code, report, captures = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertTrue(report["collection_completed"])
-            self.assertEqual(report["cases"][0]["session_python_handles"], report["cases"][1]["session_python_handles"])
-            self.assertEqual(report["cases"][0]["session_python_handles"]["adapter"], id(env.adapter))
-            self.assertEqual(env.diagnostic_calls, 2)
-            self.assertEqual(env.adapter.disconnect_calls, 1)
-            self.assertEqual(env.telemetry.events.count("sw.attach.enter"), 1)
-            self.assertEqual([row[0] for row in env.cache_calls], [
-                env.driver.SM_POSITIVE["drawing"]["key"], env.driver.SM_POSITIVE["part"]["key"],
-                env.driver.S1["part"]["key"],
-            ])
-            self.assertEqual(env.blob_calls, [
-                "ManagedIdentityCredential",
-                ("ContainerClient", "https://stswboot5qnlwu2vtr6gs.blob.core.windows.net", "results"),
-                ("get_blob_client", env.driver.S1["drawing"]["blob"]),
-                "download_blob", "readall", "container.close", "credential.close",
-            ])
-            for index, feature in enumerate(("BracketMountingTaps", "LeverTap")):
-                case = report["cases"][index]
-                self.assertEqual(case["status"], "observed")
-                self.assertTrue(case["collection_completed"])
-                self.assertEqual(case["diagnostic"]["feature"], feature)
-                self.assertEqual(case["errors"], [])
-                self.assertEqual(len(case["opens"]), 2)
-                self.assertEqual(len(case["closures"]), 2)
-                self.assertTrue(case["reads"]["base.reference_IsSame_opened_part"])
-                for phase in ("initial", "final"):
-                    self.assertTrue(case["inventories"][phase]["enumerated"])
-                    self.assertEqual(case["inventories"][phase]["native_count_before"], 0)
-                    self.assertEqual(case["inventories"][phase]["native_count_after"], 0)
-                    self.assertEqual(case["inventories"][phase]["documents"], [])
-                for kind in ("drawing", "part"):
-                    self.assertEqual(case["reads"][f"staged.{kind}"], case["reads"][f"final.{kind}"])
-                self.assertTrue(case["reads"]["final.currentModel_identity_restored"])
-                self.assertTrue(case["reads"]["final.active_identity_restored"])
-            self.assertEqual(report["cases"][1]["reads"]["sheet_names"], ["Sheet1"])
-            self.assertEqual(report["cases"][1]["views"][1]["section_label"], "A")
-            self.assertEqual(captures, [])
+    
 
-    def test_active_sketch_reads_enclose_entire_diagnostic_for_both_documents(self):
-        with Environment().installed() as env:
-            def during_diagnostic():
-                for doc in env.app.documents:
-                    doc.active_sketch = object()
+    
 
-            env.after_diagnostic = during_diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            for case in report["cases"]:
-                for name in ("source", "drawing"):
-                    before = case["active_sketch"]["before_diagnostic_including_generation"][name]
-                    after = case["active_sketch"]["after_diagnostic_including_generation"][name]
-                    self.assertEqual(before, {"state": "NULL", "errors": []})
-                    self.assertEqual(after, {"state": "PRESENT", "errors": []})
-            events = [event for event in env.app.events if isinstance(event, tuple)
-                      and event[0] in ("ActiveSketch", "diagnostic")]
-            self.assertEqual([event[0] for event in events],
-                             ["ActiveSketch", "ActiveSketch", "diagnostic", "ActiveSketch", "ActiveSketch"] * 2)
-            self.assertEqual([event[1] for event in events if event[0] == "ActiveSketch"], [1, 3, 1, 3] * 2)
-
-    def test_s1_sketch_read_failures_are_independent_unavailable_not_null(self):
-        with Environment().installed() as env:
-            primary = BrokenText()
-
-            def prepare(doc):
-                if "mg-magnifying-bracket" in doc.path:
-                    if doc.kind == 1:
-                        doc.sketch_manager_error = primary
-                    else:
-                        doc.active_sketch = object()
-
-            env.app.after_open = prepare
-            code, report, captures = env.run_driver()
-            self.assertEqual(code, 1)
-            self.assertEqual(report["cases"][0]["errors"], [])
-            b0 = report["cases"][1]
-            self.assertTrue(b0["collection_completed"])
-            for phase in ("before_diagnostic_including_generation", "after_diagnostic_including_generation"):
-                source = b0["active_sketch"][phase]["source"]
-                self.assertEqual(source["state"], "UNAVAILABLE")
-                self.assertEqual(source["errors"][0]["type"], "BrokenText")
-                self.assertEqual(b0["active_sketch"][phase]["drawing"]["state"], "PRESENT")
-            self.assertEqual(env.app.documents, [])
-            self.assertEqual(captures[0]["primary_failure"]["case"], "s1")
-            body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
-            self.assertIs(body_exit[2], primary)
-            self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
+    
 
     def test_wrong_reference_or_auto_loaded_document_never_gets_adopted(self):
         for case_index in (0, 1):
@@ -1534,7 +1623,7 @@ class OwnedControlSmoke(unittest.TestCase):
                         self.assertEqual(report["cases"][1]["status"], "not_started")
                         self.assertEqual(env.blob_calls, [])
 
-    def test_sm_final_hash_failure_prevents_s1_staging(self):
+    def test_sm_final_hash_failure_prevents_representation_staging(self):
         with Environment().installed() as env:
             def changed_identity(path):
                 if Path(path).name == "sm-summing-lever.SLDPRT" and env.diagnostic_calls:
@@ -1549,7 +1638,7 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertEqual(len(env.cache_calls), 2)
             self.assertEqual(env.app.documents, [])
 
-    def test_s1_download_errors_or_hash_mismatch_cannot_open_or_replace_source(self):
+    def test_drawing_download_errors_or_hash_mismatch_cannot_open_or_replace_source(self):
         for mode in ("access_denied", "wrong_bytes"):
             with self.subTest(mode=mode), Environment().installed() as env:
                 if mode == "access_denied":
@@ -1564,7 +1653,7 @@ class OwnedControlSmoke(unittest.TestCase):
                 self.assertEqual(env.diagnostic_calls, 1)
                 self.assertEqual(len(env.cache_calls), 2)
                 self.assertEqual(env.app.documents, [])
-                self.assertEqual(captures[0]["primary_failure"]["case"], "s1")
+                self.assertEqual(captures[0]["primary_failure"]["case"], "r1")
                 self.assertEqual(captures[0]["primary_failure"]["operation"], "captured_blob.download")
                 self.assertIn("credential.close", env.blob_calls)
                 if mode == "access_denied":
@@ -1573,771 +1662,22 @@ class OwnedControlSmoke(unittest.TestCase):
                     self.assertIs(body_exit[2], env.blob_error)
                     self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
 
-    def test_s1_original_disk_hash_change_is_reported_after_owned_cleanup(self):
-        with Environment().installed() as env:
-            def change_bytes():
-                if env.diagnostic_calls == 2:
-                    (env.driver.ROOT / env.driver.S1["drawing"]["path"]).write_bytes(b"changed on disk")
+    
 
-            env.after_diagnostic = change_bytes
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            sm, b0 = report["cases"]
-            self.assertEqual(sm["status"], "observed")
-            self.assertEqual(b0["status"], "failed")
-            self.assertNotEqual(b0["reads"]["staged.drawing"], b0["reads"]["final.drawing"])
-            self.assertEqual(env.app.documents, [])
+    
 
-    def test_s1_dirty_copy_is_discarded_but_wrong_open_mode_refuses_access(self):
-        for mode in ("dirty", "readonly"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                def prepare(doc):
-                    if mode == "readonly" and "mg-magnifying-bracket" in doc.path and doc.kind == 1:
-                        doc.readonly = True
+    
 
-                def dirty_after():
-                    if mode == "dirty" and env.diagnostic_calls == 2:
-                        env.app.documents[0].dirty = True
+    
 
-                env.app.after_open = prepare
-                env.after_diagnostic = dirty_after
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 0 if mode == "dirty" else 1)
-                self.assertEqual(report["cases"][0]["status"], "observed")
-                self.assertEqual(env.app.documents, [])
-                self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
-                if mode == "readonly":
-                    self.assertEqual(env.diagnostic_calls, 1)
-
-    def test_s1_original_baseexception_survives_cleanup_baseexception(self):
-        with Environment().installed() as env:
-            primary = KeyboardInterrupt("original S1 baseline diagnostic")
-
-            def interrupt():
-                if env.diagnostic_calls == 2:
-                    env.app.close_error = SystemExit("secondary CloseDoc")
-                    trip(primary)
-
-            env.after_diagnostic = interrupt
-            code, report, captures = env.run_driver()
-            self.assertEqual(code, 1)
-            self.assertEqual(report["cases"][0]["errors"], [])
-            self.assertEqual(captures[0]["primary_failure"]["type"], "KeyboardInterrupt")
-            self.assertEqual(captures[0]["primary_failure"]["case"], "s1")
-            self.assertEqual(len(env.app.documents), 2)
-            self.assertIn("after_diagnostic_including_generation", report["cases"][1]["active_sketch"])
-            body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
-            self.assertIs(body_exit[2], primary)
-            self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(body_exit[3])))
-
-    def test_s1_baseline_positive_ink_stops_without_claiming_flank_recovery(self):
-        with Environment().installed() as env:
-            key = "after_generation.thread[0].ICThread.lines.count"
-            def diagnostic(feature):
-                value = recorded_diagnostic("sm_positive" if feature == "BracketMountingTaps" else "b0")
-                if feature == "LeverTap":
-                    value["reads"][key] = 1
-                    value["reads"]["after_generation.thread[0].ICThread.lines[0]"] = [0, 1, 2]
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            b0 = report["cases"][1]
-            self.assertEqual(b0["thread_ink"]["state"], "PRESENT")
-            self.assertEqual(b0["thread_ink"]["positive_count_fields"], [key])
-            self.assertTrue(b0["thread_ink"]["recommendation"].startswith("STOP;"))
-            self.assertEqual(b0["diagnostic"]["reads"]["after_generation.thread[0].ICThread.lines[0]"], [0, 1, 2])
-            self.assertEqual(env.diagnostic_calls, 2)
-            self.assertEqual(report["native_ship"], "NOT_EVALUATED")
-
-    def test_diagnostic_reader_failure_is_not_reported_as_zero_ink(self):
-        with Environment().installed() as env:
-            def diagnostic(feature):
-                value = recorded_diagnostic("sm_positive" if feature == "BracketMountingTaps" else "b0")
-                if feature == "LeverTap":
-                    value["reads"] = {}
-                    value["errors"] = {"after_generation.thread[0].ICThread.lines.count": "reader failed"}
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertEqual(report["status"], "observed_with_diagnostic_read_errors")
-            b0 = report["cases"][1]
-            self.assertEqual(b0["thread_ink"]["state"], "UNAVAILABLE")
-            self.assertEqual(b0["diagnostic"]["reads"], {})
-            self.assertEqual(len(b0["diagnostic"]["errors"]), 1)
+    
 
 
 
-class S1Behavior(unittest.TestCase):
-    def test_actual_recorded_positive_and_complete_zero_are_distinct(self):
-        with Environment().installed() as env:
-            positive = env.driver.thread_ink_summary(recorded_diagnostic("sm_positive"))
-            zero = env.driver.thread_ink_summary(recorded_diagnostic("b0"))
-            self.assertEqual(positive["state"], "PRESENT")
-            self.assertTrue(positive["complete"])
-            self.assertEqual(len(positive["positive_count_fields"]), 8)
-            self.assertEqual(len(positive["positive_payload_fields"]), 28)
-            self.assertEqual(zero["state"], "OBSERVED_ZERO")
-            self.assertTrue(zero["complete"])
-            self.assertEqual(zero["positive_count_fields"], [])
-
-    def test_each_actual_zero_count_requires_an_actual_nonnegative_integer(self):
-        original = recorded_diagnostic("b0")
-        fields = [key for key in original["reads"] if key.endswith((".lines.count", ".polylines.count", ".arcs.count"))]
-        self.assertEqual(len(fields), 12)
-        with Environment().installed() as env:
-            for key in fields:
-                for value in (None, True, False, -1, 0.0, "0", DEFAULT):
-                    with self.subTest(key=key, value_type=type(value).__name__):
-                        diagnostic = copy.deepcopy(original)
-                        if value is DEFAULT:
-                            del diagnostic["reads"][key]
-                        else:
-                            diagnostic["reads"][key] = value
-                        self.assertEqual(env.driver.thread_ink_summary(diagnostic)["state"], "UNAVAILABLE")
-
-    def test_every_thread_annotation_display_and_list_witness_is_required(self):
-        original = recorded_diagnostic("b0")
-        fields = [key for key in original["reads"]
-                  if key.endswith((".threads", ".thread_count", ".annotation", ".display"))
-                  or key in ("before_generation.thread[0]", "after_generation.thread[0]")]
-        with Environment().installed() as env:
-            for key in fields:
-                diagnostic = copy.deepcopy(original)
-                del diagnostic["reads"][key]
-                with self.subTest(key=key):
-                    self.assertEqual(env.driver.thread_ink_summary(diagnostic)["state"], "UNAVAILABLE")
-            for key in ("before_generation.thread_count", "after_generation.thread_count"):
-                for value in (None, False, True, -1, 0, 1.0):
-                    diagnostic = copy.deepcopy(original)
-                    diagnostic["reads"][key] = value
-                    self.assertEqual(env.driver.thread_ink_summary(diagnostic)["state"], "UNAVAILABLE")
-            for error_key in ("before_generation.thread[0].ICThread.lines.count", "source.definition"):
-                diagnostic = copy.deepcopy(original)
-                diagnostic["errors"][error_key] = "actual reader failure"
-                self.assertEqual(env.driver.thread_ink_summary(diagnostic)["state"], "UNAVAILABLE")
-
-    def test_positive_count_stops_access_even_with_incomplete_evidence(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            original = env.diagnostic_result
-            def diagnostic(feature):
-                value = original(feature)
-                if feature == "LeverTap":
-                    value["reads"]["before_generation.thread[0].ICThread.lines.count"] = 1
-                    del value["reads"]["before_generation.thread[0].annotation"]
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertEqual(report["cases"][1]["s1"]["state"], "STOP_BASELINE_PRIMITIVES")
-            self.assertEqual(env.app.scenes[-1].access_calls, 0)
-            self.assertEqual(env.app.scenes[-1].edge_reads, 0)
-
-    def test_wizard_only_is_unavailable_without_selected_edge_substitution(self):
-        with Environment().installed() as env:
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            evidence = report["cases"][1]["s1"]
-            self.assertTrue(evidence["phases"]["before"]["complete"])
-            self.assertEqual(evidence["cosmetic_candidate_count"], 0)
-            self.assertEqual(evidence["intended_wizard_count"], 1)
-            self.assertEqual(evidence["state"], "UNAVAILABLE")
-            self.assertEqual(evidence["access_calls"], 0)
-            self.assertEqual(env.app.scenes[-1].edge_reads, 0)
-
-    def test_complete_access_release_reacquires_all_phases_and_discards_only_copies(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            code, report, captures = env.run_driver()
-            self.assertEqual(code, 0)
-            sm, s1 = report["cases"]
-            scene = env.app.scenes[-1]
-            self.assertEqual(scene.events, ["access", "release"])
-            self.assertEqual((scene.access_calls, scene.release_calls, scene.edge_reads), (1, 1, 1))
-            evidence = s1["s1"]
-            self.assertEqual(evidence["state"], "ACCESS_READ_RELEASE_OBSERVED")
-            self.assertTrue(evidence["clean_comparison"])
-            self.assertTrue(evidence["roll_forward_witness"])
-            self.assertEqual(evidence["causal_conclusion"], "NOT_ESTABLISHED")
-            self.assertTrue(evidence["selected_edge"]["wizard_face_association"])
-            self.assertEqual(evidence["selected_edge"]["trimmed_circle"]["state"], "FULL_TRIMMED_CIRCLE")
-            self.assertEqual(set(evidence["phases"]), {"before", "accessed", "after"})
-            self.assertFalse(evidence["phases"]["accessed"]["all_features_rolled_forward"])
-            self.assertEqual(set(phase for _, phase in scene.definition_reads), {"before", "accessed", "after"})
-            self.assertEqual([row[2] for row in env.app.open_calls], [3, 3, 1, 3])
-            self.assertNotEqual(sm["copy_root"], s1["copy_root"])
-            for case in (sm, s1):
-                for kind in ("part", "drawing"):
-                    self.assertEqual(case["reads"][f"copy_before.{kind}"], case["reads"][f"copy_after.{kind}"])
-                    self.assertEqual(case["reads"][f"staged.{kind}"], case["reads"][f"final.{kind}"])
-                self.assertTrue(case["reads"]["final.inventory_empty"])
-                self.assertEqual(case["reads"]["final.ActiveDoc_state"], "NULL")
-                for row in case["opens"]:
-                    self.assertEqual(Path(row["path"]).parent, Path(case["copy_root"]))
-                    self.assertEqual(Path(row["path"]).name, Path(case["contract"][row["kind"]]["path"]).name)
-            self.assertEqual(env.diagnostic_calls, 3)
-            self.assertEqual(env.app.documents, [])
-            self.assertEqual(captures, [])
-
-    def test_incomplete_or_ambiguous_source_never_selects_one_good_candidate(self):
-        for mode in ("second_cosmetic", "type_error", "definition_error", "owner_error",
-                     "null_definition", "wrong_typed_definition", "unowned_owner", "scalar_error", "cycle", "subfeature_cycle"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    if mode == "second_cosmetic":
-                        scene.cosmetic.next = SourceFeature(scene, "Other", "CosmeticThread", SourceDefinition(scene, True))
-                    elif mode == "null_definition":
-                        scene.cosmetic.definition = None
-                    elif mode == "wrong_typed_definition":
-                        scene.cosmetic.definition = scene.wizard.definition
-                    elif mode == "unowned_owner":
-                        scene.cosmetic.owner = NativeObject()
-                    elif mode == "scalar_error":
-                        scene.wizard.definition.values["ThreadDiameter"] = ProbeError("scalar unavailable")
-                    elif mode == "cycle":
-                        scene.later.next = scene.wizard
-                    elif mode == "subfeature_cycle":
-                        scene.cosmetic.child = scene.wizard
-                    else:
-                        setattr(scene.later, mode, ProbeError("independent candidate inventory failed"))
-                env.app.prepare_scene = prepare
-                _, report, _ = env.run_driver()
-                evidence = report["cases"][1]["s1"]
-                self.assertEqual(evidence["state"], "UNAVAILABLE")
-                self.assertEqual(evidence["access_calls"], 0)
-                self.assertEqual(env.app.scenes[-1].release_calls, 0)
-                self.assertTrue(evidence["phases"]["before"]["features"][0]["scalars"])
-
-    def test_native_null_owner_is_observed_not_fabricated_failure(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            env.app.prepare_scene = lambda scene: setattr(scene.cosmetic, "owner", None)
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            evidence = report["cases"][1]["s1"]
-            self.assertEqual(evidence["access_calls"], 1)
-            self.assertEqual(evidence["phases"]["before"]["features"][1]["owner_state"], "NULL")
-            self.assertTrue(evidence["selected_edge"]["wizard_face_association"])
-
-    def test_access_requires_actual_true_and_never_blindly_releases_or_retries(self):
-        for value in (False, None, 1, "true", ProbeError("access state unknown")):
-            with self.subTest(value_type=type(value).__name__), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                env.app.prepare_scene = lambda scene: setattr(scene, "access_result", value)
-                _, report, _ = env.run_driver()
-                evidence = report["cases"][1]["s1"]
-                self.assertEqual(evidence["state"], "UNAVAILABLE")
-                self.assertEqual((evidence["access_calls"], evidence["release_calls"]), (1, 0))
-                self.assertEqual(env.app.scenes[-1].edge_reads, 0)
-                self.assertIn("after", evidence["phases"])
-
-    def test_selected_reader_primary_survives_one_release_failure_and_dirty_cleanup(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            primary = BrokenText()
-            def prepare(scene):
-                scene.edge_error = primary
-                scene.release_error = ProbeError("release secondary")
-            env.app.prepare_scene = prepare
-            code, report, captures = env.run_driver()
-            self.assertEqual(code, 1)
-            evidence = report["cases"][1]["s1"]
-            self.assertEqual((evidence["access_calls"], evidence["release_calls"]), (1, 1))
-            self.assertFalse(evidence["roll_forward_witness"])
-            self.assertFalse(evidence["clean_comparison"])
-            self.assertIn("after", evidence["phases"])
-            self.assertEqual(report["primary_failure"]["type"], "BrokenText")
-            self.assertIn("selected_edge", report["primary_failure"]["operation"])
-            self.assertEqual(env.app.documents, [])
-            self.assertTrue(captures[0]["primary_traceback"]["available"])
-            root_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
-            self.assertIs(root_exit[2], primary)
-
-    def test_persistent_status_or_native_identity_cannot_be_replaced_by_same_bytes(self):
-        for mode in ("bool_status", "deleted", "null", "same_geometry_other_identity"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    if mode == "bool_status":
-                        scene.resolve_status = False
-                    elif mode == "deleted":
-                        scene.resolve_status = 4
-                    elif mode == "null":
-                        scene.resolve_override = lambda _entity: None
-                    else:
-                        scene.resolve_override = lambda _entity: NativeObject()
-                env.app.prepare_scene = prepare
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertEqual(report["cases"][1]["s1"]["access_calls"], 0)
-                self.assertEqual(env.app.documents, [])
-
-    def test_arc_failed_evaluation_and_foreign_body_never_establish_clean_comparison(self):
-        for mode in ("arc", "bad_status", "foreign_body", "domain_false", "domain_bool_range", "geometry_drift"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    if mode == "arc":
-                        scene.span = math.pi
-                    elif mode == "bad_status":
-                        scene.eval_status = 0
-                    elif mode == "foreign_body":
-                        scene.edge_body = NativeObject()
-                    elif mode == "domain_false":
-                        scene.domain = (False, 0.0, math.tau, True, True)
-                    elif mode == "domain_bool_range":
-                        scene.domain = (True, False, math.tau, True, True)
-                    else:
-                        scene.on_release = lambda: setattr(scene, "radius", 0.004)
-                env.app.prepare_scene = prepare
-                _, report, _ = env.run_driver()
-                evidence = report["cases"][1]["s1"]
-                failed_operation = mode in ("bad_status", "domain_false", "domain_bool_range")
-                self.assertEqual(evidence["release_calls"], 0 if failed_operation else 1)
-                self.assertFalse(evidence["clean_comparison"])
-                if failed_operation:
-                    self.assertFalse(evidence["phases"]["before"]["complete"])
-                    self.assertFalse(evidence["display_generation_permitted"])
-                self.assertEqual(evidence["causal_conclusion"], "NOT_ESTABLISHED")
-                if mode == "arc":
-                    self.assertEqual(evidence["selected_edge"]["trimmed_circle"]["state"], "NOT_FULL_OR_CONTRADICTORY")
-                if mode == "geometry_drift":
-                    self.assertFalse(evidence["selected_geometry_unchanged"])
-
-    def test_unknown_dirty_foreign_document_or_user_control_strands_s1_without_close(self):
-        for mode in ("dirty_none", "dirty_int", "foreign", "user_control", "identity"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    def after_release():
-                        if mode == "dirty_none":
-                            scene.document.dirty = None
-                        elif mode == "dirty_int":
-                            scene.document.dirty = 1
-                        elif mode == "foreign":
-                            env.app.documents.append(Document("C:/foreign/hidden.SLDPRT", 1))
-                        elif mode == "identity":
-                            env.app.identity_override = -1
-                        else:
-                            env.app.control = False
-                    scene.on_release = after_release
-                env.app.prepare_scene = prepare
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT"])
-                self.assertTrue(all(row["status"] == "stranded_owned" for row in report["cases"][1]["closures"]))
-
-    def test_copy_disk_drift_is_reported_after_cleanup_without_adopting_native_bytes(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            env.app.prepare_scene = lambda scene: setattr(
-                scene, "on_release", lambda: Path(scene.document.path).write_bytes(b"changed copy on disk"),
-            )
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            s1 = report["cases"][1]
-            self.assertEqual(s1["reads"]["staged.part"], s1["reads"]["final.part"])
-            self.assertNotEqual(s1["reads"]["copy_before.part"], s1["reads"]["copy_after.part"])
-            self.assertEqual(env.app.documents, [])
 
 
-    def test_every_s1_view_reference_not_only_target_section_must_be_owned(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            foreign = Document("C:/foreign/another.SLDPRT", 1)
-            def prepare(doc):
-                if doc.kind == 3 and "mg-magnifying-bracket" in doc.path:
-                    doc.extra_views.append(View(foreign, doc.sheet_name, doc.section_label, base=True))
-            env.app.after_open = prepare
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            self.assertEqual(env.app.scenes[-1].access_calls, 0)
-            self.assertEqual(env.diagnostic_calls, 1)
-            self.assertEqual(env.app.documents, [])
-            self.assertTrue(any(".reference" in row["operation"] for row in report["cases"][1]["errors"]))
-
-    def test_nonzero_or_unknown_open_warning_never_reaches_access(self):
-        for warning in (1, None, False, "0"):
-            with self.subTest(warning=warning), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                env.app.open_warning = warning
-                code, _, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertEqual(env.app.scenes[-1].access_calls, 0)
-                self.assertEqual(env.app.documents, [])
-
-    def test_source_open_mode_is_reread_after_baseline_before_access(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            def change_mode():
-                if env.diagnostic_calls == 2:
-                    env.app.documents[0].readonly = True
-            env.after_diagnostic = change_mode
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            s1 = report["cases"][1]
-            self.assertIs(s1["reads"]["before_access.part.IsOpenedReadOnly"], True)
-            self.assertIs(s1["reads"]["before_access.drawing.IsOpenedReadOnly"], True)
-            self.assertEqual(s1["s1"]["access_calls"], 0)
-            self.assertEqual(env.app.documents, [])
-
-    def test_definitions_are_reacquired_not_read_through_stale_access_objects(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            def prepare(scene):
-                def release():
-                    old_wizard, old_cosmetic = scene.wizard.definition, scene.cosmetic.definition
-                    scene.wizard.definition = SourceDefinition(scene)
-                    scene.cosmetic.definition = SourceDefinition(scene, True)
-                    for old in (old_wizard, old_cosmetic):
-                        old.values = {name: ProbeError("stale definition read") for name in old.values}
-                scene.on_release = release
-            env.app.prepare_scene = prepare
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertTrue(report["cases"][1]["s1"]["clean_comparison"])
-            self.assertEqual(env.app.scenes[-1].edge_reads, 1)
-
-    def test_native_body_or_definition_drift_blocks_clean_comparison(self):
-        for mode in ("body", "definition"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    def release():
-                        if mode == "body":
-                            scene.body = scene.edge_body = NativeObject()
-                        else:
-                            scene.wizard.definition.values["ThreadDiameter"] = 0.008
-                    scene.on_release = release
-                env.app.prepare_scene = prepare
-                _, report, _ = env.run_driver()
-                self.assertFalse(report["cases"][1]["s1"]["clean_comparison"])
-                self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-
-    def test_primitives_after_single_access_stop_without_flank_or_cause_claim(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            original = env.diagnostic_result
-            def diagnostic(feature):
-                value = original(feature)
-                if env.diagnostic_calls == 3:
-                    value["reads"]["after_generation.thread[0].ICThread.lines.count"] = 1
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            s1 = report["cases"][1]
-            self.assertEqual(s1["after_access_thread_ink"]["state"], "PRESENT")
-            self.assertIn("do not establish recovered flanks", s1["s1"]["stop"])
-            self.assertEqual(s1["s1"]["causal_conclusion"], "NOT_ESTABLISHED")
-            self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-            self.assertEqual(env.diagnostic_calls, 3)
 
 
-    def test_s1_rechecks_user_control_before_second_dirty_copy_close(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            original_close = env.app.CloseDoc
-            def close(title):
-                original_close(title)
-                if title == "mg-magnifying-bracket-native-thread.SLDDRW":
-                    env.app.control = False
-            with patch.object(env.app, "CloseDoc", close):
-                code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            self.assertEqual(env.app.close_calls, [
-                "sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT",
-                "mg-magnifying-bracket-native-thread.SLDDRW",
-            ])
-            self.assertEqual(report["cases"][1]["closures"][1]["status"], "stranded_owned")
-            self.assertEqual(len(env.app.documents), 1)
-            self.assertIs(env.app.documents[0].dirty, True)
-
-    def test_void_release_is_not_a_boolean_success_contract_or_retry_trigger(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            def prepare(scene):
-                original_release = scene.cosmetic.definition.ReleaseSelectionAccess
-                def bad_void():
-                    original_release()
-                    return False
-                scene.cosmetic.definition.ReleaseSelectionAccess = bad_void
-            env.app.prepare_scene = prepare
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 1)
-            evidence = report["cases"][1]["s1"]
-            self.assertFalse(evidence["release_returned"])
-            self.assertFalse(evidence["clean_comparison"])
-            self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-            self.assertEqual(env.app.documents, [])
-
-    def test_after_access_reader_error_remains_unavailable_not_observed_zero(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            original = env.diagnostic_result
-            def diagnostic(feature):
-                value = original(feature)
-                if env.diagnostic_calls == 3:
-                    value["errors"]["after_generation.thread[0].ICThread.lines.count"] = "reader failed"
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertEqual(report["status"], "observed_with_diagnostic_read_errors")
-            self.assertEqual(report["cases"][1]["after_access_thread_ink"]["state"], "UNAVAILABLE")
-            self.assertFalse(report["cases"][1]["s1"]["clean_comparison"])
-            self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-
-
-class S1SafetyRepairs(unittest.TestCase):
-    def test_redirected_copy_ancestor_refuses_before_any_creation_or_open(self):
-        # Simulate resolve() through a symlink/junction without creating one or
-        # needing Windows link privileges. The write guard records ATTEMPTS.
-        for ancestor in ("cad/out/diagnostic-copies",
-                         "cad/out/diagnostic-copies/mg-saved-thread-control"):
-            with self.subTest(ancestor=ancestor), Environment().installed() as env:
-                env.path_redirect = ancestor
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertIn("uncertified output path", report["primary_failure"]["message"])
-                self.assertEqual(env.copy_fs_attempts, [])
-                self.assertEqual(env.cache_calls, [])
-                self.assertEqual(env.blob_calls, [])
-                self.assertEqual(env.app.open_calls, [])
-                self.assertEqual(env.app.close_calls, [])
-                self.assertEqual(env.app.documents, [])
-                self.assertEqual(report["cases"][1]["status"], "not_started")
-
-    def test_copy_path_is_recertified_at_direct_ownership_and_cleanup(self):
-        for boundary in ("direct_open", "cleanup"):
-            with self.subTest(boundary=boundary), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def redirect():
-                    env.path_redirect = "cad/out/diagnostic-copies/mg-saved-thread-control"
-                if boundary == "direct_open":
-                    def after_open(doc):
-                        if doc.kind == 1 and "mg-magnifying-bracket" in doc.path:
-                            redirect()
-                    env.app.after_open = after_open
-                else:
-                    env.app.prepare_scene = lambda scene: setattr(scene, "on_release", redirect)
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT"])
-                s1 = report["cases"][1]
-                if boundary == "direct_open":
-                    self.assertEqual(len(env.app.documents), 1)
-                    self.assertEqual(s1["opens"][0]["ownership_state"], "UNAVAILABLE_STRANDED")
-                    self.assertEqual(env.app.scenes[-1].access_calls, 0)
-                else:
-                    self.assertEqual(len(env.app.documents), 2)
-                    self.assertTrue(all(row["status"] == "stranded_owned" for row in s1["closures"]))
-
-    def test_unconfirmed_access_release_or_rollforward_never_generates_after_display(self):
-        for mode in ("access_false", "access_unknown", "access_error", "release_error",
-                     "release_nonvoid", "rolled_back", "rollback_unknown"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    if mode == "access_false":
-                        scene.access_result = False
-                    elif mode == "access_unknown":
-                        scene.access_result = 1
-                    elif mode == "access_error":
-                        scene.access_result = ProbeError("access failed")
-                    elif mode == "release_error":
-                        scene.release_error = ProbeError("release failed")
-                    elif mode == "release_nonvoid":
-                        release = scene.cosmetic.definition.ReleaseSelectionAccess
-                        def bad_void():
-                            release()
-                            return False
-                        scene.cosmetic.definition.ReleaseSelectionAccess = bad_void
-                    elif mode == "rolled_back":
-                        scene.on_release = lambda: setattr(scene, "accessed", True)
-                    else:
-                        scene.on_release = lambda: setattr(scene.later, "IsRolledBack", lambda: None)
-                env.app.prepare_scene = prepare
-                _, report, _ = env.run_driver()
-                source = report["cases"][1]["s1"]
-                self.assertFalse(source["display_generation_permitted"])
-                self.assertFalse(source["clean_comparison"])
-                self.assertIn("after", source["phases"])
-                self.assertNotIn("after_access_diagnostic", report["cases"][1])
-                self.assertEqual(env.diagnostic_calls, 2)
-                self.assertEqual([Path(path).suffix for path in env.app.activation_calls],
-                                 [".SLDDRW", ".SLDDRW", ".SLDPRT"])
-                self.assertEqual(env.app.scenes[-1].release_calls, 0 if mode.startswith("access_") else 1)
-                self.assertEqual(env.app.documents, [])
-
-    def test_escaping_access_body_baseexception_precedes_release_failure(self):
-        for primary in (KeyboardInterrupt("original interrupt"), SystemExit("original exit")):
-            with self.subTest(primary=type(primary).__name__), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                env.app.prepare_scene = lambda scene: setattr(scene, "release_error", ProbeError("secondary release"))
-                original = env.driver.trimmed_circle_summary
-                interrupted = False
-                def classify(reads):
-                    nonlocal interrupted
-                    if env.app.scenes[-1].accessed and not interrupted:
-                        interrupted = True
-                        trip(primary)  # Outside source_intervention.read(), after actual access True.
-                    return original(reads)
-                with patch.object(env.driver, "trimmed_circle_summary", classify):
-                    code, report, captures = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertTrue(interrupted)
-                self.assertEqual(report["primary_failure"]["operation"], "s1.access_body")
-                self.assertEqual(report["primary_failure"]["type"], type(primary).__name__)
-                source = report["cases"][1]["s1"]
-                self.assertEqual(source["errors"][0]["operation"], "s1.access_body")
-                self.assertTrue(any(row["operation"] == "s1.ReleaseSelectionAccess" for row in source["errors"][1:]))
-                self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-                self.assertFalse(source["display_generation_permitted"])
-                self.assertEqual(env.diagnostic_calls, 2)
-                root_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
-                self.assertIs(root_exit[2], primary)
-                self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(root_exit[3])))
-                self.assertTrue(captures[0]["primary_traceback"]["available"])
-                self.assertEqual(env.app.documents, [])
-
-    def test_positive_sm_counts_without_successful_payloads_cannot_admit_s1(self):
-        for mode in ("reader_errors", "null", "empty", "invalid_value", "stale_errored_rows"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                diagnostic = recorded_diagnostic("sm_positive")
-                fields = env.driver.thread_ink_summary(diagnostic)["positive_payload_fields"]
-                self.assertEqual(len(fields), 28)
-                for key in fields:
-                    if mode == "reader_errors":
-                        diagnostic["reads"].pop(key)
-                        diagnostic["errors"][key] = "native row reader failed"
-                    elif mode == "stale_errored_rows":
-                        diagnostic["errors"][key] = "row read not successful"
-                    else:
-                        diagnostic["reads"][key] = {"null": None, "empty": [], "invalid_value": [False]}[mode]
-                summary = env.driver.thread_ink_summary(diagnostic)
-                self.assertEqual(summary["state"], "PRESENT")  # Counts still stop any intervention.
-                self.assertEqual(len(summary["positive_count_fields"]), 8)
-                self.assertEqual(summary["positive_payload_fields"], [])
-                env.diagnostic_result = lambda _feature: diagnostic
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                self.assertEqual(env.diagnostic_calls, 1)
-                self.assertEqual(report["cases"][1]["status"], "not_started")
-                self.assertEqual(len(env.app.open_calls), 2)
-                self.assertEqual(env.blob_calls, [])
-                self.assertEqual(env.app.documents, [])
-
-    def test_successful_sm_payloads_admit_despite_unrelated_optional_reader_error(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            original = env.diagnostic_result
-            def diagnostic(feature):
-                value = original(feature)
-                if feature == "BracketMountingTaps":
-                    value["errors"]["source.CosmeticThreadType"] = "optional source reader unavailable"
-                return value
-            env.diagnostic_result = diagnostic
-            code, report, _ = env.run_driver()
-            self.assertEqual(code, 0)
-            self.assertEqual(len(report["cases"][0]["thread_ink"]["positive_payload_fields"]), 28)
-            self.assertEqual(report["cases"][0]["status"], "observed_with_diagnostic_read_errors")
-            self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
-            self.assertEqual(env.diagnostic_calls, 3)
-
-    def test_distinct_nonselected_line_requires_success_not_circle_classification(self):
-        for phase in ("before", "after"):
-            for mode in ("healthy", "bad_status", "domain_false", "domain_shape", "domain_flags", "evaluation_shape"):
-                with self.subTest(phase=phase, mode=mode), Environment().installed() as env:
-                    env.app.source_mode = "cosmetic"
-                    def prepare(scene):
-                        line = SourceLineEdge(scene)
-                        scene.edges.append(line)
-                        def configure():
-                            if mode == "bad_status":
-                                line.eval_status = 0
-                            elif mode == "domain_false":
-                                line.domain = (False, 0.0, 1.0, False, False)
-                            elif mode == "domain_shape":
-                                line.domain = (True, 0.0, 1.0)
-                            elif mode == "domain_flags":
-                                line.domain = (True, 0.0, 1.0, 0, False)
-                            elif mode == "evaluation_shape":
-                                line.Evaluate2 = lambda _parameter, _derivatives: (0.0, 0.0, 0.0)
-                        if phase == "before":
-                            configure()
-                        else:
-                            scene.on_release = configure
-                    env.app.prepare_scene = prepare
-                    code, report, _ = env.run_driver()
-                    source = report["cases"][1]["s1"]
-                    snapshot = source["phases"][phase]
-                    self.assertEqual(len(snapshot["edges"]), 2)
-                    self.assertEqual(snapshot["edges"][0]["trimmed_circle"]["state"], "FULL_TRIMMED_CIRCLE")
-                    self.assertTrue(snapshot["edges"][0]["operations_complete"])
-                    self.assertIs(snapshot["edges"][1]["reads"]["circle"], False)
-                    self.assertEqual(snapshot["edges"][1]["operations_complete"], mode == "healthy")
-                    if mode == "healthy":
-                        self.assertEqual(code, 0)
-                        self.assertTrue(source["clean_comparison"])
-                        self.assertTrue(source["display_generation_permitted"])
-                        self.assertEqual(env.diagnostic_calls, 3)
-                    else:
-                        self.assertEqual(code, 1)
-                        self.assertFalse(snapshot["complete"])
-                        self.assertFalse(source["clean_comparison"])
-                        self.assertFalse(source["display_generation_permitted"])
-                        self.assertEqual(source["release_calls"], 0 if phase == "before" else 1)
-                        self.assertEqual(env.diagnostic_calls, 2)
-                        self.assertTrue(any("edge[1]" in row["operation"] for row in source["errors"]))
-                    self.assertEqual(env.app.documents, [])
-
-    def test_open_warnings_refuse_at_boundary_including_sm_positive_and_wizard_only(self):
-        for route in ("sm", "s1_cosmetic", "s1_wizard", "s1_positive"):
-            for kind in (1, 3):
-                for warning in (1, None, False, "0"):
-                    with self.subTest(route=route, kind=kind, warning=warning), Environment().installed() as env:
-                        index = 0 if route == "sm" else 1
-                        case = "sm_positive" if index == 0 else "s1"
-                        env.app.source_mode = "wizard_only" if route == "s1_wizard" else "cosmetic"
-                        env.app.open_warnings[(case, kind)] = warning
-                        if route == "s1_positive":
-                            env.diagnostic_result = lambda _feature: recorded_diagnostic("sm_positive")
-                        code, report, _ = env.run_driver()
-                        self.assertEqual(code, 1)
-                        self.assertEqual(env.diagnostic_calls, index)
-                        failed = report["cases"][index]
-                        self.assertEqual(failed["opens"][-1]["warnings"], warning)
-                        self.assertIs(type(failed["opens"][-1]["warnings"]), type(warning))
-                        self.assertEqual(failed["opens"][-1]["ownership_state"], "CERTIFIED_COPY")
-                        self.assertTrue(failed["opens"][-1]["retained_owned"])
-                        self.assertIsNone(failed["diagnostic"])
-                        self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
-                        self.assertEqual(len(env.app.open_calls), index * 2 + (1 if kind == 1 else 2))
-                        self.assertEqual(len(env.app.close_calls), len(env.app.open_calls))
-                        self.assertEqual(env.app.documents, [])
-
-    def test_warning_does_not_authorize_close_of_unknown_direct_result(self):
-        for index in (0, 1):
-            with self.subTest(case=index), Environment().installed() as env:
-                case = "sm_positive" if index == 0 else "s1"
-                env.app.open_warnings[(case, 1)] = 1
-                def unknown_owner(doc):
-                    if doc.kind == 1 and ("mg-magnifying-bracket" in doc.path) == bool(index):
-                        doc.path = "C:/foreign/uncertified.SLDPRT"
-                env.app.after_open = unknown_owner
-                code, report, _ = env.run_driver()
-                self.assertEqual(code, 1)
-                failed = report["cases"][index]
-                self.assertEqual(failed["opens"][-1]["warnings"], 1)
-                self.assertEqual(failed["opens"][-1]["ownership_state"], "UNAVAILABLE_STRANDED")
-                self.assertFalse(failed["opens"][-1].get("retained_owned", False))
-                self.assertEqual(len(env.app.close_calls), index * 2)
-                self.assertEqual(len(env.app.documents), 1)
-                self.assertEqual(env.diagnostic_calls, index)
 
 
 def install_recorded_tree_aliases(scene):
@@ -2464,122 +1804,11 @@ class RecordedSourceIdentityBoundaries(unittest.TestCase):
             renamed[2]["name"] = "Changed History"
             self.assertNotEqual(env.driver.structural_tree(renamed, links), baseline)
 
-    def test_actual_aliases_stay_descriptive_in_all_three_synthetic_phases(self):
-        with Environment().installed() as env:
-            env.app.source_mode = "cosmetic"
-            env.app.prepare_scene = install_recorded_tree_aliases
-            code, report, _ = env.run_driver()
-            source = report["cases"][1]["s1"]
-            self.assertEqual(code, 0)
-            self.assertTrue(source["clean_comparison"])
-            self.assertEqual((source["access_calls"], source["release_calls"]), (1, 1))
-            for phase in ("before", "accessed", "after"):
-                snapshot = source["phases"][phase]
-                self.assertTrue(snapshot["complete"])
-                self.assertTrue(snapshot["tree_complete"])
-                self.assertTrue(snapshot["core_identity_complete"])
-                descriptive = [row for row in snapshot["features"] if row["identity_role"] == "DESCRIPTIVE_TREE"]
-                self.assertEqual(len(descriptive), 6)
-                for row in descriptive:
-                    proof = source["reference_observations"][f"{phase}.feature[{row['index']}].reference"]
-                    self.assertEqual((proof["status"], proof["native_same"], proof["state"]), (0, 0, "DIFFERENT"))
-                    self.assertFalse(proof["required"])
-                    self.assertFalse(proof["native_identity_claim"])
-                    self.assertEqual(proof["bytes"], recorded_source()["feature_reference_reads"]["before.feature[2].reference.bytes"])
-                self.assertTrue(any(len(alias["feature_indices"]) == 7 for alias in snapshot["reference_aliases"]))
-            self.assertTrue(source["tree_structure_unchanged"])
-            self.assertTrue(source["accessed_tree_structure_unchanged"])
-            self.assertEqual(len(source["feature_identity_after"]), source["phases"]["before"]["core_feature_count"])
-            descriptive_owners = [row for row in source["feature_identity_after"] if row["owner_identity_role"] != "NATIVE"]
-            self.assertEqual(len(descriptive_owners), 2)
-            for row in descriptive_owners:
-                self.assertIsNone(row["owner_unchanged"])
-                self.assertTrue(row["owner_relation_unchanged"])
-            self.assertEqual(env.app.documents, [])
+    
 
-    def test_optional_pid_failure_is_local_but_core_unknown_type_or_tree_failure_blocks(self):
-        for mode in ("optional_pid", "core_pid", "unknown_type", "physical_folder", "tree_type", "definition_error", "model_owner"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    nodes, alias = install_recorded_tree_aliases(scene)
-                    if mode == "optional_pid":
-                        original = scene.GetPersistReference3
-                        def get_reference(entity):
-                            if entity is nodes[2]:
-                                raise RuntimeError("optional native PID reader unavailable")
-                            return original(entity)
-                        scene.GetPersistReference3 = get_reference
-                    elif mode == "core_pid":
-                        original = scene.GetPersistReference3
-                        scene.GetPersistReference3 = lambda entity: alias if entity is scene.wizard else original(entity)
-                    elif mode in ("unknown_type", "physical_folder"):
-                        nodes[2].kind = "NewFolder" if mode == "unknown_type" else "SolidBodyFolder"
-                    elif mode == "tree_type":
-                        nodes[2].type_error = RuntimeError("mandatory tree reader unavailable")
-                    elif mode == "model_owner":
-                        scene.cosmetic.owner = nodes[11]
-                    else:
-                        nodes[2].definition_error = RuntimeError("not observed unsupported")
-                env.app.prepare_scene = prepare
-                code, report, _ = env.run_driver()
-                source = report["cases"][1]["s1"]
-                if mode == "optional_pid":
-                    self.assertEqual(code, 0)
-                    self.assertTrue(source["clean_comparison"])
-                    optional_errors = [row for row in source["reference_observations"].values() if "error" in row]
-                    self.assertEqual(len(optional_errors), 3)
-                    self.assertTrue(all(row["state"] == "UNAVAILABLE" and not row["required"] for row in optional_errors))
-                    self.assertTrue(all(row["error"]["traceback_frames"] for row in optional_errors))
-                    self.assertTrue(all(row["resolved_type_state"] == "UNAVAILABLE_NOT_READ" for row in optional_errors))
-                    self.assertFalse(source["errors"])
-                else:
-                    self.assertEqual(code, 1)
-                    self.assertFalse(source["phases"]["before"]["complete"])
-                    self.assertEqual(source["access_calls"], 0)
-                    self.assertFalse(source["display_generation_permitted"])
-                self.assertEqual(env.app.documents, [])
+    
 
-    def test_changed_descriptive_structure_after_release_stops_display_without_native_identity_claim(self):
-        for mode in ("rename", "remove", "reparent", "reader_failure", "accessed_rename"):
-            with self.subTest(mode=mode), Environment().installed() as env:
-                env.app.source_mode = "cosmetic"
-                def prepare(scene):
-                    nodes, _alias = install_recorded_tree_aliases(scene)
-                    original_name = nodes[2].Name
-                    if mode == "accessed_rename":
-                        original_access = scene.cosmetic.definition.AccessSelections
-                        def access(part, component):
-                            value = original_access(part, component)
-                            nodes[2].Name = "Temporarily changed History"
-                            return value
-                        scene.cosmetic.definition.AccessSelections = access
-                    def change():
-                        if mode == "accessed_rename":
-                            nodes[2].Name = original_name
-                            return
-                        if mode == "rename":
-                            nodes[2].Name = "Changed History"
-                        elif mode == "remove":
-                            nodes[1].next = nodes[3]
-                        elif mode == "reparent":
-                            nodes[1].next = nodes[3]
-                            nodes[1].child, nodes[2].next = nodes[2], None
-                        else:
-                            nodes[2].type_error = RuntimeError("after tree reader unavailable")
-                    scene.on_release = change
-                env.app.prepare_scene = prepare
-                code, report, _ = env.run_driver()
-                source = report["cases"][1]["s1"]
-                self.assertEqual(code, 1)
-                self.assertEqual((source["access_calls"], source["release_calls"]), (1, 1))
-                if mode == "accessed_rename":
-                    self.assertTrue(source["tree_structure_unchanged"])
-                    self.assertFalse(source["accessed_tree_structure_unchanged"])
-                else:
-                    self.assertFalse(source["tree_structure_unchanged"])
-                self.assertFalse(source["display_generation_permitted"])
-                self.assertEqual(env.diagnostic_calls, 2)
+    
 
 
 class PassiveSmScalarBoundaries(unittest.TestCase):
@@ -2606,13 +1835,13 @@ class PassiveSmScalarBoundaries(unittest.TestCase):
             self.assertEqual(census["wizard"]["scalars"]["ThreadEndCondition"], 0)
             self.assertEqual(census["wizard"]["scalars"]["ThreadDepth"], 0.00495)
             self.assertEqual([child["scalars"]["BlindDepth"] for child in census["cosmetic_children"]], [0.00495, 0.003])
-            self.assertEqual(census["enum_namespaces"], report["cases"][1]["s1"]["enum_namespaces"])
+            self.assertEqual(census["enum_namespaces"], report["cases"][1]["source_observations"]["enum_namespaces"])
             self.assertEqual(census["causal_conclusion"], "NOT_ESTABLISHED")
             scene = env.app.scenes[0]
             self.assertEqual((scene.access_calls, scene.release_calls, scene.edge_reads), (0, 0, 0))
             self.assertFalse(scene.document.dirty)
 
-    def test_missing_or_failed_sm_child_evidence_never_becomes_zero_or_admits_s1(self):
+    def test_missing_or_failed_sm_child_evidence_never_becomes_zero_or_admits_interventions(self):
         for mode in ("null_definition", "definition_error", "scalar_error", "null_scalar",
                      "wrong_owner", "owner_error", "unclassified_owner", "duplicate_wizard", "tree_error", "core_pid"):
             with self.subTest(mode=mode), Environment().installed() as env:
@@ -2681,6 +1910,406 @@ class PassiveSmScalarBoundaries(unittest.TestCase):
             self.assertEqual(census["cosmetic_child_count"], 0)
             self.assertEqual(census["cosmetic_children"], [])
             self.assertFalse(census["errors"])
+
+
+class RepresentationBehavior(unittest.TestCase):
+    def test_three_fresh_pairs_one_control_and_exactly_one_factor_each(self):
+        with Environment().installed() as env:
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 0)
+            self.assertEqual(captures, [])
+            sm, r1, c1 = report["cases"]
+            self.assertEqual([case["case"] for case in report["cases"]], ["sm_positive", "r1", "c1"])
+            self.assertEqual(env.diagnostic_calls, 1)
+            self.assertEqual(env.adapter.disconnect_calls, 1)
+            self.assertEqual([call[2] for call in env.app.open_calls], [3, 3, 3, 1, 3, 1])
+            self.assertEqual([(kind, value) for kind,value,_ in env.app.mutators], [("angle", 0.0), ("cut", False)])
+            self.assertEqual(len({case["copy_root"] for case in report["cases"]}), 3)
+            self.assertEqual(r1["reads"]["copy_before.part"], c1["reads"]["copy_before.part"])
+            self.assertEqual(r1["reads"]["copy_before.drawing"], c1["reads"]["copy_before.drawing"])
+            self.assertEqual(len(sm["thread_ink"]["positive_payload_fields"]), 28)
+            for case in report["cases"]:
+                self.assertTrue(case["collection_completed"])
+                self.assertTrue(case["reads"]["final.inventory_empty"])
+                self.assertEqual(case["reads"]["final.ActiveDoc_state"], "NULL")
+                for kind in ("part", "drawing"):
+                    self.assertEqual(case["reads"][f"staged.{kind}"], case["reads"][f"final.{kind}"])
+                    self.assertEqual(case["reads"][f"copy_before.{kind}"], case["reads"][f"copy_after.{kind}"])
+            for case in (r1, c1):
+                experiment = case["representation"]
+                self.assertEqual(experiment["state"], "OBSERVED_ZERO")
+                self.assertEqual(experiment["native_ship"], "NOT_SHIP")
+                self.assertTrue(experiment["confirmed"])
+                self.assertEqual(experiment["mutator_calls"], 1)
+                self.assertEqual(case["thread_ink"]["state"], "OBSERVED_ZERO")
+                baseline = experiment["stages"]["baseline_before_generation"]["state"]
+                self.assertEqual((baseline["angle"], baseline["cut_only"]), (math.pi/2, True))
+                self.assertTrue(case["source_observations"]["clean_comparison"])
+                self.assertEqual(set(case["source_observations"]["phases"]), {"before", "after"})
+            self.assertEqual(env.app.documents, [])
+            self.assertTrue(all(not scene.document.dirty for scene in env.app.scenes))
+
+    def test_actual_recorded_summary_and_all_zero_boundaries(self):
+        with Environment().installed() as env:
+            positive = env.driver.thread_ink_summary(recorded_diagnostic("sm_positive"))
+            self.assertEqual(len(positive["positive_payload_fields"]), 28)
+            original = recorded_diagnostic("b0")
+            self.assertEqual(env.driver.thread_ink_summary(original)["state"], "OBSERVED_ZERO")
+            keys = [key for key in original["reads"] if key.endswith((".lines.count", ".polylines.count", ".arcs.count"))]
+            self.assertEqual(len(keys), 12)
+            for key in keys:
+                for value in (None, True, False, -1, "0", 0.0, DEFAULT):
+                    changed = copy.deepcopy(original)
+                    if value is DEFAULT:
+                        changed["reads"].pop(key)
+                    else:
+                        changed["reads"][key] = value
+                    self.assertEqual(env.driver.thread_ink_summary(changed)["state"], "UNAVAILABLE")
+            for key in list(original["reads"]):
+                if key.endswith((".threads", ".thread_count", ".annotation", ".display")) or key.endswith(".thread[0]"):
+                    changed = copy.deepcopy(original)
+                    changed["reads"].pop(key)
+                    self.assertEqual(env.driver.thread_ink_summary(changed)["state"], "UNAVAILABLE")
+            changed = copy.deepcopy(original)
+            changed["errors"]["native_reader"] = "unavailable"
+            self.assertEqual(env.driver.thread_ink_summary(changed)["state"], "UNAVAILABLE")
+            changed = copy.deepcopy(original)
+            changed["reads"][keys[0]] = 1
+            result = env.driver.thread_ink_summary(changed)
+            self.assertTrue(result["positive_count_fields"])
+            self.assertFalse(result["positive_payload_fields"])
+
+    def test_invalid_fresh_baseline_never_writes_or_starts_c1(self):
+        for mode in ("angle", "cut", "positive", "null", "bool", "negative", "reader", "configuration"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def prepare(doc):
+                    if doc.kind != 3 or "mg-magnifying-bracket" not in doc.path:
+                        return
+                    view = doc.GetViews()[0][1]
+                    if mode == "angle":
+                        view._angle = 0.0
+                    elif mode == "cut":
+                        view.cut.cut_only = False
+                    elif mode == "configuration":
+                        view.ReferencedConfiguration = ""
+                env.app.after_open = prepare
+                values = {"positive":1, "null":None, "bool":False, "negative":-1, "reader":ProbeError("native count failure")}
+                if mode in values:
+                    env.app.count_fault = lambda _view,_channel,kind,value: values[mode] if kind == "lines" else value
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.app.mutators, [])
+                self.assertEqual(report["cases"][2]["status"], "not_started")
+                self.assertEqual(env.app.documents, [])
+
+    def test_native_factor_write_readback_is_required_without_retry(self):
+        for kind in ("angle", "cut"):
+            with self.subTest(kind=kind), Environment().installed() as env:
+                env.app.on_write = lambda _view, actual: setattr(env.app, "refuse_write", actual == kind)
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                index = 1 if kind == "angle" else 2
+                failed = report["cases"][index]
+                self.assertTrue(failed["representation"]["attempted"])
+                self.assertFalse(failed["representation"]["confirmed"])
+                self.assertEqual(sum(actual == kind for actual,_,_ in env.app.mutators), 1)
+                self.assertEqual(len([path for path in env.app.generation if path.startswith(failed["copy_root"])]), 1)
+                self.assertEqual(env.app.documents, [])
+
+    def test_dirty_part_unknown_saveflag_or_changed_readonly_strands_without_unsafe_close(self):
+        for mode in ("part_dirty", "drawing_unknown", "part_mode", "drawing_mode", "control", "foreign", "identity"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def change(view, _kind):
+                    if mode == "part_dirty":
+                        view.part.dirty = True
+                    elif mode == "drawing_unknown":
+                        view.document.GetSaveFlag = lambda: None
+                    elif mode == "part_mode":
+                        view.part.readonly = False
+                    elif mode == "drawing_mode":
+                        view.document.readonly = True
+                    elif mode == "control":
+                        env.app.control = False
+                    elif mode == "foreign":
+                        env.app.documents.append(Document("C:/foreign/other.SLDPRT", 1))
+                    else:
+                        env.app.identity_override = -1
+                env.app.on_write = change
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(len(env.app.close_calls), 2)  # only completed SM
+                self.assertTrue(env.app.documents)
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in report["cases"][1]["closures"]))
+                self.assertEqual(report["cases"][2]["status"], "not_started")
+
+    def test_first_mutator_baseexception_survives_readers_cleanup_and_source_after(self):
+        with Environment().installed() as env:
+            primary = KeyboardInterrupt("original representation write")
+            def fail_write(_view, _kind):
+                env.app.close_error = BrokenText()
+                trip(primary)
+            env.app.on_write = fail_write
+            code, report, captures = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertEqual(report["primary_failure"]["type"], "KeyboardInterrupt")
+            self.assertEqual(report["primary_failure"]["message"], "original representation write")
+            self.assertIn("after", report["cases"][1]["source_observations"]["phases"])
+            self.assertTrue(captures)
+            body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+            self.assertIs(body_exit[2], primary)
+            self.assertTrue(any(frame.f_code is trip.__code__ for frame,_ in traceback.walk_tb(body_exit[3])))
+
+    def test_finite_payload_positive_is_not_flank_identity_and_c1_still_runs(self):
+        with Environment().installed() as env:
+            env.app.count_fault = lambda view,_channel,kind,value: 1 if view.document.dirty and kind == "lines" else value
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            for case in report["cases"][1:]:
+                representation = case["representation"]
+                self.assertEqual(representation["state"], "OBSERVED_POSITIVE")
+                self.assertEqual(representation["causal_conclusion"], "NOT_ESTABLISHED")
+                geometry = representation["stages"]["post_write_after_generation"]["geometry"]
+                self.assertTrue(geometry["primitives"])
+                self.assertIn("UNAVAILABLE", geometry["coordinate_frame_authority"])
+                self.assertEqual(geometry["source_display_native_identity"], "UNAVAILABLE_NO_INVENTED_BRIDGE")
+                self.assertEqual(case["native_ship"], "NOT_SHIP")
+
+    def test_bad_positive_payload_is_unavailable_without_zero_substitution(self):
+        for payload in (None, [], [0.]*10, [float("nan")]*10, [True]*10):
+            with self.subTest(payload=payload), Environment().installed() as env:
+                env.app.count_fault = lambda view,_channel,kind,value: 1 if view.document.dirty and kind == "lines" else value
+                env.app.payload = lambda *_args: payload
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["cases"][1]["representation"]["state"], "UNAVAILABLE")
+                self.assertTrue(report["cases"][1]["after_intervention_diagnostic"]["errors"])
+                self.assertEqual(report["cases"][2]["status"], "not_started")
+
+    def test_rotation_normalization_is_not_axis_aligned_screen_matching(self):
+        with Environment().installed() as env:
+            origin, scale, point = [0.3,0.2], 3., [0.01,0.002,0.]
+            for angle in (0., math.pi/2, -math.pi/2):
+                c,s = math.cos(angle), math.sin(angle)
+                sheet = [origin[0]+scale*(c*point[0]-s*point[1]),
+                         origin[1]+scale*(s*point[0]+c*point[1]), 0.]
+                normalized = env.driver.normalized_point(sheet, origin, angle, scale)
+                for actual, expected in zip(normalized, point):
+                    self.assertAlmostEqual(actual, expected)
+
+    def test_original_and_copy_disk_drift_are_refusals_after_owned_cleanup(self):
+        for target in ("original", "copy"):
+            with self.subTest(target=target), Environment().installed() as env:
+                def change(view, _kind):
+                    path = env.driver.ROOT / env.driver.R1["drawing"]["path"] if target == "original" else Path(view.document.path)
+                    path.write_bytes(b"external disk drift")
+                env.app.on_write = change
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.app.documents, [])
+                self.assertEqual(report["cases"][2]["status"], "not_started")
+                first, last = ("staged.drawing","final.drawing") if target == "original" else ("copy_before.drawing","copy_after.drawing")
+                self.assertNotEqual(report["cases"][1]["reads"][first], report["cases"][1]["reads"][last])
+
+    def test_core_or_tree_failure_blocks_mutation_but_recorded_virtual_aliases_do_not(self):
+        for mode in ("aliases", "core", "unknown_type", "tree", "owner", "body"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def prepare(scene):
+                    nodes, _ = install_recorded_tree_aliases(scene)
+                    if mode == "core":
+                        scene.resolve_override = lambda _entity: scene.later
+                    elif mode == "unknown_type":
+                        nodes[2].kind = "NewFolder"
+                    elif mode == "tree":
+                        nodes[2].Name = ""
+                    elif mode == "owner":
+                        scene.cosmetic.owner_error = ProbeError("native owner unavailable")
+                    elif mode == "body":
+                        scene.edge_body = NativeObject()
+                env.app.prepare_scene = prepare
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 0 if mode == "aliases" else 1)
+                if mode == "aliases":
+                    source = report["cases"][1]["source_observations"]
+                    self.assertTrue(source["clean_comparison"])
+                    optional = [row for row in source["reference_observations"].values() if not row["required"]]
+                    self.assertEqual(len(optional), 12)
+                    self.assertTrue(all(row["native_same"] == 0 and not row["native_identity_claim"] for row in optional))
+                else:
+                    self.assertEqual(env.app.mutators, [])
+
+
+class RepresentationAdditionalBoundaries(unittest.TestCase):
+    def test_image_failure_is_explicit_gap_and_keeps_original_capture_error(self):
+        with Environment().installed() as env:
+            env.app.count_fault = lambda view,_channel,kind,value: 1 if view.document.dirty and kind == "lines" else value
+            error = ProbeError("desktop unavailable")
+            with patch.object(sys.modules["_seat_forensics"], "_grab_screen", lambda _path: trip(error)):
+                code, report, _ = env.run_driver()
+            self.assertEqual(code, 1)
+            case = report["cases"][1]
+            stage = case["representation"]["stages"]["post_write_before_generation"]
+            self.assertEqual(stage["visual"]["state"], "GAP")
+            self.assertEqual(report["primary_failure"]["message"], "desktop unavailable")
+            self.assertTrue(case["after_intervention_diagnostic"]["reads"])
+            self.assertEqual(env.app.documents, [])
+
+    def test_each_bracket_open_warning_and_actual_mode_refuses_before_write(self):
+        for case in ("r1", "c1"):
+            for kind in (1, 3):
+                for value in (None, False, 1):
+                    with self.subTest(case=case, kind=kind, value=value), Environment().installed() as env:
+                        env.app.open_warnings[(case, kind)] = value
+                        code, report, _ = env.run_driver()
+                        self.assertEqual(code, 1)
+                        self.assertEqual(len(env.app.mutators), 0 if case == "r1" else 1)
+                        self.assertFalse(report["cases"][1 if case == "r1" else 2]["collection_completed"])
+        for kind, value in ((1, False), (1, None), (3, True), (3, None)):
+            with self.subTest(kind=kind, value=value), Environment().installed() as env:
+                def alter(doc):
+                    if "mg-magnifying-bracket" in doc.path and doc.kind == kind:
+                        doc.readonly = value
+                env.app.after_open = alter
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.app.mutators, [])
+                self.assertTrue(env.app.documents)
+                self.assertEqual(report["cases"][2]["status"], "not_started")
+
+
+class RequiredControlAndPathRepairs(unittest.TestCase):
+    def test_good_sm_payload_plus_failed_required_reader_refuses_and_retains_exact_first_exception(self):
+        failures = (
+            "before_generation.thread[0].IAnnotation.arcs.count",
+            "after_generation.thread[0].ICThread.lines[1]",
+            "after_generation.thread[1].IAnnotation.display",
+        )
+        for failed_key in failures:
+            for error in (ProbeError("required native reader"), KeyboardInterrupt("required native interruption")):
+                with self.subTest(key=failed_key, error=type(error).__name__), Environment().installed() as env:
+                    env.sm_reader_fault = lambda key,value: error if key == failed_key else value
+                    env.after_diagnostic = lambda: setattr(env.app, "close_error", BrokenText())
+                    code, report, captures = env.run_driver()
+                    self.assertEqual(code, 1)
+                    sm = report["cases"][0]
+                    self.assertTrue(sm["thread_ink"]["positive_payload_fields"])
+                    self.assertFalse(sm["thread_ink"]["complete"])
+                    self.assertFalse(sm["collection_completed"])
+                    self.assertEqual(report["primary_failure"]["operation"], failed_key)
+                    self.assertEqual(report["primary_failure"]["type"], type(error).__name__)
+                    self.assertEqual(report["cases"][1]["status"], "not_started")
+                    self.assertEqual(report["cases"][2]["status"], "not_started")
+                    self.assertEqual(len(env.app.open_calls), 2)
+                    self.assertEqual(env.app.mutators, [])
+                    self.assertEqual(env.blob_calls, [])
+                    self.assertIn("after_generation.thread[3].IAnnotation.arcs.count", env.sm_reader_calls)
+                    body_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+                    self.assertIs(body_exit[2], error)
+                    self.assertTrue(any(frame.f_code is trip.__code__ for frame,_ in traceback.walk_tb(body_exit[3])))
+                    self.assertEqual(captures[0]["primary_failure"]["operation"], failed_key)
+                    self.assertTrue(any(row["type"] == "BrokenText" for row in report["errors"]))
+
+    def test_valid_required_sm_with_optional_null_bridge_and_unknown_frame_admits_both_cases(self):
+        with Environment().installed() as env:
+            env.app.prepare_sm_scene = lambda scene: setattr(scene, "GetCorrespondingEntity2", lambda _entity: None)
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            sm = report["cases"][0]
+            self.assertTrue(sm["thread_ink"]["complete"])
+            self.assertEqual(len(sm["thread_ink"]["positive_payload_fields"]), 28)
+            self.assertEqual(sm["diagnostic"]["errors"], {})
+            self.assertEqual(sm["diagnostic"]["reads"]["before_generation.thread[0].attachment[0].canonical"],
+                             {"present": False})
+            self.assertEqual(sm["optional_evidence"]["display_coordinate_frame"], "UNAVAILABLE_NO_PRIMARY_FRAME_AUTHORITY")
+            self.assertEqual([(kind,value) for kind,value,_ in env.app.mutators], [("angle",0.0),("cut",False)])
+            self.assertTrue(all(case["collection_completed"] for case in report["cases"]))
+
+    def test_sm_typed_counts_all_payloads_and_each_required_witness_are_admission_requirements(self):
+        changes = (
+            ("before_generation.thread[0].ICThread.lines.count", None),
+            ("before_generation.thread[0].ICThread.lines.count", False),
+            ("before_generation.thread[0].ICThread.lines.count", 6.0),
+            ("before_generation.thread[0].ICThread.lines.count", -1),
+            ("after_generation.thread[0].ICThread.lines[0]", None),
+            ("after_generation.thread[0].ICThread.lines[0]", []),
+            ("after_generation.thread[0].ICThread.lines[0]", [float("nan")]*10),
+            ("after_generation.thread[0].ICThread.lines[0]", [0.]*10),
+            ("after_generation.thread[0].annotation", {"present": False}),
+            ("after_generation.thread[1].IAnnotation.display", {"present": False}),
+            ("after_generation.threads", {"present": False}),
+        )
+        for key,value in changes:
+            with self.subTest(key=key, value=value), Environment().installed() as env:
+                env.sm_diagnostic["reads"][key] = value
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertFalse(report["cases"][0]["collection_completed"])
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                self.assertEqual(env.app.mutators, [])
+                self.assertEqual(env.blob_calls, [])
+                self.assertEqual(env.app.documents, [])
+
+    def test_sm_no_successful_payload_never_admits_interventions(self):
+        for mode in ("all_zero", "null", "empty", "nonfinite", "reader_error"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                def change(key, value):
+                    if mode == "all_zero" and key.endswith((".lines.count", ".polylines.count", ".arcs.count")):
+                        return 0
+                    if any(marker in key for marker in (".lines[", ".polylines[", ".arcs[")):
+                        return {"null": None, "empty": [], "nonfinite": [float("nan")],
+                                "reader_error": ProbeError("native payload unavailable")}.get(mode, value)
+                    return value
+                env.sm_reader_fault = change
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertFalse(report["cases"][0]["thread_ink"]["positive_payload_fields"])
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                self.assertEqual(env.app.mutators, [])
+                self.assertEqual(env.app.documents, [])
+
+    def test_redirected_image_ancestor_refuses_before_capture_collaborator(self):
+        with Environment().installed() as env:
+            env.path_redirect = "cad/out/reports/diagnostics/representation-images"
+            env.app.count_fault = lambda view,_channel,kind,value: 1 if view.document.dirty and kind == "lines" else value
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 1)
+            self.assertEqual(env.image_calls, [])  # driver guard, not fake writer containment
+            case = report["cases"][1]
+            self.assertEqual(case["representation"]["stages"]["post_write_before_generation"]["visual"]["state"], "GAP")
+            self.assertEqual(report["primary_failure"]["operation"], "post_write_before_generation.image")
+            self.assertEqual(report["primary_failure"]["message"], "uncertified output path")
+            self.assertEqual(report["cases"][2]["status"], "not_started")
+            self.assertEqual(env.app.documents, [])
+
+    def test_redirected_copy_ancestors_refuse_before_creation_and_open(self):
+        for ancestor in ("cad/out/diagnostic-copies", "cad/out/diagnostic-copies/mg-saved-thread-control"):
+            with self.subTest(ancestor=ancestor), Environment().installed() as env:
+                env.path_redirect = ancestor
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.copy_fs_attempts, [])
+                self.assertEqual(env.app.open_calls, [])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+
+    def test_copy_path_recertification_refuses_direct_result_or_cleanup_after_redirect(self):
+        for phase in ("direct_result", "cleanup"):
+            with self.subTest(phase=phase), Environment().installed() as env:
+                def redirect():
+                    env.path_redirect = "cad/out/diagnostic-copies"
+                if phase == "direct_result":
+                    env.app.after_open = lambda _doc: redirect()
+                else:
+                    env.after_diagnostic = redirect
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.app.close_calls, [])
+                self.assertTrue(env.app.documents)
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                if phase == "direct_result":
+                    self.assertEqual(len(env.app.open_calls), 1)
+                    self.assertEqual(report["cases"][0]["opens"][0]["ownership_state"], "UNAVAILABLE_STRANDED")
+                else:
+                    self.assertTrue(all(row["status"] == "stranded_owned" for row in report["cases"][0]["closures"]))
 
 
 if __name__ == "__main__":

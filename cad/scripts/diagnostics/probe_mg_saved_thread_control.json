@@ -1,15 +1,13 @@
 {
-  "schema": 4,
+  "schema": 5,
   "protocol": {
-    "order": "SM readonly positive, then one S1 disposable-copy access/read/release",
-    "selected_edge": "Only a unique real CosmeticThread definition; Wizard alone is UNAVAILABLE",
-    "cleanup": "SM clean-only; S1 known-dirty copies only, complete owned inventory and UserControl=True before each close",
-    "admission": "SM requires extracted positive primitive rows; every open requires exact integer zero errors/warnings",
-    "copy_paths": "Strict unaliased cad/out children under trusted ROOT, checked before creation/open and ownership certification",
-    "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward, unchanged before/accessed/after descriptive tree and no source read failures",
-    "geometry": "Every physical edge requires successful native domain/evaluation operations independently of circle classification",
-    "failure": "Retain escaping access-body BaseException and original traceback before the single finally release",
-    "tree_metadata": "Only six approved UI container types have descriptive PID quality; complete live tree and all core native identity remain mandatory",
+    "order": "SM positive once; independent fresh-original R1 then C1; no S1/source access",
+    "mutators": "R1 IView.Angle=0 only; C1 IDrSection.SetDisplayOnlySurfaceCut(False) only",
+    "baseline": "Each fresh bracket pair independently requires Angle=pi/2, cutOnly=True and complete observed zero",
+    "cleanup": "Only exact owned writable R1/C1 drawing copies may be dirty; every part stays readonly and clean; full inventory and actual UserControl=True before each close",
+    "admission": "SM probe-local strict native collector requires complete typed witnesses/counts/every payload plus genuine finite positive geometry; first reader BaseException retained; exact zero open errors/warnings",
+    "copy_paths": "Strict unaliased canonical same-basename copies under a unique per-case directory",
+    "evidence": "Before/write-readback/pre-generation/post-generation independent channels, actual transforms, native physical circles and declared major diameter; geometry correspondence is not native ownership",
     "tree_metadata_types": [
       "EnvFolder",
       "HistoryFolder",
@@ -18,127 +16,185 @@
       "SelectionSetFolder",
       "SensorFolder"
     ],
-    "tree_metadata_scope": "Only complete top-level nodes with known Boolean rollback and native NULL definition/faces/owner; all other types and modeling/geometric owners stay strict; raw aliases are not identity",
-    "sm_scalars": "Passive readonly BracketMountingTaps and owned cosmetic-child scalar census; same interfaces/enums as S1, no selection access or causal claim",
-    "limitations": "No historical in-memory part hash, flank identity, global telemetry, or hard-crash cleanup guarantee"
+    "failure": "First BaseException retained; independent reader errors never become zero; no retry/repair",
+    "display_frame": "XYZ coordinate-frame authority unavailable; native projection and angle-normalized radius deltas are candidates only",
+    "images": "Extracted nondegenerate primitives request fresh per-case/stage desktop PNG via existing pixel-only helper; unaliased trusted output/report ancestry certified before capture/hash; no native/PDF save",
+    "limitations": "No automatic SHIP, source/display identity invention, global telemetry or hard-crash cleanup guarantee"
   },
   "cases": [
-  {
-  "case": "sm_positive",
-  "sheet_number": 1,
-  "sheet_name": "Lever Geometry",
-  "section_label": "H",
-  "feature_name": "BracketMountingTaps",
-  "drawing": {
-    "path": "cad/out/slddrw/sm-summing-lever.SLDDRW",
-    "key": "0549c19080401aaeb43a3d9dc5c40e31c53d5743610994318174817cf9cb8363",
-    "bytes": 480655,
-    "sha256": "775c6edc4befe1c17f4f9dfca1a9d43d5943fc85e15c0ba5c0e411a5bcf6bcf1"
-  },
-  "part": {
-    "path": "cad/out/sldprt/sm-summing-lever.SLDPRT",
-    "key": "238dc7587b2a41b5ed7081a08f35f479039418c60291fd9497a265d1ec16457c",
-    "bytes": 280124,
-    "sha256": "ff952b3739770d218251ab4c8cb333cc3d10e7c34097dbad5762fb1bd771bfdf"
-  },
-  "historical_provenance": {
-    "status": "VERIFIED_EXTERNAL_EVIDENCE",
-    "packet": "pr1769-sm-thread-control-20261021",
-    "source_report": "C:/farm-runs/com-perf-20261019/20261021T135951435Z-16ea74332725458cadf5ff30f4c0e661.out/reports/cache.jsonl",
-    "evidence_files": {
-      "historical-recipe-execution-proof.json": {
-        "bytes": 16291,
-        "sha256": "159e8b334be89c93acd356390b3a528b873a378cd47bed5f724c5221e47db1e8"
-      },
-      "cache-archives/inventory.json": {
-        "bytes": 2823,
-        "sha256": "7b6bfe45ae9902ec60311ec5150db2b06c82268811df78eea863e0be43043ce5"
-      },
-      "manifest.json": {
-        "bytes": 4486,
-        "sha256": "7cc81384ef133e1c07978e402de01df780f8f33abe8e66798fbb882e719c63c1"
-      }
-    },
-    "epoch": "4",
-    "salt": "sw2024-sp3",
-    "salt_is_not_runtime_version_proof": true,
-    "part_manifest_id": "14e77479a2c39bfcb2d5f215a44b89f73c94b5e10e53726f33831570f9092dd3",
-    "drawing_manifest_id": "1482b721b32fc1036a5cad7c65ecfbea0ee6fb222b1cba0c5ba03ef7c703e2cb",
-    "part_input_count": 53,
-    "drawing_input_count": 56,
-    "part_recipe_digest": "26177d5c641f86d7d18f250811d52806",
-    "execution_token_canonical_md5": "c7a4f8894771527745ede767473c9f32",
-    "linkage": "Historical 53-input recipe replay and preserved execution-token canonical MD5 match the drawing manifest; token value equals the pinned part SHA-256.",
-    "historical_source_digests": {
-      "cad/scripts/build_sm_summing_lever.py": "bd4ee26fe25279c93a4cfe747cb72307",
-      "cad/scripts/draw_sm_summing_lever.py": "25b0af4513486fe1c82c09d6048c77bd",
-      "cad/scripts/sm_summing_lever_notes.py": "e1fa8767ec5f9062ca716346830dee5d",
-      "cad/scripts/sm_summing_lever_spec.py": "62e838d80e9a0a34bd1ff20d86e28e96"
-    },
-    "archives": {
+    {
+      "case": "sm_positive",
+      "sheet_number": 1,
+      "sheet_name": "Lever Geometry",
+      "section_label": "H",
+      "feature_name": "BracketMountingTaps",
       "drawing": {
-        "sha256": "1d25552b200ec6c4f5b63b19021f25cbb8dbb322b8633332b86ceec2484c2352",
-        "bytes": 1509610,
-        "epoch": "4",
-        "members": [
-          "cad/out/slddrw/sm-summing-lever.SLDDRW",
-          "cad/out/pdf/sm-summing-lever.pdf",
-          "cad/out/png/sm-summing-lever_drawing.png",
-          "cad/out/reports/layout-audit/sm-summing-lever.json"
-        ],
-        "contains_part": false,
-        "contains_execution_token": false
+        "path": "cad/out/slddrw/sm-summing-lever.SLDDRW",
+        "key": "0549c19080401aaeb43a3d9dc5c40e31c53d5743610994318174817cf9cb8363",
+        "bytes": 480655,
+        "sha256": "775c6edc4befe1c17f4f9dfca1a9d43d5943fc85e15c0ba5c0e411a5bcf6bcf1"
       },
       "part": {
-        "sha256": "5002b730b4b41c547cdb39c9f3f6c15262c22fab9797543d1e07bdab91c895e1",
-        "bytes": 563978,
+        "path": "cad/out/sldprt/sm-summing-lever.SLDPRT",
+        "key": "238dc7587b2a41b5ed7081a08f35f479039418c60291fd9497a265d1ec16457c",
+        "bytes": 280124,
+        "sha256": "ff952b3739770d218251ab4c8cb333cc3d10e7c34097dbad5762fb1bd771bfdf"
+      },
+      "historical_provenance": {
+        "status": "VERIFIED_EXTERNAL_EVIDENCE",
+        "packet": "pr1769-sm-thread-control-20261021",
+        "source_report": "C:/farm-runs/com-perf-20261019/20261021T135951435Z-16ea74332725458cadf5ff30f4c0e661.out/reports/cache.jsonl",
+        "evidence_files": {
+          "historical-recipe-execution-proof.json": {
+            "bytes": 16291,
+            "sha256": "159e8b334be89c93acd356390b3a528b873a378cd47bed5f724c5221e47db1e8"
+          },
+          "cache-archives/inventory.json": {
+            "bytes": 2823,
+            "sha256": "7b6bfe45ae9902ec60311ec5150db2b06c82268811df78eea863e0be43043ce5"
+          },
+          "manifest.json": {
+            "bytes": 4486,
+            "sha256": "7cc81384ef133e1c07978e402de01df780f8f33abe8e66798fbb882e719c63c1"
+          }
+        },
         "epoch": "4",
-        "members": [
-          "cad/out/sldprt/sm-summing-lever.SLDPRT",
-          "cad/out/stl/sm-summing-lever.STL",
-          "cad/out/png/sm-summing-lever",
-          "cad/out/png/sm-summing-lever/sm-summing-lever_isometric.png"
-        ],
-        "contains_execution_token": false
+        "salt": "sw2024-sp3",
+        "salt_is_not_runtime_version_proof": true,
+        "part_manifest_id": "14e77479a2c39bfcb2d5f215a44b89f73c94b5e10e53726f33831570f9092dd3",
+        "drawing_manifest_id": "1482b721b32fc1036a5cad7c65ecfbea0ee6fb222b1cba0c5ba03ef7c703e2cb",
+        "part_input_count": 53,
+        "drawing_input_count": 56,
+        "part_recipe_digest": "26177d5c641f86d7d18f250811d52806",
+        "execution_token_canonical_md5": "c7a4f8894771527745ede767473c9f32",
+        "linkage": "Historical 53-input recipe replay and preserved execution-token canonical MD5 match the drawing manifest; token value equals the pinned part SHA-256.",
+        "historical_source_digests": {
+          "cad/scripts/build_sm_summing_lever.py": "bd4ee26fe25279c93a4cfe747cb72307",
+          "cad/scripts/draw_sm_summing_lever.py": "25b0af4513486fe1c82c09d6048c77bd",
+          "cad/scripts/sm_summing_lever_notes.py": "e1fa8767ec5f9062ca716346830dee5d",
+          "cad/scripts/sm_summing_lever_spec.py": "62e838d80e9a0a34bd1ff20d86e28e96"
+        },
+        "archives": {
+          "drawing": {
+            "sha256": "1d25552b200ec6c4f5b63b19021f25cbb8dbb322b8633332b86ceec2484c2352",
+            "bytes": 1509610,
+            "epoch": "4",
+            "members": [
+              "cad/out/slddrw/sm-summing-lever.SLDDRW",
+              "cad/out/pdf/sm-summing-lever.pdf",
+              "cad/out/png/sm-summing-lever_drawing.png",
+              "cad/out/reports/layout-audit/sm-summing-lever.json"
+            ],
+            "contains_part": false,
+            "contains_execution_token": false
+          },
+          "part": {
+            "sha256": "5002b730b4b41c547cdb39c9f3f6c15262c22fab9797543d1e07bdab91c895e1",
+            "bytes": 563978,
+            "epoch": "4",
+            "members": [
+              "cad/out/sldprt/sm-summing-lever.SLDPRT",
+              "cad/out/stl/sm-summing-lever.STL",
+              "cad/out/png/sm-summing-lever",
+              "cad/out/png/sm-summing-lever/sm-summing-lever_isometric.png"
+            ],
+            "contains_execution_token": false
+          }
+        },
+        "scope": "Externally verified historical evidence, not worker-fetched proof files or live native reference resolution. The later archive inventory supersedes the proof JSON's pending archive-inventory note."
+      },
+      "read_only": {
+        "part": true,
+        "drawing": true
       }
     },
-    "scope": "Externally verified historical evidence, not worker-fetched proof files or live native reference resolution. The later archive inventory supersedes the proof JSON's pending archive-inventory note."
-  }
-  },
-  {
-    "case": "s1",
-    "sheet_number": 1,
-    "sheet_name": "Sheet1",
-    "section_label": "A",
-    "feature_name": "LeverTap",
-    "drawing": {
-      "path": "cad/out/slddrw/mg-magnifying-bracket-native-thread.SLDDRW",
-      "account": "stswboot5qnlwu2vtr6gs",
-      "container": "results",
-      "blob": "leaf/drawing__mg_magnifying_bracket/e2ceb7e1acd2954697f722021cdb83804314010d31c90f14f0ebf7bc980fd619/20261021T204253Z-1-9e30b42f/failures/mg-magnifying-bracket-native-thread/20261021T204332Z/mg-magnifying-bracket-native-thread.SLDDRW",
-      "bytes": 177427,
-      "sha256": "35d764341f0c221559e0793e63656578fee6c7f72452155897a1f56d71ce415d"
+    {
+      "case": "r1",
+      "sheet_number": 1,
+      "sheet_name": "Sheet1",
+      "section_label": "A",
+      "feature_name": "LeverTap",
+      "drawing": {
+        "path": "cad/out/slddrw/mg-magnifying-bracket-native-thread.SLDDRW",
+        "account": "stswboot5qnlwu2vtr6gs",
+        "container": "results",
+        "blob": "leaf/drawing__mg_magnifying_bracket/e2ceb7e1acd2954697f722021cdb83804314010d31c90f14f0ebf7bc980fd619/20261021T204253Z-1-9e30b42f/failures/mg-magnifying-bracket-native-thread/20261021T204332Z/mg-magnifying-bracket-native-thread.SLDDRW",
+        "bytes": 177427,
+        "sha256": "35d764341f0c221559e0793e63656578fee6c7f72452155897a1f56d71ce415d"
+      },
+      "part": {
+        "path": "cad/out/sldprt/mg-magnifying-bracket.SLDPRT",
+        "key": "6976969e72d6cd4dfc8775bb4d71e7a69ccc1c9034d064f9c53486bffd5eedf2",
+        "bytes": 114126,
+        "sha256": "cd30821111672d4c0a4e52ed36992ccda2594bd7a735d260c5cceea31cc13932"
+      },
+      "historical_provenance": {
+        "status": "EXECUTION_PINNED_SOURCE_WITH_CAPTURED_FAILED_DRAWING",
+        "run": "20261021T185156246Z-b65986dc5548401aa7cd9b2d8999526e",
+        "source_commit": "bd160ae0f2994f5018c187279d41cd00f1fe7ab9",
+        "part_input_count": 40,
+        "duplicate_release_yaml_retained": true,
+        "part_recipe_digest": "2d56f0ac631eb3207e61b6a0ba437201",
+        "execution_token_bytes": 66,
+        "execution_token_canonical_md5": "8469206605bed8151524b843ada692f2",
+        "capture_manifest": "C:/src/dt-logs/pr1769-r26-bracket-forensics/manifest.json",
+        "capture_document_title": "Draw54 - Sheet1",
+        "capture_section_label": "A-A",
+        "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both."
+      },
+      "read_only": {
+        "part": true,
+        "drawing": false
+      },
+      "changed_factor": "IView.Angle",
+      "baseline_angle": 1.5707963267948966,
+      "baseline_cut_only": true,
+      "requested_angle": 0.0,
+      "requested_cut_only": true
     },
-    "part": {
-      "path": "cad/out/sldprt/mg-magnifying-bracket.SLDPRT",
-      "key": "6976969e72d6cd4dfc8775bb4d71e7a69ccc1c9034d064f9c53486bffd5eedf2",
-      "bytes": 114126,
-      "sha256": "cd30821111672d4c0a4e52ed36992ccda2594bd7a735d260c5cceea31cc13932"
-    },
-    "historical_provenance": {
-      "status": "EXECUTION_PINNED_SOURCE_WITH_CAPTURED_FAILED_DRAWING",
-      "run": "20261021T185156246Z-b65986dc5548401aa7cd9b2d8999526e",
-      "source_commit": "bd160ae0f2994f5018c187279d41cd00f1fe7ab9",
-      "part_input_count": 40,
-      "duplicate_release_yaml_retained": true,
-      "part_recipe_digest": "2d56f0ac631eb3207e61b6a0ba437201",
-      "execution_token_bytes": 66,
-      "execution_token_canonical_md5": "8469206605bed8151524b843ada692f2",
-      "capture_manifest": "C:/src/dt-logs/pr1769-r26-bracket-forensics/manifest.json",
-      "capture_document_title": "Draw54 - Sheet1",
-      "capture_section_label": "A-A",
-      "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both."
+    {
+      "case": "c1",
+      "sheet_number": 1,
+      "sheet_name": "Sheet1",
+      "section_label": "A",
+      "feature_name": "LeverTap",
+      "drawing": {
+        "path": "cad/out/slddrw/mg-magnifying-bracket-native-thread.SLDDRW",
+        "account": "stswboot5qnlwu2vtr6gs",
+        "container": "results",
+        "blob": "leaf/drawing__mg_magnifying_bracket/e2ceb7e1acd2954697f722021cdb83804314010d31c90f14f0ebf7bc980fd619/20261021T204253Z-1-9e30b42f/failures/mg-magnifying-bracket-native-thread/20261021T204332Z/mg-magnifying-bracket-native-thread.SLDDRW",
+        "bytes": 177427,
+        "sha256": "35d764341f0c221559e0793e63656578fee6c7f72452155897a1f56d71ce415d"
+      },
+      "part": {
+        "path": "cad/out/sldprt/mg-magnifying-bracket.SLDPRT",
+        "key": "6976969e72d6cd4dfc8775bb4d71e7a69ccc1c9034d064f9c53486bffd5eedf2",
+        "bytes": 114126,
+        "sha256": "cd30821111672d4c0a4e52ed36992ccda2594bd7a735d260c5cceea31cc13932"
+      },
+      "historical_provenance": {
+        "status": "EXECUTION_PINNED_SOURCE_WITH_CAPTURED_FAILED_DRAWING",
+        "run": "20261021T185156246Z-b65986dc5548401aa7cd9b2d8999526e",
+        "source_commit": "bd160ae0f2994f5018c187279d41cd00f1fe7ab9",
+        "part_input_count": 40,
+        "duplicate_release_yaml_retained": true,
+        "part_recipe_digest": "2d56f0ac631eb3207e61b6a0ba437201",
+        "execution_token_bytes": 66,
+        "execution_token_canonical_md5": "8469206605bed8151524b843ada692f2",
+        "capture_manifest": "C:/src/dt-logs/pr1769-r26-bracket-forensics/manifest.json",
+        "capture_document_title": "Draw54 - Sheet1",
+        "capture_section_label": "A-A",
+        "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both."
+      },
+      "read_only": {
+        "part": true,
+        "drawing": false
+      },
+      "changed_factor": "IDrSection.SetDisplayOnlySurfaceCut",
+      "baseline_angle": 1.5707963267948966,
+      "baseline_cut_only": true,
+      "requested_angle": 1.5707963267948966,
+      "requested_cut_only": false
     }
-  }
   ]
 }

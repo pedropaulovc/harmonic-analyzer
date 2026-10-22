@@ -1,17 +1,10 @@
-"""Disposable fixed SM-positive / S1 source-definition investigation; NEVER MERGE.
+"""Fixed SM-positive / R1-angle / C1-cut-only disposable-copy investigation.
 
-SM opens independent readonly copies and retains clean-only cleanup. S1 opens
-only a unique same-basename PART COPY writable and DRW COPY readonly. After
-native ownership/reference proof and a zero baseline, at most one real cosmetic
-definition is accessed and released without modification. No settings, saves,
-reference replacement, rebuild experiment, or other intervention is reachable.
-The existing diagnostic retains its single display-generation boundary.
-SM also reads same-interface Wizard and native-owned cosmetic-child scalars,
-without selection access. Six explicitly approved non-geometric UI container
-types have descriptive-only PID quality, never native identity exemptions for
-the model: the complete live tree and every core PID/IsSame proof remain required.
-Raw virtual PID failures/aliases stay visible, and no virtual token is reused
-as authority after rollback. This local policy is not an SDK PID guarantee.
+NEVER MERGE. Three independent original-byte pairs; every PART is readonly.
+Only R1/C1 DRAWING COPIES are writable. R1 writes IView.Angle once; C1 writes
+IDrSection.SetDisplayOnlySurfaceCut once. No source selection access, geometry,
+settings, saves, reference replacement or cumulative intervention is reachable.
+Raw native source, display and transform evidence never automatically means SHIP.
 Hard termination and existing outer telemetry can defeat reporting/cleanup.
 """
 
@@ -34,6 +27,7 @@ REPORT = ROOT / "cad/out/reports/diagnostics/mg-saved-thread-control.json"
 CONTRACT_PATH = Path(__file__).with_suffix(".json")
 SM_POSITIVE = {
     "case": "sm_positive",
+    "read_only": {"part": True, "drawing": True},
     "sheet_number": 1,
     "sheet_name": "Lever Geometry",
     "section_label": "H",
@@ -114,8 +108,7 @@ SM_POSITIVE = {
         "scope": "Externally verified historical evidence, not worker-fetched proof files or live native reference resolution. The later archive inventory supersedes the proof JSON's pending archive-inventory note.",
     },
 }
-S1 = {
-    "case": "s1",
+BRACKET_ORIGINAL = {
     "sheet_number": 1,
     "sheet_name": "Sheet1",
     "section_label": "A",
@@ -149,29 +142,34 @@ S1 = {
         "scope": "Execution-pinned retained/canonical historical source plus captured failed drawing, NOT a successful drawing-cache entry. Capture contains no PRT or worker part hash; identical historical in-memory source state is NOT retrospectively proven. Source-parameter and edge-cause claims remain unproved. Sheet1 comes from the native capture title; section A comes from retained A-A capture context and the section constructor. Reopening must independently witness both.",
     },
 }
+R1 = {**BRACKET_ORIGINAL, "case": "r1", "read_only": {"part": True, "drawing": False},
+      "changed_factor": "IView.Angle", "baseline_angle": math.pi / 2, "baseline_cut_only": True,
+      "requested_angle": 0.0, "requested_cut_only": True}
+C1 = {**BRACKET_ORIGINAL, "case": "c1", "read_only": {"part": True, "drawing": False},
+      "changed_factor": "IDrSection.SetDisplayOnlySurfaceCut", "baseline_angle": math.pi / 2,
+      "baseline_cut_only": True, "requested_angle": math.pi / 2, "requested_cut_only": False}
 # Exact observed UI-node roles, not a universal SDK persistent-ID exemption.
 DESCRIPTIVE_TREE_TYPES = frozenset({
     "HistoryFolder", "SelectionSetFolder", "SensorFolder",
     "EnvFolder", "InkMarkupFolder", "MaterialFolder",
 })
 CONTRACT = {
-    "schema": 4,
+    "schema": 5,
     "protocol": {
-        "order": "SM readonly positive, then one S1 disposable-copy access/read/release",
-        "selected_edge": "Only a unique real CosmeticThread definition; Wizard alone is UNAVAILABLE",
-        "cleanup": "SM clean-only; S1 known-dirty copies only, complete owned inventory and UserControl=True before each close",
-        "admission": "SM requires extracted positive primitive rows; every open requires exact integer zero errors/warnings",
-        "copy_paths": "Strict unaliased cad/out children under trusted ROOT, checked before creation/open and ownership certification",
-        "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward, unchanged before/accessed/after descriptive tree and no source read failures",
-        "geometry": "Every physical edge requires successful native domain/evaluation operations independently of circle classification",
-        "failure": "Retain escaping access-body BaseException and original traceback before the single finally release",
-        "tree_metadata": "Only six approved UI container types have descriptive PID quality; complete live tree and all core native identity remain mandatory",
+        "order": "SM positive once; independent fresh-original R1 then C1; no S1/source access",
+        "mutators": "R1 IView.Angle=0 only; C1 IDrSection.SetDisplayOnlySurfaceCut(False) only",
+        "baseline": "Each fresh bracket pair independently requires Angle=pi/2, cutOnly=True and complete observed zero",
+        "cleanup": "Only exact owned writable R1/C1 drawing copies may be dirty; every part stays readonly and clean; full inventory and actual UserControl=True before each close",
+        "admission": "SM probe-local strict native collector requires complete typed witnesses/counts/every payload plus genuine finite positive geometry; first reader BaseException retained; exact zero open errors/warnings",
+        "copy_paths": "Strict unaliased canonical same-basename copies under a unique per-case directory",
+        "evidence": "Before/write-readback/pre-generation/post-generation independent channels, actual transforms, native physical circles and declared major diameter; geometry correspondence is not native ownership",
         "tree_metadata_types": sorted(DESCRIPTIVE_TREE_TYPES),
-        "tree_metadata_scope": "Only complete top-level nodes with known Boolean rollback and native NULL definition/faces/owner; all other types and modeling/geometric owners stay strict; raw aliases are not identity",
-        "sm_scalars": "Passive readonly BracketMountingTaps and owned cosmetic-child scalar census; same interfaces/enums as S1, no selection access or causal claim",
-        "limitations": "No historical in-memory part hash, flank identity, global telemetry, or hard-crash cleanup guarantee",
+        "failure": "First BaseException retained; independent reader errors never become zero; no retry/repair",
+        "display_frame": "XYZ coordinate-frame authority unavailable; native projection and angle-normalized radius deltas are candidates only",
+        "images": "Extracted nondegenerate primitives request fresh per-case/stage desktop PNG via existing pixel-only helper; unaliased trusted output/report ancestry certified before capture/hash; no native/PDF save",
+        "limitations": "No automatic SHIP, source/display identity invention, global telemetry or hard-crash cleanup guarantee",
     },
-    "cases": [SM_POSITIVE, S1],
+    "cases": [SM_POSITIVE, R1, C1],
 }
 MISSING = object()
 
@@ -504,12 +502,243 @@ def trimmed_circle_summary(reads):
         return {"state": "UNAVAILABLE", "reason": str(error)}
 
 
-def source_intervention(part, intended_name, bind, same, failure, before_access):
-    """The only S1 intervention. Native references always remain in this PART context."""
+def primitive_points(kind, values):
+    """Decode only documented IDisplayData layouts, retaining raw arrays too."""
+    require(isinstance(values, (list, tuple)) and values, "primitive payload unavailable")
+    values = finite_values(values, len(values))
+    if kind == "lines":
+        require(len(values) == 10, "GetLineAtIndex2 layout differs")
+        points = [values[4:7], values[7:10]]
+        require(math.dist(*points) > 0, "degenerate line is not positive geometry")
+        return points
+    if kind == "arcs":
+        require(len(values) == 17, "GetArcAtIndex2 layout differs")
+        require(math.dist(values[4:7], values[10:13]) > 0, "degenerate arc radius")
+        return [values[4:7], values[7:10], values[10:13]]
+    require(kind == "polylines" and len(values) >= 7, "polyline header unavailable")
+    count = values[6]
+    require(float(count).is_integer() and count >= 2, "polyline point count unavailable")
+    require(values[0] in (0, 1) and values[1] >= 0, "polyline geometry header unavailable")
+    require(len(values) == 7 + 3 * int(count), "polyline coordinate layout differs")
+    points = [values[index:index + 3] for index in range(7, len(values), 3)]
+    require(any(math.dist(points[0], point) > 0 for point in points[1:]), "degenerate polyline")
+    return points
+
+
+def normalized_point(point, position, angle, scale):
+    """Sheet metres -> rotation-normalized view-relative model metres."""
+    x, y = point[0] - position[0], point[1] - position[1]
+    return [(math.cos(angle) * x + math.sin(angle) * y) / scale,
+            (-math.sin(angle) * x + math.cos(angle) * y) / scale, point[2] / scale]
+
+
+def representation_state(view, base, part, drawing, cut, bind, read):
+    state = {}
+    for key, reader in (
+        ("angle", lambda: native_scalar(view.Angle, float)),
+        ("cut_only", lambda: native_scalar(cut.GetDisplayOnlySurfaceCut(), bool)),
+        ("type", lambda: native_scalar(view.Type, int)),
+        ("name", lambda: native_scalar(view.Name, str)),
+        ("configuration", lambda: native_scalar(view.ReferencedConfiguration, str)),
+        ("base_configuration", lambda: native_scalar(base.ReferencedConfiguration, str)),
+        ("scale", lambda: native_scalar(view.ScaleDecimal, float)),
+        ("position", lambda: finite_values(view.Position, 2)),
+        ("broken", lambda: native_scalar(view.IsBroken(), bool)),
+        ("mode", lambda: native_scalar(view.GetDisplayMode2(), int)),
+        ("thread_quality", lambda: native_scalar(view.GetCThreadQuality(), bool)),
+        ("use_parent_mode", lambda: native_scalar(view.GetUseParentDisplayMode(), bool)),
+        ("faceted", lambda: native_scalar(view.GetFacettedHlrDisplay(), bool)),
+    ):
+        value = read(key, reader)
+        if value is not MISSING:
+            state[key] = value
+    for key, reader in (
+        ("base_angle", lambda: native_scalar(base.Angle, float)),
+        ("base_scale", lambda: native_scalar(base.ScaleDecimal, float)),
+        ("base_mode", lambda: native_scalar(base.GetDisplayMode2(), int)),
+        ("base_thread_quality", lambda: native_scalar(base.GetCThreadQuality(), bool)),
+        ("base_use_parent_mode", lambda: native_scalar(base.GetUseParentDisplayMode(), bool)),
+        ("base_faceted", lambda: native_scalar(base.GetFacettedHlrDisplay(), bool)),
+    ):
+        value = read(key, reader)
+        if value is not MISSING:
+            state[key] = value
+    for label, document in (("source", part), ("drawing", drawing)):
+        for name, preference in (("annotations", 31), ("cosmetics", 41), ("high_quality", 257)):
+            value = read(f"{label}.{name}", lambda document=document, preference=preference:
+                         native_scalar(bind(document.Extension, "IModelDocExtension").GetUserPreferenceToggle(preference, 0), bool))
+            if value is not MISSING:
+                state[f"{label}.{name}"] = value
+    return state
+
+
+def capture_thread_stage(view, part, stage, diagnostic, bind, same, failure):
+    """Actual strict counts and independent channel rows, without generation."""
+    def read(key, reader, *, opaque=False):
+        label = f"{stage}.{key}"
+        try:
+            value = reader()
+            diagnostic["reads"][label] = {"present": value is not None} if opaque else value
+            return value
+        except BaseException as error:
+            diagnostic["errors"][label] = failure(label, error)
+            return MISSING
+    def typed(raw, interface):
+        require(raw is not None and raw is not MISSING, f"{interface} unavailable")
+        result = bind(raw, interface)
+        require(result is not None, f"{interface} null")
+        return result
+    threads = read("threads", lambda: view.GetCThreads(), opaque=True)
+    if threads is MISSING:
+        return
+    if read("thread_array", lambda: require(isinstance(threads, (tuple, list)), "native CThread array unavailable")) is MISSING:
+        return
+    diagnostic["reads"][f"{stage}.thread_count"] = len(threads)
+    for index, raw in enumerate(threads):
+        prefix = f"thread[{index}]"
+        thread = read(prefix, lambda: typed(raw, "ICThread"), opaque=True)
+        if thread is MISSING:
+            continue
+        annotation = read(f"{prefix}.annotation", lambda: typed(thread.GetAnnotation(), "IAnnotation"), opaque=True)
+        if annotation is not MISSING:
+            read(f"{prefix}.visible", lambda: native_scalar(annotation.Visible, int))
+            read(f"{prefix}.dangling", lambda: native_scalar(annotation.IsDangling(), bool))
+            read(f"{prefix}.layer", lambda: native_scalar(annotation.Layer, str))
+            read(f"{prefix}.attachment_types", annotation.GetAttachedEntityTypes)
+            attachments = read(f"{prefix}.attachments", lambda: annotation.GetAttachedEntities3(), opaque=True)
+            if attachments is not MISSING and attachments is not None:
+                if read(f"{prefix}.attachment_array", lambda: require(isinstance(attachments, (tuple, list)),
+                                                                     "attachment array unavailable")) is not MISSING:
+                    diagnostic["reads"][f"{stage}.{prefix}.attachment_count"] = len(attachments)
+                    for number, attachment in enumerate(attachments):
+                        label = f"{prefix}.attachment[{number}]"
+                        extension = read(label + ".extension", lambda: typed(part.Extension, "IModelDocExtension"), opaque=True)
+                        canonical_entity = (read(label + ".canonical", lambda: extension.GetCorrespondingEntity2(attachment), opaque=True)
+                                            if extension is not MISSING else MISSING)
+                        if canonical_entity is not MISSING and canonical_entity is not None:
+                            def reference_proof():
+                                reference = extension.GetPersistReference3(canonical_entity)
+                                require(reference is not None, "canonical attachment reference null")
+                                values = list(reference)
+                                require(values and all(type(x) is int and 0 <= x <= 255 for x in values),
+                                        "canonical attachment reference unavailable")
+                                diagnostic["reads"][f"{stage}.{label}.reference"] = values
+                                pair = extension.GetObjectByPersistReference3(reference)
+                                require(isinstance(pair, tuple) and len(pair) == 2, "attachment resolution OUT missing")
+                                resolved, status = pair
+                                diagnostic["reads"][f"{stage}.{label}.status"] = status
+                                require(type(status) is int and status == 0 and resolved is not None,
+                                        "attachment not resolved in this PART")
+                                require(same(resolved, canonical_entity, f"{stage}.{label}.identity"), "attachment identity differs")
+                            read(label + ".source_context_proof", reference_proof)
+                        # NULL correspondence is an actual unavailable native
+                        # source bridge, never a fabricated selected-edge ID.
+        for channel, owner in (("ICThread", thread), ("IAnnotation", annotation)):
+            if owner is MISSING:
+                continue
+            label = f"{prefix}.{channel}"
+            display = read(label + ".display", lambda: typed(owner.GetDisplayData(), "IDisplayData"), opaque=True)
+            if display is MISSING:
+                continue
+            for kind, count_reader, row_reader in (
+                ("lines", display.GetLineCount, display.GetLineAtIndex2),
+                ("polylines", display.GetPolyLineCount, display.GetPolylineAtIndex2),
+                ("arcs", display.GetArcCount, display.GetArcAtIndex2),
+            ):
+                count = read(f"{label}.{kind}.count", count_reader)
+                if read(f"{label}.{kind}.count_contract",
+                        lambda: require(type(count) is int and 0 <= count <= 100000, "primitive count unavailable/invalid")) is MISSING:
+                    continue
+                for number in range(count):
+                    key = f"{label}.{kind}[{number}]"
+                    def payload():
+                        value = row_reader(number)
+                        require(isinstance(value, (list, tuple)) and value, "primitive payload unavailable")
+                        return finite_values(value, len(value))
+                    raw_values = read(key, payload)
+                    if raw_values is not MISSING:
+                        read(key + ".points", lambda: primitive_points(kind, raw_values))
+
+
+def project_thread_geometry(app, view, state, source_snapshot, wizard, cosmetic, diagnostic, bind, double_array):
+    """Native projection plus explicitly non-authoritative geometric candidates."""
+    require(state["broken"] is False and state["scale"] > 0, "broken/nonpositive view projection unavailable")
+    transform = bind(view.ModelToViewTransform, "IMathTransform")
+    require(transform is not None, "model-to-view transform unavailable")
+    matrix = finite_values(transform.ArrayData, 16)
+    utility = bind(app.GetMathUtility(), "IMathUtility")
+    require(utility is not None, "native math utility unavailable")
+    def project(point):
+        model = bind(utility.CreatePoint(double_array(point)), "IMathPoint")
+        require(model is not None, "native point unavailable")
+        created = finite_values(model.ArrayData, 3)
+        require(math.dist(created, point) <= 1e-12, "native double-array marshaling changed point")
+        projected = bind(model.MultiplyTransform(transform), "IMathPoint")
+        require(projected is not None, "native point transform unavailable")
+        sheet = finite_values(projected.ArrayData, 3)
+        return {"model": list(point), "sheet": sheet,
+                "normalized": normalized_point(sheet, state["position"], state["angle"], state["scale"])}
+    output = {"transform": matrix, "angle": state["angle"], "position": state["position"], "scale": state["scale"],
+              "circles": [], "primitives": [], "source_display_native_identity": "UNAVAILABLE_NO_INVENTED_BRIDGE",
+              "coordinate_frame_authority": "UNAVAILABLE_IDisplayData_DOCS_SPECIFY_XYZ_NOT_FRAME",
+              "normalization_assumption": "Display XYZ provisionally treated in same drawing-view frame as native projection; not certified",
+              "role": "GEOMETRY_CORRESPONDENCE_ONLY_NOT_FLANK_IDENTITY_OR_SHIP"}
+    major = native_scalar(cosmetic["scalars"]["Diameter"], float)
+    require(cosmetic["scalars"]["DiameterType"] == 2 and major > 0, "native major diameter unavailable")
+    for edge in source_snapshot["edges"]:
+        if edge["trimmed_circle"]["state"] != "FULL_TRIMMED_CIRCLE":
+            continue
+        if not any(wizard["index"] in face["feature_memberships"] for face in edge["adjacent_faces"]):
+            continue
+        params = finite_values(edge["reads"]["circle_parameters"], 7)
+        center, axis, radius = params[:3], params[3:6], params[6]
+        length = math.sqrt(sum(x*x for x in axis))
+        require(length > 0, "circle axis unavailable")
+        axis = [x/length for x in axis]
+        basis = min(([1.,0.,0.], [0.,1.,0.], [0.,0.,1.]), key=lambda v: abs(sum(a*b for a,b in zip(axis,v))))
+        u = [axis[1]*basis[2]-axis[2]*basis[1], axis[2]*basis[0]-axis[0]*basis[2], axis[0]*basis[1]-axis[1]*basis[0]]
+        length = math.sqrt(sum(x*x for x in u)); u = [x/length for x in u]
+        v = [axis[1]*u[2]-axis[2]*u[1], axis[2]*u[0]-axis[0]*u[2], axis[0]*u[1]-axis[1]*u[0]]
+        row = {"edge_index": edge["index"], "body_source_matches": edge["body_source_matches"],
+               "adjacent_faces": edge["adjacent_faces"], "native_circle": params,
+               "trimmed_circle": edge["trimmed_circle"], "center": project(center),
+               "axis_point": project([center[i]+axis[i] for i in range(3)]),
+               "major_diameter_m": major, "major_role": "NATIVE_DEFINITION_NOT_PHYSICAL_EDGE",
+               "drill_diameter_m": 2*radius, "drill_samples": [], "major_samples": []}
+        for name, r in (("drill_samples", radius), ("major_samples", major/2)):
+            row[name] = [project([center[j]+r*(math.cos(t)*u[j]+math.sin(t)*v[j]) for j in range(3)])
+                         for t in (0., math.pi/2, math.pi, 3*math.pi/2)]
+        output["circles"].append(row)
+    require(output["circles"], "no native full-circle Wizard-owned physical evidence")
+    for key, points in diagnostic["reads"].items():
+        if not key.endswith(".points"):
+            continue
+        normalized = [normalized_point(p, state["position"], state["angle"], state["scale"]) for p in points]
+        row = {"payload": key.removesuffix(".points"), "sheet_points": points, "normalized_points": normalized,
+               "circle_correspondence": []}
+        # Compare axis-normal offsets, not axis-aligned screen distances:
+        # rotation cannot make an unrelated line appear at the major radius.
+        for circle in output["circles"]:
+            c = circle["center"]["normalized"]; a = circle["axis_point"]["normalized"]
+            dx,dy = a[0]-c[0], a[1]-c[1]; norm = math.hypot(dx,dy)
+            if norm <= 1e-9:
+                row["circle_correspondence"].append({"edge_index":circle["edge_index"], "state":"AXIS_PROJECTION_DEGENERATE"})
+                continue
+            distances = [abs((p[0]-c[0])*(-dy/norm)+(p[1]-c[1])*(dx/norm)) for p in normalized]
+            row["circle_correspondence"].append({
+                "edge_index":circle["edge_index"], "axis_normal_distances_m":distances,
+                "major_radius_deltas_m":[d-circle["major_diameter_m"]/2 for d in distances],
+                "drill_radius_deltas_m":[d-circle["drill_diameter_m"]/2 for d in distances],
+                "state":"MEASURED_NOT_NATIVE_ASSOCIATION"})
+        output["primitives"].append(row)
+    return output
+
+
+def source_observations(part, intended_name, bind, same, failure, observe_representation):
+    """Readonly physical evidence around one drawing-only intervention."""
     result = {"state": "UNAVAILABLE", "reads": {}, "errors": [], "phases": {},
-              "access_calls": 0, "release_calls": 0, "access_confirmed": False,
-              "clean_comparison": False, "display_generation_permitted": False,
-              "causal_conclusion": "NOT_ESTABLISHED", "reference_observations": {}}
+              "clean_comparison": False, "causal_conclusion": "NOT_ESTABLISHED",
+              "reference_observations": {}}
     body_references = {}
     result["enum_namespaces"] = THREAD_ENUM_NAMESPACES
 
@@ -519,7 +748,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             result["reads"][label] = {"present": value is not None} if opaque else value
             return value
         except BaseException as error:
-            row = failure(f"s1.{label}", error)
+            row = failure(f"source.{label}", error)
             result["errors"].append(row)
             return MISSING
 
@@ -564,7 +793,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                 for key in ("status", "resolved_present"):
                     if f"{label}.{key}" in result["reads"]:
                         observation[key] = result["reads"][f"{label}.{key}"]
-            equal = same(resolved, entity, f"s1.{label}.resolved_identity")
+            equal = same(resolved, entity, f"source.{label}.resolved_identity")
             observation["native_same"] = 1 if equal else 0
             result["reads"][f"{label}.native_same"] = observation["native_same"]
             observation["state"] = "SAME" if equal else "DIFFERENT"
@@ -692,7 +921,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                 row["owner_inventory_matches"] = []
                 for other in features:
                     value = tree_read(f"{label}.owner_vs[{other['row']['index']}]",
-                                 lambda other=other: same(owner, other["native"], f"s1.{label}.owner"))
+                                 lambda other=other: same(owner, other["native"], f"source.{label}.owner"))
                     if value is True:
                         row["owner_inventory_matches"].append(other["row"]["index"])
                 tree_read(f"{label}.owner_inventory_complete",
@@ -716,7 +945,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                     require(isinstance(raw_edges, (tuple, list)), "face edges not an array")
                     for raw_edge in raw_edges:
                         edge = typed(raw_edge, "IEdge")
-                        if not any(same(edge, existing["native"], f"s1.{phase}.edge_deduplicate") for existing in edges):
+                        if not any(same(edge, existing["native"], f"source.{phase}.edge_deduplicate") for existing in edges):
                             edge_label = f"{phase}.edge[{len(edges)}]"
                             edge_row = {"index": len(edges)}
                             snapshot["edges"].append(edge_row)
@@ -760,13 +989,16 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         evidence["body_source_matches"] = []
         if body is not MISSING and body is not None and isinstance(bodies, (tuple, list)):
             for index, source_body in enumerate(bodies):
-                value = read(f"{label}.body_vs[{index}]", lambda source_body=source_body: same(body, source_body, f"s1.{label}.body"))
+                value = read(f"{label}.body_vs[{index}]", lambda source_body=source_body: same(body, source_body, f"source.{label}.body"))
                 if value is True:
                     evidence["body_source_matches"].append(index)
         evidence["owned_body_proven"] = len(evidence["body_source_matches"]) == 1
+        read(f"{label}.owned_body", lambda: require(evidence["owned_body_proven"], "physical edge body not uniquely owned"))
         if body is not MISSING and body is not None:
             body_references[label] = persistent(body, f"{label}.body_reference")
         faces = read(f"{label}.adjacent_faces", lambda: edge.GetTwoAdjacentFaces2(), opaque=True)
+        read(f"{label}.adjacent_array", lambda: require(isinstance(faces, (tuple, list)) and len(faces) == 2,
+                                                       "native adjacent-face pair unavailable"))
         evidence["adjacent_faces"] = []
         if isinstance(faces, (tuple, list)):
             for index, raw_face in enumerate(faces):
@@ -784,7 +1016,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                     feature_index = feature["row"]["index"]
                     if oldest is not MISSING and oldest is not None:
                         value = read(f"{label}.adjacent[{index}].oldest_vs[{feature_index}]",
-                                     lambda feature=feature: same(oldest, feature["native"], f"s1.{label}.oldest"))
+                                     lambda feature=feature: same(oldest, feature["native"], f"source.{label}.oldest"))
                         if value is True:
                             face_row["oldest_owner_matches"].append(feature_index)
                             read(f"{label}.adjacent[{index}].oldest_core",
@@ -792,7 +1024,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                                                                  "physical face owner is a descriptive tree node"))
                     for owned_face in feature["faces"]:
                         value = read(f"{label}.adjacent[{index}].member[{feature_index},{len(face_row['feature_memberships'])}]",
-                                     lambda owned_face=owned_face: same(face, owned_face, f"s1.{label}.face_membership"))
+                                     lambda owned_face=owned_face: same(face, owned_face, f"source.{label}.face_membership"))
                         if value is True:
                             face_row["feature_memberships"].append(feature_index)
                             break
@@ -812,71 +1044,14 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         result["reason"] = "Unique real cosmetic definition and intended native Wizard required; Wizard-only route unavailable."
         return result
     candidate, wizard = cosmetics[0], wizards[0]
-    result["selected_feature_inventory_index"] = candidate["row"]["index"]
+    result["cosmetic_feature_inventory_index"] = candidate["row"]["index"]
     result["intended_wizard_inventory_index"] = wizard["row"]["index"]
-    if read("safety_before_access", before_access) is MISSING:
-        return result
-    selected_reference = MISSING
-    accessed = None
-    confirmed = False
-    try:
-        result["access_calls"] = 1
-        success = read("AccessSelections", lambda: candidate["definition"].AccessSelections(part, None))
-        confirmed = success is True
-        result["access_confirmed"] = confirmed
-        if confirmed:
-            accessed = capture("accessed")
-            edge = read("accessed.selected_edge", lambda: typed(candidate["definition"].Edge, "IEdge"), opaque=True)
-            if edge is not MISSING:
-                selected_reference = persistent(edge, "accessed.selected_edge.reference")
-                result["selected_edge"] = edge_evidence(edge, "accessed.selected_edge", accessed["features"], accessed["bodies"])
-                result["selected_edge"]["before_inventory_matches"] = []
-                for item in before["edges"]:
-                    if item["reference"] is MISSING:
-                        continue
-                    value = read(f"accessed.selected_edge.before[{item['row']['index']}]",
-                                 lambda item=item: same(resolve(item["reference"], "accessed.before_edge"), edge, "s1.selected_before"))
-                    if value is True:
-                        result["selected_edge"]["before_inventory_matches"].append(item["row"]["index"])
-                # Resolve the intended Wizard in the accessed inventory rather
-                # than assuming an index/name survives rollback unchanged.
-                live_wizard = read("accessed.wizard.resolve",
-                                   lambda: resolve(wizard["reference"], "accessed.wizard"), opaque=True)
-                wizard_indices = []
-                if live_wizard is not MISSING:
-                    for item in accessed["features"]:
-                        if read(f"accessed.wizard.member[{item['row']['index']}]",
-                                lambda item=item: same(live_wizard, item["native"], "s1.accessed.wizard")) is True:
-                            wizard_indices.append(item["row"]["index"])
-                result["selected_edge"]["wizard_inventory_matches"] = wizard_indices
-                result["selected_edge"]["wizard_face_association"] = (
-                    len(wizard_indices) == 1 and any(
-                        wizard_indices[0] in row["feature_memberships"]
-                        for row in result["selected_edge"]["adjacent_faces"]
-                    )
-                )
-                diameter = result["selected_edge"]["trimmed_circle"].get("diameter_m")
-                result["selected_edge"]["wizard_diameter_differences_m"] = {
-                    name: diameter - value for name, value in wizard["row"]["scalars"].items()
-                    if name in ("ThreadDiameter", "TapDrillDiameter", "ThruTapDrillDiameter")
-                    and diameter is not None
-                }
-        else:
-            result["reason"] = "AccessSelections not confirmed True; no release, retry, or repair."
-    except BaseException as error:
-        # Bookkeeping/classification can escape outside read(). Lock its actual
-        # first cause and original traceback BEFORE finally's release can fail.
-        result["errors"].append(failure("s1.access_body", error, error.__traceback__))
-    finally:
-        if confirmed:
-            result["release_calls"] = 1
-            release = read("ReleaseSelectionAccess", lambda: candidate["definition"].ReleaseSelectionAccess())
-            result["release_returned"] = release is None
-            if release is not MISSING and release is not None:
-                read("ReleaseSelectionAccess.contract",
-                     lambda: require(False, "VOID release returned a non-null value; no retry"))
-    # Fresh feature/definition reads, never reuse a pre-rollback definition to
-    # claim roll-forward. Even a release/reader error retains after evidence.
+    read("cosmetic.owner", lambda: require(candidate["row"].get("owner_inventory_matches") == [wizard["row"]["index"]],
+                                           "cosmetic definition not natively owned by intended Wizard"))
+    if not result["errors"]:
+        read("drawing_intervention", lambda: observe_representation(before["snapshot"], wizard["row"], candidate["row"]))
+    # Fresh source reads and same-PART persistent resolution even if a drawing
+    # writer/reader failed. Never alter source or repair representation.
     after = capture("after")
     result["tree_structure_unchanged"] = (
         before["snapshot"]["tree_complete"] and after["snapshot"]["tree_complete"]
@@ -884,14 +1059,6 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     )
     read("after.tree.stability", lambda: require(result["tree_structure_unchanged"],
                                                 "complete descriptive tree structure changed or unavailable"))
-    result["accessed_tree_structure_unchanged"] = (
-        None if accessed is None else accessed["snapshot"]["tree_complete"]
-        and accessed["snapshot"]["tree_structure"] == before["snapshot"]["tree_structure"]
-    )
-    if confirmed:
-        read("accessed.tree.stability",
-             lambda: require(result["accessed_tree_structure_unchanged"] is True,
-                             "complete accessed descriptive tree structure changed or unavailable"))
     result["feature_identity_after"] = []
     for item in before["features"]:
         if item["reference"] is MISSING:
@@ -899,8 +1066,8 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         def match_feature(item=item):
             restored = resolve(item["reference"], f"after.feature[{item['row']['index']}]")
             matches = [other for other in after["features"]
-                       if same(restored, other["native"], "s1.after.feature_inventory")]
-            require(len(matches) == 1, "feature absent/ambiguous after rollback")
+                       if same(restored, other["native"], "source.after.feature_inventory")]
+            require(len(matches) == 1, "feature absent/ambiguous after drawing intervention")
             other = matches[0]
             owner_unchanged = item["owner"] is None and other["owner"] is None
             owner_role = "NATIVE"
@@ -924,7 +1091,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                     )
                 else:
                     owner_unchanged = same(resolve(original_owner["reference"], "after.feature_owner"),
-                                           other["owner"], "s1.after.feature_owner")
+                                           other["owner"], "source.after.feature_owner")
                     owner_relation_unchanged = owner_unchanged
             result["feature_identity_after"].append({
                 "before": item["row"]["index"], "after": other["row"]["index"],
@@ -942,14 +1109,14 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
             require(item["reference"] is not MISSING, "before edge identity unavailable")
             restored_edge = resolve(item["reference"], f"after.physical_edge[{item['row']['index']}]")
             matches = [other for other in after["edges"]
-                       if same(restored_edge, other["native"], "s1.after.physical_edge")]
-            require(len(matches) == 1, "physical edge absent/ambiguous after rollback")
+                       if same(restored_edge, other["native"], "source.after.physical_edge")]
+            require(len(matches) == 1, "physical edge absent/ambiguous after drawing intervention")
             other = matches[0]
             old_body = body_references.get(f"before.edge[{item['row']['index']}]", MISSING)
             new_body = body_references.get(f"after.edge[{other['row']['index']}]", MISSING)
             require(old_body is not MISSING and new_body is not MISSING, "edge body persistence unavailable")
             body_same = same(resolve(old_body, "after.old_body"), resolve(new_body, "after.new_body"),
-                             "s1.after.body_identity")
+                             "source.after.body_identity")
             old_memberships = sorted(sorted(feature_indices.get(index, -1) for index in face["feature_memberships"])
                                      for face in item["row"]["adjacent_faces"])
             new_memberships = sorted(sorted(face["feature_memberships"]) for face in other["row"]["adjacent_faces"])
@@ -959,34 +1126,11 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                 "body_same": body_same, "face_feature_memberships_unchanged": old_memberships == new_memberships,
             })
         read(f"after.physical_edge[{item['row']['index']}].comparison", match_edge)
-    if selected_reference is not MISSING:
-        edge = read("after.selected_edge.resolve", lambda: typed(resolve(selected_reference, "after.selected_edge"), "IEdge"), opaque=True)
-        if edge is not MISSING:
-            result["selected_edge_after"] = edge_evidence(edge, "after.selected_edge", after["features"], after["bodies"])
-            matches = []
-            for item in after["edges"]:
-                value = read(f"after.selected_edge.member[{item['row']['index']}]",
-                             lambda item=item: same(edge, item["native"], "s1.after.selected_edge"))
-                if value is True:
-                    matches.append(item["row"]["index"])
-            result["selected_edge_after"]["inventory_matches"] = matches
-    # Native availability is not causal proof. This state only says the
-    # bounded access/read/release occurred and its entire evidence is retained.
-    result["state"] = "ACCESS_READ_RELEASE_OBSERVED" if confirmed and result.get("release_returned") else "UNAVAILABLE"
-    result["roll_forward_witness"] = after["snapshot"]["all_features_rolled_forward"]
-    selected = result.get("selected_edge", {})
-    restored = result.get("selected_edge_after", {})
-    before_matches = selected.get("before_inventory_matches", [])
-    before_geometry = before["edges"][before_matches[0]]["row"] if len(before_matches) == 1 else {}
-    result["selected_geometry_unchanged"] = (
-        bool(before_geometry)
-        and before_geometry.get("reads") == selected.get("reads") == restored.get("reads")
-    )
+    result["all_features_rolled_forward_after"] = after["snapshot"]["all_features_rolled_forward"]
     result["clean_comparison"] = (
-        confirmed and result.get("release_returned") is True and not result["errors"]
+        not result["errors"] and after["snapshot"]["complete"]
         and after["snapshot"]["all_features_rolled_forward"]
         and result["tree_structure_unchanged"]
-        and result["accessed_tree_structure_unchanged"] is True
         and before["snapshot"]["core_feature_count"] == after["snapshot"]["core_feature_count"] == len(result["feature_identity_after"])
         and all(row["scalars_unchanged"] and row["name_type_unchanged"]
                 and row["owner_relation_unchanged"] and row["definition_state_unchanged"]
@@ -994,21 +1138,8 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         and len(before["edges"]) == len(after["edges"]) == len(result["geometry_identity_after"])
         and all(row["geometry_unchanged"] and row["body_same"] and row["face_feature_memberships_unchanged"]
                 for row in result["geometry_identity_after"])
-        and accessed is not None and accessed["snapshot"]["complete"]
-        and selected.get("owned_body_proven") is True and restored.get("owned_body_proven") is True
-        and selected.get("wizard_face_association") is True
-        and len(before_matches) == 1 and len(restored.get("inventory_matches", [])) == 1
-        and selected.get("trimmed_circle", {}).get("state") == "FULL_TRIMMED_CIRCLE"
-        and restored.get("trimmed_circle", {}).get("state") == "FULL_TRIMMED_CIRCLE"
-        and result["selected_geometry_unchanged"]
     )
-    result["display_generation_permitted"] = (
-        result["access_confirmed"] is True and result.get("release_returned") is True
-        and after["snapshot"]["complete"] and result["roll_forward_witness"] is True
-        and result["tree_structure_unchanged"]
-        and result["accessed_tree_structure_unchanged"] is True
-        and not result["errors"]
-    )
+    result["state"] = "READONLY_SOURCE_UNCHANGED" if result["clean_comparison"] else "UNAVAILABLE"
     return result
 
 
@@ -1016,14 +1147,14 @@ def main():
     primary_exception = None
     primary_traceback = None
     report = {
-        "kind": "mg-saved-thread-control-s1",
+        "kind": "mg-saved-thread-representation-r1-c1",
         "status": "running",
-        "native_ship": "NOT_EVALUATED",
-        "mode": "disposable_copy_access_read_release_no_save",
+        "native_ship": "NOT_SHIP",
+        "mode": "independent_drawing_copy_one_factor_no_save",
         "contract": CONTRACT,
         "cases": [],
         "session": {
-            "scope": "Exactly two sequential pairs in one attached adapter callback; no reattach between pairs.",
+            "scope": "Exactly three independent pairs in one attached callback; no reattach or cumulative copies.",
             "native_pid_evidence": "Existing owned runner attach witness; no additional native process calls.",
         },
         "reads": {},
@@ -1041,7 +1172,7 @@ def main():
     def case_report(control):
         return {
             "case": control["case"], "contract": control, "status": "not_started",
-            "native_ship": "NOT_EVALUATED",
+            "native_ship": "NOT_SHIP",
             "reads": {}, "errors": [], "primary_failure": None,
             "inventories": {}, "restores": [], "opens": [], "closures": [],
             "views": [], "identity_comparisons": [], "active_sketch": {},
@@ -1158,15 +1289,14 @@ def main():
         require(os.environ.get("HARMONIC_COM_SEAT"), "the admitted task must hold the coordinated COM seat")
         require(os.environ.get("HARMONIC_SW_AUTOSTART") == "0", "attach-only worker seat required")
         contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-        require(contract == CONTRACT, "committed two-case contract differs from the immutable probe contract")
+        require(contract == CONTRACT, "committed three-case contract differs from immutable probe contract")
         report["reads"]["probe_identity"] = file_identity(Path(__file__))
         report["reads"]["contract_identity"] = file_identity(CONTRACT_PATH)
         sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
         from diagnostics import _script_paths  # noqa: F401
         from diagnostics._owned_native_session import run_owned_diagnostic
-        from _com import _early_bound
+        from _com import _early_bound, double_array
         import _artifact_cache as cache
-        from draw_mg_magnifying_bracket import _mouth_thread_diagnostic
 
         async def run_pair(adapter, control):
             app = adapter.swApp
@@ -1241,6 +1371,7 @@ def main():
                         ("title", lambda: doc.GetTitle(), str),
                         ("type", lambda: doc.GetType(), int),
                         ("dirty", lambda: doc.GetSaveFlag(), bool),
+                        ("read_only", lambda: doc.IsOpenedReadOnly(), bool),
                     ):
                         value = attempt(f"{tag}.{key}", reader)
                         if value is not MISSING:
@@ -1273,7 +1404,7 @@ def main():
 
             def complete(rows):
                 return rows is not None and all(
-                    all(key in row["data"] for key in ("path", "title", "type", "dirty"))
+                    all(key in row["data"] for key in ("path", "title", "type", "dirty", "read_only"))
                     for row in rows
                 )
 
@@ -1324,6 +1455,13 @@ def main():
                             f"{label}: live document differs from retained direct OpenDoc6 result")
                     require(data["title"] == owned[index]["data"]["title"],
                             f"{label}: owned document title changed")
+                    expected_mode = control["read_only"]["part" if data["type"] == 1 else "drawing"]
+                    require(data["read_only"] is expected_mode, f"{label}: owned copy read-only state changed")
+                    if data["dirty"] is True:
+                        require(control["case"] in ("r1", "c1") and data["type"] == 3
+                                and data["read_only"] is False
+                                and canonical(data["path"]) == canonical(targets["drawing"]),
+                                f"{label}: dirty document is not this case's writable drawing copy")
                     if clean:
                         require(data["dirty"] is False, f"{label}: dirty owned document is stranded; refusing CloseDoc")
                     matched.add(index)
@@ -1331,7 +1469,7 @@ def main():
 
             def open_native(kind, doc_type):
                 path = certified_copy_path(targets[kind])
-                readonly = not (control["case"] == "s1" and kind == "part")
+                readonly = control["read_only"][kind]
                 options = 3 if readonly else 1
                 row = {"kind": kind, "requested_path": str(path), "options": options}
                 report["opens"].append(row)
@@ -1417,7 +1555,7 @@ def main():
                     require(os.environ.get(name) in (None, "", expected), f"{name} redirects pinned cache")
                 for kind in ("drawing", "part"):
                     spec = control[kind]
-                    if control["case"] == "s1" and kind == "drawing":
+                    if control["case"] in ("r1", "c1") and kind == "drawing":
                         row = {"kind": kind, "source": "private_failure_blob", "complete": False}
                         report["restores"].append(row)
                         download_capture(spec, originals[kind])
@@ -1483,7 +1621,7 @@ def main():
                                 item["section_label"] = label
                                 if sheet_name == control["sheet_name"] and label == control["section_label"]:
                                     candidates.append(view)
-                        if control["case"] == "s1":
+                        if control["case"] in ("r1", "c1"):
                             def view_reference():
                                 # SDK section views have no own reference;
                                 # inspect their native parent, never substitute
@@ -1538,75 +1676,202 @@ def main():
                         if sketch is not MISSING:
                             row["state"] = "NULL" if sketch is None else "PRESENT"
 
-                # These actual native reads enclose the ENTIRE existing call,
-                # including its fixed generation boundary, not just generation.
-                observe_active_sketch("before_diagnostic_including_generation")
-                try:
-                    report["diagnostic"] = _mouth_thread_diagnostic(
-                        adapter, section, feature_name=control["feature_name"]
-                    )
-                except BaseException as error:
-                    failure("collect", error)
-                    raise
-                finally:
+                if control["case"] == "sm_positive":
+                    observe_active_sketch("before_diagnostic_including_generation")
+                    report["diagnostic"] = {"reads": {}, "errors": {}, "feature": control["feature_name"]}
+                    report["optional_evidence"] = {
+                        "display_coordinate_frame": "UNAVAILABLE_NO_PRIMARY_FRAME_AUTHORITY",
+                        "source_display_bridge": "Only actual native correspondence is recorded; NULL remains unavailable",
+                    }
+                    cut = attempt("sm.section", lambda: _early_bound(section.GetSection(), "IDrSection"))
+                    report["control_states"] = {}
+                    for phase in ("before_generation", "after_generation"):
+                        if phase == "after_generation":
+                            observe("sm.generation.ViewZoomtofit2", drawing_model.ViewZoomtofit2)
+                            observe("sm.generation.UpdateViewDisplayGeometry", section.UpdateViewDisplayGeometry)
+                        report["control_states"][phase] = representation_state(
+                            section, base, part, drawing_model, cut, _early_bound,
+                            lambda key, reader: observe(f"sm.{phase}.{key}", reader))
+                        capture_thread_stage(section, part, phase, report["diagnostic"], _early_bound, same, failure)
                     observe_active_sketch("after_diagnostic_including_generation")
-                report["thread_ink"] = thread_ink_summary(report["diagnostic"])
-                if control["case"] == "s1":
-                    if report["thread_ink"]["positive_count_fields"]:
-                        report["s1"] = {"state": "STOP_BASELINE_PRIMITIVES",
-                                        "reason": "Writable-copy reopening already has primitives; no access performed."}
-                    elif report["thread_ink"]["state"] != "OBSERVED_ZERO" or report["errors"]:
-                        report["s1"] = {"state": "UNAVAILABLE", "reason": "Baseline or native safety witnesses incomplete."}
-                    else:
-                        def before_access():
-                            require(summary["cases"][0].get("source_metadata", {}).get("state") == "OBSERVED",
-                                    "SM same-interface scalar census must precede source access")
-                            live = require_owned_inventory(inventory("before_access"), "before_access")
-                            require(len(live) == 2, "both exact owned copies must be live before access")
-                            require(all(row.get("warnings") == 0 and type(row.get("warnings")) is int
-                                        for row in report["opens"]), "open warnings prevent source intervention")
-                            part_mode = observe("before_access.part.IsOpenedReadOnly", lambda: part.IsOpenedReadOnly())
-                            drawing_mode = observe("before_access.drawing.IsOpenedReadOnly", lambda: drawing_model.IsOpenedReadOnly())
-                            require(part_mode is False and drawing_mode is True, "copy open modes changed before access")
-                            live_source = _early_bound(base.ReferencedDocument, "IModelDoc2")
-                            require(live_source is not None and same(live_source, part, "before_access.reference")
-                                    and canonical(live_source.GetPathName()) == canonical(targets["part"]),
-                                    "loaded reference changed before access")
-                            require(not report["errors"], "native safety collection failed before access")
-                            activate(part, str(targets["part"]), "activate_source_access")
-
-                        report["s1"] = source_intervention(
-                            part, control["feature_name"], _early_bound, same, failure, before_access,
-                        )
-                        if report["errors"]:
-                            report["s1"]["display_generation_permitted"] = False
-                            report["s1"]["clean_comparison"] = False
-                        if report["s1"]["display_generation_permitted"] is True:
-                            activate(drawing_model, str(targets["drawing"]), "activate_after_access")
-                            report["after_access_diagnostic"] = _mouth_thread_diagnostic(
-                                adapter, section, feature_name=control["feature_name"],
-                            )
-                            report["after_access_thread_ink"] = thread_ink_summary(report["after_access_diagnostic"])
-                            report["s1"]["display_comparison_complete"] = report["after_access_thread_ink"]["complete"]
-                            if not report["after_access_thread_ink"]["complete"]:
-                                report["s1"]["clean_comparison"] = False
-                            if report["after_access_thread_ink"]["positive_count_fields"]:
-                                report["s1"]["stop"] = "Inspect actual primitives; positive counts do not establish recovered flanks."
+                    report["thread_ink"] = thread_ink_summary(report["diagnostic"])
+                    require(report["thread_ink"]["complete"] and not report["errors"]
+                            and bool(report["thread_ink"]["positive_payload_fields"]),
+                            "SM requires complete native control readers and genuine finite positive primitive geometry")
+                    report["source_metadata"] = passive_sm_thread_metadata(part, control["feature_name"], _early_bound, same, failure)
+                    require(report["source_metadata"]["state"] == "OBSERVED", "SM scalar census unavailable")
                 else:
-                    require(bool(report["thread_ink"]["positive_payload_fields"]),
-                            "SM positive control did not extract positive native primitive payloads")
-                    report["source_metadata"] = passive_sm_thread_metadata(
-                        part, control["feature_name"], _early_bound, same, failure,
-                    )
-                    require(report["source_metadata"]["state"] == "OBSERVED",
-                            "SM same-interface source scalar census unavailable")
+                    intervention = {"state": "UNAVAILABLE", "changed_factor": control["changed_factor"],
+                                    "attempted": False, "confirmed": False, "mutator_calls": 0,
+                                    "stages": {}, "causal_conclusion": "NOT_ESTABLISHED", "native_ship": "NOT_SHIP"}
+                    report["representation"] = intervention
+                    cut = _early_bound(section.GetSection(), "IDrSection")
+                    require(cut is not None, "target native section object unavailable")
+
+                    def target_guard(label, *, clean):
+                        live = require_owned_inventory(inventory(label), label, clean=clean)
+                        require(len(live) == 2, "both exact owned copies must remain live")
+                        require(part.IsOpenedReadOnly() is True and drawing_model.IsOpenedReadOnly() is False,
+                                "representation case requires readonly PART and writable DRAWING")
+                        found = 0
+                        fresh_rows = drawing.GetViews()
+                        require(isinstance(fresh_rows, (list, tuple)), "live target view inventory unavailable")
+                        for raw_row in fresh_rows:
+                            require(isinstance(raw_row, (list, tuple)) and raw_row, "live sheet row unavailable")
+                            for raw_view in raw_row[1:]:
+                                current = _early_bound(raw_view, "IView")
+                                require(current is not None, "live view unavailable")
+                                current_cut = _early_bound(current.GetSection(), "IDrSection")
+                                parent = _early_bound(current.GetBaseView(), "IView") if current_cut is not None else current
+                                require(parent is not None, "live reference owner unavailable")
+                                reference = _early_bound(parent.ReferencedDocument, "IModelDoc2")
+                                require(reference is not None and canonical(reference.GetPathName()) == canonical(targets["part"])
+                                        and same(reference, part, f"{label}.reference"), "live drawing reference changed")
+                                if same(current, section, f"{label}.target_view"):
+                                    found += 1
+                                    require(current.Type == 2 and same(parent, base, f"{label}.base")
+                                            and current_cut is not None and same(current_cut, cut, f"{label}.section"),
+                                            "target native view/parent/section identity changed")
+                        require(found == 1, "target view absent or ambiguous")
+                        if label == "before_intervention":
+                            for kind in ("part", "drawing"):
+                                original_hash = observe(f"{label}.original.{kind}", lambda kind=kind: file_identity(originals[kind]))
+                                copy_hash = observe(f"{label}.copy.{kind}", lambda kind=kind: file_identity(targets[kind]))
+                                require(original_hash == report["reads"][f"staged.{kind}"]
+                                        and copy_hash == report["reads"][f"copy_before.{kind}"],
+                                        "original or disposable copy bytes drifted before write")
+                        require(user_control(label) is True, "UserControl not proven before representation operation")
+                        require(not report["errors"], "representation ownership/state reader failed")
+
+                    def run_representation(snapshot, wizard, cosmetic):
+                        report["diagnostic"] = {"reads": {}, "errors": {}, "feature": control["feature_name"]}
+                        report["after_intervention_diagnostic"] = {"reads": {}, "errors": {}, "feature": control["feature_name"]}
+                        def stage(label, channel_phase, diagnostic):
+                            entry = {"state": {}, "geometry": None, "visual": {"state": "NOT_REQUESTED_ZERO_OR_UNAVAILABLE"}}
+                            intervention["stages"][label] = entry
+                            def state_read(key, reader):
+                                return observe(f"{label}.{key}", reader)
+                            entry["state"] = representation_state(section, base, part, drawing_model, cut, _early_bound, state_read)
+                            observe_active_sketch(label)
+                            capture_thread_stage(section, part, channel_phase, diagnostic, _early_bound, same, failure)
+                            entry["annotation_controls"] = {
+                                key.removeprefix(channel_phase + "."): value
+                                for key, value in diagnostic["reads"].items()
+                                if key.startswith(channel_phase + ".") and key.endswith((".visible", ".dangling", ".layer", ".attachment_types"))
+                            }
+                            if any(key.startswith(channel_phase + ".") and key.endswith(".points") and value
+                                   for key, value in diagnostic["reads"].items()):
+                                def capture_image():
+                                    # Existing pixel-only helper: no native save,
+                                    # viewport mutation, window lookup or COM call.
+                                    from _seat_forensics import _grab_screen
+                                    expected_parent = ROOT / "cad/out/reports/diagnostics/representation-images" / copy_root.name
+                                    expected_name = f"{control['case']}-{label}.png"
+                                    def certify_image_path():
+                                        target = cache._restore_path(REPORT.parent / "representation-images" / copy_root.name / expected_name)
+                                        require(REPORT.parent == ROOT / "cad/out/reports/diagnostics"
+                                                and target.parent == expected_parent and target.name == expected_name,
+                                                "image path is outside trusted unique report subtree")
+                                        return target
+                                    path = certify_image_path()
+                                    require(not path.exists(), "image path not fresh")
+                                    _grab_screen(path)
+                                    identity = file_identity(certify_image_path())
+                                    require(identity["bytes"] > 0, "image capture produced no bytes")
+                                    return {"state": "CAPTURED_DESKTOP", "path": str(path), **identity,
+                                            "limitation": "Session desktop pixels; no claim of unobscured target view or native flank identity"}
+                                image = attempt(f"{label}.image", capture_image)
+                                entry["visual"] = ({"state": "GAP", "reason": "Pixel-only capture failed; see original local error"}
+                                                   if image is MISSING else image)
+                            geometry_diagnostic = {"reads": {key:value for key,value in diagnostic["reads"].items()
+                                                            if key.startswith(channel_phase + ".")}}
+                            geometry = attempt(f"{label}.geometry", lambda: project_thread_geometry(
+                                app, section, entry["state"], snapshot, wizard, cosmetic,
+                                geometry_diagnostic, _early_bound, double_array))
+                            if geometry is not MISSING:
+                                entry["geometry"] = geometry
+                            return entry["state"]
+                        def expected_state(state, angle, cut_only):
+                            require(type(state.get("angle")) in (float,int) and math.isclose(state["angle"], angle, rel_tol=0, abs_tol=1e-10)
+                                    and state.get("cut_only") is cut_only, "fresh baseline/factor readback differs")
+                            require(type(state.get("type")) is int and state["type"] == 2
+                                    and state.get("broken") is False, "target is not an unbroken section view")
+                            require(type(state.get("configuration")) is str and bool(state["configuration"])
+                                    and state.get("configuration") == state.get("base_configuration"),
+                                    "native section/base configuration unavailable or different")
+                        def generation(label):
+                            observe(label + ".ViewZoomtofit2", drawing_model.ViewZoomtofit2)
+                            observe(label + ".UpdateViewDisplayGeometry", section.UpdateViewDisplayGeometry)
+                        target_guard("before_baseline", clean=True)
+                        baseline = stage("baseline_before_generation", "before_generation", report["diagnostic"])
+                        expected_state(baseline, control["baseline_angle"], True)
+                        require(not report["errors"], "baseline readers unavailable")
+                        generation("baseline_generation")
+                        baseline_after = stage("baseline_after_generation", "after_generation", report["diagnostic"])
+                        expected_state(baseline_after, control["baseline_angle"], True)
+                        require(baseline_after == baseline, "baseline generation changed a controlled factor")
+                        report["thread_ink"] = thread_ink_summary(report["diagnostic"])
+                        require(report["thread_ink"]["state"] == "OBSERVED_ZERO" and report["thread_ink"]["complete"],
+                                "fresh baseline is not complete observed zero; intervention refused")
+                        require(not report["errors"], "baseline safety/evidence unavailable")
+                        target_guard("before_intervention", clean=False)
+                        # Last baseline readback after ownership census; only
+                        # the explicitly selected drawing mutator follows.
+                        last = representation_state(section, base, part, drawing_model, cut, _early_bound,
+                                                    lambda key,reader: observe("before_write."+key,reader))
+                        expected_state(last, control["baseline_angle"], True)
+                        require(last == baseline, "controlled state drifted immediately before write")
+                        require(user_control("immediate_prewrite") is True, "UserControl changed before write")
+                        require(not report["errors"], "last prewrite evidence unavailable")
+                        intervention["attempted"] = True
+                        intervention["mutator_calls"] = 1
+                        try:
+                            if control["case"] == "r1":
+                                section.Angle = 0.0  # IView PUT DISPID200, radians.
+                            else:
+                                value = cut.SetDisplayOnlySurfaceCut(False)  # IDrSection VT_VOID, never BOOL.
+                                report["reads"]["intervention.setter_return"] = value
+                                require(value is None, "VOID cut-only setter returned unexpected value")
+                        except BaseException as error:
+                            failure("intervention.write", error, error.__traceback__)
+                        finally:
+                            post = stage("post_write_before_generation", "before_generation", report["after_intervention_diagnostic"])
+                        expected_state(post, control["requested_angle"], control["requested_cut_only"])
+                        allowed = ("angle", "cut_only", "position") if control["case"] == "r1" else ("angle", "cut_only")
+                        unchanged = [key for key in baseline if key not in allowed]
+                        require(all(post.get(key) == baseline[key] for key in unchanged),
+                                "intervention changed another controlled factor")
+                        # Position is observed separately: rotation may move
+                        # a view's geometric centre, never write it to repair.
+                        intervention["position_changed"] = post.get("position") != baseline.get("position")
+                        require(not report["errors"], "write/readback failed; no generation or retry")
+                        intervention["confirmed"] = True
+                        target_guard("after_intervention", clean=False)
+                        generation("post_write_generation")
+                        final_state = stage("post_write_after_generation", "after_generation", report["after_intervention_diagnostic"])
+                        expected_state(final_state, control["requested_angle"], control["requested_cut_only"])
+                        require(all(final_state.get(key) == baseline[key] for key in unchanged),
+                                "post-generation controlled factors changed")
+                        controls = [entry["annotation_controls"] for entry in intervention["stages"].values()]
+                        require(all(value == controls[0] for value in controls), "annotation visibility/layer/attachment type controls changed")
+                        target_guard("after_generation", clean=False)
+                        report["after_intervention_thread_ink"] = thread_ink_summary(report["after_intervention_diagnostic"])
+                        ink = report["after_intervention_thread_ink"]
+                        require(ink["complete"] and not report["errors"], "post-intervention evidence unavailable")
+                        intervention["state"] = ("OBSERVED_POSITIVE" if ink["positive_payload_fields"]
+                                                 else "OBSERVED_ZERO" if ink["state"] == "OBSERVED_ZERO" else "UNAVAILABLE")
+                        require(intervention["state"] != "UNAVAILABLE", "positive counts without extracted geometry")
+                    report["source_observations"] = source_observations(
+                        part, control["feature_name"], _early_bound, same, failure, run_representation)
+                    require(report["source_observations"]["clean_comparison"] is True
+                            and intervention["confirmed"] is True and not report["errors"],
+                            "readonly source stability or drawing intervention incomplete")
                 report["collection_completed"] = True
             except BaseException as error:
                 failure("collect", error)
             finally:
-                # CloseDoc may also close hidden docs: EVERY live document must
-                # be an exact owned copy with a known Boolean save flag. Only
-                # S1 permits known dirty copies; SM still requires all clean.
+                # CloseDoc also closes hidden documents: certify every live
+                # copy and readonly mode; only this R1/C1 drawing may be dirty.
                 for index, owned_row in enumerate(sorted(owned, key=lambda row: row["data"]["type"] != 3)):
                     data = owned_row["data"]
                     closure = {"path": data["path"], "title": data["title"], "status": "stranded_owned"}
@@ -1614,7 +1879,7 @@ def main():
 
                     def close_owned():
                         now = require_owned_inventory(inventory(f"before_close_{index}"),
-                                                      f"before_close_{index}", clean=control["case"] != "s1")
+                                                      f"before_close_{index}", clean=control["case"] == "sm_positive")
                         matches = [row for row in now if canonical(row["data"]["path"]) == canonical(data["path"])]
                         if not matches:
                             closure["status"] = "already_unloaded"
@@ -1670,7 +1935,7 @@ def main():
             }
             try:
                 # Explicit order; one adapter/native session, no case matrix.
-                for control, case in zip((SM_POSITIVE, S1), summary["cases"], strict=True):
+                for control, case in zip((SM_POSITIVE, R1, C1), summary["cases"], strict=True):
                     report = case
                     report["status"] = "running"
                     try:
@@ -1686,7 +1951,7 @@ def main():
                         report["status"] = "failed" if report["errors"] else (
                             "observed_with_diagnostic_read_errors"
                             if any((report.get(key) or {}).get("errors")
-                                   for key in ("diagnostic", "after_access_diagnostic")) else "observed"
+                                   for key in ("diagnostic", "after_intervention_diagnostic")) else "observed"
                         )
                     # run_pair returns only after owned-copy close, full empty/
                     # null proof, and unchanged original/copy hashes without errors.
@@ -1706,7 +1971,7 @@ def main():
         report["status"] = "failed" if report["errors"] else (
             "observed_with_diagnostic_read_errors"
             if any((case.get(key) or {}).get("errors") for case in report["cases"]
-                   for key in ("diagnostic", "after_access_diagnostic"))
+                   for key in ("diagnostic", "after_intervention_diagnostic"))
             else "observed"
         )
         try:
