@@ -42,6 +42,7 @@ async def build(adapter: Any) -> dict[str, str]:
             supplier_disc_spring_dimensions, spec=supplier_spec, settled_checks=settled_checks,
         ),
         installed_caption="INSTALLED ENVELOPE",
+        installed_caption_gap=0.003,
         settled_checks=settled_checks,
     )
 
