@@ -541,6 +541,8 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     else:
         drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name != "NeckToFootSide"], lateral_location=items["NeckToFootSide"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
+        assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
+        assert items["NeckThickness"].OffsetText
         assert ink["NeckThickness"].text[1] > .2235368
         assert ink["FlangeDepth"].text[2] < .196
         assert ink["MountingX0"].text[2] < .054375

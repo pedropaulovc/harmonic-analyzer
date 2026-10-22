@@ -288,7 +288,7 @@ def _layout_linear_annotations(
     seat_line = min(line.x0 for line in verticals("SeatToAxis"))
     front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
     targets = {
-        "NeckThickness": (before["NeckThickness"].text[0], front_outline[3] + 0.004),
+        "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, front_outline[3] + 0.004),
         "FlangeDepth": (seat_line - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]), before["FlangeDepth"].text[1]),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
@@ -301,11 +301,11 @@ def _layout_linear_annotations(
         annotation = by_name[name]
         display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         display.CenterText = False
-        if name == "MountingY0":
-            # Keep its real dimension/witness lines fixed while moving the
-            # horizontal text off their centreline, using the native jog.
+        if name in ("NeckThickness", "MountingY0"):
+            # Jog the text outside its witnesses without dragging a native
+            # dimension/extension line through the shorter unqualified value.
             display.OffsetText = True
-        if display.CenterText is not False or (name == "MountingY0" and display.OffsetText is not True):
+        if display.CenterText is not False or (name in ("NeckThickness", "MountingY0") and display.OffsetText is not True):
             raise RuntimeError(f"{name}: native text placement mode did not persist")
         for _attempt in range(3):
             ink = _dimension_layout_ink(adapter, annotation, label=name)

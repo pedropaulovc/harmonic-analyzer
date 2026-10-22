@@ -1928,6 +1928,10 @@ checks; retain its measured two-edge attachments, native name and ordinary band.
 Do not rediscover that annotation through an imported-model dimension name
 reader. R32 passed its constructor checks but failed that later rediscovery;
 the exact native legacy-reader behavior was not captured.
+For the unqualified12.50 thickness, jog its text beyond the outermost actual
+native vertical witness plus4mm and above the front outline. R33 reported an
+own-line crossing at the former qualified text's Xstation; the exact crossing
+segment was not captured. Keep the native line/arrow/neighbor checks strict.
 The earlier+10 option intersected the existing hex knife stub and was rejected.
 The knife mount's pre-existing0.6835 nominal axial air gap is not a2mm wall
 policy violation or permission to claim a full articulation clearance proof.
