@@ -11,6 +11,7 @@ import pytest
 import _config
 import _mcmaster_91595a452 as dims
 import build_ch_rocker_arm_tl_vn_oblique_cl_dowel as part
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as spec
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
@@ -171,4 +172,4 @@ def test_riser_referenced_fitup_covers_the_finished_plate_stack(
     )
     assert contact >= spec.PRESS_ENGAGEMENT_MIN_D * spec.DIA_MAX
     assert tip_height - dims.DOME_H > 0.0
-    assert tip_height < (spec.rocker.ARM_THICKNESS + spec.rocker.ARM_THICKNESS_BAND[1])
+    assert tip_height < (rocker_outline.ARM_THICKNESS + spec.rocker.ARM_THICKNESS_BAND[1])

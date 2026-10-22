@@ -61,7 +61,8 @@ from _drawing_marks import (
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _holes import wizard_holes
 from ch_vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
 from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 from ch_vn_frame_side_screw_spec import SHANK_DIA as FRAME_SIDE_SHANK_DIA

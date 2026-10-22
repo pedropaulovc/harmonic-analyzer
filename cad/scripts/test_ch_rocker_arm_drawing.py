@@ -16,6 +16,7 @@ import pytest
 
 import ch_rocker_arm_notes
 import ch_rocker_arm_spec
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
@@ -85,12 +86,12 @@ def test_draw_view_math_matches_the_spec() -> None:
     # copy; the spec's geometry must match the part the build actually builds.
     assert (drawing.ROD_HOLE_X, drawing.TOP_END_Y) == (
         rocker_interface.ROD_HOLE_X,
-        ch_rocker_arm_spec.TOP_END_Y,
+        rocker_outline.TOP_END_Y,
     )
-    assert ch_rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
-    assert ch_rocker_arm_spec.TOP_ARC_LEN == arm.TOP_ARC_LEN
-    assert ch_rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
-    assert ch_rocker_arm_spec.TIP_FACE == arm.TIP_FACE
+    assert rocker_outline.ARM_THICKNESS == arm.ARM_THICKNESS
+    assert rocker_outline.TOP_ARC_LEN == arm.TOP_ARC_LEN
+    assert rocker_outline.BOT_ARC_LEN == arm.BOT_ARC_LEN
+    assert rocker_outline.TIP_FACE == arm.TIP_FACE
     assert arm.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
     assert drawing._ROD_HOLE_DIA == blind_cut_dia_mm(ch_rocker_arm_spec.ROD_HOLE_SPEC)
 
@@ -122,7 +123,7 @@ def test_sheet_runs_at_1_to_2() -> None:
     assert f"VIEW {ch_rocker_arm_notes.VIEW_ARROW_LETTER} " in ch_rocker_arm_notes.RIGHT_VIEW_NOTE
     # The caption sits under view F's silhouette, inside the sheet border.
     scale = drawing.RIGHT_SCALE[0] / drawing.RIGHT_SCALE[1]
-    view_bottom = drawing.RIGHT_CENTER[1] - ch_rocker_arm_spec.TOP_END_Y * scale / 2000.0
+    view_bottom = drawing.RIGHT_CENTER[1] - rocker_outline.TOP_END_Y * scale / 2000.0
     assert drawing.RIGHT_CAPTION_XY[1] < view_bottom - 0.02
     assert drawing.RIGHT_CAPTION_XY[0] > 0.0125
     assert (
@@ -286,7 +287,7 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
 def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
     """Inside-circle R800 placement retained a centre tail on the native sheet."""
     centre_model_y = (
-        drawing.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+        drawing.PIVOT_MID_Y + rocker_outline.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
     )
     centre = _front_xy(0.0, centre_model_y)
     for name, radius in (
@@ -307,7 +308,7 @@ def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
 def test_radius_text_positions_are_outside_their_parent_circles() -> None:
     """Inside-circle R800 placement retained a centre tail on the native sheet."""
     centre_model_y = (
-        drawing.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+        drawing.PIVOT_MID_Y + rocker_outline.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
     )
     centre = _front_xy(0.0, centre_model_y)
     for name, radius in (
@@ -353,7 +354,7 @@ def _view_f_xy(z_mm: float, y_mm: float) -> tuple[float, float]:
     scale = drawing.RIGHT_SCALE[0] / drawing.RIGHT_SCALE[1]
     return (
         drawing.RIGHT_CENTER[0] - z_mm * scale / 1000.0,
-        drawing.RIGHT_CENTER[1] + (y_mm - ch_rocker_arm_spec.TOP_END_Y / 2.0) * scale / 1000.0,
+        drawing.RIGHT_CENTER[1] + (y_mm - rocker_outline.TOP_END_Y / 2.0) * scale / 1000.0,
     )
 
 
@@ -407,9 +408,9 @@ def test_datum_b_sits_on_the_projected_broad_face_above_the_hub_and_thickness_bl
     # view F's scale, above the hub band (the hub hides the flank there) and
     # inside the strap's height.
     ((_x, pick_y, pick_z),) = projected
-    assert pick_z * 1000.0 == pytest.approx(ch_rocker_arm_spec.ARM_THICKNESS / 2.0)
+    assert pick_z * 1000.0 == pytest.approx(rocker_outline.ARM_THICKNESS / 2.0)
     hub_top = rocker_interface.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0
-    assert hub_top + 5.0 < pick_y * 1000.0 < ch_rocker_arm_spec.TOP_END_Y - 0.5
+    assert hub_top + 5.0 < pick_y * 1000.0 < rocker_outline.TOP_END_Y - 0.5
     assert calls[0]["edge_xy"] == _view_f_xy(pick_z * 1000.0, pick_y * 1000.0)
     # The tag box (~7 mm) hangs up-left of the pick, above the strap
     # thickness block (value + three mate rows, centred on its request).
@@ -1385,16 +1386,16 @@ def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
     """Only at the mirror station is the arc normal vertical. These limits
     do not assert a rigid vertical offset of the curve at its ends."""
     centre = rocker_interface.CENTER_Y
-    assert (ch_rocker_arm_spec.R_TOP, rocker_interface.R_BOTTOM) == (800.0, 816.0)
-    nominal_top = centre - ch_rocker_arm_spec.R_TOP - rocker_interface.PIVOT_MID_Y
+    assert (rocker_outline.R_TOP, rocker_interface.R_BOTTOM) == (800.0, 816.0)
+    nominal_top = centre - rocker_outline.R_TOP - rocker_interface.PIVOT_MID_Y
     nominal_bottom = centre - rocker_interface.R_BOTTOM
     assert nominal_top == pytest.approx(8.0)
     assert nominal_bottom == pytest.approx(0.0)
-    assert drawing.TOP_EDGE_BAND is ch_rocker_arm_spec.TOP_EDGE_BAND
-    assert drawing.ARC_PROFILE_ZONE_MM == f"{ch_rocker_arm_spec.TOP_EDGE_BAND[0]:g}"
+    assert drawing.TOP_EDGE_BAND is rocker_outline.TOP_EDGE_BAND
+    assert drawing.ARC_PROFILE_ZONE_MM == f"{rocker_outline.TOP_EDGE_BAND[0]:g}"
     assert drawing.ARC_PROFILE_OUTSIDE_MM == {
         "TopRadius": drawing.ARC_PROFILE_ZONE_MM,
-        "BottomRadius": f"{ch_rocker_arm_spec.TOP_EDGE_BAND[1]:g}",
+        "BottomRadius": f"{rocker_outline.TOP_EDGE_BAND[1]:g}",
     }
     zone = float(drawing.ARC_PROFILE_ZONE_MM)
     top_outside = float(drawing.ARC_PROFILE_OUTSIDE_MM["TopRadius"])
@@ -1531,9 +1532,9 @@ def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -
     strap = _callout_block(drawing.STRAP_THICKNESS_TEXT_XY, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)
     hub = _callout_block(drawing.HUB_LENGTH_TEXT_XY, drawing.HUB_LENGTH_TEXT)
     hub_end_x, _ = _view_f_xy(ch_rocker_arm_spec.HUB_LENGTH / 2.0, 0.0)
-    strap_left_x, _ = _view_f_xy(ch_rocker_arm_spec.ARM_THICKNESS / 2.0, 0.0)
+    strap_left_x, _ = _view_f_xy(rocker_outline.ARM_THICKNESS / 2.0, 0.0)
     _, view_bottom = _view_f_xy(0.0, 0.0)
-    _, view_top = _view_f_xy(0.0, ch_rocker_arm_spec.TOP_END_Y)
+    _, view_top = _view_f_xy(0.0, rocker_outline.TOP_END_Y)
     _, hub_top = _view_f_xy(0.0, rocker_interface.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0)
     for block in (strap, hub):
         assert block.xmin - DRAWABLE.xmin >= 0.005
@@ -1612,9 +1613,9 @@ def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> Non
     drawing's imported height is BASIC and governed by surface profile."""
     from _drawing_contract import model_toleranced_dimensions
 
-    upper, lower = ch_rocker_arm_spec.TOP_EDGE_BAND
+    upper, lower = rocker_outline.TOP_EDGE_BAND
     assert lower == 0.0 < upper == 0.50
-    assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
+    assert rocker_outline.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
     assert not hasattr(ch_rocker_arm_notes, "TOP_EDGE_BAND")
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
     assert model_toleranced_dimensions(arm)[("TopEdgeReference", "TopAbovePivot")] == (
@@ -1783,7 +1784,7 @@ def _tip_angle_reference_case(monkeypatch, *, defect=None):
     )
 
 
-@pytest.mark.parametrize("alpha", [ch_rocker_arm_spec._ALPHA_TOP, 0.24])
+@pytest.mark.parametrize("alpha", [rocker_outline._ALPHA_TOP, 0.24])
 def test_tip_angle_measures_real_radial_land_from_vertical_without_driving_it(monkeypatch, alpha):
     import asyncio
 
@@ -1837,10 +1838,10 @@ def test_tip_angle_is_recorded_before_the_unchanged_profile_definition_and_extru
                      and node.func.attr == "create_extrusion")
     assert [ast.unparse(arg) for arg in angle.args] == ["adapter", "rod_tip_line", "strap"]
     assert angle.lineno < defined.lineno < extrusion.lineno
-    assert arm._ALPHA_TOP == pytest.approx(ch_rocker_arm_spec._ALPHA_TOP)
+    assert arm._ALPHA_TOP == pytest.approx(rocker_outline._ALPHA_TOP)
     land_angle = math.atan2(
-        ch_rocker_arm_spec.ROD_TIP_X - ch_rocker_arm_spec.TOP_END_X,
-        ch_rocker_arm_spec.TIP_FACE * math.cos(ch_rocker_arm_spec._ALPHA_TOP),
+        rocker_outline.ROD_TIP_X - rocker_outline.TOP_END_X,
+        rocker_outline.TIP_FACE * math.cos(rocker_outline._ALPHA_TOP),
     )
     assert land_angle == pytest.approx(arm._ALPHA_TOP)
 
@@ -2455,7 +2456,7 @@ def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() ->
 
 
 def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
-    spec = ch_rocker_arm_spec
+    spec = rocker_outline
     alpha = spec.TOP_ARC_LEN / (2.0 * rocker_interface.CURVE_RADIUS)
     assert spec._ALPHA_TOP == pytest.approx(alpha)
     assert 2.0 * spec.ROD_TIP_X == pytest.approx(
@@ -2466,8 +2467,8 @@ def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
         * math.sin(spec.BOT_ARC_LEN / (2.0 * (rocker_interface.CURVE_RADIUS + rocker_interface.ARM_DEPTH))),
     )
     assert spec.TIP_FACE == pytest.approx(5.588)
-    assert spec.HUB_DIA == pytest.approx(10.2)
-    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.27825)
+    assert ch_rocker_arm_spec.HUB_DIA == pytest.approx(10.2)
+    assert (ch_rocker_arm_spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.27825)
 
 
 def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands():
@@ -2477,9 +2478,9 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     ignoring its material-adding disposition. This short through hole in
     2.5 mm plate needs no deep-hole drill-wander allowance.
     """
-    from _printed_tolerance import drilled_oversize_mm
+    from _printed_drilled_tolerance import drilled_oversize_mm
 
-    spec = ch_rocker_arm_spec
+    spec = rocker_outline
     centre = (rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y)
     tip = (
         spec.ROD_TIP_X,
@@ -2504,14 +2505,14 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     )
     assert normal_distance == pytest.approx(face_distance)
     assert normal_distance == pytest.approx(3.81835328575)
-    hole_nominal = blind_cut_dia_mm(spec.ROD_HOLE_SPEC)
+    hole_nominal = blind_cut_dia_mm(ch_rocker_arm_spec.ROD_HOLE_SPEC)
     # A named drill retains its real size even when its numeric callout rounds
     # down. Charge the larger of the native and displayed nominal.
     conservative_hole_max = max(
         hole_nominal, round(hole_nominal, drawing.ROD_HOLE.precision["dia"])
     ) + drilled_oversize_mm()
     assert conservative_hole_max == pytest.approx(2.094)
-    position_diameter = float(spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+    position_diameter = float(ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     assert position_diameter == drawing.ROD_HOLE.fields["position_dia"][0]
     profile_allowance = float(drawing.ARC_PROFILE_ZONE_MM)
     worst_wall = normal_distance - conservative_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
@@ -2579,11 +2580,11 @@ def test_rod_drill_identifier_and_native_callout_process_share_the_hole_spec() -
 
 
 @pytest.mark.parametrize("quantity,expected", [
-    ("overall", 2.0 * ch_rocker_arm_spec.ROD_TIP_X),
-    ("land", ch_rocker_arm_spec.TIP_FACE),
-    ("taper", ch_rocker_arm_spec.BOT_END_X),
+    ("overall", 2.0 * rocker_outline.ROD_TIP_X),
+    ("land", rocker_outline.TIP_FACE),
+    ("taper", rocker_outline.BOT_END_X),
     ("hub", ch_rocker_arm_spec.HUB_DIA),
-    ("offset", (ch_rocker_arm_spec.HUB_LENGTH - ch_rocker_arm_spec.ARM_THICKNESS) / 2.0),
+    ("offset", (ch_rocker_arm_spec.HUB_LENGTH - rocker_outline.ARM_THICKNESS) / 2.0),
 ])
 @pytest.mark.parametrize("defect", [
     None, "wrong", "missing", "neighbour", "dangling", "nan", "inf", "no_value",
@@ -2684,12 +2685,16 @@ def test_imported_native_dimensions_cannot_lose_the_model_two_place_precision(
             _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
 
 
-@pytest.mark.parametrize("name", [
-    "ROD_TIP_X", "TIP_FACE", "_ALPHA_TOP", "BOT_END_X", "HUB_DIA",
-    "ARM_THICKNESS",
+@pytest.mark.parametrize(("name", "owner"), [
+    ("ROD_TIP_X", rocker_outline),
+    ("TIP_FACE", rocker_outline),
+    ("_ALPHA_TOP", rocker_outline),
+    ("BOT_END_X", rocker_outline),
+    ("HUB_DIA", ch_rocker_arm_spec),
+    ("ARM_THICKNESS", rocker_outline),
 ])
-def test_measured_dimension_expectations_import_the_geometry_source(name: str) -> None:
-    assert getattr(drawing, name) == getattr(ch_rocker_arm_spec, name)
+def test_measured_dimension_expectations_import_the_geometry_source(name: str, owner) -> None:
+    assert getattr(drawing, name) == getattr(owner, name)
 
 
 class _NativeQuantityAnnotation:
@@ -2804,13 +2809,13 @@ def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
 
     displays = {
         "PivotDia": _NativeQuantity("PivotDia", ch_rocker_arm_spec.PIVOT_HOLE_DIA),
-        "RodTipLen": _NativeQuantity("RodTipLen", ch_rocker_arm_spec.TIP_FACE, precision=1),
+        "RodTipLen": _NativeQuantity("RodTipLen", rocker_outline.TIP_FACE, precision=1),
         "HubDia": _NativeQuantity("HubDia", ch_rocker_arm_spec.HUB_DIA),
         "TipLandAngle": _NativeQuantity("TipLandAngle", 0.0),
     }
     angle = displays["TipLandAngle"]
     angle.Type2 = angle.model.Type2 = 3
-    angle.model.SystemValue = ch_rocker_arm_spec._ALPHA_TOP
+    angle.model.SystemValue = rocker_outline._ALPHA_TOP
     adapter = SimpleNamespace(
         _attempt=lambda fn, **_kwargs: fn(), swApp=_APP,
         currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None),
@@ -2849,7 +2854,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     assert displays["RodTipLen"].text[1] == ch_rocker_arm_notes.TIP_LAND_PREFIX == "2X "
     assert displays["RodTipLen"].model.GetToleranceType() == 1
     angle = displays["TipLandAngle"]
-    assert angle.model.SystemValue == pytest.approx(ch_rocker_arm_spec._ALPHA_TOP)
+    assert angle.model.SystemValue == pytest.approx(rocker_outline._ALPHA_TOP)
     assert angle.text[1] == ch_rocker_arm_notes.TIP_LAND_ANGLE_PREFIX == "2X "
     assert angle.model.GetToleranceType() == 1
     assert angle.ShowDimensionValue is True
@@ -2888,7 +2893,7 @@ def test_tip_angle_import_preserves_the_builder_signed_readback_contract(
 ) -> None:
     adapter, displays = _imported_native_quantities(monkeypatch)
     angle = displays["TipLandAngle"]
-    actual = sign * (ch_rocker_arm_spec._ALPHA_TOP + offset)
+    actual = sign * (rocker_outline._ALPHA_TOP + offset)
     angle.model.SystemValue = actual
     annotations = [displays[name].GetAnnotation() for name in drawing.END_KEEP]
     if not accepted:
@@ -3033,13 +3038,13 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     drawing._add_rocker_outline_dimensions(state.adapter, object())
     assert state.basic_calls
     assert state.radius_calls == state.basic_calls
-    assert all(point[2] == ch_rocker_arm_spec.ARM_THICKNESS / 2.0 for point in state.land.line)
+    assert all(point[2] == rocker_outline.ARM_THICKNESS / 2.0 for point in state.land.line)
     expected = {
-        "rocker overall width": 2.0 * ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
-        "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
-        "left taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
-        "tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
-        "left tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
+        "rocker overall width": 2.0 * rocker_outline.ROD_TIP_X / 1000.0,
+        "taper intersection X": rocker_outline.BOT_END_X / 1000.0,
+        "left taper intersection X": rocker_outline.BOT_END_X / 1000.0,
+        "tip land X location": rocker_outline.ROD_TIP_X / 1000.0,
+        "left tip land X location": rocker_outline.ROD_TIP_X / 1000.0,
     }
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
@@ -3176,10 +3181,9 @@ def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometr
     native_front, monkeypatch,
 ):
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    assert any(
-        isinstance(node, ast.ImportFrom) and node.module == "ch_rocker_arm_spec"
-        and any(alias.name == "ROD_TIP_X" for alias in node.names)
-        for node in tree.body
+    assert drawing.ROD_TIP_X == pytest.approx(
+        (rocker_outline.R_TOP + rocker_outline.TIP_FACE)
+        * math.sin(rocker_outline._ALPHA_TOP)
     )
     for name in ("_add_rocker_outline_dimensions", "_require_land_location"):
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name)
@@ -3194,7 +3198,7 @@ def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometr
     front = object()
     _front_annotations, _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(native_front.adapter, front)
     monkeypatch.setattr(drawing, "_bound_view_annotations", lambda *_a, **_k: [display.annotation])
-    monkeypatch.setattr(drawing, "ROD_TIP_X", ch_rocker_arm_spec.ROD_TIP_X + 0.1)
+    monkeypatch.setattr(drawing, "ROD_TIP_X", rocker_outline.ROD_TIP_X + 0.1)
     with pytest.raises(RuntimeError):
         drawing._require_land_location(native_front.adapter, (("front", front),), display, entities)
 
@@ -3279,7 +3283,7 @@ def native_hub_root(monkeypatch: pytest.MonkeyPatch):
     root = _HubRootDisplay()
     neighbours = [
         _NativeQuantity("HubLength", ch_rocker_arm_spec.HUB_LENGTH),
-        _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS),
+        _NativeQuantity("StrapThickness", rocker_outline.ARM_THICKNESS),
     ]
     return SimpleNamespace(
         adapter=adapter, display=root,
@@ -3573,7 +3577,7 @@ def test_view_f_draws_the_strap_centre_plane_the_g_basic_runs_to(monkeypatch) ->
         faces.fields["lower_z"][0] for faces in (drawing.HUB_FACES, drawing.STRAP_FACES)
     )
     assert hub_lower == -ch_rocker_arm_spec.HUB_LENGTH / 2
-    assert strap_lower == -ch_rocker_arm_spec.ARM_THICKNESS / 2
+    assert strap_lower == -rocker_outline.ARM_THICKNESS / 2
 
 
 @pytest.mark.parametrize(
@@ -5460,7 +5464,7 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
     hub = _NativeQuantity("HubLength", ch_rocker_arm_spec.HUB_LENGTH, precision=3)
     hub.band = tuple(value / 1000.0 for value in ch_rocker_arm_spec.HUB_LENGTH_BAND)
     hub.tolerance_type = 4
-    strap = _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS, precision=3)
+    strap = _NativeQuantity("StrapThickness", rocker_outline.ARM_THICKNESS, precision=3)
     strap.tolerance_type = 4
     root = _HubRootDisplay()
     before = [
@@ -9026,7 +9030,7 @@ def r24_tip(bound, monkeypatch):
 def _r24_tip_effective_gaps(case, gaps, use_doc):
     """A different legitimate native gap must change the actual line starts."""
     case.gaps[:], case.use_doc[:] = gaps, use_doc
-    normal = (math.cos(ch_rocker_arm_spec._ALPHA_TOP), math.sin(ch_rocker_arm_spec._ALPHA_TOP))
+    normal = (math.cos(rocker_outline._ALPHA_TOP), math.sin(rocker_outline._ALPHA_TOP))
     for index, (x, y, _z) in enumerate(case.land.line):
         point = _end_xy(x, y)
         case.data.lines[index][4:6] = (point[0] + normal[0] * gaps[index],
@@ -9781,7 +9785,7 @@ def test_least_tip_land_is_the_basic_land_shortened_by_the_taper_tilted_into_the
     # swings its foot the whole zone into the material, so the land ends
     # where that tilted taper crosses it.
     top, tip, bottom = drawing._TOP, drawing._TIP, drawing._BOTTOM
-    zone = ch_rocker_arm_spec.TOP_EDGE_BAND[0]
+    zone = rocker_outline.TOP_EDGE_BAND[0]
     tx, ty = bottom[0] - tip[0], bottom[1] - tip[1]
     length = math.hypot(tx, ty)
     normal = (-ty / length, tx / length)
@@ -9799,5 +9803,5 @@ def test_least_tip_land_is_the_basic_land_shortened_by_the_taper_tilted_into_the
     # A parallel shift of the taper (zone / sin of the land-taper angle) is
     # milder than the tilt; the land never lengthens past its basic as worst.
     cos_angle = abs(ux * tx + uy * ty) / (math.hypot(ux, uy) * length)
-    parallel = ch_rocker_arm_spec.TIP_FACE - zone / math.sqrt(1.0 - cos_angle**2)
-    assert drawing.TIP_LAND_LEAST_MM < parallel < ch_rocker_arm_spec.TIP_FACE
+    parallel = rocker_outline.TIP_FACE - zone / math.sqrt(1.0 - cos_angle**2)
+    assert drawing.TIP_LAND_LEAST_MM < parallel < rocker_outline.TIP_FACE

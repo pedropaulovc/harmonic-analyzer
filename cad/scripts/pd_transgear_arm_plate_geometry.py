@@ -32,7 +32,8 @@ import math
 
 import pd_transgear_arm_geometry as ARM
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
-from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
 # K follows the reducer's physical mounting centre, transformed into the arm

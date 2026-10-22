@@ -21,7 +21,7 @@ MM_PER_IN = 25.4
 # test_ch_amplitude_bar_drawing pins each to its source). ---
 LEVER_THICKNESS = 3.0  # ch_channel_lever_spec.LEVER_THICKNESS (the top notch's)
 LEVER_THICKNESS_TOLERANCE = 0.05  # ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE
-STRAP_THICKNESS = 2.5  # ch_rocker_arm_spec.ARM_THICKNESS (the foot notch's)
+STRAP_THICKNESS = 2.5  # ch_rocker_arm_outline_spec.ARM_THICKNESS (the foot notch's)
 STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: "STRAP 2.50" at .XX
 STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
 
@@ -89,7 +89,7 @@ TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.60
 # The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks
 # either side pass over the rocker hub; a deep notch drops them onto it one
 # for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
-# a shallow notch just lifts the bar at rest (ch_rocker_arm_spec.TOP_EDGE_BAND
+# a shallow notch just lifts the bar at rest (ch_rocker_arm_outline_spec.TOP_EDGE_BAND
 # states the lift budget and its effect on the channel). drawing-simplicity-policy.md `How the repository implements the guidelines`
 # (Codex #936 PRRT_kwDOPHDy386mWF0L): the band is the part's, native on
 # BottomNotchHeight, never note text.

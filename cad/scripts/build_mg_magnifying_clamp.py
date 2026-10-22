@@ -43,7 +43,8 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
-from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
+from _cylindrical_holes import cross_hole_volume_mm3
+from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild

@@ -25,7 +25,7 @@ import pd_latch_hook_geometry as hook
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_latch_hook_spec as hook_spec
-from _printed_tolerance import angular_band_deg
+from _printed_angular_tolerance import angular_band_deg
 from _gear_quality import (
     rack_flank_constraint_deviation_mm,
     pinion_pitch_index_deviation_mm,

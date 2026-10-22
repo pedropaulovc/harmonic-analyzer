@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,

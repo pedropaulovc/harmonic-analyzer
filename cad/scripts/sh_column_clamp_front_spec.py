@@ -14,7 +14,8 @@ axis or a face, authored on the part.
 
 from __future__ import annotations
 
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_deviations
 
 # Part-owned bore and ear geometry remains separate from the shared seating
 # depths, so bar consumers need neither this drawing contract nor that geometry.

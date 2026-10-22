@@ -32,25 +32,144 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
     raise AssertionError(f"{FCF_HELPER} call on line {call.lineno} lacks {name}=")
 
 
-def _part_mapping(spec_path: Path) -> dict[str, str]:
-    tree = ast.parse(spec_path.read_text(encoding="utf-8"), filename=str(spec_path))
+def _literal_mapping(
+    source: Path, name: str, active: frozenset[tuple[Path, str]],
+) -> dict[str, str]:
+    source = source.resolve()
+    identity = (source, name)
+    assert identity not in active, f"{source}: cyclic literal mapping {name}"
+    assert source.is_file(), f"{source}: missing literal mapping source for {name}"
+    active = active | {identity}
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    definitions: list[ast.expr | None] = []
+    imports: list[tuple[ast.ImportFrom, str]] = []
     for node in tree.body:
-        if not isinstance(node, ast.AnnAssign):
-            continue
-        if not isinstance(node.target, ast.Name):
-            continue
-        if node.target.id != TOLERANCE_MAPPING:
-            continue
-        assert isinstance(node.value, ast.Dict)
-        raw_keys = [ast.literal_eval(key) for key in node.value.keys]
-        assert all(isinstance(key, str) for key in raw_keys)
-        assert len(raw_keys) == len(set(raw_keys)), (
-            f"{spec_path}: duplicate {TOLERANCE_MAPPING} keys"
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == name
+        ):
+            definitions.append(node.value)
+        elif (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == name
+        ):
+            definitions.append(node.value)
+        elif isinstance(node, ast.ImportFrom):
+            imports.extend(
+                (node, alias.name)
+                for alias in node.names if (alias.asname or alias.name) == name
+            )
+    assert len(definitions) + len(imports) == 1, (
+        f"{source}: missing or ambiguous literal mapping {name}"
+    )
+    if imports:
+        imported, exported = imports[0]
+        assert imported.level == 0 and imported.module and imported.module.isidentifier(), (
+            f"{source}: {name} needs a direct local-module import"
         )
-        mapping = ast.literal_eval(node.value)
-        assert isinstance(mapping, dict)
-        return mapping
-    raise AssertionError(f"{spec_path} lacks {TOLERANCE_MAPPING}")
+        return _literal_mapping(source.parent / f"{imported.module}.py", exported, active)
+
+    value = definitions[0]
+    assert isinstance(value, ast.Dict), f"{source}: {name} must be a literal mapping"
+    mapping: dict[str, str] = {}
+    for key, item in zip(value.keys, value.values):
+        if key is None:
+            assert isinstance(item, ast.Name), f"{source}: {name} requires **Name expansions"
+            entries = _literal_mapping(source, item.id, active)
+        else:
+            assert isinstance(key, ast.Constant) and isinstance(key.value, str), (
+                f"{source}: {name} requires literal string keys"
+            )
+            assert isinstance(item, ast.Constant) and isinstance(item.value, str), (
+                f"{source}: {name} requires literal string values"
+            )
+            entries = {key.value: item.value}
+        assert not mapping.keys() & entries.keys(), f"{source}: duplicate {name} keys"
+        mapping.update(entries)
+    return mapping
+
+
+def _part_mapping(spec_path: Path) -> dict[str, str]:
+    return _literal_mapping(spec_path, TOLERANCE_MAPPING, frozenset())
+
+
+def test_part_mapping_follows_imported_literal_changes_without_executing_them(tmp_path) -> None:
+    interface = tmp_path / "interface.py"
+    spec = tmp_path / "sample_spec.py"
+    interface.write_text(
+        "raise RuntimeError('source contracts must not execute imports')\n"
+        "BASE = {'mounting position': '0.15'}\n"
+        "MOUNTING = {**BASE}\n",
+        encoding="utf-8",
+    )
+    spec.write_text(
+        "from interface import MOUNTING as SEAT\n"
+        "GEOMETRIC_TOLERANCES_MM: dict[str, str] = {'bore position': '0.20', **SEAT}\n",
+        encoding="utf-8",
+    )
+    assert _part_mapping(spec) == {"bore position": "0.20", "mounting position": "0.15"}
+    interface.write_text("MOUNTING = {'mounting position': '0.155'}\n", encoding="utf-8")
+    assert _part_mapping(spec) == {"bore position": "0.20", "mounting position": "0.155"}
+
+
+@pytest.mark.parametrize(("shared", "expression"), [
+    ("MOUNTING = {'position': '0.15'}", "{'position': '0.10', 'position': '0.20'}"),
+    ("MOUNTING = {'position': '0.15'}", "{'position': '0.10', **MOUNTING}"),
+    ("MOUNTING = {'position': '0.15'}", "{**MOUNTING, 'position': '0.10'}"),
+    ("MOUNTING = {'position': '0.15'}", "{**MOUNTING, **MOUNTING}"),
+    ("MOUNTING = {'position': '0.10', 'position': '0.20'}", "{**MOUNTING}"),
+])
+def test_part_mapping_rejects_duplicates_including_import_expansions(
+    tmp_path, shared: str, expression: str,
+) -> None:
+    (tmp_path / "interface.py").write_text(shared, encoding="utf-8")
+    spec = tmp_path / "sample_spec.py"
+    spec.write_text(
+        "from interface import MOUNTING\n"
+        f"GEOMETRIC_TOLERANCES_MM: dict[str, str] = {expression}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(AssertionError, match="duplicate"):
+        _part_mapping(spec)
+
+
+@pytest.mark.parametrize(("shared", "source"), [
+    (None, "from interface import MOUNTING\nGEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+    ("OTHER = {}", "from interface import MOUNTING\nGEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+    ("", "GEOMETRIC_TOLERANCES_MM = {**MISSING}"),
+    ("", "FIRST = {**SECOND}\nSECOND = {**FIRST}\nGEOMETRIC_TOLERANCES_MM = {**FIRST}"),
+    ("from sample_spec import GEOMETRIC_TOLERANCES_MM as MOUNTING",
+     "from interface import MOUNTING\nGEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+    ("MOUNTING = {}", "from interface import MOUNTING\nMOUNTING = {}\n"
+     "GEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+    ("", "if True:\n    MOUNTING = {}\nGEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+    ("", "def choose():\n    MOUNTING = {}\nGEOMETRIC_TOLERANCES_MM = {**MOUNTING}"),
+])
+def test_part_mapping_rejects_missing_ambiguous_and_cyclic_sources(tmp_path, shared, source) -> None:
+    if shared is not None:
+        (tmp_path / "interface.py").write_text(shared, encoding="utf-8")
+    spec = tmp_path / "sample_spec.py"
+    spec.write_text(source, encoding="utf-8")
+    with pytest.raises(AssertionError, match="missing|ambiguous|cyclic"):
+        _part_mapping(spec)
+
+
+@pytest.mark.parametrize("expression", [
+    "{1: '0.15'}",
+    "{'position': 0.15}",
+    "{'position': f'{0.15}'}",
+    "{'position': VALUE}",
+    "dict(position='0.15')",
+    "{**{'position': '0.15'}}",
+])
+def test_part_mapping_requires_literal_string_entries(tmp_path, expression: str) -> None:
+    spec = tmp_path / "sample_spec.py"
+    spec.write_text(f"GEOMETRIC_TOLERANCES_MM = {expression}\n", encoding="utf-8")
+    with pytest.raises(AssertionError):
+        _part_mapping(spec)
 
 
 def _loop_string_bindings(tree: ast.AST) -> dict[str, tuple[str, ...]]:

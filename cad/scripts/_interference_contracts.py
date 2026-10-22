@@ -448,7 +448,7 @@ _PEN_ALLOWED_PAIRS = {
 def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> float:
     """Volume a tube pin lying diametrally across a solid shaft shares with it:
     the perpendicular-cylinder intersection at its OD less that at its ID.
-    _holes.cross_hole_volume_mm3's trapezoid integral, restated so every
+    _cylindrical_holes.cross_hole_volume_mm3's trapezoid integral, restated so every
     assembly's recipe stays clear of the Hole Wizard helpers."""
 
     def solid(pin_d: float, n: int = 20001) -> float:

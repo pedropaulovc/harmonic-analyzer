@@ -32,7 +32,7 @@ import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
-from _printed_tolerance import angular_band_deg
+from _printed_angular_tolerance import angular_band_deg
 import pd_transgear_pivot_spacer_spec as SPACER
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 

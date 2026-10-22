@@ -28,7 +28,8 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import angular_band_deg, printed_deviations
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_deviations
 
 # --- Turned outline (contract §1.6) -------------------------------------------
 HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl

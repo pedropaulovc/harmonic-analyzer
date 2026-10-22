@@ -47,6 +47,7 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
@@ -72,10 +73,10 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 
 # --- Plate bands (upper, lower) ----------------------------------------------
 GRIP_MAX = (riser.THICKNESS + riser.THICKNESS_BAND) + (
-    rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[0]
+    rocker_outline.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[0]
 )
 GRIP_MIN = (riser.THICKNESS - riser.THICKNESS_BAND) + (
-    rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
+    rocker_outline.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
 )
 CARRIER_MIN = carrier.THICKNESS - carrier.THICKNESS_BAND
 

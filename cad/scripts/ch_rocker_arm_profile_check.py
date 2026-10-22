@@ -39,6 +39,7 @@ import tomllib
 
 import _config
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 from _hole_spec import blind_cut_dia_mm
@@ -72,19 +73,19 @@ _XY = tuple[float, float]
 # is the Y axis), +X toward the rocker's connecting-rod end, plate Z0..THICK.
 #
 # Every edge derives from the rocker's own CAD source and aims at the middle
-# of its 0.5 surface-profile zone (rocker.TOP_EDGE_BAND): outside on the top
+# of its 0.5 surface-profile zone (rocker_outline.TOP_EDGE_BAND): outside on the top
 # arc, inside on the lower outline, leaving the zone's whole width to the
 # filing that follows. The arcs sit half the zone higher, on the trammel's own
 # radii; the tip lands and tapered ends are offset half the zone along their
 # own normals, since a rigid +Y shift put each tip land 0.0453 OUTSIDE the
 # lower zone (#1544).
-R_TOP = rocker.R_TOP
+R_TOP = rocker_outline.R_TOP
 R_BOTTOM = rocker_interface.R_BOTTOM
-_ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+_ROCKER_ZONE = rocker_outline.TOP_EDGE_BAND[0] - rocker_outline.TOP_EDGE_BAND[1]
 _MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 # The aim: the middle of the rocker's one-sided top-edge band.
-_ROCKER_TOP_LOW = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[1]
-_ROCKER_TOP_HIGH = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0]
+_ROCKER_TOP_LOW = rocker_outline.TOP_EDGE_ABOVE_PIVOT + rocker_outline.TOP_EDGE_BAND[1]
+_ROCKER_TOP_HIGH = rocker_outline.TOP_EDGE_ABOVE_PIVOT + rocker_outline.TOP_EDGE_BAND[0]
 TOP_ABOVE_PIVOT = round((_ROCKER_TOP_LOW + _ROCKER_TOP_HIGH) / 2.0, 2)  # 8.25
 CENTER_Y = TOP_ABOVE_PIVOT + R_TOP  # 808.25
 BOTTOM_BELOW_PIVOT = round(R_BOTTOM - CENTER_Y, 2)  # 7.75
@@ -94,7 +95,11 @@ if abs(TOP_ABOVE_PIVOT + BOTTOM_BELOW_PIVOT - rocker_interface.ARM_DEPTH) > 1e-9
     raise AssertionError(
         "template arcs are no longer ARM_DEPTH apart on the mirror line"
     )
-if abs(_CENTRE[1] + (TOP_ABOVE_PIVOT - rocker.TOP_EDGE_ABOVE_PIVOT) - CENTER_Y) > 1e-9:
+if abs(
+    _CENTRE[1]
+    + (TOP_ABOVE_PIVOT - rocker_outline.TOP_EDGE_ABOVE_PIVOT)
+    - CENTER_Y
+) > 1e-9:
     raise AssertionError(
         "template arc centre is not the rocker's, raised by the aim offset"
     )
@@ -126,16 +131,16 @@ def _crossing(p: _XY, d: _XY, q: _XY, e: _XY) -> _XY:
 
 # The rocker's BASIC +X land (radial from its top-arc end) and taper, pivot frame.
 _ROCKER_TOP_END = (
-    R_TOP * math.sin(rocker._ALPHA_TOP),
-    _CENTRE[1] - R_TOP * math.cos(rocker._ALPHA_TOP),
+    R_TOP * math.sin(rocker_outline._ALPHA_TOP),
+    _CENTRE[1] - R_TOP * math.cos(rocker_outline._ALPHA_TOP),
 )
 _ROCKER_TIP = (
-    _ROCKER_TOP_END[0] + rocker.TIP_FACE * math.sin(rocker._ALPHA_TOP),
-    _ROCKER_TOP_END[1] - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP),
+    _ROCKER_TOP_END[0] + rocker_outline.TIP_FACE * math.sin(rocker_outline._ALPHA_TOP),
+    _ROCKER_TOP_END[1] - rocker_outline.TIP_FACE * math.cos(rocker_outline._ALPHA_TOP),
 )
 _ROCKER_BOT_END = (
-    rocker.BOT_END_X,
-    _CENTRE[1] - math.sqrt(R_BOTTOM**2 - rocker.BOT_END_X**2),
+    rocker_outline.BOT_END_X,
+    _CENTRE[1] - math.sqrt(R_BOTTOM**2 - rocker_outline.BOT_END_X**2),
 )
 ROCKER_LAND = (_ROCKER_TOP_END, _ROCKER_TIP)
 ROCKER_TAPER = (_ROCKER_TIP, _ROCKER_BOT_END)
@@ -366,11 +371,11 @@ SEGMENTS: dict[str, dict] = {
     "top arc": {
         "features": ("top_edge",),
         "frame": "TopRadius",
-        "label": f"the R{rocker.R_TOP:g} top arc",
+        "label": f"the R{rocker_outline.R_TOP:g} top arc",
         "edge": lambda s: _arc(R_TOP, s * TOP_END_X),
         "length": R_TOP * ALPHA_TOP,
         "tau": lambda q: (
-            _radial(q) - rocker.R_TOP
+            _radial(q) - rocker_outline.R_TOP
         ),  # the material lies away from the centre
     },
     "tip land": {
@@ -486,7 +491,7 @@ def method_steps() -> list[str]:
     half_travel = DTI_TRAVEL_IN / 2.0
     return [
         f"Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) "
-        f"pinned in datums A and C: the top edge ({ZONE_MM:g}, all outside the R{rocker.R_TOP:g} BASIC arc) and "
+        f"pinned in datums A and C: the top edge ({ZONE_MM:g}, all outside the R{rocker_outline.R_TOP:g} BASIC arc) and "
         f"the lower outline J to K ({ZONE_MM:g}, all inside the BASIC outline: the R{rocker_interface.R_BOTTOM:g} arc, both "
         f"tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on "
         f"the granite surface plate (gauges.granite-surface-plate), off the rest plate.",

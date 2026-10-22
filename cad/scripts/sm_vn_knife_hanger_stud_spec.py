@@ -35,7 +35,8 @@ from _mcmaster_92314a253 import (
     THREAD_MAJOR_MAX,
     THREAD_MAJOR_MIN,
 )
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm
 
 SKU = DIMS.part_no
 THREAD = "#10-24"

@@ -25,6 +25,7 @@ import _config
 import ch_pivot_shaft_spec as shaft
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 import dt_cone_pivot_post_spec as cone
 import rocker_bank_layout as bank
@@ -296,14 +297,14 @@ def test_rocker_shared_profile_radius_exports_interface_authority(
     feature = exporter.requirement_manifest("ch_rocker_arm")["features"][feature_name]
     citations = set(feature["cite"][field])
     assert set(exporter._cite(rocker_interface, "CURVE_RADIUS")) <= citations
-    assert citations.isdisjoint(exporter._cite(rocker, "R_TOP"))
+    assert citations.isdisjoint(exporter._cite(rocker_outline, "R_TOP"))
     if tip_sign is None:
         assert feature[field] == rocker_interface.CURVE_RADIUS
     else:
-        alpha = rocker.TOP_ARC_LEN / (2.0 * rocker_interface.CURVE_RADIUS)
+        alpha = rocker_outline.TOP_ARC_LEN / (2.0 * rocker_interface.CURVE_RADIUS)
         expected = [
-            tip_sign * (rocker_interface.CURVE_RADIUS + rocker.TIP_FACE) * math.sin(alpha),
-            rocker_interface.CENTER_Y - (rocker_interface.CURVE_RADIUS + rocker.TIP_FACE) * math.cos(alpha),
+            tip_sign * (rocker_interface.CURVE_RADIUS + rocker_outline.TIP_FACE) * math.sin(alpha),
+            rocker_interface.CENTER_Y - (rocker_interface.CURVE_RADIUS + rocker_outline.TIP_FACE) * math.cos(alpha),
         ]
         assert feature[field] == pytest.approx(expected)
 
@@ -397,23 +398,23 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         # BASIC: the J↔K profile zone is its band.
-        assert features[name]["tip_land"] == rocker.TIP_FACE
-        assert features[name]["land_angle_deg"] == round(math.degrees(rocker._ALPHA_TOP), 2)
+        assert features[name]["tip_land"] == rocker_outline.TIP_FACE
+        assert features[name]["land_angle_deg"] == round(math.degrees(rocker_outline._ALPHA_TOP), 2)
         assert features[name]["precision"]["land_angle_deg"] == 2
         assert features[name]["dimension_type"] == "basic"
         citations = features[name]["cite"]["land_angle_deg"]
         assert "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg" not in citations
         assert not any("linear_" in citation for citation in citations)
-        assert set(exporter._cite(rocker, "_ALPHA_TOP")) <= set(citations)
+        assert set(exporter._cite(rocker_outline, "_ALPHA_TOP")) <= set(citations)
         native = set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_dress_detail_dimensions"))
         assert native <= set(citations)
         assert native <= set(features[name]["cite"]["dimension_type"])
         assert native <= set(features[name]["cite"]["top_edge_feature"])
         # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
-        assert features[name]["station"] == rocker.ROD_TIP_X
+        assert features[name]["station"] == rocker_outline.ROD_TIP_X
         assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features[name]["cite"]["station"])
     assert manifest["material"]["thickness"] == 2.5
-    assert exporter._cite(rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
+    assert exporter._cite(rocker_outline, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
     # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
     for name in ("strap_datum_b", "strap_faces"):
         assert features[name]["thickness"] == [2.475, 2.525]
@@ -435,19 +436,19 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert not any("unknown" in fields.get("requirements", ()) for fields in features.values())
     assert "bottom_arc_len" not in features["profile_outer"]["requirements"]
     assert "arc_len" not in features["top_edge"]["requirements"]
-    assert features["top_edge"]["radius"] == rocker.R_TOP
-    assert features["top_edge"]["height_above_pivot"] == rocker.TOP_EDGE_ABOVE_PIVOT
+    assert features["top_edge"]["radius"] == rocker_outline.R_TOP
+    assert features["top_edge"]["height_above_pivot"] == rocker_outline.TOP_EDGE_ABOVE_PIVOT
     assert features["profile_outer"]["bottom_radius"] == rocker_interface.R_BOTTOM
-    assert features["top_edge"]["arc_len"] == rocker.TOP_ARC_LEN
-    assert features["profile_outer"]["bottom_arc_len"] == rocker.BOT_ARC_LEN
+    assert features["top_edge"]["arc_len"] == rocker_outline.TOP_ARC_LEN
+    assert features["profile_outer"]["bottom_arc_len"] == rocker_outline.BOT_ARC_LEN
     for name, outside, suffix in (
-        ("top_edge", rocker.TOP_EDGE_BAND[0], ""),
-        ("profile_outer", rocker.TOP_EDGE_BAND[1], ", BETWEEN J AND K"),
+        ("top_edge", rocker_outline.TOP_EDGE_BAND[0], ""),
+        ("profile_outer", rocker_outline.TOP_EDGE_BAND[1], ", BETWEEN J AND K"),
     ):
         assert features[name]["dimension_type"] == "basic"
         assert features[name]["surface_profile_u"] == outside
-        assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C{suffix}"
-        assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
+        assert features[name]["note"] == f"SURFACE PROFILE {rocker_outline.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C{suffix}"
+        assert set(exporter._cite(rocker_outline, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
     shaft = exporter.requirement_manifest("ch_pivot_shaft")
@@ -463,18 +464,18 @@ def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_bas
     zone_fields = ("surface_profile", "surface_profile_u", "surface_profile_datums")
     for name, frame in (("top_edge", "TopRadius"), ("profile_outer", "BottomRadius"), ("tip_land_pos_x", "BottomRadius"), ("tip_land_neg_x", "BottomRadius")):
         fields = features[name]
-        assert fields["surface_profile"] == float(draw.ARC_PROFILE_ZONE_MM) == rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+        assert fields["surface_profile"] == float(draw.ARC_PROFILE_ZONE_MM) == rocker_outline.TOP_EDGE_BAND[0] - rocker_outline.TOP_EDGE_BAND[1]
         assert fields["surface_profile_u"] == float(draw.ARC_PROFILE_OUTSIDE_MM[frame])
         assert fields["surface_profile_datums"] == list(draw.ARC_PROFILE_DATUMS)
         # Each governed key is one of the feature's own BASIC requirements.
         assert set(fields["surface_profile_governs"]) <= set(fields["requirements"]) - {"surface_profile"}
-        assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(fields["cite"]["surface_profile"])
+        assert set(exporter._cite(rocker_outline, "TOP_EDGE_BAND")) <= set(fields["cite"]["surface_profile"])
     # The J-to-K zone covers both lands: each declares profile_outer's identical frame.
     lower = {field: features["profile_outer"][field] for field in zone_fields}
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert {field: features[name][field] for field in zone_fields} == lower
         assert features[name]["surface_profile_governs"]["land_angle_deg"] == {"tilt_across": draw.TIP_LAND_LEAST_MM}
-        assert features[name]["surface_profile_governs"]["station"] == {"sense": "increases", "obliquity_deg": math.degrees(rocker._ALPHA_TOP)}
+        assert features[name]["surface_profile_governs"]["station"] == {"sense": "increases", "obliquity_deg": math.degrees(rocker_outline._ALPHA_TOP)}
     assert features["top_edge"]["surface_profile_governs"] == {"radius": "decreases", "height_above_pivot": "increases"}
     assert features["profile_outer"]["surface_profile_governs"] == {"bottom_radius": "increases"}
 
@@ -510,16 +511,16 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_rod_pin_h
     assert manifest["features"]["rod_hole"]["datum"] == "C"
     assert manifest["features"]["rod_hole"]["position_datums"] == ["A", "B"]
     assert manifest["features"]["profile_outer"]["note"].endswith(", BETWEEN J AND K")
-    assert _owners("ch_rocker_arm", _plane((0, 0, 1), (0, 0, rocker.ARM_THICKNESS / 2))) == ["strap_datum_b"]
-    assert _owners("ch_rocker_arm", _plane((0, 0, -1), (0, 0, -rocker.ARM_THICKNESS / 2))) == ["strap_faces"]
+    assert _owners("ch_rocker_arm", _plane((0, 0, 1), (0, 0, rocker_outline.ARM_THICKNESS / 2))) == ["strap_datum_b"]
+    assert _owners("ch_rocker_arm", _plane((0, 0, -1), (0, 0, -rocker_outline.ARM_THICKNESS / 2))) == ["strap_faces"]
     # The authored land is radial from the top arc's endpoint. Its surface
     # normal is perpendicular to that radius, independently of selector code.
-    radial_x = rocker.TOP_END_X / rocker.R_TOP
-    radial_y = (rocker.TOP_END_Y - rocker_interface.CENTER_Y) / rocker.R_TOP
-    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * radial_y, 0.0)
+    radial_x = rocker_outline.TOP_END_X / rocker_outline.R_TOP
+    radial_y = (rocker_outline.TOP_END_Y - rocker_interface.CENTER_Y) / rocker_outline.R_TOP
+    tip = (rocker_outline.ROD_TIP_X, rocker_outline.TOP_END_Y + rocker_outline.TIP_FACE * radial_y, 0.0)
     assert _owners("ch_rocker_arm", _plane((-radial_y, radial_x, 0), tip)) == ["tip_land_pos_x"]
     assert _owners("ch_rocker_arm", _plane((radial_y, radial_x, 0), (-tip[0], tip[1], 0))) == ["tip_land_neg_x"]
-    bottom = (rocker.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2))
+    bottom = (rocker_outline.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker_outline.BOT_END_X**2))
     dx, dy = bottom[0] - tip[0], bottom[1] - tip[1]
     length = math.hypot(dx, dy)
     assert _owners("ch_rocker_arm", _plane((-dy / length, dx / length, 0), tip)) == ["profile_outer"]
@@ -549,10 +550,10 @@ def test_rocker_hub_root_names_both_root_fillets_with_the_printed_max_limit() ->
     # Each fillet's tube centre stands one radius off the hub wall and the strap face.
     major = rocker.HUB_DIA / 2 + radius
     for sign in (-1, 1):
-        centre = (0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + radius))
+        centre = (0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker_outline.ARM_THICKNESS / 2 + radius))
         assert _owners("ch_rocker_arm", _torus(centre, major, radius)) == ["hub_root"]
-        assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, sign * rocker.ARM_THICKNESS / 2), major, radius)) == []
-    assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, rocker.ARM_THICKNESS / 2 + radius), major, 2 * radius)) == []
+        assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, sign * rocker_outline.ARM_THICKNESS / 2), major, radius)) == []
+    assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, rocker_outline.ARM_THICKNESS / 2 + radius), major, 2 * radius)) == []
 
 
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:

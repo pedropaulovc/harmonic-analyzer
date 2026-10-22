@@ -29,7 +29,8 @@ import math
 
 import _config
 import mg_vn_wheel_axle_back_washer_spec as _back
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import SurfaceFinishControl
 from mg_magnifying_wheel_geom import HUB_BACK_Z
 from mg_wheel_bar_geom import BAR_FRONT_Z

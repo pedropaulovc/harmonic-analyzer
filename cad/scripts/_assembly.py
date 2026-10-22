@@ -19,6 +19,7 @@ import _config
 import _telemetry
 from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
+from _chain_component_identity import _CHAIN_LINK_IDENTITIES
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
 from _component_references import (
@@ -120,12 +121,6 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # (``_chain_mounts.mounted_wheels()``); importing it here would put the cone
 # line and channel table on every assembly's recipe.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
-# Exact native member identities; Name2 basenames are allocator-controlled and
-# cannot prove that an occurrence is a chain link.
-_CHAIN_LINK_IDENTITIES = {
-    ("sh-vn-chain-link", "InnerLink"): "InnerLink",
-    ("sh-vn-chain-link", "OuterLink"): "OuterLink",
-}
 
 
 # COM readback tolerances, NOT manufacturing allowances: 0.00001 mm for the
