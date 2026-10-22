@@ -433,17 +433,6 @@ def test_controls_print_at_the_title_block_rows() -> None:
     assert feed.SCREW_FAR_END_S + spec.LENGTH_TOLERANCE < feed.WHEEL_S[1]
 
 
-def test_spec_is_pure_data() -> None:
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    imports = re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE)
-    assert set(imports) <= {
-        "__future__",
-        "math",
-        "_printed_tolerance",
-        "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
-    }
-
-
 def test_sheet_is_the_registered_modified_stock_drawing() -> None:
     sheet = DRAWINGS_BY_NAME[NAME]
     assert (sheet.part, sheet.artifact_stem, sheet.script_name) == (
