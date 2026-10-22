@@ -181,6 +181,12 @@ def _isolate_inherited_leaf_environment(monkeypatch):
     collection-time environment isolation, not a general network sandbox;
     tests may explicitly install their own fake-backend leaf context.
     """
+    for name in (
+        "HARMONIC_FARM_REQUESTS",
+        "HARMONIC_FARM_BUILD_ID",
+        "HARMONIC_FARM_PREPARATION_READINESS",
+    ):
+        monkeypatch.delenv(name, raising=False)
     for endpoint in (
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
@@ -336,12 +342,18 @@ def _solidworks_autostart_off(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _cache_refresh_isolated(monkeypatch):
-    """Build refreshes must not change the synthetic graphs exercised by checks.
+    """Tests must not inherit their invoking build's refresh or ownership.
 
-    check:* subprocesses inherit their build's carrier, but a test's fake tasks
-    and cache modes are independent invocations. Tests of refresh set it explicitly.
+    check:* subprocesses inherit build carriers, but fake tasks and result roots
+    are independent invocations. Tests of those carriers set them explicitly.
     """
-    monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
+    for name in (
+        "HARMONIC_CACHE_REFRESH",
+        "HARMONIC_FARM_REQUESTS",
+        "HARMONIC_FARM_BUILD_ID",
+        "HARMONIC_FARM_PREPARATION_READINESS",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture

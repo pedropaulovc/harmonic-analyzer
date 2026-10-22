@@ -8,6 +8,7 @@ import importlib.util
 import inspect
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -2689,3 +2690,121 @@ def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier(tmp_path
     assert result.returncode == 0, output[-8000:]
     assert "1 passed" in output, output[-8000:]
     assert all(path.read_text(encoding="utf-8") == "another session's evidence" for path in sentinels)
+
+
+def test_check_pytest_process_isolates_parent_publication_ownership(tmp_path):
+    inherited_requests = tmp_path / "inherited-requests"
+    inherited_requests.mkdir()
+    sentinel = inherited_requests / "keep.txt"
+    sentinel.write_text("the enclosing build owns this root", encoding="utf-8")
+    inherited = {
+        "HARMONIC_FARM_REQUESTS": str(inherited_requests),
+        "HARMONIC_FARM_BUILD_ID": "inherited-build",
+        "HARMONIC_FARM_PREPARATION_READINESS": "inherited-readiness",
+    }
+    project = tmp_path / "private-pytest"
+    project.mkdir()
+    shutil.copy2(REPO_ROOT / "conftest.py", project / "conftest.py")
+    guard_dir = project / "tests" / "_child_guard"
+    guard_dir.mkdir(parents=True)
+    for name in ("sitecustomize.py", "harmonic_solidworks_guard.py"):
+        shutil.copy2(REPO_ROOT / "tests" / "_child_guard" / name, guard_dir / name)
+    # Real record helpers and telemetry run from copies so capture stays temporary.
+    scripts = project / "cad" / "scripts"
+    scripts.mkdir(parents=True)
+    for name in ("_farm.py", "_telemetry.py"):
+        shutil.copy2(REPO_ROOT / "cad" / "scripts" / name, scripts / name)
+    (project / "test_ownership.py").write_text(
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "import pytest\n"
+        f"sys.path.insert(0, {str(scripts)!r})\n"
+        "import _farm\n"
+        f"INHERITED = {inherited!r}\n"
+        "# Collection must be isolated before any function fixtures run.\n"
+        "assert all(name not in os.environ for name in INHERITED)\n"
+        "\n"
+        "@pytest.fixture(scope='session', autouse=True)\n"
+        "def reintroduce_parent_context_after_collection():\n"
+        "    # Prove the existing per-test fixture also clears these carriers.\n"
+        "    with pytest.MonkeyPatch.context() as patch:\n"
+        "        for name, value in INHERITED.items():\n"
+        "            patch.setenv(name, value)\n"
+        "        yield\n"
+        "\n"
+        "@pytest.fixture\n"
+        "def owned_context(monkeypatch, tmp_path):\n"
+        "    assert all(name not in os.environ for name in INHERITED)\n"
+        "    owned = tmp_path / 'owned-requests'\n"
+        "    owned.mkdir()\n"
+        "    monkeypatch.setenv('HARMONIC_FARM_REQUESTS', str(owned))\n"
+        "    monkeypatch.setenv('HARMONIC_FARM_BUILD_ID', 'fixture-owned-build')\n"
+        "    monkeypatch.setenv('HARMONIC_FARM_PREPARATION_READINESS', 'fixture-readiness')\n"
+        "    return owned\n"
+        "\n"
+        "def test_inherited_parent_context_is_not_usable():\n"
+        "    assert all(name not in os.environ for name in INHERITED)\n"
+        "    with pytest.raises(_farm.BuildOwnershipError):\n"
+        "        _farm._required_build_id()\n"
+        "    _farm._record_build('must-not-reach-the-parent-root')\n"
+        "\n"
+        "def test_explicit_fixture_context_is_preserved(owned_context):\n"
+        "    assert _farm._required_build_id() == 'fixture-owned-build'\n"
+        "    assert os.environ['HARMONIC_FARM_PREPARATION_READINESS'] == 'fixture-readiness'\n"
+        "    _farm._record_build(_farm._required_build_id())\n"
+        "    record = json.loads((owned_context / 'build.json').read_text(encoding='utf-8'))\n"
+        "    assert record['build_id'] == 'fixture-owned-build'\n",
+        encoding="utf-8",
+    )
+    runtime_temp = tmp_path / "runtime-temp"
+    runtime_temp.mkdir()
+    child_log = tmp_path / "child-refusals.log"
+    child_log.touch()
+    environment = dict(os.environ)
+    environment.update(inherited)
+    environment.update({
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONPYCACHEPREFIX": str(tmp_path / "pycache"),
+        "HARMONIC_BUILDGRAPH_CACHE": str(tmp_path / "buildgraph-facts"),
+        "HARMONIC_TEST_FORBID_SOLIDWORKS": str(child_log),
+        "NOSW_GUARD": "1",
+        "TEMP": str(runtime_temp),
+        "TMP": str(runtime_temp),
+        "TMPDIR": str(runtime_temp),
+    })
+    environment.pop("PYTEST_ADDOPTS", None)
+    environment.pop("PYTEST_PLUGINS", None)
+    for endpoint in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        environment[endpoint] = ""
+    stdout_path = tmp_path / "ownership-pytest.stdout.txt"
+    stderr_path = tmp_path / "ownership-pytest.stderr.txt"
+    with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
+        "w", encoding="utf-8"
+    ) as stderr:
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                    "--basetemp", str(tmp_path / "nested-pytest"), "test_ownership.py",
+                ],
+                cwd=project,
+                env=environment,
+                stdout=stdout,
+                stderr=stderr,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as exc:
+            exc.add_note(f"Retained child output: {stdout_path}; {stderr_path}")
+            raise
+    output = (
+        stdout_path.read_text(encoding="utf-8", errors="replace")
+        + stderr_path.read_text(encoding="utf-8", errors="replace")
+    )
+    assert result.returncode == 0, output[-8000:]
+    assert "2 passed" in output, output[-8000:]
+    assert sentinel.read_text(encoding="utf-8") == "the enclosing build owns this root"
+    assert sorted(path.name for path in inherited_requests.iterdir()) == ["keep.txt"]

@@ -286,6 +286,13 @@ survive, so the child cannot prune other sessions' evidence. Child stdout/stderr
 are retained under the outer test's temporary directory even on timeout; the
 30-second deadline is unchanged.
 
+Root conftest also removes inherited `HARMONIC_FARM_REQUESTS`,
+`HARMONIC_FARM_BUILD_ID` and `HARMONIC_FARM_PREPARATION_READINESS` before
+collection and before each test. Tests may explicitly set their own temporary
+request root and ownership afterward. The publication-ownership regression in
+`tests/test_farm_mode.py` checks collection and per-test isolation, leaves the
+inherited root untouched, and permits an explicit fixture-owned result record.
+
 ### Finite stock-envelope endpoint reuse
 
 `paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's
