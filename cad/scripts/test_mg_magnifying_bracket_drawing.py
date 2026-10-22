@@ -466,7 +466,7 @@ def test_neck_location_uses_straight_physical_faces_away_from_smooth_root(monkey
         assert selected["p0"][1] > .150 and selected["p1"][1] < .115
 
 
-@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing"))
+@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name"))
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault):
     """Historical native ink stations with updated labels and simulated moves."""
     rows = {
@@ -492,6 +492,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     items = {name: SimpleNamespace(name=name, dx=0.0, dy=0.0, CenterText=True, OffsetText=False) for name in rows}
     for item in items.values():
         item.GetSpecificAnnotation = lambda item=item: item
+    items["NeckToFootSide"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "lateral_name" else "NeckToFootSide")
 
     def native_display(_adapter, item):
         native_lines = list(lines[item.name])
@@ -519,7 +520,10 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "annotation_display", native_display)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
+    # R32 created and measured this native edge dimension successfully, but
+    # later model-item name discovery did not find it. Its retained handle
+    # must still receive the same real ink and neighbour-clearance checks.
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item is items["NeckToFootSide"] else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
@@ -531,11 +535,11 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
     if fault:
-        message = "did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line")
+        message = "retained native dimension name" if fault == "lateral_name" else ("did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line"))
         with pytest.raises(RuntimeError, match=message):
-            drawing._layout_linear_annotations(object(), front, object(), list(items.values()))
+            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name != "NeckToFootSide"], lateral_location=items["NeckToFootSide"])
     else:
-        drawing._layout_linear_annotations(object(), front, object(), list(items.values()))
+        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name != "NeckToFootSide"], lateral_location=items["NeckToFootSide"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
         assert ink["NeckThickness"].text[1] > .2235368
         assert ink["FlangeDepth"].text[2] < .196
