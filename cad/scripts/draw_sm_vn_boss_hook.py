@@ -129,6 +129,7 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
     """Use the physical matching eye ID and an explicit nominal thread carrier."""
     eye = None
+    circles = []
     for raw in visible_view_entities(front, 4, label="counter anchor supplier contours"):
         silhouette = _early_bound(raw, "ISilhouetteEdge")
         raw_curve = silhouette.GetCurve()
@@ -138,6 +139,7 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         if not curve.IsCircle():
             continue
         circle = tuple(float(value) for value in curve.CircleParams)
+        circles.append(circle)
         if (
             all(abs(value) < 1e-8 for value in circle[:3])
             and abs(abs(circle[5]) - 1.0) < 1e-8
@@ -146,7 +148,10 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
             eye = raw
             break
     if eye is None:
-        raise RuntimeError("unchanged counter eye has no exact ID circular silhouette")
+        raise RuntimeError(
+            "unchanged counter eye has no exact ID circular silhouette; "
+            f"circles={circles!r}, configuration={front.ReferencedConfiguration!r}"
+        )
     try:
         _select_view_entity(
             adapter, front, "SILHOUETTE", None, label="EyeID", entity=eye

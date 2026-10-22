@@ -356,7 +356,23 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                 if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
                     adapter, entities[0], expected_entity, "SILHOUETTE"
                 ):
-                    raise RuntimeError(f"{contract['label']}: supplier eye reference moved to another contour")
+                    def contour_readback(entity):
+                        silhouette = _early_bound(entity, "ISilhouetteEdge")
+                        raw_curve = silhouette.GetCurve()
+                        if raw_curve is None:
+                            return None
+                        curve = _early_bound(raw_curve, "ICurve")
+                        return tuple(float(value) for value in curve.CircleParams) if curve.IsCircle() else "not-circle"
+
+                    visible = visible_view_entities(view, 4, label="settled spring eye identity readback")
+                    raise RuntimeError(
+                        f"{contract['label']}: supplier eye reference moved to another contour; "
+                        f"entities={len(entities)}, kinds={kinds}, "
+                        f"expected_circle={contour_readback(expected_entity)!r}, "
+                        f"attached_circles={[contour_readback(entity) for entity in entities]!r}, "
+                        f"visible_circles={[contour_readback(entity) for entity in visible]!r}, "
+                        f"configuration={view.ReferencedConfiguration!r}"
+                    )
 
 
 def _verify_supplier_layout(adapter, view_contracts, notes):
