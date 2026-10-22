@@ -1,3 +1,9 @@
+# HELD REFERENCE ROUTE: not qualified manufacturing instructions.
+# This plan is not enrolled in _process_plans.TRAVELER_STEMS and ships no traveler.
+# Its S5 template and other standalone tooling CAD were retired at the owner's
+# request. Inline shop solids are collision envelopes, not replacement tool drawings.
+# Requalify the route and its required tooling before manufacturing from it.
+#
 # ch_rocker_arm (MHA-CH-06) prechips route, authored from scratch (trial T4, ported from
 # cad/prechips-shop 6d5991c9b onto the merged shop fixtures MHA-CH-06-TL-04/05 and TL-10..19).
 # Those TL CAD parts are retired (Numbers reserved); the fixtures and gauges stay shop
