@@ -16,10 +16,8 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
-from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -153,144 +151,61 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _supplier_eye_circle(
-    adapter: Any, view: Any, raw: Any, *, readback: dict[str, Any] | None = None,
+    adapter: Any, view: Any, raw: Any,
 ) -> tuple[float, ...] | None:
-    """Read an exact model-XY circle on the authoritative physical eye torus."""
-    if readback is not None:
-        readback.update(dict.fromkeys((
-            "curve_present", "is_circle", "circle_params_m", "circle_length7",
-            "circle_finite7", "circle_center_matches", "circle_z_normal_matches",
-            "view_present", "view_name", "expected_view_name", "view_name_matches",
-            "document_present", "native_path", "source_resolved_path", "lexical_path_matches",
-            "expected_feature_present", "face_present", "owner_present", "owner_same_as_expected",
-            "surface_present", "is_torus", "torus_params_m", "torus_length8", "torus_finite8",
-            "torus_center_matches", "torus_z_normal_matches", "torus_major_matches",
-            "torus_minor_matches", "id_diameter_matches", "od_diameter_matches",
-            "diameter_matches",
-        ), "unobserved"))
-        readback["first_rejection"] = None
-
-    def mark(stage, **values):
-        if readback is not None:
-            readback.update(values)
-            readback["stage"] = stage
-
-    def reject(field):
-        if readback is not None:
-            readback["first_rejection"] = field
-        return None
-
-    mark("raw", raw_present=raw is not None)
+    """Read an exact model-XY circle on the authoritative source eye torus."""
     if raw is None:
-        return reject("raw_present")
-    mark("bind_silhouette")
+        return None
     silhouette = _early_bound(raw, "ISilhouetteEdge")
-    mark("GetCurve")
     raw_curve = silhouette.GetCurve()
-    mark("GetCurve", curve_present=raw_curve is not None)
     if raw_curve is None:
-        return reject("curve_present")
-    mark("bind_curve")
+        return None
     curve = _early_bound(raw_curve, "ICurve")
-    mark("IsCircle")
-    is_circle = curve.IsCircle()
-    mark("IsCircle", is_circle=bool(is_circle))
-    if not is_circle:
-        return reject("is_circle")
-    mark("CircleParams")
+    if not curve.IsCircle():
+        return None
     circle = tuple(float(value) for value in curve.CircleParams)
-    mark(
-        "CircleParams",
-        circle_params_m=[value if math.isfinite(value) else str(value) for value in circle],
-        circle_length7=len(circle) == 7,
-        circle_finite7=len(circle) == 7 and all(math.isfinite(value) for value in circle),
-        circle_center_matches=len(circle) >= 3 and all(abs(value) <= 1e-8 for value in circle[:3]),
-        circle_z_normal_matches=len(circle) >= 6 and abs(abs(circle[5]) - 1.0) <= 1e-8,
-    )
     if not (
         len(circle) == 7
         and all(math.isfinite(value) for value in circle)
         and all(abs(value) <= 1e-8 for value in circle[:3])
         and abs(abs(circle[5]) - 1.0) <= 1e-8
     ):
-        for field in ("circle_length7", "circle_finite7", "circle_center_matches", "circle_z_normal_matches"):
-            if readback is not None and not readback[field]:
-                return reject(field)
         return None
-    mark("GetView")
     native_view = silhouette.GetView()
-    mark("GetView", view_present=native_view is not None)
-    if native_view is None:
-        return reject("view_present")
-    mark("native_view_name")
-    native_name = view_name(adapter, native_view)
-    mark("expected_view_name", view_name=native_name)
-    expected_name = view_name(adapter, view)
-    mark("view_name_matches", expected_view_name=expected_name, view_name_matches=native_name == expected_name)
-    if native_name != expected_name:
-        return reject("view_name_matches")
-    mark("ReferencedDocument")
+    if native_view is None or view_name(adapter, native_view) != view_name(adapter, view):
+        return None
     raw_document = view.ReferencedDocument
-    mark("ReferencedDocument", document_present=raw_document is not None)
     if raw_document is None:
-        return reject("document_present")
-    mark("bind_document")
+        return None
     document = _early_bound(raw_document, "IModelDoc2")
-    mark("GetPathName")
     native_path = str(document.GetPathName())
-    mark("SOURCE.resolve", native_path=native_path)
-    source_path = SOURCE.resolve().as_posix()
-    path_matches = native_path.replace("\\", "/").casefold() == source_path.casefold()
-    mark("lexical_path_matches", source_resolved_path=source_path, lexical_path_matches=path_matches)
-    if not path_matches:
-        return reject("lexical_path_matches")
-    mark("FeatureByName")
+    if native_path.replace("\\", "/").casefold() != SOURCE.resolve().as_posix().casefold():
+        return None
     expected_feature = _early_bound(raw_document, "IPartDoc").FeatureByName(_SUPPLIER_EYE_FEATURE)
-    mark("GetFace", expected_feature_present=expected_feature is not None)
     raw_face = silhouette.GetFace()
-    mark("GetFace", face_present=raw_face is not None)
     if expected_feature is None or raw_face is None:
-        return reject("expected_feature_present" if expected_feature is None else "face_present")
-    mark("bind_face")
-    face = _early_bound(raw_face, "IFace2")
-    mark("GetFeature")
+        return None
+    raw_extension = document.Extension
+    if raw_extension is None:
+        return None
+    # A drawing face's feature is a different native object from its source
+    # owner. Map every face into this source part before comparing identity or
+    # reading the torus; neither names nor drawing-context equality prove it.
+    extension = _early_bound(raw_extension, "IModelDocExtension")
+    raw_source_face = extension.GetCorrespondingEntity2(_early_bound(raw_face, "IFace2"))
+    if raw_source_face is None:
+        return None
+    face = _early_bound(raw_source_face, "IFace2")
     owner = face.GetFeature()
-    mark("GetFeature", owner_present=owner is not None)
-    if owner is None:
-        return reject("owner_present")
-    mark("IsSame_owner_expected")
-    owner_same = int(adapter.swApp.IsSame(owner, expected_feature))
-    mark("IsSame_owner_expected", owner_same_as_expected=owner_same)
-    if owner_same != 1:
-        return reject("owner_same_as_expected")
-    mark("GetSurface")
+    if owner is None or int(adapter.swApp.IsSame(owner, expected_feature)) != 1:
+        return None
     raw_surface = face.GetSurface()
-    mark("GetSurface", surface_present=raw_surface is not None)
     if raw_surface is None:
-        return reject("surface_present")
-    mark("bind_surface")
+        return None
     surface = _early_bound(raw_surface, "ISurface")
-    mark("IsTorus")
-    is_torus = surface.IsTorus()
-    mark("IsTorus", is_torus=bool(is_torus))
-    if not is_torus:
-        return reject("is_torus")
-    mark("TorusParams")
+    if not surface.IsTorus():
+        return None
     torus = tuple(float(value) for value in surface.TorusParams)
-    mark(
-        "TorusParams",
-        torus_params_m=[value if math.isfinite(value) else str(value) for value in torus],
-        torus_length8=len(torus) == 8,
-        torus_finite8=len(torus) == 8 and all(math.isfinite(value) for value in torus),
-        torus_center_matches=len(torus) >= 3 and all(abs(value) <= 1e-8 for value in torus[:3]),
-        torus_z_normal_matches=len(torus) >= 6 and abs(abs(torus[5]) - 1.0) <= 1e-8,
-        torus_major_matches=len(torus) >= 7 and abs(
-            torus[6] * 2000.0 - 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm
-        ) < 1e-5,
-        torus_minor_matches=len(torus) >= 8 and abs(
-            torus[7] * 2000.0 - _SUPPLIER_ANCHOR.wire_dia_mm
-        ) < 1e-5,
-    )
     if not (
         len(torus) == 8
         and all(math.isfinite(value) for value in torus)
@@ -299,375 +214,8 @@ def _supplier_eye_circle(
         and abs(torus[6] * 2000.0 - 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm) < 1e-5
         and abs(torus[7] * 2000.0 - _SUPPLIER_ANCHOR.wire_dia_mm) < 1e-5
     ):
-        for field in (
-            "torus_length8", "torus_finite8", "torus_center_matches",
-            "torus_z_normal_matches", "torus_major_matches", "torus_minor_matches",
-        ):
-            if readback is not None and not readback[field]:
-                return reject(field)
         return None
-    mark("accepted_circle")
     return circle
-
-
-def _supplier_eye_failure_readback(adapter: Any, view: Any, visible: Any) -> dict[str, Any]:
-    """Observe the failed inventory, never select, regenerate, or relax it."""
-    packet: dict[str, Any] = {
-        "diagnostic": "spring-eye-missing-label",
-        "observation_only": True,
-        "thresholds": {
-            "circle_center_abs_m_le": 1e-8,
-            "circle_abs_axis_z_minus_one_le": 1e-8,
-            "diameter_error_mm_lt": 1e-5,
-            "id_mm": SUPPLIER_EYE_MM["EyeID"],
-            "catalogue_id_mm": _SUPPLIER_ANCHOR.eye_id_mm,
-            "eye_mm": dict(SUPPLIER_EYE_MM),
-            "od_mm": _SUPPLIER_ANCHOR.eye_od_mm,
-            "torus_center_abs_m_le": 1e-8,
-            "torus_abs_axis_z_minus_one_le": 1e-8,
-            "torus_major_radius_mm": _SUPPLIER_ANCHOR.eye_mean_radius_mm,
-            "torus_wire_diameter_mm": _SUPPLIER_ANCHOR.wire_dia_mm,
-            "torus_order": "centerXYZ_m,axisXYZ,major_radius_m,minor_radius_m",
-        },
-    }
-
-    def capture(row, field, getter, *, describe=None):
-        try:
-            value = getter()
-            row[field] = value if describe is None else describe(value)
-            return value
-        except Exception as exc:
-            row[field] = None
-            row.setdefault("errors", {})[field] = {
-                "type": type(exc).__name__, "message": str(exc),
-            }
-            return None
-
-    def entity(row, field, getter, kind):
-        raw = capture(row, field + "_present", getter, describe=lambda value: value is not None)
-        return capture(
-            row, field + "_bound",
-            lambda: _early_bound(raw, kind) if raw is not None else None,
-            describe=lambda value: value is not None,
-        )
-
-    def same(row, field, first, second):
-        capture(
-            row, field,
-            lambda: int(adapter.swApp.IsSame(first, second))
-            if first is not None and second is not None else None,
-        )
-
-    def feature_readback(feature):
-        row = {"present": feature is not None}
-        for field, getter in (
-            ("name", lambda: str(feature.Name)),
-            ("type", lambda: str(feature.GetTypeName2())),
-            ("id", lambda: int(feature.GetID())),
-        ):
-            capture(row, field, lambda getter=getter: getter() if feature is not None else None)
-        same(row, "self_is_same", feature, feature)
-        return row
-
-    context: dict[str, Any] = {}
-    packet["source"] = context
-    expected_name = capture(context, "view_name", lambda: view_name(adapter, view))
-    referenced_configuration = capture(
-        context, "referenced_configuration", lambda: str(view.ReferencedConfiguration),
-    )
-    capture(context, "display_mode", lambda: int(view.GetDisplayMode2()))
-    capture(
-        context, "model_to_view_transform",
-        lambda: tuple(float(value) for value in view.ModelToViewTransform.ArrayData),
-    )
-    same(context, "view_self_is_same", view, view)
-    document = entity(context, "document", lambda: view.ReferencedDocument, "IModelDoc2")
-    path = capture(
-        context, "native_path",
-        lambda: str(document.GetPathName()) if document is not None else None,
-    )
-    capture(context, "source_raw_path", lambda: str(SOURCE))
-    source_resolved = capture(context, "source_resolved_path", lambda: SOURCE.resolve().as_posix())
-    capture(
-        context, "lexical_path_matches",
-        lambda: path.replace("\\", "/").casefold() == source_resolved.casefold()
-        if path is not None and source_resolved is not None else None,
-    )
-    capture(
-        context, "native_canonical_path",
-        lambda: Path(path).resolve().as_posix() if path else None,
-    )
-    capture(context, "source_canonical_path", lambda: SOURCE.resolve().as_posix())
-    capture(
-        context, "physical_samefile",
-        lambda: SOURCE.samefile(path) if path else None,
-    )
-    for field, candidate_path in (("source_file_id", SOURCE), ("native_file_id", path)):
-        capture(
-            context, field,
-            lambda candidate_path=candidate_path: (
-                (lambda stat: {"dev": stat.st_dev, "ino": stat.st_ino})(Path(candidate_path).stat())
-                if candidate_path else None
-            ),
-        )
-    capture(context, "document_type", lambda: int(document.GetType()) if document is not None else None)
-    capture(context, "document_title", lambda: str(document.GetTitle()) if document is not None else None)
-    manager = entity(
-        context, "configuration_manager",
-        lambda: document.ConfigurationManager if document is not None else None,
-        "IConfigurationManager",
-    )
-    for field, getter in (
-        ("active_configuration", lambda: manager.ActiveConfiguration if manager is not None else None),
-        ("referenced_configuration_object", lambda: document.GetConfigurationByName(referenced_configuration)
-         if document is not None and referenced_configuration is not None else None),
-    ):
-        row: dict[str, Any] = {}
-        context[field] = row
-        configuration = entity(row, "configuration", getter, "IConfiguration")
-        capture(row, "name", lambda: str(configuration.Name) if configuration is not None else None)
-        capture(row, "id", lambda: int(configuration.GetID()) if configuration is not None else None)
-    part = entity(context, "part", lambda: document, "IPartDoc")
-    expected_feature = entity(
-        context, "expected_feature",
-        lambda: part.FeatureByName(_SUPPLIER_EYE_FEATURE) if part is not None else None,
-        "IFeature",
-    )
-    context["expected_feature"] = feature_readback(expected_feature)
-    extension = entity(
-        context, "extension",
-        lambda: document.Extension if document is not None else None, "IModelDocExtension",
-    )
-    view_feature = entity(
-        context, "view_corresponding_feature",
-        lambda: view.GetCorresponding(expected_feature) if expected_feature is not None else None,
-        "IFeature",
-    )
-    context["view_corresponding_feature"] = feature_readback(view_feature)
-    same(context, "view_feature_same_as_expected", view_feature, expected_feature)
-
-    def face_readback(raw, *, frame):
-        row: dict[str, Any] = {"coordinate_context": frame}
-        face = entity(row, "face", lambda: raw, "IFace2")
-        same(row, "self_is_same", face, face)
-        owner = entity(
-            row, "owner", lambda: face.GetFeature() if face is not None else None, "IFeature",
-        )
-        row["owner"] = feature_readback(owner)
-        same(row, "owner_same_as_expected", owner, expected_feature)
-        row["owner_matches_expected"] = (
-            row["owner_same_as_expected"] == 1 if row["owner_same_as_expected"] is not None else None
-        )
-        surface = entity(
-            row, "surface", lambda: face.GetSurface() if face is not None else None, "ISurface",
-        )
-        capture(row, "surface_identity", lambda: int(surface.Identity()) if surface is not None else None)
-        is_torus = capture(row, "is_torus", lambda: bool(surface.IsTorus()) if surface is not None else None)
-        torus = capture(
-            row, "torus_params_m",
-            lambda: tuple(float(value) for value in surface.TorusParams) if is_torus else None,
-        )
-        for field, predicate in (
-            ("torus_length8", lambda: len(torus) == 8),
-            ("torus_finite8", lambda: len(torus) == 8 and all(math.isfinite(value) for value in torus)),
-            ("torus_center_matches", lambda: len(torus) >= 3 and all(abs(value) <= 1e-8 for value in torus[:3])),
-            ("torus_z_normal_matches", lambda: len(torus) >= 6 and abs(abs(torus[5]) - 1.0) <= 1e-8),
-            ("torus_major_matches", lambda: len(torus) >= 7 and abs(
-                torus[6] * 2000.0 - 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm
-            ) < 1e-5),
-            ("torus_minor_matches", lambda: len(torus) >= 8 and abs(
-                torus[7] * 2000.0 - _SUPPLIER_ANCHOR.wire_dia_mm
-            ) < 1e-5),
-        ):
-            capture(row, field, lambda predicate=predicate: predicate() if torus is not None else None)
-        row["eye_torus_relevant"] = is_torus is True and (
-            row["torus_center_matches"] is True or row["torus_major_matches"] is True
-        )
-        if frame == "source_part" and row["eye_torus_relevant"] and torus is not None and len(torus) >= 3:
-            capture(
-                row, "center_sheet_xy_m",
-                lambda: model_points_in_view(
-                    adapter, view, [torus[:3]], label="spring eye failure source torus centre",
-                )[0],
-            )
-        return row, face
-
-    source_faces = capture(
-        context, "wire_face_count",
-        lambda: tuple(expected_feature.GetFaces() or ()) if expected_feature is not None else None,
-        describe=lambda faces: len(faces) if faces is not None else None,
-    )
-    context["wire_faces"] = []
-    native_source_faces = []
-    for index, raw in enumerate(source_faces or ()):
-        row, face = face_readback(raw, frame="source_part")
-        row["index"] = index
-        context["wire_faces"].append(row)
-        native_source_faces.append(face)
-
-    def curve_readback(row, curve):
-        capture(row, "curve_identity", lambda: int(curve.Identity()) if curve is not None else None)
-        is_circle = capture(row, "is_circle", lambda: bool(curve.IsCircle()) if curve is not None else None)
-        circle = capture(
-            row, "circle_params_m",
-            lambda: tuple(float(value) for value in curve.CircleParams) if is_circle else None,
-        )
-        for field, predicate in (
-            ("circle_length7", lambda: len(circle) == 7),
-            ("circle_finite7", lambda: len(circle) == 7 and all(math.isfinite(value) for value in circle)),
-            ("circle_center_matches", lambda: len(circle) >= 3 and all(abs(value) <= 1e-8 for value in circle[:3])),
-            ("circle_z_normal_matches", lambda: len(circle) >= 6 and abs(abs(circle[5]) - 1.0) <= 1e-8),
-            ("id_diameter_matches", lambda: len(circle) >= 7 and abs(circle[6] * 2000.0 - SUPPLIER_EYE_MM["EyeID"]) < 1e-5),
-            ("od_diameter_matches", lambda: len(circle) >= 7 and abs(
-                circle[6] * 2000.0 - SUPPLIER_EYE_MM["EyeOD"]
-            ) < 1e-5),
-        ):
-            capture(row, field, lambda predicate=predicate: predicate() if circle is not None else None)
-        return is_circle
-
-    def sample_non_circle(row, curve):
-        is_line = capture(row, "is_line", lambda: bool(curve.IsLine()))
-        if is_line:
-            capture(row, "line_params_m", lambda: tuple(float(value) for value in curve.LineParams))
-        # Generated ICurve wrapper: bool retval followed by Start, End, IsClosed,
-        # IsPeriodic OUTs. Infinite lines are summarized, never evaluated.
-        ends = capture(row, "end_params", lambda: tuple(curve.GetEndParams()))
-        valid = capture(
-            row, "sample_range_valid",
-            lambda: len(ends) == 5 and bool(ends[0]) and is_line is False
-            and all(math.isfinite(float(value)) and abs(float(value)) < 1e100 for value in ends[1:3])
-            and float(ends[1]) < float(ends[2])
-            if ends is not None else None,
-        )
-        row["samples"] = []
-        if not valid:
-            return
-        start, end = float(ends[1]), float(ends[2])
-        for index in range(9):
-            parameter = start + (end - start) * index / 8.0
-            sample = {"parameter": parameter}
-            capture(sample, "xyz_m", lambda: tuple(float(value) for value in curve.Evaluate2(parameter, 0)[:3]))
-            row["samples"].append(sample)
-
-    candidates = []
-    packet["kind4"] = candidates
-    for index, raw in enumerate(visible):
-        row = {"index": index, "raw_present": raw is not None}
-        candidates.append(row)
-        silhouette = entity(row, "silhouette", lambda: raw, "ISilhouetteEdge")
-        curve = entity(
-            row, "curve", lambda: silhouette.GetCurve() if silhouette is not None else None, "ICurve",
-        )
-        is_circle = curve_readback(row, curve)
-        native_view = entity(
-            row, "view", lambda: silhouette.GetView() if silhouette is not None else None, "IView",
-        )
-        name = capture(row, "view_name", lambda: view_name(adapter, native_view) if native_view is not None else None)
-        row["expected_view_name"] = expected_name
-        row["view_name_matches"] = name == expected_name if name is not None and expected_name is not None else None
-        same(row, "view_self_is_same", native_view, native_view)
-        same(row, "view_same_as_front", native_view, view)
-        row["source_lexical_path_matches"] = context["lexical_path_matches"]
-        raw_face = capture(
-            row, "face_present", lambda: silhouette.GetFace() if silhouette is not None else None,
-            describe=lambda value: value is not None,
-        )
-        face_row, face = face_readback(raw_face, frame="silhouette_GetFace_context_undocumented")
-        row["face"] = face_row
-        row["same_as_source_wire_faces"] = []
-        if face_row["eye_torus_relevant"]:
-            for source_index, source_face in enumerate(native_source_faces):
-                equality = {"source_face_index": source_index}
-                same(equality, "is_same", face, source_face)
-                row["same_as_source_wire_faces"].append(equality)
-            mapped = entity(
-                row, "mapped_source_face",
-                lambda: extension.GetCorrespondingEntity2(face) if extension is not None and face is not None else None,
-                "IFace2",
-            )
-            row["mapped_source_face"], _ = face_readback(mapped, frame="source_part")
-            roundtrip = entity(
-                row, "roundtrip_face",
-                lambda: view.GetCorrespondingEntity(mapped) if mapped is not None else None, "IFace2",
-            )
-            same(row, "roundtrip_self_is_same", roundtrip, roundtrip)
-            same(row, "roundtrip_same_as_drawing_face", roundtrip, face)
-        if curve is not None and is_circle is not True and face_row["eye_torus_relevant"]:
-            sample_non_circle(row, curve)
-        common_predicates = all(value is True for value in (
-            row["raw_present"], row["curve_present"], is_circle,
-            row["circle_finite7"], row["circle_center_matches"], row["circle_z_normal_matches"],
-            row["view_present"], row["view_name_matches"],
-            context["document_present"], row["source_lexical_path_matches"],
-            context["expected_feature_present"], row["face_present"],
-            face_row["owner_matches_expected"], face_row["surface_present"], face_row["is_torus"],
-            face_row["torus_finite8"], face_row["torus_center_matches"], face_row["torus_z_normal_matches"],
-            face_row["torus_major_matches"], face_row["torus_minor_matches"],
-        ))
-        row["diameter_matches"] = {
-            "EyeID": row["id_diameter_matches"], "EyeOD": row["od_diameter_matches"],
-        }
-        row["accepted_id_predicates"] = common_predicates and row["id_diameter_matches"] is True
-        row["accepted_od_predicates"] = common_predicates and row["od_diameter_matches"] is True
-    packet["kind4_count"] = len(candidates)
-    packet["raw_exact_circle_count"] = sum(
-        row["is_circle"] is True and row["circle_finite7"] is True for row in candidates
-    )
-    packet["raw_origin_xy_id_circle_count"] = sum(
-        all(row[field] is True for field in (
-            "is_circle", "circle_finite7", "circle_center_matches",
-            "circle_z_normal_matches", "id_diameter_matches",
-        )) for row in candidates
-    )
-    packet["accepted_id_count"] = sum(row["accepted_id_predicates"] for row in candidates)
-    packet["raw_origin_xy_od_circle_count"] = sum(
-        all(row[field] is True for field in (
-            "is_circle", "circle_finite7", "circle_center_matches",
-            "circle_z_normal_matches", "od_diameter_matches",
-        )) for row in candidates
-    )
-    packet["accepted_od_count"] = sum(row["accepted_od_predicates"] for row in candidates)
-    edges = capture(
-        packet, "kind1_count",
-        lambda: visible_view_entities(view, 1, label="spring anchor missing-eye census edges"),
-        describe=len,
-    )
-    packet["kind1"] = []
-    packet["kind1_curve_identity_counts"] = {}
-    for index, raw in enumerate(edges or ()):
-        row = {"index": index, "raw_present": raw is not None}
-        packet["kind1"].append(row)
-        edge = entity(row, "edge", lambda: raw, "IEdge")
-        curve = entity(row, "curve", lambda: edge.GetCurve() if edge is not None else None, "ICurve")
-        is_circle = curve_readback(row, curve)
-        identity = str(row["curve_identity"])
-        counts = packet["kind1_curve_identity_counts"]
-        counts[identity] = counts.get(identity, 0) + 1
-        adjacent = capture(
-            row, "adjacent_face_count",
-            lambda: tuple(edge.GetTwoAdjacentFaces2() or ()) if edge is not None else (),
-            describe=len,
-        )
-        row["adjacent_faces"] = []
-        for face_index, raw_face in enumerate(adjacent or ()):
-            face_row, _ = face_readback(raw_face, frame="kind1_adjacent_face_context")
-            face_row["index"] = face_index
-            row["adjacent_faces"].append(face_row)
-        if curve is not None and is_circle is not True and any(
-            face_row["eye_torus_relevant"] for face_row in row["adjacent_faces"]
-        ):
-            sample_non_circle(row, curve)
-
-    def json_values(value):
-        if isinstance(value, float) and not math.isfinite(value):
-            return str(value)
-        if isinstance(value, dict):
-            return {key: json_values(item) for key, item in value.items()}
-        if isinstance(value, (tuple, list)):
-            return [json_values(item) for item in value]
-        return value
-
-    return json_values(packet)
 
 
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
@@ -675,41 +223,19 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
     eye = {}
     refs = []
     visible = visible_view_entities(front, 4, label="spring anchor supplier contours")
-    observations = []
-    for index, raw in enumerate(visible):
-        observation = {"index": index}
-        observations.append(observation)
-        try:
-            circle = _supplier_eye_circle(adapter, front, raw, readback=observation)
-        except Exception as error:
-            observation["error"] = {"type": type(error).__name__, "message": str(error)}
-            packet = _supplier_eye_failure_readback(adapter, front, visible)
-            packet["requested_label"] = None
-            packet["predicate_time"] = observations
-            error.add_note(json.dumps(packet, sort_keys=True, allow_nan=False))
-            raise
+    for raw in visible:
+        circle = _supplier_eye_circle(adapter, front, raw)
         if circle is None:
             continue
-        observation["diameter_matches"] = {}
         for name, diameter in SUPPLIER_EYE_MM.items():
-            matches = abs(circle[6] * 2000.0 - diameter) < 1e-5
-            observation["diameter_matches"][name] = matches
-            observation["id_diameter_matches" if name == "EyeID" else "od_diameter_matches"] = matches
-            if matches:
+            if abs(circle[6] * 2000.0 - diameter) < 1e-5:
                 eye.setdefault(name, raw)
-        if not any(observation["diameter_matches"].values()):
-            observation["first_rejection"] = "eye_diameter_matches"
     for name, text_xy in (
         ("EyeOD", (0.169, 0.255)),
         ("EyeID", (0.165, 0.228)),
     ):
         if name not in eye:
-            error = RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
-            packet = _supplier_eye_failure_readback(adapter, front, visible)
-            packet["requested_label"] = name
-            packet["predicate_time"] = observations
-            error.add_note(json.dumps(packet, sort_keys=True, allow_nan=False))
-            raise error
+            raise RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
         try:
             _select_view_entity(
                 adapter, front, "SILHOUETTE", None, label=name, entity=eye[name]

@@ -1,12 +1,12 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
-import json
 import math
 from types import SimpleNamespace
 
 import pytest
 
 import _stock_trim_drawing as trim_drawing
+import _drawing_selection as selection
 import _drawing_view_display as view_display
 import sm_vn_boss_hook_spec as spec
 import draw_sm_vn_boss_hook as drawing
@@ -103,32 +103,198 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
             drawing._verify_controls(None, annotations)
 
 
-@pytest.mark.parametrize(
-    "fault", (None, "missing", "outer", "bend", "foreign-visible", "wrong-path",
-              "missing-curve", "noncircle", "wrong-radius", "stuck-hlv", "stuck-hlr"),
-)
-def test_supplier_eye_requires_real_mode_regeneration_and_preserves_controls(monkeypatch, fault):
-    """An immediate repaint alone cannot restore post-annotation native ID edges."""
+@pytest.fixture
+def supplier_eye_scene(monkeypatch, tmp_path):
+    """Offline native-shaped contracts, not proof of a live SOLIDWORKS pick."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(selection, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", view_display.set_hidden_lines_removed)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
-    owner = object()
-    source = SimpleNamespace(
-        GetPathName=lambda: str(drawing.SOURCE.resolve()),
-        FeatureByName=lambda name: owner if name == "Wire" else None,
+    monkeypatch.setattr(selection, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(selection, "null_callout", lambda: None)
+    source_path = tmp_path / "eye.SLDPRT"
+    monkeypatch.setattr(drawing, "SOURCE", source_path)
+    state = SimpleNamespace(
+        mode=2, selected=False, count=1, kind=46, hit=True, active_view=None,
+        hlv_seen=False, hlr_seen=False, refreshed=False, sheet="FINISHED",
     )
+    queries, projections, picks, dimensions, mappings, clears = [], [], [], [], [], []
+    visible_queries, visible = [], []
+    owner = SimpleNamespace(Name="Wire")
+    drawing_owner = SimpleNamespace(Name="Wire")
     surface = SimpleNamespace(
         IsTorus=lambda: True,
-        TorusParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                     anchor.eye_mean_radius_mm / 1000, anchor.wire_dia_mm / 2000),
+        TorusParams=(-4.4201138409138974e-11, -1.3548712585881306e-10, 0.0,
+                     0.0, 0.0, 1.0, 0.006381749644849558, 0.002413),
     )
-    face = SimpleNamespace(GetSurface=lambda: surface, GetFeature=lambda: owner)
+    source_face = SimpleNamespace(GetFeature=lambda: owner, GetSurface=lambda: surface)
+    bend = SimpleNamespace(
+        GetFeature=lambda: owner,
+        GetSurface=lambda: SimpleNamespace(
+            IsTorus=lambda: True,
+            TorusParams=(0.003, -0.009, 0.0, 0.0, 0.0, 1.0, 0.0005, 0.002413),
+        ),
+    )
+    shank = SimpleNamespace(
+        GetFeature=lambda: owner,
+        GetSurface=lambda: SimpleNamespace(IsTorus=lambda: False),
+    )
+    faces = [source_face, bend, shank]
+    owner.GetFaces = lambda: queries.append("faces") or tuple(faces)
+    mapped_faces = {}
+
+    def corresponding(face):
+        mappings.append(face)
+        return mapped_faces.get(id(face))
+
+    source = SimpleNamespace(
+        GetPathName=lambda: queries.append("path") or str(source_path.resolve()),
+        FeatureByName=lambda name: queries.append(("feature", name)) or (
+            owner if name == "Wire" else None
+        ),
+        Extension=SimpleNamespace(GetCorrespondingEntity2=corresponding),
+    )
+    front = SimpleNamespace(
+        Name="finished-front", ReferencedDocument=source, ReferencedConfiguration="Finished",
+        GetDisplayMode2=lambda: state.mode,
+        GetVisibleEntities2=lambda *_args: visible_queries.append("visible") or tuple(visible),
+        GetCorrespondingEntity=lambda _face: pytest.fail("reverse mapping is not required"),
+    )
+
+    def set_mode(_parent, mode, *_args):
+        previous, state.mode = state.mode, mode
+        if previous == 2 and mode == 1:
+            state.hlv_seen = True
+        if previous == 1 and mode == 2 and state.hlv_seen:
+            state.hlr_seen = True
+        state.refreshed = False
+        return previous != mode
+
+    def refresh():
+        state.refreshed = True
+
+    front.SetDisplayMode4 = set_mode
+    front.UpdateViewDisplayGeometry = refresh
+
+    def contour(diameter=None, attached_source_face=source_face):
+        torus = surface.TorusParams
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(*torus[:3], 0.0, 0.0, 1.0,
+                          torus[6] - torus[7] if diameter is None else diameter / 2000),
+        )
+        face = SimpleNamespace(
+            GetFeature=lambda: drawing_owner,
+            GetSurface=lambda: pytest.fail("read torus in drawing context instead of source"),
+        )
+        mapped_faces[id(face)] = attached_source_face
+        return SimpleNamespace(GetCurve=lambda: curve, GetFace=lambda: face, GetView=lambda: front)
+
+    eye, outer = contour(), contour(anchor.eye_od_mm)
+    state.pick = eye
+    native_dimension = SimpleNamespace(FullName="EyeID@native")
+    display = SimpleNamespace(GetDimension2=lambda _index: native_dimension)
+
+    def select_by_id(*args):
+        assert state.active_view == front.Name
+        assert state.hlv_seen and state.hlr_seen and state.mode == 2 and state.refreshed
+        assert args[0:2] == ("", "SILHOUETTE")
+        assert args[4:] == (0.0, False, 0, None, 0)
+        picks.append(args[2:4])
+        state.selected = state.hit
+        return state.hit
+
+    def clear(_all):
+        clears.append(state.selected)
+        state.selected = False
+
+    def add_diameter(*point):
+        assert state.selected and state.count == 1 and state.kind == 46
+        assert state.pick is not None
+        dimensions.append((state.pick, point))
+        return display
+
+    model = SimpleNamespace(
+        ActivateView=lambda name: setattr(state, "active_view", name) or True,
+        ClearSelection2=clear, AddDiameterDimension2=add_diameter,
+        Extension=SimpleNamespace(SelectByID2=select_by_id),
+        SelectionManager=SimpleNamespace(
+            GetSelectedObjectCount2=lambda _mark: state.count if state.selected else 0,
+            GetSelectedObjectType3=lambda _index, _mark: state.kind,
+            GetSelectedObject6=lambda _index, _mark: state.pick if state.selected else None,
+        ),
+    )
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
+
+    def project(actual_adapter, view, points, *, label):
+        assert actual_adapter is adapter and view is front and label == "EyeID"
+        projections.extend(tuple(point) for point in points)
+        return [(0.100 + 4.0 * point[0], 0.175 + 4.0 * point[1]) for point in points]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda _adapter, value, **_kwargs: value)
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    return SimpleNamespace(
+        adapter=adapter, model=model, state=state, front=front, source=source,
+        source_path=source_path, owner=owner, drawing_owner=drawing_owner, surface=surface,
+        source_face=source_face, faces=faces, mapped_faces=mapped_faces, mappings=mappings,
+        eye=eye, outer=outer, contour=contour, projections=projections, picks=picks,
+        dimensions=dimensions, queries=queries, clears=clears,
+        visible=visible, visible_queries=visible_queries,
+    )
+
+
+@pytest.mark.parametrize("inventory", ("empty", "omits-id"))
+def test_primary_pick_projects_actual_source_torus_without_visible_enumeration(
+    supplier_eye_scene, inventory,
+):
+    scene = supplier_eye_scene
+    if inventory == "omits-id":
+        scene.visible[:] = [scene.outer]
+    assert len(scene.faces) == 3
+    assert scene.adapter.swApp.IsSame(scene.eye.GetFace().GetFeature(), scene.owner) == 0
+    refs = drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    cx, cy, cz, _nx, _ny, _nz, major, minor = scene.surface.TorusParams
+    assert scene.projections == [(cx, cy + major - minor, cz)]
+    assert scene.picks == [(0.100 + 4.0 * cx, 0.175 + 4.0 * (cy + major - minor))]
+    assert scene.dimensions == [(scene.eye, (0.150, 0.241, 0.0))]
+    assert scene.mappings == [scene.eye.GetFace()]
+    assert scene.visible_queries == [], "Coordinate acquisition is primary, not an enumeration rescue"
+    assert scene.state.hlv_seen and scene.state.hlr_seen and scene.state.mode == 2
+    assert scene.state.selected is False and scene.clears[-1] is True
+    assert refs == [("EyeID@native", {
+        "label": "EyeID", "expected_mm": spec.SUPPLIER_EYE_ID_MM, "units": "in",
+        "precision": drawing.SUPPLIER_REFERENCE_PRECISION["EyeID"], "presentation": "diameter",
+        "fraction_denominator": drawing.SUPPLIER_FRACTION_DENOMINATOR,
+    })]
+
+
+@pytest.mark.parametrize("stuck_mode", (1, 2))
+def test_existing_hlv_to_hlr_setup_must_succeed_before_querying_the_source(
+    supplier_eye_scene, stuck_mode,
+):
+    scene = supplier_eye_scene
+    set_mode = scene.front.SetDisplayMode4
+
+    def refuse_mode(parent, mode, *args):
+        return False if mode == stuck_mode else set_mode(parent, mode, *args)
+
+    scene.front.SetDisplayMode4 = refuse_mode
+    with pytest.raises(RuntimeError, match="failed to"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert scene.queries == [] and scene.projections == [] and scene.dimensions == []
+
+
+def test_physical_eye_creation_preserves_imported_machining_controls(supplier_eye_scene, monkeypatch):
+    scene = supplier_eye_scene
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
-    controls, control_displays = [], []
+    controls, displays = [], []
     for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
-        dimension = SimpleNamespace(
+        native = SimpleNamespace(
             DrivenState=2, SystemValue=nominal,
             Tolerance=SimpleNamespace(
                 Type=spec.DIMENSION_TOLERANCE_TYPES[name],
@@ -136,620 +302,415 @@ def test_supplier_eye_requires_real_mode_regeneration_and_preserves_controls(mon
                 GetMaxValue=lambda upper=upper: upper,
             ),
         )
-        display_control = SimpleNamespace(
-            GetDimension2=lambda _index, dimension=dimension: dimension,
-            GetText=lambda _index: "",
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native, GetText=lambda _part: "",
             GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
         )
-        control_displays.append(display_control)
+        displays.append(display)
         controls.append(SimpleNamespace(
-            name=name, GetSpecificAnnotation=lambda display=display_control: display,
+            name=name, GetSpecificAnnotation=lambda display=display: display,
         ))
-    for index, display_control in enumerate(control_displays):
-        following = control_displays[index + 1] if index + 1 < len(control_displays) else None
-        display_control.GetNext5 = lambda following=following: following
-    state = SimpleNamespace(mode=2, hlv_seen=False, regenerated=False, materialized=False)
-    front = SimpleNamespace(Name="finished-front", ReferencedDocument=source)
-    front.GetFirstDisplayDimension6 = lambda: control_displays[0]
-
-    def set_mode(_parent, mode, *_args):
-        if (fault == "stuck-hlv" and mode == 1) or (fault == "stuck-hlr" and mode == 2):
-            return False
-        previous = state.mode
-        state.mode = mode
-        if previous == 2 and mode == 1:
-            state.hlv_seen = True
-        if previous == 1 and mode == 2 and state.hlv_seen:
-            state.regenerated = True
-        state.materialized = False
-        return previous != mode
-
-    def refresh():
-        state.materialized = state.regenerated and state.mode == 2
-
-    front.SetDisplayMode4 = set_mode
-    front.GetDisplayMode2 = lambda: state.mode
-    front.UpdateViewDisplayGeometry = refresh
-
-    def contour(diameter, attached_face=face, center=(0.0, 0.0, 0.0)):
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            CircleParams=(*center, 0.0, 0.0, 1.0, diameter / 2000),
-        )
-        return SimpleNamespace(
-            GetCurve=lambda: curve, GetFace=lambda: attached_face, GetView=lambda: front,
-        )
-
-    eye = contour(spec.SUPPLIER_EYE_ID_MM)
-    outer = contour(anchor.eye_od_mm)
-    bend = contour(0.9123785, center=(-0.002869189, -0.00879475, 0.0))
-    visible = [outer, bend, eye]
-    if fault in ("missing", "outer", "bend"):
-        visible = {"missing": [], "outer": [outer], "bend": [bend]}[fault]
-    elif fault == "foreign-visible":
-        face.GetFeature = lambda: object()
-    elif fault == "wrong-path":
-        source.GetPathName = lambda: "D:/foreign.SLDPRT"
-    elif fault == "missing-curve":
-        eye.GetCurve = lambda: None
-    elif fault == "noncircle":
-        eye.GetCurve().IsCircle = lambda: False
-    elif fault == "wrong-radius":
-        values = list(eye.GetCurve().CircleParams)
-        values[6] += 2e-8
-        eye.GetCurve().CircleParams = tuple(values)
-
-    def enumerate_visible(view, kind, **_kwargs):
-        assert view is front
-        assert kind == 4, "ID discovery must never fall back to edges"
-        # Refresh alone does not regenerate edges after imported annotations.
-        return visible if state.materialized else [outer, bend]
-
-    monkeypatch.setattr(drawing, "visible_view_entities", enumerate_visible)
-    selected = []
-    monkeypatch.setattr(
-        drawing, "_select_view_entity",
-        lambda _adapter, _view, kind, _point, **kwargs: selected.append((kind, kwargs["entity"])),
-    )
-    display = SimpleNamespace(GetDimension2=lambda _index: SimpleNamespace(FullName="EyeID@native"))
-    model = SimpleNamespace(
-        AddDiameterDimension2=lambda *_args: display, ClearSelection2=lambda _all: None,
-    )
-    adapter = SimpleNamespace(
-        currentModel=model, swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
-    )
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda _adapter, value, **_kwargs: value)
-    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
-    drawing._verify_controls(adapter, controls)
-    if fault is None:
-        refs = drawing._supplier_references(adapter, front)
-        assert selected == [("SILHOUETTE", eye)]
-        assert refs == [("EyeID@native", {
-            "label": "EyeID", "expected_mm": spec.SUPPLIER_EYE_ID_MM, "units": "in",
-            "precision": drawing.SUPPLIER_REFERENCE_PRECISION["EyeID"],
-            "presentation": "diameter",
-            "fraction_denominator": drawing.SUPPLIER_FRACTION_DENOMINATOR,
-        })]
-        assert state.mode == 2 and state.regenerated and state.materialized
-    else:
-        with pytest.raises(RuntimeError):
-            drawing._supplier_references(adapter, front)
-        assert selected == []
+    for index, display in enumerate(displays):
+        following = displays[index + 1] if index + 1 < len(displays) else None
+        display.GetNext5 = lambda following=following: following
+    scene.front.GetFirstDisplayDimension6 = lambda: displays[0]
+    drawing._verify_controls(scene.adapter, controls)
+    drawing._supplier_references(scene.adapter, scene.front, "Finished")
     surviving = []
-    current = front.GetFirstDisplayDimension6()
-    while current is not None:
-        surviving.append(current)
-        current = current.GetNext5()
+    display = scene.front.GetFirstDisplayDimension6()
+    while display is not None:
+        surviving.append(display)
+        display = display.GetNext5()
     assert len(surviving) == len(drawing.FRONT_KEEP)
-    assert all(actual is expected for actual, expected in zip(surviving, control_displays))
-    drawing._verify_controls(adapter, controls)
+    assert all(actual is expected for actual, expected in zip(surviving, displays))
+    drawing._verify_controls(scene.adapter, controls)
 
 
-@pytest.fixture
-def supplier_eye_census_scene(monkeypatch, tmp_path):
-    """Native-shaped behavior only; these fixtures do not establish COM support."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "set_hidden_lines_removed", view_display.set_hidden_lines_removed)
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
-    source_path = tmp_path / "eye.SLDPRT"
-    source_path.write_bytes(b"offline identity fixture")
-    monkeypatch.setattr(drawing, "SOURCE", source_path)
-    actions, queries, observations = [], [], []
-    state = SimpleNamespace(mode=2)
-    owner = SimpleNamespace(Name="Wire", GetTypeName2=lambda: "Sweep", GetID=lambda: 81)
-    foreign_owner = SimpleNamespace(Name="Bend", GetTypeName2=lambda: "Sweep", GetID=lambda: 82)
-    surface = SimpleNamespace(
-        Identity=lambda: 4007, IsTorus=lambda: True,
-        TorusParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                     anchor.eye_mean_radius_mm / 1000, anchor.wire_dia_mm / 2000),
-    )
-    source_face = SimpleNamespace(GetFeature=lambda: owner, GetSurface=lambda: surface)
-    drawing_face = SimpleNamespace(GetFeature=lambda: owner, GetSurface=lambda: surface)
-    owner.GetFaces = lambda: (source_face,)
-    active_configuration = SimpleNamespace(Name="Default", GetID=lambda: 31)
-    referenced_configuration = SimpleNamespace(Name="Finished", GetID=lambda: 32)
-    source = SimpleNamespace(
-        GetPathName=lambda: str(source_path.resolve()),
-        GetType=lambda: observations.append("document-type") or 1,
-        GetTitle=lambda: "eye.SLDPRT",
-        FeatureByName=lambda name: owner if name == "Wire" else None,
-        ConfigurationManager=SimpleNamespace(ActiveConfiguration=active_configuration),
-        GetConfigurationByName=lambda name: referenced_configuration if name == "Finished" else None,
-        Extension=SimpleNamespace(
-            GetCorrespondingEntity2=lambda face: source_face if face is drawing_face else None,
-        ),
-    )
-    front = SimpleNamespace(
-        Name="finished-front", ReferencedDocument=source, ReferencedConfiguration="Finished",
-        ModelToViewTransform=SimpleNamespace(ArrayData=(
-            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-            0.100, 0.175, 0.0, 4.0, 0.0, 0.0, 0.0,
-        )),
-        GetDisplayMode2=lambda: state.mode,
-        GetCorresponding=lambda feature: owner if feature is owner else None,
-        GetCorrespondingEntity=lambda face: drawing_face if face is source_face else None,
-    )
-
-    def set_mode(_parent, mode, *_args):
-        actions.append(("mode", mode))
-        previous, state.mode = state.mode, mode
-        return previous != mode
-
-    front.SetDisplayMode4 = set_mode
-    front.UpdateViewDisplayGeometry = lambda: actions.append(("refresh",))
-
-    def contour(diameter=spec.SUPPLIER_EYE_ID_MM, face=drawing_face):
-        curve = SimpleNamespace(
-            Identity=lambda: 3002, IsCircle=lambda: True,
-            CircleParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, diameter / 2000),
-        )
-        return SimpleNamespace(GetCurve=lambda: curve, GetFace=lambda: face, GetView=lambda: front)
-
-    eye, outer = contour(), contour(anchor.eye_od_mm)
-    visible, edges = [outer], []
-
-    def enumerate_visible(view, kind, **_kwargs):
-        assert view is front
-        queries.append(kind)
-        assert kind in (4, 1)
-        return visible if kind == 4 else edges
-
-    monkeypatch.setattr(drawing, "visible_view_entities", enumerate_visible)
-    monkeypatch.setattr(
-        drawing, "_select_view_entity",
-        lambda _adapter, _view, kind, _point, **kwargs: actions.append(("select", kind, kwargs["entity"])),
-    )
-    display = SimpleNamespace(GetDimension2=lambda _index: SimpleNamespace(FullName="EyeID@native"))
-    model = SimpleNamespace(
-        AddDiameterDimension2=lambda *_args: actions.append(("dimension",)) or display,
-        ClearSelection2=lambda _all: actions.append(("clear",)),
-    )
-    adapter = SimpleNamespace(
-        currentModel=model,
-        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
-    )
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda _adapter, value, **_kwargs: value)
-    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(
-        drawing, "model_points_in_view",
-        lambda _adapter, _view, points, **_kwargs: [(point[0] * 4 + 0.100, point[1] * 4 + 0.175) for point in points],
-    )
-    return SimpleNamespace(
-        adapter=adapter, front=front, source=source, source_path=source_path,
-        owner=owner, foreign_owner=foreign_owner, surface=surface,
-        drawing_face=drawing_face, source_face=source_face,
-        eye=eye, outer=outer, contour=contour, visible=visible, edges=edges,
-        actions=actions, queries=queries, observations=observations,
-    )
+@pytest.mark.parametrize("fault", ("wrong-configuration", "wrong-path", "alias-path", "missing-source", "missing-wire"))
+def test_acquisition_refuses_wrong_finished_source_before_projection_or_creation(
+    supplier_eye_scene, fault,
+):
+    scene = supplier_eye_scene
+    if fault == "wrong-configuration":
+        scene.front.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+        scene.source.GetPathName = lambda: pytest.fail("queried source before refusing wrong view configuration")
+        scene.source.FeatureByName = lambda _name: pytest.fail("queried Wire in wrong view configuration")
+    elif fault == "wrong-path":
+        scene.source.GetPathName = lambda: str(scene.source_path.parent / "foreign.SLDPRT")
+        scene.source.FeatureByName = lambda _name: pytest.fail("queried Wire in foreign source")
+    elif fault == "alias-path":
+        scene.source.GetPathName = lambda: str(scene.source_path.parent / "alias" / ".." / scene.source_path.name)
+    elif fault == "missing-source":
+        scene.front.ReferencedDocument = None
+    elif fault == "missing-wire":
+        scene.source.FeatureByName = lambda _name: None
+    with pytest.raises(RuntimeError, match="unchanged counter eye has no exact ID circular silhouette"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert not scene.projections and not scene.picks and not scene.dimensions
+    if fault == "wrong-configuration":
+        assert scene.queries == []
 
 
-def _missing_eye_packet(scene):
-    with pytest.raises(RuntimeError) as caught:
-        drawing._supplier_references(scene.adapter, scene.front)
-    assert type(caught.value) is RuntimeError
-    assert str(caught.value) == "unchanged counter eye has no exact ID circular silhouette"
-    assert len(caught.value.__notes__) == 1
-    packet = json.loads(caught.value.__notes__[0])
-    assert packet["observation_only"] is True
-    assert scene.queries == [4, 1], "Reuse the original kind4 snapshot; kind1 is diagnostic only"
-    assert scene.actions == [("mode", 1), ("mode", 2), ("refresh",)]
-    return packet
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "foreign-owner", "missing-owner", "identity-error"))
+def test_source_wire_requires_one_native_owned_eye_torus(supplier_eye_scene, fault):
+    scene = supplier_eye_scene
+    if fault == "missing":
+        scene.faces.remove(scene.source_face)
+    elif fault == "duplicate":
+        scene.faces.append(SimpleNamespace(
+            GetFeature=lambda: scene.owner, GetSurface=lambda: scene.surface,
+        ))
+    elif fault == "foreign-owner":
+        scene.source_face.GetFeature = lambda: SimpleNamespace(Name="Wire")
+    elif fault == "missing-owner":
+        scene.source_face.GetFeature = lambda: None
+    elif fault == "identity-error":
+        scene.adapter.swApp.IsSame = lambda *_args: -1
+    with pytest.raises(RuntimeError, match="requires one authoritative source Wire eye torus"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert not scene.projections and not scene.picks and not scene.dimensions
 
 
 @pytest.mark.parametrize(
-    "fault,field",
-    (
-        ("owner", "owner"), ("view", "view_name_matches"),
-        ("path", "source_lexical_path_matches"), ("torus-center", "torus_center_matches"),
-        ("torus-z", "torus_z_normal_matches"), ("torus-major", "torus_major_matches"),
-        ("torus-minor", "torus_minor_matches"),
-    ),
+    "fault", ("missing-surface", "nontorus", "short", "long", "center-boundary",
+              "wrong-normal", "wrong-major", "wrong-minor", "negative-major", "negative-minor"),
 )
-def test_failure_census_distinguishes_raw_id_from_individual_predicate_rejection(
-    supplier_eye_census_scene, fault, field,
-):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    if fault == "owner":
-        scene.drawing_face.GetFeature = lambda: scene.foreign_owner
-    elif fault == "view":
-        scene.eye.GetView = lambda: SimpleNamespace(Name="other-front")
-    elif fault == "path":
-        scene.source.GetPathName = lambda: str(scene.source_path.parent / "foreign.SLDPRT")
+def test_invalid_native_source_torus_cannot_supply_a_pick_point(supplier_eye_scene, fault):
+    scene = supplier_eye_scene
+    if fault == "missing-surface":
+        scene.source_face.GetSurface = lambda: None
+    elif fault == "nontorus":
+        scene.surface.IsTorus = lambda: False
+    elif fault == "short":
+        scene.surface.TorusParams = scene.surface.TorusParams[:-1]
+    elif fault == "long":
+        scene.surface.TorusParams += (0.0,)
     else:
         values = list(scene.surface.TorusParams)
-        values[{"torus-center": 0, "torus-z": 5, "torus-major": 6, "torus-minor": 7}[fault]] += 0.001
+        index, value = {
+            "center-boundary": (0, 1e-8),
+            "wrong-normal": (5, 1.0 - 2e-8),
+            "wrong-major": (6, values[6] + 2e-8),
+            "wrong-minor": (7, values[7] + 2e-8),
+            "negative-major": (6, -values[6]),
+            "negative-minor": (7, -values[7]),
+        }[fault]
+        values[index] = value
         scene.surface.TorusParams = tuple(values)
-    packet = _missing_eye_packet(scene)
-    assert packet["raw_exact_circle_count"] == 1
-    assert packet["raw_origin_xy_id_circle_count"] == 1
-    assert packet["accepted_id_count"] == 0
-    row = packet["kind4"][0]
-    assert row["circle_finite7"] is True
-    assert row["circle_center_matches"] is True
-    assert row["circle_z_normal_matches"] is True
-    assert row["id_diameter_matches"] is True
-    if fault == "owner":
-        assert row["face"]["owner_same_as_expected"] == 0
-        assert row["face"]["owner_matches_expected"] is False
-        assert row["face"]["owner"]["id"] == 82
-        # Mapping back to Wire is evidence, never a waiver of the direct rejection.
-        assert row["mapped_source_face"]["owner_same_as_expected"] == 1
-        assert row["roundtrip_same_as_drawing_face"] == 1
-    elif fault.startswith("torus-"):
-        assert row["face"][field] is False
-    else:
-        assert row[field] is False
+    with pytest.raises(RuntimeError, match="requires one authoritative source Wire eye torus"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert not scene.projections and not scene.dimensions
 
 
-@pytest.mark.parametrize("inventory", ("empty", "missing-curve", "noncircle", "outer"))
-def test_failure_census_separates_raw_absence_and_wrong_contour(supplier_eye_census_scene, inventory):
-    scene = supplier_eye_census_scene
-    if inventory == "empty":
-        scene.visible.clear()
-    elif inventory == "missing-curve":
-        scene.outer.GetCurve = lambda: None
-    elif inventory == "noncircle":
-        scene.outer.GetCurve().IsCircle = lambda: False
-    packet = _missing_eye_packet(scene)
-    assert packet["kind4_count"] == (0 if inventory == "empty" else 1)
-    assert packet["raw_exact_circle_count"] == int(inventory == "outer")
-    assert packet["raw_origin_xy_id_circle_count"] == 0
-    assert packet["accepted_id_count"] == 0
-    if inventory == "outer":
-        assert packet["kind4"][0]["od_diameter_matches_observation_only"] is True
-        assert packet["kind4"][0]["id_diameter_matches"] is False
+@pytest.mark.parametrize("index", range(8))
+@pytest.mark.parametrize("value", (math.nan, math.inf, -math.inf))
+def test_all_native_torus_parameters_must_be_finite(supplier_eye_scene, index, value):
+    scene = supplier_eye_scene
+    values = list(scene.surface.TorusParams)
+    values[index] = value
+    scene.surface.TorusParams = tuple(values)
+    with pytest.raises(RuntimeError, match="requires one authoritative source Wire eye torus"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert not scene.projections and not scene.dimensions
 
 
-def test_failure_census_keeps_independent_api_errors_and_negative_controls(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    scene.drawing_face.GetFeature = lambda: scene.foreign_owner
-
-    def fail(message):
-        raise OSError(message)
-
-    scene.foreign_owner.GetID = lambda: fail("owner ID failed")
-    scene.owner.GetTypeName2 = lambda: fail("expected type failed")
-    scene.surface.Identity = lambda: fail("surface identity failed")
-    scene.source.GetType = lambda: fail("document type failed")
-    scene.source.GetConfigurationByName("Finished").GetID = lambda: fail("configuration ID failed")
-    scene.adapter.swApp.IsSame = lambda _first, _second: -1
-    packet = _missing_eye_packet(scene)
-    row, source = packet["kind4"][0], packet["source"]
-    assert row["face"]["owner"]["errors"]["id"]["message"] == "owner ID failed"
-    assert source["expected_feature"]["errors"]["type"]["message"] == "expected type failed"
-    assert row["face"]["errors"]["surface_identity"]["message"] == "surface identity failed"
-    assert source["errors"]["document_type"]["message"] == "document type failed"
-    assert source["referenced_configuration_object"]["errors"]["id"]["message"] == "configuration ID failed"
-    assert source["expected_feature"]["self_is_same"] == -1
-    assert row["face"]["owner"]["self_is_same"] == -1
-    assert row["face"]["owner_same_as_expected"] == -1
-    assert row["face"]["owner_matches_expected"] is False
-    assert row["face"]["torus_major_matches"] is True
-    assert row["face"]["torus_minor_matches"] is True
-    assert row["circle_finite7"] is True
-    assert row["roundtrip_same_as_drawing_face"] == -1
-
-
-def test_failure_census_records_alias_identity_without_relaxing_lexical_path(
-    supplier_eye_census_scene,
+@pytest.mark.parametrize("count,kind,pick", ((0, 46, "eye"), (2, 46, "eye"), (1, 1, "eye"), (1, 2, "eye"), (1, 46, "null")))
+def test_coordinate_hit_must_leave_one_nonnull_type46_selection(
+    supplier_eye_scene, count, kind, pick,
 ):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    alias = scene.source_path.parent / "alias"
-    alias.mkdir()
-    scene.source.GetPathName = lambda: str(alias / ".." / scene.source_path.name)
-    packet = _missing_eye_packet(scene)
-    source = packet["source"]
-    assert source["lexical_path_matches"] is False
-    assert source["physical_samefile"] is True
-    assert source["native_canonical_path"] == source["source_canonical_path"]
-    assert source["native_file_id"] == source["source_file_id"]
-    assert source["document_type"] == 1
-    assert source["document_title"] == "eye.SLDPRT"
-    assert source["active_configuration"]["name"] == "Default"
-    assert source["active_configuration"]["id"] == 31
-    assert source["referenced_configuration_object"]["name"] == "Finished"
-    assert source["referenced_configuration_object"]["id"] == 32
-    assert packet["accepted_id_count"] == 0
+    scene = supplier_eye_scene
+    scene.state.count, scene.state.kind = count, kind
+    if pick == "null":
+        scene.state.pick = None
+    with pytest.raises(RuntimeError):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert len(scene.picks) == 1 and scene.dimensions == []
+    assert scene.state.selected is False and scene.clears[-1] is True
 
 
-def test_failure_census_exposes_source_torus_and_native_shaped_roundtrip(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    packet = _missing_eye_packet(scene)
-    source, row = packet["source"], packet["kind4"][0]
-    assert source["model_to_view_transform"] == list(scene.front.ModelToViewTransform.ArrayData)
-    assert source["referenced_configuration"] == "Finished"
-    assert source["display_mode"] == 2
-    assert source["view_self_is_same"] == 1
-    assert source["expected_feature"] == {
-        "present": True, "name": "Wire", "type": "Sweep", "id": 81, "self_is_same": 1,
-    }
-    assert source["wire_face_count"] == 1
-    source_torus = source["wire_faces"][0]
-    assert source_torus["coordinate_context"] == "source_part"
-    assert source_torus["owner_same_as_expected"] == 1
-    assert source_torus["torus_params_m"][6:] == pytest.approx([
-        anchor.eye_mean_radius_mm / 1000, anchor.wire_dia_mm / 2000,
-    ])
-    assert source_torus["center_sheet_xy_m"] == pytest.approx([0.100, 0.175])
-    assert row["face"]["coordinate_context"] == "silhouette_GetFace_context_undocumented"
-    assert row["mapped_source_face"]["coordinate_context"] == "source_part"
-    assert row["mapped_source_face"]["owner_same_as_expected"] == 1
-    assert row["same_as_source_wire_faces"] == [{"source_face_index": 0, "is_same": 0}]
-    assert row["roundtrip_face_present"] is True
-    assert row["roundtrip_self_is_same"] == 1
-    assert row["roundtrip_same_as_drawing_face"] == 1
-    assert source["view_corresponding_feature"]["self_is_same"] == 1
-    assert source["view_feature_same_as_expected"] == 1
-
-
-@pytest.mark.parametrize("mapping", ("null", "error"))
-def test_failure_census_retains_null_or_failed_correspondence(supplier_eye_census_scene, mapping):
-    scene = supplier_eye_census_scene
-
-    def corresponding(_face):
-        if mapping == "error":
-            raise OSError("correspondence unavailable")
-        return None
-
-    scene.source.Extension.GetCorrespondingEntity2 = corresponding
-    row = _missing_eye_packet(scene)["kind4"][0]
-    assert row["mapped_source_face"]["face_present"] is False
-    assert row["roundtrip_face_present"] is False
-    assert row["roundtrip_same_as_drawing_face"] is None
-    if mapping == "error":
-        assert row["errors"]["mapped_source_face_present"]["message"] == "correspondence unavailable"
-    else:
-        assert row["mapped_source_face_present"] is False
-
-
-def test_failure_census_keeps_all_candidates_and_failure_only_edge_inventory(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.outer] * 24 + [None]
-    sampled = []
-    spline = SimpleNamespace(
-        Identity=lambda: 3005, IsCircle=lambda: False, IsLine=lambda: False,
-        GetEndParams=lambda: (True, 2.0, 6.0, False, False),
-        Evaluate2=lambda parameter, derivatives: sampled.append((parameter, derivatives)) or (parameter, 0.0, 0.0, 99.0),
-    )
-    line = SimpleNamespace(
-        Identity=lambda: 3001, IsCircle=lambda: False, IsLine=lambda: True,
-        LineParams=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-        GetEndParams=lambda: (True, -1.7e308, 1.7e308, False, False),
-        Evaluate2=lambda *_args: pytest.fail("Infinite line must not be sampled"),
-    )
-    scene.edges[:] = [
-        SimpleNamespace(GetCurve=lambda: scene.eye.GetCurve(), GetTwoAdjacentFaces2=lambda: (scene.drawing_face, None)),
-        SimpleNamespace(GetCurve=lambda: spline, GetTwoAdjacentFaces2=lambda: (scene.drawing_face, None)),
-        SimpleNamespace(GetCurve=lambda: line, GetTwoAdjacentFaces2=lambda: (scene.drawing_face, None)),
-    ]
-    packet = _missing_eye_packet(scene)
-    assert packet["kind4_count"] == 25
-    assert len(packet["kind4"]) == 25
-    assert packet["kind4"][-1]["raw_present"] is False
-    assert packet["kind1_count"] == 3
-    assert packet["kind1_curve_identity_counts"] == {"3002": 1, "3005": 1, "3001": 1}
-    assert packet["kind1"][0]["id_diameter_matches"] is True
-    assert packet["accepted_id_count"] == 0, "A type1 circle must not become a type46 fallback"
-    assert sampled == [(2.0 + index * 0.5, 0) for index in range(9)]
-    assert len(packet["kind1"][1]["samples"]) == 9
-    assert packet["kind1"][1]["samples"][0]["xyz_m"] == [2.0, 0.0, 0.0]
-    assert packet["kind1"][1]["adjacent_faces"][0]["torus_major_matches"] is True
-    assert packet["kind1"][2]["sample_range_valid"] is False
-    assert packet["kind1"][2]["samples"] == []
-
-
-def test_success_does_not_run_census_or_add_observational_native_calls(
-    supplier_eye_census_scene, monkeypatch,
-):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    monkeypatch.setattr(
-        drawing, "_supplier_eye_failure_readback",
-        lambda *_args: pytest.fail("Successful discovery must not run a census"),
-    )
-    assert drawing._supplier_references(scene.adapter, scene.front)[0][0] == "EyeID@native"
-    assert scene.queries == [4]
-    assert scene.observations == []
-    assert scene.actions == [
-        ("mode", 1), ("mode", 2), ("refresh",),
-        ("select", "SILHOUETTE", scene.eye), ("dimension",), ("clear",),
-    ]
-
-
-def test_failure_census_preserves_transient_original_rejection(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    calls = []
-
-    def transient_owner():
-        calls.append("owner")
-        return scene.foreign_owner if len(calls) == 1 else scene.owner
-
-    scene.drawing_face.GetFeature = transient_owner
-    packet = _missing_eye_packet(scene)
-    original = packet["predicate_time"][0]
-    assert original["index"] == 0
-    assert original["first_rejection"] == "owner_same_as_expected"
-    assert original["owner_same_as_expected"] == 0
-    assert original["circle_params_m"] == list(scene.eye.GetCurve().CircleParams)
-    assert original["circle_finite7"] is True
-    assert original["circle_center_matches"] is True
-    assert original["circle_z_normal_matches"] is True
-    assert original["surface_present"] == "unobserved"
-    assert original["torus_params_m"] == "unobserved"
-    assert packet["accepted_id_count"] == 1
-    assert packet["kind4"][0]["face"]["owner_same_as_expected"] == 1
-    assert packet["kind4"][0]["accepted_id_predicates"] is True
-
-
-def test_predicate_native_exception_keeps_original_object_type_message_and_stage(
-    supplier_eye_census_scene,
-):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
+@pytest.mark.parametrize(
+    "fault", ("outer", "unrelated-circle", "missing-curve", "noncircle", "short-circle",
+              "long-circle", "center-boundary", "wrong-normal", "wrong-radius",
+              "missing-view", "wrong-view", "wrong-native-configuration",
+              "missing-face", "missing-extension", "null-correspondence", "foreign-owner",
+              "missing-owner", "not-same", "mapped-wrong-torus"),
+)
+def test_selected_contour_must_prove_exact_id_and_mapped_source_wire(supplier_eye_scene, fault):
+    scene = supplier_eye_scene
     curve = scene.eye.GetCurve()
-    error = OSError("original disconnected native curve")
+    if fault == "outer":
+        scene.state.pick = scene.outer
+    elif fault == "unrelated-circle":
+        curve.CircleParams = (0.002, -0.009, 0.0, *curve.CircleParams[3:])
+    elif fault == "missing-curve":
+        scene.eye.GetCurve = lambda: None
+    elif fault == "noncircle":
+        curve.IsCircle = lambda: False
+    elif fault == "short-circle":
+        curve.CircleParams = curve.CircleParams[:-1]
+    elif fault == "long-circle":
+        curve.CircleParams += (0.0,)
+    elif fault in ("center-boundary", "wrong-normal", "wrong-radius"):
+        values = list(curve.CircleParams)
+        index, value = {
+            "center-boundary": (0, 1e-8),
+            "wrong-normal": (5, 1.0 - 2e-8),
+            "wrong-radius": (6, values[6] + 2e-8),
+        }[fault]
+        values[index] = value
+        curve.CircleParams = tuple(values)
+    elif fault == "missing-view":
+        scene.eye.GetView = lambda: None
+    elif fault == "wrong-view":
+        scene.eye.GetView = lambda: SimpleNamespace(Name="other-front")
+    elif fault == "wrong-native-configuration":
+        scene.eye.GetView = lambda: SimpleNamespace(
+            Name=scene.front.Name, ReferencedConfiguration="other",
+        )
+    elif fault == "missing-face":
+        scene.eye.GetFace = lambda: None
+    elif fault == "missing-extension":
+        scene.source.Extension = None
+    elif fault == "null-correspondence":
+        scene.mapped_faces.clear()
+    else:
+        mapped_surface = SimpleNamespace(IsTorus=lambda: True, TorusParams=scene.surface.TorusParams)
+        mapped_owner = scene.owner
+        if fault == "foreign-owner":
+            mapped_owner = SimpleNamespace(Name="Wire")
+        elif fault == "missing-owner":
+            mapped_owner = None
+        elif fault == "not-same":
+            original_same = scene.adapter.swApp.IsSame
+            scene.adapter.swApp.IsSame = lambda first, second: (
+                0 if first is mapped_owner else original_same(first, second)
+            )
+            # Keep source acquisition valid; this distinct owner is returned
+            # only by the drawing-to-source correspondence.
+            mapped_owner = SimpleNamespace(Name="Wire")
+        elif fault == "mapped-wrong-torus":
+            values = list(mapped_surface.TorusParams)
+            values[6] += 0.001
+            mapped_surface.TorusParams = tuple(values)
+        scene.mapped_faces[id(scene.eye.GetFace())] = SimpleNamespace(
+            GetFeature=lambda: mapped_owner, GetSurface=lambda: mapped_surface,
+        )
+    with pytest.raises(RuntimeError, match="unchanged counter eye has no exact ID circular silhouette"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert scene.dimensions == [] and scene.state.selected is False
+    assert scene.clears[-1] is True
+
+
+@pytest.mark.parametrize("index", range(7))
+@pytest.mark.parametrize("value", (math.nan, math.inf, -math.inf))
+def test_all_selected_circle_parameters_must_be_finite(supplier_eye_scene, index, value):
+    scene = supplier_eye_scene
+    curve = scene.eye.GetCurve()
+    values = list(curve.CircleParams)
+    values[index] = value
+    curve.CircleParams = tuple(values)
+    with pytest.raises(RuntimeError, match="unchanged counter eye has no exact ID circular silhouette"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert scene.dimensions == [] and scene.state.selected is False
+
+
+@pytest.mark.parametrize("direct_owner", ("source", "drawing-proxy"))
+def test_even_apparently_native_faces_require_source_correspondence(supplier_eye_scene, direct_owner):
+    scene = supplier_eye_scene
+    face = scene.eye.GetFace()
+    if direct_owner == "source":
+        face.GetFeature = lambda: scene.owner
+    scene.source.Extension.GetCorrespondingEntity2 = lambda _face: None
+    assert drawing._supplier_eye_circle(scene.adapter, scene.front, scene.eye, "Finished") is None
+
+
+@pytest.mark.parametrize(
+    "operation", ("GetFaces", "projection", "SelectByID2", "GetCurve", "GetCorrespondingEntity2", "AddDiameterDimension2"),
+)
+def test_native_failure_is_not_suppressed_retried_or_replaced(supplier_eye_scene, monkeypatch, operation):
+    scene = supplier_eye_scene
+    error = OSError(f"native {operation} failed")
     calls = []
 
-    def disconnected_once():
-        calls.append("curve")
-        if len(calls) == 1:
-            raise error
-        return curve
+    def fail(*_args, **_kwargs):
+        calls.append(operation)
+        raise error
 
-    scene.eye.GetCurve = disconnected_once
+    if operation == "GetFaces":
+        scene.owner.GetFaces = fail
+    elif operation == "projection":
+        monkeypatch.setattr(drawing, "model_points_in_view", fail)
+    elif operation == "SelectByID2":
+        scene.model.Extension.SelectByID2 = fail
+    elif operation == "GetCurve":
+        scene.eye.GetCurve = fail
+    elif operation == "GetCorrespondingEntity2":
+        scene.source.Extension.GetCorrespondingEntity2 = fail
+    elif operation == "AddDiameterDimension2":
+        scene.model.AddDiameterDimension2 = fail
     with pytest.raises(OSError) as caught:
-        drawing._supplier_references(scene.adapter, scene.front)
-    assert caught.value is error
-    assert type(caught.value) is OSError
-    assert str(caught.value) == "original disconnected native curve"
-    assert len(caught.value.__notes__) == 1
-    packet = json.loads(caught.value.__notes__[0])
-    original = packet["predicate_time"][0]
-    assert original["stage"] == "GetCurve"
-    assert original["first_rejection"] is None
-    assert original["curve_present"] == "unobserved"
-    assert original["error"] == {"type": "OSError", "message": "original disconnected native curve"}
-    assert packet["raw_origin_xy_id_circle_count"] == 1
-    assert scene.queries == [4, 1]
-    assert scene.actions == [("mode", 1), ("mode", 2), ("refresh",)]
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert caught.value is error and calls == [operation]
+    assert not getattr(error, "__notes__", ())
+    assert scene.state.selected is False and scene.visible_queries == []
 
 
-def test_optional_predicate_readback_does_not_change_native_getters_or_guard_result(
-    supplier_eye_census_scene,
+def test_null_native_dimension_still_clears_the_verified_selection(supplier_eye_scene):
+    scene = supplier_eye_scene
+    scene.model.AddDiameterDimension2 = lambda *_args: None
+    with pytest.raises(RuntimeError, match="cannot dimension the counter eye ID silhouette"):
+        drawing._supplier_references(scene.adapter, scene.front, "Finished")
+    assert scene.mappings == [scene.eye.GetFace()]
+    assert scene.state.selected is False and scene.clears[-1] is True
+
+
+def _settled_supplier_scene(scene, monkeypatch):
+    """Install complete per-sheet native dimensions with fresh attachment getters."""
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    state = scene.state
+    scene.model.ActivateSheet = lambda name: setattr(state, "sheet", name) or True
+    iso = SimpleNamespace(Name="finished-iso", ReferencedConfiguration="Finished")
+    stock = SimpleNamespace(
+        Name="stock-front", ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+    )
+    refs_by_sheet, contracts, displays_by_sheet = {}, {}, {}
+    attachment = SimpleNamespace(entities=[scene.eye], kinds=[46], dangling=False, count=1)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: tuple(attachment.entities),
+        GetAttachedEntityTypes=lambda: tuple(attachment.kinds),
+        GetAttachedEntityCount3=lambda: attachment.count,
+        IsDangling=lambda: attachment.dangling,
+    )
+    for sheet_name, view, names, configuration in (
+        ("FINISHED", scene.front, ("EyeID", "SupplierThreadMajor"), "Finished"),
+        ("SUPPLIER-STOCK", stock,
+         ("SupplierNominalEyeOD", "SupplierNominalWire", "SupplierStockShank", "SupplierStockOverall"),
+         drawing.SUPPLIER_STOCK_CONFIGURATION),
+    ):
+        displays, refs = [], []
+        for name in names:
+            feature = (
+                "native" if name == "EyeID" else drawing.SUPPLIER_THREAD_FEATURE
+                if name == "SupplierThreadMajor" else drawing.SUPPLIER_STOCK_FEATURE
+            )
+            key = f"{name}@{feature}@eye.SLDPRT"
+            native = SimpleNamespace(FullName=key, Tolerance=SimpleNamespace(Type=0), DrivenState=1)
+            display = SimpleNamespace(
+                GetDimension2=lambda _index, native=native: native,
+                GetAnnotation=lambda: annotation,
+            )
+            displays.append(display)
+            refs.append((key, {"label": name}))
+        if sheet_name == "FINISHED":
+            for name in drawing.FRONT_KEEP:
+                native = SimpleNamespace(FullName=f"{name}@machining@eye.SLDPRT")
+                displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
+        for index, display in enumerate(displays):
+            following = displays[index + 1] if index + 1 < len(displays) else None
+            display.GetNext5 = lambda following=following: following
+        view.GetFirstDisplayDimension6 = lambda displays=displays: displays[0]
+        refs_by_sheet[sheet_name], displays_by_sheet[sheet_name] = refs, displays
+        contracts[sheet_name] = (
+            (scene.front.Name, iso.Name) if sheet_name == "FINISHED" else (stock.Name,),
+            configuration,
+        )
+
+    def no_mutation(*_args):
+        pytest.fail("settled geometry proof mutated a view, rebuilt, selected, or activated source configuration")
+
+    scene.front.UpdateViewDisplayGeometry = no_mutation
+    scene.model.EditRebuild3 = no_mutation
+    scene.model.ForceRebuild3 = no_mutation
+    scene.model.ActivateView = no_mutation
+    scene.model.Extension.SelectByID2 = no_mutation
+    scene.source.ShowConfiguration2 = no_mutation
+    scene.source.EditRebuild3 = no_mutation
+    scene.source.ForceRebuild3 = no_mutation
+    monkeypatch.setattr(drawing, "model_points_in_view", no_mutation)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", no_mutation)
+    monkeypatch.setattr(
+        drawing, "iter_views",
+        lambda _adapter: (scene.front, iso) if state.sheet == "FINISHED" else (stock,),
+    )
+    return SimpleNamespace(
+        refs=refs_by_sheet, contracts=contracts, attachment=attachment,
+        displays=displays_by_sheet, stock=stock, iso=iso,
+    )
+
+
+@pytest.mark.parametrize(
+    "fault", (None, "missing", "null", "multiple", "wrong-kind", "wrong-count", "dangling",
+              "outer", "unrelated-circle", "foreign-owner", "null-correspondence",
+              "wrong-torus", "wrong-path", "wrong-configuration", "wrong-iso-configuration",
+              "missing-dimension", "extra-dimension", "tolerance"),
+)
+def test_rebuild_and_native_save_reacquire_strict_attached_geometry_without_repairs(
+    supplier_eye_scene, monkeypatch, fault,
 ):
-    scene = supplier_eye_census_scene
-    calls = []
-
-    class NativeSpy:
-        def __init__(self, target, label):
-            self.target = target
-            self.label = label
-
-        def __getattr__(self, name):
-            value = getattr(self.target, name)
-            if not callable(value):
-                calls.append(f"{self.label}.{name}")
-                return value
-
-            def invoke(*args):
-                calls.append(f"{self.label}.{name}")
-                return value(*args)
-
-            return invoke
-
-    owner = scene.owner
-    surface = NativeSpy(scene.surface, "surface")
-    face = NativeSpy(SimpleNamespace(GetFeature=lambda: owner, GetSurface=lambda: surface), "face")
-    source = NativeSpy(SimpleNamespace(
-        GetPathName=lambda: str(scene.source_path.resolve()),
-        FeatureByName=lambda _name: owner,
-    ), "source")
-    front = NativeSpy(SimpleNamespace(Name="finished-front", ReferencedDocument=source), "front")
-    curve = NativeSpy(scene.eye.GetCurve(), "curve")
-    silhouette = NativeSpy(SimpleNamespace(
-        GetCurve=lambda: curve, GetView=lambda: front, GetFace=lambda: face,
-    ), "silhouette")
-    adapter = SimpleNamespace(swApp=NativeSpy(
-        SimpleNamespace(IsSame=lambda first, second: int(first is second)), "app",
-    ))
-    expected_calls = [
-        "silhouette.GetCurve", "curve.IsCircle", "curve.CircleParams", "silhouette.GetView",
-        "front.Name", "front.Name", "front.ReferencedDocument", "source.GetPathName",
-        "source.FeatureByName", "silhouette.GetFace", "face.GetFeature", "app.IsSame",
-        "face.GetSurface", "surface.IsTorus", "surface.TorusParams",
-    ]
-    result = drawing._supplier_eye_circle(adapter, front, silhouette)
-    assert calls == expected_calls
-    calls.clear()
-    readback = {}
-    assert drawing._supplier_eye_circle(adapter, front, silhouette, readback=readback) == result
-    assert calls == expected_calls
-    assert readback["stage"] == "accepted_circle"
-    assert readback["first_rejection"] is None
-    assert readback["owner_same_as_expected"] == 1
-    assert readback["torus_params_m"] == list(scene.surface.TorusParams)
-
-
-def test_failure_census_serializes_nonfinite_values_without_changing_refusal(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    circle = list(scene.eye.GetCurve().CircleParams)
-    circle[0] = float("nan")
-    scene.eye.GetCurve().CircleParams = tuple(circle)
-    packet = _missing_eye_packet(scene)
-    assert packet["predicate_time"][0]["first_rejection"] == "circle_finite7"
-    assert packet["predicate_time"][0]["circle_params_m"][0] == "nan"
-    assert packet["predicate_time"][0]["circle_finite7"] is False
-    assert packet["predicate_time"][0]["view_present"] == "unobserved"
-    assert packet["kind4"][0]["circle_params_m"][0] == "nan"
-    assert packet["kind4"][0]["circle_finite7"] is False
-    json.dumps(packet, allow_nan=False)
-
-
-def test_census_keeps_later_predicate_getter_errors_independent_of_original_refusal(
-    supplier_eye_census_scene,
-):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye]
-    circle = list(scene.eye.GetCurve().CircleParams)
-    circle[0] = 1e-8
-    scene.eye.GetCurve().CircleParams = tuple(circle)
-
-    def fail(message):
-        raise OSError(message)
-
-    scene.eye.GetView = lambda: fail("view getter failed")
-    scene.eye.GetFace = lambda: fail("face getter failed")
-    scene.source.GetPathName = lambda: fail("path getter failed")
-    packet = _missing_eye_packet(scene)
-    original, later = packet["predicate_time"][0], packet["kind4"][0]
-    assert original["first_rejection"] == "circle_center_matches"
-    assert original["circle_center_matches"] is False, "SM's threshold stays strict <1e-8"
-    assert original["view_present"] == "unobserved"
-    assert later["errors"]["view_present"]["message"] == "view getter failed"
-    assert later["errors"]["face_present"]["message"] == "face getter failed"
-    assert packet["source"]["errors"]["native_path"]["message"] == "path getter failed"
-    assert later["circle_finite7"] is True
-    assert packet["source"]["wire_faces"][0]["torus_major_matches"] is True
-
-
-def test_negative_curve_parameter_control_is_not_sampled(supplier_eye_census_scene):
-    scene = supplier_eye_census_scene
-    scene.visible[:] = [scene.eye, None]
-    curve = scene.eye.GetCurve()
-    curve.Identity = lambda: 3005
-    curve.IsCircle = lambda: False
-    curve.IsLine = lambda: False
-    curve.GetEndParams = lambda: (False, 0.0, 1.0, False, False)
-    curve.Evaluate2 = lambda *_args: pytest.fail("Negative native parameter control cannot be sampled")
-    packet = _missing_eye_packet(scene)
-    assert packet["kind4"][0]["end_params"] == [False, 0.0, 1.0, False, False]
-    assert packet["kind4"][0]["sample_range_valid"] is False
-    assert packet["kind4"][0]["samples"] == []
-    assert [row["index"] for row in packet["predicate_time"]] == [0, 1]
-    assert [row["first_rejection"] for row in packet["predicate_time"]] == ["is_circle", "raw_present"]
+    scene = supplier_eye_scene
+    settled = _settled_supplier_scene(scene, monkeypatch)
+    drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
+    for phase in ("after-rebuild", "after-native-save"):
+        old_eye, old_face = settled.attachment.entities[0], scene.source_face
+        fresh_surface = SimpleNamespace(IsTorus=lambda: True, TorusParams=scene.surface.TorusParams)
+        fresh_face = SimpleNamespace(GetFeature=lambda: scene.owner, GetSurface=lambda: fresh_surface)
+        fresh_eye = scene.contour(attached_source_face=fresh_face)
+        settled.attachment.entities = [fresh_eye]
+        scene.source_face = fresh_face
+        old_eye.GetCurve = lambda: pytest.fail("read an obsolete attached silhouette")
+        old_face.GetFeature = lambda: pytest.fail("read an obsolete source face")
+        if phase == "after-native-save":
+            if fault == "missing":
+                settled.attachment.entities = []
+                settled.attachment.count = 0
+            elif fault == "null":
+                settled.attachment.entities = [None]
+            elif fault == "multiple":
+                settled.attachment.entities *= 2
+                settled.attachment.kinds *= 2
+                settled.attachment.count = 2
+            elif fault == "wrong-kind":
+                settled.attachment.kinds = [1]
+            elif fault == "wrong-count":
+                settled.attachment.count = 2
+            elif fault == "dangling":
+                settled.attachment.dangling = True
+            elif fault == "outer":
+                settled.attachment.entities = [scene.contour(anchor.eye_od_mm, fresh_face)]
+            elif fault == "unrelated-circle":
+                values = list(fresh_eye.GetCurve().CircleParams)
+                values[1] = -0.009
+                fresh_eye.GetCurve().CircleParams = tuple(values)
+            elif fault == "foreign-owner":
+                fresh_face.GetFeature = lambda: SimpleNamespace(Name="Wire")
+            elif fault == "null-correspondence":
+                scene.mapped_faces.clear()
+            elif fault == "wrong-torus":
+                values = list(fresh_surface.TorusParams)
+                values[7] += 0.001
+                fresh_surface.TorusParams = tuple(values)
+            elif fault == "wrong-path":
+                scene.source.GetPathName = lambda: "D:/foreign.SLDPRT"
+            elif fault == "wrong-configuration":
+                scene.front.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+            elif fault == "wrong-iso-configuration":
+                settled.iso.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+            elif fault == "missing-dimension":
+                settled.displays["FINISHED"][0].GetDimension2(0).FullName = "lost@other"
+            elif fault == "extra-dimension":
+                previous = scene.front.GetFirstDisplayDimension6()
+                extra = SimpleNamespace(
+                    GetDimension2=lambda _index: SimpleNamespace(FullName="extra@other"),
+                    GetNext5=lambda: previous,
+                )
+                scene.front.GetFirstDisplayDimension6 = lambda: extra
+            elif fault == "tolerance":
+                settled.displays["FINISHED"][0].GetDimension2(0).Tolerance.Type = 1
+        if phase == "after-native-save" and fault is not None:
+            with pytest.raises(RuntimeError):
+                drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
+        else:
+            before = len(scene.mappings)
+            drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
+            assert len(scene.mappings) == before + 1 and scene.mappings[-1] is fresh_eye.GetFace()
+    assert scene.picks == [] and scene.projections == [] and scene.visible_queries == []
