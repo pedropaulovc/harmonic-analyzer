@@ -10,6 +10,7 @@ shared finalizer must leave every physical sheet linked to the live source.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -2183,6 +2184,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
         capture_fit_denominator=4.0,
         capture_edge_defect=None,
         selected_types=[], pick_slots=[], reselections=[], binding_calls=[],
+        coordinate_picks=[], zoom_centre=None,
         edge_first=False, raw_picks=True, zoomed=False,
     )
     for name in physical_names:
@@ -2398,7 +2400,12 @@ def native_property_package(monkeypatch, native_bom_bindings):
         doc.selected_types.clear()
 
     doc.ClearSelection2 = clear_selection
-    doc.ViewZoomTo2 = lambda *_bounds: setattr(doc, "zoomed", True)
+
+    def zoom_to(x0, y0, _z0, x1, y1, _z1):
+        doc.zoomed = True
+        doc.zoom_centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+
+    doc.ViewZoomTo2 = zoom_to
     doc.ViewZoomtofit2 = lambda: setattr(doc, "zoomed", False)
     doc.EditRebuild3 = lambda: True
     doc.GraphicsRedraw2 = lambda: None
@@ -2550,6 +2557,20 @@ def native_property_package(monkeypatch, native_bom_bindings):
                         (-outer, 0.0, spec.pivot_pin.FLANGE_BOTTOM_STATION),
                         (-outer, 0.0, spec.pivot_pin.FLANGE_TOP_STATION),
                     )
+            elif reading.stem == spec.PIVOT_RETAINER and reading.text.startswith("C4 MOUTH"):
+                # A-A cuts the retainer's bore as one vertical wall from the
+                # washer floor to its top corner (jig-retention 1772 worker
+                # 15, GENERATED section edges 126/127: (±5.1, 0, 0) to
+                # (±5.1, 0, 4.1641) retainer mm). The top corner is the C4
+                # criterion; the row's mid-height point is only where the
+                # coordinate pick acquires the wall.
+                x, y, top = reading.local_mm
+                endpoints = ((x, y, 0.0), (x, y, top))
+                if doc.capture_edge_defect == "short-mouth-wall":
+                    # The retainer's own wall still runs through the
+                    # mid-height acquisition point but stops below the top
+                    # corner: the unchanged strict criterion must refuse it.
+                    endpoints = ((x, y, 0.0), (x, y, 0.75 * top))
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -2579,6 +2600,17 @@ def native_property_package(monkeypatch, native_bom_bindings):
                                   for p in endpoints)
             edge = native_edge(component, reading.stem, reading.index, endpoints, c2=c2)
             edges.append(edge)
+        if index == 2 and component.Name2 == spec.instance_name(spec.PIVOT_CLEVIS_PIN, 0):
+            # A-A also cuts the clevis shank resting on the retainer: its lower
+            # section line (clevis z = -R, from the head bearing face x = 0 to
+            # the 1-1/4 length) lies at the retainer top's world height and
+            # runs through both mouth corners (jig-retention 1772 worker 15:
+            # centre z 98.86955, R2.33045, bottom 96.5391 = retainer top).
+            radius = hardware.CLEVIS_DIA / 2.0
+            edges.append(native_edge(
+                component, spec.PIVOT_CLEVIS_PIN, 0,
+                ((0.0, 0.0, -radius), (hardware.CLEVIS_LENGTH, 0.0, -radius)),
+            ))
         return tuple(edges)
 
     def select_edge(_name, kind, x, y, _z, _append, _mark, _callout, _option):
@@ -2586,6 +2618,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
         view = doc.active_view
         candidates = []
         index = doc.sheets[doc.active].views.index(view)
+        components = []
         for reading in drawing.capture_readings():
             if reading.view_index != index:
                 continue
@@ -2593,10 +2626,11 @@ def native_property_package(monkeypatch, native_bom_bindings):
                 leaf.Component for leaf in view.components
                 if leaf.Component.Name2 == spec.instance_name(reading.stem, reading.index)
             )
+            if not any(known is component for known in components):
+                components.append(component)
+        for component in components:
+            leaf = next(leaf for leaf in view.components if leaf.Component is component)
             for edge in reading_edges(view, component):
-                target = tuple(value / 1000.0 for value in reading.local_mm)
-                edge.GetClosestPointOn(*target)
-                leaf = next(leaf for leaf in view.components if leaf.Component is component)
                 owner = edge.owner
                 if index in (2, 3):
                     # Section views own parts through the source assembly's
@@ -2666,9 +2700,25 @@ def native_property_package(monkeypatch, native_bom_bindings):
                         owner.Name2 = f"{source_root.Name2}/{component.Name2}"
                     elif defect == "plan-wrong-part-file":
                         owner.GetPathName = lambda: f"C:/native/{foreign_part}.SLDPRT"
-                projected = view.ModelToViewTransform.apply(edge.world)
-                candidates.append((math.dist((x, y), projected[:2]), edge))
-        distance, edge = min(candidates, key=lambda item: item[0])
+                # A coordinate pick hits the nearest projected physical
+                # segment; no reading's intended point enters the choice.
+                pa, pb = (view.ModelToViewTransform.apply(p)[:2] for p in edge.world_endpoints)
+                direction = (pb[0] - pa[0], pb[1] - pa[1])
+                fraction = (
+                    ((x - pa[0]) * direction[0] + (y - pa[1]) * direction[1])
+                    / (direction[0] ** 2 + direction[1] ** 2)
+                )
+                clamped = max(0.0, min(1.0, fraction))
+                hit = (pa[0] + clamped * direction[0], pa[1] + clamped * direction[1])
+                interior = min(math.dist(hit, pa), math.dist(hit, pb)) > 1e-8
+                candidates.append((math.dist((x, y), hit), interior, edge))
+        nearest = min(distance for distance, _interior, _edge in candidates)
+        tied = [item for item in candidates if item[0] - nearest <= 1e-8]
+        # A vertex-shared pick resolves as jig-retention 1772 worker 9 did at
+        # the retainer's top bore corner: the CLEVIS section line running
+        # through that corner won over the retainer wall ending there.
+        distance, _interior, edge = next((item for item in tied if item[1]), tied[0])
+        doc.coordinate_picks.append(((x, y), doc.zoom_centre, tuple(candidates)))
         if doc.capture_edge_defect != "no-exact-point":
             assert distance < 1e-8
         if edge.c2 and doc.capture_edge_defect == "coordinate-foreign-owner":
@@ -3481,6 +3531,161 @@ def test_capture_native_pick_refuses_actual_context_owner_geometry_and_reselecti
     with pytest.raises(RuntimeError):
         drawing._place_package(package.adapter)
     assert package.doc.attached_notes == []
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("raw_picks", (False, True))
+def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top_corner(
+    native_property_package, raw_picks,
+) -> None:
+    """The two C4 MOUTH rows pick the retainer's bore wall at mid-height,
+    where it is the only segment, and still identify, attach and land at the
+    unchanged top-corner criterion, which the clevis shank's coincident lower
+    section line also runs through (jig-retention 1772 workers 9 and 15).
+    """
+    package = native_property_package
+    package.doc.raw_picks = raw_picks
+    _scales, settled = drawing._place_package(package.adapter)
+    readings = drawing.capture_readings()
+    # Only the two C4 MOUTH rows separate acquisition from criterion.
+    assert [reading.pick_local_mm is not None for reading in readings] == [
+        reading.text.startswith("C4 MOUTH") for reading in readings
+    ]
+    mouth = [(index, reading) for index, reading in enumerate(readings)
+             if reading.text.startswith("C4 MOUTH")]
+    bore = spec.pivot_retainer.BORE_DIA / 2.0
+    top = spec.pivot_retainer.THICKNESS
+    root = package.source_root.Name2
+    retainer = f"{root}/{spec.instance_name(spec.PIVOT_RETAINER, 0)}"
+    clevis = f"{root}/{spec.instance_name(spec.PIVOT_CLEVIS_PIN, 0)}"
+    for (index, reading), side in zip(mouth, (-1.0, 1.0), strict=True):
+        assert reading.stem == spec.PIVOT_RETAINER
+        assert reading.local_mm == (side * bore, 0.0, top)
+        assert reading.pick_local_mm == (side * bore, 0.0, top / 2.0)
+        note = package.doc.attached_notes[index]
+        assert note.text == reading.text
+        view = note.view
+        criterion = drawing._capture_world_point(reading)
+        acquisition = drawing._capture_world_point(reading, local_mm=reading.pick_local_mm)
+        paper_criterion = view.ModelToViewTransform.apply(criterion)[:2]
+        paper_acquisition = view.ModelToViewTransform.apply(acquisition)[:2]
+        ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+        assert math.dist(paper_acquisition, paper_criterion) == pytest.approx(
+            ratio * top / 2000.0, abs=1e-12,
+        )
+        # The zoom aperture and the coordinate pick see the acquisition only.
+        pick_xy, zoom_centre, candidates = package.doc.coordinate_picks[index]
+        assert pick_xy == pytest.approx(paper_acquisition, abs=1e-12)
+        assert zoom_centre == pytest.approx(paper_acquisition, abs=1e-12)
+        # Mid-height, the retainer's own wall is the one segment at the pick.
+        touching = [edge for distance, _interior, edge in candidates if distance <= 1e-8]
+        assert [edge.owner.Name2 for edge in touching] == [retainer]
+        wall, = touching
+        assert note.entity is wall
+        floor, ceiling = wall.endpoints
+        assert floor == pytest.approx((side * bore / 1000.0, 0.0, 0.0), abs=1e-15)
+        assert ceiling == pytest.approx(tuple(v / 1000.0 for v in reading.local_mm), abs=1e-15)
+        # The clevis line is a real separate candidate: it runs through the
+        # top corner in model space, half a thickness above the pick.
+        lower, = [
+            edge for _distance, _interior, edge in candidates
+            if edge.owner.Name2 == clevis
+            and all(abs(point[2] - criterion[2]) < 1e-12 for point in edge.world_endpoints)
+        ]
+        a, b = lower.world_endpoints
+        axis = tuple(b[i] - a[i] for i in range(3))
+        along = sum((criterion[i] - a[i]) * axis[i] for i in range(3)) / sum(v * v for v in axis)
+        assert 0.0 < along < 1.0
+        assert math.dist(criterion, tuple(a[i] + along * axis[i] for i in range(3))) < 1e-12
+        clevis_distance, = [d for d, _interior, edge in candidates if edge is lower]
+        assert clevis_distance == pytest.approx(ratio * top / 2000.0, abs=1e-12)
+        # Identification, attachment and landing stay at the top corner.
+        owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
+        assert owner.Name2 == retainer
+        assert note.world == pytest.approx(criterion, abs=1e-12)
+        landing = note.annotation.GetLeaderPointsAtIndex(0)[-3:-1]
+        assert landing == pytest.approx(paper_criterion, abs=1e-12)
+        assert math.dist(landing, paper_acquisition) > 1e-4
+        closest = wall.GetClosestPointOn(*ceiling)
+        assert math.dist(closest[:3], ceiling) < 1e-12 and closest[3] == pytest.approx(1.0)
+        assert wall.GetClosestPointOn(*(v / 1000.0 for v in reading.pick_local_mm))[3] == pytest.approx(0.5)
+    settled[-1]()
+
+
+def test_capture_c4_mouth_top_corner_pick_selects_the_coincident_clevis_line(
+    native_property_package, monkeypatch,
+) -> None:
+    """Picking at the criterion itself lands on the retainer's top bore corner,
+    where the clevis shank's lower section line is coincident and runs through.
+    Native resolved that pick to the CLEVIS (jig-retention 1772 worker 9); the
+    unchanged strict owner proof refuses it before any C4 note or BOM, so the
+    mid-height acquisition point is necessary.
+    """
+    package = native_property_package
+    readings = tuple(
+        dataclasses.replace(reading, pick_local_mm=None)
+        if reading.text.startswith("C4 MOUTH") else reading
+        for reading in drawing.capture_readings()
+    )
+    monkeypatch.setattr(drawing, "capture_readings", lambda: readings)
+    with pytest.raises(RuntimeError, match=r"jig capture C4 MOUTH.*did not select .* own edge"):
+        drawing._place_package(package.adapter)
+    index = next(i for i, reading in enumerate(readings) if reading.text.startswith("C4 MOUTH"))
+    assert readings[index + 1].text.startswith("C4 MOUTH")
+    assert len(package.doc.coordinate_picks) == index + 1
+    pick_xy, zoom_centre, candidates = package.doc.coordinate_picks[index]
+    slots, types = package.doc.pick_slots[index]
+    picked = slots[types.index(1)]
+    view = slots[types.index(12)]
+    corner = view.ModelToViewTransform.apply(drawing._capture_world_point(readings[index]))[:2]
+    assert pick_xy == pytest.approx(corner, abs=1e-12)
+    assert zoom_centre == pytest.approx(corner, abs=1e-12)
+    root = package.source_root.Name2
+    retainer = f"{root}/{spec.instance_name(spec.PIVOT_RETAINER, 0)}"
+    clevis = f"{root}/{spec.instance_name(spec.PIVOT_CLEVIS_PIN, 0)}"
+    touching = sorted(
+        (edge.owner.Name2, interior)
+        for distance, interior, edge in candidates if distance <= 1e-8
+    )
+    assert touching == sorted(((retainer, False), (clevis, True)))
+    assert picked.owner.Name2 == clevis
+    # The coincidence is physical: both mouth corners lie on the clevis line.
+    a, b = picked.world_endpoints
+    axis = tuple(b[i] - a[i] for i in range(3))
+    for reading in readings[index:index + 2]:
+        point = drawing._capture_world_point(reading)
+        along = sum((point[i] - a[i]) * axis[i] for i in range(3)) / sum(v * v for v in axis)
+        assert 0.0 < along < 1.0
+        assert math.dist(point, tuple(a[i] + along * axis[i] for i in range(3))) < 1e-12
+    assert not any(note.text.startswith("C4 MOUTH") for note in package.doc.attached_notes)
+    assert not package.doc.bom_inserted
+
+
+def test_capture_c4_mouth_wall_through_the_pick_but_short_of_its_corner_is_refused(
+    native_property_package,
+) -> None:
+    """The retainer's own wall acquired at mid-height does not identify the
+    reading unless it reaches the top corner: the unchanged strict closest
+    point refuses it before any C4 note or BOM.
+    """
+    package = native_property_package
+    package.doc.capture_edge_defect = "short-mouth-wall"
+    with pytest.raises(RuntimeError, match=r"jig capture C4 MOUTH.*does not pass through its section point"):
+        drawing._place_package(package.adapter)
+    readings = drawing.capture_readings()
+    index = next(i for i, reading in enumerate(readings) if reading.text.startswith("C4 MOUTH"))
+    reading = readings[index]
+    slots, types = package.doc.pick_slots[index]
+    picked = slots[types.index(1)]
+    root = package.source_root.Name2
+    assert picked.owner.Name2 == f"{root}/{spec.instance_name(spec.PIVOT_RETAINER, 0)}"
+    local_pick = tuple(v / 1000.0 for v in reading.pick_local_mm)
+    assert picked.GetClosestPointOn(*local_pick)[:3] == pytest.approx(local_pick, abs=1e-15)
+    local = tuple(v / 1000.0 for v in reading.local_mm)
+    assert math.dist(picked.GetClosestPointOn(*local)[:3], local) == pytest.approx(
+        spec.pivot_retainer.THICKNESS / 4000.0, abs=1e-12,
+    )
+    assert not any(note.text.startswith("C4 MOUTH") for note in package.doc.attached_notes)
     assert not package.doc.bom_inserted
 
 

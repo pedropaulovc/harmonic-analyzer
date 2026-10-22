@@ -230,7 +230,7 @@ chamber excess is chamber height minus flange thickness, not a third gap.
 Neither a centre section nor a static nominal pose replaces the prescribed
 whole-face, endplay, clocking and motion inspections.
 Assembly-section edge listings can be empty while the native sheet pick finds
-the drawn edge. Use the existing narrow-zoom pick at the unchanged station:
+the drawn edge. Use the existing narrow-zoom pick on that native edge:
 require exactly one native EDGE, with any other selection only the same
 activated drawing view. A bare plan owner must match the unique visible leaf's
 full model path case-exactly, have no native parent, and reference the same
@@ -243,6 +243,10 @@ never decide occurrence identity from a basename or suffix. Reselect only the
 verified edge and prove native identity before creating its attached note.
 Section witnesses retain the existing `1e-8 mm²` part-local closest-point bound,
 so a nearby rim, floor or roof cannot substitute for the intended land.
+At the two C4 bore mouths, the retainer top corner and loaded clevis meet.
+Acquire the natively proved vertical bore edge at midheight, then retain the
+original top-corner closest-point, attachment and settled leader-landing
+checks. The acquisition point is not a changed inspection station or a retry.
 
 The C5B plan note identifies the cotter eye/prong regions and points to the
 manual motion/feeler inspection; it is not a static clearance dimension.

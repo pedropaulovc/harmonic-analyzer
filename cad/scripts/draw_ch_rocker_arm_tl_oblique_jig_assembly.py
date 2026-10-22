@@ -2530,6 +2530,7 @@ class CaptureReading:
     text: str
     text_xy: tuple[float, float]
     index: int = 0
+    pick_local_mm: tuple[float, float, float] | None = None
 
 
 def _capture_local_point(stem: str, world: Sequence[float]) -> tuple[float, float, float]:
@@ -2566,7 +2567,8 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         CaptureReading(2, spec.PIVOT_CAP, roof,
                        f"C2 CHAMBER MINUS FLANGE\n{band(r.CAP_CHAMBER_EXCESS)}\nEXCESS, NOT A THIRD GAP", (0.365, 0.128)),
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
-                         f"C4 MOUTH / FLAT LAND\nFULL SHANK PAST MOUTH\n{spec.TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN, BOTH SIDES", (x, 0.199))
+                         f"C4 MOUTH / FLAT LAND\nFULL SHANK PAST MOUTH\n{spec.TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN, BOTH SIDES", (x, 0.199),
+                         pick_local_mm=(side * mouth, 0.0, top / 2.0))
           for side, x in ((-1.0, 0.224), (1.0, 0.365))),
         *(CaptureReading(2, spec.CARRIER, carrier_face(side),
                          f"C4 COMMON SHANK / LAND\nSOLID CARRIER BACKING\n{spec.TOP_CARRIER_BACKED_BEARING_STRIP_MIN:.1f} MIN, BOTH SIDES"
@@ -2593,9 +2595,12 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     )
 
 
-def _capture_world_point(reading: CaptureReading) -> tuple[float, float, float]:
+def _capture_world_point(
+    reading: CaptureReading, *, local_mm: tuple[float, float, float] | None = None
+) -> tuple[float, float, float]:
     origin, rows = spec.PLACEMENTS[reading.stem][reading.index]
-    return tuple((origin[axis] + sum(reading.local_mm[k] * rows[k][axis] for k in range(3))) / 1000.0 for axis in range(3))
+    local = reading.local_mm if local_mm is None else local_mm
+    return tuple((origin[axis] + sum(local[k] * rows[k][axis] for k in range(3))) / 1000.0 for axis in range(3))
 
 
 def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], ...]:
@@ -2832,14 +2837,17 @@ def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[A
         label = f"jig capture {reading.text.splitlines()[0]}"
         world = _capture_world_point(reading)
         point = model_point_in_view(adapter, view, world, label=label)
+        pick_point = point if reading.pick_local_mm is None else model_point_in_view(
+            adapter, view, _capture_world_point(reading, local_mm=reading.pick_local_mm), label=label
+        )
         context = f"local_mm={reading.local_mm}; model_m={world}; sheet_m={point}"
         if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(view.GetName2())):
             raise RuntimeError(f"{label}: failed to activate reading view; {context}")
         adapter.currentModel.ClearSelection2(True)
         bound_view.UpdateViewDisplayGeometry()
-        with _zoomed_on(adapter, point, _HIT_ZOOM_HALF):
+        with _zoomed_on(adapter, pick_point, _HIT_ZOOM_HALF):
             picked = adapter.currentModel.Extension.SelectByID2(
-                "", "EDGE", *point, 0.0, False, 0, null_callout(), 0
+                "", "EDGE", *pick_point, 0.0, False, 0, null_callout(), 0
             )
         if not picked:
             raise RuntimeError(f"{label}: failed to select reading edge; {context}")
