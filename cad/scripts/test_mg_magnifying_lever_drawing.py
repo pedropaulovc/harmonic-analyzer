@@ -1111,7 +1111,7 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
 
 
 
-def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, nullable_empty_arrays=False, fault=None, null_entity_index=0):
+def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, nullable_empty_arrays=False, fault=None, null_entity_index=0, missing_callout=False):
     """Expose a drawing ICThread/INote graph, separate from native part metadata."""
     view = SimpleNamespace() if view is None else view
     state = SimpleNamespace(
@@ -1209,9 +1209,51 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
         GetAnnotation=lambda: observed("annotation_handle", None if fault == "post_annotation_unavailable" and state.writes else annotation),
         SetText=set_text,
     )
-    state.thread = SimpleNamespace(ThreadCallout=state.note, GetNext=lambda: None)
+    state.creation_calls, state.selection, state.active_view = [], None, None
+    thread_annotation = SimpleNamespace()
+
+    def select_thread(_append, _mark):
+        state.selection = SimpleNamespace(GetAnnotation=lambda: object()) if fault == "creation_wrong_selection" else state.thread
+        return fault != "creation_selection_refused"
+
+    thread_annotation.Select2 = select_thread
+    state.thread = SimpleNamespace(ThreadCallout=state.note, GetNext=lambda: None, GetAnnotation=lambda: thread_annotation)
+    state.original_thread = state.thread
     view.GetCThreadCount = lambda: 0 if fault == "no_seed" else 1
     view.GetFirstCThread = lambda: state.thread
+    if not hasattr(view, "GetName2"):
+        view.GetName2 = lambda: "Detail A"
+    if not hasattr(view, "UpdateViewDisplayGeometry"):
+        view.UpdateViewDisplayGeometry = lambda: state.creation_calls.append("update_geometry")
+
+    def insert_thread_callout():
+        state.creation_calls.append("insert")
+        assert state.active_view == "Detail A" and state.selection is state.thread
+        assert not state.writes  # Creation precedes the print-only mutation.
+        if fault != "no_note":
+            state.thread.ThreadCallout = state.note
+        if fault == "creation_thread_replaced":
+            state.thread = SimpleNamespace(ThreadCallout=state.note, GetNext=lambda: None, GetAnnotation=lambda: object())
+        return None  # IDrawingDoc.InsertThreadCallout is VT_VOID.
+
+    def activate_view(name):
+        state.active_view = name
+        return True
+
+    def clear_selection(_all):
+        state.selection = None
+
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: int(state.selection is not None),
+        GetSelectedObjectType3=lambda _index, _mark: 1 if fault == "creation_wrong_type" else 39,
+        GetSelectedObject6=lambda _index, _mark: state.selection,
+    )
+    draw = SimpleNamespace(
+        SelectionManager=manager, ClearSelection2=clear_selection,
+        ActivateView=activate_view, InsertThreadCallout=insert_thread_callout,
+    )
+    if missing_callout:
+        state.thread.ThreadCallout = None
     if fault == "no_note":
         state.thread.ThreadCallout = None
     elif fault == "unexpected_text":
@@ -1228,7 +1270,10 @@ def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=F
             return 2
         return int(first is second)
 
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=same))
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=same), currentModel=draw,
+        _get_attr_or_call=lambda native, member: getattr(native, member)(),
+    )
     return adapter, view, state
 
 
@@ -1252,6 +1297,7 @@ def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_
     assert "2A" not in state.note.GetText()
     assert state.model_thread.ThreadCallout == original_model_text
     assert state.model_thread.thread_class == "2A"
+    assert state.creation_calls == []  # Existing native INote must not be duplicated.
     if nullable_empty_arrays:
         assert state.note.GetAnnotation().GetAttachedEntities3() is None
         assert state.note.GetAnnotation().GetAttachedEntityTypes() is None
@@ -1264,6 +1310,46 @@ def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_
         assert attributes["auditJSON"] == payload
         assert attributes["operation_stage"] == audit["stage"]
         assert json.loads(attributes["failed_conditions"]) == audit.get("failed", [])
+
+
+@pytest.mark.parametrize("fault, message", (
+    (None, None),
+    ("no_note", "no native drawing callout note"),
+    ("creation_selection_refused", "cannot select its native cosmetic thread"),
+    ("creation_wrong_type", "cannot select its native cosmetic thread"),
+    ("creation_wrong_selection", "cannot select its native cosmetic thread"),
+    ("creation_thread_replaced", "lost identity after callout insertion"),
+    ("identity_unsupported", "annotation identity is unavailable"),
+    ("unexpected_text", "unexpected native lever thread callout"),
+))
+def test_missing_native_thread_callout_is_created_only_on_the_verified_thread(monkeypatch, fault, message):
+    """Replay R2's missing INote; this is a native-object protocol mock, not COM proof."""
+    adapter, view, state = _native_thread_note_adapter(missing_callout=True, attachment_types=(2,), fault=fault)
+    messages = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, native: native.GetName2())
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
+    if message is not None:
+        with pytest.raises(RuntimeError, match=message):
+            drawing._print_native_thread_callout(adapter, view)
+        assert state.writes == []
+    else:
+        annotation = drawing._print_native_thread_callout(adapter, view)
+        assert annotation is state.note.GetAnnotation()
+        assert state.thread is state.original_thread and state.thread.ThreadCallout is state.note
+        assert state.writes == [spec.PRINT_THREAD_CALLOUT.replace("\n", "\r\n")]
+        assert len(state.writes[0].splitlines()) == 4
+        assert state.entities == state.note.GetAnnotation().GetAttachedEntities3()
+        assert state.model_thread.ThreadCallout == spec.THREAD_CALLOUT
+        assert state.model_thread.thread_class == "2A"
+        creation = [json.loads(message.split("creation: ", 1)[1]) for message, _fields in messages if "creation: " in message]
+        assert creation[-1] == {
+            "callout_before": False, "callout_after": True, "requested": True,
+            "selection_count": 1, "selection_type": 39, "same_thread": True,
+        }
+    assert state.creation_calls.count("insert") == int(fault in (None, "no_note", "creation_thread_replaced", "unexpected_text"))
+    assert state.selection is None
 
 
 @pytest.mark.parametrize("fault, message", (

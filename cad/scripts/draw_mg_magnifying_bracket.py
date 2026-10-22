@@ -9,6 +9,7 @@ The native 12.50 neck and 3.175 foot thicknesses remain controlling dimensions.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import sys
@@ -314,8 +315,39 @@ def _layout_linear_annotations(
         if len(matches) != 1:
             raise RuntimeError(f"bracket layout requires exactly one {name}")
         by_name[name] = matches[0]
+
+    def capture(stage: str, measured: list[tuple[str, Any, CalloutInk]]) -> None:
+        records = {}
+        for name, annotation, ink in measured:
+            raw, errors = annotation_display(adapter, annotation)
+            records[name] = {
+                "text_box": ink.text,
+                "segments": [(line.x0, line.y0, line.x1, line.y1) for line in ink.leader],
+                "native_display": raw, "read_errors": errors,
+            }
+        evidence = json.dumps({"stage": stage, "dimensions": records}, sort_keys=True)
+        _telemetry.info(f"bracket linear layout geometry: {evidence}", operation_stage=stage, auditJSON=evidence)
+
     rebuild_drawing(adapter, label="measure bracket linear callouts")
+    initial = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
+    capture("before_text_modes", [(name, by_name[name], ink) for name, ink in initial.items()])
+    placed_names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide")
+    offset_names = ("NeckThickness", "MountingY0", "TapFromSide")
+    for name in placed_names:
+        display = _early_bound(_early_bound(by_name[name], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+        display.CenterText = False
+        if name in offset_names:
+            display.OffsetText = True
+    # OffsetText creates a freely movable leader while its dimension and
+    # extension lines stay fixed (IDisplayDimension SDK). Rebuild that mode
+    # change BEFORE measuring the lines that bound the new text lane.
+    rebuild_drawing(adapter, label="settle bracket linear text modes")
+    for name in placed_names:
+        display = _early_bound(_early_bound(by_name[name], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+        if display.CenterText is not False or (name in offset_names and display.OffsetText is not True):
+            raise RuntimeError(f"{name}: native text placement mode did not persist")
     before = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
+    capture("settled_text_modes", [(name, by_name[name], ink) for name, ink in before.items()])
 
     def verticals(name: str) -> list[LeaderSegment]:
         lines = [line for line in before[name].leader if abs(line.x0 - line.x1) < 1e-7 and abs(line.y0 - line.y1) > 0.001]
@@ -343,14 +375,6 @@ def _layout_linear_annotations(
     }
     for name, target in targets.items():
         annotation = by_name[name]
-        display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
-        display.CenterText = False
-        if name in ("NeckThickness", "MountingY0", "TapFromSide"):
-            # Jog the text outside its witnesses without dragging a native
-            # dimension/extension line through the shorter unqualified value.
-            display.OffsetText = True
-        if display.CenterText is not False or (name in ("NeckThickness", "MountingY0", "TapFromSide") and display.OffsetText is not True):
-            raise RuntimeError(f"{name}: native text placement mode did not persist")
         for _attempt in range(3):
             ink = _dimension_layout_ink(adapter, annotation, label=name)
             delta = (target[0] - ink.text[0], target[1] - ink.text[1])
@@ -361,6 +385,12 @@ def _layout_linear_annotations(
         if math.dist(ink.text[:2], target) > 0.00005:
             raise RuntimeError(f"{name}: native text placement did not settle")
     settled = [(item, _dimension_layout_ink(adapter, item, label=f"bracket dimension {index}")) for index, item in enumerate(annotations)]
+    # Emit every final box/line/arrow before the first guard can refuse. R2
+    # stopped at MountingY0 without preserving that dimension's final geometry.
+    capture("placed", [
+        (next((name for name, known in by_name.items() if known is annotation), ink.label), annotation, ink)
+        for annotation, ink in settled
+    ])
     region = sheet_region(adapter)
     for name in names:
         annotation = by_name[name]
