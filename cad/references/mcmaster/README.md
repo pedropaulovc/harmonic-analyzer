@@ -1547,12 +1547,22 @@ spans, `drawing.purchased_source_open` and `drawing.purchased_source_hash`;
 there is no per-chunk instrumentation. Measure their cost from native traces,
 not source-only tests.
 
-Native clamp validation nevertheless detected changed source bytes after
-finalization; read-only acquisition is not a persistence guarantee. Generic
-purchased sheets now checkpoint live document state and SHA around setup,
-presentation, saves and close to locate and refuse drift, not to claim a fix.
+Native clamp run `f6635a090` isolated the transition to the legacy
+`IModelDoc2.SaveAs3` drawing save: the same source part was read-only before
+the save and writable afterward, with changed bytes and unchanged native
+identities. Read-only acquisition alone is therefore not a persistence
+guarantee. Generic purchased-sheet checkpoints observe live document state
+and SHA around setup, presentation, saves and close, and refuse drift.
 Failure capture copies existing exports with unproven generation; it performs
 no additional COM save or export.
+
+The vendored drawing helper uses `IModelDocExtension.SaveAs3` with
+`(path, 0, 1, None, None, 0, 0)` and its `(ok, errors, warnings)` result,
+following the [existing template-maintenance positive control](../../scripts/maintain_drawing_templates.py).
+It requires success, zero errors and a fresh output file; warnings are logged.
+The read-only, identity and source-hash guards remain unchanged. The template
+control is not source-preservation proof for purchased drawings with loaded
+parts; the next native canary must verify their source state and bytes.
 
 The [native presentation-save receipt](../../docs/pipeline/evidence/vm2-datum-placement/probes/rack-source-save-callout/receipt.json)
 records `SetText` dirtying the source part and drawing `SaveAs3` persisting

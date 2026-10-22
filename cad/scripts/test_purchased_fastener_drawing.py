@@ -7821,14 +7821,29 @@ def test_source_checkpoint_identifies_first_mutating_artifact_boundary(
     }
     saved = []
 
-    def save(path, version, options):
-        assert (version, options) == (0, 0)
+    def save(path, version, options, export_data, advanced_options, errors, warnings):
+        assert (version, options, export_data, advanced_options, errors, warnings) == (
+            0,
+            1,
+            None,
+            None,
+            0,
+            0,
+        )
         saved.append(Path(path).suffix)
         Path(path).write_bytes(b"completed native output")
         if Path(path) == outputs[kind]:
             case.source.write_bytes(b"persisted despite read-only")
+        return True, 0, 0
 
-    case.drawing.SaveAs3 = save
+    extension = SimpleNamespace(SaveAs3=save)
+    case.drawing.Extension = extension
+
+    def bind_extension(value, interface):
+        assert value is extension and interface == "IModelDocExtension"
+        return extension
+
+    monkeypatch.setattr(native_drawing._sw_type_info, "early_bound", bind_extension)
     monkeypatch.setattr(native_drawing, "_draw", lambda adapter: adapter.currentModel)
     monkeypatch.setattr(
         common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()
@@ -7948,21 +7963,36 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
             case.source.write_bytes(b"native mutation before failure")
             raise original
 
-    def save(path, version, options):
-        assert (version, options) == (0, 0)
+    def save(path, version, options, export_data, advanced_options, errors, warnings):
+        assert (version, options, export_data, advanced_options, errors, warnings) == (
+            0,
+            1,
+            None,
+            None,
+            0,
+            0,
+        )
         Path(path).write_bytes(b"native output")
         if Path(path).suffix == ".SLDDRW":
             draw.path = path
             attempt("drawing_save")
         else:
             attempt("pdf_save")
+        return True, 0, 0
 
     def close(title):
         assert title == "observed.SLDDRW"
         draw.closed = True
         attempt("drawing_close")
 
-    draw.SaveAs3 = save
+    extension = SimpleNamespace(SaveAs3=save)
+    draw.Extension = extension
+
+    def bind_extension(value, interface):
+        assert value is extension and interface == "IModelDocExtension"
+        return extension
+
+    monkeypatch.setattr(native_drawing._sw_type_info, "early_bound", bind_extension)
     case.app.CloseDoc = close
 
     def member(target, name):
