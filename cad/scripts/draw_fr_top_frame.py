@@ -197,6 +197,15 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
+# SOLIDWORKS 2026 swconst typelib: document Image Quality, not application
+# defaults or the source part's shaded/draft tessellation.
+_IMAGE_QUALITY_WIREFRAME = 45
+_IMAGE_QUALITY_WIREFRAME_VALUE = 46
+_IMAGE_QUALITY_HIGH_CURVES = 527
+_NO_PREFERENCE_OPTION = 0
+_WIREFRAME_CUSTOM = 2
+_CURVE_RESOLUTION = 100
+
 SHEET_NAMES = (
     "PICTORIAL",
     "GEOMETRY",
@@ -2827,6 +2836,43 @@ def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> 
     return socket.edge
 
 
+def _set_precise_curve_quality(adapter: Any) -> None:
+    """Resolve native drawing curves finely enough to show their actual shape.
+
+    Faceted=False selects precise HLR, but its curves still use the drawing's
+    wireframe-resolution slider. The high-curve option refines angular
+    tolerance at settings 92..100 (SDK Document Properties > Image Quality).
+    Pin only this new drawing, before any model views compute their geometry.
+    """
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    before = (
+        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME_VALUE, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceToggle(_IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION),
+    )
+    for preference, value in (
+        (_IMAGE_QUALITY_WIREFRAME, _WIREFRAME_CUSTOM),
+        (_IMAGE_QUALITY_WIREFRAME_VALUE, _CURVE_RESOLUTION),
+    ):
+        if extension.SetUserPreferenceInteger(preference, _NO_PREFERENCE_OPTION, value) is not True:
+            raise RuntimeError("failed to set top-frame drawing curve resolution")
+    if extension.SetUserPreferenceToggle(
+        _IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION, True
+    ) is not True:
+        raise RuntimeError("failed to improve top-frame drawing curve quality")
+    after = (
+        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME_VALUE, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceToggle(_IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION),
+    )
+    if after[:2] != (_WIREFRAME_CUSTOM, _CURVE_RESOLUTION) or after[2] is not True:
+        raise RuntimeError(f"top-frame drawing curve quality did not persist: {after!r}")
+    _telemetry.info(
+        "top-frame drawing precise curve resolution",
+        curve_quality_before=before, curve_quality_after=after,
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2857,6 +2903,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _set_precise_curve_quality(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="top-frame package")
     stamp_drawing_summary(
         adapter,

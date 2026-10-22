@@ -5054,3 +5054,156 @@ def _named_calls(node, name):
 
 def _keyword(call, name):
     return next((item.value for item in call.keywords if item.arg == name), None)
+
+
+# --- Drawing-local curve tessellation (offline, not exported-ink proof) ------
+
+
+class _CurveQualityExtension:
+    """ModelDocExtension preference signatures, with real stored readback."""
+
+    def __init__(self, *, rejected=None, unpersisted=None):
+        self.values = {
+            drawing._IMAGE_QUALITY_WIREFRAME: 0,
+            drawing._IMAGE_QUALITY_WIREFRAME_VALUE: 17,
+            drawing._IMAGE_QUALITY_HIGH_CURVES: False,
+        }
+        self.rejected = rejected
+        self.unpersisted = unpersisted
+        self.sets = []
+        self.gets = []
+
+    def _set(self, kind, preference, option, value):
+        self.sets.append((kind, preference, option, value))
+        assert option == drawing._NO_PREFERENCE_OPTION == 0
+        assert preference in self.values
+        assert type(value) is (bool if kind == "toggle" else int)
+        if preference == self.rejected:
+            return False
+        if preference != self.unpersisted:
+            self.values[preference] = value
+        return True
+
+    def SetUserPreferenceInteger(self, preference, option, value):
+        return self._set("integer", preference, option, value)
+
+    def SetUserPreferenceToggle(self, preference, option, value):
+        return self._set("toggle", preference, option, value)
+
+    def GetUserPreferenceInteger(self, preference, option):
+        assert option == drawing._NO_PREFERENCE_OPTION
+        assert type(self.values[preference]) is int
+        self.gets.append(preference)
+        return self.values[preference]
+
+    def GetUserPreferenceToggle(self, preference, option):
+        assert option == drawing._NO_PREFERENCE_OPTION
+        assert type(self.values[preference]) is bool
+        self.gets.append(preference)
+        return self.values[preference]
+
+
+def _curve_quality_adapter(monkeypatch, extension):
+    from types import SimpleNamespace
+
+    def early_bound(entity, interface):
+        assert entity is extension
+        assert interface == "IModelDocExtension"
+        return entity
+
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    # Deliberately no swApp or source-model receiver: preferences belong only
+    # to the new drawing, not the application or its referenced part.
+    return SimpleNamespace(currentModel=SimpleNamespace(Extension=extension))
+
+
+def test_precise_curves_set_and_read_back_only_drawing_preferences(monkeypatch) -> None:
+    extension = _CurveQualityExtension()
+    drawing._set_precise_curve_quality(_curve_quality_adapter(monkeypatch, extension))
+    expected = {
+        drawing._IMAGE_QUALITY_WIREFRAME: drawing._WIREFRAME_CUSTOM,
+        drawing._IMAGE_QUALITY_WIREFRAME_VALUE: drawing._CURVE_RESOLUTION,
+        drawing._IMAGE_QUALITY_HIGH_CURVES: True,
+    }
+    assert drawing._WIREFRAME_CUSTOM == 2
+    assert drawing._CURVE_RESOLUTION == 100
+    assert len(expected) == 3
+    assert extension.values == expected
+    assert len(extension.sets) == 3
+    assert set(extension.sets) == {
+        ("integer", drawing._IMAGE_QUALITY_WIREFRAME, 0, 2),
+        ("integer", drawing._IMAGE_QUALITY_WIREFRAME_VALUE, 0, 100),
+        ("toggle", drawing._IMAGE_QUALITY_HIGH_CURVES, 0, True),
+    }
+    # Both the initial telemetry snapshot and the post-write check read every
+    # preference, without prescribing an irrelevant order among preferences.
+    assert {preference: extension.gets.count(preference) for preference in expected} == {
+        preference: 2 for preference in expected
+    }
+
+
+@pytest.mark.parametrize("preference", (
+    "_IMAGE_QUALITY_WIREFRAME",
+    "_IMAGE_QUALITY_WIREFRAME_VALUE",
+    "_IMAGE_QUALITY_HIGH_CURVES",
+))
+@pytest.mark.parametrize("failure", ("rejected", "unpersisted"))
+def test_precise_curves_refuse_failed_or_unpersisted_preferences(
+    monkeypatch, preference, failure
+) -> None:
+    extension = _CurveQualityExtension(**{failure: getattr(drawing, preference)})
+    with pytest.raises(RuntimeError):
+        drawing._set_precise_curve_quality(_curve_quality_adapter(monkeypatch, extension))
+    assert any(write[1] == getattr(drawing, preference) for write in extension.sets)
+
+
+def test_precise_curves_are_configured_immediately_after_new_drawing() -> None:
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    (new_drawing,) = _named_calls(build, "new_project_drawing")
+    (quality,) = _named_calls(build, "_set_precise_curve_quality")
+    setup_index = next(
+        index for index, statement in enumerate(build.body)
+        if new_drawing in ast.walk(statement)
+    )
+    assert isinstance(build.body[setup_index + 1], ast.Expr)
+    assert build.body[setup_index + 1].value is quality
+    assert [ast.unparse(arg) for arg in quality.args] == ["adapter"]
+
+
+def test_precise_curve_native_members_match_generated_extension_contract() -> None:
+    import ast
+    from test_native_bank_retention_contract import _bind, _dispatch, _members
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    helper = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_set_precise_curve_quality"
+    )
+    (binding,) = _named_calls(helper, "_early_bound")
+    assert ast.unparse(binding.args[0]) == "adapter.currentModel.Extension"
+    assert ast.literal_eval(binding.args[1]) == "IModelDocExtension"
+    methods, _getters, _setters = _members("IModelDocExtension")
+    expected_returns = {
+        "SetUserPreferenceInteger": 11,  # VT_BOOL, not an integer preference value
+        "SetUserPreferenceToggle": 11,
+        "GetUserPreferenceInteger": 3,  # VT_I4
+        "GetUserPreferenceToggle": 11,
+    }
+    calls = [
+        node for node in ast.walk(helper)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "extension"
+    ]
+    assert {call.func.attr for call in calls} == set(expected_returns)
+    for call in calls:
+        method = methods[call.func.attr]
+        _bind(method, call, native=True)
+        retval, _arguments = _dispatch(method)
+        assert retval[0] == expected_returns[call.func.attr]
