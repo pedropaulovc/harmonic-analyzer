@@ -58,6 +58,12 @@ cannot ask for what the authors were told to leave out.
   carrier. Source bands remain model-owned. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
+  Connected linear witnesses reuse an existing anchor only after both native
+  endpoints report `swFullyConstrained`; independent witnesses retain their
+  origin anchors. Included angles select both existing rays and use native
+  angular type, exact-value and driving-state readback, with text placement
+  transformed through the owning sketch plane. Final-frame coordinate and
+  fully-defined-sketch guards remain mandatory.
   Source ownership requires native `IDimension` identity both with the source
   parameter and with a dimension enumerated from the intended model feature;
   matching names or values alone cannot prove membership. `IFeature` wrapper

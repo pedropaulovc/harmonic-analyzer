@@ -6831,6 +6831,388 @@ def test_supplier_chord_rejects_same_length_in_wrong_final_frame(
         reference._assert_line_frame(adapter, "chord", (0.0, 0.0), (6.35, 0.0))
 
 
+def _supplier_reference_solver(monkeypatch):
+    """Small witness solver: shared point identity carries native constraints."""
+    import _supplier_screw_reference as reference
+    import _sketch
+
+    monkeypatch.setattr(reference, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        reference, "set_sketch_direct_db", lambda adapter, enabled: None
+    )
+    case = SimpleNamespace(
+        lines={}, points={}, emitted=[], overdefined=False, unreadable=None,
+        selected=[], native_angles=[],
+    )
+
+    def success(data=None):
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    class Point:
+        def __init__(self, x, y):
+            self.X, self.Y, self.Z = x / 1000.0, y / 1000.0, 0.0
+            self.axes = set()
+
+        @property
+        def Status(self):
+            solve()
+            if case.unreadable is not None:
+                if isinstance(case.unreadable, Exception):
+                    raise case.unreadable
+                return case.unreadable
+            if case.overdefined:
+                return 4  # swOverConstrained, never equivalent to fully constrained.
+            return 3 if len(self.axes) == 2 else 2
+
+    def point(x, y):
+        return case.points.setdefault((x, y), Point(x, y))
+
+    class Line:
+        ConstructionGeometry = False
+
+        def __init__(self, start, end):
+            self.start, self.end = start, end
+            self.orientation = None
+            self.sized = False
+
+        def GetStartPoint2(self):
+            return self.start
+
+        def GetEndPoint2(self):
+            return self.end
+
+        def GetSketch(self):
+            return case.sketch
+
+    def solve():
+        # A sized oriented line transfers its anchored end's position to the
+        # other end; a sized oblique ray still has one free rotational DOF.
+        for _ in range(len(case.lines) + 1):
+            for line in case.lines.values():
+                if line.sized and line.orientation:
+                    if len(line.start.axes) == 2 or len(line.end.axes) == 2:
+                        line.start.axes.update(("x", "y"))
+                        line.end.axes.update(("x", "y"))
+
+    def resolve(ref):
+        entity, endpoint = ref.rsplit(".", 1)
+        return getattr(case.lines[entity], endpoint)
+
+    async def add_line(x1, y1, x2, y2):
+        name = f"line{len(case.lines)}"
+        case.lines[name] = Line(point(x1, y1), point(x2, y2))
+        return success(name)
+
+    async def constraint(left, right, kind):
+        if kind in ("horizontal", "vertical"):
+            case.lines[left].orientation = kind
+        elif kind == "coincident":
+            if right == "origin":
+                resolve(left).axes.update(("x", "y"))
+            else:
+                entity, endpoint = right.rsplit(".", 1)
+                setattr(case.lines[entity], endpoint, resolve(left))
+        elif kind in ("horizontal_points", "vertical_points"):
+            resolve(left).axes.add("y" if kind == "horizontal_points" else "x")
+        else:
+            raise AssertionError(f"unexpected witness relation {kind}")
+        solve()
+        return success()
+
+    async def dimension(left, right, kind, value):
+        case.emitted.append((left, right, kind, value))
+        if right == "origin":
+            target = resolve(left)
+            if len(target.axes) == 2:
+                case.overdefined = True
+            target.axes.add("x" if kind == "horizontal_distance" else "y")
+        else:
+            entity = left.rsplit(".", 1)[0]
+            case.lines[entity].sized = True
+        solve()
+        return success(f"D{len(case.emitted)}")
+
+    async def definition():
+        solve()
+        state = (
+            "over_defined" if case.overdefined else
+            "fully_defined" if all(
+                len(p.axes) == 2
+                for line in case.lines.values() for p in (line.start, line.end)
+            ) else "under_defined"
+        )
+        return success({"definition_state": state})
+
+    async def over_relations():
+        return success(["redundant origin anchor"])
+
+    case.adapter = SimpleNamespace(
+        _sketch_entities=case.lines, add_line=add_line,
+        add_sketch_constraint=constraint, add_sketch_dimension=dimension,
+        check_sketch_fully_defined=definition,
+        get_over_defining_relations=over_relations,
+    )
+    case.reference = reference
+    case.dimensions = _sketch.SketchDims()
+    case.point = point
+    case.solve = solve
+    case.ensure = lambda: asyncio.run(
+        reference.ensure_fully_defined(case.adapter, "SupplierReference")
+    )
+    case.linear = lambda name, value, orientation, start: asyncio.run(
+        reference._linear(
+            case.adapter, case.dimensions, name, value, orientation, start
+        )
+    )
+    return case
+
+
+def test_supplier_reference_linear_independent_witness_needs_origin_anchor(monkeypatch):
+    case = _supplier_reference_solver(monkeypatch)
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    case.ensure()
+    assert case.emitted == [
+        ("line0.start", "line0.end", "horizontal_distance", 6.0),
+        ("line0.start", "origin", "horizontal_distance", 2.0),
+        ("line0.start", "origin", "vertical_distance", 3.0),
+    ]
+    assert case.dimensions._rows == [
+        ("Diameter", None), ("DiameterStartX", None), ("DiameterStartY", None),
+    ]
+    assert case.lines["line0"].ConstructionGeometry is True
+
+
+def test_supplier_reference_linear_shared_end_inherits_spigot_anchor(monkeypatch):
+    case = _supplier_reference_solver(monkeypatch)
+    case.linear("Spigot", 5.0, "vertical", (8.0, -2.0))
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    case.ensure()
+    spigot, witness = case.lines.values()
+    assert witness.end is spigot.end
+    assert (witness.start.Status, witness.end.Status) == (3, 3)
+    assert case.emitted == [
+        ("line0.start", "line0.end", "vertical_distance", 5.0),
+        ("line0.start", "origin", "horizontal_distance", 8.0),
+        ("line0.start", "origin", "vertical_distance", 2.0),
+        ("line1.start", "line1.end", "horizontal_distance", 6.0),
+    ]
+    assert case.dimensions._rows == [
+        ("Spigot", None), ("SpigotStartX", None), ("SpigotStartY", None),
+        ("Diameter", None),
+    ]
+    assert not case.overdefined
+
+
+@pytest.mark.parametrize("status", [None, "3", RuntimeError("native Status unavailable")])
+def test_supplier_reference_linear_unreadable_status_fails_without_anchors(
+    monkeypatch, status
+):
+    case = _supplier_reference_solver(monkeypatch)
+    # None is an unreadable native property too; use a separate property for it.
+    if status is None:
+        case.point(2.0, 3.0).__class__.Status = property(lambda self: None)
+    else:
+        case.unreadable = status
+    with pytest.raises(RuntimeError, match="status is unreadable|Status unavailable"):
+        case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert case.emitted == [
+        ("line0.start", "line0.end", "horizontal_distance", 6.0),
+    ]
+    assert case.dimensions._rows == [("Diameter", None)]
+
+
+def test_supplier_reference_linear_overdefined_status_cannot_skip_anchor_or_guard(
+    monkeypatch,
+):
+    case = _supplier_reference_solver(monkeypatch)
+    case.overdefined = True
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert [row[1] for row in case.emitted] == ["line0.end", "origin", "origin"]
+    assert case.dimensions._rows[-2:] == [
+        ("DiameterStartX", None), ("DiameterStartY", None),
+    ]
+    with pytest.raises(RuntimeError, match="OVER-defined"):
+        case.ensure()
+
+
+@pytest.mark.parametrize("fault", ["reflected", "translated"])
+def test_supplier_reference_linear_constrained_wrong_frame_is_rejected(
+    monkeypatch, fault
+):
+    case = _supplier_reference_solver(monkeypatch)
+    original = case.adapter.add_sketch_dimension
+
+    async def displaced(*args):
+        result = await original(*args)
+        if args[1] != "origin":
+            line = case.lines["line0"]
+            line.start.axes.update(("x", "y"))
+            line.end.axes.update(("x", "y"))
+            if fault == "reflected":
+                line.end.X = line.start.X - (line.end.X - line.start.X)
+            else:
+                line.start.X += 0.001
+                line.end.X += 0.001
+        return result
+
+    case.adapter.add_sketch_dimension = displaced
+    with pytest.raises(RuntimeError, match="final-frame coordinates"):
+        case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert case.dimensions._rows == [("Diameter", None)]
+    assert len(case.emitted) == 1  # No anchor should hide the bad solved frame.
+
+
+def _supplier_reference_angle_solver(monkeypatch, defect=None):
+    import math
+    import solidworks_mcp.adapters.com_variant as variants
+    import solidworks_mcp.adapters.solidworks.sketch as sdk_sketch
+
+    case = _supplier_reference_solver(monkeypatch)
+    case.angle_text = None
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            self.ArrayData = tuple(coordinates)
+
+        def MultiplyTransform(self, transform):
+            return MathPoint(transform(self.ArrayData))
+
+    # Rotated/translated owning plane: sketch +Y is model +Z, not model +Y.
+    # Native AddSpecificDimension takes MODEL metres even in an active sketch.
+    def sketch_to_model(xyz):
+        x, y, z = xyz
+        return (0.020 + x, 0.030 - z, 0.040 + y)
+
+    case.sketch = SimpleNamespace(
+        ModelToSketchTransform=SimpleNamespace(Inverse=lambda: sketch_to_model)
+    )
+    case.adapter.swApp = SimpleNamespace(
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=MathPoint)
+    )
+    monkeypatch.setattr(variants, "double_array", lambda values: values)
+
+    def select(adapter, entities, mark):
+        case.selected = [adapter._sketch_entities[name] for name in entities]
+
+    monkeypatch.setattr(sdk_sketch, "_select_sketch_entities", select)
+
+    class Angle:
+        def __init__(self, attachments, value):
+            self.attachments = attachments
+            self.SystemValue = value
+            self._driven = 1
+
+        @property
+        def DrivenState(self):
+            return self._driven
+
+        @DrivenState.setter
+        def DrivenState(self, state):
+            if defect == "not-driving":
+                return
+            self._driven = state
+            if state == 2 and len(self.attachments) == 2:
+                baseline, ray = self.attachments
+                if baseline.start is ray.start and baseline.orientation:
+                    ray.orientation = "included-angle"
+                    case.solve()
+
+    def add_specific(x, y, z, kind, options):
+        attachments = tuple(case.selected)
+        assert len(attachments) == 2
+        assert all(hasattr(line, "GetEndPoint2") for line in attachments)
+        baseline, ray = attachments
+        a = (
+            baseline.end.X - baseline.start.X,
+            baseline.end.Y - baseline.start.Y,
+        )
+        b = (ray.end.X - ray.start.X, ray.end.Y - ray.start.Y)
+        value = math.acos(
+            (a[0] * b[0] + a[1] * b[1]) / (math.hypot(*a) * math.hypot(*b))
+        )
+        # Invert the actual non-Front placement. A sketch-space text point
+        # cannot pass either the plane test or the interior-wedge test.
+        local = (x - 0.020, z - 0.040, 0.030 - y)
+        dx, dy = local[0] - baseline.start.X, local[1] - baseline.start.Y
+        assert local[2] == pytest.approx(0.0, abs=1e-12)
+        assert math.atan2(dy, dx) == pytest.approx(value / 2.0)
+        assert math.hypot(dx, dy) == pytest.approx(0.0005)
+        assert (kind, options) == (3, 0)
+        case.angle_text = (x, y, z)
+        if defect == "supplement":
+            value = math.pi - value
+        native = Angle(
+            attachments,
+            value + math.radians(0.01) if defect == "wrong-value" else value,
+        )
+        case.native_angles.append(native)
+        case.emitted.append((baseline, ray, "native-angular", native))
+        return SimpleNamespace(
+            Type2=2 if defect == "wrong-type" else 3,
+            GetDimension2=lambda index: native,
+        ), 0
+
+    case.adapter.currentModel = SimpleNamespace(
+        ClearSelection2=lambda all_marks: case.selected.clear(),
+        Extension=SimpleNamespace(AddSpecificDimension=add_specific),
+    )
+    case.angle = lambda: asyncio.run(
+        case.reference._angle(
+            case.adapter, case.dimensions, "Included", 82.0, (2.0, 3.0)
+        )
+    )
+    return case
+
+
+def test_supplier_reference_angle_drives_both_rays_in_native_owning_plane(monkeypatch):
+    import math
+
+    case = _supplier_reference_angle_solver(monkeypatch)
+    case.angle()
+    case.ensure()
+    baseline, ray = case.lines.values()
+    assert baseline.start is ray.start
+    assert baseline.sized and ray.sized
+    assert baseline.ConstructionGeometry and ray.ConstructionGeometry
+    assert len(case.lines) == 2
+    assert case.native_angles[0].attachments == (baseline, ray)
+    assert case.native_angles[0].DrivenState == 2
+    assert case.native_angles[0].SystemValue == pytest.approx(math.radians(82.0))
+    assert case.angle_text is not None
+    assert case.selected == []
+    assert [row[2] for row in case.emitted] == [
+        "horizontal_distance", "horizontal_distance", "vertical_distance",
+        "distance", "native-angular",
+    ]
+    assert case.dimensions._rows == [
+        ("IncludedBaselineLength", None),
+        ("IncludedStartX", None), ("IncludedStartY", None),
+        ("IncludedRayLength", None), ("Included", None),
+    ]
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        ("wrong-type", "not a native angular dimension"),
+        ("wrong-value", "not the specified 82 degrees"),
+        ("supplement", "not the specified 82 degrees"),
+        ("not-driving", "not an exact driving control"),
+    ],
+)
+def test_supplier_reference_angle_rejects_invalid_native_control(
+    monkeypatch, defect, message
+):
+    case = _supplier_reference_angle_solver(monkeypatch, defect)
+    with pytest.raises(RuntimeError, match=message):
+        case.angle()
+    assert ("Included", None) not in case.dimensions._rows
+    assert case.native_angles[0].DrivenState != 2
+    assert case.selected == []
+    with pytest.raises(RuntimeError, match="not fully defined"):
+        case.ensure()
+
+
 def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(
     monkeypatch,
 ):
