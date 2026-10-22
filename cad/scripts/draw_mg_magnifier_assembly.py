@@ -212,11 +212,6 @@ _PAD = 0.004
 CLAMP_STATION_RISE = 0.012
 FIXTURE_DROP_RUN = 0.018
 FIXTURE_DROP_BELOW = 0.006
-LEVER_CALLOUT_LOCATION = {
-    stack.CLAMP_STATION_DIMENSION: "above",
-    stack.FIXTURE_DROP_DIMENSION: "below",
-    stack.THREAD_PROJECTION_DIMENSION: "below",
-}
 LEVER_VIEW_LABEL = "lever settings (back)"
 
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
@@ -575,7 +570,7 @@ class StackDetail:
     # The parts the detail sets, named under its title (a blind reviewer of
     # run 20261012T192552713Z could not tell what the gauge presses).
     parts: str = ""
-    orientation: str = "*Right"
+    orientation: str = stack.DRAWING_LEFT_VIEW
 
     @property
     def mm(self) -> float:
@@ -619,7 +614,7 @@ class LeverTipDetail:
     """The actual tip/far-face interface, viewed from the nose side of the flange."""
 
     title: str = notes.THREAD_PROJECTION_DETAIL_TITLE
-    orientation: str = "*Back"
+    orientation: str = "*Front"
     scale: tuple[int, int] = (4, 1)
     centre: tuple[float, float] = (0.100, 0.053)
     crop_radius: float = 0.020  # 5 mm of model radius at 4:1
@@ -640,9 +635,9 @@ class LeverTipDetail:
 
 
 LEVER_TIP = LeverTipDetail()
-# The opposite (*Front) direction sees the flange, whose footprint completely
-# covers this crop. Only this detail changes direction; the assembled views
-# stay put. Their back caption is fitted against the actual padded outline.
+# remap_front_to_machine_front captures old Back as current Front: viewer at
+# machine -Z, sheet X reversed and Y retained. Current Back / saved MG BACK
+# sees the occluding flange at +Z. No component pose or artificial camera moves.
 LEVER_TIP_FIELD = (0.025, 0.014, 0.180, 0.075)
 
 
@@ -909,6 +904,7 @@ def _stack_dimensions(
             ):
                 raise RuntimeError(f"{name}: settled band changed")
         _assert_callouts(displays, callouts)
+        source_step("stack settings settled readback")
 
     return settled
 
@@ -984,7 +980,7 @@ def _thread_projection_text_box(
             raise RuntimeError(f"{label}: native text fragment {index} has no extent")
         boxes.append((box.xmin, box.ymin, box.xmax, box.ymax))
         texts.append(text)
-    qualifier = " ".join(notes.LEVER_CALLOUTS[label].split())
+    qualifier = " ".join(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][label][1].split())
     if qualifier not in " ".join(" ".join(texts).split()):
         raise RuntimeError(f"{label}: missing rendered qualifier ink: {texts!r}")
     if include_shoulder:
@@ -2376,7 +2372,7 @@ def _fit_projection_back_caption(
         raise RuntimeError(f"{LEVER_TIP.title}: non-finite native view outline {outline!r}")
     for note in neighbour_notes:
         note = _early_bound(note, "INote")
-        if str(note.GetText() or "") != ASSEMBLED_VIEW_CAPTIONS["*Front"]:
+        if str(note.GetText() or "") != ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW]:
             continue
         box = _projection_note_box(note)
         if not boxes_clear(box, outline):
@@ -2452,7 +2448,7 @@ def _projection_layout(
         raise RuntimeError(f"{label}: neighbouring caption crowds the actual native view outline")
     region = sheet_region(adapter)
     for note, box in zip(neighbour_notes, note_boxes, strict=True):
-        if str(_early_bound(note, "INote").GetText() or "") == ASSEMBLED_VIEW_CAPTIONS["*Front"]:
+        if str(_early_bound(note, "INote").GetText() or "") == ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW]:
             require_inside("assembled back caption", box, region)
     neighbours = [
         TITLE_BLOCK,
@@ -2479,10 +2475,12 @@ def _projection_layout(
 
 def _thread_projection_detail(
     adapter: Any, neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
+    source_step: Callable[[str], None],
 ) -> Callable[[], None]:
-    """Import the existing control once on the enlarged, isolated Back view."""
+    """Read the model-owned control on the unobstructed machine-front view."""
     detail = LEVER_TIP
     view = _placed_detail(adapter, detail)
+    source_step("lever tip view placement, configuration and isolation")
     calibration: dict[str, Any] = {}
     tip, face = _projection_model_ink(
         adapter, view, stage="uncropped physical boundaries", calibration=calibration,
@@ -2500,9 +2498,10 @@ def _thread_projection_detail(
     crop_context = _crop(adapter, view, detail)
     annotation = _unique_projection(adapter, view, stage="after crop")
     _projection_source(adapter, view, annotation, stage="after crop", original=original)
-    set_dimension_callouts(
-        adapter, [annotation], {name: notes.LEVER_CALLOUTS[name]}, location="below"
-    )
+    callouts = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    _assert_callouts([(name, display)], callouts)
+    source_step("lever tip import, crop and inherited callout readback")
     _fit_thread_projection(adapter, annotation)
     _activate(adapter, view, label=detail.title)
     caption = add_note(adapter, detail.label_text, *detail.label_xy)
@@ -2513,17 +2512,19 @@ def _thread_projection_detail(
         raise RuntimeError(f"{detail.title}: native caption text changed")
     rebuild_drawing(adapter, label=f"settle {detail.title} caption")
     _fit_projection_back_caption(adapter, view, neighbour_views, neighbour_notes)
+    source_step("lever tip qualifier and caption placement")
 
     def settled() -> None:
         _activate_sheet(adapter, SHEET_NAMES[0])
         current = _unique_projection(adapter, view, stage="settled drawing")
         _projection_source(adapter, view, current, stage="settled drawing", original=original)
         display = _early_bound(current.GetSpecificAnnotation(), "IDisplayDimension")
-        _assert_lever_callouts([(name, display)], _printable_lever_callouts())
+        _assert_callouts([(name, display)], callouts)
         _projection_layout(
             adapter, view, current, caption, neighbour_views, neighbour_notes, calibration,
             crop_context=crop_context,
         )
+        source_step("lever tip settled source, callout and whole-ink readback")
 
     settled()
     return settled
@@ -3362,7 +3363,9 @@ def _place_assembled_sheet(
             annotation = _early_bound(annotation, "IAnnotation")
             if int(annotation.GetType()) == 6:  # swNote
                 captions.append(_early_bound(annotation.GetSpecificAnnotation(), "INote"))
-    projection_settled = _thread_projection_detail(adapter, neighbours, tuple(captions))
+    projection_settled = _thread_projection_detail(
+        adapter, neighbours, tuple(captions), source_step
+    )
     return lever_settled, stack_settled, projection_settled
 
 
@@ -3762,12 +3765,18 @@ async def build(adapter: Any) -> dict[str, str]:
                 "magnifier source preserved: Default, collapsed and clean; "
                 f"SHA256 {source_sha256}"
             )
-        except Exception as proof_error:
+        except BaseException as proof_error:
             if primary_error is None:
                 raise
-            _telemetry.warn(
-                f"magnifier source identity proof after drawing failure: {proof_error}"
-            )
+            # A secondary reader, formatter or logger must not replace the
+            # original native failure/cancellation and its traceback.
+            try:
+                _telemetry.warn(
+                    "magnifier source identity proof after drawing failure: "
+                    f"{_projection_error_text(proof_error)}"
+                )
+            except BaseException:
+                pass
     return artifacts
 
 
