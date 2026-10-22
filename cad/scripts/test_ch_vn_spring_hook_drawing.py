@@ -792,5 +792,3 @@ def test_channel_creation_preserves_native_errors_without_rescanning(monkeypatch
     assert caught.value is error
     assert calls == ["curve"]
     assert queries == [4]
-
-
