@@ -6258,6 +6258,156 @@ def test_clamp_shelving_rejects_native_line_station_drift(key):
         clamp._assert_stations("head", original, moved)
 
 
+@pytest.fixture
+def clamp_native_supplier_inventory(monkeypatch):
+    import draw_sh_vn_clamp_screw as clamp
+
+    class Display:
+        def __init__(self, full_name):
+            # Only the proven typed IDimension.FullName is available: no
+            # assumed short Name or annotation-name convenience interface.
+            self.native = SimpleNamespace(FullName=full_name)
+            self.next = None
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return self.native
+
+        def GetAnnotation(self):
+            raise AssertionError("annotation-name convenience path is unavailable")
+
+        def GetNext5(self):
+            return self.next
+
+    class View:
+        def __init__(self, orientation, displays):
+            self.orientation = orientation
+            self.displays = displays
+
+        def GetOrientationName(self):
+            return self.orientation
+
+        def GetFirstDisplayDimension6(self):
+            for index, display in enumerate(self.displays):
+                display.next = (
+                    self.displays[index + 1] if index + 1 < len(self.displays) else None
+                )
+            return self.displays[0] if self.displays else None
+
+    # Spec-derived identities, not a retained 4e200 native inventory.
+    identities = (
+        ("SupplierHeadDiameter", "SupplierReference", "*Front"),
+        ("SupplierLength", "SupplierTopReference", "*Top"),
+        ("SupplierHeadHeight", "SupplierTopReference", "*Top"),
+        ("SupplierThreadDiameter", "SupplierTopReference", "*Top"),
+    )
+    displays = {
+        name: Display(f"{name}@{feature}@sh-vn-clamp-screw.Part")
+        for name, feature, _owner in identities
+    }
+    views = {
+        owner: View(
+            owner,
+            [
+                displays[name]
+                for name, _feature, expected_owner in identities
+                if expected_owner == owner
+            ],
+        )
+        for owner in ("*Front", "*Top", "*Right", "*Isometric")
+    }
+    adapter = object()
+    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(clamp, "iter_views", lambda _adapter: iter(views.values()))
+    return SimpleNamespace(
+        clamp=clamp,
+        adapter=adapter,
+        displays=displays,
+        views=views,
+        identities=identities,
+        make_display=Display,
+    )
+
+
+def test_clamp_supplier_displays_accepts_exact_typed_native_inventory(
+    clamp_native_supplier_inventory,
+):
+    case = clamp_native_supplier_inventory
+    actual = case.clamp._supplier_displays(case.adapter)
+    assert set(actual) == set(case.displays)
+    assert all(actual[name] is display for name, display in case.displays.items())
+    assert len(actual) == 4
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "missing",
+        "duplicate",
+        "unexpected-name",
+        "wrong-feature",
+        "wrong-view-front",
+        "wrong-view-right",
+        "wrong-view-isometric",
+        "missing-native-dimension",
+    ),
+)
+def test_clamp_supplier_displays_rejects_changed_native_inventory(
+    clamp_native_supplier_inventory, defect
+):
+    case = clamp_native_supplier_inventory
+    name = "SupplierHeadHeight"
+    display = case.displays[name]
+    top = case.views["*Top"].displays
+    missing = []
+    if defect == "missing":
+        top.remove(display)
+        missing = [name]
+    elif defect == "duplicate":
+        top.append(case.make_display(display.native.FullName))
+    elif defect == "unexpected-name":
+        top.append(
+            case.make_display(
+                "UnexpectedDimension@SupplierTopReference@sh-vn-clamp-screw.Part"
+            )
+        )
+    elif defect == "wrong-feature":
+        display.native.FullName = f"{name}@SupplierReference@sh-vn-clamp-screw.Part"
+        missing = [name]
+    elif defect.startswith("wrong-view-"):
+        owner = {
+            "wrong-view-front": "*Front",
+            "wrong-view-right": "*Right",
+            "wrong-view-isometric": "*Isometric",
+        }[defect]
+        top.remove(display)
+        case.views[owner].displays.append(display)
+        missing = [name]
+    elif defect == "missing-native-dimension":
+        display.native = None
+        missing = [name]
+
+    expected_inventory = sorted(
+        (f"{name}@{feature}", owner) for name, feature, owner in case.identities
+    )
+    actual_inventory = [
+        (
+            display.native.FullName if display.native is not None else "",
+            owner,
+        )
+        for owner, view in case.views.items()
+        for display in view.displays
+    ]
+    with pytest.raises(
+        RuntimeError, match="clamp supplier dimension inventory changed"
+    ) as exc:
+        case.clamp._supplier_displays(case.adapter)
+    diagnostic = str(exc.value)
+    assert f"expected={expected_inventory}" in diagnostic
+    assert f"actual={actual_inventory}" in diagnostic
+    assert f"missing={missing}" in diagnostic
+
+
 def _clamp_recovered_head_height():
     # 4dcfee recovered SupplierHeadHeight display data, metres, 2026-10-21.
     # Inline only the native primitives needed here; no external log dependency.

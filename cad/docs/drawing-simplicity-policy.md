@@ -76,8 +76,10 @@ cannot ask for what the authors were told to leave out.
   without subtracting fixed sheet-space padding. Short clamp-reference text
   is shelved only when its measured extent cannot clear the native arrow
   span; the measured arrow/witness stations stay fixed and final native
-  paths, text and cell containment remain checked. This layout contract is
-  not a substitute for the rendered comparison with the supplier drawing.
+  paths, text and cell containment remain checked. Missing, duplicate, foreign
+  or wrong-view native references refuse with expected and observed inventories.
+  This layout contract is not a substitute for the rendered comparison with
+  the supplier drawing.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

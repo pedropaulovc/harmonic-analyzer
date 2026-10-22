@@ -8,7 +8,7 @@ from functools import partial
 from math import dist, isfinite
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_views
+from solidworks_mcp.adapters.solidworks.drawing import iter_views
 
 import _telemetry
 from _com import _early_bound
@@ -20,6 +20,7 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _layout_audit import (
     FindingSeverity,
     annotation_geometry,
@@ -45,19 +46,47 @@ _ORIENTATIONS = {
 
 
 def _supplier_displays(adapter: Any) -> dict[str, Any]:
+    """Reacquire exact native identities without the annotation-name convenience path."""
+    expected = {}
+    for name in _ORIENTATIONS:
+        plane = supplier.SUPPLIER_REFERENCE_PLANES.get(name, "Front")
+        expected[name] = (FEATURE_BY_PLANE[plane], f"*{plane}")
     found = {}
-    for view in iter_views(adapter):
-        display = _early_bound(view, "IView").GetFirstDisplayDimension6()
+    actual = []
+    invalid = False
+    for raw_view in iter_views(adapter):
+        view = _early_bound(raw_view, "IView")
+        owner = str(view.GetOrientationName())
+        display = view.GetFirstDisplayDimension6()
         while display is not None:
             display = _early_bound(display, "IDisplayDimension")
-            name = dimension_name(adapter, display.GetAnnotation())
-            if name in _ORIENTATIONS:
-                if name in found:
-                    raise RuntimeError(f"{name}: duplicate clamp supplier dimension")
+            native = display.GetDimension2(0)
+            full_name = (
+                str(_early_bound(native, "IDimension").FullName)
+                if native is not None
+                else ""
+            )
+            actual.append((full_name, owner))
+            identity = full_name.split("@")
+            name = identity[0]
+            if (
+                len(identity) < 2
+                or name in found
+                or expected.get(name) != (identity[1], owner)
+            ):
+                invalid = True
+            else:
                 found[name] = display
             display = display.GetNext5()
-    if set(found) != set(_ORIENTATIONS):
-        raise RuntimeError("clamp supplier dimension inventory changed")
+    if invalid or set(found) != set(expected):
+        expected_inventory = sorted(
+            (f"{name}@{feature}", owner) for name, (feature, owner) in expected.items()
+        )
+        raise RuntimeError(
+            "clamp supplier dimension inventory changed: "
+            f"expected={expected_inventory}; actual={actual}; "
+            f"missing={sorted(set(expected) - set(found))}"
+        )
     return found
 
 
