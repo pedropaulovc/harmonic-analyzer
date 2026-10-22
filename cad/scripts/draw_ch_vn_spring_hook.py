@@ -305,7 +305,7 @@ def _supplier_stock_sheet(adapter):
 
 
 def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Resolve source coverage from freshly enumerated post-rebuild dimensions."""
+    """Read geometry and attachments without refreshing or repairing the views."""
     if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
         raise RuntimeError("spring anchor must retain all six supplier dimensions")
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -318,7 +318,6 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
             if name not in views or str(views[name].ReferencedConfiguration) != configuration:
                 raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
         view = views[names[0]]
-        view.UpdateViewDisplayGeometry()
         displays = {}
         display = view.GetFirstDisplayDimension6()
         while display is not None:
@@ -332,6 +331,27 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
         expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
         if len(displays) != expected_count:
             raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
+        eye_contours = None
+
+        def eye_circle(raw):
+            if raw is None:
+                return None
+            raw_curve = _early_bound(raw, "ISilhouetteEdge").GetCurve()
+            if raw_curve is None:
+                return None
+            curve = _early_bound(raw_curve, "ICurve")
+            if not curve.IsCircle():
+                return None
+            circle = tuple(float(value) for value in curve.CircleParams)
+            if (
+                len(circle) == 7
+                and all(math.isfinite(value) for value in circle)
+                and all(abs(value) <= 1e-8 for value in circle[:3])
+                and abs(abs(circle[5]) - 1.0) <= 1e-8
+            ):
+                return circle
+            return None
+
         for key, contract, expected_entity in refs:
             if key not in displays:
                 raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
@@ -353,25 +373,51 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                 annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
                 entities = tuple(annotation.GetAttachedEntities3() or ())
                 kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-                if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                    adapter, entities[0], expected_entity, "SILHOUETTE"
+                if (
+                    int(annotation.GetAttachedEntityCount3()) != 1
+                    or len(entities) != 1
+                    or kinds != (46,)
+                    or entities[0] is None
+                    or annotation.IsDangling()
                 ):
-                    def contour_readback(entity):
-                        silhouette = _early_bound(entity, "ISilhouetteEdge")
-                        raw_curve = silhouette.GetCurve()
-                        if raw_curve is None:
-                            return None
-                        curve = _early_bound(raw_curve, "ICurve")
-                        return tuple(float(value) for value in curve.CircleParams) if curve.IsCircle() else "not-circle"
-
-                    visible = visible_view_entities(view, 4, label="settled spring eye identity readback")
                     raise RuntimeError(
-                        f"{contract['label']}: supplier eye reference moved to another contour; "
-                        f"entities={len(entities)}, kinds={kinds}, "
-                        f"expected_circle={contour_readback(expected_entity)!r}, "
-                        f"attached_circles={[contour_readback(entity) for entity in entities]!r}, "
-                        f"visible_circles={[contour_readback(entity) for entity in visible]!r}, "
-                        f"configuration={view.ReferencedConfiguration!r}"
+                        f"{contract['label']}: supplier eye must retain one live physical "
+                        f"silhouette; entities={len(entities)}, kinds={kinds}"
+                    )
+                attached = _early_bound(entities[0], "ISilhouetteEdge")
+                circle = eye_circle(attached)
+                diameter = SUPPLIER_EYE_MM[contract["label"]]
+                if circle is None or abs(circle[6] * 2000.0 - diameter) >= 1e-5:
+                    raise RuntimeError(
+                        f"{contract['label']}: supplier eye reference changed physical circle; "
+                        f"circle={circle!r}, expected_diameter_mm={diameter}"
+                    )
+                attached_view = attached.GetView()
+                if attached_view is None or view_name(adapter, attached_view) != names[0]:
+                    raise RuntimeError(f"{contract['label']}: supplier eye changed its native drawing view")
+                if eye_contours is None:
+                    # Silhouette handles captured before the settling rebuild are stale.
+                    # Reacquire from the configuration-bound view; native enumeration
+                    # can report the same eye circle twice, but the dimension must
+                    # still have exactly one attachment to a current physical owner.
+                    eye_contours = []
+                    for raw in visible_view_entities(view, 4, label="settled spring physical eye contours"):
+                        visible_circle = eye_circle(raw)
+                        if visible_circle is not None:
+                            eye_contours.append((raw, visible_circle))
+                matching = [
+                    raw for raw, visible_circle in eye_contours
+                    if abs(visible_circle[6] * 2000.0 - diameter) < 1e-5
+                ]
+                if not any(
+                    _is_same_attachment(adapter, attached, raw, "SILHOUETTE")
+                    for raw in matching
+                ):
+                    raise RuntimeError(
+                        f"{contract['label']}: supplier eye lost its current physical contour owner; "
+                        f"circle={circle!r}, matching_visible_contours={len(matching)}, "
+                        f"attached_face_present={attached.GetFace() is not None}, "
+                        f"visible_faces_present={[_early_bound(raw, 'ISilhouetteEdge').GetFace() is not None for raw in matching]}"
                     )
 
 
@@ -490,6 +536,17 @@ async def build(adapter: Any) -> dict[str, str]:
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
         SHEET_NAMES[1]: ((view_name(adapter, stock), view_name(adapter, stock_iso)), SUPPLIER_STOCK_CONFIGURATION),
     }
+    refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
+
+    def verify_after_native_save(event):
+        if event != "after_drawing_save":
+            return
+        # SaveAs3 can regenerate a silhouette. Inspect the still-open document
+        # without rebuilding/refreshing it; this is not cold-reopen disk proof.
+        _verify_supplier_references(adapter, refs_by_sheet, view_contracts)
+        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+            raise RuntimeError("cannot restore finished spring anchor sheet after saved-eye inspection")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -500,12 +557,13 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(adapter, annotations),
-            lambda: _verify_supplier_references(
-                adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
-            ),
+            # The existing layout check refreshes every view before the final
+            # attachment readback; the shared verifier stays geometry-read-only.
             lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
+            lambda: _verify_supplier_references(adapter, refs_by_sheet, view_contracts),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
+        checkpoint=verify_after_native_save,
     )
 
 

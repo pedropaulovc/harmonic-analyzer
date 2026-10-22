@@ -1,13 +1,17 @@
 """Offline manufacturing boundaries for the trimmed channel-spring anchor."""
 
+import ast
+import inspect
 import math
 from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _drawing_attachment
 import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
+import draw_sm_vn_boss_hook as boss_drawing
 import ch_vn_spring_hook_spec as spec
 import spring_mount_geom as mounts
 import sm_summing_lever_spec as lever
@@ -251,3 +255,181 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
     low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert f"the {low:.2f} low limit" in entry.reason
     assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
+
+
+def _settled_eye_scene(monkeypatch):
+    """Old silhouette handles are deliberately unusable after a view rebuild."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    state = SimpleNamespace(sheet="FINISHED")
+    model = SimpleNamespace(ActivateSheet=lambda name: setattr(state, "sheet", name) or True)
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
+
+    def contour(diameter, face):
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, diameter / 2000.0),
+        )
+        return SimpleNamespace(
+            GetCurve=lambda: curve, GetFace=lambda: face,
+            GetView=lambda: views["FINISHED"],
+        )
+
+    contours = {
+        name: contour(diameter, object()) for name, diameter in spec.SUPPLIER_EYE_MM.items()
+    }
+    # Exact positive readbacks from native diagnostic 2942dd065, worker log L42.
+    for name, circle in {
+        "EyeOD": (-2.102257677834285e-10, -7.358970724458125e-11, 0.0,
+                  0.0, 0.0, 1.0, 0.006350000187332174),
+        "EyeID": (-2.102257677834285e-10, -7.358970724458125e-11, 0.0,
+                  0.0, 0.0, -1.0, 0.003175000187332174),
+    }.items():
+        contours[name].GetCurve().CircleParams = circle
+    annotations = {}
+    views = {}
+    refs_by_sheet = {}
+    contracts = {}
+    for sheet, names, configuration in (
+        ("FINISHED", ("EyeOD", "EyeID", "SupplierThreadMajor"), "Default"),
+        ("SUPPLIER-STOCK", ("SupplierStockThread", "SupplierStockShank", "SupplierStockOverall"), spec.SUPPLIER_STOCK_CONFIGURATION),
+    ):
+        displays = []
+        refs = []
+        for name in names:
+            feature = (
+                "native-eye" if name in contours else
+                spec.SUPPLIER_THREAD_FEATURE if name == "SupplierThreadMajor" else
+                spec.SUPPLIER_STOCK_FEATURE
+            )
+            key = f"{name}@{feature}@anchor.SLDPRT"
+            native = SimpleNamespace(FullName=key, Tolerance=SimpleNamespace(Type=0), DrivenState=1)
+            annotation = SimpleNamespace(
+                entities=[contours[name]] if name in contours else [],
+                kinds=[46] if name in contours else [],
+            )
+            annotation.GetAttachedEntities3 = lambda annotation=annotation: tuple(annotation.entities)
+            annotation.GetAttachedEntityTypes = lambda annotation=annotation: tuple(annotation.kinds)
+            annotation.GetAttachedEntityCount3 = lambda annotation=annotation: len(annotation.entities)
+            annotation.IsDangling = lambda: False
+            annotations[name] = annotation
+            display = SimpleNamespace(
+                GetDimension2=lambda _index, native=native: native,
+                GetAnnotation=lambda annotation=annotation: annotation,
+            )
+            displays.append(display)
+            stale = SimpleNamespace(
+                GetCurve=lambda: pytest.fail("dereferenced a pre-rebuild silhouette"),
+                GetFace=lambda: None,
+            ) if name in contours else None
+            refs.append((key, {"label": name, "expected_mm": spec.SUPPLIER_EYE_MM.get(name, 1.0)}, stale))
+        if sheet == "FINISHED":
+            for name in drawing.FRONT_KEEP:
+                native = SimpleNamespace(FullName=f"{name}@control@anchor.SLDPRT")
+                displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
+        for index, display in enumerate(displays):
+            following = displays[index + 1] if index + 1 < len(displays) else None
+            display.GetNext5 = lambda following=following: following
+        view = SimpleNamespace(
+            Name=f"{sheet}-front", ReferencedConfiguration=configuration,
+            UpdateViewDisplayGeometry=lambda: pytest.fail("geometry-read-only verifier refreshed a view"),
+            GetFirstDisplayDimension6=lambda displays=displays: displays[0],
+        )
+        views[sheet] = view
+        refs_by_sheet[sheet] = refs
+        contracts[sheet] = ((view.Name,), configuration)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (views[state.sheet],))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    visible = list(contours.values())
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda _view, kind, **_kwargs: visible if kind == 4 else ())
+    return adapter, refs_by_sheet, contracts, contours, annotations, views, visible, contour
+
+
+@pytest.mark.parametrize("label", ("EyeOD", "EyeID"))
+@pytest.mark.parametrize(
+    "fault",
+    (None, "duplicate-visible", "outer", "same-face-wrong-circle", "foreign-face", "missing",
+     "extra", "wrong-type", "missing-visible", "wrong-center", "wrong-normal", "wrong-radius",
+     "wrong-configuration", "wrong-view", "dangling", "count-mismatch"),
+)
+def test_settled_eye_reacquires_exact_physical_contour_and_refuses_drift(monkeypatch, label, fault):
+    adapter, refs, contracts, contours, annotations, views, visible, contour = _settled_eye_scene(monkeypatch)
+    annotation = annotations[label]
+    original = contours[label]
+    other = "EyeOD" if label == "EyeID" else "EyeID"
+    if fault == "outer":
+        annotation.entities = [contours[other]]
+    elif fault == "same-face-wrong-circle":
+        annotation.entities = [contour(spec.SUPPLIER_EYE_MM[other], original.GetFace())]
+    elif fault == "foreign-face":
+        annotation.entities = [contour(spec.SUPPLIER_EYE_MM[label], object())]
+    elif fault == "missing":
+        annotation.entities = []
+    elif fault == "extra":
+        annotation.entities.append(original)
+    elif fault == "wrong-type":
+        annotation.kinds = [1]
+    elif fault == "missing-visible":
+        visible.remove(original)
+    elif fault == "duplicate-visible":
+        # Actual native CH enumeration contains two identical ID-circle readbacks.
+        visible.append(contour(spec.SUPPLIER_EYE_MM[label], original.GetFace()))
+    elif fault in ("wrong-center", "wrong-normal"):
+        values = list(original.GetCurve().CircleParams)
+        values[0 if fault == "wrong-center" else 5] += 2e-8
+        original.GetCurve().CircleParams = tuple(values)
+    elif fault == "wrong-configuration":
+        views["FINISHED"].ReferencedConfiguration = spec.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "wrong-radius":
+        values = list(original.GetCurve().CircleParams)
+        values[6] += 2e-8
+        original.GetCurve().CircleParams = tuple(values)
+    elif fault == "wrong-view":
+        original.GetView = lambda: SimpleNamespace(Name="another-view")
+    elif fault == "dangling":
+        annotation.IsDangling = lambda: True
+    elif fault == "count-mismatch":
+        annotation.GetAttachedEntityCount3 = lambda: 2
+    if fault in (None, "duplicate-visible"):
+        drawing._verify_supplier_references(adapter, refs, contracts)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_supplier_references(adapter, refs, contracts)
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_native_save_observer_checks_only_native_save_and_preserves_failures(module):
+    """Exercise the actual nested callback without constructing a COM adapter."""
+    build = ast.parse(inspect.getsource(module.build)).body[0]
+    callback = next(
+        node for node in build.body
+        if isinstance(node, ast.FunctionDef) and node.name == "verify_after_native_save"
+    )
+    calls = []
+    namespace = {
+        "adapter": object(), "refs_by_sheet": object(), "view_contracts": object(),
+        "SHEET_NAMES": module.SHEET_NAMES,
+        "drawing": SimpleNamespace(ActivateSheet=lambda name: calls.append(("sheet", name)) or True),
+        "_verify_supplier_references": lambda *args: calls.append(("verify", args)),
+    }
+    exec(compile(ast.Module(body=[callback], type_ignores=[]), "<native-save-observer>", "exec"), namespace)
+    observer = namespace[callback.name]
+    for event in ("before_drawing_save", "before_pdf_save", "after_pdf_save", "after_drawing_close"):
+        observer(event)
+    assert calls == []
+    observer("after_drawing_save")
+    assert calls == [
+        ("verify", (namespace["adapter"], namespace["refs_by_sheet"], namespace["view_contracts"])),
+        ("sheet", module.SHEET_NAMES[0]),
+    ]
+
+    def refuse(*_args):
+        raise RuntimeError("saved attachment changed")
+
+    namespace["_verify_supplier_references"] = refuse
+    with pytest.raises(RuntimeError, match="saved attachment changed"):
+        observer("after_drawing_save")

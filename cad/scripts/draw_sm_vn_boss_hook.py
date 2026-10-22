@@ -128,10 +128,11 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
 
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
     """Use the physical matching eye ID and an explicit nominal thread carrier."""
+    # HLR/configuration changes precede this query. Materialize their geometry
+    # now: native repaint is deferred while the recipe retains COM control.
+    front.UpdateViewDisplayGeometry()
     eye = None
-    circles = []
-    silhouettes = visible_view_entities(front, 4, label="counter anchor supplier contours")
-    for raw in silhouettes:
+    for raw in visible_view_entities(front, 4, label="counter anchor supplier contours"):
         silhouette = _early_bound(raw, "ISilhouetteEdge")
         raw_curve = silhouette.GetCurve()
         if raw_curve is None:
@@ -140,7 +141,6 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         if not curve.IsCircle():
             continue
         circle = tuple(float(value) for value in curve.CircleParams)
-        circles.append(circle)
         if (
             all(abs(value) < 1e-8 for value in circle[:3])
             and abs(abs(circle[5]) - 1.0) < 1e-8
@@ -149,74 +149,7 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
             eye = raw
             break
     if eye is None:
-        def face_readback(raw_face):
-            if raw_face is None:
-                return None
-            face = _early_bound(raw_face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            feature = _early_bound(face.GetFeature(), "IFeature")
-            return {
-                "feature": str(feature.Name),
-                "torus": tuple(float(value) for value in surface.TorusParams) if surface.IsTorus() else None,
-            }
-
-        silhouette_readbacks = []
-        for raw in silhouettes:
-            silhouette = _early_bound(raw, "ISilhouetteEdge")
-            raw_curve = silhouette.GetCurve()
-            if raw_curve is None:
-                silhouette_readbacks.append({"identity": None, "face": face_readback(silhouette.GetFace())})
-                continue
-            curve = _early_bound(raw_curve, "ICurve")
-            samples = None
-            if curve.IsBcurve():
-                limits = tuple(curve.GetEndParams())
-                if limits[0] is True:
-                    samples = [
-                        tuple(float(value) for value in curve.Evaluate2(
-                            float(limits[1]) + fraction * (float(limits[2]) - float(limits[1])), 0
-                        )[:3])
-                        for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)
-                    ]
-            silhouette_readbacks.append({
-                "identity": int(curve.Identity()),
-                "circle": tuple(float(value) for value in curve.CircleParams) if curve.IsCircle() else None,
-                "face": face_readback(silhouette.GetFace()),
-                "samples": samples,
-            })
-        edge_circles = []
-        exact_id_edges = []
-        edge_kinds = {}
-        edges = visible_view_entities(front, 1, label="counter anchor missing physical ID discriminator")
-        for raw in edges:
-            edge = _early_bound(raw, "IEdge")
-            raw_curve = edge.GetCurve()
-            if raw_curve is None:
-                continue
-            curve = _early_bound(raw_curve, "ICurve")
-            identity = int(curve.Identity())
-            edge_kinds[identity] = edge_kinds.get(identity, 0) + 1
-            if not curve.IsCircle():
-                continue
-            circle = tuple(float(value) for value in curve.CircleParams)
-            edge_circles.append(circle)
-            if (
-                all(abs(value) < 1e-8 for value in circle[:3])
-                and abs(abs(circle[5]) - 1.0) < 1e-8
-                and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
-            ):
-                exact_id_edges.append({
-                    "circle": circle,
-                    "faces": [face_readback(face) for face in (edge.GetTwoAdjacentFaces2() or ())],
-                })
-        raise RuntimeError(
-            "unchanged counter eye has no exact ID circular silhouette; "
-            f"silhouettes={silhouette_readbacks!r}, "
-            f"edge_count={len(edges)}, edge_kinds={edge_kinds!r}, "
-            f"edge_circle_count={len(edge_circles)}, edge_circles={edge_circles[:64]!r}, "
-            f"exact_id_edges={exact_id_edges!r}, configuration={front.ReferencedConfiguration!r}, "
-            f"model_to_view={tuple(_early_bound(front.ModelToViewTransform, 'IMathTransform').ArrayData)!r}"
-        )
+        raise RuntimeError("unchanged counter eye has no exact ID circular silhouette")
     try:
         _select_view_entity(
             adapter, front, "SILHOUETTE", None, label="EyeID", entity=eye
@@ -369,7 +302,7 @@ def _supplier_stock_diagram(adapter: Any):
 
 
 def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Resolve the final views/dimensions afresh; never repair settled state."""
+    """Read geometry and attachments without refreshing or repairing the views."""
     if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
         raise RuntimeError("counter anchor must retain all six supplier dimensions")
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -382,7 +315,6 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
             if name not in views or str(views[name].ReferencedConfiguration) != configuration:
                 raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
         view = views[names[0]]
-        view.UpdateViewDisplayGeometry()
         displays = {}
         display = view.GetFirstDisplayDimension6()
         while display is not None:
@@ -417,10 +349,54 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                 annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
                 entities = tuple(annotation.GetAttachedEntities3() or ())
                 kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-                if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                    adapter, entities[0], expected_entity, "SILHOUETTE"
+                if (
+                    int(annotation.GetAttachedEntityCount3()) != 1
+                    or len(entities) != 1
+                    or kinds != (46,)
+                    or entities[0] is None
+                    or annotation.IsDangling()
                 ):
-                    raise RuntimeError("supplier eye ID moved to another physical contour")
+                    raise RuntimeError(
+                        "supplier eye ID must retain one live physical silhouette; "
+                        f"entities={len(entities)}, kinds={kinds}"
+                    )
+
+                def exact_eye_id(raw):
+                    raw_curve = _early_bound(raw, "ISilhouetteEdge").GetCurve()
+                    if raw_curve is None:
+                        return False
+                    curve = _early_bound(raw_curve, "ICurve")
+                    if not curve.IsCircle():
+                        return False
+                    circle = tuple(float(value) for value in curve.CircleParams)
+                    return (
+                        len(circle) == 7
+                        and all(math.isfinite(value) for value in circle)
+                        and all(abs(value) < 1e-8 for value in circle[:3])
+                        and abs(abs(circle[5]) - 1.0) < 1e-8
+                        and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
+                    )
+
+                attached = _early_bound(entities[0], "ISilhouetteEdge")
+                if not exact_eye_id(attached):
+                    raise RuntimeError("supplier eye ID changed its exact physical circle")
+                attached_view = attached.GetView()
+                if attached_view is None or view_name(adapter, attached_view) != names[0]:
+                    raise RuntimeError("supplier eye ID changed its native drawing view")
+                # Compare current native owners, not a pre-rebuild silhouette.
+                matching = [
+                    raw for raw in visible_view_entities(view, 4, label="settled counter physical eye ID")
+                    if exact_eye_id(raw)
+                ]
+                if not any(
+                    _is_same_attachment(adapter, attached, raw, "SILHOUETTE")
+                    for raw in matching
+                ):
+                    raise RuntimeError(
+                        "supplier eye ID lost its current physical contour owner; "
+                        f"matching_visible_contours={len(matching)}, "
+                        f"attached_face_present={attached.GetFace() is not None}"
+                    )
 
 
 def _verify_supplier_layout(adapter, view_contracts, notes):
@@ -539,6 +515,16 @@ async def build(adapter: Any) -> dict[str, str]:
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
         SHEET_NAMES[1]: ((view_name(adapter, stock),), SUPPLIER_STOCK_CONFIGURATION),
     }
+    refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
+
+    def verify_after_native_save(event):
+        if event != "after_drawing_save":
+            return
+        # Still-open post-SaveAs3 inspection, not cold-reopen disk proof.
+        _verify_supplier_references(adapter, refs_by_sheet, view_contracts)
+        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+            raise RuntimeError("cannot restore finished counter anchor sheet after saved-eye inspection")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -549,12 +535,13 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(adapter, annotations),
-            lambda: _verify_supplier_references(
-                adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
-            ),
+            # The layout check owns pre-save view refreshes; the attachment
+            # verifier is also safe to call after the native save.
             lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
+            lambda: _verify_supplier_references(adapter, refs_by_sheet, view_contracts),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
+        checkpoint=verify_after_native_save,
     )
 
 
