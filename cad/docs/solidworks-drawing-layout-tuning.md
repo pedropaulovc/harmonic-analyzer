@@ -1931,11 +1931,11 @@ root at enlarged scale. The user-approved5mm free-end extension changes only
 machineX−3 to−8 (local−43 to−48), foot49.25 to54.25 and setbacks4/17.70 to
 9/22.70; that extension alone leaves both mounting axes, seat, width, thickness
 and lever pose fixed. The separate 2026-10-22 plate-tap relocation lowers the
-matched receiver, bracket-clearance and screw row to localY−0.71 / machineY978.99,
-retaining machineX1/14.7 and the body/seat/threaded-lever pose. Its native row
-dimensions are3.25±0.05 below the actual coefficient top and5.64±0.05 above
-the actual foot lower edge. The fixed-top7.00±0.51 plate backs the receiver
-pilot beyond the uniform5.00±0.51 ribs; retain one native `3X 5.00` rib dimension.
+matched receiver, bracket-clearance and screw row to local Y−0.71 / machine Y978.99,
+retaining machine X1/14.7 and the body/seat/threaded-lever pose. Its native row
+dimensions are 3.25±0.05 below the actual coefficient top and 5.64±0.05 above
+the actual foot lower edge. The fixed-top 7.00±0.51 plate backs the receiver
+pilot beyond the uniform 5.00±0.51 ribs; retain one native `3X 5.00` rib dimension.
 Do not restore superseded rib-only containment or a finished-thread envelope.
 Pass the actual drawing-created lateral dimension annotation to its layout
 checks; retain its measured two-edge attachments, native name and ordinary band.
@@ -2066,9 +2066,9 @@ The user explicitly retained generic low-carbon steel with the blued finish,
 not a named certified grade. `mg_magnifying_bracket_arm_check.py` supplies the
 load-demand screen consumed by `error_budget.py` in JSON and human-readable
 reports. Its factor-three simultaneous bending/torsion demand uses the fitted
-maximum gravity arm of161.565 mm, derived from the same length/neck/projection
-bands above, not the nominal160 mm arm. Joint moments use the actual relocated
-screw-row centroid projected to the seat plane. Assumed E200GPa/G79GPa serve
+maximum gravity arm of 161.565 mm, derived from the same length/neck/projection
+bands above, not the nominal 160 mm arm. Joint moments use the actual relocated
+screw-row centroid projected to the seat plane. Assumed E200 GPa/G79 GPa serve
 compliance calculations only; verified yield and verified yield safety factor
 remain unavailable. This is a calculated procurement demand, not a material-data
 acceptance gate, native proof or demonstrated safety factor.
