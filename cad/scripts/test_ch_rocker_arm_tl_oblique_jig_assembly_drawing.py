@@ -4561,6 +4561,78 @@ def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
 
 
 @pytest.mark.parametrize("defect", (
+    "source-qualified-name", "carrier-hidden", "empty-path",
+))
+@pytest.mark.parametrize("unread_view", ("source-qualified-name", "read-error"))
+def test_capture_settled_isolation_refusal_reports_all_native_view_censuses(
+    native_property_package, defect, unread_view,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    views = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_CAPTURE_SHEET)
+    support = drawing.capture_support_instances(cluster, 0)
+    carrier_path = spec.instance_name(spec.CARRIER, 0)
+    installed = support | {carrier_path}
+    carrier = next(leaf for leaf in views[2].components if leaf.Component.Name2 == carrier_path)
+    qualified_path = f"{package.source_root.Name2}/{carrier_path}"
+    if defect == "source-qualified-name":
+        carrier.Component.Name2 = qualified_path
+        actual = (installed - {carrier_path}) | {qualified_path}
+        offending = [(carrier.Name, qualified_path, True)]
+        extra = [qualified_path]
+    elif defect == "carrier-hidden":
+        carrier.Visible = False
+        actual = installed - {carrier_path}
+        offending = [(carrier.Name, carrier_path, False)]
+        extra = []
+    else:
+        # This authored component has no semantic reference requiring a path.
+        assert carrier.Component.ComponentReference == ""
+        carrier.Component.Name2 = ""
+        actual = (installed - {carrier_path}) | {""}
+        offending = [(carrier.Name, "", True)]
+        extra = [""]
+
+    # View 3 has not been walked when the strict view-2 isolation check fails.
+    # Its own fresh inventory (or read error) must be in that same refusal.
+    if unread_view == "source-qualified-name":
+        last_carrier = next(
+            leaf for leaf in views[3].components if leaf.Component.Name2 == carrier_path
+        )
+        last_carrier.Component.Name2 = qualified_path
+        last_actual = (installed - {carrier_path}) | {qualified_path}
+        last_offending = [(last_carrier.Name, qualified_path, True)]
+        last_record = (
+            f"view 3: expected={sorted(installed)!r}; actual={sorted(last_actual)!r}; "
+            f"missing={[carrier_path]!r}; extra={[qualified_path]!r}; leaves={last_offending!r}"
+        )
+    else:
+        views[3].RootDrawingComponent2 = lambda _resolve: None
+        error = RuntimeError("jig capture isolation census: drawing view has no root component")
+        last_record = f"view 3: read_error={error!r}"
+
+    # Keep the actual native leaf reader: mutating IComponent2.Name2 or the
+    # IDrawingComponent visibility must never normalize or repair isolation.
+    assert drawing._view_component_leaves is _drawing_balloons._view_component_leaves
+    with pytest.raises(RuntimeError) as refusal:
+        settled[-1]()
+    census = [
+        f"view 0: expected={sorted(support)!r}; actual={sorted(support)!r}; "
+        "missing=[]; extra=[]; leaves=[]",
+        f"view 1: expected={sorted(installed)!r}; actual={sorted(installed)!r}; "
+        "missing=[]; extra=[]; leaves=[]",
+        f"view 2: expected={sorted(installed)!r}; actual={sorted(actual)!r}; "
+        f"missing={[carrier_path]!r}; extra={extra!r}; leaves={offending!r}",
+        last_record,
+    ]
+    assert str(refusal.value) == (
+        "jig capture view 2: wrong visible occurrence isolation; "
+        f"isolation_census={census!r}"
+    )
+
+
+@pytest.mark.parametrize("defect", (
     "extra-view", "scale", "configuration", "exploded", "carrier-hidden",
     "crop", "missing-section", "hatch", "partial", "label", "cut-plane",
     "cut-axis", "fasteners", "cut-only", "hidden-lines", "cut-arrows", "legacy-xy-cut",

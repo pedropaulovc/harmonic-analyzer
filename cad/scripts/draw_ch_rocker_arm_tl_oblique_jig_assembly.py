@@ -3007,8 +3007,28 @@ def _assert_capture_sheet(
             raise RuntimeError(f"jig capture view {index}: changed scale/configuration/exploded state")
         leaves_by_view[index] = _view_component_leaves(adapter, view, label="jig capture")
         shown = {leaf.path for leaf in leaves_by_view[index] if leaf.visible}
-        if shown != (capture_support_instances(cluster, 0) if index == 0 else installed):
-            raise RuntimeError(f"jig capture view {index}: wrong visible occurrence isolation")
+        expected = capture_support_instances(cluster, 0) if index == 0 else installed
+        if shown != expected:
+            census = []
+            for census_index, census_view in enumerate(views):
+                expected = capture_support_instances(cluster, 0) if census_index == 0 else installed
+                try:
+                    if census_index not in leaves_by_view:
+                        leaves_by_view[census_index] = _view_component_leaves(adapter, census_view, label="jig capture isolation census")
+                    leaves = leaves_by_view[census_index]
+                    actual = {leaf.path for leaf in leaves if leaf.visible}
+                    missing, extra = expected - actual, actual - expected
+                    offending = sorted(
+                        (leaf.name, leaf.path, leaf.visible) for leaf in leaves
+                        if not leaf.path or leaf.path in missing | extra
+                    )
+                    census.append(
+                        f"view {census_index}: expected={sorted(expected)!r}; actual={sorted(actual)!r}; "
+                        f"missing={sorted(missing)!r}; extra={sorted(extra)!r}; leaves={offending!r}"
+                    )
+                except Exception as exc:
+                    census.append(f"view {census_index}: read_error={exc!r}")
+            raise RuntimeError(f"jig capture view {index}: wrong visible occurrence isolation; isolation_census={census!r}")
         if index:
             if not bool(bound.IsCropped()):
                 raise RuntimeError(f"jig capture view {index}: assembled reading view lost its crop")

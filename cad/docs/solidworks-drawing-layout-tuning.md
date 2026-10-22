@@ -259,6 +259,12 @@ The visible prong and obscured eye can share a plan projection at different
 depths. Preserve its exact occurrence, attachment and existing 2D leader-landing
 proof without inventing a 3D gap witness or changing the inspection criterion.
 
+After the reading-label rebuild, compare freshly enumerated visible occurrence
+paths with the exact installed set. On refusal, record all four views' sorted
+expected, actual, missing and extra paths plus offending drawing-name/path/
+visibility tuples before changing identity or isolation rules. Successful
+edge selection does not prove settled component visibility.
+
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture
 have distinct headings in that print order, without new acceptance criteria.
