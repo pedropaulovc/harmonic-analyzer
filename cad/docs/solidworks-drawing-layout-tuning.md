@@ -229,25 +229,21 @@ Inspection callouts identify the existing C-step reading points and limits:
 chamber excess is chamber height minus flange thickness, not a third gap.
 Neither a centre section nor a static nominal pose replaces the prescribed
 whole-face, endplay, clocking and motion inspections.
-Resolve each fixed reading against only its actual occurrence's visible edges,
-at the unchanged occurrence-local point. Require one native closest-point match
-within the existing `1e-8 mm²` exact-edge tolerance, then select that entity
-through its view. Never substitute a screen-coordinate pick or a nearby rim,
-floor or roof. Enumeration does not prove ownership: retain the selected
-entity's actual occurrence/type and final attachment/landing readbacks. A
-missing, ambiguous or unreadable section edge remains a diagnostic refusal.
+Assembly-section edge listings can be empty while the native sheet pick finds
+the drawn edge. Use the existing narrow-zoom pick at the unchanged station:
+require exactly one native EDGE, with any other selection only the same
+activated drawing view. Match its owner case-exactly to the unique visible
+leaf's full model path or that same leaf's native drawing-component name;
+never decide occurrence identity from a basename or suffix. Reselect only that
+verified edge and prove native identity before creating its attached note.
+Section witnesses retain the existing `1e-8 mm²` part-local closest-point bound,
+so a nearby rim, floor or roof cannot substitute for the intended land.
 
-The `cfcfbd3175be` native run returned zero occurrence-listed edges at the
-first C2 station; this does not establish that the drawn section geometry is
-absent. The `9d3905dea289` probe picked at all fourteen unchanged stations,
-but each pick had two selection slots; its single-slot gate prevented any
-ownership or geometry readback. The temporary diagnostic now records each of
-the first four slots independently, including raw interface/binding errors,
-native view identity, both edge-ownership channels, curve endpoints and
-part-local/assembly-world closest-point results. It uses the frame assembly's
-existing narrow-zoom pattern, not inferred identities for the two slots.
-It never supplies an accepted edge or creates a label: the original exact-edge
-refusal remains unconditional. Do not infer a geometry frame from an owner name.
+The C5B plan note identifies the cotter eye/prong regions and points to the
+manual motion/feeler inspection; it is not a static clearance dimension.
+The visible prong and obscured eye can share a plan projection at different
+depths. Preserve its exact occurrence, attachment and existing 2D leader-landing
+proof without inventing a 3D gap witness or changing the inspection criterion.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture

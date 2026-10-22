@@ -2169,7 +2169,9 @@ def native_property_package(monkeypatch, native_bom_bindings):
         attached_notes=[], events=[], bom_inserted=False, crop_status=1,
         bad_crop=False, bad_section=False, bad_pick=False, bad_attachment=False,
         capture_fit_denominator=4.0,
-        capture_edge_defect=None, coordinate_shadow=False,
+        capture_edge_defect=None,
+        selected_types=[], pick_slots=[], reselections=[], binding_calls=[],
+        edge_first=False, raw_picks=True, zoomed=False,
     )
     for name in physical_names:
         sheet = SimpleNamespace(
@@ -2240,31 +2242,28 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     else spec.instance_name(stem, occurrence)
                 )
                 leaves.append(SimpleNamespace(
-                    Name=component.Name2, Component=component, Visible=True,
+                    Name=(f"jig-assembly/{component.Name2}"
+                          if sheet.name == drawing.PIVOT_CAPTURE_SHEET and index in (2, 3)
+                          else component.Name2),
+                    Component=component, Visible=True,
                     GetChildren=lambda: (),
                 ))
         view.components = leaves
         view.RootDrawingComponent2 = lambda _resolve: SimpleNamespace(GetChildren=lambda: tuple(leaves))
 
         def select_entity(entity, append):
-            if not append:
-                doc.selected.clear()
+            assert append is False and doc.selected == []
             selected = entity
-            # Native selection initially anchors to an edge endpoint; only
-            # SetSelectionPoint2 moves the eventual leader to the reading.
             selected.world = entity.world_endpoints[0]
-            if doc.bad_pick or (
-                doc.capture_edge_defect == "selected-other-owner"
-                and entity.c2
-            ):
-                other = next(
-                    leaf.Component for leaf in view.components
-                    if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_BLOCK, 1)
-                )
-                selected = SimpleNamespace(
-                    GetComponent=lambda: other, world=entity.world,
-                )
-            doc.selected.append(selected)
+            defect = doc.capture_edge_defect if entity.c2 else None
+            if defect == "reselect-substitute":
+                selected = SimpleNamespace(**vars(entity))
+            doc.selected[:] = [selected]
+            doc.selected_types[:] = [12 if defect == "reselect-type" else 1]
+            if defect == "reselect-count":
+                doc.selected.append(entity)
+                doc.selected_types.append(1)
+            doc.reselections.append((entity, tuple(doc.selected), tuple(doc.selected_types)))
             return True
 
         view.SelectEntity = select_entity
@@ -2382,7 +2381,13 @@ def native_property_package(monkeypatch, native_bom_bindings):
 
     doc.GetFirstView = first_view
     doc.CreateDrawViewFromModelView3 = create_view
-    doc.ClearSelection2 = lambda _all: doc.selected.clear()
+    def clear_selection(_all):
+        doc.selected.clear()
+        doc.selected_types.clear()
+
+    doc.ClearSelection2 = clear_selection
+    doc.ViewZoomTo2 = lambda *_bounds: setattr(doc, "zoomed", True)
+    doc.ViewZoomtofit2 = lambda: setattr(doc, "zoomed", False)
     doc.EditRebuild3 = lambda: True
     doc.GraphicsRedraw2 = lambda: None
     doc.EditSheet = lambda: doc.paper_edits.append(doc.active)
@@ -2473,7 +2478,8 @@ def native_property_package(monkeypatch, native_bom_bindings):
         a, b = (tuple(value / 1000.0 for value in point) for point in endpoints)
         origin, rows = spec.PLACEMENTS[stem][occurrence]
         edge = SimpleNamespace(
-            GetComponent=lambda: component, endpoints=(a, b), c2=c2,
+            GetComponent=lambda: raw(edge.owner), endpoints=(a, b), c2=c2,
+            owner=SimpleNamespace(Name2=component.Name2),
         )
 
         def closest(x, y, z):
@@ -2499,8 +2505,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
         )
         return edge
 
-    def visible_edges(view, component, entity_type):
-        assert entity_type == 1
+    def reading_edges(view, component):
         if not any(leaf.Component is component and leaf.Visible for leaf in view.components):
             return ()
         index = doc.sheets[view.Sheet.name].views.index(view)
@@ -2529,17 +2534,33 @@ def native_property_package(monkeypatch, native_bom_bindings):
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
+            if reading.view_index == 1 or (
+                c2 and doc.capture_edge_defect == "wrong-section-depth"
+            ):
+                # The measured cotter prong shares the eye's projected XY,
+                # but is 7.67055 mm away in depth. A section cannot do this.
+                depth_mm = 7.67055 if reading.view_index == 1 else 1.0
+                normal = (
+                    view.right[1] * view.up[2] - view.right[2] * view.up[1],
+                    view.right[2] * view.up[0] - view.right[0] * view.up[2],
+                    view.right[0] * view.up[1] - view.right[1] * view.up[0],
+                )
+                _origin, rows = spec.PLACEMENTS[reading.stem][reading.index]
+                delta = tuple(depth_mm * sum(normal[i] * row[i] for i in range(3))
+                              for row in rows)
+                if reading.view_index == 1:
+                    tangent = tuple(sum(view.right[i] * row[i] for i in range(3))
+                                    for row in rows)
+                    endpoints = tuple(
+                        tuple(reading.local_mm[i] + sign * 0.25 * tangent[i]
+                              for i in range(3))
+                        for sign in (-1.0, 1.0)
+                    )
+                endpoints = tuple(tuple(p[i] + delta[i] for i in range(3))
+                                  for p in endpoints)
             edge = native_edge(component, reading.stem, reading.index, endpoints, c2=c2)
             edges.append(edge)
-            if c2 and doc.capture_edge_defect == "multiple-exact-edges":
-                # Distinct native entities representing the same physical
-                # face-intersection segment are still ambiguous; no tie-break.
-                edges.append(native_edge(
-                    component, reading.stem, reading.index, endpoints, c2=True,
-                ))
         return tuple(edges)
-
-    monkeypatch.setattr(drawing, "visible_component_entities", visible_edges)
 
     def select_edge(_name, kind, x, y, _z, _append, _mark, _callout, _option):
         assert kind == "EDGE"
@@ -2553,34 +2574,70 @@ def native_property_package(monkeypatch, native_bom_bindings):
                 leaf.Component for leaf in view.components
                 if leaf.Component.Name2 == spec.instance_name(reading.stem, reading.index)
             )
-            for edge in visible_edges(view, component, 1):
-                edge.GetClosestPointOn(*(value / 1000.0 for value in reading.local_mm))
+            for edge in reading_edges(view, component):
+                target = tuple(value / 1000.0 for value in reading.local_mm)
+                edge.GetClosestPointOn(*target)
+                leaf = next(leaf for leaf in view.components if leaf.Component is component)
+                edge.owner.Name2 = leaf.Name
+                if edge.c2:
+                    defect = doc.capture_edge_defect
+                    if defect == "wrong-parent":
+                        edge.owner.Name2 = f"foreign-parent/{component.Name2}"
+                    elif defect == "wrong-root":
+                        edge.owner.Name2 = f"foreign-root/{leaf.Name}"
+                    elif defect == "wrong-occurrence":
+                        edge.owner.Name2 = leaf.Name + "-2"
+                    elif defect == "wrong-case":
+                        edge.owner.Name2 = leaf.Name.upper()
+                    elif defect == "owner-backslashes":
+                        edge.owner.Name2 = leaf.Name.replace("/", "\\")
+                    elif defect == "model-path":
+                        edge.owner.Name2 = component.Name2
+                    elif defect == "null-owner":
+                        edge.GetComponent = lambda: None
+                    if doc.bad_pick:
+                        edge.owner.Name2 = spec.instance_name(spec.PIVOT_BLOCK, 1)
                 projected = view.ModelToViewTransform.apply(edge.world)
                 candidates.append((math.dist((x, y), projected[:2]), edge))
-                if doc.coordinate_shadow and edge.c2:
-                    # The actual floor/roof is only 0.075 paper-mm away at
-                    # 1:2: inside a coordinate pick's ambiguous aperture.
-                    sign = -1.0 if reading.text.startswith("C2 LOWER") else 1.0
-                    other = next(
-                        leaf.Component for leaf in view.components
-                        if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_BLOCK, 0)
-                    )
-                    # Model the neighbor's floor/roof in the pin's reference
-                    # frame, while its native ownership remains the other part.
-                    endpoints = tuple(
-                        (p[0] * 1000.0, p[1] * 1000.0,
-                         p[2] * 1000.0 + sign * spec.retention.PIN_LOWER_GAP[1])
-                        for p in edge.endpoints
-                    )
-                    neighbor = native_edge(other, spec.PIVOT_PIN, 0, endpoints)
-                    neighbor.GetClosestPointOn(*(v / 1000.0 for v in reading.local_mm))
-                    paper = view.ModelToViewTransform.apply(neighbor.world)
-                    if math.dist((x, y), paper[:2]) < 0.0001:
-                        doc.selected[:] = [neighbor]
-                        return True
         distance, edge = min(candidates, key=lambda item: item[0])
-        assert distance < 1e-8
-        return view.SelectEntity(edge, False)
+        if doc.capture_edge_defect != "no-exact-point":
+            assert distance < 1e-8
+        if edge.c2 and doc.capture_edge_defect == "coordinate-foreign-owner":
+            edge.owner.Name2 = spec.instance_name(spec.PIVOT_BLOCK, 0)
+        assert doc.zoomed and doc.selected == []
+        slots = [view, edge]
+        types = [12, 1]
+        if doc.edge_first:
+            slots.reverse()
+            types.reverse()
+        defect = doc.capture_edge_defect if edge.c2 else None
+        edge_slot = types.index(1)
+        view_slot = types.index(12)
+        if defect == "foreign-view":
+            slots[view_slot] = doc.sheets[doc.active].views[0]
+        elif defect == "wrong-context-type":
+            types[view_slot] = 2
+        elif defect == "extra-foreign-view":
+            slots.append(doc.sheets[doc.active].views[0])
+            types.append(12)
+        elif defect == "multiple-edge-slots":
+            slots.append(SimpleNamespace(**vars(edge)))
+            types.append(1)
+        elif defect == "null-edge":
+            slots[edge_slot] = None
+        elif defect == "no-edge":
+            slots, types = [view], [12]
+        elif defect == "duplicate-visible-leaf":
+            leaf = next(leaf for leaf in view.components
+                        if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_PIN, 0))
+            view.components.append(SimpleNamespace(**vars(leaf)))
+        elif defect == "hidden-visible-leaf":
+            next(leaf for leaf in view.components
+                 if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_PIN, 0)).Visible = False
+        doc.selected[:] = [raw(item) if item is not None else None for item in slots]
+        doc.selected_types[:] = types
+        doc.pick_slots.append((tuple(slots), tuple(types)))
+        return True
 
     def selection_point(index, mark, x, y, z):
         assert (index, mark, z) == (1, -1, 0.0)
@@ -2602,6 +2659,8 @@ def native_property_package(monkeypatch, native_bom_bindings):
         note = native_note(text, doc.active_view, entity=entity, world=entity.world)
         if doc.bad_attachment:
             note.entity = object()
+        if doc.capture_edge_defect == "plan-wrong-paper" and text.startswith("C5B COTTER"):
+            note.landing_shift = (0.001, 0.0)
         doc.attached_notes.append(note)
         return note
 
@@ -2609,8 +2668,12 @@ def native_property_package(monkeypatch, native_bom_bindings):
     doc.SelectionManager = SimpleNamespace(
         CreateSelectData=lambda: SimpleNamespace(View=None),
         GetSelectedObjectCount2=lambda _mark: len(doc.selected),
-        GetSelectedObject6=lambda index, _mark: doc.selected[index-1],
-        GetSelectedObjectType3=lambda _index, _mark: 1,
+        GetSelectedObject6=lambda index, _mark: (
+            raw(unraw(doc.selected[index-1])) if doc.selected_types else doc.selected[index-1]
+        ),
+        GetSelectedObjectType3=lambda index, _mark: (
+            doc.selected_types[index-1] if doc.selected_types else 1
+        ),
         SetSelectionPoint2=selection_point,
     )
     doc.InsertNote = insert_note
@@ -2710,9 +2773,25 @@ def native_property_package(monkeypatch, native_bom_bindings):
         currentModel=doc, _attempt=lambda callback, **_kwargs: callback(), _get_attr_or_call=member,
         swApp=SimpleNamespace(
             GetMathUtility=lambda: SimpleNamespace(CreatePoint=_InspectionMathPoint),
-            IsSame=lambda a, b: 1 if a is b else 0,
+            IsSame=lambda a, b: 1 if unraw(a) is unraw(b) else 0,
         ),
     )
+    class RawDispatch:
+        """Selection dispatch exposes no typed members before native binding."""
+        def __init__(self, value):
+            self.value = value
+
+    def raw(value):
+        return RawDispatch(value) if doc.raw_picks else value
+
+    def unraw(value):
+        return value.value if isinstance(value, RawDispatch) else value
+
+    def bind(value, interface):
+        doc.binding_calls.append((value, interface))
+        return unraw(value)
+
+    monkeypatch.setattr(drawing, "_bind", bind)
     for module in (drawing, _drawing_common, _drawing_view_configuration,
                    _drawing_sections, _drawing_selection, _drawing_balloons,
                    _drawing_detail_crop, _section_axis):
@@ -3087,7 +3166,12 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     assert {item.instance for item in bearings} == {spec.instance_name(spec.BEARING, i) for i in (0, 1)}
     assert all(item.note.GetBomBalloonText(True) == "14" for item in bearings)
     assert len(package.doc.attached_notes) == len(drawing.capture_readings())
-    assert all(note.entity.GetComponent().Name2 in installed for note in package.doc.attached_notes)
+    for note, reading in zip(package.doc.attached_notes, drawing.capture_readings(), strict=True):
+        wanted = spec.instance_name(reading.stem, reading.index)
+        assert wanted in installed
+        leaf, = (leaf for leaf in note.view.components if leaf.Component.Name2 == wanted)
+        owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
+        assert owner.Name2 == leaf.Name
     targets = []
     for reading in drawing.capture_readings():
         view = sheet.views[reading.view_index]
@@ -3217,11 +3301,16 @@ def test_capture_refuses_real_creation_crop_and_attachment_failures(
     assert not package.doc.bom_inserted
 
 
-def test_capture_occurrence_edges_keep_c2_on_flange_despite_other_owner_coordinate_shadow(
-    native_property_package,
+@pytest.mark.parametrize("edge_first", (False, True))
+@pytest.mark.parametrize("raw_picks", (False, True))
+@pytest.mark.parametrize("owner_form", ("drawing-name", "model-path", "owner-backslashes"))
+def test_capture_native_two_slot_pick_reselects_only_the_exact_edge(
+    native_property_package, edge_first, raw_picks, owner_form,
 ) -> None:
     package = native_property_package
-    package.doc.coordinate_shadow = True
+    package.doc.edge_first = edge_first
+    package.doc.raw_picks = raw_picks
+    package.doc.capture_edge_defect = owner_form
     _scales, settled = drawing._place_package(package.adapter)
     notes = [note for note in package.doc.attached_notes if note.text.startswith("C2 ")]
     flange_notes = [note for note in notes if note.text.startswith(("C2 LOWER", "C2 UPPER"))]
@@ -3237,45 +3326,127 @@ def test_capture_occurrence_edges_keep_c2_on_flange_despite_other_owner_coordina
             (origin[i] + sum(local[k] * rows[k][i] for k in range(3))) / 1000.0
             for i in range(3)
         )
-        assert note.entity.GetComponent().Name2 == spec.instance_name(spec.PIVOT_PIN, 0)
+        owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
+        leaf = next(leaf for leaf in note.view.components
+                    if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_PIN, 0))
+        expected = leaf.Component.Name2 if owner_form == "model-path" else leaf.Name
+        assert owner.Name2.replace("\\", "/") == expected
         assert note.world == pytest.approx(physical, abs=1e-12)
         leader = note.annotation.GetLeaderPointsAtIndex(0)
         assert leader[-3:-1] == pytest.approx(
             note.view.ModelToViewTransform.apply(physical)[:2], abs=1e-12,
         )
+    assert len(package.doc.pick_slots) == len(drawing.capture_readings())
+    for (slots, types), (edge, selected, selected_types) in zip(
+        package.doc.pick_slots, package.doc.reselections, strict=True,
+    ):
+        assert types == ((1, 12) if edge_first else (12, 1))
+        assert slots[types.index(1)] is edge
+        assert selected == (edge,) and selected_types == (1,)
+        assert slots[types.index(12)] is next(
+            note.view for note in package.doc.attached_notes if note.entity is edge
+        )
+    if raw_picks:
+        assert {"IEntity", "IEdge", "IComponent2", "IView"} <= {
+            interface for _value, interface in package.doc.binding_calls
+        }
     settled[-1]()
 
 
-@pytest.mark.parametrize("defect, refusal", (
-    ("multiple-exact-edges", "requires one exact occurrence edge, got 2"),
-    ("no-exact-point", "requires one exact occurrence edge, got 0"),
-    ("selected-other-owner", "own edge"),
+@pytest.mark.parametrize("edge_first", (False, True))
+@pytest.mark.parametrize("defect", (
+    "foreign-view",
+    "extra-foreign-view",
+    "wrong-context-type",
+    "multiple-edge-slots",
+    "null-edge",
+    "no-edge",
+    "wrong-parent",
+    "wrong-root",
+    "wrong-occurrence",
+    "wrong-case",
+    "null-owner",
+    "duplicate-visible-leaf",
+    "hidden-visible-leaf",
+    "coordinate-foreign-owner",
+    "no-exact-point",
+    "wrong-section-depth",
+    "reselect-substitute",
+    "reselect-count",
+    "reselect-type",
 ))
-def test_capture_occurrence_edges_refuse_ambiguous_missing_or_substituted_c2(
-    native_property_package, defect, refusal,
+def test_capture_native_pick_refuses_actual_context_owner_geometry_and_reselection_counterexamples(
+    native_property_package, defect, edge_first,
 ) -> None:
     package = native_property_package
     package.doc.capture_edge_defect = defect
-    with pytest.raises(RuntimeError, match=f"jig capture C2 LOWER.*{refusal}"):
+    package.doc.edge_first = edge_first
+    with pytest.raises(RuntimeError):
         drawing._place_package(package.adapter)
     assert package.doc.attached_notes == []
     assert not package.doc.bom_inserted
 
 
-@pytest.mark.parametrize("defect", ("attachment", "landing"))
+@pytest.mark.parametrize("defect", ("owner", "attachment", "landing"))
 @pytest.mark.parametrize("prefix", ("C2 LOWER", "C2 UPPER"))
 def test_capture_occurrence_edges_still_refuse_settled_c2_attachment_and_landing_drift(
     native_property_package, defect, prefix,
 ) -> None:
     package = native_property_package
-    package.doc.coordinate_shadow = True
     _scales, settled = drawing._place_package(package.adapter)
     note = next(note for note in package.doc.attached_notes if note.text.startswith(prefix))
-    if defect == "attachment":
+    if defect == "owner":
+        note.entity.owner.Name2 = f"foreign-parent/{spec.instance_name(spec.PIVOT_PIN, 0)}"
+    elif defect == "attachment":
         note.entity = object()
     else:
         note.landing_shift = (0.001, 0.0)
     with pytest.raises(RuntimeError, match=f"jig capture {prefix}"):
+        settled[-1]()
+
+
+def test_capture_plan_cotter_identification_preserves_measured_depth_difference(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    reading = next(reading for reading in drawing.capture_readings()
+                   if reading.view_index == 1)
+    note = next(note for note in package.doc.attached_notes if note.text == reading.text)
+    local = tuple(value / 1000.0 for value in reading.local_mm)
+    closest = note.entity.GetClosestPointOn(*local)[:3]
+    assert math.dist(local, closest) == pytest.approx(0.00767055, abs=1e-12)
+    expected = note.view.ModelToViewTransform.apply(drawing._capture_world_point(reading))
+    landing = note.annotation.GetLeaderPointsAtIndex(0)[-3:-1]
+    assert landing == pytest.approx(expected[:2], abs=1e-12)
+    settled[-1]()
+
+
+def test_capture_plan_same_owner_wrong_paper_landing_is_not_identification(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    package.doc.capture_edge_defect = "plan-wrong-paper"
+    with pytest.raises(RuntimeError, match="jig capture C5B COTTER"):
+        drawing._place_package(package.adapter)
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("defect", ("owner", "attachment", "landing"))
+def test_capture_plan_identification_still_refuses_settled_drift(
+    native_property_package, defect,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    note = next(note for note in package.doc.attached_notes
+                if note.text.startswith("C5B COTTER"))
+    if defect == "owner":
+        note.entity.owner.Name2 = f"foreign-root/{note.entity.owner.Name2}"
+    elif defect == "attachment":
+        note.entity = object()
+    else:
+        note.landing_shift = (0.001, 0.0)
+    with pytest.raises(RuntimeError, match="jig capture C5B COTTER"):
         settled[-1]()
 
 

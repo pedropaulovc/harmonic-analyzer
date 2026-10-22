@@ -109,7 +109,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _simplified_names import simplified_name
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, visible_component_entities
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
@@ -2766,225 +2766,101 @@ def _capture_overlap(a: Sequence[float], b: Sequence[float]) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
-def _probe_capture_reading_picks(adapter: Any, views: Sequence[Any]) -> None:
-    """Diagnose all fixed stations; never supply an edge to the drawing."""
-    draw = adapter.currentModel
-    manager = _early_bound(_bind(draw.SelectionManager, "ISelectionMgr"), "ISelectionMgr")
-    for reading in capture_readings():
-        label = f"jig capture {reading.text.splitlines()[0]}"
-        view = views[reading.view_index]
-        local = tuple(value / 1000.0 for value in reading.local_mm)
-        world = _capture_world_point(reading)
-        evidence: dict[str, Any] = {
-            "expected_owner": spec.instance_name(reading.stem, reading.index),
-            "local_m": local,
-            "world_m": world,
-        }
-        try:
-            point = model_point_in_view(adapter, view, world, label=label)
-            evidence["sheet_m"] = point
-            if not _early_bound(draw, "IDrawingDoc").ActivateView(str(view.GetName2())):
-                raise RuntimeError("failed to activate diagnostic reading view")
-            draw.ClearSelection2(True)
-            _early_bound(view, "IView").UpdateViewDisplayGeometry()
-            with _zoomed_on(adapter, point, _HIT_ZOOM_HALF):
-                evidence["picked"] = bool(draw.Extension.SelectByID2(
-                    "", "EDGE", *point, 0.0, False, 0, null_callout(), 0
-                ))
-            count = int(manager.GetSelectedObjectCount2(-1))
-            evidence["count"] = count
-            evidence["uninspected_slots"] = max(0, count - 4)
-            slots = []
-            evidence["selected_slots"] = slots
-            for index in range(1, min(count, 4) + 1):
-                slot: dict[str, Any] = {"index": index}
-                slots.append(slot)
-                native_type, entity = None, None
-                try:
-                    native_type = int(manager.GetSelectedObjectType3(index, -1))
-                    slot["native_type"] = native_type
-                except Exception as exc:
-                    slot["native_type_error"] = repr(exc)
-                try:
-                    entity = manager.GetSelectedObject6(index, -1)
-                    slot["entity_python_type"] = type(entity).__name__
-                    slot["entity_has_oleobj"] = getattr(entity, "_oleobj_", None) is not None
-                except Exception as exc:
-                    slot["selected_object_error"] = repr(exc)
-                if entity is not None:
-                    try:
-                        slot["entity_interface"] = (
-                            getattr(entity, "_oleobj_", entity).GetTypeInfo().GetDocumentation(-1)[0]
-                        )
-                    except Exception as exc:
-                        slot["entity_interface_error"] = repr(exc)
-                if native_type == 12 and entity is not None:  # swSelDRAWINGVIEWS
-                    try:
-                        selected_view = _early_bound(_bind(entity, "IView"), "IView")
-                        slot["drawing_view_name"] = str(selected_view.GetName2())
-                    except Exception as exc:
-                        slot["drawing_view_or_binding_error"] = repr(exc)
-                    try:
-                        slot["drawing_view_is_same"] = int(adapter.swApp.IsSame(
-                            _early_bound(_bind(entity, "IView"), "IView"), view
-                        ))
-                    except Exception as exc:
-                        slot["drawing_view_identity_or_binding_error"] = repr(exc)
-                elif native_type == 1 and entity is not None:  # swSelEDGES
-                    owners = {}
-                    try:
-                        owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent()
-                        owners["entity"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
-                        slot["entity_owner"] = str(owners["entity"].Name2) if owner is not None else None
-                    except Exception as exc:
-                        slot["entity_owner_or_binding_error"] = repr(exc)
-                    try:
-                        owner = manager.GetSelectedObjectsComponent4(index, -1)
-                        slot["component4_python_type"] = type(owner).__name__
-                        slot["component4_has_oleobj"] = getattr(owner, "_oleobj_", None) is not None
-                        if owner is not None:
-                            interface = getattr(owner, "_oleobj_", owner).GetTypeInfo().GetDocumentation(-1)[0]
-                            slot["component4_interface"] = interface
-                            if interface == "IDrawingComponent":
-                                owner = _early_bound(_bind(owner, interface), interface).Component
-                            elif interface != "IComponent2":
-                                raise RuntimeError(f"unresolved Component4 native interface {interface!r}")
-                        owners["component4"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
-                        slot["component4_owner"] = str(owners["component4"].Name2) if owner is not None else None
-                    except Exception as exc:
-                        slot["component4_owner_or_binding_error"] = repr(exc)
-                    transforms = {}
-                    for channel, owner in owners.items():
-                        if owner is not None:
-                            try:
-                                transform = _early_bound(_bind(owner.Transform2, "IMathTransform"), "IMathTransform")
-                                values = tuple(float(value) for value in transform.ArrayData)
-                                slot[f"{channel}_transform2"] = values
-                                if len(values) != 16:
-                                    raise RuntimeError("incomplete native component transform")
-                                transforms[channel] = values
-                            except Exception as exc:
-                                slot[f"{channel}_transform_or_binding_error"] = repr(exc)
-                    edge = None
-                    try:
-                        edge = _early_bound(_bind(entity, "IEdge"), "IEdge")
-                    except Exception as exc:
-                        slot["edge_binding_error"] = repr(exc)
-                    if edge is not None:
-                        try:
-                            curve = edge.GetCurve()  # Required before GetCurveParams2.
-                            slot["curve_endpoints_m"] = (
-                                tuple(float(value) for value in (edge.GetCurveParams2() or ()))[:6]
-                                if curve is not None else None
-                            )
-                        except Exception as exc:
-                            slot["curve_or_binding_error"] = repr(exc)
-                        for frame, target in (("local", local), ("world", world)):
-                            try:
-                                closest = tuple(float(value) for value in (edge.GetClosestPointOn(*target) or ()))
-                                slot[f"closest_{frame}_m"] = closest[:3]
-                                slot[f"closest_{frame}_parameter"] = closest[3] if len(closest) > 3 else None
-                                slot[f"distance_{frame}_mm"] = math.dist(closest[:3], target) * 1000.0
-                                for channel, values in transforms.items():
-                                    slot[f"closest_{frame}_via_{channel}_world_m"] = tuple(
-                                        values[12] * sum(closest[j] * values[i + 3 * j] for j in range(3)) + values[9 + i]
-                                        for i in range(3)
-                                    )
-                            except Exception as exc:
-                                slot[f"closest_{frame}_error"] = repr(exc)
-                else:
-                    slot["edge_channels_not_queried"] = "not a readable native EDGE selection"
-        except Exception as exc:
-            evidence["pick_or_binding_error"] = repr(exc)
-        finally:
-            try:
-                draw.ClearSelection2(True)
-            except Exception as exc:
-                evidence["clear_selection_error"] = repr(exc)
-            _telemetry.info(f"{label}: diagnostic_only_pick={evidence!r}")
+def _capture_reading_component(
+    adapter: Any, reading: CaptureReading, entity: Any, leaves: Sequence[Any], *, label: str
+) -> Any:
+    """Require this view's exact native occurrence path, including its root."""
+    wanted = spec.instance_name(reading.stem, reading.index)
+    matches = [leaf for leaf in leaves if leaf.visible and leaf.path.replace("\\", "/") == wanted]
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one visible occurrence {wanted!r}, got {len(matches)}")
+    leaf = matches[0]
+    owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent() if entity is not None else None
+    component = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+    actual = str(component.Name2 or "").replace("\\", "/") if component is not None else ""
+    allowed = (leaf.path.replace("\\", "/"), leaf.name.replace("\\", "/"))
+    if not actual or actual not in allowed:
+        raise RuntimeError(
+            f"{label}: reading point did not select {wanted!r}'s own edge; "
+            f"actual_owner={actual!r}; occurrence_path={leaf.path!r}; drawing_component_name={leaf.name!r}"
+        )
+    return component
 
 
 def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[Any, ...], ...]:
     records = []
     leaves_by_view = {}
-    edges_by_occurrence = {}
     for reading in capture_readings():
         view = views[reading.view_index]
+        bound_view = _early_bound(view, "IView")
         label = f"jig capture {reading.text.splitlines()[0]}"
         world = _capture_world_point(reading)
         point = model_point_in_view(adapter, view, world, label=label)
-        wanted = spec.instance_name(reading.stem, reading.index)
-        context = (
-            f"expected_owner={wanted!r}; local_mm={reading.local_mm}; "
-            f"model_m={world}; sheet_m={point}"
-        )
-        if reading.view_index not in leaves_by_view:
-            _early_bound(view, "IView").UpdateViewDisplayGeometry()
-            leaves_by_view[reading.view_index] = _view_component_leaves(adapter, view, label=label)
-        key = (reading.view_index, wanted.casefold())
-        if key not in edges_by_occurrence:
-            leaves = [
-                leaf for leaf in leaves_by_view[reading.view_index]
-                if leaf.visible and leaf.path.casefold() == wanted.casefold()
-            ]
-            if len(leaves) != 1:
+        context = f"local_mm={reading.local_mm}; model_m={world}; sheet_m={point}"
+        if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(view.GetName2())):
+            raise RuntimeError(f"{label}: failed to activate reading view; {context}")
+        adapter.currentModel.ClearSelection2(True)
+        bound_view.UpdateViewDisplayGeometry()
+        with _zoomed_on(adapter, point, _HIT_ZOOM_HALF):
+            picked = adapter.currentModel.Extension.SelectByID2(
+                "", "EDGE", *point, 0.0, False, 0, null_callout(), 0
+            )
+        if not picked:
+            raise RuntimeError(f"{label}: failed to select reading edge; {context}")
+        manager = _early_bound(_bind(adapter.currentModel.SelectionManager, "ISelectionMgr"), "ISelectionMgr")
+        edge = None
+        count = int(manager.GetSelectedObjectCount2(-1))
+        for index in range(1, count + 1):
+            native_type = int(manager.GetSelectedObjectType3(index, -1))
+            selected = manager.GetSelectedObject6(index, -1)
+            if native_type == 1 and selected is not None:  # swSelEDGES
+                if edge is not None:
+                    raise RuntimeError(f"{label}: expected exactly one reading EDGE; {context}")
+                edge = _early_bound(_bind(selected, "IEdge"), "IEdge")
+            elif (
+                native_type == 12 and selected is not None  # swSelDRAWINGVIEWS
+                and int(adapter.swApp.IsSame(_early_bound(_bind(selected, "IView"), "IView"), view)) == 1
+            ):
+                pass
+            else:
                 raise RuntimeError(
-                    f"{label}: expected one visible occurrence, got {len(leaves)}; {context}"
+                    f"{label}: unexpected reading selection context at slot {index}, "
+                    f"type={native_type}, entity_present={selected is not None}; {context}"
                 )
-            edges_by_occurrence[key] = visible_component_entities(view, leaves[0].component, 1)
-        # Occurrence-listed edges use part metres, as in assembly balloon
-        # anchoring. Keep the actual section-land point, not a nearby rim.
-        local = tuple(value / 1000.0 for value in reading.local_mm)
-        matches, nearest = [], []
-        for edge in edges_by_occurrence[key]:
+        if edge is None:
+            raise RuntimeError(f"{label}: expected exactly one reading EDGE, got none; {context}")
+        if reading.view_index not in leaves_by_view:
+            leaves_by_view[reading.view_index] = _view_component_leaves(adapter, view, label=label)
+        _capture_reading_component(
+            adapter, reading, edge, leaves_by_view[reading.view_index], label=label
+        )
+        if reading.view_index in (2, 3):
+            local = tuple(value / 1000.0 for value in reading.local_mm)
             try:
                 closest = tuple(float(value) for value in (edge.GetClosestPointOn(*local) or ()))[:3]
             except Exception as exc:
                 raise RuntimeError(f"{label}: native edge closest-point query failed; {context}") from exc
             if len(closest) != 3 or not all(math.isfinite(value) for value in closest):
-                raise RuntimeError(
-                    f"{label}: native edge closest point is invalid: {closest!r}; {context}"
-                )
+                raise RuntimeError(f"{label}: native edge closest point is invalid: {closest!r}; {context}")
             error_sq = sum((actual - expected) ** 2 for actual, expected in zip(closest, local, strict=True))
-            distance_mm = math.sqrt(error_sq) * 1000.0
-            nearest.append((distance_mm, tuple(value * 1000.0 for value in closest)))
-            if error_sq <= 1e-14:  # ViewEdges.exact_line_through's 1e-8 mm².
-                matches.append((edge, distance_mm))
-        if len(matches) != 1:
-            # A diagnostic pick must never bypass this exact-edge refusal.
-            try:
-                _probe_capture_reading_picks(adapter, views)
-            except Exception as exc:
-                _telemetry.info(f"{label}: diagnostic-only probe aborted: {exc!r}")
-            raise RuntimeError(
-                f"{label}: requires one exact occurrence edge, got {len(matches)}; "
-                f"edge_count={len(edges_by_occurrence[key])}; "
-                f"nearest_mm={sorted(nearest)[:3]}; actual_owner='<not-selected>'; "
-                f"native_type='<not-selected>'; {context}"
-            )
-        edge, distance_mm = matches[0]
-        if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(view.GetName2())):
-            raise RuntimeError(f"{label}: failed to activate reading view; {context}")
+            if error_sq > 1e-14:  # ViewEdges.exact_line_through's 1e-8 mm².
+                raise RuntimeError(
+                    f"{label}: reading edge does not pass through its section point; "
+                    f"closest_mm={math.sqrt(error_sq) * 1000.0:g}; {context}"
+                )
+        elif reading.view_index != 1:
+            raise RuntimeError(f"{label}: unsupported reading view role {reading.view_index}")
+        # The plan note identifies hardware regions, not a static 3D gap.
+        # Reselect just the verified edge: coordinate picks also select its view.
         adapter.currentModel.ClearSelection2(True)
-        if not _early_bound(view, "IView").SelectEntity(edge, False):
-            raise RuntimeError(
-                f"{label}: failed to select exact occurrence edge; closest_mm={distance_mm:g}; {context}"
-            )
-        manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+        if not bound_view.SelectEntity(edge, False):
+            raise RuntimeError(f"{label}: failed to reselect reading edge; {context}")
         count = int(manager.GetSelectedObjectCount2(-1))
-        if count != 1:
-            raise RuntimeError(f"{label}: exact edge selection produced {count} entities; {context}")
-        entity = manager.GetSelectedObject6(1, -1)
-        native_type = int(manager.GetSelectedObjectType3(1, -1))
-        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2") if entity is not None else None
-        actual_owner = str(component.Name2) if component is not None else ""
-        evidence = (
-            f"actual_owner={actual_owner!r}; native_type={native_type}; "
-            f"closest_mm={distance_mm:g}; {context}"
-        )
-        _telemetry.info(f"{label}: {evidence}")
-        if native_type != 1 or actual_owner.casefold() != wanted.casefold():  # swSelEDGES
-            raise RuntimeError(f"{label}: reading point did not select {wanted!r}'s own edge; {evidence}")
+        if count != 1 or int(manager.GetSelectedObjectType3(1, -1)) != 1:
+            raise RuntimeError(f"{label}: reading edge reselection is not one native EDGE; {context}")
+        entity = _early_bound(_bind(manager.GetSelectedObject6(1, -1), "IEdge"), "IEdge")
+        if entity is None or int(adapter.swApp.IsSame(entity, edge)) != 1:
+            raise RuntimeError(f"{label}: reading edge reselection substituted another entity; {context}")
         if manager.SetSelectionPoint2(1, -1, *point, 0.0) is not True:
             raise RuntimeError(f"{label}: could not set native reading point")
         note = adapter.currentModel.InsertNote(reading.text)
@@ -3076,13 +2952,15 @@ def _assert_capture_sheet(
         raise RuntimeError("jig capture: expected three selected native crop profiles")
     cluster = next(c for c in CLUSTERS if c.sheet == PIVOT_CAPTURE_SHEET)
     installed = capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
+    leaves_by_view = {}
     for index, (view, scale, region) in enumerate(zip(views, scales, CAPTURE_VIEW_REGIONS, strict=True)):
         bound = _early_bound(view, "IView")
         ratio = tuple(float(v) for v in bound.ScaleRatio)
         configuration = SIMPLIFIED_VIEW_CONFIGURATION if index == 0 else ASSEMBLY_VIEW_CONFIGURATION
         if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9 or str(bound.ReferencedConfiguration) != configuration or bool(bound.IsExploded()) != (index == 0):
             raise RuntimeError(f"jig capture view {index}: changed scale/configuration/exploded state")
-        shown = {leaf.path for leaf in _view_component_leaves(adapter, view, label="jig capture") if leaf.visible}
+        leaves_by_view[index] = _view_component_leaves(adapter, view, label="jig capture")
+        shown = {leaf.path for leaf in leaves_by_view[index] if leaf.visible}
         if shown != (capture_support_instances(cluster, 0) if index == 0 else installed):
             raise RuntimeError(f"jig capture view {index}: wrong visible occurrence isolation")
         if index:
@@ -3112,9 +2990,12 @@ def _assert_capture_sheet(
         height = float(_early_bound(annotation.GetTextFormat(0), "ITextFormat").CharHeight)
         if abs(height - CAPTURE_NOTE_HEIGHT) > 1e-8:
             raise RuntimeError(f"{label}: native reading-label height changed")
-        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2")
-        if component is None or str(component.Name2) != spec.instance_name(reading.stem, reading.index):
-            raise RuntimeError(f"{label}: lost source occurrence edge ownership")
+        try:
+            _capture_reading_component(
+                adapter, reading, entity, leaves_by_view[reading.view_index], label=label
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(f"{label}: lost source occurrence edge ownership; {exc}") from exc
         _assert_attached_to(adapter, annotation, entity, entity_type="EDGE", what="reading label", label=label)
         point = model_point_in_view(adapter, views[reading.view_index], _capture_world_point(reading), label=label)
         _assert_leader_lands(annotation, point, what="reading label", label=label, tolerance=0.0002)
