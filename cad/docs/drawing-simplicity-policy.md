@@ -77,6 +77,9 @@ cannot ask for what the authors were told to leave out.
   station/extent proof is not exact glyph or foreign-line clearance proof;
   retain every line, including fraction bars, and inspect the actual PDF ink,
   whole sheet and automated machinist result after regeneration.
+  Front and Right reserve the same vertical annotation margins before fitting,
+  so their physical projection centres remain aligned without moving a fitted
+  view or changing its shared scale; per-view horizontal budgets remain intact.
   The five nut stems additionally enforce `text-clearance`, `text-on-line`,
   `dim-line-through-own-text`, `text-on-view` and `arrow-near-text`.
   `extension-through-own-text` remains reported rather than newly enforced:

@@ -6,6 +6,7 @@ wrappers. They exercise production proofs, not native farm/COM coverage.
 
 from __future__ import annotations
 
+import importlib
 import math
 from types import SimpleNamespace as NS
 
@@ -13,6 +14,7 @@ import pytest
 
 import _drawing_layout_audit as layout_audit
 import _drawing_edge_dimensions as edge_dimensions
+import _purchased_fastener_drawing as purchased
 import _supplier_dimensions as supplier_dimensions
 import _supplier_nut_drawing as nuts
 import _supplier_screw_dimensions as screws
@@ -898,3 +900,229 @@ def test_public_nut_settled_proof_does_not_repair_transverse_text_drift(monkeypa
         settled()
     assert ink.writes == writes
     assert case.rebuilds == rebuilds
+
+
+# Actual27f layout-audit records, 20261022T220225221Z-
+# 7f2282487c0847d88dfd647d05b513be, reports/layout-audit/<part>.json.
+# Keep the captured outlines self-contained: no farm files or native seat needed.
+PROJECTION_CONSUMERS = [
+    pytest.param(
+        "draw_pn_vn_pen_hanger_jam_nut", (5, 1), 0.008,
+        {
+            "*Front": (0.093537, 0.1103311, 0.136463, 0.1581689),
+            "*Top": (0.093537, 0.2184589, 0.136463, 0.2415411),
+            "*Right": (0.3034589, 0.1163311, 0.3265411, 0.1641689),
+            "*Isometric": (0.2989772, 0.1975338, 0.3410228, 0.2564662),
+        },
+        id="jam",
+    ),
+    pytest.param(
+        "draw_mg_vn_wheel_axle_nut", (5, 1), 0.008,
+        {
+            "*Front": (0.093537, 0.1125811, 0.136463, 0.1604189),
+            "*Top": (0.093537, 0.2184589, 0.136463, 0.2415411),
+            "*Right": (0.3034589, 0.1185811, 0.3265411, 0.1664189),
+            "*Isometric": (0.2989772, 0.1975338, 0.3410228, 0.2564662),
+        },
+        id="axle",
+    ),
+    pytest.param(
+        "draw_pn_vn_pen_adjust_nut", (8, 1), 0.011,
+        {
+            "*Front": (0.093537, 0.1103311, 0.136463, 0.1581689),
+            "*Top": (0.093537, 0.2196495, 0.136463, 0.2403505),
+            "*Right": (0.3046495, 0.1163311, 0.3253505, 0.1641689),
+            "*Isometric": (0.2998191, 0.1980198, 0.3401809, 0.2559802),
+        },
+        id="adjust",
+    ),
+    pytest.param(
+        "draw_pn_vn_pen_hanger_nut", (4, 1), 0.006,
+        {
+            "*Front": (0.0919495, 0.108498, 0.1380505, 0.160002),
+            "*Top": (0.0919495, 0.218062, 0.1380505, 0.241938),
+            "*Right": (0.303062, 0.114498, 0.326938, 0.166002),
+            "*Isometric": (0.297574, 0.1952269, 0.342426, 0.2587731),
+        },
+        id="hanger",
+    ),
+    pytest.param(
+        "draw_sm_vn_boss_hook_jam_nut", (4, 1), 0.007,
+        {
+            "*Front": (0.093537, 0.1125811, 0.136463, 0.1604189),
+            "*Top": (0.093537, 0.2188557, 0.136463, 0.2411443),
+            "*Right": (0.3038557, 0.1185811, 0.3261443, 0.1664189),
+            "*Isometric": (0.2992578, 0.1976958, 0.3407422, 0.2563042),
+        },
+        id="bossjam",
+    ),
+]
+_NUT_OUTLINE_PADDING_M = 0.011176
+
+
+def _extent(bounds):
+    return (bounds[2] - bounds[0], bounds[3] - bounds[1])
+
+
+class NutFitView:
+    """Physical projections plus captured fixed outline padding, never COM.
+
+    Candidate bounds model scale-dependent body geometry and scale-independent
+    sheet padding. They are not measurements of unobserved native candidates.
+    Right/Top retain the off-origin 0..THICKNESS extrusion rather than assuming
+    the native view origin is already the outline centre.
+    """
+
+    def __init__(self, bounds, position):
+        self._bounds = bounds
+        self._position = position
+        self._scale_ratio = (1.0, 1.0)
+        self.UseSheetScale = 1
+        self.moves = []
+        self.scale_writes = []
+        self.refreshes = []
+
+    @property
+    def Position(self):
+        return self._position
+
+    @property
+    def ScaleRatio(self):
+        return self._scale_ratio
+
+    @ScaleRatio.setter
+    def ScaleRatio(self, ratio):
+        self._scale_ratio = tuple(ratio)
+        self.scale_writes.append((self._scale_ratio, len(self.moves)))
+
+    def geometry_bounds(self):
+        ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+        x, y = self.Position
+        x0, y0, x1, y1 = self._bounds
+        return (x + x0 * ratio, y + y0 * ratio,
+                x + x1 * ratio, y + y1 * ratio)
+
+    def GetOutline(self):
+        x0, y0, x1, y1 = self.geometry_bounds()
+        pad = _NUT_OUTLINE_PADDING_M / 2
+        return (x0 - pad, y0 - pad, x1 + pad, y1 + pad)
+
+    def UpdateViewDisplayGeometry(self):
+        self.refreshes.append((self.ScaleRatio, len(self.moves)))
+
+    def SetViewPosition(self, position, _update):
+        self._position = tuple(position)
+        self.moves.append(self.Position)
+        return True
+
+
+def _fit_nut_recipe(monkeypatch, recipe, expected_scale, captured, *, margins=None):
+    # Only replace native array marshaling, not cells, candidate scales,
+    # rebuild/refresh, size rejection, centering or containment.
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    label = recipe.SPEC.artifact_stem
+    notes = str(purchased._config.parts(label).get("installation_notes", ""))
+    outer = purchased.fastener_view_cells(purchased.view_band_bottom(notes, label=label))
+    fitted = purchased.supplier_fit_cells(
+        outer, recipe.SUPPLIER_MARGINS if margins is None else margins, label=label,
+    )
+    af = recipe.supplier.ACROSS_FLATS / 1000.0
+    ac = recipe.supplier.ACROSS_CORNERS / 1000.0
+    thickness = recipe.supplier.THICKNESS / 1000.0
+    ratio = expected_scale[0] / expected_scale[1]
+    # The Isometric participates independently in the real four-view fit.
+    # Its size is a decomposition of the captured outline, not a claimed
+    # physical silhouette proof; orthographic bodies use the actual nut spec.
+    iso_width, iso_height = (
+        (size - _NUT_OUTLINE_PADDING_M) / ratio
+        for size in _extent(captured["*Isometric"])
+    )
+    bounds = {
+        "*Front": (-af / 2, -ac / 2, af / 2, ac / 2),
+        "*Top": (-af / 2, -thickness, af / 2, 0.0),
+        "*Right": (-thickness, -ac / 2, 0.0, ac / 2),
+        "*Isometric": (-iso_width / 2, -iso_height / 2, iso_width / 2, iso_height / 2),
+    }
+    views = {name: NutFitView(bounds[name], center) for name, center, _cell in outer}
+    scales = purchased._fit_views(NS(EditRebuild3=lambda: True), list(views.values()), fitted)
+    return NS(outer=outer, fitted=fitted, views=views, scales=scales)
+
+
+@pytest.mark.parametrize(
+    "recipe_name,expected_scale,right_padding,captured", PROJECTION_CONSUMERS,
+)
+def test_actual_nut_margins_preserve_projected_geometry_at_original_standard_scale(
+    monkeypatch, recipe_name, expected_scale, right_padding, captured,
+):
+    recipe = importlib.import_module(recipe_name)
+    result = _fit_nut_recipe(monkeypatch, recipe, expected_scale, captured)
+    assert result.scales == {name: expected_scale for name in result.views}
+    front = result.views["*Front"].geometry_bounds()
+    right = result.views["*Right"].geometry_bounds()
+    top = result.views["*Top"].geometry_bounds()
+    # Equal model-Y endpoints must stay projected, not merely equal view
+    # origins or API arguments; Top also keeps Front's model-X projection.
+    assert (right[1], right[3]) == pytest.approx((front[1], front[3]), abs=1e-12)
+    assert (top[0], top[2]) == pytest.approx((front[0], front[2]), abs=1e-12)
+    original = {name: cell for name, _center, cell in result.outer}
+    for name, _center, cell in result.fitted:
+        view = result.views[name]
+        assert purchased._inside(view.GetOutline(), cell)
+        assert purchased._inside(view.GetOutline(), original[name])
+        assert purchased._inside(view.geometry_bounds(), cell)
+        # The captured JSON rounds each coordinate to seven decimal places.
+        assert _extent(view.GetOutline()) == pytest.approx(
+            _extent(captured[name]), rel=0.0, abs=2e-7,
+        )
+        assert view.ScaleRatio == expected_scale
+        assert view.UseSheetScale == 0
+        assert len(view.moves) == 1
+        assert view.Position == view.moves[0]
+        assert all(moves_before_write == 0 for _ratio, moves_before_write in view.scale_writes)
+        assert view.refreshes[-1] == (expected_scale, 1)
+        if name in ("*Front", "*Right"):
+            # Keep both original annotation reservations: reverting either
+            # Right's bottom or top independently must change real geometry.
+            assert cell[1] == pytest.approx(original[name][1] + 0.026)
+            assert cell[3] == pytest.approx(original[name][3] - 0.020)
+            body = view.geometry_bounds()
+            original_center = (original[name][1] + original[name][3]) / 2
+            assert (body[1] + body[3]) / 2 == pytest.approx(original_center + 0.003)
+        if name == "*Right":
+            assert (cell[0], cell[2]) == pytest.approx(
+                (original[name][0] + right_padding, original[name][2] - right_padding),
+            )
+
+
+@pytest.mark.parametrize(
+    "recipe_name,expected_scale,right_padding,captured", PROJECTION_CONSUMERS,
+)
+def test_legacy_nut_right_padding_reproduces_six_mm_physical_projection_error(
+    monkeypatch, recipe_name, expected_scale, right_padding, captured,
+):
+    recipe = importlib.import_module(recipe_name)
+    aligned = _fit_nut_recipe(monkeypatch, recipe, expected_scale, captured)
+    legacy_margins = {
+        **recipe.SUPPLIER_MARGINS,
+        "*Right": (right_padding, 0.018, right_padding, 0.0),
+    }
+    legacy = _fit_nut_recipe(
+        monkeypatch, recipe, expected_scale, captured, margins=legacy_margins,
+    )
+    assert aligned.outer == legacy.outer
+    assert aligned.scales == legacy.scales == {
+        name: expected_scale for name in aligned.views
+    }
+    front = legacy.views["*Front"].geometry_bounds()
+    right = legacy.views["*Right"].geometry_bounds()
+    assert (right[1] - front[1], right[3] - front[3]) == pytest.approx((0.006, 0.006))
+    for name, _center, cell in legacy.outer:
+        old = legacy.views[name]
+        new = aligned.views[name]
+        assert purchased._inside(old.GetOutline(), cell)
+        assert purchased._inside(new.GetOutline(), cell)
+        if name == "*Right":
+            x0, y0, x1, y1 = old.geometry_bounds()
+            assert new.geometry_bounds() == pytest.approx((x0, y0 - 0.006, x1, y1 - 0.006))
+        else:
+            assert new.geometry_bounds() == pytest.approx(old.geometry_bounds())

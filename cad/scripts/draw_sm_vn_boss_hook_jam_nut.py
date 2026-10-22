@@ -26,7 +26,10 @@ SUPPLIER_MARGINS = supplier_screw_margins(
     supplier.SUPPLIER_REFERENCE_DIMENSIONS,
     sides={"ThreadNominalMajor": "bottom"},
 )
-SUPPLIER_MARGINS["*Right"] = (0.007, 0.018, 0.007, 0.0)
+# Match Front's vertical fit budget to preserve projected alignment.
+SUPPLIER_MARGINS["*Right"] = (
+    0.007, SUPPLIER_MARGINS["*Front"][1], 0.007, SUPPLIER_MARGINS["*Front"][3],
+)
 
 
 def _supplier_dimensions(
