@@ -196,6 +196,7 @@ def _head_height_points() -> tuple[tuple[float, float, float], ...]:
     )
 
 
+@_telemetry.traced("drawing.pivot_head_height_entities")
 def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
     """Name one physical arc at each station; circle parameters alone are not identity."""
     front = _early_bound(front, "IView")
@@ -223,26 +224,32 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
                 and radius_error <= 1e-5
                 and axis_error <= 1e-6
             )
-            nearest, point_error = (), None
-            if named_circle:
-                raw = _early_bound(item.edge, "IEdge").GetClosestPointOn(
-                    point[0], point[1], point[2]
-                )
-                nearest = tuple(float(value) for value in (raw or ())[:3])
-                if len(nearest) == 3 and all(math.isfinite(value) for value in nearest):
-                    point_error = math.dist(nearest, point)
-                    if point_error <= 1e-8:
-                        matches.append(item.edge)
-            candidates.append({
+            candidate = {
                 "circle_mm": geometry,
                 "center_error_mm": center_error,
                 "radius_error_mm": radius_error,
                 "axis_error": axis_error,
-                "nearest_m": nearest,
-                "point_error_m": point_error,
-            })
+                "nearest_m": (),
+                "point_error_m": None,
+            }
+            candidates.append(candidate)
+            if not named_circle:
+                continue
+            raw = _early_bound(item.edge, "IEdge").GetClosestPointOn(
+                point[0], point[1], point[2]
+            )
+            nearest = tuple(float(value) for value in (raw or ())[:3])
+            candidate["nearest_m"] = nearest
+            if len(nearest) != 3 or not all(math.isfinite(value) for value in nearest):
+                continue
+            point_error = math.dist(nearest, point)
+            candidate["point_error_m"] = point_error
+            if point_error > 1e-8:
+                continue
+            matches.append(item.edge)
         candidates.sort(key=lambda item: (
-            item["center_error_mm"] + item["radius_error_mm"] + item["axis_error"]
+            item["center_error_mm"] + item["radius_error_mm"] + item["axis_error"],
+            item["point_error_m"] if item["point_error_m"] is not None else math.inf,
         ))
         evidence = candidates[:12]
         _telemetry.event(
@@ -261,15 +268,27 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
     return resolved[0], resolved[1]
 
 
-def _assert_physical_head_height(adapter: Any, front: Any, display: Any) -> float:
-    """Rescan the real rims and prove native value and exactly two EDGE attachments."""
-    entities = _head_height_entities(adapter, front)
+@_telemetry.traced("drawing.pivot_head_height_assert")
+def _assert_physical_head_height(
+    adapter: Any, front: Any, display: Any, *, entities: tuple[Any, Any] | None = None
+) -> float:
+    """Prove native vertical value/attachments; settled and saved calls rescan rims."""
+    if entities is None:
+        entities = _head_height_entities(adapter, front)
     if display is None:
         raise RuntimeError("SupplierHeadHeight: missing native display dimension")
     display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) != 12:  # swDimensionType_e.swVertLinearDimension
+        raise RuntimeError("SupplierHeadHeight: native dimension is not vertical")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError("SupplierHeadHeight: missing native annotation")
+    owner = annotation.Owner
+    if (
+        int(annotation.OwnerType) != 0 or owner is None
+        or int(adapter.swApp.IsSame(owner, front)) != 1
+    ):
+        raise RuntimeError("SupplierHeadHeight: annotation owner is not the exact front view")
     attached = tuple(annotation.GetAttachedEntities3() or ())
     kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
     if (
@@ -284,6 +303,7 @@ def _assert_physical_head_height(adapter: Any, front: Any, display: Any) -> floa
     )
 
 
+@_telemetry.traced("drawing.pivot_head_height_add")
 def _add_physical_head_height(
     adapter: Any, front: Any, text_xy: tuple[float, float]
 ) -> Any:
@@ -320,7 +340,7 @@ def _add_physical_head_height(
         display = model.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
         if display is None:
             raise RuntimeError("SupplierHeadHeight: native vertical dimension creation returned null")
-        _assert_physical_head_height(adapter, front, display)
+        _assert_physical_head_height(adapter, front, display, entities=entities)
         return display
     finally:
         model.ClearSelection2(True)
@@ -509,6 +529,7 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
 
 
+@_telemetry.traced("drawing.pivot_head_height_saved")
 def _assert_saved_physical_head_height(
     adapter: Any, identities: dict, configurations: dict
 ) -> None:
@@ -541,6 +562,8 @@ def _assert_saved_physical_head_height(
             raise RuntimeError("SupplierHeadHeight: reopened file is not the current drawing")
         adapter.currentModel = model
         drawing = _early_bound(model, "IDrawingDoc")
+        if tuple(str(name) for name in (drawing.GetSheetNames() or ())) != SHEET_NAMES:
+            raise RuntimeError("SupplierHeadHeight: saved sheet census changed")
         full_name, expected_owner, _old_entities, _old_kinds = identities["SupplierHeadHeight"]
         expected_configuration = configurations[expected_owner]
         if expected_configuration[0] != SHEET_NAMES[0]:
@@ -555,8 +578,11 @@ def _assert_saved_physical_head_height(
                 view = _early_bound(view, "IView")
                 for raw in view.GetDisplayDimensions() or ():
                     display = _early_bound(raw, "IDisplayDimension")
-                    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-                    if dimension is not None and str(dimension.FullName) == full_name:
+                    native = display.GetDimension2(0)
+                    if native is None:
+                        raise RuntimeError("SupplierHeadHeight: saved display has no native dimension")
+                    dimension = _early_bound(native, "IDimension")
+                    if str(dimension.FullName) == full_name:
                         matches.append((sheet_name, view, display))
                 view = view.GetNextView()
         if len(matches) != 1:

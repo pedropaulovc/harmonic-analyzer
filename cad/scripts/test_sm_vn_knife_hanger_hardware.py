@@ -1489,7 +1489,7 @@ def test_stud_head_height_creates_native_vertical_dimension_with_strict_edge_rea
     assert case.creations == [(0.218, 0.216, 0.0)]
     assert case.clears == [True, True]
     assert not case.selections
-    assert len(case.scans) == 2  # Selection resolution, then independent created readback.
+    assert len(case.scans) == 1  # Creation reuses the just-resolved pair for native readback.
     projected = case.projections[0][1]
     assert projected == [
         tuple(value / 1000 for value in point)
@@ -1833,3 +1833,206 @@ def test_stud_head_height_refuses_unreadable_or_moved_actual_bearing_point(monke
         bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
     assert not case.selection_log
     assert not case.creations
+
+
+@pytest.mark.parametrize(
+    "name",
+    ("_head_height_entities", "_add_physical_head_height",
+     "_assert_physical_head_height", "_assert_saved_physical_head_height"),
+)
+def test_stud_physical_head_height_native_entrypoints_are_traced(name):
+    assert hasattr(getattr(bolt_drawing, name), "__wrapped__")
+
+
+@pytest.mark.parametrize("wrong_value", [False, True])
+def test_stud_created_readback_reuses_named_pair_without_skipping_native_proof(
+    monkeypatch, wrong_value
+):
+    case = _stud_height_case(monkeypatch)
+
+    def unexpected_scan(*_args, **_kwargs):
+        raise AssertionError("creation readback must reuse its freshly resolved physical pair")
+
+    monkeypatch.setattr(bolt_drawing, "scan_view_edges", unexpected_scan)
+    if wrong_value:
+        case.native.SystemValue -= 0.0001
+        with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+            bolt_drawing._assert_physical_head_height(
+                case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+            )
+        return
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+    ) == pytest.approx(bolt.HEAD_H)
+
+
+def test_stud_unique_physical_pair_does_not_repeat_the_bearing_identity_lookup(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    comparisons = []
+
+    def same(first, second):
+        comparisons.append((first, second))
+        return int(first is second)
+
+    case.app.IsSame = same
+    bearing, top = bolt_drawing._head_height_entities(case.adapter, case.front)
+    assert bearing is case.bearing
+    assert top is case.top
+    assert comparisons == [(case.bearing, case.top)]
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stud_changed_geometry_diagnostics_keep_nearest_lines_and_circles_bounded(
+    monkeypatch, reverse
+):
+    case = _stud_height_case(monkeypatch)
+    near_line = replace(
+        case.bearing_item,
+        line=tuple((x, y + 0.001, z) for x, y, z in case.bearing_item.line),
+    )
+    near_circle = replace(
+        case.top_item,
+        circle=(*case.top_item.circle[:6], bolt.HEAD_AF / 2 + 0.001),
+    )
+    far_lines = [
+        replace(
+            case.bearing_item, edge=case.edge(None),
+            line=tuple((x, y + 10 + index, z) for x, y, z in case.bearing_item.line),
+        )
+        for index in range(16)
+    ]
+    far_circles = [
+        replace(
+            case.top_item, edge=case.edge(None),
+            circle=(*case.top_item.circle[:6], bolt.HEAD_AF / 2 + 10 + index),
+        )
+        for index in range(16)
+    ]
+    invalid_line = replace(
+        case.bearing_item,
+        line=((math.nan, bolt.LENGTH, 0.0), case.bearing_item.line[1]),
+    )
+    invalid_circle = replace(
+        case.top_item, circle=(*case.top_item.circle[:6], math.nan)
+    )
+    edges = [*far_lines, *far_circles, invalid_line, invalid_circle, near_line, near_circle]
+    case.front.scan = ViewEdges(
+        "changed source with near misses", tuple(reversed(edges) if reverse else edges)
+    )
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._head_height_entities(case.adapter, case.front)
+    evidence = next(fields for name, fields in case.events if name.endswith("_geometry"))
+    assert evidence["line_count"] == evidence["circle_count"] == 18
+    assert len(evidence["lines"]) == len(evidence["circles"]) == 12
+    assert evidence["lines"][0]["line_mm"] == near_line.line
+    assert evidence["circles"][0]["circle_mm"] == near_circle.circle
+    assert evidence["lines"][0]["geometry_error_mm"] == pytest.approx(0.001)
+    assert evidence["circles"][0]["geometry_error_mm"] == pytest.approx(0.001)
+    assert not evidence["circles"][0]["shape_matches"]
+
+
+@pytest.mark.parametrize("missing_registered", [False, True])
+def test_stud_saved_proof_requires_the_opened_document_to_be_registered_by_exact_path(
+    monkeypatch, tmp_path, missing_registered
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    loaded_lookups = []
+
+    def lookup(path):
+        assert path == case.path
+        if not case.loaded:
+            return None
+        loaded_lookups.append(path)
+        if len(loaded_lookups) == 1:
+            return None if missing_registered else object()
+        return case.model
+
+    case.app.GetOpenDocumentByName = lookup
+    with pytest.raises(RuntimeError, match="wrong current drawing"):
+        bolt_drawing._assert_saved_physical_head_height(
+            case.adapter, case.identities, case.configurations
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert not case.loaded
+    assert not case.scans
+
+
+@pytest.mark.parametrize("missing_current", [False, True])
+def test_stud_saved_proof_refuses_adapter_current_model_drift_before_geometry_readback(
+    monkeypatch, tmp_path, missing_current
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    original_activate = case.model.ActivateSheet
+
+    def activate(name):
+        result = original_activate(name)
+        case.adapter.currentModel = None if missing_current else case.previous_model
+        return result
+
+    case.model.ActivateSheet = activate
+    with pytest.raises(RuntimeError, match="adapter's exact current drawing"):
+        bolt_drawing._assert_saved_physical_head_height(
+            case.adapter, case.identities, case.configurations
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert not case.loaded
+    assert not case.scans
+
+
+def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_major(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    af_display, height_display, thread_display = object(), object(), object()
+    edge_calls, formats, head_calls, imports = [], [], [], []
+    thread_annotation = SimpleNamespace(GetSpecificAnnotation=lambda: thread_display)
+
+    def add_edge(_adapter, view, **kwargs):
+        edge_calls.append((view, kwargs))
+        return af_display
+
+    def add_height(_adapter, view, text_xy):
+        head_calls.append((view, text_xy))
+        return height_display
+
+    def format_reference(_adapter, display, name):
+        formats.append((display, name))
+        return name
+
+    def import_major(_adapter, view, **kwargs):
+        imports.append((view, kwargs))
+        return [thread_annotation]
+
+    monkeypatch.setattr(bolt_drawing, "add_edge_dimension", add_edge)
+    monkeypatch.setattr(bolt_drawing, "_add_physical_head_height", add_height)
+    monkeypatch.setattr(bolt_drawing, "_format_supplier_reference", format_reference)
+    monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", import_major)
+    monkeypatch.setattr(
+        bolt_drawing, "dimension_name", lambda _adapter, _annotation: "SupplierThreadMajor"
+    )
+    result = bolt_drawing._add_supplier_references(case.adapter, case.front)
+    assert result == {
+        name: name for name in ("SupplierHeadAF", "SupplierHeadHeight", "SupplierThreadMajor")
+    }
+    points_m = case.projections[0][1]
+    assert points_m[0] == pytest.approx((
+        -bolt.HEAD_AF / 2000, (bolt.LENGTH + bolt.HEAD_H / 3) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    ))
+    assert points_m[1] == pytest.approx((
+        bolt.HEAD_AF / 2000, (bolt.LENGTH + bolt.HEAD_H / 3) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    ))
+    assert edge_calls == [(case.front, {
+        "p0": (points_m[0][0] + 0.1, points_m[0][1] + 0.1),
+        "p1": (points_m[1][0] + 0.1, points_m[1][1] + 0.1),
+        "text_xy": (0.110, 0.255), "label": "SupplierHeadAF", "orientation": "horizontal",
+    })]
+    assert head_calls == [(case.front, (0.218, 0.216))]
+    assert formats == [
+        (af_display, "SupplierHeadAF"), (height_display, "SupplierHeadHeight"),
+        (thread_display, "SupplierThreadMajor"),
+    ]
+    assert imports[0][0] is case.front
+    assert imports[0][1]["keep"] == {"SupplierThreadMajor": (0.170, 0.194)}
+    assert imports[0][1]["dimensions_by_feature"] is bolt.SUPPLIER_DRAWING_DIMENSIONS

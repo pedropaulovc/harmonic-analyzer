@@ -616,7 +616,7 @@ def _physical_head_fixture(monkeypatch):
     presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"]
     texts = {1: "(", 2: " in)", 4: presentation.get("callout", "")}
     display = SimpleNamespace(
-        Type2=2, ShowDimensionValue=True, ShowParenthesis=False,
+        Type2=12, ShowDimensionValue=True, ShowParenthesis=False,
         GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
         GetUseDocUnits=lambda: False, GetUnits=lambda: 3,
         GetPrimaryPrecision2=lambda: presentation["precision"],
@@ -801,7 +801,7 @@ def test_physical_head_height_uses_strict_entity_selection_and_native_vertical_d
         for index, point in enumerate(projected, 1)
     ]
     assert state.additions == [(0.224, 0.201, 0.0)]
-    assert len(state.scans) == 2  # Creation proof freshly resolves actual edges.
+    assert len(state.scans) == 1  # Creation reuses its strictly resolved physical pair.
     assert state.selection.clear_count == 2
     assert not state.selection.selected
 
@@ -862,6 +862,10 @@ def test_physical_head_height_refuses_bad_native_selection_and_creation(
     ("attachment_type", "two EDGE attachments"),
     ("dangling", "named entities"),
     ("missing_native", "no native model dimension"),
+    ("dimension_type", "not vertical"),
+    ("owner_type", "exact front view"),
+    ("missing_owner", "exact front view"),
+    ("wrong_owner", "exact front view"),
 ))
 def test_physical_head_height_proves_creation_and_settled_native_state(
     monkeypatch, phase, fault, message,
@@ -889,6 +893,14 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
         state.annotation.dangling = True
     elif fault == "missing_native":
         state.display.GetDimension2 = lambda _index: None
+    elif fault == "dimension_type":
+        state.display.Type2 = 11
+    elif fault == "owner_type":
+        state.annotation.OwnerType = 1
+    elif fault == "missing_owner":
+        state.annotation.Owner = None
+    elif fault == "wrong_owner":
+        state.annotation.Owner = SimpleNamespace(name=state.front.name)
     with pytest.raises(RuntimeError, match=message):
         if phase == "creation":
             drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
@@ -952,6 +964,7 @@ def _saved_head_fixture(monkeypatch, tmp_path):
         GetPathName=lambda: str(state.path), GetType=lambda: 3,
         GetTitle=lambda: state.path.name,
         GetFirstView=lambda: state.sheets[state.active_sheet],
+        GetSheetNames=lambda: tuple(state.sheets),
     )
 
     def activate_sheet(name):
@@ -1042,7 +1055,17 @@ def test_saved_head_height_reopens_read_only_rescans_proves_and_closes(
     ("wrong_annotation_owner", "owner/configuration"),
     ("wrong_configuration", "owner/configuration"),
     ("wrong_sheet", "owner/configuration"),
-    ("missing_sheet", "activate saved sheet"),
+    ("missing_sheet", "sheet census"),
+    ("extra_sheet", "sheet census"),
+    ("duplicate_sheet_names", "sheet census"),
+    ("reordered_sheet_names", "sheet census"),
+    ("empty_sheet_names", "sheet census"),
+    ("sheet_activation", "activate saved sheet"),
+    ("missing_native", "saved display has no native dimension"),
+    ("orphan_display", "saved display has no native dimension"),
+    ("dimension_type", "not vertical"),
+    ("owner_type", "exact front view"),
+    ("same_named_wrong_owner", "exact front view"),
     ("wrong_value", "measures"),
     ("wrong_attachment", "named entities"),
     ("wrong_type_attachment", "two EDGE attachments"),
@@ -1098,6 +1121,26 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
         state.sheets[drawing.SHEET_NAMES[1]].GetNextView = lambda: state.front
     elif fault == "missing_sheet":
         del state.sheets[drawing.SHEET_NAMES[1]]
+    elif fault == "extra_sheet":
+        state.sheets["EXTRA"] = SimpleNamespace()
+    elif fault == "duplicate_sheet_names":
+        state.saved.GetSheetNames = lambda: (*drawing.SHEET_NAMES, drawing.SHEET_NAMES[0])
+    elif fault == "reordered_sheet_names":
+        state.saved.GetSheetNames = lambda: tuple(reversed(drawing.SHEET_NAMES))
+    elif fault == "empty_sheet_names":
+        state.saved.GetSheetNames = lambda: None
+    elif fault == "sheet_activation":
+        state.saved.ActivateSheet = lambda name: name != drawing.SHEET_NAMES[1]
+    elif fault == "missing_native":
+        state.display.GetDimension2 = lambda _index: None
+    elif fault == "orphan_display":
+        state.front.dimensions.append(SimpleNamespace(GetDimension2=lambda _index: None))
+    elif fault == "dimension_type":
+        state.display.Type2 = 11
+    elif fault == "owner_type":
+        state.annotation.OwnerType = 1
+    elif fault == "same_named_wrong_owner":
+        state.annotation.Owner = SimpleNamespace(name=state.front.name)
     elif fault == "wrong_value":
         state.native.SystemValue -= screw.HEAD_CHAMFER / 1000
     elif fault == "wrong_attachment":
@@ -1309,3 +1352,35 @@ def test_build_proves_physical_head_after_finalizer_closes_saved_drawing(
     assert events == [
         "identities", "finalize", "settled", "closed", "saved-reopen-proof",
     ]
+
+
+def test_physical_head_height_bounds_arc_evidence_without_hiding_the_nearest_match(
+    monkeypatch,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.edges[1:1] = [
+        state.item(_HeadRim(
+            state.selection, state.top.circle,
+            nearest=(0.0, screw.HEAD_H / 1000, -0.004, 0.0, 0.0),
+        ))
+        for _ in range(20)
+    ]
+    assert drawing._head_height_entities(state.adapter, state.front) == (
+        state.bearing, state.top,
+    )
+    _name, top_evidence = state.events[-1]
+    assert top_evidence["station"] == "top"
+    assert top_evidence["candidate_count"] == 22
+    assert len(top_evidence["candidates"]) == 12
+    assert top_evidence["candidates"][0]["point_error_m"] == 0.0
+    assert top_evidence["candidates"][0]["nearest_m"] == drawing._head_height_points()[1]
+
+
+@pytest.mark.parametrize("dimension_type", (0, 2, 6, 11))
+def test_physical_head_height_refuses_every_nonvertical_native_type(
+    monkeypatch, dimension_type,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.display.Type2 = dimension_type
+    with pytest.raises(RuntimeError, match="not vertical"):
+        drawing._assert_physical_head_height(state.adapter, state.front, state.display)

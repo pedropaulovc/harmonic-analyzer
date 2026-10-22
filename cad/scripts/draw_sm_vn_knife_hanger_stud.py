@@ -183,6 +183,7 @@ def _head_height_points_mm() -> tuple[tuple[float, float, float], ...]:
     )
 
 
+@_telemetry.traced("drawing.stud_head_height_entities")
 def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
     """Name the physical underside hex segment and frontmost outer top trim arc."""
     front = _early_bound(front, "IView")
@@ -192,63 +193,96 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
     bearing_point, top_point = _head_height_points_mm()
     tolerance_mm = 1e-5
     bearing_matches = []
+    line_details = []
     for item in scan.lines:
-        start, end = item.line
+        detail = {"line_mm": item.line, "geometry_error_mm": math.inf}
+        line_details.append(detail)
         if not all(math.isfinite(value) for point in item.line for value in point):
             continue
-        if math.dist(start, end) <= tolerance_mm:
-            continue
-        # The front-right outer hex side runs between (0, AF/sqrt(3))
-        # and (AF/2, AF/(2sqrt(3))) in XZ, at the actual underside Y.
-        if any(
-            abs(y - LENGTH) > tolerance_mm
-            or not -tolerance_mm <= x <= HEAD_AF / 2 + tolerance_mm
-            or abs(z - (HEAD_AF - x) / math.sqrt(3)) > tolerance_mm
-            for x, y, z in item.line
-        ):
-            continue
+        start, end = item.line
         vector = tuple(b - a for a, b in zip(start, end))
         length_sq = sum(value * value for value in vector)
-        t = sum((p - a) * v for p, a, v in zip(bearing_point, start, vector)) / length_sq
-        closest = tuple(a + t * v for a, v in zip(start, vector))
-        if 0.0 <= t <= 1.0 and math.dist(closest, bearing_point) <= tolerance_mm:
-            bearing_matches.append(item)
+        t = (
+            sum((p - a) * v for p, a, v in zip(bearing_point, start, vector)) / length_sq
+            if length_sq > 0.0 else 0.0
+        )
+        closest = tuple(a + min(1.0, max(0.0, t)) * v for a, v in zip(start, vector))
+        point_error_mm = math.dist(closest, bearing_point)
+        station_error_mm = max(abs(point[1] - LENGTH) for point in item.line)
+        # The front-right outer hex side runs between (0, AF/sqrt(3))
+        # and (AF/2, AF/(2sqrt(3))) in XZ, at the actual underside Y.
+        hex_side_error_mm = max(
+            abs(z - (HEAD_AF - x) / math.sqrt(3)) for x, _y, z in item.line
+        )
+        span_error_mm = max(
+            max(0.0, -point[0], point[0] - HEAD_AF / 2) for point in item.line
+        )
+        geometry_error_mm = max(
+            point_error_mm, station_error_mm, hex_side_error_mm, span_error_mm
+        )
+        detail.update(
+            geometry_error_mm=geometry_error_mm, point_error_mm=point_error_mm,
+            station_error_mm=station_error_mm, hex_side_error_mm=hex_side_error_mm,
+            span_error_mm=span_error_mm, length_mm=math.sqrt(length_sq),
+        )
+        if (
+            length_sq <= tolerance_mm ** 2
+            or not 0.0 <= t <= 1.0
+            or geometry_error_mm > tolerance_mm
+        ):
+            continue
+        bearing_matches.append(item)
+    line_details.sort(key=lambda row: row["geometry_error_mm"])
     top_matches = []
     circle_details = []
     top_point_m = tuple(value / 1000 for value in top_point)
     for item in scan.circles:
+        detail = {
+            "circle_mm": item.circle, "geometry_error_mm": math.inf,
+            "shape_matches": False, "nearest_m": None, "point_error_m": None,
+        }
+        circle_details.append(detail)
+        if not all(math.isfinite(value) for value in item.circle):
+            continue
         cx, cy, cz, nx, ny, nz, radius = item.circle
+        center_error_mm = max(abs(cx), abs(cy - HEAD_TOP_Y), abs(cz))
+        radius_error_mm = abs(radius - HEAD_AF / 2)
+        axis_error = max(abs(abs(ny) - 1.0), abs(nx), abs(nz))
+        geometry_error_mm = center_error_mm + radius_error_mm + axis_error * HEAD_AF / 2
         shape_matches = (
-            all(math.isfinite(value) for value in item.circle)
-            and max(abs(cx), abs(cy - HEAD_TOP_Y), abs(cz)) <= tolerance_mm
-            and abs(radius - HEAD_AF / 2) <= tolerance_mm
-            and abs(abs(ny) - 1.0) <= 1e-6
-            and max(abs(nx), abs(nz)) <= 1e-6
+            center_error_mm <= tolerance_mm
+            and radius_error_mm <= tolerance_mm
+            and axis_error <= 1e-6
         )
-        nearest = None
-        error_m = None
-        if shape_matches:
-            raw = _early_bound(item.edge, "IEdge").GetClosestPointOn(
-                top_point_m[0], top_point_m[1], top_point_m[2]
-            )
-            if raw is not None and len(raw) >= 3:
-                nearest = tuple(float(value) for value in raw[:3])
-                if all(math.isfinite(value) for value in nearest):
-                    error_m = math.dist(nearest, top_point_m)
-                    if error_m <= 1e-8:
-                        top_matches.append(item)
-        circle_details.append({
-            "circle_mm": item.circle, "shape_matches": shape_matches,
-            "nearest_m": nearest, "point_error_m": error_m,
-        })
-    circle_details.sort(key=lambda row: (
-        not row["shape_matches"],
-        row["point_error_m"] if row["point_error_m"] is not None else math.inf,
-    ))
+        detail.update(
+            geometry_error_mm=geometry_error_mm, center_error_mm=center_error_mm,
+            radius_error_mm=radius_error_mm, axis_error=axis_error,
+            shape_matches=shape_matches,
+        )
+        if not shape_matches:
+            continue
+        raw = _early_bound(item.edge, "IEdge").GetClosestPointOn(
+            top_point_m[0], top_point_m[1], top_point_m[2]
+        )
+        if raw is None or len(raw) < 3:
+            continue
+        nearest = tuple(float(value) for value in raw[:3])
+        detail["nearest_m"] = nearest
+        if not all(math.isfinite(value) for value in nearest):
+            continue
+        error_m = math.dist(nearest, top_point_m)
+        detail.update(
+            point_error_m=error_m, geometry_error_mm=geometry_error_mm + error_m * 1000
+        )
+        if error_m > 1e-8:
+            continue
+        top_matches.append(item)
+    circle_details.sort(key=lambda row: row["geometry_error_mm"])
     _telemetry.event(
         "drawing.physical_head_height_geometry", label="SupplierHeadHeight",
         bearing_point_mm=bearing_point, top_point_mm=top_point,
-        line_count=len(scan.lines), lines_mm=[item.line for item in scan.lines[:12]],
+        line_count=len(scan.lines), lines_mm=[row["line_mm"] for row in line_details[:12]],
+        lines=line_details[:12],
         bearing_lines_mm=[item.line for item in bearing_matches[:12]],
         bearing_matches=len(bearing_matches), circle_count=len(scan.circles),
         circles=circle_details[:12], top_matches=len(top_matches),
@@ -257,13 +291,11 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
         raise RuntimeError(
             "SupplierHeadHeight: expected one actual underside hex edge and one "
             f"frontmost outer trim arc; bearing={len(bearing_matches)}, "
-            f"top={len(top_matches)}; lines={[item.line for item in scan.lines[:12]]}; "
+            f"top={len(top_matches)}; lines={line_details[:12]}; "
             f"circles={circle_details[:12]}"
         )
-    bearing = scan.exact_line_through(bearing_point, label="SupplierHeadHeight underside hex")
+    bearing = bearing_matches[0]
     app = _early_bound(adapter.swApp, "ISldWorks")
-    if int(app.IsSame(bearing.edge, bearing_matches[0].edge)) != 1:
-        raise RuntimeError("SupplierHeadHeight: exact underside line resolved to another edge")
     top = top_matches[0]
     if int(app.IsSame(bearing.edge, top.edge)) != 0:
         raise RuntimeError("SupplierHeadHeight: physical stations are not distinct edges")
@@ -275,9 +307,13 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
     return bearing.edge, top.edge
 
 
-def _assert_physical_head_height(adapter: Any, front: Any, display: Any) -> float:
-    """Rescan physical stations and prove the native vertical value/attachments."""
-    entities = _head_height_entities(adapter, front)
+@_telemetry.traced("drawing.stud_head_height_assert")
+def _assert_physical_head_height(
+    adapter: Any, front: Any, display: Any, entities: tuple[Any, Any] | None = None
+) -> float:
+    """Prove the native value/attachments; settled/saved callers rescan stations."""
+    if entities is None:
+        entities = _head_height_entities(adapter, front)
     display = _early_bound(display, "IDisplayDimension")
     raw_annotation = display.GetAnnotation()
     if raw_annotation is None:
@@ -299,6 +335,7 @@ def _assert_physical_head_height(adapter: Any, front: Any, display: Any) -> floa
     )
 
 
+@_telemetry.traced("drawing.stud_head_height_add")
 def _add_physical_head_height(adapter: Any, front: Any, text_xy: tuple[float, float]) -> Any:
     """Select/read back each actual station; never fall back to coordinate hits."""
     entities = _head_height_entities(adapter, front)
@@ -353,32 +390,29 @@ def _add_physical_head_height(adapter: Any, front: Any, text_xy: tuple[float, fl
             raise RuntimeError("SupplierHeadHeight: AddVerticalDimension2 returned no dimension")
     finally:
         model.ClearSelection2(True)
-    _assert_physical_head_height(adapter, front, display)
+    _assert_physical_head_height(adapter, front, display, entities=entities)
     return display
 
 
 def _add_supplier_references(adapter: Any, front: Any) -> dict[str, Any]:
     """Measure the surviving physical head and import the native major envelope."""
     flat = HEAD_AF / 2
-    authored = {}
-    for name, first, second, text_xy, orientation in (
-        (
-            "SupplierHeadAF",
-            (-flat, LENGTH + HEAD_H / 3, HEAD_AF / (2 * math.sqrt(3))),
-            (flat, LENGTH + HEAD_H / 3, HEAD_AF / (2 * math.sqrt(3))),
-            (0.110, 0.255), "horizontal",
-        ),
-    ):
-        picks = model_points_in_view(
-            adapter, front,
-            [tuple(value / 1000 for value in point) for point in (first, second)],
-            label=name,
-        )
-        display = add_edge_dimension(
-            adapter, front, p0=picks[0], p1=picks[1], text_xy=text_xy,
-            label=name, orientation=orientation,
-        )
-        authored[name] = _format_supplier_reference(adapter, display, name)
+    points_mm = (
+        (-flat, LENGTH + HEAD_H / 3, HEAD_AF / (2 * math.sqrt(3))),
+        (flat, LENGTH + HEAD_H / 3, HEAD_AF / (2 * math.sqrt(3))),
+    )
+    picks = model_points_in_view(
+        adapter, front,
+        [tuple(value / 1000 for value in point) for point in points_mm],
+        label="SupplierHeadAF",
+    )
+    display = add_edge_dimension(
+        adapter, front, p0=picks[0], p1=picks[1], text_xy=(0.110, 0.255),
+        label="SupplierHeadAF", orientation="horizontal",
+    )
+    authored = {
+        "SupplierHeadAF": _format_supplier_reference(adapter, display, "SupplierHeadAF")
+    }
     authored["SupplierHeadHeight"] = _format_supplier_reference(
         adapter, _add_physical_head_height(adapter, front, (0.218, 0.216)),
         "SupplierHeadHeight",
@@ -533,6 +567,7 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
 
 
+@_telemetry.traced("drawing.stud_head_height_saved")
 def _assert_saved_physical_head_height(adapter: Any, identities: dict, configurations: dict) -> None:
     """Audit only the finalized, closed SLDDRW, read-only; never rebuild or repair."""
     label = "SupplierHeadHeight"
@@ -556,9 +591,12 @@ def _assert_saved_physical_head_height(adapter: Any, identities: dict, configura
         if model is None or errors != 0:
             raise RuntimeError(f"{label}: saved open failed ({errors=}, {warnings=})")
         model = _early_bound(model, "IModelDoc2")
+        registered = app.GetOpenDocumentByName(path_string)
         if (
             int(model.GetType()) != 3
             or str(Path(str(model.GetPathName())).resolve()).casefold() != path_string.casefold()
+            or registered is None
+            or int(app.IsSame(registered, model)) != 1
             or app.ActiveDoc is None
             or int(app.IsSame(app.ActiveDoc, model)) != 1
         ):
@@ -599,6 +637,8 @@ def _assert_saved_physical_head_height(adapter: Any, identities: dict, configura
             raise RuntimeError(f"{label}: saved native owner/configuration changed")
         if not drawing.ActivateSheet(sheet_name):
             raise RuntimeError(f"{label}: cannot reactivate saved finished sheet")
+        if adapter.currentModel is None or int(app.IsSame(adapter.currentModel, model)) != 1:
+            raise RuntimeError(f"{label}: saved reader lost the adapter's exact current drawing")
         measured = _assert_physical_head_height(adapter, front, display)
         assert_supplier_reference_dimension(
             adapter, display, label=label, **SUPPLIER_REFERENCE_DIMENSIONS[label]
