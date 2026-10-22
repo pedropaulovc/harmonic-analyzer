@@ -906,12 +906,17 @@ Catalog specifications checked on September 10, 2026:
   bearing boundary at `Y=46.7` to the factory tip-face rim at `Y=-4.1`, radius
   `1.512358333... mm` (`major_dia/2 - 0.851*pitch`), not the finished cut end
   or the factory chamfer's major junction. A fresh HLR scan of the view's exact
-  `AS SUPPLIED STOCK`
-  configuration resolves those physical entities. `IView.SelectEntity` selects
+  `AS SUPPLIED STOCK` configuration resolves those physical entities.
+  `IView.SelectEntity` selects
   them in the drawing view; native selection and attachment identities, exact
   axial stations and the scaled span must agree. A missing selection, null
   creation or angular result refuses. Both head and stock references undergo
   the same strict creation, settled and independently reopened saved-file proof.
+  Before the already-saved drawing closes, a fresh native-object census binds
+  both original authored annotations to their actual serialized FullNames.
+  The cold read matches those exact names, not guessed or normalized pre-save
+  strings, and repeats every physical/source/configuration proof. Missing,
+  stale or ambiguous native identity refuses with actual boundary inventories.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1116,6 +1121,13 @@ Catalog specifications checked on September 10, 2026:
   than silently substituting a circle, silhouette or finished-tip station.
   Both head and stock references are checked afresh at creation, after settling
   and after independently reopening the saved drawing without repair or resave.
+  Saved identity is captured from the original authored annotations after the
+  existing saves and before close, using a unique fresh native `IsSame` census.
+  Reopening requires those exact serialized FullNames, not a suffix-stripped
+  or geometry-only substitute. Boundary and failure inventories preserve the
+  original and observed names without claiming that a rename occurred.
+  The purchased-head note's leader runs to its original head-top target from
+  the right-hand open field, clear of the complete diameter-reference text.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

@@ -22,6 +22,7 @@ The stock-only creator selects actual model edges through IView.SelectEntity.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import view_name
@@ -32,7 +33,11 @@ from _drawing_projection import model_points_in_view
 import _telemetry
 
 
-__all__ = ["add_native_physical_axial_dimension", "assert_native_physical_axial_dimension"]
+__all__ = [
+    "add_native_physical_axial_dimension",
+    "assert_native_physical_axial_dimension",
+    "capture_serialized_physical_axial_names",
+]
 
 _POSITION_TOL_M = 1e-8
 _DIRECTION_TOL = 1e-9
@@ -463,3 +468,373 @@ def add_native_physical_axial_dimension(
     finally:
         if model is not None:
             model.ClearSelection2(True)
+
+
+@_telemetry.traced("drawing.physical_axial_serialized_identity_capture")
+def capture_serialized_physical_axial_names(
+    adapter: Any,
+    references: dict[str, Any],
+    identities: dict,
+    configurations: dict,
+    *,
+    labels: tuple[str, str],
+    drawing_path: Path,
+    sheet_names: tuple[str, ...],
+) -> dict[str, str]:
+    """Read actual post-save names, anchored ONLY to the two original annotations.
+
+    Call at ``before_drawing_close``, after the successful saves and strict audit.
+    FullName includes a containing-model name; neither it nor GetName() or
+    GetNameForSelection() is assumed immutable across a save or a cold reopen.
+    This census does not repeat the physical proof, select, activate, or repair.
+
+    SDK: IDrawingDoc.GetViews() returns unordered sheet rows, each led by its
+    sheet view. IAnnotation.GetName() and IDisplayDimension.GetNameForSelection()
+    take zero arguments; ISldWorks.IsSame(Object1, Object2) compares native
+    objects, not their Python wrappers or diagnostic names.
+    """
+    if (
+        not isinstance(labels, (tuple, list))
+        or len(labels) != 2 or any(not isinstance(label, str) or not label for label in labels)
+        or len(set(labels)) != 2
+    ):
+        raise RuntimeError("serialized physical references require exactly two distinct labels")
+    missing = object()
+    errors: list[tuple[str, Exception]] = []
+    problems: list[str] = []
+    inventory: list[dict[str, Any]] = []
+    matches: dict[str, list[dict[str, Any]]] = {label: [] for label in labels}
+    expected: dict[str, dict[str, Any]] = {}
+    originals: dict[str, Any] = {}
+    original_owners: dict[str, Any] = {}
+    evidence: dict[str, Any] = {
+        "phase": "serialized_capture",
+        "expected_original_full_names": {},
+        "expected_serialized_full_names": {},
+        "label_match_counts": {label: 0 for label in labels},
+        "originals": expected,
+        "inventory": inventory,
+    }
+
+    def observe(record, key, getter, *, native=False):
+        # A thrown getter leaves its field absent, not an invented null/empty
+        # value. Continue independent reads/rows so the original cause and all
+        # reachable actual IDs survive together in the refusal.
+        try:
+            value = getter()
+        except Exception as exc:
+            errors.append((key, exc))
+            record.setdefault("errors", []).append({
+                "field": key, "type": type(exc).__name__, "error": str(exc)[:500],
+            })
+            return missing
+        if native:
+            record[f"{key}_null"] = value is None
+        else:
+            record[key] = (
+                value if value is None or isinstance(value, (str, bool, int, float))
+                else {"type": type(value).__name__, "repr": repr(value)[:120]}
+            )
+        return value
+
+    def same(record, key, left, right):
+        value = observe(record, key, lambda: app.IsSame(left, right))
+        if value is missing:
+            return missing
+        checked = observe(
+            record, f"{key}_integer", lambda: _native_integer(value, key)
+        )
+        if checked is not missing and checked not in (0, 1):
+            problems.append(f"{key}: unknown native IsSame state {checked!r}")
+        return checked
+
+    def require(condition, reason):
+        if not condition:
+            problems.append(reason)
+
+    path = Path(drawing_path).resolve()
+    evidence["expected_document_path"] = str(path)
+    for label in labels:
+        record = expected[label] = {}
+        identity = identities.get(label)
+        if not isinstance(identity, tuple) or len(identity) != 4:
+            problems.append(f"{label}: missing original four-field identity")
+        else:
+            full_name, owner, _entities, _kinds = identity
+            record.update(full_name=full_name, owner=owner)
+            evidence["expected_original_full_names"][label] = full_name
+            require(
+                isinstance(full_name, str) and bool(full_name)
+                and isinstance(owner, str) and bool(owner),
+                f"{label}: original FullName/owner must be nonempty native names",
+            )
+            captured = configurations.get(owner) if isinstance(owner, str) else None
+            if isinstance(captured, tuple) and len(captured) == 2:
+                record.update(sheet=captured[0], configuration=captured[1])
+            else:
+                problems.append(f"{label}: missing captured sheet/configuration")
+        raw = references.get(label)
+        record["annotation_null"] = raw is None
+        if raw is None:
+            problems.append(f"{label}: original annotation is null or missing")
+            continue
+        annotation = observe(
+            record, "annotation_bind", lambda: _early_bound(raw, "IAnnotation"), native=True
+        )
+        if annotation is missing or annotation is None:
+            problems.append(f"{label}: original annotation binding is unavailable")
+            continue
+        originals[label] = annotation
+        observe(record, "annotation_name", lambda: annotation.GetName())
+        observe(record, "owner_type", lambda: _native_integer(annotation.OwnerType, "original OwnerType"))
+        original_owners[label] = observe(record, "owner", lambda: annotation.Owner, native=True)
+
+    app = observe(
+        evidence, "application_bind", lambda: _early_bound(adapter.swApp, "ISldWorks"), native=True
+    )
+    model = observe(
+        evidence, "model_bind", lambda: _early_bound(adapter.currentModel, "IModelDoc2"), native=True
+    )
+    require(model is not missing and model is not None, "current drawing is null or unavailable")
+    require(app is not missing and app is not None, "native application is null or unavailable")
+    if app is not missing and app is not None and len(originals) == 2:
+        require(
+            same(evidence, "original_annotations_is_same", originals[labels[0]], originals[labels[1]]) == 0,
+            "original annotations must be provably distinct (IsSame=0)",
+        )
+    if model is not missing and model is not None:
+        actual_path = observe(evidence, "document_path", lambda: model.GetPathName())
+        observe(evidence, "document_title", lambda: model.GetTitle())
+        document_type = observe(
+            evidence, "document_type", lambda: _native_integer(model.GetType(), "document type")
+        )
+        require(document_type == 3, "current document is not a native drawing (type=3)")
+        absolute_path = isinstance(actual_path, str) and bool(actual_path) and Path(actual_path).is_absolute()
+        resolved_path = (
+            observe(evidence, "resolved_document_path", lambda: str(Path(actual_path).resolve()))
+            if absolute_path else missing
+        )
+        require(
+            absolute_path and isinstance(resolved_path, str) and Path(resolved_path) == path,
+            "current drawing path does not equal the actual saved output",
+        )
+        if app is not missing and app is not None:
+            current = observe(
+                evidence, "open_document", lambda: app.GetOpenDocumentByName(str(path)), native=True
+            )
+            active = observe(evidence, "active_document", lambda: app.ActiveDoc, native=True)
+            for key, document in (("open_document_is_same", current), ("active_document_is_same", active)):
+                if document is missing or document is None:
+                    problems.append(f"{key}: saved output is not the current drawing")
+                else:
+                    require(
+                        same(evidence, key, document, model) == 1,
+                        f"{key}: saved output is not the current drawing (IsSame=1)",
+                    )
+
+    drawing = missing
+    if model is not missing and model is not None:
+        drawing = observe(
+            evidence, "drawing_bind", lambda: _early_bound(model, "IDrawingDoc"), native=True
+        )
+    rows = missing
+    if drawing is not missing and drawing is not None:
+        actual_sheets = observe(evidence, "sheet_names", lambda: drawing.GetSheetNames())
+        require(
+            isinstance(actual_sheets, (tuple, list)) and tuple(actual_sheets) == tuple(sheet_names),
+            "saved drawing sheet census changed",
+        )
+        if isinstance(actual_sheets, (tuple, list)):
+            evidence["sheet_names"] = tuple(actual_sheets)
+        rows = observe(evidence, "view_rows", lambda: drawing.GetViews(), native=True)
+    actual_row_sheets = []
+    actual_views: list[dict[str, Any]] = []
+    all_dimensions: list[dict[str, Any]] = []
+    require(isinstance(rows, (tuple, list)), "actual all-sheet view census is unavailable")
+    for row_index, row in enumerate(rows if isinstance(rows, (tuple, list)) else ()):
+        if not isinstance(row, (tuple, list)) or not row:
+            problems.append(f"sheet row {row_index}: missing native sheet view")
+            inventory.append({"row_index": row_index, "row_raw_none": row is None})
+            continue
+        sheet_record: dict[str, Any] = {"row_index": row_index}
+        sheet_view = observe(
+            sheet_record, "sheet_view_bind", lambda: _early_bound(row[0], "IView"), native=True
+        )
+        sheet = missing
+        if sheet_view is not missing and sheet_view is not None:
+            sheet = observe(sheet_record, "sheet", lambda: view_name(adapter, sheet_view))
+        actual_row_sheets.append(sheet)
+        for view_index, raw_view in enumerate(row):
+            record = dict(sheet_record, view_index=view_index, is_sheet_view=view_index == 0, dimensions=[])
+            if "errors" in record:
+                record["errors"] = list(record["errors"])
+            inventory.append(record)
+            view = observe(
+                record, "view_bind", lambda: _early_bound(raw_view, "IView"), native=True
+            )
+            if view is missing or view is None:
+                problems.append(f"sheet row {row_index} view {view_index}: null/unavailable view")
+                continue
+            observe(record, "view", lambda: view_name(adapter, view))
+            if view_index != 0:
+                actual_views.append(record)
+                observe(record, "configuration", lambda: view.ReferencedConfiguration)
+                source = observe(record, "source", lambda: view.ReferencedDocument, native=True)
+                if source is not missing and source is not None:
+                    source_model = observe(
+                        record, "source_bind", lambda: _early_bound(source, "IModelDoc2"), native=True
+                    )
+                    if source_model is not missing and source_model is not None:
+                        observe(record, "source_path", lambda: source_model.GetPathName())
+            displays = observe(record, "displays", lambda: view.GetDisplayDimensions(), native=True)
+            if displays is missing:
+                continue
+            record["raw_none"] = displays is None
+            if displays is not None and not isinstance(displays, (tuple, list)):
+                problems.append(f"sheet row {row_index} view {view_index}: malformed display array")
+                record["malformed_display_array"] = {
+                    "type": type(displays).__name__, "repr": repr(displays)[:120],
+                }
+                continue
+            record["count"] = 0 if displays is None else len(displays)
+            for display_index, raw_display in enumerate(displays if displays is not None else ()):
+                item: dict[str, Any] = {"display_index": display_index, "label_is_same": {}}
+                record["dimensions"].append(item)
+                all_dimensions.append(item)
+                display = observe(
+                    item, "display_bind", lambda: _early_bound(raw_display, "IDisplayDimension"), native=True
+                )
+                if display is missing or display is None:
+                    problems.append("actual display dimension is null or unavailable")
+                    continue
+                observe(item, "selection_name", lambda: display.GetNameForSelection())
+                raw_annotation = observe(item, "annotation", lambda: display.GetAnnotation(), native=True)
+                if raw_annotation is not missing and raw_annotation is not None:
+                    annotation = observe(
+                        item, "annotation_bind", lambda: _early_bound(raw_annotation, "IAnnotation"), native=True
+                    )
+                    if annotation is not missing and annotation is not None:
+                        observe(item, "annotation_name", lambda: annotation.GetName())
+                        observe(item, "owner_type", lambda: _native_integer(annotation.OwnerType, "OwnerType"))
+                        owner = observe(item, "owner", lambda: annotation.Owner, native=True)
+                        if owner is not missing and owner is not None:
+                            if item.get("owner_type") == 0:
+                                observe(item, "owner", lambda: view_name(adapter, owner))
+                            elif item.get("owner_type") == 1:
+                                sheet_owner = observe(
+                                    item, "sheet_owner_bind", lambda: _early_bound(owner, "ISheet"), native=True
+                                )
+                                if sheet_owner is not missing and sheet_owner is not None:
+                                    observe(item, "owner", lambda: sheet_owner.GetName())
+                            if app is not missing and app is not None:
+                                same(item, "owner_is_same", owner, view)
+                        if app is not missing and app is not None:
+                            for label in labels:
+                                if label in originals:
+                                    equality = same(item["label_is_same"], label, annotation, originals[label])
+                                    if equality == 1:
+                                        matches[label].append({"view": record, "dimension": item, "native_view": view})
+                    else:
+                        problems.append("actual native annotation binding is unavailable")
+                else:
+                    problems.append("actual display has no native annotation")
+                native_dimension = observe(
+                    item, "native_dimension", lambda: display.GetDimension2(0), native=True
+                )
+                if native_dimension is missing or native_dimension is None:
+                    problems.append("actual display has no native dimension")
+                    continue
+                dimension = observe(
+                    item, "dimension_bind", lambda: _early_bound(native_dimension, "IDimension"), native=True
+                )
+                if dimension is not missing and dimension is not None:
+                    observe(item, "full_name", lambda: dimension.FullName)
+                else:
+                    problems.append("actual native dimension binding is unavailable")
+
+    require(
+        len(actual_row_sheets) == len(sheet_names)
+        and all(isinstance(name, str) for name in actual_row_sheets)
+        and set(actual_row_sheets) == set(sheet_names),
+        "all-sheet view rows do not cover the exact saved sheets",
+    )
+    serialized: dict[str, str] = {}
+    evidence["actual_full_names_by_label"] = {
+        label: [
+            match["dimension"]["full_name"] for match in matches[label]
+            if "full_name" in match["dimension"]
+        ]
+        for label in labels
+    }
+    for label in labels:
+        evidence["label_match_counts"][label] = len(matches[label])
+        require(len(matches[label]) == 1, f"{label}: original annotation census must be exactly 1")
+        if len(matches[label]) != 1:
+            continue
+        match = matches[label][0]
+        record, item = match["view"], match["dimension"]
+        captured = expected[label]
+        require(
+            not record["is_sheet_view"] and record.get("view") == captured.get("owner")
+            and record.get("sheet") == captured.get("sheet")
+            and record.get("configuration") == captured.get("configuration")
+            and all(key in captured for key in ("owner", "sheet", "configuration")),
+            f"{label}: captured view/sheet/configuration changed",
+        )
+        require(
+            sum(view.get("view") == captured.get("owner") for view in actual_views) == 1,
+            f"{label}: captured view name is not unique in actual drawing",
+        )
+        require(
+            item.get("owner_type") == 0 and not isinstance(item.get("owner_type"), bool)
+            and isinstance(item.get("owner_type"), int) and item.get("owner_is_same") == 1
+            and item.get("owner") == captured.get("owner"),
+            f"{label}: annotation must have the exact native view owner (OwnerType=0, IsSame=1)",
+        )
+        original_owner = original_owners.get(label, missing)
+        if original_owner is missing or original_owner is None or app is missing or app is None:
+            problems.append(f"{label}: original native owner is unavailable")
+        else:
+            require(
+                same(captured, "owner_is_same", original_owner, match["native_view"]) == 1
+                and captured.get("owner_type") == 0
+                and isinstance(captured.get("owner_type"), int)
+                and not isinstance(captured.get("owner_type"), bool),
+                f"{label}: original native owner changed",
+            )
+        source_path = record.get("source_path")
+        require(
+            isinstance(source_path, str) and bool(source_path) and Path(source_path).is_absolute(),
+            f"{label}: matched view has no actual source document path",
+        )
+        full_name = item.get("full_name")
+        if "full_name" in item:
+            evidence["expected_serialized_full_names"][label] = full_name
+        require(isinstance(full_name, str) and bool(full_name), f"{label}: native FullName is empty or malformed")
+        if isinstance(full_name, str) and full_name:
+            serialized[label] = full_name
+            require(
+                sum(other.get("full_name") == full_name for other in all_dimensions) == 1,
+                f"{label}: serialized FullName is not unique in actual drawing",
+            )
+    require(
+        len(serialized) == 2 and len(set(serialized.values())) == 2,
+        "physical references require two distinct actual serialized FullNames",
+    )
+    evidence["problems"] = problems
+    boundary = {
+        key: evidence[key] for key in ("document_path", "document_title", "document_type")
+        if key in evidence
+    }
+    for record in inventory:
+        _telemetry.event(
+            "drawing.physical_axial_identity_inventory",
+            phase=evidence["phase"], **boundary, **record,
+        )
+    if errors or problems:
+        stage, cause = errors[0] if errors else ("identity_predicates", RuntimeError("; ".join(problems)))
+        evidence.update(failure_stage=stage, failure_error_type=type(cause).__name__, failure_error=str(cause)[:500])
+        _telemetry.event("drawing.physical_axial_serialized_identity", status="refused", **evidence)
+        raise RuntimeError(f"serialized physical identity capture refused; native_snapshot={evidence!r}") from cause
+    _telemetry.event("drawing.physical_axial_serialized_identity", status="captured", **evidence)
+    return serialized

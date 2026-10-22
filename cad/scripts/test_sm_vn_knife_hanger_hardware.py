@@ -914,7 +914,12 @@ def test_production_cut_positions_complete_stock_at_finished_head_pose(monkeypat
     )
 
 
-@pytest.mark.parametrize("fault", [None, "callout", "link", "text"])
+@pytest.mark.parametrize(
+    "fault",
+    [None, "callout", "link", "text", "checkpoint_missing", "checkpoint_duplicate",
+     "capture_wrong_annotation", "capture_wrong_owner", "capture_wrong_configuration",
+     "capture_wrong_path"],
+)
 def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch, tmp_path, fault
 ):
@@ -932,19 +937,80 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     offsets = []
     projected = []
     finalization = []
+    case = _settled_stud_height_case(monkeypatch)
+    case.front.name = "*Front"
+    case.views[1].name = "*Isometric"
+    references = case.references
+    original_identities = bolt_drawing._supplier_reference_identities(case.adapter, references)
+    case.native_doc_path = str(tmp_path / "unsaved-drawing.SLDDRW")
+    case.model.GetPathName = lambda: case.native_doc_path
+    case.model.GetType = lambda: 3
+    case.model.GetTitle = lambda: Path(case.native_doc_path).name
+    case.app.ActiveDoc = case.model
+    case.app.GetOpenDocumentByName = lambda path: (
+        case.model if path == case.native_doc_path else None
+    )
+    output_path = tmp_path / "saved-stud.SLDDRW"
+    capture_calls = []
+    shared_capture = bolt_drawing.capture_serialized_physical_axial_names
+
+    def capture(adapter, captured_references, identities, configurations, **kwargs):
+        capture_calls.append(dict(identities))
+        assert identities == original_identities
+        assert set(captured_references) == {"SupplierHeadHeight", "SupplierStockLength"}
+        assert all(captured_references[name] is references[name] for name in captured_references)
+        if fault != "capture_wrong_path":
+            assert adapter.currentModel.GetPathName() == str(output_path.resolve())
+        result = shared_capture(adapter, captured_references, identities, configurations, **kwargs)
+        finalization.append("captured")
+        return result
+
+    def saved_reader(_adapter, identities, _configurations, *, serialized_full_names):
+        assert identities == original_identities
+        assert serialized_full_names == {
+            "SupplierHeadHeight": case.native.FullName,
+            "SupplierStockLength": case.stock_case.native.FullName,
+        }
+        assert all(serialized_full_names[name] != identities[name][0] for name in serialized_full_names)
+        finalization.append("saved physical proof")
 
     async def open_model(_path):
         pass
 
-    async def finalize(*_args, **_kwargs):
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for settled in settled_checks:
+            settled()
+        assert case.native.FullName == original_identities["SupplierHeadHeight"][0]
+        assert case.stock_case.native.FullName == original_identities["SupplierStockLength"][0]
+        finalization.append("settled")
+        checkpoint("before_native_save")
+        case.native_doc_path = str(output_path.resolve())
+        for display in case.displays.values():
+            native = display.GetDimension2(0)
+            native.FullName = f"{native.FullName}@SERIALIZED"
+        checkpoint("after_native_save")
+        checkpoint("after_pdf_save")
+        finalization.append("saved and strict-audited")
+        if fault == "capture_wrong_annotation":
+            impostor = SimpleNamespace(**vars(case.annotation))
+            case.display.GetAnnotation = lambda: impostor
+        elif fault == "capture_wrong_owner":
+            case.annotation.Owner = case.views[1]
+        elif fault == "capture_wrong_configuration":
+            case.front.ReferencedConfiguration = "ForeignConfiguration"
+        elif fault == "capture_wrong_path":
+            case.model.GetPathName = lambda: str(tmp_path / "wrong.SLDDRW")
+        if fault != "checkpoint_missing":
+            checkpoint("before_drawing_close")
+        if fault == "checkpoint_duplicate":
+            checkpoint("before_drawing_close")
         finalization.append("finalized")
+        checkpoint("after_drawing_close")
         return {"drawing": "recorded"}
 
     def place_view(_adapter, _source, orientation, *_args, **_kwargs):
         views.append((orientation, _kwargs["scale"]))
-        return SimpleNamespace(
-            name=orientation, ReferencedConfiguration="Default"
-        )
+        return case.front if orientation == "*Front" else case.views[1]
 
     def read_properties(_model, names, *, required: tuple[str, ...]):
         properties.update({name: properties.get(name, name) for name in names})
@@ -997,6 +1063,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     ):
         monkeypatch.setattr(bolt_drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(bolt_drawing, "SOURCE", source)
+    monkeypatch.setattr(bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=output_path))
     monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         bolt_drawing, "dimension_name", lambda _adapter, item: item.name
@@ -1005,9 +1072,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(
         bolt_drawing,
         "new_project_drawing",
-        lambda *_args, **_kwargs: (
-            SimpleNamespace(ActivateSheet=lambda _name: True), object()
-        ),
+        lambda *_args, **_kwargs: (case.model, object()),
     )
     monkeypatch.setattr(bolt_drawing, "place_view", place_view)
     monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
@@ -1020,38 +1085,41 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(bolt_drawing, "add_property_linked_callout", callout)
     monkeypatch.setattr(bolt_drawing, "finalize_drawing", finalize)
     monkeypatch.setattr(
-        bolt_drawing, "_add_supplier_references", lambda *_args: {}
+        bolt_drawing, "_add_supplier_references",
+        lambda *_args: {name: annotation for name, annotation in references.items()
+                       if name != "SupplierStockLength"},
     )
     monkeypatch.setattr(
         bolt_drawing,
         "_add_stock_reference",
-        lambda _adapter: (
-            SimpleNamespace(
-                name="stock-front",
-                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
-            ),
-            SimpleNamespace(
-                name="stock-isometric",
-                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
-            ),
-            object(),
-        ),
+        lambda _adapter: (case.stock_case.front, case.views[3], case.stock_case.annotation),
     )
-    monkeypatch.setattr(
-        bolt_drawing, "_supplier_reference_identities", lambda *_args: {}
-    )
-    monkeypatch.setattr(
-        bolt_drawing, "_assert_saved_physical_references",
-        lambda *_args: finalization.append("saved physical proof"),
-    )
+    monkeypatch.setattr(bolt_drawing, "capture_serialized_physical_axial_names", capture)
+    monkeypatch.setattr(bolt_drawing, "_assert_saved_physical_references", saved_reader)
     monkeypatch.setattr(bolt_drawing, "view_name", lambda _adapter, view: view.name)
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+    adapter = case.adapter
+    adapter.open_model = open_model
     if fault is not None:
-        with pytest.raises(RuntimeError, match="did not persist"):
+        expected = (
+            "did not persist" if fault in ("callout", "link", "text")
+            else "checkpoint.*not called" if fault == "checkpoint_missing"
+            else "more than once" if fault == "checkpoint_duplicate"
+            else "SupplierHeadHeight|serialized|identity"
+        )
+        with pytest.raises(RuntimeError, match=expected):
             asyncio.run(bolt_drawing.build(adapter))
+        if fault == "checkpoint_missing":
+            assert not capture_calls
+        elif fault == "checkpoint_duplicate":
+            assert len(capture_calls) == 1
+        assert "saved physical proof" not in finalization
         return
     assert asyncio.run(bolt_drawing.build(adapter)) == {"drawing": "recorded"}
-    assert finalization == ["finalized", "saved physical proof"]
+    assert finalization == [
+        "settled", "saved and strict-audited", "captured", "finalized", "saved physical proof",
+    ]
+    assert len(capture_calls) == 1
+    assert capture_calls[0] == original_identities
     assert "Purchased Screw Note" in required
     for retired in (
         "Machining Route",
@@ -1797,7 +1865,10 @@ def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
                 case.adapter, case.identities, case.configurations
             )
         else:
-            bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+            )
     if phase == "saved":
         assert case.close_calls == ["finished-stud.SLDDRW"]
         assert case.adapter.currentModel is case.previous_model
@@ -1817,6 +1888,7 @@ def _settled_stud_height_case(monkeypatch):
     displays = {
         "SupplierHeadHeight": case.display, "SupplierStockLength": stock_case.display,
     }
+    case.displays = displays
     for name in bolt.SUPPLIER_REFERENCE_DIMENSIONS:
         if name in displays:
             continue
@@ -1827,7 +1899,7 @@ def _settled_stud_height_case(monkeypatch):
             Tolerance=SimpleNamespace(Type=0),
         )
         annotation = SimpleNamespace(
-            Owner=owner, GetAttachedEntities3=lambda: (case.bearing,),
+            Owner=owner, OwnerType=0, GetAttachedEntities3=lambda: (case.bearing,),
             GetAttachedEntityTypes=lambda: (1,),
         )
         display = SimpleNamespace(
@@ -1836,6 +1908,14 @@ def _settled_stud_height_case(monkeypatch):
         )
         annotation.GetSpecificAnnotation = lambda display=display: display
         displays[name] = display
+    for name, display in displays.items():
+        annotation = display.GetAnnotation()
+        annotation.GetName = lambda name=name: f"native-annotation:{name}"
+        display.GetNameForSelection = lambda name=name: f"native-selection:{name}"
+    for view in case.views:
+        view.ReferencedDocument = SimpleNamespace(
+            GetPathName=lambda: str(bolt_drawing.SOURCE.resolve())
+        )
     for first, second in ((front, iso), (stock, stock_iso)):
         first.GetNextView = lambda second=second: second
         second.GetNextView = lambda: None
@@ -1852,8 +1932,16 @@ def _settled_stud_height_case(monkeypatch):
         OwnerType=1, GetType=lambda: 6, GetSpecificAnnotation=lambda: note,
     )
     sheet_views = (
-        SimpleNamespace(GetNextView=lambda: front, GetAnnotations=lambda: ()),
-        SimpleNamespace(GetNextView=lambda: stock, GetAnnotations=lambda: (caption,)),
+        SimpleNamespace(
+            name=bolt_drawing.SHEET_NAMES[0], ReferencedConfiguration="", ReferencedDocument=None,
+            GetNextView=lambda: front, GetAnnotations=lambda: (),
+            GetDisplayDimensions=lambda: None,
+        ),
+        SimpleNamespace(
+            name=bolt_drawing.SHEET_NAMES[1], ReferencedConfiguration="", ReferencedDocument=None,
+            GetNextView=lambda: stock, GetAnnotations=lambda: (caption,),
+            GetDisplayDimensions=lambda: (),
+        ),
     )
     case.sheet_index = 0
 
@@ -1864,9 +1952,11 @@ def _settled_stud_height_case(monkeypatch):
     case.model.ActivateSheet = activate
     case.model.GetFirstView = lambda: sheet_views[case.sheet_index]
     case.model.GetSheetNames = lambda: bolt_drawing.SHEET_NAMES
-    case.identities = bolt_drawing._supplier_reference_identities(
-        case.adapter, {name: display.GetAnnotation() for name, display in displays.items()}
+    case.model.GetViews = lambda: (
+        (sheet_views[0], front, iso), (sheet_views[1], stock, stock_iso),
     )
+    case.references = {name: display.GetAnnotation() for name, display in displays.items()}
+    case.identities = bolt_drawing._supplier_reference_identities(case.adapter, case.references)
     case.configurations = {
         view.name: (bolt_drawing.SHEET_NAMES[0 if index < 2 else 1],
                     view.ReferencedConfiguration)
@@ -1908,11 +1998,10 @@ def _saved_stud_height_case(monkeypatch, tmp_path):
     path.touch()
     case.path = str(path.resolve())
     case.model.GetType = lambda: 3
-    case.model.GetPathName = lambda: case.path
+    case.native_doc_path = str(tmp_path / "Drawing.SLDDRW")
+    case.model.GetPathName = lambda: case.native_doc_path
     case.model.GetTitle = lambda: "finished-stud.SLDDRW"
     case.previous_model = object()
-    case.adapter.currentModel = case.previous_model
-    case.loaded = False
     case.open_calls = []
     case.close_calls = []
     case.open_result = (case.model, 0, 0)
@@ -1929,12 +2018,32 @@ def _saved_stud_height_case(monkeypatch, tmp_path):
 
     case.app.OpenDoc6 = open_doc
     case.app.CloseDoc = close_doc
-    case.app.GetOpenDocumentByName = lambda _path: case.model if case.loaded else None
+    case.app.GetOpenDocumentByName = lambda native_path: (
+        case.model if case.loaded and native_path == case.path else None
+    )
     monkeypatch.setattr(bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=path))
     monkeypatch.setattr(
         bolt_drawing, "assert_supplier_reference_dimension",
         supplier_dimensions.assert_supplier_reference_dimension,
     )
+    # Simulate successful native/PDF saves before the pre-close checkpoint.
+    # Annotation COM anchors stay identical while actual document/name fields change.
+    original_identities = dict(case.identities)
+    case.native_doc_path = case.path
+    case.loaded = True
+    for name in ("SupplierHeadHeight", "SupplierStockLength"):
+        native = case.displays[name].GetDimension2(0)
+        native.FullName = f"{native.FullName}@finished-stud"
+    case.serialized_full_names = bolt_drawing.capture_serialized_physical_axial_names(
+        case.adapter,
+        {name: case.references[name] for name in ("SupplierHeadHeight", "SupplierStockLength")},
+        case.identities, case.configurations,
+        labels=("SupplierHeadHeight", "SupplierStockLength"),
+        drawing_path=path, sheet_names=bolt_drawing.SHEET_NAMES,
+    )
+    assert case.identities == original_identities
+    case.loaded = False
+    case.adapter.currentModel = case.previous_model
     # Captured creation handles deliberately cannot match the freshly reopened edges.
     for name in ("SupplierHeadHeight", "SupplierStockLength"):
         full_name, owner, _entities, kinds = case.identities[name]
@@ -1946,7 +2055,14 @@ def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_f
     monkeypatch, tmp_path
 ):
     case = _saved_stud_height_case(monkeypatch, tmp_path)
-    bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+    assert all(
+        case.identities[name][0] != actual_name
+        for name, actual_name in case.serialized_full_names.items()
+    )
+    bolt_drawing._assert_saved_physical_references(
+        case.adapter, case.identities, case.configurations,
+        serialized_full_names=case.serialized_full_names,
+    )
     assert case.open_calls == [(case.path, 3, 3, "", 0, 0)]
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
@@ -1978,12 +2094,238 @@ def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_f
     }
 
 
+@pytest.mark.parametrize("fault", ["missing", "extra", "empty", "null", "duplicate"])
+def test_stud_saved_reader_requires_complete_distinct_serialized_mapping_before_open(
+    monkeypatch, tmp_path, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    serialized = dict(case.serialized_full_names)
+    if fault == "missing":
+        serialized.pop("SupplierStockLength")
+    elif fault == "extra":
+        serialized["SupplierHeadAF"] = "foreign-serialized-name"
+    elif fault == "empty":
+        serialized["SupplierHeadHeight"] = ""
+    elif fault == "null":
+        serialized["SupplierHeadHeight"] = None
+    else:
+        serialized["SupplierStockLength"] = serialized["SupplierHeadHeight"]
+    with pytest.raises(RuntimeError, match="serialized native FullNames"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+        )
+    assert not case.open_calls and not case.close_calls and not case.scans
+    assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_reader_has_no_implicit_original_name_fallback(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    with pytest.raises(TypeError, match="serialized_full_names"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+        )
+    assert not case.open_calls and not case.close_calls
+
+
+@pytest.mark.parametrize("fault", ["original", "suffix_only", "near_match"])
+def test_stud_saved_reader_matches_only_the_actual_serialized_full_names(
+    monkeypatch, tmp_path, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    serialized = dict(case.serialized_full_names)
+    for name in serialized:
+        if fault == "original":
+            serialized[name] = case.identities[name][0]
+        elif fault == "suffix_only":
+            serialized[name] = serialized[name].split("@", 1)[1]
+        else:
+            serialized[name] += " "
+    with pytest.raises(RuntimeError, match="label_match_counts"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 0, "SupplierStockLength": 0,
+    }
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_missing_both_names_emits_full_actual_native_inventory_before_refusal(
+    monkeypatch, tmp_path,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    case.native.FullName = "ACTUAL-HEAD-AFTER-SAVE"
+    case.stock_case.native.FullName = "ACTUAL-STOCK-AFTER-SAVE"
+    case.views[3].GetDisplayDimensions = lambda: None
+    with pytest.raises(RuntimeError) as failure:
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["document"] == {
+        "title": "finished-stud.SLDDRW", "path": case.path, "type": 3,
+        "sheet_names": bolt_drawing.SHEET_NAMES,
+    }
+    assert receipt["expected_original_full_names"] == {
+        name: case.identities[name][0] for name in case.serialized_full_names
+    }
+    assert receipt["expected_serialized_full_names"] == case.serialized_full_names
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 0, "SupplierStockLength": 0,
+    }
+    observed = {
+        (sheet["sheet"], view["view"]): view
+        for sheet in receipt["inventory"] for view in sheet["views"]
+    }
+    assert set(observed) == {
+        (bolt_drawing.SHEET_NAMES[index], name)
+        for index, names in enumerate((
+            (bolt_drawing.SHEET_NAMES[0], "FinishedFront", "FinishedIso"),
+            (bolt_drawing.SHEET_NAMES[1], "StockFront", "StockIso"),
+        ))
+        for name in names
+    }
+    finished_sheet = observed[(bolt_drawing.SHEET_NAMES[0], bolt_drawing.SHEET_NAMES[0])]
+    stock_sheet = observed[(bolt_drawing.SHEET_NAMES[1], bolt_drawing.SHEET_NAMES[1])]
+    stock_iso = observed[(bolt_drawing.SHEET_NAMES[1], "StockIso")]
+    assert finished_sheet["raw_none"] is True and finished_sheet["count"] == 0
+    assert stock_sheet["raw_none"] is False and stock_sheet["count"] == 0
+    assert stock_iso["raw_none"] is True and stock_iso["count"] == 0
+    for name, owner, actual_full_name in (
+        ("SupplierHeadHeight", "FinishedFront", case.native.FullName),
+        ("SupplierStockLength", "StockFront", case.stock_case.native.FullName),
+    ):
+        sheet_name, configuration = case.configurations[owner]
+        view = observed[(sheet_name, owner)]
+        assert view["configuration"] == configuration
+        assert view["source_document_path"] == str(bolt_drawing.SOURCE.resolve())
+        dimension = next(row for row in view["dimensions"] if row["full_name"] == actual_full_name)
+        assert dimension["annotation_name"] == f"native-annotation:{name}"
+        assert dimension["selection_name"] == f"native-selection:{name}"
+        assert dimension["owner"] == owner
+        assert dimension["owner_type"] == 0 and dimension["owner_same"] == 1
+        assert actual_full_name in str(failure.value)
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+
+
+def test_stud_saved_inventory_visits_unexpected_actual_sheets_before_sheet_census_refusal(
+    monkeypatch, tmp_path,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    extra_name = "Unexpected actual saved sheet"
+    extra_view = SimpleNamespace(
+        name=extra_name, ReferencedConfiguration="", ReferencedDocument=None,
+        GetDisplayDimensions=lambda: None, GetNextView=lambda: None,
+    )
+    activate_original = case.model.ActivateSheet
+    first_original = case.model.GetFirstView
+    case.extra_active = False
+
+    def activate(name):
+        case.extra_active = name == extra_name
+        return True if case.extra_active else activate_original(name)
+
+    case.model.ActivateSheet = activate
+    case.model.GetFirstView = lambda: extra_view if case.extra_active else first_original()
+    case.model.GetSheetNames = lambda: (*bolt_drawing.SHEET_NAMES, extra_name)
+    with pytest.raises(RuntimeError, match=extra_name):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert [sheet["sheet"] for sheet in receipt["inventory"]] == [
+        *bolt_drawing.SHEET_NAMES, extra_name,
+    ]
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 1, "SupplierStockLength": 1,
+    }
+    extra_record = receipt["inventory"][-1]["views"][0]
+    assert extra_record["view"] == extra_name
+    assert extra_record["raw_none"] is True and extra_record["count"] == 0
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+
+
+@pytest.mark.parametrize("getter", ["selection", "annotation", "dimension", "full_name", "view"])
+def test_stud_saved_inventory_continues_after_getter_failure_and_chains_original_cause(
+    monkeypatch, tmp_path, getter,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    cause = OSError(f"original native {getter} getter failure")
+
+    def fail(*_args):
+        raise cause
+
+    if getter == "selection":
+        case.display.GetNameForSelection = fail
+    elif getter == "annotation":
+        case.annotation.GetName = fail
+    elif getter == "dimension":
+        case.display.GetDimension2 = fail
+    elif getter == "full_name":
+        class BrokenDimension:
+            @property
+            def FullName(self):
+                raise cause
+
+        broken_dimension = BrokenDimension()
+        case.display.GetDimension2 = lambda _index: broken_dimension
+    else:
+        case.front.GetDisplayDimensions = fail
+    with pytest.raises(RuntimeError) as failure:
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
+    assert failure.value.__cause__ is cause
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": int(getter in ("selection", "annotation")),
+        "SupplierStockLength": 1,
+    }
+    assert [sheet["sheet"] for sheet in receipt["inventory"]] == list(bolt_drawing.SHEET_NAMES)
+    stock_view = next(
+        view for sheet in receipt["inventory"] for view in sheet["views"]
+        if view.get("view") == "StockFront"
+    )
+    assert stock_view["dimensions"][0]["full_name"] == case.stock_case.native.FullName
+    assert str(cause) in str(failure.value)
+    if getter == "view":
+        front_view = next(
+            view for sheet in receipt["inventory"] for view in sheet["views"]
+            if view.get("view") == "FinishedFront"
+        )
+        assert "raw_none" not in front_view and "count" not in front_view
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
 @pytest.mark.parametrize(
     "fault",
     (
         "open_errors", "null_open", "bad_open_shape", "wrong_path", "wrong_type",
         "wrong_current", "sheet_census", "activate_sheet", "missing_dimension",
         "duplicate_dimension", "wrong_owner", "wrong_annotation_owner",
+        "same_named_foreign_owner", "wrong_owner_type",
         "wrong_configuration", "value", "attachment", "station", "format", "band",
         "missing_native", "missing_annotation", "close_failure",
     ),
@@ -2021,6 +2363,10 @@ def test_stud_saved_reopen_refuses_corruption_and_restores_adapter_even_on_failu
         case.front.name = "WrongView"
     elif fault == "wrong_annotation_owner":
         case.annotation.Owner = case.views[1]
+    elif fault == "same_named_foreign_owner":
+        case.annotation.Owner = SimpleNamespace(name=case.front.name)
+    elif fault == "wrong_owner_type":
+        case.annotation.OwnerType = 1
     elif fault == "wrong_configuration":
         case.front.ReferencedConfiguration = bolt.SUPPLIER_STOCK_CONFIGURATION
     elif fault == "value":
@@ -2040,7 +2386,10 @@ def test_stud_saved_reopen_refuses_corruption_and_restores_adapter_even_on_failu
     elif fault == "close_failure":
         case.app.CloseDoc = lambda title: case.close_calls.append(title)
     with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
-        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert case.loaded is (fault == "close_failure")
@@ -2062,7 +2411,10 @@ def test_stud_saved_proof_requires_existing_closed_finalized_file(
             bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=tmp_path / "missing.SLDDRW")
         )
     with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
-        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
     assert not case.open_calls
     assert not case.close_calls
     assert case.adapter.currentModel is case.previous_model
@@ -2204,7 +2556,10 @@ def test_stud_saved_proof_requires_the_opened_document_to_be_registered_by_exact
 
     case.app.GetOpenDocumentByName = lookup
     with pytest.raises(RuntimeError, match="wrong current drawing"):
-        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
@@ -2225,7 +2580,10 @@ def test_stud_saved_proof_refuses_adapter_current_model_drift_before_geometry_re
 
     case.model.ActivateSheet = activate
     with pytest.raises(RuntimeError, match="adapter's exact current drawing"):
-        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+        )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
@@ -2632,7 +2990,8 @@ def test_stud_stock_native_proof_is_required_at_every_consumer(
             )
         else:
             bolt_drawing._assert_saved_physical_references(
-                case.adapter, case.identities, case.configurations
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
             )
     if phase == "saved":
         assert case.close_calls == ["finished-stud.SLDDRW"]
@@ -2689,7 +3048,8 @@ def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
     with pytest.raises(RuntimeError):
         if phase == "saved":
             bolt_drawing._assert_saved_physical_references(
-                case.adapter, case.identities, case.configurations
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
             )
         else:
             bolt_drawing._assert_supplier_references(
@@ -2774,7 +3134,8 @@ def test_stud_saved_physical_census_requires_each_exact_sheet_and_source_configu
         other.GetDisplayDimensions = lambda: (*original_other(), display)
     with pytest.raises(RuntimeError, match=name):
         bolt_drawing._assert_saved_physical_references(
-            case.adapter, case.identities, case.configurations
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
         )
     assert case.adapter.currentModel is case.previous_model
     if fault == "moved_sheet":
@@ -2877,7 +3238,8 @@ def test_stud_stock_requires_observed_native_source_document_at_every_consumer(
             )
         else:
             bolt_drawing._assert_saved_physical_references(
-                case.adapter, case.identities, case.configurations
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
             )
     assert not any(record[1] is stock.front for record in case.scans)
     assert not case.creations
@@ -2917,7 +3279,8 @@ def test_stud_physical_census_refuses_missing_native_dimension_before_full_name_
     with pytest.raises(RuntimeError, match="dimension has no native identity"):
         if phase == "saved":
             bolt_drawing._assert_saved_physical_references(
-                case.adapter, case.identities, case.configurations
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
             )
         else:
             bolt_drawing._assert_supplier_references(

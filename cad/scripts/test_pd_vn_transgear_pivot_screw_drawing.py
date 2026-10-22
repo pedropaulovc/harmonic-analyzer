@@ -26,6 +26,7 @@ import pd_vn_transgear_pivot_screw_spec as screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
+from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 from _printed_tolerance import angular_band_deg
 from _stock_recipe import recipe_declaration
 from _test_stock_recipes import discovered_recipes
@@ -34,6 +35,10 @@ from diagnostics import diag_build_90325A174 as entry
 IN = 25.4
 SCRIPTS = Path(__file__).resolve().parent
 UNDERHEAD = screw.SHOULDER_LEN + screw.THREAD_LEN
+# The e4bfc7a58 PD worker's strict-audit log reports this COMPLETE supplier
+# head-diameter text envelope and the leader below, rounded to 0.1 sheet mm.
+# No native witness inventory or full-sheet audit dump survived that attempt.
+_HEAD_DIAMETER_TEXT_BOX = Box(0.1279, 0.2122, 0.1521, 0.2168)
 
 
 def test_spec_is_the_catalogue_screw() -> None:
@@ -1153,6 +1158,14 @@ def test_supplier_references_route_only_head_height_through_physical_api(monkeyp
     assert calls[2][1] is top
     assert calls[2][2]["label"] == "SupplierSocketAF"
     assert calls[2][2]["entity_type"] == "EDGE"
+    # Bound the whole recorded text against the actual producer's projected
+    # diameter witness stations. These full source-to-dimension-line corridors
+    # are conservative source geometry, not fabricated native witness rows.
+    diameter = calls[0][2]
+    for x, y in (diameter["p0"], diameter["p1"]):
+        witness = Segment(x, y, x, diameter["text_xy"][1], role="extension")
+        assert segment_box_overlap_length(witness, _HEAD_DIAMETER_TEXT_BOX) == 0.0
+        assert segment_box_distance(witness, _HEAD_DIAMETER_TEXT_BOX) >= 0.002
 
 
 def _attach_stock_fixture(state):
@@ -1250,10 +1263,17 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
     state.path = path.resolve()
     monkeypatch.setattr(drawing, "OUTPUTS", SimpleNamespace(slddrw=path))
     state.previous = state.adapter.currentModel
+    state.front.ReferencedDocument = SimpleNamespace(GetPathName=lambda: str(drawing.SOURCE.resolve()))
+    state.annotation.GetName = lambda: "Head annotation native name"
+    state.display.GetNameForSelection = lambda: "Head display native selection name"
+    state.stock.annotation.GetName = lambda: "Stock annotation native name"
+    state.stock.display.GetNameForSelection = lambda: "Stock display native selection name"
     finished_sheet = SimpleNamespace(
+        name=drawing.SHEET_NAMES[0], ReferencedConfiguration="", ReferencedDocument=None,
         GetDisplayDimensions=lambda: (), GetNextView=lambda: state.front,
     )
     stock_sheet = SimpleNamespace(
+        name=drawing.SHEET_NAMES[1], ReferencedConfiguration="", ReferencedDocument=None,
         GetDisplayDimensions=lambda: (), GetNextView=lambda: state.stock.view,
     )
     state.sheets = dict(zip(drawing.SHEET_NAMES, (finished_sheet, stock_sheet), strict=True))
@@ -1310,6 +1330,14 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
             (object(), object()), (1, 1),  # Also stale across document close/reopen.
         ),
     }
+    # A native save may change these IDs; only the observed post-save names
+    # belong to the saved lookup. The pre-save records stay untouched.
+    state.native.FullName = "D2@FinishedFront@pivot.SLDDRW"
+    state.stock.native.FullName = "D1@StockFront@pivot.SLDDRW"
+    state.serialized_full_names = {
+        "SupplierHeadHeight": state.native.FullName,
+        "SupplierStockThreadLength": state.stock.native.FullName,
+    }
     state.configurations = {
         state.front.name: (drawing.SHEET_NAMES[0], state.front.ReferencedConfiguration),
         state.stock.view.name: (
@@ -1326,6 +1354,7 @@ def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
     state.open_warnings = 2  # Warning telemetry is not a false load error.
     drawing._assert_saved_physical_references(
         state.adapter, state.identities, state.configurations,
+        serialized_full_names=state.serialized_full_names,
     )
     assert state.opens == [(str(state.path), 3, 3, "", 0, 0)]
     assert state.closes == [state.path.name]
@@ -1338,6 +1367,8 @@ def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
     proof = next(fields for name, fields in state.events if name == "drawing.pivot_head_height_proof")
     assert proof["phase"] == "after_saved_reopen"
     assert proof["full_name"] == state.native.FullName
+    assert proof["original_full_name"] == state.identities["SupplierHeadHeight"][0]
+    assert proof["original_full_name"] != proof["full_name"]
     assert proof["measured_head_height_mm"] == pytest.approx(screw.HEAD_H)
     assert proof["attached_circle_params_m"] == (
         state.bearing.GetCurve().CircleParams, state.top.GetCurve().CircleParams,
@@ -1346,6 +1377,8 @@ def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
         fields for name, fields in state.events if name == "drawing.pivot_stock_length_proof"
     )
     assert stock_proof["full_name"] == state.stock.native.FullName
+    assert stock_proof["original_full_name"] == state.identities["SupplierStockThreadLength"][0]
+    assert stock_proof["original_full_name"] != stock_proof["full_name"]
     assert stock_proof["measured_stock_thread_length_mm"] == pytest.approx(screw.THREAD_LEN)
     assert stock_proof["configuration"] == screw.SUPPLIER_STOCK_CONFIGURATION
     native_proofs = [
@@ -1356,6 +1389,170 @@ def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
         ("SupplierHeadHeight", "saved"), ("SupplierStockThreadLength", "saved"),
     }
     assert not state.additions and not state.selection.calls
+
+
+@pytest.mark.parametrize("fault", (
+    "missing_both", "missing_head", "missing_stock", "extra", "empty", "null",
+    "non_string", "duplicate",
+))
+def test_saved_physical_reader_requires_complete_distinct_serialized_names_before_open(
+    monkeypatch, tmp_path, fault,
+) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    names = dict(state.serialized_full_names)
+    if fault == "missing_both":
+        names.clear()
+    elif fault.startswith("missing_"):
+        names.pop("SupplierHeadHeight" if fault == "missing_head" else "SupplierStockThreadLength")
+    elif fault == "extra":
+        names["SupplierHeadDiameter"] = "Other@Native"
+    else:
+        names["SupplierHeadHeight"] = {
+            "empty": "", "null": None, "non_string": 17,
+            "duplicate": state.serialized_full_names["SupplierStockThreadLength"],
+        }[fault]
+    with pytest.raises(RuntimeError, match="serialized FullNames"):
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations, serialized_full_names=names,
+        )
+    assert not state.opens and not state.closes and not state.scans
+    assert state.adapter.currentModel is state.previous
+
+
+def test_saved_physical_reader_has_no_implicit_presave_name_fallback(monkeypatch, tmp_path) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    with pytest.raises(TypeError, match="serialized_full_names"):
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+        )
+    assert not state.opens and not state.closes
+
+
+@pytest.mark.parametrize("fault", ("original", "suffix", "whitespace", "selection", "annotation"))
+def test_saved_lookup_refuses_every_nonexact_serialized_identity_with_full_inventory(
+    monkeypatch, tmp_path, fault,
+) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    original_identities = dict(state.identities)
+    actual_names = dict(state.serialized_full_names)
+    names = dict(actual_names)
+    if fault == "original":
+        names = {name: record[0] for name, record in state.identities.items()}
+    elif fault == "suffix":
+        names["SupplierHeadHeight"] = actual_names["SupplierHeadHeight"].split("@", 1)[1]
+    elif fault == "whitespace":
+        names["SupplierHeadHeight"] = f" {actual_names['SupplierHeadHeight']} "
+    elif fault == "selection":
+        names["SupplierHeadHeight"] = state.display.GetNameForSelection()
+    else:
+        names["SupplierHeadHeight"] = state.annotation.GetName()
+    state.sheets[drawing.SHEET_NAMES[0]].GetDisplayDimensions = lambda: None
+    with pytest.raises(RuntimeError, match="saved FullName census is 0") as refusal:
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations, serialized_full_names=names,
+        )
+    ((event, evidence),) = state.events
+    assert event == "drawing.physical_axial_identity_inventory"
+    assert evidence["expected_original_full_names"] == {
+        name: record[0] for name, record in original_identities.items()
+    }
+    assert evidence["expected_serialized_full_names"] == names
+    assert evidence["label_match_counts"] == {
+        "SupplierHeadHeight": 0, "SupplierStockThreadLength": 0 if fault == "original" else 1,
+    }
+    assert evidence["document_path"] == str(state.path)
+    assert evidence["document_title"] == state.path.name and evidence["document_type"] == 3
+    inventory = evidence["inventory"]
+    assert [(row["sheet"], row["view"]) for row in inventory] == [
+        (drawing.SHEET_NAMES[0], drawing.SHEET_NAMES[0]),
+        (drawing.SHEET_NAMES[0], state.front.name),
+        (drawing.SHEET_NAMES[1], drawing.SHEET_NAMES[1]),
+        (drawing.SHEET_NAMES[1], state.stock.view.name),
+    ]
+    assert inventory[0]["is_sheet_view"] and inventory[0]["raw_none"]
+    assert inventory[0]["count"] == 0 and inventory[0]["dimensions"] == []
+    assert inventory[2]["is_sheet_view"] and not inventory[2]["raw_none"]
+    assert inventory[2]["count"] == 0 and inventory[2]["dimensions"] == []
+    assert not inventory[1]["is_sheet_view"] and not inventory[3]["is_sheet_view"]
+    for row, name, owner, annotation, display in (
+        (inventory[1], "SupplierHeadHeight", state.front, state.annotation, state.display),
+        (inventory[3], "SupplierStockThreadLength", state.stock.view,
+         state.stock.annotation, state.stock.display),
+    ):
+        assert row["count"] == 1 and row["configuration"] == owner.ReferencedConfiguration
+        assert row["source_document_path"] == str(drawing.SOURCE.resolve())
+        (native,) = row["dimensions"]
+        assert native["full_name"] == actual_names[name]
+        assert native["selection_name"] == display.GetNameForSelection()
+        assert native["annotation_name"] == annotation.GetName()
+        assert native["owner"] == owner.name and native["owner_type"] == 0
+        assert native["owner_same_view"] == 1 and not native["owner_null"]
+        assert actual_names[name] in str(refusal.value)
+        assert original_identities[name][0] in str(refusal.value)
+    assert "label_match_counts" in str(refusal.value)
+    assert state.identities == original_identities
+    assert not state.scans and not state.additions and not state.selection.calls
+    assert state.closes == [state.path.name] and state.adapter.currentModel is state.previous
+
+
+def test_saved_lookup_preserves_actual_fullnames_without_stripping(monkeypatch, tmp_path) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.native.FullName = f" {state.native.FullName} "
+    state.serialized_full_names["SupplierHeadHeight"] = state.native.FullName
+    drawing._assert_saved_physical_references(
+        state.adapter, state.identities, state.configurations,
+        serialized_full_names=state.serialized_full_names,
+    )
+    evidence = next(
+        fields for name, fields in state.events if name == "drawing.physical_axial_identity_inventory"
+    )
+    assert evidence["inventory"][1]["dimensions"][0]["full_name"] == state.native.FullName
+    assert evidence["expected_serialized_full_names"]["SupplierHeadHeight"] == state.native.FullName
+
+
+@pytest.mark.parametrize("getter", ("annotation_name", "selection_name", "native_full_name"))
+def test_saved_inventory_keeps_original_getter_cause_and_visits_the_other_label(
+    monkeypatch, tmp_path, getter,
+) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    error = OSError(f"native {getter} getter failed")
+
+    def fail():
+        raise error
+
+    if getter == "annotation_name":
+        state.annotation.GetName = fail
+    elif getter == "selection_name":
+        state.display.GetNameForSelection = fail
+    else:
+        class StaleDimension:
+            @property
+            def FullName(self):
+                raise error
+
+        state.display.GetDimension2 = lambda _index: StaleDimension()
+    with pytest.raises(RuntimeError, match="saved inventory getter/metadata refusal") as refusal:
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
+        )
+    assert refusal.value.__cause__ is error
+    ((event, evidence),) = state.events
+    assert event == "drawing.physical_axial_identity_inventory"
+    assert evidence["label_match_counts"] == {
+        "SupplierHeadHeight": 0 if getter == "native_full_name" else 1,
+        "SupplierStockThreadLength": 1,
+    }
+    head = evidence["inventory"][1]["dimensions"][0]
+    assert getter.replace("native_", "") not in head
+    assert any(str(error) in message for message in head["errors"])
+    stock = evidence["inventory"][3]["dimensions"][0]
+    assert stock["full_name"] == state.stock.native.FullName
+    assert stock["annotation_name"] == state.stock.annotation.GetName()
+    assert stock["selection_name"] == state.stock.display.GetNameForSelection()
+    assert state.stock.native.FullName in str(refusal.value)
+    assert not state.scans and not state.additions and not state.selection.calls
+    assert state.closes == [state.path.name] and state.adapter.currentModel is state.previous
 
 
 @pytest.mark.parametrize("fault, message", (
@@ -1479,6 +1676,7 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
     with pytest.raises(RuntimeError, match=message):
         drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
         )
     assert state.closes == [state.path.name]
     assert state.adapter.currentModel is state.previous
@@ -1494,6 +1692,7 @@ def test_saved_head_height_refuses_an_already_open_drawing_without_closing_it(
     with pytest.raises(RuntimeError, match="finalize and close"):
         drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
         )
     assert not state.opens and not state.closes
     assert state.loaded is state.saved
@@ -1508,6 +1707,7 @@ def test_saved_head_height_requires_the_output_file(monkeypatch, tmp_path) -> No
     with pytest.raises(RuntimeError, match="saved drawing is missing"):
         drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
         )
     assert not state.opens and not state.closes
 
@@ -1563,13 +1763,17 @@ def test_settled_supplier_census_invokes_fresh_physical_head_proof(
             )
 
 
-def test_build_proves_both_physical_references_after_finalizer_closes_saved_drawing(
-    monkeypatch, tmp_path,
-) -> None:
+def _record_drawing_build(
+    monkeypatch, tmp_path, *, checkpoint_calls=1, capture_fault=None,
+):
+    """Exercise the real build producer over the existing no-COM doubles."""
     source = tmp_path / "pivot.SLDPRT"
     source.touch()
     events = []
-    model = SimpleNamespace(ActivateSheet=lambda _name: True)
+    projections, callouts = [], []
+    head_edge = (0.1478, 0.2022)  # Recorded native leader landing, sheet metres.
+    model = SimpleNamespace(path="", ActivateSheet=lambda _name: True)
+    model.GetPathName = lambda: model.path
     adapter = SimpleNamespace(currentModel=model)
 
     async def open_model(_path):
@@ -1577,7 +1781,7 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
 
     adapter.open_model = open_model
     properties = {
-        "Purchased Screw Note": "PURCHASED HEAD",
+        "Purchased Screw Note": _config.parts(part.PART_NAME)["purchased_note"],
         "Supplier Reference Title": screw.SUPPLIER_STOCK_TITLE,
     }
     front, iso, top = (
@@ -1600,8 +1804,34 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
         name: object() for name in screw.SUPPLIER_REFERENCE_DIMENSIONS
         if name != "SupplierStockThreadLength"
     }
-    stock_annotation = object()
-    identities = {"captured": object()}
+    physical_labels = ("SupplierHeadHeight", "SupplierStockThreadLength")
+    native_dimensions = {
+        "SupplierHeadHeight": SimpleNamespace(FullName="D2@FinishedFront@UnsavedDrawing"),
+        "SupplierStockThreadLength": SimpleNamespace(FullName="D1@StockFront@UnsavedDrawing"),
+    }
+    for name in physical_labels:
+        native = native_dimensions[name]
+        display = SimpleNamespace(GetDimension2=lambda _index, native=native: native)
+        references[name] = SimpleNamespace(
+            GetSpecificAnnotation=lambda display=display: display,
+        )
+    stock_annotation = references.pop("SupplierStockThreadLength")
+    physical_references = {
+        "SupplierHeadHeight": references["SupplierHeadHeight"],
+        "SupplierStockThreadLength": stock_annotation,
+    }
+    identities = {
+        name: (native_dimensions[name].FullName, owner, (object(), object()), (1, 1))
+        for name, owner in zip(physical_labels, (front.name, stock.name), strict=True)
+    }
+    original_identities = dict(identities)
+    serialized_names = {
+        name: native.FullName.replace("@UnsavedDrawing", "@pivot.SLDDRW")
+        for name, native in native_dimensions.items()
+    }
+    captures = []
+    output = SimpleNamespace(slddrw=tmp_path / "pivot.SLDDRW")
+    monkeypatch.setattr(drawing, "OUTPUTS", output)
     monkeypatch.setattr(drawing, "SOURCE", source)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
@@ -1624,14 +1854,20 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
     monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_args: None)
     monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_add_supplier_references", lambda *_args: references)
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda *_args, **_kwargs: (0.0, 0.0))
-    monkeypatch.setattr(
-        drawing, "add_property_linked_callout",
-        lambda *_args, **_kwargs: SimpleNamespace(
+
+    def project_head(_adapter, view, point, *, label):
+        projections.append((view, point, label))
+        return head_edge
+
+    def linked_callout(_adapter, view, **options):
+        callouts.append((view, options))
+        return SimpleNamespace(
             GetText=lambda: properties["Purchased Screw Note"],
             PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
-        ),
-    )
+        )
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project_head)
+    monkeypatch.setattr(drawing, "add_property_linked_callout", linked_callout)
     monkeypatch.setattr(
         drawing, "_add_stock_reference", lambda *_args: (stock, stock_iso, stock_annotation)
     )
@@ -1643,8 +1879,37 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
 
     monkeypatch.setattr(drawing, "_supplier_reference_identities", capture)
 
+    def capture_serialized(
+        actual_adapter, actual_references, actual_identities, configurations, *,
+        labels, drawing_path, sheet_names,
+    ):
+        assert actual_adapter is adapter and adapter.currentModel is model
+        assert model.GetPathName() == str(output.slddrw.resolve())
+        assert set(actual_references) == set(physical_labels)
+        assert all(actual_references[name] is physical_references[name] for name in physical_labels)
+        assert actual_identities is identities and identities == original_identities
+        assert labels == physical_labels and sheet_names == drawing.SHEET_NAMES
+        assert drawing_path is output.slddrw and len(configurations) == 5
+        actual_names = {name: native.FullName for name, native in native_dimensions.items()}
+        assert actual_names == serialized_names
+        assert all(actual_names[name] != identities[name][0] for name in physical_labels)
+        captures.append(actual_names)
+        if capture_fault == "missing":
+            actual_names.pop("SupplierStockThreadLength")
+        elif capture_fault == "empty":
+            actual_names["SupplierHeadHeight"] = ""
+        elif capture_fault == "duplicate":
+            actual_names["SupplierStockThreadLength"] = actual_names["SupplierHeadHeight"]
+        elif capture_fault == "extra":
+            actual_names["UnrelatedLabel"] = "Other@Native"
+        return actual_names
+
+    monkeypatch.setattr(drawing, "capture_serialized_physical_axial_names", capture_serialized)
+
     def settled(_adapter, actual_identities, configurations):
         assert actual_identities is identities
+        assert identities == original_identities and model.GetPathName() == ""
+        assert all(native_dimensions[name].FullName == identities[name][0] for name in physical_labels)
         assert configurations[front.name] == (drawing.SHEET_NAMES[0], "Default")
         assert configurations[stock.name] == (
             drawing.SHEET_NAMES[1], screw.SUPPLIER_STOCK_CONFIGURATION,
@@ -1659,22 +1924,96 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
         events.append("finalize")
         for check in options["settled_checks"]:
             check()
+        # Simulate the existing successful native SaveAs, PDF export and audit,
+        # then invoke the real local checkpoint while the original refs are live.
+        model.path = str(outputs.slddrw.resolve())
+        for name, native in native_dimensions.items():
+            native.FullName = serialized_names[name]
+        for _ in range(checkpoint_calls):
+            options["checkpoint"]("before_drawing_close")
         adapter.currentModel = None
         events.append("closed")
         return expected
 
-    def saved(_adapter, actual_identities, configurations):
+    def saved(_adapter, actual_identities, configurations, *, serialized_full_names):
         assert adapter.currentModel is None
         assert actual_identities is identities
         assert len(configurations) == 5
+        assert actual_identities == original_identities
+        assert serialized_full_names == serialized_names and len(captures) == 1
         events.append("saved-reopen-proof")
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     monkeypatch.setattr(drawing, "_assert_saved_physical_references", saved)
-    assert asyncio.run(drawing.build(adapter)) is expected
-    assert events == [
+    return SimpleNamespace(
+        result=asyncio.run(drawing.build(adapter)), expected=expected, events=events,
+        projections=projections, callouts=callouts, head_edge=head_edge, front=front,
+        captures=captures, identities=identities, original_identities=original_identities,
+        serialized_names=serialized_names,
+    )
+
+
+def test_build_proves_both_physical_references_after_finalizer_closes_saved_drawing(
+    monkeypatch, tmp_path,
+) -> None:
+    recorded = _record_drawing_build(monkeypatch, tmp_path)
+    assert recorded.result is recorded.expected
+    assert recorded.events == [
         "identities", "finalize", "settled", "closed", "saved-reopen-proof",
     ]
+    assert recorded.identities == recorded.original_identities
+    assert recorded.captures == [recorded.serialized_names]
+
+
+@pytest.mark.parametrize("checkpoint_calls, capture_fault, message", (
+    (0, None, "checkpoint was never called"),
+    (2, None, "capture called more than once"),
+    (1, "missing", "capture is incomplete"),
+    (1, "empty", "capture is incomplete"),
+    (1, "duplicate", "capture is incomplete"),
+    (1, "extra", "capture is incomplete"),
+))
+def test_build_requires_one_complete_postsave_identity_capture_before_saved_proof(
+    monkeypatch, tmp_path, checkpoint_calls, capture_fault, message,
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _record_drawing_build(
+            monkeypatch, tmp_path, checkpoint_calls=checkpoint_calls,
+            capture_fault=capture_fault,
+        )
+
+
+def test_purchased_note_producer_keeps_head_landing_and_clears_complete_diameter_text(
+    monkeypatch, tmp_path,
+) -> None:
+    """A translated recorded route is an offline control, not native all-ink proof."""
+    recorded = _record_drawing_build(monkeypatch, tmp_path)
+    ((view, point, label),) = recorded.projections
+    assert view is recorded.front
+    assert point == pytest.approx((
+        screw.HEAD_DIA / 4 / 1000, screw.HEAD_H / 1000, 0.0,
+    ))
+    assert label == "purchased socket head top edge"
+    ((view, callout),) = recorded.callouts
+    assert view is recorded.front
+    assert callout["property_name"] == "Purchased Screw Note"
+    assert callout["edge_xy"] is recorded.head_edge
+
+    old_route = Segment(0.1495, 0.2432, *recorded.head_edge, role="leader")
+    # The logged 4.57 mm strike must remain visible to the unchanged predicate;
+    # the retained box/segment coordinates were rounded to 0.1 mm.
+    assert segment_box_overlap_length(
+        old_route, _HEAD_DIAMETER_TEXT_BOX,
+    ) == pytest.approx(0.00457, abs=0.0001)
+
+    # Retain the observed leader-start offset from the requested note anchor,
+    # and translate ONLY that start using the real producer's note_xy argument.
+    x, y = callout["note_xy"]
+    route = Segment(x - 0.0005, y - 0.0018, *recorded.head_edge, role="leader")
+    assert segment_box_overlap_length(route, _HEAD_DIAMETER_TEXT_BOX) == 0.0
+    assert segment_box_distance(route, _HEAD_DIAMETER_TEXT_BOX) >= 0.002
+    # The changed-source native audit must still clear every sheet's actual ink,
+    # including the complete note, witnesses and neighbouring annotations.
 
 
 def test_physical_head_height_bounds_arc_evidence_without_hiding_the_nearest_match(
@@ -1780,6 +2119,7 @@ def test_physical_head_height_spatial_proof_is_fresh_at_every_boundary(
         else:
             drawing._assert_saved_physical_references(
                 state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
             )
     assert state.events[-1][0] == "drawing.physical_axial_dimension_native_refusal"
     assert not state.selection.selected
@@ -2142,12 +2482,18 @@ def test_stock_physical_proof_is_fresh_in_settled_and_readonly_saved_census(
         stock.view.dimensions.append(stock.display)
     elif fault == "presentation":
         stock.texts[2] = ")"
-    run = (
-        drawing._assert_supplier_references if phase == "settled"
-        else drawing._assert_saved_physical_references
-    )
+    def run():
+        if phase == "settled":
+            drawing._assert_supplier_references(
+                state.adapter, state.identities, state.configurations,
+            )
+        else:
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+            )
     if fault == "none":
-        run(state.adapter, state.identities, state.configurations)
+        run()
         proofs = [
             fields for name, fields in state.events
             if name == "drawing.physical_axial_dimension_native_proof"
@@ -2158,7 +2504,7 @@ def test_stock_physical_proof_is_fresh_in_settled_and_readonly_saved_census(
         assert [scan[1] for scan in state.scans] == [state.front, stock.view]
     else:
         with pytest.raises(RuntimeError):
-            run(state.adapter, state.identities, state.configurations)
+            run()
     assert not state.additions and not state.selection.calls
     if phase == "saved":
         assert state.closes == [state.path.name]
@@ -2193,9 +2539,8 @@ def test_saved_stock_exact_inventory_owner_configuration_and_source_guards(
     elif fault == "captured_wrong_configuration":
         state.configurations[stock.view.name] = (drawing.SHEET_NAMES[1], "Default")
     elif fault in ("duplicate_captured_name", "missing_captured_name"):
-        state.identities["SupplierStockThreadLength"] = (
-            state.native.FullName if fault == "duplicate_captured_name" else "",
-            stock.view.name, (object(), object()), (1, 1),
+        state.serialized_full_names["SupplierStockThreadLength"] = (
+            state.native.FullName if fault == "duplicate_captured_name" else ""
         )
     elif fault == "lost_hlr":
         stock.view.mode = 1
@@ -2204,8 +2549,12 @@ def test_saved_stock_exact_inventory_owner_configuration_and_source_guards(
     with pytest.raises(RuntimeError):
         drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
         )
-    assert state.closes == [state.path.name]
+    if fault in ("duplicate_captured_name", "missing_captured_name"):
+        assert not state.opens and not state.closes
+    else:
+        assert state.closes == [state.path.name]
     assert state.adapter.currentModel is state.previous
     assert not state.additions and not state.selection.calls
 

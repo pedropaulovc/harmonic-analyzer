@@ -1216,3 +1216,656 @@ def test_stock_selected_pair_requires_exact_native_different_state(native, monke
     monkeypatch.setattr(native.application, "IsSame", equality)
     native.refuse_creation("selected physical edges are not provably distinct|native integer")
     assert native.reads["create_dimension"] == 0
+
+
+class _SerializedNode(_Native):
+    def __init__(self, state, key, *, token=None, **values):
+        super().__init__(state)
+        self.key = key
+        self.token = object() if token is None else token
+        self.values = values
+
+    def get(self, member):
+        return self.read(f"{self.key}.{member}", self.values[member])
+
+
+class _SerializedModel(_SerializedNode):
+    def GetPathName(self):
+        return self.get("path")
+
+    def GetTitle(self):
+        return self.get("title")
+
+    def GetType(self):
+        return self.get("type")
+
+    def GetSheetNames(self):
+        return self.get("sheets")
+
+    def GetViews(self):
+        return self.get("rows")
+
+
+class _SerializedView(_SerializedNode):
+    @property
+    def ReferencedConfiguration(self):
+        return self.get("configuration")
+
+    @property
+    def ReferencedDocument(self):
+        return self.get("source")
+
+    def GetDisplayDimensions(self):
+        return self.get("displays")
+
+
+class _SerializedAnnotation(_SerializedNode):
+    def GetName(self):
+        return self.get("name")
+
+    @property
+    def OwnerType(self):
+        return self.get("owner_type")
+
+    @property
+    def Owner(self):
+        return self.get("owner")
+
+
+class _SerializedDimension(_SerializedNode):
+    @property
+    def FullName(self):
+        return self.get("full_name")
+
+
+class _SerializedDisplay(_SerializedNode):
+    def GetNameForSelection(self):
+        return self.get("selection_name")
+
+    def GetAnnotation(self):
+        return self.get("annotation")
+
+    def GetDimension2(self, index):
+        assert index == 0
+        return self.get("dimension")
+
+
+class _SerializedApplication(_SerializedNode):
+    @property
+    def ActiveDoc(self):
+        return self.get("active")
+
+    def GetOpenDocumentByName(self, path):
+        assert path == str(self.state.path.resolve())
+        return self.get("open")
+
+    def IsSame(self, left, right):
+        assert left is not None and right is not None
+        self.state.comparisons.append((left, right))
+        pair = (left.token, right.token)
+        failure = self.state.same_failures.get(pair)
+        if failure is not None:
+            raise failure
+        return self.read("IsSame", self.state.same_overrides.get(pair, int(left.token is right.token)))
+
+
+class _SerializedHarness:
+    labels = ("SupplierHeadHeight", "SupplierStockThreadLength")
+    sheet_names = ("Finished", "SourceStock")
+
+    def __init__(self, monkeypatch, tmp_path):
+        self.reads = Counter()
+        self.failures = {}
+        self.fail_on = {}
+        self.events = []
+        self.comparisons = []
+        self.same_overrides = {}
+        self.same_failures = {}
+        self.path = tmp_path / "invented-output.slddrw"
+        self.source = _SerializedModel(self, "source", path=str(tmp_path / "invented-source.sldprt"))
+        self.views = [
+            _SerializedView(
+                self, "head_view", name="FinishedFront", configuration="Finished",
+                source=self.source, displays=[],
+            ),
+            _SerializedView(
+                self, "stock_view", name="StockFront", configuration="OriginalStock",
+                source=self.source, displays=[],
+            ),
+        ]
+        self.sheet_views = [
+            _SerializedView(self, "finished_sheet", name="Finished", displays=None),
+            _SerializedView(self, "stock_sheet", name="SourceStock", displays=[]),
+        ]
+        self.empty_view = _SerializedView(
+            self, "empty_view", name="EmptyIso", configuration="Finished",
+            source=self.source, displays=[],
+        )
+        self.originals = []
+        self.actuals = []
+        self.displays = []
+        self.dimensions = []
+        self.references = {}
+        self.identities = {}
+        self.configurations = {}
+        for index, (label, view, sheet) in enumerate(zip(self.labels, self.views, self.sheet_names, strict=True)):
+            original = _SerializedAnnotation(
+                self, f"original_{index}", name=f"original-native-{index}", owner_type=0, owner=view,
+            )
+            # Different Python wrappers are intentionally the SAME native
+            # annotation. Post-save names do not participate in IsSame.
+            actual = _SerializedAnnotation(
+                self, f"actual_{index}", token=original.token,
+                name=f"serialized-annotation-{index}", owner_type=0, owner=view,
+            )
+            dimension = _SerializedDimension(
+                self, f"dimension_{index}", full_name=f"D{index + 1}@Physical@actual-saved-output",
+            )
+            display = _SerializedDisplay(
+                self, f"display_{index}", selection_name=f"actual-selection-{index}",
+                annotation=actual, dimension=dimension,
+            )
+            view.values["displays"].append(display)
+            self.originals.append(original)
+            self.actuals.append(actual)
+            self.displays.append(display)
+            self.dimensions.append(dimension)
+            self.references[label] = original
+            self.identities[label] = (
+                f"D{index + 1}@Physical@before-save", view.values["name"], (object(), object()), (1, 1),
+            )
+            self.configurations[view.values["name"]] = (sheet, view.values["configuration"])
+        self.configurations["EmptyIso"] = ("Finished", "Finished")
+        # The caller preserves its entire original identity map, not just the
+        # two physical entries selected by labels.
+        self.identities["OtherSupplierSize"] = ("Other@BeforeSave", "EmptyIso", (), ())
+        self.document = _SerializedModel(
+            self, "document", path=str(self.path), title="invented-output.slddrw", type=3,
+            sheets=self.sheet_names,
+            rows=[
+                [self.sheet_views[0], self.views[0], self.empty_view],
+                [self.sheet_views[1], self.views[1]],
+            ],
+        )
+        self.application = _SerializedApplication(self, "application", active=self.document, open=self.document)
+        self.adapter = SimpleNamespace(currentModel=self.document, swApp=self.application)
+        monkeypatch.setattr(proof, "_early_bound", self.bind)
+        monkeypatch.setattr(proof, "view_name", lambda _adapter, view: view.get("name"))
+        monkeypatch.setattr(proof._telemetry, "event", lambda name, **fields: self.events.append((name, fields)))
+        for name in ("assert_native_physical_axial_dimension", "assert_dimension_measures", "model_points_in_view"):
+            monkeypatch.setattr(proof, name, self.forbidden_physical_call)
+
+    def bind(self, value, interface):
+        _Native(self).read(f"bind_{interface}")
+        return value
+
+    @staticmethod
+    def forbidden_physical_call(*_args, **_kwargs):
+        raise AssertionError("serialized identity capture must not repeat a physical proof")
+
+    def capture(self, **changes):
+        arguments = dict(labels=self.labels, drawing_path=self.path, sheet_names=self.sheet_names)
+        arguments.update(changes)
+        return proof.capture_serialized_physical_axial_names(
+            self.adapter, self.references, self.identities, self.configurations, **arguments,
+        )
+
+    def refuse(self, match):
+        with pytest.raises(RuntimeError, match=match) as caught:
+            self.capture()
+        name, fields = self.events[-1]
+        assert name == "drawing.physical_axial_serialized_identity"
+        assert fields["status"] == "refused"
+        assert set(fields["label_match_counts"]) == set(self.labels)
+        assert fields["failure_error_type"] == type(caught.value.__cause__).__name__
+        return caught.value, fields
+
+
+@pytest.fixture
+def serialized(monkeypatch, tmp_path):
+    return _SerializedHarness(monkeypatch, tmp_path)
+
+
+def test_serialized_capture_accepts_actual_changed_fullnames_only_by_original_native_annotations(serialized):
+    before = dict(serialized.identities)
+    references = dict(serialized.references)
+    configurations = dict(serialized.configurations)
+    assert serialized.capture() == {
+        label: dimension.values["full_name"]
+        for label, dimension in zip(serialized.labels, serialized.dimensions, strict=True)
+    }
+    assert all(
+        serialized.identities[label] is identity for label, identity in before.items()
+    )
+    assert serialized.identities == before
+    assert serialized.references == references and serialized.configurations == configurations
+    assert serialized.adapter.currentModel is serialized.document
+    name, fields = serialized.events[-1]
+    assert name == "drawing.physical_axial_serialized_identity"
+    assert fields["status"] == "captured"
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert fields["expected_original_full_names"] == {
+        label: before[label][0] for label in serialized.labels
+    }
+    assert all(
+        fields["expected_original_full_names"][label] != fields["expected_serialized_full_names"][label]
+        for label in serialized.labels
+    )
+    for actual in serialized.actuals:
+        assert all((actual, original) in serialized.comparisons for original in serialized.originals)
+    assert fields["document_path"] == str(serialized.path)
+    assert fields["document_title"] == "invented-output.slddrw" and fields["document_type"] == 3
+    assert not any(name == "drawing.physical_axial_dimension_native_proof" for name, _ in serialized.events)
+
+
+def test_serialized_inventory_includes_every_sheet_view_empty_and_raw_none_with_actual_names(serialized):
+    serialized.capture()
+    inventory = serialized.events[-1][1]["inventory"]
+    assert len(inventory) == 5
+    assert inventory[0]["is_sheet_view"] and inventory[0]["raw_none"] and inventory[0]["count"] == 0
+    assert inventory[3]["is_sheet_view"] and not inventory[3]["raw_none"] and inventory[3]["count"] == 0
+    assert inventory[2]["view"] == "EmptyIso" and not inventory[2]["raw_none"] and inventory[2]["count"] == 0
+    for row, index in ((inventory[1], 0), (inventory[4], 1)):
+        assert row["source_path"] == serialized.source.values["path"]
+        item, = row["dimensions"]
+        assert item["full_name"] == serialized.dimensions[index].values["full_name"]
+        assert item["annotation_name"] == f"serialized-annotation-{index}"
+        assert item["selection_name"] == f"actual-selection-{index}"
+        assert item["owner"] == serialized.views[index].values["name"]
+        assert item["owner_type"] == 0 and item["owner_is_same"] == 1
+    assert len([name for name, _ in serialized.events if name == "drawing.physical_axial_identity_inventory"]) == 5
+
+
+def test_serialized_census_uses_actual_sheet_names_not_undetermined_getviews_row_order(serialized):
+    serialized.document.values["rows"].reverse()
+    assert set(serialized.capture()) == set(serialized.labels)
+
+
+def test_serialized_census_rereads_every_actual_name_without_caching_or_normalization(serialized):
+    first = serialized.capture()
+    serialized.dimensions[0].values["full_name"] = " exactly@Different@Native-ID "
+    second = serialized.capture()
+    assert second[serialized.labels[0]] == " exactly@Different@Native-ID "
+    assert second[serialized.labels[0]] != first[serialized.labels[0]]
+    assert serialized.reads["dimension_0.full_name"] == 2
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_diagnostic_names_are_truthful_not_cross_session_identity_requirements(serialized, value):
+    serialized.actuals[0].values["name"] = value
+    serialized.displays[0].values["selection_name"] = value
+    assert set(serialized.capture()) == set(serialized.labels)
+    item = serialized.events[-1][1]["inventory"][1]["dimensions"][0]
+    assert item["annotation_name"] is value and item["selection_name"] is value
+
+
+def test_same_fullname_and_diagnostic_names_on_another_annotation_are_not_an_identity_fallback(serialized):
+    serialized.actuals[0].token = object()
+    serialized.actuals[0].values["name"] = serialized.originals[0].values["name"]
+    serialized.dimensions[0].values["full_name"] = serialized.identities[serialized.labels[0]][0]
+    _error, fields = serialized.refuse("original annotation census")
+    assert fields["label_match_counts"] == dict(zip(serialized.labels, (0, 1), strict=True))
+    assert fields["inventory"][1]["dimensions"][0]["full_name"] == serialized.identities[serialized.labels[0]][0]
+    assert fields["inventory"][4]["dimensions"][0]["full_name"] == serialized.dimensions[1].values["full_name"]
+
+
+@pytest.mark.parametrize("fault", ["missing", "null", "stale", "same-native", "same-wrapper"])
+def test_original_annotations_are_required_live_and_native_distinct(serialized, fault):
+    label = serialized.labels[0]
+    original = OSError("original annotation getter is stale")
+    if fault == "missing":
+        del serialized.references[label]
+    elif fault == "null":
+        serialized.references[label] = None
+    elif fault == "stale":
+        serialized.failures["original_0.name"] = original
+    elif fault == "same-native":
+        serialized.originals[1].token = serialized.originals[0].token
+    else:
+        serialized.references[serialized.labels[1]] = serialized.originals[0]
+    error, fields = serialized.refuse("original|distinct")
+    assert len(fields["inventory"]) == 5
+    if fault == "stale":
+        assert error.__cause__ is original
+        assert "annotation_name" not in fields["originals"][label]
+        assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+
+
+@pytest.mark.parametrize("fault", [
+    "missing-match", "null-annotation", "null-display", "null-dimension", "duplicate-match",
+    "duplicate-fullname", "same-two-fullnames",
+])
+def test_actual_native_census_refuses_missing_null_duplicate_matches_and_fullnames(serialized, fault):
+    if fault == "missing-match":
+        serialized.views[0].values["displays"] = []
+    elif fault == "null-annotation":
+        serialized.displays[0].values["annotation"] = None
+    elif fault == "null-display":
+        serialized.views[0].values["displays"] = [None]
+    elif fault == "null-dimension":
+        serialized.displays[0].values["dimension"] = None
+    elif fault == "duplicate-match":
+        serialized.empty_view.values["displays"] = [serialized.displays[0]]
+    elif fault == "duplicate-fullname":
+        other_annotation = _SerializedAnnotation(
+            serialized, "other_annotation", name="other", owner_type=0, owner=serialized.views[0],
+        )
+        other = _SerializedDisplay(
+            serialized, "other_display", selection_name="other-selection",
+            annotation=other_annotation, dimension=serialized.dimensions[0],
+        )
+        serialized.views[0].values["displays"].append(other)
+    else:
+        serialized.dimensions[1].values["full_name"] = serialized.dimensions[0].values["full_name"]
+    _error, fields = serialized.refuse("census|native|unique|distinct")
+    assert len(fields["inventory"]) == 5
+    assert fields["label_match_counts"][serialized.labels[1]] == 1
+
+
+@pytest.mark.parametrize("value", [None, "", 0, True, 2.0, object()])
+def test_matched_serialized_fullname_must_be_an_actual_nonempty_string(serialized, value):
+    serialized.dimensions[0].values["full_name"] = value
+    _error, fields = serialized.refuse("FullName")
+    actual = fields["inventory"][1]["dimensions"][0]["full_name"]
+    assert actual == (
+        value if value is None or isinstance(value, (str, bool, int, float))
+        else {"type": type(value).__name__, "repr": repr(value)[:120]}
+    )
+
+
+@pytest.mark.parametrize("comparison", ["originals", "match", "owner", "original-owner", "active", "open"])
+@pytest.mark.parametrize("value", [2, -1, None, True, False, "1", 1.0])
+def test_every_native_identity_comparison_requires_exact_known_integer_states(serialized, comparison, value):
+    if comparison == "originals":
+        pair = (serialized.originals[0], serialized.originals[1])
+    elif comparison == "match":
+        pair = (serialized.actuals[0], serialized.originals[0])
+    elif comparison in ("owner", "original-owner"):
+        pair = (serialized.views[0], serialized.views[0])
+    else:
+        document = _SerializedNode(serialized, f"{comparison}_document", token=serialized.document.token)
+        serialized.application.values[comparison] = document
+        pair = (document, serialized.document)
+    serialized.same_overrides[(pair[0].token, pair[1].token)] = value
+    _error, fields = serialized.refuse("IsSame|integer|owner|current drawing")
+    assert len(fields["inventory"]) == 5
+
+
+@pytest.mark.parametrize("fault", [
+    "view", "configuration", "sheet", "owner", "owner-null", "owner-type",
+    "original-owner", "original-owner-null", "original-owner-type", "duplicate-view",
+    "source-null", "source-relative", "captured-configuration", "captured-sheet",
+])
+def test_matched_annotation_requires_exact_captured_view_sheet_configuration_owner_and_source(serialized, fault):
+    if fault == "view":
+        serialized.views[0].values["name"] = "DifferentFront"
+    elif fault == "configuration":
+        serialized.views[0].values["configuration"] = "OriginalStock"
+    elif fault == "sheet":
+        serialized.document.values["rows"][0].remove(serialized.views[0])
+        serialized.document.values["rows"][1].append(serialized.views[0])
+    elif fault == "owner":
+        serialized.actuals[0].values["owner"] = serialized.views[1]
+    elif fault == "owner-null":
+        serialized.actuals[0].values["owner"] = None
+    elif fault == "owner-type":
+        serialized.actuals[0].values["owner_type"] = 1
+    elif fault == "original-owner":
+        serialized.originals[0].values["owner"] = serialized.views[1]
+    elif fault == "original-owner-null":
+        serialized.originals[0].values["owner"] = None
+    elif fault == "original-owner-type":
+        serialized.originals[0].values["owner_type"] = 1
+    elif fault == "duplicate-view":
+        serialized.empty_view.values["name"] = serialized.views[0].values["name"]
+    elif fault == "source-null":
+        serialized.views[0].values["source"] = None
+    elif fault == "source-relative":
+        serialized.source.values["path"] = "relative-source.sldprt"
+    elif fault == "captured-configuration":
+        serialized.configurations["FinishedFront"] = ("Finished", "Wrong")
+    else:
+        serialized.configurations["FinishedFront"] = ("SourceStock", "Finished")
+    _error, fields = serialized.refuse("view|sheet|configuration|owner|source")
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert len(fields["inventory"]) == 5
+
+
+@pytest.mark.parametrize("field", ["owner_type", "original_owner_type"])
+@pytest.mark.parametrize("value", [None, True, False, "0", 0.0, 0.5])
+def test_matched_and_original_owner_types_are_not_coerced(serialized, field, value):
+    annotation = serialized.actuals[0] if field == "owner_type" else serialized.originals[0]
+    annotation.values["owner_type"] = value
+    serialized.refuse("owner")
+
+
+@pytest.mark.parametrize("fault", [
+    "wrong-path", "relative-path", "empty-path", "null-path", "wrong-type", "null-model",
+    "null-active", "different-active", "null-open", "different-open", "ordered-sheets",
+    "missing-row", "duplicate-row", "wrong-row-sheet", "null-rows", "null-row", "null-view",
+    "null-drawing",
+])
+def test_capture_requires_actual_saved_current_drawing_and_complete_exact_sheet_census(serialized, monkeypatch, fault):
+    if fault in ("wrong-path", "relative-path", "empty-path", "null-path"):
+        serialized.document.values["path"] = {
+            "wrong-path": str(serialized.path.with_name("different.slddrw")),
+            "relative-path": serialized.path.name, "empty-path": "", "null-path": None,
+        }[fault]
+    elif fault == "wrong-type":
+        serialized.document.values["type"] = 1
+    elif fault == "null-model":
+        serialized.adapter.currentModel = None
+    elif fault in ("null-active", "different-active", "null-open", "different-open"):
+        key = fault.split("-")[1]
+        serialized.application.values[key] = None if fault.startswith("null") else serialized.source
+    elif fault == "ordered-sheets":
+        serialized.document.values["sheets"] = tuple(reversed(serialized.sheet_names))
+    elif fault == "missing-row":
+        serialized.document.values["rows"].pop()
+    elif fault == "duplicate-row":
+        serialized.document.values["rows"].append(serialized.document.values["rows"][0])
+    elif fault == "wrong-row-sheet":
+        serialized.sheet_views[0].values["name"] = "WrongSheet"
+    elif fault == "null-rows":
+        serialized.document.values["rows"] = None
+    elif fault == "null-row":
+        serialized.document.values["rows"][0] = None
+    elif fault == "null-view":
+        serialized.document.values["rows"][0].append(None)
+    else:
+        original = serialized.bind
+        monkeypatch.setattr(
+            proof, "_early_bound",
+            lambda value, interface: None if interface == "IDrawingDoc" else original(value, interface),
+        )
+    serialized.refuse("drawing|saved|sheet|view")
+
+
+@pytest.mark.parametrize("value", [None, True, "3", 3.0, 3.5])
+def test_document_type_requires_a_native_integer_without_coercion(serialized, value):
+    serialized.document.values["type"] = value
+    error, _fields = serialized.refuse("native integer")
+    assert isinstance(error.__cause__, TypeError)
+
+
+@pytest.mark.parametrize("key", [
+    "original_0.name", "original_0.owner_type", "original_0.owner",
+    "application.active", "application.open", "document.path", "document.title", "document.type",
+    "document.sheets", "document.rows", "finished_sheet.name", "head_view.name",
+    "head_view.configuration", "head_view.source", "source.path", "head_view.displays",
+    "display_0.selection_name", "display_0.annotation", "display_0.dimension",
+    "actual_0.name", "actual_0.owner_type", "actual_0.owner", "dimension_0.full_name",
+    "bind_IAnnotation", "bind_IDisplayDimension", "bind_IDimension", "bind_IView",
+    "bind_IModelDoc2", "bind_IDrawingDoc", "bind_ISldWorks", "IsSame",
+])
+def test_capture_getter_and_binding_failures_retain_original_cause_and_all_reachable_inventory(serialized, key):
+    original = OSError(f"native {key} failed")
+    serialized.failures[key] = original
+    error, fields = serialized.refuse("native")
+    assert error.__cause__ is original
+    assert fields["failure_error"] == str(original)
+    if key not in ("document.rows", "bind_IModelDoc2", "bind_IDrawingDoc"):
+        assert len(fields["inventory"]) == 5
+    if key == "dimension_0.full_name":
+        head, = fields["inventory"][1]["dimensions"]
+        assert "full_name" not in head
+        assert head["annotation_name"] == "serialized-annotation-0"
+        assert head["selection_name"] == "actual-selection-0"
+        assert fields["inventory"][4]["dimensions"][0]["full_name"] == serialized.dimensions[1].values["full_name"]
+        assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+
+
+def test_multiple_native_getter_failures_keep_first_original_and_independent_partial_actual_fields(serialized):
+    first = OSError("selection getter failed first")
+    second = OSError("native dimension getter also failed")
+    serialized.failures["display_0.selection_name"] = first
+    serialized.failures["display_0.dimension"] = second
+    error, fields = serialized.refuse("selection getter failed first")
+    assert error.__cause__ is first
+    head, = fields["inventory"][1]["dimensions"]
+    assert "selection_name" not in head and "full_name" not in head
+    assert head["annotation_name"] == "serialized-annotation-0"
+    assert [entry["error"] for entry in head["errors"]] == [str(first), str(second)]
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert fields["inventory"][4]["dimensions"][0]["full_name"] == serialized.dimensions[1].values["full_name"]
+
+
+@pytest.mark.parametrize("value", [None, [], (), ("only-one",), ("", "Stock"), ("same", "same")])
+def test_capture_requires_exactly_two_nonempty_distinct_label_names(serialized, value):
+    with pytest.raises((RuntimeError, TypeError)):
+        serialized.capture(labels=value)
+
+
+@pytest.mark.parametrize("fault", ["missing-identity", "short-identity", "empty-original-name", "missing-configuration"])
+def test_capture_requires_the_unchanged_original_identity_and_configuration_metadata(serialized, fault):
+    label = serialized.labels[0]
+    if fault == "missing-identity":
+        del serialized.identities[label]
+    elif fault == "short-identity":
+        serialized.identities[label] = serialized.identities[label][:3]
+    elif fault == "empty-original-name":
+        _name, owner, entities, kinds = serialized.identities[label]
+        serialized.identities[label] = ("", owner, entities, kinds)
+    else:
+        del serialized.configurations["FinishedFront"]
+    before = dict(serialized.identities)
+    _error, fields = serialized.refuse("original|captured")
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert len(fields["inventory"]) == 5
+    assert serialized.identities == before
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_missing_matches_complete_both_label_counts_after_raw_none_or_empty_dimension_census(serialized, value):
+    serialized.views[0].values["displays"] = value
+    _error, fields = serialized.refuse("original annotation census")
+    assert fields["label_match_counts"] == dict(zip(serialized.labels, (0, 1), strict=True))
+    row = fields["inventory"][1]
+    assert row["raw_none"] is (value is None) and row["count"] == 0 and row["dimensions"] == []
+    assert fields["inventory"][4]["dimensions"][0]["full_name"] == serialized.dimensions[1].values["full_name"]
+
+
+@pytest.mark.parametrize("value", ["not-an-array", 7, object()])
+def test_malformed_dimension_arrays_are_not_replaced_with_a_fabricated_empty_inventory(serialized, value):
+    serialized.views[0].values["displays"] = value
+    _error, fields = serialized.refuse("malformed display array")
+    row = fields["inventory"][1]
+    assert row["raw_none"] is False and "count" not in row
+    assert row["malformed_display_array"] == {"type": type(value).__name__, "repr": repr(value)[:120]}
+    assert fields["label_match_counts"] == dict(zip(serialized.labels, (0, 1), strict=True))
+
+
+@pytest.mark.parametrize("target", ["IAnnotation", "IDimension"])
+def test_null_binding_of_an_unrelated_display_is_not_skipped_when_proving_inventory_uniqueness(
+    serialized, monkeypatch, target,
+):
+    annotation = _SerializedAnnotation(
+        serialized, "unrelated_annotation", name="unrelated", owner_type=0, owner=serialized.empty_view,
+    )
+    dimension = _SerializedDimension(serialized, "unrelated_dimension", full_name="Other@Actual@Drawing")
+    display = _SerializedDisplay(
+        serialized, "unrelated_display", selection_name="unrelated-selection",
+        annotation=annotation, dimension=dimension,
+    )
+    serialized.empty_view.values["displays"] = [display]
+    original = serialized.bind
+    unavailable = annotation if target == "IAnnotation" else dimension
+    monkeypatch.setattr(
+        proof, "_early_bound",
+        lambda value, interface: None if interface == target and value is unavailable else original(value, interface),
+    )
+    _error, fields = serialized.refuse("binding is unavailable")
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert fields["inventory"][2]["count"] == 1
+
+
+def test_unread_fullname_does_not_fabricate_a_null_serialized_identity(serialized):
+    original = OSError("actual native fullname unavailable")
+    serialized.failures["dimension_0.full_name"] = original
+    error, fields = serialized.refuse("actual native fullname unavailable")
+    assert error.__cause__ is original
+    assert serialized.labels[0] not in fields["expected_serialized_full_names"]
+    assert fields["expected_serialized_full_names"][serialized.labels[1]] == serialized.dimensions[1].values["full_name"]
+
+
+def test_document_getter_failure_does_not_emit_fabricated_null_boundary_fields(serialized):
+    original = OSError("document path unavailable")
+    serialized.failures["document.path"] = original
+    error, fields = serialized.refuse("document path unavailable")
+    assert error.__cause__ is original and "document_path" not in fields
+    inventories = [fields for name, fields in serialized.events if name == "drawing.physical_axial_identity_inventory"]
+    assert len(inventories) == 5
+    assert all("document_path" not in fields and fields["document_title"] == "invented-output.slddrw" for fields in inventories)
+
+
+def test_native_source_and_configuration_values_are_not_accepted_via_diagnostic_repr(serialized):
+    class ConfigurationImpersonator:
+        def __repr__(self):
+            return "Finished"
+
+    serialized.views[0].values["configuration"] = ConfigurationImpersonator()
+    _error, fields = serialized.refuse("captured view/sheet/configuration changed")
+    assert fields["inventory"][1]["configuration"] == {"type": "ConfigurationImpersonator", "repr": "Finished"}
+
+
+def test_identical_owner_name_on_a_different_native_view_does_not_satisfy_owner_proof(serialized):
+    lookalike = _SerializedView(
+        serialized, "lookalike_owner", name="FinishedFront",
+        configuration="Finished", source=serialized.source, displays=[],
+    )
+    serialized.actuals[0].values["owner"] = lookalike
+    _error, fields = serialized.refuse("exact native view owner")
+    item, = fields["inventory"][1]["dimensions"]
+    assert item["owner"] == "FinishedFront" and item["owner_is_same"] == 0
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+
+
+def test_native_same_owner_and_current_document_wrappers_need_not_be_python_identical(serialized):
+    owner = _SerializedView(
+        serialized, "owner_alias", token=serialized.views[0].token, name="FinishedFront",
+    )
+    document = _SerializedNode(serialized, "document_alias", token=serialized.document.token)
+    serialized.actuals[0].values["owner"] = owner
+    serialized.application.values.update(active=document, open=document)
+    assert set(serialized.capture()) == set(serialized.labels)
+
+
+def test_original_annotation_found_in_a_sheet_view_is_not_a_physical_source_view(serialized):
+    serialized.views[0].values["displays"] = []
+    serialized.sheet_views[0].values["displays"] = [serialized.displays[0]]
+    _error, fields = serialized.refuse("captured view/sheet/configuration changed")
+    assert fields["label_match_counts"] == dict.fromkeys(serialized.labels, 1)
+    assert fields["inventory"][0]["is_sheet_view"] and fields["inventory"][0]["count"] == 1
+
+
+def test_identity_refusal_contains_both_original_ids_actual_ids_counts_and_all_actual_views(serialized):
+    serialized.actuals[0].token = object()
+    error, fields = serialized.refuse("original annotation census")
+    text = str(error)
+    assert set(fields["label_match_counts"]) == set(serialized.labels)
+    for label, dimension in zip(serialized.labels, serialized.dimensions, strict=True):
+        assert label in text and serialized.identities[label][0] in text
+        assert dimension.values["full_name"] in text
+    assert all(view.values["name"] in text for view in [*serialized.sheet_views, *serialized.views, serialized.empty_view])
+    assert fields["actual_full_names_by_label"][serialized.labels[0]] == []
+    assert fields["actual_full_names_by_label"][serialized.labels[1]] == [serialized.dimensions[1].values["full_name"]]

@@ -1,4 +1,10 @@
-"""Create MHA-PD-VN-57's drawing with creation/settled/saved physical axial proofs."""
+"""Create MHA-PD-VN-57's drawing with creation/settled/saved physical axial proofs.
+
+Keep original identities for settled checks. Capture the actual serialized
+FullNames from those same annotations only after successful saves/audit, at
+``before_drawing_close``; cold reopening must find those exact names before
+running the independent saved physical and presentation proofs.
+"""
 
 from __future__ import annotations
 
@@ -32,6 +38,7 @@ from _drawing_notes import add_property_linked_note, property_link
 from _drawing_physical_axial_dimension import (
     add_native_physical_axial_dimension,
     assert_native_physical_axial_dimension,
+    capture_serialized_physical_axial_names,
 )
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -122,10 +129,11 @@ CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
 # The reference length's four lines stand wholly left of its dimension line
 # (73 mm wide), so neither its arrows nor its extension lines strike them.
 CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
-# The purchased-screw note flags the unmodified head and shoulder: its leader
-# lands on the head-top edge, the note stands up and right in the open field.
+# The purchased-screw note flags the unmodified head and shoulder. Keep its
+# head-top landing fixed; place the note farther into the right field so its
+# straight leader bypasses the complete head-diameter text envelope.
 HEAD_PICK_MM = (HEAD_DIA / 4, HEAD_H, 0.0)
-PURCHASED_NOTE_XY = (0.150, 0.245)
+PURCHASED_NOTE_XY = (0.190, 0.245)
 # Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.360, 0.165)
@@ -672,9 +680,21 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
 
 @_telemetry.traced("drawing.pivot_physical_references_saved")
 def _assert_saved_physical_references(
-    adapter: Any, identities: dict, configurations: dict
+    adapter: Any, identities: dict, configurations: dict, *,
+    serialized_full_names: dict[str, str],
 ) -> None:
-    """Read-only reopened proof of BOTH physical sizes, without stale attachments."""
+    """Cold-read exact serialized names, then prove BOTH physical sizes afresh."""
+    names = ("SupplierHeadHeight", "SupplierStockThreadLength")
+    if (
+        set(serialized_full_names) != set(names)
+        or any(not isinstance(value, str) or not value for value in serialized_full_names.values())
+        or len(set(serialized_full_names.values())) != 2
+    ):
+        raise RuntimeError(
+            "physical references: missing, extra, empty or duplicate serialized FullNames; "
+            f"expected labels={names!r}, serialized_full_names={serialized_full_names!r}"
+        )
+    required = {serialized_full_names[name]: name for name in names}
     path = OUTPUTS.slddrw.resolve()
     if not path.is_file():
         raise RuntimeError("SupplierHeadHeight: saved drawing is missing")
@@ -705,10 +725,132 @@ def _assert_saved_physical_references(
         drawing = _early_bound(model, "IDrawingDoc")
         if tuple(str(name) for name in (drawing.GetSheetNames() or ())) != SHEET_NAMES:
             raise RuntimeError("SupplierHeadHeight: saved sheet census changed")
-        names = ("SupplierHeadHeight", "SupplierStockThreadLength")
-        required = {identities[name][0]: name for name in names}
-        if len(required) != 2 or any(not full_name for full_name in required):
-            raise RuntimeError("physical references: missing or duplicate captured FullNames")
+        expected_original_full_names = {name: identities[name][0] for name in names}
+        matches = {name: [] for name in names}
+        inventory = []
+        inventory_errors = []
+        document = {}
+        try:
+            document["document_path"] = model.GetPathName()
+            document["document_title"] = model.GetTitle()
+            document["document_type"] = model.GetType()
+        except Exception as error:
+            document["errors"] = [f"{type(error).__name__}: {error}"]
+            inventory_errors.append(error)
+        for sheet_name in SHEET_NAMES:
+            try:
+                if not drawing.ActivateSheet(sheet_name):
+                    raise RuntimeError(f"physical references: cannot activate saved sheet {sheet_name}")
+                view = _early_bound(drawing.GetFirstView(), "IView")
+            except Exception as error:
+                inventory.append({
+                    "sheet": sheet_name, "errors": [f"{type(error).__name__}: {error}"],
+                })
+                inventory_errors.append(error)
+                continue
+            is_sheet_view = True
+            while view is not None:
+                view = _early_bound(view, "IView")
+                record: dict[str, Any] = {
+                    "sheet": sheet_name, "is_sheet_view": is_sheet_view, "dimensions": [],
+                }
+                inventory.append(record)
+                try:
+                    record["view"] = view_name(adapter, view)
+                    record["configuration"] = view.ReferencedConfiguration
+                    source = view.ReferencedDocument
+                    record["source_document_null"] = source is None
+                    if source is not None:
+                        record["source_document_path"] = _early_bound(
+                            source, "IModelDoc2"
+                        ).GetPathName()
+                except Exception as error:
+                    record.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                    inventory_errors.append(error)
+                try:
+                    raw_dimensions = view.GetDisplayDimensions()
+                    record["raw_none"] = raw_dimensions is None
+                    if raw_dimensions is not None and not isinstance(raw_dimensions, (tuple, list)):
+                        raise RuntimeError("physical references: malformed saved display array")
+                    dimensions = () if raw_dimensions is None else raw_dimensions
+                    record["count"] = len(dimensions)
+                except Exception as error:
+                    record.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                    inventory_errors.append(error)
+                    dimensions = ()
+                for index, raw in enumerate(dimensions):
+                    item: dict[str, Any] = {"index": index, "display_null": raw is None}
+                    record["dimensions"].append(item)
+                    try:
+                        if raw is None:
+                            raise RuntimeError("physical references: saved display is null")
+                        display = _early_bound(raw, "IDisplayDimension")
+                        native = display.GetDimension2(0)
+                        item["native_dimension_null"] = native is None
+                        if native is None:
+                            raise RuntimeError("physical references: saved display has no native dimension")
+                        full_name = _early_bound(native, "IDimension").FullName
+                        item["full_name"] = full_name
+                        if not isinstance(full_name, str) or not full_name:
+                            raise RuntimeError("physical references: saved native FullName is empty or invalid")
+                        name = required.get(full_name)
+                        if name is not None:
+                            matches[name].append((sheet_name, view, display))
+                    except Exception as error:
+                        item.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                        inventory_errors.append(error)
+                    if raw is None:
+                        continue
+                    try:
+                        display = _early_bound(raw, "IDisplayDimension")
+                        # SDK: IDisplayDimension.GetNameForSelection() has zero arguments.
+                        item["selection_name"] = display.GetNameForSelection()
+                    except Exception as error:
+                        item.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                        inventory_errors.append(error)
+                    try:
+                        display = _early_bound(raw, "IDisplayDimension")
+                        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                        item["annotation_null"] = annotation is None
+                        if annotation is None:
+                            raise RuntimeError("physical references: saved annotation is null")
+                        # SDK: IAnnotation.GetName() has zero arguments.
+                        item["annotation_name"] = annotation.GetName()
+                        item["owner_type"] = annotation.OwnerType
+                        native_owner = annotation.Owner
+                        item["owner_null"] = native_owner is None
+                        if native_owner is not None:
+                            item["owner_same_view"] = app.IsSame(native_owner, view)
+                            if item["owner_type"] == 0:
+                                item["owner"] = view_name(adapter, native_owner)
+                    except Exception as error:
+                        item.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                        inventory_errors.append(error)
+                try:
+                    view = view.GetNextView()
+                    is_sheet_view = False
+                except Exception as error:
+                    record.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
+                    inventory_errors.append(error)
+                    break
+        label_match_counts = {name: len(matches[name]) for name in names}
+        evidence = dict(
+            phase="saved", expected_original_full_names=expected_original_full_names,
+            expected_serialized_full_names=dict(serialized_full_names),
+            label_match_counts=label_match_counts, inventory=inventory, **document,
+        )
+        _telemetry.event("drawing.physical_axial_identity_inventory", **evidence)
+        if inventory_errors:
+            raise RuntimeError(
+                f"physical references: saved inventory getter/metadata refusal: "
+                f"{inventory_errors[0]}; actual inventory={evidence!r}"
+            ) from inventory_errors[0]
+        if any(count != 1 for count in label_match_counts.values()):
+            census = "; ".join(
+                f"{name}: saved FullName census is {label_match_counts[name]}, expected exactly 1"
+                for name in names
+            )
+            raise RuntimeError(f"{census}; actual inventory={evidence!r}")
         for name, expected_sheet in zip(names, SHEET_NAMES, strict=True):
             expected_owner = identities[name][1]
             captured_sheet, captured_configuration = configurations[expected_owner]
@@ -718,30 +860,9 @@ def _assert_saved_physical_references(
                 captured_configuration == SUPPLIER_STOCK_CONFIGURATION
             ):
                 raise RuntimeError(f"{name}: captured source configuration changed")
-        matches = {name: [] for name in names}
-        for sheet_name in SHEET_NAMES:
-            if not drawing.ActivateSheet(sheet_name):
-                raise RuntimeError(f"physical references: cannot activate saved sheet {sheet_name}")
-            view = _early_bound(drawing.GetFirstView(), "IView")
-            while view is not None:
-                view = _early_bound(view, "IView")
-                for raw in view.GetDisplayDimensions() or ():
-                    display = _early_bound(raw, "IDisplayDimension")
-                    native = display.GetDimension2(0)
-                    if native is None:
-                        raise RuntimeError("physical references: saved display has no native dimension")
-                    full_name = str(_early_bound(native, "IDimension").FullName)
-                    name = required.get(full_name)
-                    if name is not None:
-                        matches[name].append((sheet_name, view, display))
-                view = view.GetNextView()
         for name in names:
-            if len(matches[name]) != 1:
-                raise RuntimeError(
-                    f"{name}: saved FullName census is {len(matches[name])}, expected exactly 1"
-                )
-        for name in names:
-            full_name, expected_owner, _old_entities, _old_kinds = identities[name]
+            original_full_name, expected_owner, _old_entities, _old_kinds = identities[name]
+            full_name = serialized_full_names[name]
             sheet_name, front, display = matches[name][0]
             owner = view_name(adapter, front)
             annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
@@ -770,6 +891,7 @@ def _assert_saved_physical_references(
             )
             common = dict(
                 phase="after_saved_reopen", full_name=full_name,
+                original_full_name=original_full_name,
                 attached_circle_params_m=actual_circles, owner=owner,
                 configuration=str(front.ReferencedConfiguration),
             )
@@ -909,6 +1031,32 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     if properties["Supplier Reference Title"].replace("\r", "") != SUPPLIER_STOCK_TITLE:
         raise RuntimeError("source-stock title does not identify the original screw")
+    physical_labels = ("SupplierHeadHeight", "SupplierStockThreadLength")
+    serialized_full_names: dict[str, str] = {}
+    capture_called = False
+
+    def checkpoint(stage: str) -> None:
+        nonlocal capture_called
+        if stage != "before_drawing_close":
+            return
+        if capture_called:
+            raise RuntimeError("physical references: serialized identity capture called more than once")
+        capture_called = True
+        captured = capture_serialized_physical_axial_names(
+            adapter, {name: supplier_refs[name] for name in physical_labels}, identities,
+            configurations, labels=physical_labels, drawing_path=OUTPUTS.slddrw,
+            sheet_names=SHEET_NAMES,
+        )
+        if (
+            set(captured) != set(physical_labels)
+            or any(not isinstance(value, str) or not value for value in captured.values())
+            or len(set(captured.values())) != 2
+        ):
+            raise RuntimeError(
+                f"physical references: serialized identity capture is incomplete: {captured!r}"
+            )
+        serialized_full_names.update(captured)
+
     result = await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -917,8 +1065,13 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
+        checkpoint=checkpoint,
     )
-    _assert_saved_physical_references(adapter, identities, configurations)
+    if not capture_called:
+        raise RuntimeError("physical references: before_drawing_close identity checkpoint was never called")
+    _assert_saved_physical_references(
+        adapter, identities, configurations, serialized_full_names=serialized_full_names,
+    )
     return result
 
 

@@ -32,6 +32,7 @@ from _drawing_notes import add_property_linked_note, property_link
 from _drawing_physical_axial_dimension import (
     add_native_physical_axial_dimension,
     assert_native_physical_axial_dimension,
+    capture_serialized_physical_axial_names,
 )
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -731,10 +732,19 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
 
 
 @_telemetry.traced("drawing.stud_physical_references_saved")
-def _assert_saved_physical_references(adapter: Any, identities: dict, configurations: dict) -> None:
+def _assert_saved_physical_references(
+    adapter: Any, identities: dict, configurations: dict, *,
+    serialized_full_names: dict[str, str],
+) -> None:
     """Audit only the finalized, closed SLDDRW, read-only; never rebuild or repair."""
     label = "SupplierHeadHeight"
     labels = ("SupplierHeadHeight", "SupplierStockLength")
+    if (
+        set(serialized_full_names) != set(labels)
+        or any(not isinstance(value, str) or not value for value in serialized_full_names.values())
+        or len(set(serialized_full_names.values())) != len(labels)
+    ):
+        raise RuntimeError(f"{label}: require two distinct exact serialized native FullNames")
     captured = {}
     for index, name in enumerate(labels):
         full_name, expected_owner, _entities, _kinds = identities[name]
@@ -744,9 +754,7 @@ def _assert_saved_physical_references(adapter: Any, identities: dict, configurat
             or (expected_configuration[1] == SUPPLIER_STOCK_CONFIGURATION) != (index == 1)
         ):
             raise RuntimeError(f"{name}: saved identity has the wrong physical sheet/configuration")
-        captured[name] = (full_name, expected_owner, expected_configuration)
-    if len({record[0] for record in captured.values()}) != len(labels):
-        raise RuntimeError(f"{label}: physical references share a native FullName")
+        captured[name] = (serialized_full_names[name], expected_owner, expected_configuration)
     saved_path = Path(OUTPUTS.slddrw).resolve()
     if not saved_path.is_file() or saved_path.suffix.lower() != ".slddrw":
         raise RuntimeError(f"{label}: finalized SLDDRW is missing")
@@ -775,31 +783,142 @@ def _assert_saved_physical_references(adapter: Any, identities: dict, configurat
             raise RuntimeError(f"{label}: saved reader acquired the wrong current drawing")
         adapter.currentModel = model
         drawing = _early_bound(model, "IDrawingDoc")
-        if tuple(drawing.GetSheetNames() or ()) != SHEET_NAMES:
-            raise RuntimeError(f"{label}: saved sheet census changed")
         matches = {name: [] for name in labels}
-        for sheet_name in SHEET_NAMES:
-            if not drawing.ActivateSheet(sheet_name):
-                raise RuntimeError(f"{label}: cannot activate saved sheet {sheet_name}")
-            sheet_view = _early_bound(drawing.GetFirstView(), "IView")
-            view = sheet_view.GetNextView()
+        inventory = []
+        inventory_errors = []
+
+        def native_field(record, key, getter):
+            try:
+                value = getter()
+            except Exception as error:
+                record[f"{key}_error"] = f"{type(error).__name__}: {error}"
+                inventory_errors.append(error)
+                return None
+            record[key] = value
+            return value
+
+        document = {}
+        native_field(document, "title", lambda: model.GetTitle())
+        native_field(document, "path", lambda: model.GetPathName())
+        native_field(document, "type", lambda: model.GetType())
+        actual_sheets = native_field(document, "sheet_names", lambda: drawing.GetSheetNames())
+        for sheet_name in actual_sheets or ():
+            sheet_record = {"sheet": sheet_name, "views": []}
+            inventory.append(sheet_record)
+            activated = native_field(
+                sheet_record, "activated", lambda: drawing.ActivateSheet(sheet_name)
+            )
+            if not activated:
+                inventory_errors.append(RuntimeError(f"cannot activate saved sheet {sheet_name}"))
+                continue
+            view = native_field(sheet_record, "first_view", lambda: drawing.GetFirstView())
+            # Native handles never enter telemetry; retain only observed scalar fields.
+            sheet_record.pop("first_view", None)
+            is_sheet_view = True
             while view is not None:
-                view = _early_bound(view, "IView")
-                for raw in view.GetDisplayDimensions() or ():
-                    display = _early_bound(raw, "IDisplayDimension")
-                    raw_dimension = display.GetDimension2(0)
-                    if raw_dimension is None:
-                        raise RuntimeError(f"{label}: saved dimension has no native identity")
-                    dimension = _early_bound(raw_dimension, "IDimension")
-                    for name, (full_name, _owner, _configuration) in captured.items():
-                        if str(dimension.FullName) == full_name:
-                            matches[name].append((sheet_name, view, display))
-                view = view.GetNextView()
-        for name, found in matches.items():
-            if len(found) != 1:
-                raise RuntimeError(
-                    f"{name}: saved native FullName census is {len(found)}, expected 1"
+                view_record = {"sheet_view": is_sheet_view, "dimensions": []}
+                sheet_record["views"].append(view_record)
+                view = native_field(view_record, "native_view", lambda: _early_bound(view, "IView"))
+                view_record.pop("native_view", None)
+                if view is None:
+                    break
+                native_field(view_record, "view", lambda: view_name(adapter, view))
+                native_field(view_record, "configuration", lambda: view.ReferencedConfiguration)
+                source = native_field(view_record, "source_document", lambda: view.ReferencedDocument)
+                view_record.pop("source_document", None)
+                if "source_document_error" not in view_record:
+                    view_record["source_document_is_none"] = source is None
+                if isinstance(source, str):
+                    view_record["source_document_raw"] = source
+                elif source is not None:
+                    native_field(
+                        view_record, "source_document_path",
+                        lambda: _early_bound(source, "IModelDoc2").GetPathName(),
+                    )
+                raw_displays = native_field(
+                    view_record, "raw_displays", lambda: view.GetDisplayDimensions()
                 )
+                view_record.pop("raw_displays", None)
+                if "raw_displays_error" in view_record:
+                    displays = ()
+                else:
+                    view_record["raw_none"] = raw_displays is None
+                    displays = tuple(raw_displays or ())
+                    view_record["count"] = len(displays)
+                for raw in displays:
+                    record = {}
+                    view_record["dimensions"].append(record)
+                    display = native_field(
+                        record, "native_display", lambda: _early_bound(raw, "IDisplayDimension")
+                    )
+                    record.pop("native_display", None)
+                    if display is None:
+                        inventory_errors.append(RuntimeError("saved native display dimension is null"))
+                        continue
+                    native_field(record, "selection_name", lambda: display.GetNameForSelection())
+                    dimension = native_field(record, "native_dimension", lambda: display.GetDimension2(0))
+                    record.pop("native_dimension", None)
+                    if "native_dimension_error" not in record:
+                        record["native_dimension_is_none"] = dimension is None
+                    if dimension is None:
+                        inventory_errors.append(RuntimeError("saved dimension has no native identity"))
+                    else:
+                        full_name = native_field(
+                            record, "full_name",
+                            lambda: _early_bound(dimension, "IDimension").FullName,
+                        )
+                        for name, (expected_name, _owner, _configuration) in captured.items():
+                            if full_name == expected_name:
+                                matches[name].append((sheet_name, view, display))
+                    annotation = native_field(record, "native_annotation", lambda: display.GetAnnotation())
+                    record.pop("native_annotation", None)
+                    if "native_annotation_error" not in record:
+                        record["native_annotation_is_none"] = annotation is None
+                    if annotation is None:
+                        inventory_errors.append(RuntimeError("saved native dimension has no annotation"))
+                    else:
+                        annotation = native_field(
+                            record, "bound_annotation", lambda: _early_bound(annotation, "IAnnotation")
+                        )
+                        record.pop("bound_annotation", None)
+                        if annotation is None:
+                            continue
+                        native_field(record, "annotation_name", lambda: annotation.GetName())
+                        native_field(record, "owner_type", lambda: annotation.OwnerType)
+                        owner = native_field(record, "native_owner", lambda: annotation.Owner)
+                        record.pop("native_owner", None)
+                        if "native_owner_error" not in record:
+                            record["owner_is_none"] = owner is None
+                        if owner is not None:
+                            if record.get("owner_type") == 0:
+                                native_field(record, "owner", lambda: view_name(adapter, owner))
+                            native_field(record, "owner_same", lambda: app.IsSame(owner, view))
+                view = native_field(view_record, "next_view", lambda: view.GetNextView())
+                view_record.pop("next_view", None)
+                is_sheet_view = False
+        expected_original_full_names = {name: identities[name][0] for name in labels}
+        counts = {name: len(found) for name, found in matches.items()}
+        _telemetry.event(
+            "drawing.physical_axial_identity_inventory", phase="saved",
+            document=document, inventory=inventory,
+            expected_original_full_names=expected_original_full_names,
+            expected_serialized_full_names=dict(serialized_full_names),
+            label_match_counts=counts,
+        )
+        if (
+            inventory_errors or tuple(actual_sheets or ()) != SHEET_NAMES
+            or any(count != 1 for count in counts.values())
+        ):
+            error = RuntimeError(
+                f"{label}: saved native identity inventory refused; "
+                f"expected_original_full_names={expected_original_full_names!r}; "
+                f"expected_serialized_full_names={serialized_full_names!r}; "
+                f"label_match_counts={counts!r}; document={document!r}; inventory={inventory!r}; "
+                f"inventory_errors={[str(cause) for cause in inventory_errors]!r}"
+            )
+            if inventory_errors:
+                raise error from inventory_errors[0]
+            raise error
         for name in labels:
             full_name, expected_owner, expected_configuration = captured[name]
             sheet_name, front, display = matches[name][0]
@@ -809,6 +928,9 @@ def _assert_saved_physical_references(adapter: Any, identities: dict, configurat
             annotation = _early_bound(raw_annotation, "IAnnotation")
             if (
                 view_name(adapter, front) != expected_owner
+                or int(annotation.OwnerType) != 0
+                or annotation.Owner is None
+                or int(app.IsSame(annotation.Owner, front)) != 1
                 or view_name(adapter, annotation.Owner) != expected_owner
                 or (sheet_name, str(front.ReferencedConfiguration)) != expected_configuration
             ):
@@ -963,6 +1085,22 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     if properties["Supplier Reference Title"].replace("\r", "") != SUPPLIER_STOCK_TITLE:
         raise RuntimeError("source-stock title does not identify the original screw")
+    serialized_full_names: dict[str, str] = {}
+    capture_attempted = False
+
+    def checkpoint(stage: str) -> None:
+        nonlocal capture_attempted
+        if stage != "before_drawing_close":
+            return
+        if capture_attempted:
+            raise RuntimeError("physical serialized identity checkpoint was called more than once")
+        capture_attempted = True
+        labels = ("SupplierHeadHeight", "SupplierStockLength")
+        serialized_full_names.update(capture_serialized_physical_axial_names(
+            adapter, {name: supplier_refs[name] for name in labels}, identities, configurations,
+            labels=labels, drawing_path=OUTPUTS.slddrw, sheet_names=SHEET_NAMES,
+        ))
+
     artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -971,8 +1109,13 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
+        checkpoint=checkpoint,
     )
-    _assert_saved_physical_references(adapter, identities, configurations)
+    if not capture_attempted:
+        raise RuntimeError("physical serialized identity checkpoint before_drawing_close was not called")
+    _assert_saved_physical_references(
+        adapter, identities, configurations, serialized_full_names=serialized_full_names,
+    )
     return artifacts
 
 
