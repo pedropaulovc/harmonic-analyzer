@@ -1630,6 +1630,13 @@ existing capacity. Native outline padding is measured at each candidate scale;
 it is not scaled with the part, and the settled view/annotation guards remain
 authoritative. Recorded R38 outlines provide offline fit regressions, not proof
 that the repaired drawing has passed a fresh native run.
+After supplier formatting settles, this same selected layout offsets short
+head-height text left and AF/diameter text right of the measured native line
+ends, using the existing 2 mm clearance. Arrow tips, witness spans and physical
+dimension-line stations must remain unchanged; the full ink audit still sees
+the offset leader. The block screw's thread-length lane is left of the part,
+opposite its overall length. Recorded R44 paint-data replays cover the observed
+collisions and refusal paths; they do not qualify a fresh native export.
 
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never

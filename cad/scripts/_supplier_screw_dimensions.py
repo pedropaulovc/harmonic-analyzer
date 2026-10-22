@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from math import isfinite
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
@@ -17,13 +17,16 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _com import _bind, _early_bound
 from _dimensions import _feature_display_dimensions
+from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_projection import model_points_in_view
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _supplier_screw_layout import supplier_screw_lane_plan
+from _supplier_screw_layout import supplier_screw_lane_plan, supplier_top_text_geometry
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 import _seat_forensics
 import _telemetry
@@ -489,6 +492,122 @@ def _assert_source(
     )
 
 
+# These short native chords carry horizontal text much wider than their span.
+# Only the explicitly selected supplier_top layout uses offset-text shelves.
+_SUPPLIER_TOP_SHELVES = {
+    "SupplierHeadHeight": (False, "left"),
+    "SupplierThreadDiameter": (True, "right"),
+    "SupplierHeadDiameter": (True, "right"),
+    "SupplierDriveWidth": (True, "right"),
+}
+
+
+def _supplier_top_record(adapter: Any, display: Any) -> dict[str, Any]:
+    reader = _Reader(adapter)
+    record = _dump_annotation(reader, display.GetAnnotation())
+    errors = reader.take_errors()
+    if errors or record is None or int(record.get("type", 0)) != 4:
+        raise RuntimeError(f"supplier Top shelf annotation read failed: {errors}")
+    texts = (record.get("display") or {}).get("texts") or ()
+    if not texts or any(
+        not isfinite(float(row.get("w") or 0.0)) or float(row.get("w") or 0.0) <= 0.0
+        for row in texts
+    ):
+        raise RuntimeError("supplier Top shelf text has no measured native width")
+    return record
+
+
+def _assert_supplier_top_stations(
+    name: str, before: Mapping[str, Any], after: Mapping[str, Any]
+) -> None:
+    for field in ("tips", "witnesses", "physical_lines"):
+        if len(before[field]) != len(after[field]) or any(
+            len(prior) != len(current)
+            or any(abs(a - b) > 1e-5 for a, b in zip(prior, current, strict=True))
+            for prior, current in zip(before[field], after[field], strict=True)
+        ):
+            raise RuntimeError(f"{name}: supplier Top shelf moved native {field}")
+
+
+def _assert_supplier_top_shelves(
+    adapter: Any, displays: Mapping[str, Any]
+) -> dict[str, dict[str, Any]]:
+    measured = {}
+    for name, (horizontal, side) in _SUPPLIER_TOP_SHELVES.items():
+        if name not in displays:
+            continue
+        display = _early_bound(displays[name], "IDisplayDimension")
+        actual = supplier_top_text_geometry(
+            _supplier_top_record(adapter, display), horizontal=horizontal
+        )
+        text = actual["text"]
+        gap = (
+            actual["left"] - text.xmax if side == "left"
+            else text.xmin - actual["right"]
+        )
+        if display.OffsetText is not True or gap < CLEAR_GAP_M:
+            raise RuntimeError(f"{name}: supplier Top text shelf is not clear")
+        measured[name] = actual
+    return measured
+
+
+def _shelf_supplier_top_text(adapter: Any, displays: Mapping[str, Any]) -> None:
+    """Move text only, after formatting; retain measured native line stations."""
+    rebuild_drawing(adapter, label="supplier Top formatting and native lanes settled")
+    before = {}
+    positions = {}
+    anchors = {}
+    for name, (horizontal, _side) in _SUPPLIER_TOP_SHELVES.items():
+        if name not in displays:
+            continue
+        display = _early_bound(displays[name], "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if len(position) != 3 or not all(map(isfinite, position)):
+            raise RuntimeError(f"{name}: supplier Top shelf has no native position")
+        actual = supplier_top_text_geometry(
+            _supplier_top_record(adapter, display), horizontal=horizontal
+        )
+        before[name], positions[name] = actual, position
+        # OffsetText makes the old annotation anchor the physical line station.
+        # Seed it from the measured arrow tips first, as on the thumb screw.
+        normal = 1 if horizontal else 0
+        anchor = list(position[:2])
+        anchor[normal] = sum(tip[normal] for tip in actual["tips"]) / 2.0
+        anchors[name] = tuple(anchor)
+        if not annotation.SetPosition2(*anchor, 0.0):
+            raise RuntimeError(f"{name}: failed to prepare supplier Top offset anchor")
+    rebuild_drawing(adapter, label="supplier Top measured pre-offset anchors")
+    for name, anchor in anchors.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        display.OffsetText = True
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if not annotation.SetPosition2(*anchor, 0.0):
+            raise RuntimeError(f"{name}: failed to enable supplier Top text offset")
+    rebuild_drawing(adapter, label="supplier Top native offset-text mode")
+    for name, (horizontal, side) in _SUPPLIER_TOP_SHELVES.items():
+        if name not in before:
+            continue
+        display = _early_bound(displays[name], "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        actual = supplier_top_text_geometry(
+            _supplier_top_record(adapter, display), horizontal=horizontal
+        )
+        _assert_supplier_top_stations(name, before[name], actual)
+        text = actual["text"]
+        gap = CLEAR_GAP_M + PLACE_SETTLE_M
+        dx = (
+            actual["left"] - gap - text.xmax if side == "left"
+            else actual["right"] + gap - text.xmin
+        )
+        current = tuple(float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(current[0] + dx, positions[name][1], 0.0):
+            raise RuntimeError(f"{name}: failed to place supplier Top text shelf")
+    rebuild_drawing(adapter, label="supplier Top text shelves settled")
+    for name, actual in _assert_supplier_top_shelves(adapter, displays).items():
+        _assert_supplier_top_stations(name, before[name], actual)
+
+
 @_telemetry.traced("drawing.supplier_screw_settled_check")
 def assert_supplier_screw(
     adapter: Any,
@@ -499,6 +618,7 @@ def assert_supplier_screw(
     planes: Mapping[str, str] | None = None,
     units: Mapping[str, str] | None = None,
     _bindings: Mapping[str, tuple[str, str, str]] | None = None,
+    layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
 ) -> dict[str, Any]:
     """Reacquire final native carriers and refuse missing, duplicate or alien ink."""
     planes = planes or {}
@@ -577,6 +697,8 @@ def assert_supplier_screw(
         raise RuntimeError(
             f"settled supplier references missing {sorted(set(expected) - set(found))}"
         )
+    if layout == "supplier_top":
+        _assert_supplier_top_shelves(adapter, found)
     return found
 
 
@@ -592,6 +714,7 @@ def annotate_supplier_screw(
     sides: Mapping[str, str] | None = None,
     units: Mapping[str, str] | None = None,
     settled_checks: list[Callable[[], None]] | None = None,
+    layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
 ) -> dict[str, Any]:
     """Curate exact native sizes into their orthographic annotation lanes.
 
@@ -695,10 +818,20 @@ def annotate_supplier_screw(
                     units=units.get(name, "in"),
                 ),
             )
+            if layout == "supplier_top":
+                # A model annotation may inherit offset mode. Place the whole
+                # dimension in its lane before opting into text-only movement.
+                display = _early_bound(displays[name], "IDisplayDimension")
+                display.OffsetText = False
+                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                if not annotation.SetPosition2(*keep[name], 0.0):
+                    raise RuntimeError(f"{name}: failed to settle supplier Top lane")
     if set(displays) != names:
         raise RuntimeError(
             f"supplier references missing {sorted(names - set(displays))}"
         )
+    if layout == "supplier_top":
+        _shelf_supplier_top_text(adapter, displays)
     if settled_checks is not None:
         settled_checks.append(
             partial(
@@ -710,6 +843,7 @@ def annotate_supplier_screw(
                 planes=planes,
                 units=units,
                 _bindings=bindings,
+                layout=layout,
             )
         )
     return displays
