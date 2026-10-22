@@ -1039,6 +1039,44 @@ def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypat
     assert state.events[-1][1]["failure_probe_error"] == "native display data failed"
 
 
+@pytest.mark.parametrize("phase", ("metadata", "probe"))
+@pytest.mark.parametrize("error_type", (Exception, OSError))
+def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
+    monkeypatch, phase, error_type,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    error = error_type("native transport failed")
+
+    def broken_native_read():
+        raise error
+
+    if phase == "metadata":
+        state.annotation.IsDangling = broken_native_read
+    else:
+        state.display.Type2 = 2
+        state.annotation.GetDisplayData = broken_native_read
+    with pytest.raises(RuntimeError, match="native_snapshot=") as refusal:
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+        )
+    assert refusal.value.__cause__ is error
+    evidence = state.events[-1][1]
+    assert evidence["count_api"] == 2
+    assert evidence["attached_len"] == 2
+    assert evidence["kinds"] == (1, 1)
+    if phase == "metadata":
+        assert evidence["failure_stage"] == "IsDangling"
+        assert evidence["failure_error_type"] == error_type.__name__
+        assert evidence["failure_error"] == "native transport failed"
+        assert evidence["dangling"] is None
+    else:
+        assert "not vertical" in str(refusal.value)
+        assert evidence["failure_probe_stage"] == "GetDisplayData"
+        assert evidence["failure_probe_error_type"] == error_type.__name__
+        assert evidence["failure_probe_error"] == "native transport failed"
+        assert evidence["owner_is_same"] == 1
+
+
 def test_physical_head_height_refusal_reads_each_native_metadata_getter_once(monkeypatch) -> None:
     state = _physical_head_fixture(monkeypatch)
     state.display.Type2 = 2

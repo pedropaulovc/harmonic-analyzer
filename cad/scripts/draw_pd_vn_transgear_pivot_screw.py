@@ -284,33 +284,44 @@ def _assert_physical_head_height(
     }
     annotation = None
     attached = ()
+    stage = "display"
     try:
         if display is None:
             raise RuntimeError("SupplierHeadHeight: missing native display dimension")
         display = _early_bound(display, "IDisplayDimension")
+        stage = "Type2"
         snapshot["type2"] = display.Type2
+        stage = "GetAnnotation"
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         snapshot["annotation_null"] = annotation is None
         if annotation is None:
             raise RuntimeError("SupplierHeadHeight: missing native annotation")
+        stage = "GetAttachedEntityCount3"
         snapshot["count_api"] = annotation.GetAttachedEntityCount3()
+        stage = "GetAttachedEntities3"
         attached_raw = annotation.GetAttachedEntities3()
         snapshot["attached_len"] = 0 if attached_raw is None else len(attached_raw)
         attached = tuple(
             attached_raw[index] for index in range(min(snapshot["attached_len"], 4))
         )
         snapshot["attached_nulls"] = tuple(item is None for item in attached)
+        stage = "GetAttachedEntityTypes"
         kinds_raw = annotation.GetAttachedEntityTypes()
         snapshot["kinds_len"] = 0 if kinds_raw is None else len(kinds_raw)
         snapshot["kinds"] = tuple(
             kinds_raw[index] for index in range(min(snapshot["kinds_len"], 4))
         )
+        stage = "IsDangling"
         snapshot["dangling"] = bool(annotation.IsDangling())
+        stage = "OwnerType"
         snapshot["owner_type"] = annotation.OwnerType
+        stage = "Owner"
         owner = annotation.Owner
         snapshot["owner_null"] = owner is None
         if owner is not None:
+            stage = "owner IsSame"
             snapshot["owner_is_same"] = adapter.swApp.IsSame(owner, front)
+        stage = "strict metadata predicates"
         if int(snapshot["type2"]) != 12:  # swDimensionType_e.swVertLinearDimension
             raise RuntimeError("SupplierHeadHeight: native dimension is not vertical")
         if (
@@ -329,19 +340,26 @@ def _assert_physical_head_height(
             )
         if snapshot["dangling"] or any(snapshot["attached_nulls"]):
             raise RuntimeError("SupplierHeadHeight is not the dimension between its named entities")
+        stage = "named attachment and native value proof"
         return assert_dimension_measures(
             adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
         )
-    except (RuntimeError, TypeError, ValueError, AttributeError, IndexError) as exc:
+    except Exception as exc:
+        snapshot.update(
+            failure_stage=stage, failure_error_type=type(exc).__name__,
+            failure_error=str(exc)[:400],
+        )
         # Refusal-only probes: observe the native value and rendered arrows, never repair.
         snapshot.update(native_dimension_null=None, system_value=None, attachment_is_same=(),
                         display_data_null=None, arrow_count=None, arrows=())
         try:
+            probe_stage = "GetDimension2"
             if display is not None:
                 native = display.GetDimension2(0)
                 snapshot["native_dimension_null"] = native is None
                 if native is not None:
                     snapshot["system_value"] = _early_bound(native, "IDimension").SystemValue
+            probe_stage = "attachment IsSame matrix"
             snapshot["attachment_is_same"] = tuple(
                 tuple(
                     None if actual is None or expected is None
@@ -351,14 +369,17 @@ def _assert_physical_head_height(
                 for actual in attached[:2]
             )
             if annotation is not None:
+                probe_stage = "GetDisplayData"
                 data = annotation.GetDisplayData()
                 snapshot["display_data_null"] = data is None
                 if data is not None:
                     data = _early_bound(data, "IDisplayData")
+                    probe_stage = "GetArrowHeadCount"
                     count = int(data.GetArrowHeadCount())
                     snapshot["arrow_count"] = count
                     arrows = []
                     for index in range(min(count, 4)):
+                        probe_stage = "GetArrowHeadAtIndex2"
                         arrow = data.GetArrowHeadAtIndex2(index)
                         arrows.append(
                             None if arrow is None else tuple(
@@ -366,8 +387,12 @@ def _assert_physical_head_height(
                             )
                         )
                     snapshot["arrows"] = tuple(arrows)
-        except (RuntimeError, TypeError, ValueError, AttributeError, IndexError) as probe_error:
-            snapshot["failure_probe_error"] = str(probe_error)[:400]
+        except Exception as probe_error:
+            snapshot.update(
+                failure_probe_stage=probe_stage,
+                failure_probe_error_type=type(probe_error).__name__,
+                failure_probe_error=str(probe_error)[:400],
+            )
             _telemetry.event("drawing.pivot_head_height_refusal", **snapshot)
             raise RuntimeError(f"{exc}; native_snapshot={snapshot}") from probe_error
         _telemetry.event("drawing.pivot_head_height_refusal", **snapshot)

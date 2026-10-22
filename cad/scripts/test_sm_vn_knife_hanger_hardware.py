@@ -1618,19 +1618,16 @@ def test_stud_head_height_refusal_reports_every_actual_native_field_once(monkeyp
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
         )
-    snapshot = next(
-        fields for name, fields in case.events
-        if name == "drawing.stud_head_height_native_snapshot"
-    )
-    assert snapshot == {
-        "type2": 2, "attached_count": 7, "attached_length": 2,
-        "kinds_length": 2, "kinds": (1, 46), "attached_nulls": (False, True),
-        "dangling": True, "owner_type": 9, "owner_null": False, "owner_same": 2,
-    }
     refusal = next(
         fields for name, fields in case.events
         if name == "drawing.stud_head_height_native_refusal"
     )
+    expected_snapshot = {
+        "type2": 2, "attached_count": 7, "attached_length": 2,
+        "kinds_length": 2, "kinds": (1, 46), "attached_nulls": (False, True),
+        "dangling": True, "owner_type": 9, "owner_null": False, "owner_same": 2,
+    }
+    assert {key: refusal[key] for key in expected_snapshot} == expected_snapshot
     assert refusal["native_dimension_null"] is False
     assert refusal["system_value"] == case.native.SystemValue
     assert refusal["attachment_same"] == ((2, 2), (None, None))
@@ -1755,11 +1752,25 @@ def test_stud_head_height_native_diagnostic_errors_are_not_swallowed(monkeypatch
     else:
         case.display.Type2 = 2
         case.annotation.GetDisplayData = fail
-    with pytest.raises(OSError) as error:
+    with pytest.raises(RuntimeError, match="native_snapshot=") as error:
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
         )
-    assert error.value is failure
+    assert error.value.__cause__ is failure
+    receipt = next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_head_height_native_refusal"
+    )
+    assert receipt["type2"] == (12 if stage == "metadata" else 2)
+    assert receipt["failure_probe_error"] == {
+        "stage": "attached_count" if stage == "metadata" else "display_data",
+        "type": "OSError", "message": "native metadata read failed",
+    }
+    assert "'failure_probe_error':" in str(error.value)
+    assert receipt["reason"] == (
+        "native metadata snapshot failed" if stage == "metadata"
+        else "expected vertical dimension Type2=12"
+    )
 
 
 def _settled_stud_height_case(monkeypatch):
