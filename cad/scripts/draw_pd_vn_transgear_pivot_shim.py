@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -11,7 +11,7 @@ import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
-from _supplier_washer_drawing import supplier_washer_dimensions
+from _supplier_washer_drawing import SupplierWasherProof, supplier_washer_dimensions
 import pd_vn_transgear_pivot_shim_spec as part
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_shim"]
@@ -27,7 +27,7 @@ SUPPLIER_MARGINS = {
 
 def _supplier_dimensions(
     adapter: Any, views: dict[str, Any]
-) -> Callable[[], None]:
+) -> SupplierWasherProof:
     return supplier_washer_dimensions(
         adapter,
         views,
@@ -42,7 +42,7 @@ def _supplier_dimensions(
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    proofs: list[Callable[[], None]] = []
+    proofs: list[SupplierWasherProof] = []
 
     def dimensions(adapter: Any, views: dict[str, Any]) -> None:
         proofs.append(_supplier_dimensions(adapter, views))
@@ -52,6 +52,13 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("supplier washer dimensions must be authored exactly once")
         proofs[0]()
 
+    def saved_dimensions(adapter: Any, path: Path) -> None:
+        if len(proofs) != 1:
+            raise RuntimeError("supplier washer dimensions must be authored exactly once before saved proof")
+        saved = proofs[0].saved_check
+        proofs.clear()
+        saved(adapter, path)
+
     return await build_purchased_fastener_drawing(
         adapter,
         SPEC,
@@ -59,6 +66,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
+        saved_check=saved_dimensions,
     )
 
 

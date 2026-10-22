@@ -1,14 +1,17 @@
 """Import model-owned washer supplier bands; add only unbanded rim refs.
 
 The part owns every banded dimension's native value, tolerance and supplier
-presentation. Drawing imports are positioned, then inspected read-only.
+presentation. Imports retain the source's explicit display units; precision,
+reference ink and bands are never rewritten.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import hashlib
 import json
+from pathlib import Path
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
@@ -27,6 +30,7 @@ from _supplier_washer_model import (
     OUTER_DIAMETER,
     SOURCE_DIMENSIONS,
     THICKNESS,
+    _assert_supplier_washer_presentation,
     assert_supplier_washer_band,
     assert_supplier_washer_body,
     assert_supplier_washer_source_attachment,
@@ -46,50 +50,53 @@ class _WasherReference:
     callout: str | None = None
 
 
-def _import_presentation_evidence(
-    adapter: Any, view: Any, display: Any, *, label: str,
-) -> None:
-    """Capture every discriminator without repairing a refused native import."""
-    def snapshot(item: Any) -> dict[str, Any]:
-        readers = {
-            "use_doc_units": item.GetUseDocUnits,
-            "units": item.GetUnits,
-            "precision": item.GetPrimaryPrecision2,
-            "tolerance_precision": item.GetPrimaryTolPrecision2,
-            "fraction_base": item.GetFractionBase,
-            "fraction_value": item.GetFractionValue,
-            "round_to_fraction": item.GetRoundToFraction,
-            "parentheses": lambda: item.ShowParenthesis,
-            "override": item.GetOverride,
-            "show_value": lambda: item.ShowDimensionValue,
-            "prefix": lambda: item.GetText(1),
-            "suffix": lambda: item.GetText(2),
-            "below": lambda: item.GetText(4),
-            "full_name": lambda: item.GetDimension2(0).FullName,
-            "system_value": lambda: item.GetDimension2(0).SystemValue,
-            "tolerance_type": lambda: item.GetDimension2(0).Tolerance.Type,
-            "tolerance_min": lambda: item.GetDimension2(0).Tolerance.GetMinValue(),
-            "tolerance_max": lambda: item.GetDimension2(0).Tolerance.GetMaxValue(),
-        }
-        result = {}
-        for field, reader in readers.items():
-            try:
-                result[field] = reader()
-            except Exception as error:
-                result[field] = {"read_error": f"{type(error).__name__}: {error}"}
-        return result
+@dataclass(frozen=True)
+class SupplierWasherProof:
+    """Keep the live finalizer check callable; audit saved bytes separately."""
 
-    evidence = {"label": label, "imported": snapshot(display)}
-    try:
-        model = _early_bound(view, "IView").ReferencedDocument
-        feature_name, name = SOURCE_DIMENSIONS[label]
-        feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
-        source, native = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
-        evidence["source"] = snapshot(source)
-        evidence["native_identity"] = int(adapter.swApp.IsSame(display.GetDimension2(0), native))
-    except Exception as error:
-        evidence["source_read_error"] = f"{type(error).__name__}: {error}"
-    _telemetry.info("supplier washer import presentation: " + json.dumps(evidence, sort_keys=True))
+    settled_check: Callable[[], None]
+    saved_check: Callable[[Any, Path], None]
+
+    def __call__(self) -> None:
+        self.settled_check()
+
+
+def _persist_imported_units(
+    adapter: Any, view: Any, display: Any, *, label: str,
+    units: Literal["in", "mm"], precision: int, expected_mm: float,
+    callout: str | None,
+) -> None:
+    """Transfer only unit-display ownership lost by native model-item import."""
+    model = _early_bound(view, "IView").ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{label}: imported supplier dimension has no source part")
+    feature_name, name = SOURCE_DIMENSIONS[label]
+    feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+    if feature is None:
+        raise RuntimeError(f"{label}: imported supplier source feature is missing")
+    source, native = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
+    _assert_supplier_washer_presentation(
+        source, label=label, units=units, precision=precision,
+        expected_mm=expected_mm, callout=callout,
+    )
+    if int(adapter.swApp.IsSame(display.GetDimension2(0), native)) != 1:
+        raise RuntimeError(f"{label}: imported supplier dimension is not its native source")
+    # Import selects drawing-document units even when the source display has
+    # explicit units. SDK GetUnits/GetFractionBase then return -1, not the
+    # supplier settings. FractDenom is meaningful only for fractional inches;
+    # transfer the source getter unchanged rather than inventing a denominator.
+    # HalfAway=0 is the source author's documented decimal-rounding choice.
+    status = display.SetUnits2(
+        False, source.GetUnits(), source.GetFractionBase(),
+        source.GetFractionValue(), source.GetRoundToFraction(), 0,
+    )
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: imported supplier units were rejected ({status!r})")
+    assert_supplier_reference_dimension(
+        adapter, display, label=label, units=units, precision=precision,
+        expected_mm=expected_mm, presentation="length" if label == THICKNESS else "diameter",
+        callout=callout,
+    )
 
 
 def _rim(
@@ -236,13 +243,300 @@ def assert_supplier_washer_dimensions(
         )
 
 
+_WASHER_ORIENTATIONS = frozenset(("*Front", "*Top", "*Right", "*Isometric"))
+
+
+def _native_path(value: Any, *, label: str) -> Path:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"{label}: native document path is missing")
+    return Path(value).resolve()
+
+
+def _saved_washer_identity(model: Any, path: Path) -> Any:
+    model = _early_bound(model, "IModelDoc2")
+    if _native_path(model.GetPathName(), label="saved washer drawing") != path:
+        raise RuntimeError("saved washer drawing resolved to another document path")
+    if type(kind := model.GetType()) is not int or kind != 3:  # swDocDRAWING
+        raise RuntimeError("saved washer drawing is not a native drawing document")
+    return model
+
+
+def _supplier_washer_proof(
+    adapter: Any, views: dict[str, Any], references: tuple[_WasherReference, ...], *,
+    axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
+    units: Literal["in", "mm"], precision: Mapping[str, int],
+    bands: Mapping[str, tuple[float, float, str]],
+) -> SupplierWasherProof:
+    """Capture source path/configurations before the authoring views close.
+
+    The saved reader never activates, rebuilds, dresses or saves a document.
+    Only the drawing it opens is closed; the builder owns source preservation.
+    """
+    if set(views) != _WASHER_ORIENTATIONS:
+        raise RuntimeError("supplier washer proof requires exactly four standard views")
+    source = _early_bound(views["*Front"], "IView").ReferencedDocument
+    if source is None:
+        raise RuntimeError("supplier washer proof has no authoring source part")
+    source = _early_bound(source, "IModelDoc2")
+    source_path = _native_path(source.GetPathName(), label="authoring washer source")
+    if type(kind := source.GetType()) is not int or kind != 1:  # swDocPART
+        raise RuntimeError("supplier washer proof source is not a native part")
+    configurations: dict[str, str] = {}
+    for orientation, raw in views.items():
+        view = _early_bound(raw, "IView")
+        model = view.ReferencedDocument
+        configuration = view.ReferencedConfiguration
+        if (
+            view.GetOrientationName() != orientation
+            or model is None or int(adapter.swApp.IsSame(model, source)) != 1
+            or _native_path(view.GetReferencedModelName(), label=orientation) != source_path
+            or not isinstance(configuration, str) or not configuration.strip()
+        ):
+            raise RuntimeError(f"{orientation}: authoring washer source/view identity differs")
+        configurations[orientation] = configuration
+    # The saved callback retains only scalar reference expectations, never an
+    # authoring IView or source COM handle that closing the drawing may unload.
+    saved_references = tuple(
+        (_early_bound(reference.view, "IView").GetOrientationName(),
+         reference.label, reference.expected_mm, reference.imported, reference.callout)
+        for reference in references
+    )
+    if any(reference[0] not in configurations for reference in saved_references):
+        raise RuntimeError("supplier washer reference has no captured standard orientation")
+    # Freeze expectations independently of both caller mappings and reopened state.
+    precision, bands = dict(precision), dict(bands)
+
+    def settled_check() -> None:
+        assert_supplier_washer_dimensions(
+            adapter, views, references, axis=axis, bore_mm=bore_mm,
+            outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
+            precision=precision, bands=bands,
+        )
+
+    @_telemetry.traced("drawing.saved_supplier_washer_dimensions")
+    def saved_check(saved_adapter: Any, path: Path) -> None:
+        saved_path = Path(path).resolve()
+        if saved_path.suffix.lower() != ".slddrw" or not saved_path.is_file():
+            raise ValueError("saved washer proof requires an existing native SLDDRW")
+        app = _early_bound(saved_adapter.swApp, "ISldWorks")
+        path_string = str(saved_path)
+        if app.GetOpenDocumentByName(path_string) is not None:
+            raise RuntimeError("finalize and close the washer drawing before saved proof")
+        # The finalizer has closed this drawing. Drop its adapter-held wrapper
+        # before OpenDoc6 so a stale document cannot survive the saved reopen.
+        saved_adapter.currentModel = None
+        with saved_path.open("rb") as saved_file:
+            before = hashlib.file_digest(saved_file, "sha256").hexdigest()
+        opened_model = None
+        primary: BaseException | None = None
+        receipt: dict[str, Any] = {}
+        try:
+            # Generated OpenDoc6 appends the two native [out] LONGs. No BYREF
+            # variants, ViewOnly/detailing mode, activation or fresh adapter model.
+            opened = app.OpenDoc6(path_string, 3, 1 | 2, "", 0, 0)
+            if not isinstance(opened, tuple) or len(opened) != 3:
+                raise RuntimeError("saved washer OpenDoc6 did not return (model, errors, warnings)")
+            opened_model, errors, warnings = opened
+            if type(errors) is not int or type(warnings) is not int:
+                raise RuntimeError("saved washer OpenDoc6 returned non-native error/warning codes")
+            if opened_model is None or errors != 0:
+                raise RuntimeError(f"saved washer native open failed ({errors=}, {warnings=})")
+            model = _saved_washer_identity(opened_model, saved_path)
+            read_only = model.IsOpenedReadOnly()
+            if read_only is not True:
+                raise RuntimeError("saved washer drawing did not open read-only")
+            # Closing the finalizer's drawing can unload its hidden source.
+            # The saved drawing autoloads that source; reacquire its live model
+            # from the captured path, never from a view or an old COM handle.
+            loaded_source = app.GetOpenDocumentByName(str(source_path))
+            if loaded_source is None:
+                raise RuntimeError("saved washer source context was not loaded by the drawing")
+            loaded_source = _early_bound(loaded_source, "IModelDoc2")
+            if _native_path(loaded_source.GetPathName(), label="saved washer source") != source_path:
+                raise RuntimeError("saved washer source path changed")
+            if type(kind := loaded_source.GetType()) is not int or kind != 1:
+                raise RuntimeError("saved washer source context is not a native part")
+            if loaded_source.IsOpenedReadOnly() is not True:
+                raise RuntimeError("saved washer source context is not read-only")
+            sheets = tuple(_early_bound(model, "IDrawingDoc").GetViews() or ())
+            if len(sheets) != 1:
+                raise RuntimeError("saved washer drawing must contain exactly one sheet")
+            sheet_views = tuple(sheets[0] or ())
+            if len(sheet_views) != 5:  # first IView is the sheet, not a model view
+                raise RuntimeError("saved washer drawing must contain exactly four model views")
+            fresh: dict[str, Any] = {}
+            view_receipts = []
+            for raw in sheet_views[1:]:
+                view = _early_bound(raw, "IView")
+                orientation = view.GetOrientationName()
+                if orientation not in configurations or orientation in fresh:
+                    raise RuntimeError("saved washer view orientation is unexpected or duplicated")
+                referenced = view.ReferencedDocument
+                if referenced is None or int(app.IsSame(referenced, loaded_source)) != 1:
+                    raise RuntimeError(f"{orientation}: saved washer references another source identity")
+                actual_path = _native_path(
+                    _early_bound(referenced, "IModelDoc2").GetPathName(), label=orientation,
+                )
+                named_path = _native_path(view.GetReferencedModelName(), label=orientation)
+                configuration = view.ReferencedConfiguration
+                if actual_path != source_path or named_path != source_path:
+                    raise RuntimeError(f"{orientation}: saved washer references another source path")
+                if configuration != configurations[orientation]:
+                    raise RuntimeError(f"{orientation}: saved washer source configuration changed")
+                fresh[orientation] = view
+                view_receipts.append(dict(
+                    orientation=orientation, source_path=str(actual_path),
+                    configuration=configuration,
+                ))
+            if set(fresh) != _WASHER_ORIENTATIONS:
+                raise RuntimeError("saved washer standard view census differs")
+            # SaveAs can rename a drawing-owned dimension's model component.
+            # Rebind by source semantics or exact physical attachment, never by
+            # the old document's names, displayed value or presentation text.
+            displays = {orientation: _visible_dimensions(view)
+                        for orientation, view in fresh.items()}
+            rim_scans: dict[str, ViewEdges] = {}
+            source_native_identities: dict[tuple[str, str], int | None] = {}
+            fresh_references = []
+            for orientation, label, expected_mm, imported, callout in saved_references:
+                view = fresh[orientation]
+                matches = []
+                native_identity = None
+                if imported:
+                    feature_name, dimension_name = SOURCE_DIMENSIONS[label]
+                    feature = _early_bound(loaded_source, "IPartDoc").FeatureByName(feature_name)
+                    if feature is None:
+                        raise RuntimeError(f"{label}: saved supplier source feature is missing")
+                    source_display, source_native = _named_dimensions(
+                        saved_adapter, feature_name, {dimension_name}, feature=feature,
+                    )[dimension_name]
+                    _assert_supplier_washer_presentation(
+                        source_display, label=label, units=units, precision=precision[label],
+                        expected_mm=expected_mm, callout=callout,
+                    )
+                    for display in displays[orientation]:
+                        raw = display.GetDimension2(0)
+                        if raw is not None and str(
+                            _early_bound(raw, "IDimension").FullName or ""
+                        ).split("@")[:2] == [dimension_name, feature_name]:
+                            native_identity = int(app.IsSame(raw, source_native))
+                            if native_identity != 1:
+                                raise RuntimeError(
+                                    f"{label}: saved imported dimension is not its actual native source"
+                                )
+                            matches.append(display)
+                else:
+                    if orientation not in rim_scans:
+                        rim_scans[orientation] = scan_view_edges(
+                            view, label="saved supplier washer semantic rim lookup",
+                        )
+                    rim = _rim(
+                        rim_scans[orientation], axis=axis, station_mm=thickness_mm,
+                        diameter_mm=expected_mm, label=label,
+                    )
+                    for display in displays[orientation]:
+                        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                        attached = tuple(annotation.GetAttachedEntities3() or ())
+                        if (
+                            len(attached) == 1 and attached[0] is not None
+                            and _is_same_attachment(saved_adapter, attached[0], rim, "EDGE")
+                        ):
+                            matches.append(display)
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        f"{label}: saved semantic native display census failed "
+                        f"(found {len(matches)}, expected one)"
+                    )
+                fresh_reference = _reference(
+                    matches[0], view, label, expected_mm,
+                    imported=imported, callout=callout,
+                )
+                fresh_references.append(fresh_reference)
+                source_native_identities[(orientation, fresh_reference.selection_name)] = native_identity
+            assert_supplier_washer_dimensions(
+                saved_adapter, fresh, tuple(fresh_references), axis=axis, bore_mm=bore_mm,
+                outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
+                precision=precision, bands=bands,
+            )
+            dimensions = []
+            for orientation, view in fresh.items():
+                for display in _visible_dimensions(view):
+                    native = _early_bound(display.GetDimension2(0), "IDimension")
+                    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                    tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+                    tolerance_type = int(tolerance.Type)
+                    selection_name = str(display.GetNameForSelection() or "")
+                    dimensions.append(dict(
+                        selection_name=selection_name,
+                        source_native_identity=source_native_identities[(orientation, selection_name)],
+                        full_name=native.FullName, system_value=float(native.SystemValue),
+                        units=display.GetUnits(), precision=display.GetPrimaryPrecision2(),
+                        tolerance_precision=display.GetPrimaryTolPrecision2(),
+                        prefix=display.GetText(1), suffix=display.GetText(2),
+                        below=display.GetText(4), use_document_units=display.GetUseDocUnits(),
+                        fraction_base=display.GetFractionBase(),
+                        fraction_value=display.GetFractionValue(),
+                        round_to_fraction=display.GetRoundToFraction(),
+                        parentheses=display.ShowParenthesis, override=display.GetOverride(),
+                        show_value=display.ShowDimensionValue,
+                        attachment_count=annotation.GetAttachedEntityCount3(),
+                        attachment_types=list(annotation.GetAttachedEntityTypes() or ()),
+                        dangling=annotation.IsDangling(), tolerance_type=tolerance_type,
+                        tolerance_min=tolerance.GetMinValue() if tolerance_type else None,
+                        tolerance_max=tolerance.GetMaxValue() if tolerance_type else None,
+                    ))
+            receipt = dict(
+                drawing_path=str(saved_path), sha256=before,
+                open_errors=errors, open_warnings=warnings, read_only=read_only,
+                views=view_receipts, dimensions=dimensions,
+            )
+        except BaseException as error:
+            primary = error
+            raise
+        finally:
+            cleanup_errors = []
+            try:
+                loaded = app.GetOpenDocumentByName(path_string)
+                if loaded is not None:
+                    loaded = _saved_washer_identity(loaded, saved_path)
+                    if opened_model is not None and int(app.IsSame(loaded, opened_model)) != 1:
+                        raise RuntimeError("saved washer cleanup refuses a different loaded identity")
+                    title = loaded.GetTitle()
+                    if not isinstance(title, str) or not title.strip():
+                        raise RuntimeError("saved washer cleanup refuses an empty document title")
+                    app.CloseDoc(title)  # VT_VOID, closes only this invocation's target
+                    if app.GetOpenDocumentByName(path_string) is not None:
+                        raise RuntimeError("saved washer proof document did not close")
+            except Exception as error:
+                cleanup_errors.append(error)
+            try:
+                with saved_path.open("rb") as saved_file:
+                    after = hashlib.file_digest(saved_file, "sha256").hexdigest()
+                if after != before:
+                    raise RuntimeError("saved washer proof changed the native drawing bytes")
+            except Exception as error:
+                cleanup_errors.append(error)
+            if cleanup_errors:
+                if primary is not None:
+                    for error in cleanup_errors:
+                        primary.add_note(f"saved washer cleanup: {type(error).__name__}: {error}")
+                else:
+                    error = cleanup_errors[0]
+                    for extra in cleanup_errors[1:]:
+                        error.add_note(f"saved washer cleanup: {type(extra).__name__}: {extra}")
+                    raise error
+        _telemetry.info("supplier washer saved native proof: " + json.dumps(receipt, sort_keys=True))
+
+    return SupplierWasherProof(settled_check, saved_check)
+
+
 @_telemetry.traced("drawing.supplier_washer_dimensions")
 def supplier_washer_dimensions(
     adapter: Any, views: dict[str, Any], *, axis: Literal["y", "z"],
     bore_mm: float, outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
-) -> Callable[[], None]:
+) -> SupplierWasherProof:
     """Import every banded size; author only bandless OD/ID physical refs."""
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
@@ -277,16 +571,11 @@ def supplier_washer_dimensions(
         for label in imported_labels:
             annotation = named[SOURCE_DIMENSIONS[label][1]]
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-            # No units, precision, tolerance or reference-ink setter on imports.
-            try:
-                assert_supplier_reference_dimension(
-                    adapter, display, label=label, units=units, precision=precision[label],
-                    expected_mm=values[label], presentation="length" if label == THICKNESS else "diameter",
-                    callout=bore_callout if label == BORE_DIAMETER else None,
-                )
-            except RuntimeError:
-                _import_presentation_evidence(adapter, view, display, label=label)
-                raise
+            _persist_imported_units(
+                adapter, view, display, label=label, units=units,
+                precision=precision[label], expected_mm=values[label],
+                callout=bore_callout if label == BORE_DIAMETER else None,
+            )
             references.append(_reference(display, view, label, values[label], imported=True,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
     unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
@@ -304,11 +593,8 @@ def supplier_washer_dimensions(
             references.append(_reference(display, face, label, values[label], imported=False,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
 
-    def settled_check() -> None:
-        assert_supplier_washer_dimensions(
-            adapter, views, tuple(references), axis=axis, bore_mm=bore_mm,
-            outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
-            precision=precision, bands=bands,
-        )
-
-    return settled_check
+    return _supplier_washer_proof(
+        adapter, views, tuple(references), axis=axis, bore_mm=bore_mm,
+        outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
+        precision=precision, bands=bands,
+    )

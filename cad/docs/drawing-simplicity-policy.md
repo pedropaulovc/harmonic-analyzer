@@ -67,6 +67,18 @@ cannot ask for what the authors were told to leave out.
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
+  Washer model-item import can replace an explicit supplier unit display with
+  drawing-document units while retaining the same native model dimension,
+  value, tolerance, precision and reference text. `_supplier_washer_drawing`
+  validates the original source display and native `IDimension` identity, then
+  transfers only the source unit/fraction settings with `SetUnits2`; it never
+  rewrites imported precision, text, values or bands. The original strict
+  presentation and source-geometry checks run after import and final rebuild.
+  These sheets also use the purchased builder's post-close `saved_check` hook:
+  reopen the actual SLDDRW read-only, reacquire its source/configuration and
+  dimensions, repeat native identity/value/attachment/band/presentation checks,
+  and require the saved drawing's SHA-256 to remain unchanged. A pre-save
+  check or an authoring-view handle is not saved-file evidence.
   The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
   outer Top cell retains the existing 46 mm annotation reserve, leaving
   50 mm for the measured native outline. The bottom-row cells' tops and
