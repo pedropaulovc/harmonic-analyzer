@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import json
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
@@ -16,6 +17,7 @@ from _com import _early_bound
 from _drawing_attachment import _is_same_attachment
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_precision import _named_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
@@ -42,6 +44,52 @@ class _WasherReference:
     presentation: Literal["length", "diameter"]
     imported: bool
     callout: str | None = None
+
+
+def _import_presentation_evidence(
+    adapter: Any, view: Any, display: Any, *, label: str,
+) -> None:
+    """Capture every discriminator without repairing a refused native import."""
+    def snapshot(item: Any) -> dict[str, Any]:
+        readers = {
+            "use_doc_units": item.GetUseDocUnits,
+            "units": item.GetUnits,
+            "precision": item.GetPrimaryPrecision2,
+            "tolerance_precision": item.GetPrimaryTolPrecision2,
+            "fraction_base": item.GetFractionBase,
+            "fraction_value": item.GetFractionValue,
+            "round_to_fraction": item.GetRoundToFraction,
+            "parentheses": lambda: item.ShowParenthesis,
+            "override": item.GetOverride,
+            "show_value": lambda: item.ShowDimensionValue,
+            "prefix": lambda: item.GetText(1),
+            "suffix": lambda: item.GetText(2),
+            "below": lambda: item.GetText(4),
+            "full_name": lambda: item.GetDimension2(0).FullName,
+            "system_value": lambda: item.GetDimension2(0).SystemValue,
+            "tolerance_type": lambda: item.GetDimension2(0).Tolerance.Type,
+            "tolerance_min": lambda: item.GetDimension2(0).Tolerance.GetMinValue(),
+            "tolerance_max": lambda: item.GetDimension2(0).Tolerance.GetMaxValue(),
+        }
+        result = {}
+        for field, reader in readers.items():
+            try:
+                result[field] = reader()
+            except Exception as error:
+                result[field] = {"read_error": f"{type(error).__name__}: {error}"}
+        return result
+
+    evidence = {"label": label, "imported": snapshot(display)}
+    try:
+        model = _early_bound(view, "IView").ReferencedDocument
+        feature_name, name = SOURCE_DIMENSIONS[label]
+        feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+        source, native = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
+        evidence["source"] = snapshot(source)
+        evidence["native_identity"] = int(adapter.swApp.IsSame(display.GetDimension2(0), native))
+    except Exception as error:
+        evidence["source_read_error"] = f"{type(error).__name__}: {error}"
+    _telemetry.info("supplier washer import presentation: " + json.dumps(evidence, sort_keys=True))
 
 
 def _rim(
@@ -230,11 +278,15 @@ def supplier_washer_dimensions(
             annotation = named[SOURCE_DIMENSIONS[label][1]]
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
             # No units, precision, tolerance or reference-ink setter on imports.
-            assert_supplier_reference_dimension(
-                adapter, display, label=label, units=units, precision=precision[label],
-                expected_mm=values[label], presentation="length" if label == THICKNESS else "diameter",
-                callout=bore_callout if label == BORE_DIAMETER else None,
-            )
+            try:
+                assert_supplier_reference_dimension(
+                    adapter, display, label=label, units=units, precision=precision[label],
+                    expected_mm=values[label], presentation="length" if label == THICKNESS else "diameter",
+                    callout=bore_callout if label == BORE_DIAMETER else None,
+                )
+            except RuntimeError:
+                _import_presentation_evidence(adapter, view, display, label=label)
+                raise
             references.append(_reference(display, view, label, values[label], imported=True,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
     unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
