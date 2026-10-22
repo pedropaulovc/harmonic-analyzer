@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -23,7 +24,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import add_property_linked_note, property_link
@@ -46,6 +48,7 @@ from pd_vn_transgear_pivot_screw_spec import (
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
     FITTED_THREAD_LEN,
+    HEAD_CHAMFER,
     HEAD_DIA,
     HEAD_H,
     SHOULDER_END_Y,
@@ -184,21 +187,154 @@ def _format_supplier_reference(adapter: Any, display: Any, name: str) -> Any:
     return _early_bound(display.GetAnnotation(), "IAnnotation")
 
 
+
+def _head_height_points() -> tuple[tuple[float, float, float], ...]:
+    """Actual bearing and true head-top rim points, in model metres."""
+    return tuple(
+        (radius / math.sqrt(2) / 1000, y / 1000, radius / math.sqrt(2) / 1000)
+        for y, radius in ((0.0, HEAD_DIA / 2), (HEAD_H, HEAD_DIA / 2 - HEAD_CHAMFER))
+    )
+
+
+def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
+    """Name one physical arc at each station; circle parameters alone are not identity."""
+    front = _early_bound(front, "IView")
+    if int(front.GetDisplayMode2()) != 2:  # swDisplayMode_e.swHIDDEN
+        raise RuntimeError("SupplierHeadHeight: front view is not hidden-lines-removed")
+    scan = scan_view_edges(front, label="SupplierHeadHeight physical head rims")
+    resolved = []
+    for station, y, radius, point in zip(
+        ("bearing", "top"),
+        (0.0, HEAD_H),
+        (HEAD_DIA / 2, HEAD_DIA / 2 - HEAD_CHAMFER),
+        _head_height_points(),
+        strict=True,
+    ):
+        matches, candidates = [], []
+        for item in scan.circles:
+            geometry = tuple(float(value) for value in item.circle)
+            cx, cy, cz, nx, ny, nz, actual_r = geometry
+            center_error = math.dist((cx, cy, cz), (0.0, y, 0.0))
+            radius_error = abs(actual_r - radius)
+            axis_error = max(abs(nx), abs(abs(ny) - 1.0), abs(nz))
+            named_circle = (
+                all(math.isfinite(value) for value in geometry)
+                and center_error <= 1e-5
+                and radius_error <= 1e-5
+                and axis_error <= 1e-6
+            )
+            nearest, point_error = (), None
+            if named_circle:
+                raw = _early_bound(item.edge, "IEdge").GetClosestPointOn(
+                    point[0], point[1], point[2]
+                )
+                nearest = tuple(float(value) for value in (raw or ())[:3])
+                if len(nearest) == 3 and all(math.isfinite(value) for value in nearest):
+                    point_error = math.dist(nearest, point)
+                    if point_error <= 1e-8:
+                        matches.append(item.edge)
+            candidates.append({
+                "circle_mm": geometry,
+                "center_error_mm": center_error,
+                "radius_error_mm": radius_error,
+                "axis_error": axis_error,
+                "nearest_m": nearest,
+                "point_error_m": point_error,
+            })
+        candidates.sort(key=lambda item: (
+            item["center_error_mm"] + item["radius_error_mm"] + item["axis_error"]
+        ))
+        evidence = candidates[:12]
+        _telemetry.event(
+            "drawing.pivot_head_height_edges", station=station,
+            point_m=point, matches=len(matches), candidate_count=len(candidates),
+            candidates=evidence,
+        )
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"SupplierHeadHeight: {station} physical rim has {len(matches)} matches; "
+                f"expected exactly 1 at y={y:g} r={radius:g} mm: {evidence!r}"
+            )
+        resolved.append(matches[0])
+    if int(adapter.swApp.IsSame(resolved[0], resolved[1])) != 0:
+        raise RuntimeError("SupplierHeadHeight: physical rim pair is not distinct")
+    return resolved[0], resolved[1]
+
+
+def _assert_physical_head_height(adapter: Any, front: Any, display: Any) -> float:
+    """Rescan the real rims and prove native value and exactly two EDGE attachments."""
+    entities = _head_height_entities(adapter, front)
+    if display is None:
+        raise RuntimeError("SupplierHeadHeight: missing native display dimension")
+    display = _early_bound(display, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("SupplierHeadHeight: missing native annotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+    if (
+        len(attached) != 2 or int(annotation.GetAttachedEntityCount3()) != 2
+        or kinds != (1, 1)
+    ):
+        raise RuntimeError(
+            f"SupplierHeadHeight: expected two EDGE attachments, got {len(attached)} {kinds}"
+        )
+    return assert_dimension_measures(
+        adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
+    )
+
+
+def _add_physical_head_height(
+    adapter: Any, front: Any, text_xy: tuple[float, float]
+) -> Any:
+    """Select and read back the named physical rims, never coordinate-hit-test them."""
+    entities = _head_height_entities(adapter, front)
+    picks = model_points_in_view(
+        adapter, front, _head_height_points(), label="SupplierHeadHeight physical rim points"
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing = _early_bound(model, "IDrawingDoc")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    try:
+        if not drawing.ActivateView(view_name(adapter, front)):
+            raise RuntimeError("SupplierHeadHeight: cannot activate exact front view")
+        model.ClearSelection2(True)
+        selected = []
+        for index, (entity, point) in enumerate(zip(entities, picks, strict=True), 1):
+            data = _early_bound(manager.CreateSelectData(), "ISelectData")
+            data.View = front
+            if not _early_bound(entity, "IEntity").Select4(index > 1, data):
+                raise RuntimeError(f"SupplierHeadHeight: failed to select physical edge {index}")
+            if int(manager.GetSelectedObjectCount2(-1)) != index:
+                raise RuntimeError(f"SupplierHeadHeight: selection count changed at edge {index}")
+            if int(manager.GetSelectedObjectType3(index, -1)) != 1:
+                raise RuntimeError(f"SupplierHeadHeight: selected object {index} is not an EDGE")
+            actual = manager.GetSelectedObject6(index, -1)
+            if actual is None or int(adapter.swApp.IsSame(actual, entity)) != 1:
+                raise RuntimeError(f"SupplierHeadHeight: wrong selected object at edge {index}")
+            if selected and int(adapter.swApp.IsSame(selected[0], actual)) != 0:
+                raise RuntimeError("SupplierHeadHeight: selected edges are not distinct")
+            selected.append(actual)
+            if manager.SetSelectionPoint2(index, -1, point[0], point[1], 0.0) is not True:
+                raise RuntimeError(f"SupplierHeadHeight: cannot set physical selection point {index}")
+        display = model.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+        if display is None:
+            raise RuntimeError("SupplierHeadHeight: native vertical dimension creation returned null")
+        _assert_physical_head_height(adapter, front, display)
+        return display
+    finally:
+        model.ClearSelection2(True)
+
+
 def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, Any]:
     """Measure physical head/socket; import native nominal-major and source bands."""
-    head_r, shoulder_r = HEAD_DIA / 2, SHOULDER_DIA / 2
-    bearing_pick = (head_r + shoulder_r) / 2
+    head_r = HEAD_DIA / 2
     authored = {}
     for name, view, first, second, text_xy, orientation, entity_type in (
         (
             "SupplierHeadDiameter", front,
             (-head_r, HEAD_H / 2, 0.0), (head_r, HEAD_H / 2, 0.0),
             (0.140, 0.225), "horizontal", "SILHOUETTE",
-        ),
-        (
-            "SupplierHeadHeight", front,
-            (bearing_pick, 0.0, 0.0), (bearing_pick, HEAD_H, 0.0),
-            (0.224, 0.201), "vertical", "EDGE",
         ),
         (
             "SupplierSocketAF", top,
@@ -216,6 +352,11 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
             label=name, orientation=orientation, entity_type=entity_type,
         )
         authored[name] = _format_supplier_reference(adapter, display, name)
+        if name == "SupplierHeadDiameter":
+            height = _add_physical_head_height(adapter, front, (0.224, 0.201))
+            authored["SupplierHeadHeight"] = _format_supplier_reference(
+                adapter, height, "SupplierHeadHeight"
+            )
     references = curate_view_dimensions(
         adapter, front,
         keep={
@@ -351,6 +492,8 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                 assert_supplier_reference_dimension(
                     adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
                 )
+                if name == "SupplierHeadHeight":
+                    _assert_physical_head_height(adapter, view, display)
                 attached = tuple(annotation.GetAttachedEntities3() or ())
                 actual_kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
                 if len(attached) != len(entities) or actual_kinds != kinds or any(
@@ -364,6 +507,111 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
             view = view.GetNextView()
     if found_views != set(configurations) or any(count != 1 for count in counts.values()):
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
+
+
+def _assert_saved_physical_head_height(
+    adapter: Any, identities: dict, configurations: dict
+) -> None:
+    """Read the closed saved drawing, with fresh edges and no repair/rebuild/save."""
+    path = OUTPUTS.slddrw.resolve()
+    if not path.is_file():
+        raise RuntimeError("SupplierHeadHeight: saved drawing is missing")
+    path_string = str(path)
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    previous = adapter.currentModel
+    if app.GetOpenDocumentByName(path_string) is not None:
+        raise RuntimeError("SupplierHeadHeight: finalize and close drawing before saved proof")
+    try:
+        opened = app.OpenDoc6(path_string, 3, 3, "", 0, 0)
+        if not isinstance(opened, tuple) or len(opened) != 3:
+            raise RuntimeError("SupplierHeadHeight: saved OpenDoc6 did not return model/errors/warnings")
+        model, errors, warnings = opened
+        if model is None or int(errors) != 0:
+            raise RuntimeError(
+                f"SupplierHeadHeight: saved drawing open failed ({errors=}, {warnings=})"
+            )
+        model = _early_bound(model, "IModelDoc2")
+        if Path(str(model.GetPathName())).resolve() != path or int(model.GetType()) != 3:
+            raise RuntimeError("SupplierHeadHeight: saved drawing path/type mismatch")
+        current = app.GetOpenDocumentByName(path_string)
+        if (
+            current is None or int(app.IsSame(current, model)) != 1
+            or app.ActiveDoc is None or int(app.IsSame(app.ActiveDoc, model)) != 1
+        ):
+            raise RuntimeError("SupplierHeadHeight: reopened file is not the current drawing")
+        adapter.currentModel = model
+        drawing = _early_bound(model, "IDrawingDoc")
+        full_name, expected_owner, _old_entities, _old_kinds = identities["SupplierHeadHeight"]
+        expected_configuration = configurations[expected_owner]
+        if expected_configuration[0] != SHEET_NAMES[0]:
+            raise RuntimeError("SupplierHeadHeight: captured owner is not on the finished sheet")
+        matches = []
+        for sheet_name in SHEET_NAMES:
+            if not drawing.ActivateSheet(sheet_name):
+                raise RuntimeError(f"SupplierHeadHeight: cannot activate saved sheet {sheet_name}")
+            sheet_view = _early_bound(drawing.GetFirstView(), "IView")
+            view = sheet_view
+            while view is not None:
+                view = _early_bound(view, "IView")
+                for raw in view.GetDisplayDimensions() or ():
+                    display = _early_bound(raw, "IDisplayDimension")
+                    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+                    if dimension is not None and str(dimension.FullName) == full_name:
+                        matches.append((sheet_name, view, display))
+                view = view.GetNextView()
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"SupplierHeadHeight: saved FullName census is {len(matches)}, expected exactly 1"
+            )
+        sheet_name, front, display = matches[0]
+        owner = view_name(adapter, front)
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if (
+            owner != expected_owner
+            or (sheet_name, str(front.ReferencedConfiguration)) != expected_configuration
+            or str(front.ReferencedConfiguration) == SUPPLIER_STOCK_CONFIGURATION
+            or annotation is None or view_name(adapter, annotation.Owner) != expected_owner
+        ):
+            raise RuntimeError("SupplierHeadHeight: saved owner/configuration changed")
+        if not drawing.ActivateSheet(sheet_name):
+            raise RuntimeError("SupplierHeadHeight: cannot reactivate saved finished sheet")
+        measured = _assert_physical_head_height(adapter, front, display)
+        assert_supplier_reference_dimension(
+            adapter, display, label="SupplierHeadHeight",
+            **SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"],
+        )
+        _assert_supplier_tolerance(display, "SupplierHeadHeight")
+        actual_circles = tuple(
+            tuple(float(value) for value in _early_bound(
+                _early_bound(edge, "IEdge").GetCurve(), "ICurve"
+            ).CircleParams)
+            for edge in annotation.GetAttachedEntities3()
+        )
+        _telemetry.event(
+            "drawing.pivot_head_height_proof", phase="after_saved_reopen",
+            full_name=full_name, measured_head_height_mm=measured,
+            attached_circle_params_m=actual_circles,
+            physical_points_m=_head_height_points(), owner=owner,
+            configuration=str(front.ReferencedConfiguration),
+        )
+    finally:
+        try:
+            reopened = app.GetOpenDocumentByName(path_string)
+            if reopened is not None:
+                reopened = _early_bound(reopened, "IModelDoc2")
+                if (
+                    Path(str(reopened.GetPathName())).resolve() != path
+                    or int(reopened.GetType()) != 3
+                ):
+                    raise RuntimeError("SupplierHeadHeight: refuse to close a different document")
+                title = str(reopened.GetTitle() or "")
+                if not title:
+                    raise RuntimeError("SupplierHeadHeight: reopened drawing has no title")
+                app.CloseDoc(title)
+                if app.GetOpenDocumentByName(path_string) is not None:
+                    raise RuntimeError("SupplierHeadHeight: reopened saved drawing did not close")
+        finally:
+            adapter.currentModel = previous
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -472,7 +720,7 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     if properties["Supplier Reference Title"].replace("\r", "") != SUPPLIER_STOCK_TITLE:
         raise RuntimeError("source-stock title does not identify the original screw")
-    return await finalize_drawing(
+    result = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Screw — Modified Stock Drawing",
@@ -481,6 +729,8 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
     )
+    _assert_saved_physical_head_height(adapter, identities, configurations)
+    return result
 
 
 if __name__ == "__main__":

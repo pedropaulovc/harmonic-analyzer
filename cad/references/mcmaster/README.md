@@ -888,6 +888,15 @@ Catalog specifications checked on September 10, 2026:
   independently inspect the cut bolt's tail and
   #10-24 class 2A thread; none is a new supplied SKU length or tolerance.
   The head bears on the new washer, not the obsolete #6 counterbore floor.
+  The head-height drawing reference uses the physical outer hex bearing edge
+  at `Y=LENGTH` and the outer trim rim at `Y=HEAD_TOP_Y`, radius `HEAD_AF/2`.
+  It does not measure the crown-dish floor or a corner-trim transition. The
+  HLR edge scan distinguishes trimmed circular arcs by an exact point on the
+  frontmost rim; ambiguous or missing edges refuse rather than using a
+  silhouette or an approximate height. Selection identities and the measured
+  `HEAD_H` are checked at insertion, after settling and from the reopened
+  read-only saved drawing. These are native model-reference checks, not new
+  supplier tolerances or proof that a catalogue-only depiction is vendor CAD.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1067,6 +1076,15 @@ Catalog specifications checked on September 10, 2026:
   the hex socket; full thread starts 1.7653 below the shoulder's end face,
   and the joint charges one full pitch at the faced tip, so the worst-case
   engagement is 1.515D (1.582D nominal).
+  Its head-height drawing reference spans the actual outer bearing rim at
+  `Y=0` and the chamfer-reduced top rim at `Y=HEAD_H`,
+  radius `HEAD_DIA/2 - HEAD_CHAMFER`. The full-radius chamfer junction below
+  the top and the socket rim cannot substitute for that top boundary. Exact
+  visible model edges, distinct native selections and their dimension
+  attachments are checked under HLR; the measured height is checked again
+  after settling and on the reopened read-only saved drawing. Interior face
+  points are not reliable drawing-edge picks, even when their projection
+  crosses the apparent rim.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through
