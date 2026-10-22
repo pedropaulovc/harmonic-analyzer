@@ -2291,7 +2291,8 @@ def aggregate_package(
     judge_model = judge_model or review_config.DEFAULT_MODELS[judge_reviewer]
     judge_effort = judge_effort or review_config.DEFAULT_EFFORTS[judge_reviewer]
     with _telemetry.span(
-        "machinist_review.aggregate", name=package.name, run_count=runs
+        "machinist_review.aggregate", name=package.name, kind=package.kind, run_count=runs,
+        reviewer=reviewer, model=model, judge_reviewer=judge_reviewer, judge_model=judge_model,
     ) as span:
         started = time.monotonic()
         # Canonical ordinal names pair explicit PDFs even across renames.
@@ -2329,64 +2330,82 @@ def aggregate_package(
             "diff": None, "session_id": None,
         }
         after_sheet_count = 0
-        if not force:
-            try:
-                # Forced build/benchmark gates do not execute or depend on diff
-                # tooling; keep its dynamic identity-map closure out of them.
-                from _drawing_diff import create_drawing_diff
-                if snapshot_error:
-                    raise RuntimeError(snapshot_error)
-                if not package.sources or len(package.before_sources) != len(package.sources):
-                    raise ValueError("precheck requires paired before and after PDFs; use --force for an unconditional after-only review")
-                if any(
-                    source.suffix.casefold() != ".pdf"
-                    for source in (*package.sources, *package.before_sources)
-                ):
-                    raise ValueError("precheck inputs must be PDFs")
-                after_sheet_count = _validate_package(snapshot)
-                directory = report_dir / package.name / "precheck"
-                diff = create_drawing_diff(
-                    source_dir / "before", source_dir / "after", directory / "diff.zip",
-                    old_label="BEFORE", new_label="AFTER", include_unchanged=True,
-                )
-                diff["after_sheet_count"] = after_sheet_count
-                overlay_sources: list[Path] = []
-                with ZipFile(diff["asset_path"]) as archive:
-                    for index, member in enumerate(diff["images"]):
-                        target = directory / "overlays" / f"overlay-{index + 1:04d}.png"
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_bytes(archive.read(member))
-                        overlay_sources.append(target)
-                if not overlay_sources or len(overlay_sources) != len(diff["pages"]):
-                    raise RuntimeError("PDF diff did not provide an overlay for every page")
-                diff["overlay_sheets"] = [
-                    {"sheet": after_sheet_count + index + 1, "image": member}
-                    for index, member in enumerate(diff["images"])
-                ]
-                precheck_info["diff"] = diff
-                judge_package = ReviewPackage(
-                    package.name, package.kind, (*snapshot.sources, *overlay_sources)
-                )
-                precheck = _review_session(
-                    judge_package, reviewer=judge_reviewer, model=judge_model,
-                    effort=judge_effort, report_dir=directory, retries=retries,
-                    timeout_s=timeout_s, claude=claude, codex=codex, precheck_diff=diff,
-                )
-                precheck_info["report"] = str(directory / f"{package.name}.json")
-                if not precheck.passed or not precheck.extra.get("session_id"):
-                    raise RuntimeError(precheck.error or "precheck failed blind sheet/session evidence checks")
-                precheck_info.update(precheck.verdict or {})
-                precheck_info["session_id"] = precheck.extra["session_id"]
-                precheck_info["skipped"] = precheck_info["decision"] == "skip"
-                if precheck_info["skipped"]:
-                    precheck_info["warning"] = (
-                        "MINIMAL-CHANGE SKIP: independent machinist reviews were not run; "
-                        "this is not a full machinist review or baseline approval. "
-                        "Change triage only. " + precheck_info["reason"]
+        with _telemetry.span(
+            "machinist_review.precheck", name=package.name, kind=package.kind,
+            judge_reviewer=judge_reviewer, judge_model=judge_model, forced=force,
+        ) as precheck_span:
+            if not force:
+                try:
+                    # Forced build/benchmark gates do not execute or depend on diff
+                    # tooling; keep its dynamic identity-map closure out of them.
+                    from _drawing_diff import create_drawing_diff
+                    if snapshot_error:
+                        raise RuntimeError(snapshot_error)
+                    if not package.sources or len(package.before_sources) != len(package.sources):
+                        raise ValueError("precheck requires paired before and after PDFs; use --force for an unconditional after-only review")
+                    if any(
+                        source.suffix.casefold() != ".pdf"
+                        for source in (*package.sources, *package.before_sources)
+                    ):
+                        raise ValueError("precheck inputs must be PDFs")
+                    after_sheet_count = _validate_package(snapshot)
+                    directory = report_dir / package.name / "precheck"
+                    diff = create_drawing_diff(
+                        source_dir / "before", source_dir / "after", directory / "diff.zip",
+                        old_label="BEFORE", new_label="AFTER", include_unchanged=True,
                     )
-            except Exception as exc:
-                precheck_info["error"] = f"{type(exc).__name__}: {exc}"
-                precheck_info["warning"] = "Precheck failed closed; no minimal-change skip was accepted."
+                    diff["after_sheet_count"] = after_sheet_count
+                    overlay_sources: list[Path] = []
+                    with ZipFile(diff["asset_path"]) as archive:
+                        for index, member in enumerate(diff["images"]):
+                            target = directory / "overlays" / f"overlay-{index + 1:04d}.png"
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            target.write_bytes(archive.read(member))
+                            overlay_sources.append(target)
+                    if not overlay_sources or len(overlay_sources) != len(diff["pages"]):
+                        raise RuntimeError("PDF diff did not provide an overlay for every page")
+                    diff["overlay_sheets"] = [
+                        {"sheet": after_sheet_count + index + 1, "image": member}
+                        for index, member in enumerate(diff["images"])
+                    ]
+                    precheck_info["diff"] = diff
+                    judge_package = ReviewPackage(
+                        package.name, package.kind, (*snapshot.sources, *overlay_sources)
+                    )
+                    precheck = _review_session(
+                        judge_package, reviewer=judge_reviewer, model=judge_model,
+                        effort=judge_effort, report_dir=directory, retries=retries,
+                        timeout_s=timeout_s, claude=claude, codex=codex, precheck_diff=diff,
+                    )
+                    precheck_info["report"] = str(directory / f"{package.name}.json")
+                    if not precheck.passed or not precheck.extra.get("session_id"):
+                        raise RuntimeError(precheck.error or "precheck failed blind sheet/session evidence checks")
+                    precheck_info.update(precheck.verdict or {})
+                    precheck_info["session_id"] = precheck.extra["session_id"]
+                    precheck_info["skipped"] = precheck_info["decision"] == "skip"
+                    if precheck_info["skipped"]:
+                        precheck_info["warning"] = (
+                            "MINIMAL-CHANGE SKIP: independent machinist reviews were not run; "
+                            "this is not a full machinist review or baseline approval. "
+                            "Change triage only. " + precheck_info["reason"]
+                        )
+                except Exception as exc:
+                    precheck_info["error"] = f"{type(exc).__name__}: {exc}"
+                    precheck_info["warning"] = "Precheck failed closed; no minimal-change skip was accepted."
+            precheck_outcome = (
+                "error" if precheck_info["error"] else "bypass" if force
+                else "skip" if precheck_info["skipped"] else "review"
+            )
+            precheck_attributes = {
+                "outcome": precheck_outcome,
+                "skip_kind": precheck_info["skip_kind"] or "none",
+                "reason": precheck_info["reason"] or (
+                    "Precheck bypassed by --force." if force else ""
+                ),
+                "error": precheck_info["error"] or "",
+            }
+            for key, value in precheck_attributes.items():
+                precheck_span.set_attribute(key, value)
 
         def run(run_id: str) -> Review:
             directory = report_dir / package.name / "runs" / run_id
@@ -2540,6 +2559,16 @@ def aggregate_package(
         span.set_attribute("gating_count", gating_count)
         span.set_attribute("error_count", sum(bool(summary["error"]) for summary in summaries))
         span.set_attribute("verdict", verdict)
+        span.set_attribute(
+            "decision_basis",
+            "error" if error else "precheck_skip" if precheck_info["skipped"] else "full_review",
+        )
+        span.set_attribute("completed_run_count", len(summaries))
+        span.set_attribute("valid_run_count", valid_runs)
+        span.set_attribute("judge_executed", not judge_info["skipped"])
+        span.set_attribute("error", error or "")
+        for key, value in precheck_attributes.items():
+            span.set_attribute(f"precheck_{key}", value)
         (report_dir / f"{package.name}.aggregate.json").write_text(
             json.dumps(aggregate, indent=2), encoding="utf-8"
         )
