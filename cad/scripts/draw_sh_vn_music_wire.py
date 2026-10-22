@@ -23,7 +23,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _telemetry
 from _check import check
 from _com import _early_bound
-from _config import parts
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -332,7 +332,7 @@ def _note_box(note: Any, label: str) -> tuple[float, ...]:
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    row = parts(PART_STEM)
+    row = _config.parts(SPEC.source.stem)
     quantities = row["configuration_quantities"]
     if set(quantities) != set(SHEET_NAMES):
         raise RuntimeError("music-wire sheets do not match the registry members")
