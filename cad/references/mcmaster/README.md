@@ -1604,6 +1604,10 @@ and physical witness before import. Only the drawing-local display is formatted,
 including its tolerance-display precision; source values and tolerance bands
 are never written. The drawing checks the independently mapped witness in its
 actual view, then rechecks the original source after dressing and final rebuild.
+The shared pin stations reserve room for the dressed reference text: dowel
+diameters clear the end-view center marks, and spring-pin application-hole
+labels sit to the right of their circle so the leader approaches outside the
+multiline qualifier. These are drawing-only moves within the existing lanes.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping
