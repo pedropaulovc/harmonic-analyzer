@@ -124,7 +124,10 @@ cap top and the 2.00 minimum whole-floor thickness, including full-width edge
 openings. Their citations include `fitted_counterbore_acceptance` as well as
 the printed limits. The 8.40 model cut remains `depth_ref`, not a toleranced
 machining depth. The wire-channel note retains normal-to-actual-top,
-whole-groove-floor applicability alongside the numeric width/depth bands.
+whole-groove-floor applicability alongside the numeric width/depth bands. Each
+register note carries the boss root-radius maximum, cited to
+`REGISTER_ROOT_RADIUS_MAX`, the value charged to the register assembly and
+engagement proof; the native root stays sharp.
 Installed `prechips==0.2.0` accepts these authored note requirements but does
 not select text notes for automated tolerance inspection or its traveler
 tolerance table. Schema validation therefore proves representation and

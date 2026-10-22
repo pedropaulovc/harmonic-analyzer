@@ -222,7 +222,7 @@ for _index, (_x, _y) in enumerate(part_spec.REGISTER_POINTS, 1):
             "width_nominal": (_y, ("REGISTER_POINTS",)),
             "length": (limits(part_spec.REGISTER_PROJECTION, part_spec.REGISTER_PROJECTION_PLACES), ("REGISTER_PROJECTION", "REGISTER_PROJECTION_PLACES")),
             "length_nominal": (part_spec.REGISTER_PROJECTION, ("REGISTER_PROJECTION",)),
-            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["RegisterDia"], part_spec.DIMENSION_CALLOUTS[f"Register{_index}X"], part_spec.DIMENSION_CALLOUTS["RegisterProjection"])), ("DIMENSION_CALLOUTS",)),
+            "note": ("\n".join((part_spec.DIMENSION_CALLOUTS["RegisterDia"], part_spec.DIMENSION_CALLOUTS[f"Register{_index}X"], part_spec.DIMENSION_CALLOUTS["RegisterProjection"])), ("DIMENSION_CALLOUTS", "REGISTER_ROOT_RADIUS_MAX")),
         },
         precision={"dia": 2, "station": part_spec.REGISTER_LOCATION_PLACES, "width": part_spec.REGISTER_LOCATION_PLACES, "length": part_spec.REGISTER_PROJECTION_PLACES},
     )

@@ -340,7 +340,7 @@ Keep the full source text and 1:1 scale, with these separate ASME B sheets:
 | `ACCESS` | Outline, aperture coordinates/size, head and wire access, mouth depths |
 | `SECTIONS` | Underside pocket size/corner coordinates, A-A pocket section and cap thickness |
 | `BOLT-LOCATIONS` | Through-clearance size and all eight actual pocket-axis bolt coordinates |
-| `REGISTERS` | Both bosses' size/coordinates/projection and no-root-undercut requirement |
+| `REGISTERS` | Both bosses' size/coordinates/projection, root-radius maximum and no-undercut requirement |
 
 The formerly explicit circular-rim chamfer imported in `*Top`, not `*Right`;
 native transfer to `*Right` refused. Do not preserve its extra XZ view or marked

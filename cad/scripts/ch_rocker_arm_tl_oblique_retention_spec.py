@@ -98,9 +98,15 @@ CAP_REGISTER_DIAMETER_BAND = (0.10, -0.10)
 CAP_REGISTER_PROJECTION = 1.000
 CAP_REGISTER_PROJECTION_PLACES = 3
 # cad/config/title_block.yaml edge_break.chamfer_max_mm governs the free end.
-# The capture proof subtracts that full chamfer from straight engagement;
-# the locating roots remain unrelieved. No separate tighter cap callout.
+# The capture proof subtracts that full chamfer from straight engagement.
 CAP_REGISTER_END_CHAMFER_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+# The boss root fillet is tangent to the seating plane, so it meets the
+# receiver's sharp mouth (its edge break is a MAX only, never credited) at
+# boss radius + root radius. The title block's R1.0 inside-corner default
+# would not enter the Ø7.20 receiver, so the cap prints this tighter maximum.
+# It is charged in full to radial register assembly and, past the vertical
+# motion enclosure, to straight engagement. The native root stays sharp.
+CAP_REGISTER_ROOT_RADIUS_MAX = 0.12
 BLOCK_REGISTER_DIAMETER = 7.20
 BLOCK_REGISTER_DIAMETER_BAND = (0.10, 0.0)
 BLOCK_REGISTER_DEPTH = 2.000
@@ -597,17 +603,19 @@ def capture_bounds(
     register_assembly = (
         (register_bore_diameter_min - register_boss_diameter_max) / 2.0
         - math.sqrt(2.0) * (receiver_location_band + cap_location_band)
-        - register_axis_allowance - pattern_mismatch
+        - register_axis_allowance - pattern_mismatch - CAP_REGISTER_ROOT_RADIUS_MAX
     )
     register_bottom = (
         depth_min * math.cos(gamma) - receiver_radius_max * math.sin(gamma)
         - projection_max * math.cos(gamma + rock_limit) - boss_radius_max * math.sin(gamma + rock_limit)
         - CAP_VERTICAL_MOTION_ENCLOSURE
     )
+    # Straight land in the receiver loses the larger of the cap's lift and
+    # the root fillet; the fillet sits above the mouth once lifted that far.
     register_engagement = (
         projection_min * math.cos(gamma + rock_limit)
         - boss_radius_max * math.sin(gamma + rock_limit) - CAP_REGISTER_END_CHAMFER_MAX
-        - CAP_VERTICAL_MOTION_ENCLOSURE
+        - max(CAP_VERTICAL_MOTION_ENCLOSURE, CAP_REGISTER_ROOT_RADIUS_MAX)
     )
     if min(register_float, register_assembly, register_bottom, register_engagement) <= 0.0:
         raise ValueError("integral register assembly, bottom clearance or engagement is lost")

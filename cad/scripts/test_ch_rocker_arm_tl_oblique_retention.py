@@ -36,6 +36,7 @@ def test_capture_uses_actual_component_patterns_and_unchanged_functional_fits(mo
         ("CAP_REGISTER_PROJECTION", cap.REGISTER_PROJECTION),
         ("CAP_REGISTER_PROJECTION_PLACES", cap.REGISTER_PROJECTION_PLACES),
         ("CAP_REGISTER_END_CHAMFER_MAX", cap.REGISTER_END_CHAMFER_MAX),
+        ("CAP_REGISTER_ROOT_RADIUS_MAX", cap.REGISTER_ROOT_RADIUS_MAX),
         ("BLOCK_REGISTER_DEPTH", block.REGISTER_DEPTH),
         ("BLOCK_REGISTER_DEPTH_PLACES", block.REGISTER_DEPTH_PLACES),
         ("PIN_STOP_FACE_VARIATION_MAX", pin.STOP_FACE_VARIATION_MAX),
@@ -540,6 +541,39 @@ def test_register_assembly_boundary_uses_both_manufactured_patterns(fraction: fl
     else:
         with pytest.raises(ValueError, match="register"):
             retention.capture_bounds(**changes)
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_register_root_radius_boundary_at_sharp_receiver_mouth(
+    monkeypatch: pytest.MonkeyPatch, fraction: float,
+) -> None:
+    """The tangent root fillet reaches boss radius + root at the receiver's
+    uncredited sharp mouth; the title-block R1.0 inside corner cannot enter."""
+    bounds = retention.capture_bounds()
+    monkeypatch.setattr(retention, "CAP_REGISTER_ROOT_RADIUS_MAX", 1.0)
+    with pytest.raises(ValueError, match="register"):
+        retention.capture_bounds()
+    root = cap.REGISTER_ROOT_RADIUS_MAX + fraction * bounds.register_assembly_clearance
+    monkeypatch.setattr(retention, "CAP_REGISTER_ROOT_RADIUS_MAX", root)
+    if fraction < 1.0:
+        actual = retention.capture_bounds()
+        assert actual.register_assembly_clearance == pytest.approx((1.0 - fraction) * bounds.register_assembly_clearance)
+        assert actual.register_engagement == bounds.register_engagement
+    else:
+        with pytest.raises(ValueError, match="register"):
+            retention.capture_bounds()
+
+
+def test_register_root_radius_costs_engagement_only_past_vertical_motion(monkeypatch: pytest.MonkeyPatch) -> None:
+    bounds = retention.capture_bounds()
+    excess = 0.05
+    root = retention.CAP_VERTICAL_MOTION_ENCLOSURE + excess
+    monkeypatch.setattr(retention, "CAP_REGISTER_ROOT_RADIUS_MAX", root)
+    # Hypothetical perfectly located patterns (consistent, unlike an inverted
+    # receiver band) free radial assembly for the larger root, so engagement
+    # alone is measured. A wholly wider receiver loses the rocking floor proof.
+    actual = retention.capture_bounds(receiver_location_band=0.0, cap_location_band=0.0)
+    assert actual.register_engagement == pytest.approx(bounds.register_engagement - excess)
 
 
 @pytest.mark.parametrize("fraction", (0.99, 1.01))

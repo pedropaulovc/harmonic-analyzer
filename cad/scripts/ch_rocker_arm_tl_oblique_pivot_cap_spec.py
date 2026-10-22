@@ -9,7 +9,8 @@ seated. Bearing axial behavior is not part of this acceptance.
 
 Two integral underside registers locate the cap in the block's flat-bottom
 receivers. Their real 45-degree free-end chamfers use the title-block edge-break
-maximum; the roots remain unrelieved for straight locating engagement.
+maximum; the modelled roots stay sharp, with no undercut, and print a root
+radius maximum small enough to enter the receivers' sharp mouths.
 
 The four circular counterbores are fitted to the actual installed screw heads;
 their nominal depth is reference-only. Their FULL width and depth open to the
@@ -61,6 +62,7 @@ REGISTER_PROJECTION = retention.CAP_REGISTER_PROJECTION
 REGISTER_LOCATION_PLACES = retention.CAP_REGISTER_LOCATION_PLACES
 REGISTER_PROJECTION_PLACES = retention.CAP_REGISTER_PROJECTION_PLACES
 REGISTER_END_CHAMFER_MAX = retention.CAP_REGISTER_END_CHAMFER_MAX
+REGISTER_ROOT_RADIUS_MAX = retention.CAP_REGISTER_ROOT_RADIUS_MAX
 TOTAL_HEIGHT = HEIGHT + REGISTER_PROJECTION
 APERTURE_BAND = retention.CAP_APERTURE_BAND
 # Existing blank authority: cad/config/parts/ch-rocker-arm-tl-oblique-pivot-cap.yaml,
@@ -406,7 +408,10 @@ DIMENSION_CALLOUTS = {
     "WireDepth": "2X NORMAL TO\nACTUAL CAP TOP FACE;\nDEPTH LIMITS OVER\nWHOLE GROOVE FLOOR",
     **{f"Bolt{index}{axis}": "FROM POCKET AXIS;\nLOCATES TL-22 CAP SCREW" for index in range(1, 5) for axis in ("X", "Y")},
     "RegisterDia": "2X INTEGRAL; LOCATES IN TL-22 RECEIVERS",
-    "RegisterProjection": "2X BELOW BLOCK SEATING FACE;\nLOCATES IN TL-22 RECEIVERS;\nNO ROOT UNDERCUT",
+    "RegisterProjection": (
+        "2X BELOW BLOCK SEATING FACE;\nLOCATES IN TL-22 RECEIVERS;\n"
+        f"ROOT R{REGISTER_ROOT_RADIUS_MAX:.2f} MAX; NO UNDERCUT"
+    ),
     **{f"Register{index}{axis}": "FROM ACTUAL POCKET AXIS;\nLOCATES IN TL-22 RECEIVER" for index in range(1, 3) for axis in ("X", "Y")},
 }
 SURFACE_FINISHES = (SurfaceFinishControl("block_seat", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),)
