@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import shutil
+import traceback
 from pathlib import Path
 from sys import exception as active_exception
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -50,12 +51,46 @@ class SmMinimalReproStop(RuntimeError):
         super().__init__(f"INTENTIONAL MINIMAL REPRO STOP: {report['stop_reason']}")
 
 
-def _cast(obj, interface):
-    from win32com.client import CastTo, gencache
+_BINDING = None
 
+
+def _load_binding(sw):
+    """Load installed primary wrappers independently of a returned object's type info."""
+    global _BINDING
+    if _BINDING is not None:
+        return
+    import pythoncom
+    from win32com.client import gencache
+
+    executable = Path(sw.GetExecutablePath())
+    root = executable if executable.is_dir() else executable.parent
+    candidates = (root / "sldworks.tlb", root / "SOLIDWORKS/sldworks.tlb")
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if path is None:
+        raise FileNotFoundError("primary SOLIDWORKS typelib missing; checked "
+                                + ", ".join(str(candidate) for candidate in candidates))
+    iid, lcid, _syskind, major, minor, _flags = pythoncom.LoadTypeLib(str(path)).GetLibAttr()
+    if str(iid) != "{83A33D31-27C5-11CE-BFD4-00400513BB57}":
+        raise RuntimeError(f"unexpected primary SOLIDWORKS typelib: {iid}")
+    module = gencache.EnsureModule(str(iid), lcid, major, minor, bForDemand=False)
+    if module is None:
+        raise RuntimeError("primary SOLIDWORKS wrapper generation returned None")
+    _BINDING = module
+
+
+def _cast(obj, interface):
     if obj is None:
         raise RuntimeError(f"null native {interface}")
-    return CastTo(gencache.EnsureDispatch(obj), interface)
+    if _BINDING is None:
+        raise RuntimeError("primary SOLIDWORKS wrappers have not been loaded")
+    cls = getattr(_BINDING, interface)
+    if isinstance(obj, cls):
+        return obj
+    try:
+        return cls(obj._oleobj_)
+    except BaseException as error:
+        error.add_note(f"native interface binding: {interface} from {type(obj).__name__}")
+        raise
 
 
 def _array(kind, values):
@@ -361,7 +396,7 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
     original = extension.GetUserPreferenceInteger(preference, no_option)
     hwnd = _cast(sw.Frame(), "IFrame").GetHWndx64()
     row = {"index": index, "seat_pid": sw.GetProcessID(), "view_pose": pose,
-           "native_calls": 0, "secondary_errors": []}
+           "native_calls": 0, "secondary_errors": [], "stage": "normal_options"}
     try:
         if not extension.SetUserPreferenceInteger(preference, no_option, normal):
             raise RuntimeError("Normal line weight did not apply")
@@ -374,18 +409,23 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
             name, "DRAWINGVIEW", 0., 0., 0., False, 0, None, 0
         ):
             raise RuntimeError("final view selection failed")
+        row["stage"] = "autoballoon"
         row["native_calls"] = 1
         raw = ddoc.AutoBalloon5(options)
         row["raw_count"] = len(raw) if type(raw) in (tuple, list) else None
         row["raw_collection_type"] = type(raw).__name__
+        row["stage"] = "passive_pixels"
         try:
             row["post_call_png"] = _pixels(
                 hwnd, Path(out_dir) / f"attempt-{index}-post-call.png"
             )
         except BaseException as error:
-            row["secondary_errors"].append(f"passive post-call capture: {error}")
+            row["secondary_errors"].append(
+                "passive post-call capture: " + "".join(traceback.format_exception(error))
+            )
         if raw is not None and type(raw) not in (tuple, list):
             raise RuntimeError("AutoBalloon returned a non-array")
+        row["stage"] = "postcall_observations"
         row["raw_notes"] = [_note(note) for note in (raw or ())]
         row["raw_texts"] = [note["text"] for note in row["raw_notes"]]
         row["inventory"] = [_note(note) for note in (view.GetNotes() or ())
@@ -442,13 +482,14 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
                           "spring_omitted": row["spring_omitted"]}), flush=True)
     except BaseException as error:
         row["error"] = f"{type(error).__name__}: {error}"
+        row["traceback"] = "".join(traceback.format_exception(error))
     finally:
         try:
             if (not extension.SetUserPreferenceInteger(preference, no_option, original)
                     or extension.GetUserPreferenceInteger(preference, no_option) != original):
                 raise RuntimeError("Normal restoration readback failed")
         except BaseException as error:
-            row["secondary_errors"].append(f"Normal restore: {error}")
+            row["secondary_errors"].append("Normal restore: " + "".join(traceback.format_exception(error)))
         # Never save/export/reopen a drawing before the raw+independent observations.
         if "raw_notes" in row and "inventory" in row:
             target = Path(out_dir) / f"attempt-{index}.SLDDRW"
@@ -458,7 +499,9 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
                     raise RuntimeError("post-observation drawing evidence not saved")
                 row["drawing"] = str(target)
             except BaseException as error:
-                row["secondary_errors"].append(f"post-observation save: {error}")
+                row["secondary_errors"].append(
+                    "post-observation save: " + "".join(traceback.format_exception(error))
+                )
     return row
 
 
@@ -559,18 +602,24 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
         report["prior_cases"] = prior["cases"]
     selected = None
     try:
+        report["stage"] = "load_binding"
+        _load_binding(sw_app)
+        report["stage"] = "pack_seed"
         owned_seed = _pack(sw_app, assembly, out_dir / "owned-seed")
+        report["stage"] = "read_seed"
         baseline_fixture = _fixture(sw_app, owned_seed)
         if baseline_fixture["component_count"] != 16:
             raise RuntimeError("full SM seed must contain the actual16 component instances")
         seed_pose = prior["seed_pose"] if prior is not None else None
         seed_omissions = None
         for case in cases:
+            report["stage"] = f"prepare_case:{case}"
             target, fixture = _prepare_case(sw_app, owned_seed, case, out_dir, baseline_fixture)
             result = {"case": case, "assembly": str(target), "fixture": fixture,
                       "attempts": [], "spring_omissions": 0}
             report["cases"].append(result)
             for index in range(1, 5):
+                report["stage"] = f"attempt:{case}:{index}"
                 if sw_app.GetProcessID() != report["seat_pid"]:
                     raise RuntimeError("held seat PID changed")
                 attempt = _attempt(sw_app, target, drawing_template, bom_template,
@@ -619,17 +668,19 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
         if report["total_native_calls_including_prior_leaf"] > 24:
             raise RuntimeError("predeclared native call cap exceeded")
         if selected is not None:
+            report["stage"] = "bundle"
             report["native_zip"] = _bundle(
                 sw_app, selected, drawing_template, bom_template, report, out_dir
             )
     except BaseException as error:
         report["errors"].append(f"{type(error).__name__}: {error}")
+        report["traceback"] = "".join(traceback.format_exception(error))
         report["stop_reason"] = "construction/native/packaging failure; not a passing fixture"
     finally:
         try:
             _close_all(sw_app)
         except BaseException as error:
-            report["errors"].append(f"final close: {error}")
+            report["errors"].append("final close: " + "".join(traceback.format_exception(error)))
         report["cached_source_unchanged"] = _sha(assembly) == source_hash
         if not report["cached_source_unchanged"]:
             report["errors"].append("cached source changed during owned-copy diagnostic")
@@ -650,6 +701,9 @@ def _replay(sw, *, assembly, drawing_template, bom_template, out_dir):
               "seat_pid": sw.GetProcessID(), "native_calls": 0, "attempts": [], "errors": [],
               "stop_reason": "single-call replay incomplete"}
     try:
+        report["stage"] = "load_binding"
+        _load_binding(sw)
+        report["stage"] = "attempt:1"
         attempt = _attempt(sw, assembly, drawing_template, bom_template, out_dir, 1, None)
         report["attempts"].append(attempt)
         report["native_calls"] = attempt["native_calls"]
@@ -660,11 +714,12 @@ def _replay(sw, *, assembly, drawing_template, bom_template, out_dir):
         )
     except BaseException as error:
         report["errors"].append(f"{type(error).__name__}: {error}")
+        report["traceback"] = "".join(traceback.format_exception(error))
     finally:
         try:
             _close_all(sw)
         except BaseException as error:
-            report["errors"].append(f"final close: {error}")
+            report["errors"].append("final close: " + "".join(traceback.format_exception(error)))
         (out_dir / "result.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     raise SmMinimalReproStop(report)
 
@@ -672,7 +727,9 @@ def _replay(sw, *, assembly, drawing_template, bom_template, out_dir):
 def _attach():
     from win32com.client import GetActiveObject
 
-    return _cast(GetActiveObject("SldWorks.Application"), "ISldWorks")
+    sw = GetActiveObject("SldWorks.Application")
+    _load_binding(sw)
+    return _cast(sw, "ISldWorks")
 
 
 def main():
