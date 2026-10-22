@@ -356,7 +356,7 @@ class SourceFace(NativeObject):
         self.scene = scene
 
     def GetEdges(self):
-        return [self.scene.edge]
+        return self.scene.edges
 
     def GetFeature(self):
         return self.scene.wizard
@@ -430,6 +430,48 @@ class SourceEdge(NativeObject):
         return self.scene.faces
 
 
+class SourceLineCurve:
+    def __init__(self, edge):
+        self.edge = edge
+
+    def IsCircle(self):
+        return False
+
+    @property
+    def CircleParams(self):
+        raise AssertionError("line has no circle parameters")
+
+    def GetEndParams(self):
+        return self.edge.domain
+
+
+class SourceLineTrim:
+    UMinValue, UMaxValue, Sense = 0.0, 1.0, True
+    StartPoint, EndPoint = (0.0, 0.0, 0.0), (1.0, 0.0, 0.0)
+
+
+class SourceLineEdge(SourceEdge):
+    def __init__(self, scene):
+        super().__init__(scene)
+        self.domain = (True, 0.0, 1.0, False, False)
+        self.eval_status = 1
+
+    def GetCurve(self):
+        self.curve_fetched = True
+        return SourceLineCurve(self)
+
+    def GetCurveParams3(self):
+        if not self.curve_fetched:
+            raise AssertionError("GetCurve prerequisite missing")
+        return SourceLineTrim()
+
+    def Evaluate2(self, parameter, derivatives):
+        if derivatives != 0:
+            raise AssertionError("only endpoint positions requested")
+        status = struct.unpack("<d", struct.pack("<II", self.eval_status, 0))[0]
+        return (parameter, 0.0, 0.0, status)
+
+
 class SourceScene:
     def __init__(self, document, mode):
         self.document = document
@@ -454,6 +496,7 @@ class SourceScene:
         self.wizard.faces = self.faces
         self.later.faces = self.faces[1:]
         self.edge = SourceEdge(self)
+        self.edges = [self.edge]
         self.selected_edge = self.edge
         self.references = {}
         self.resolve_status = 0
@@ -499,6 +542,8 @@ class Application:
         self.before_open = lambda _path, _kind: None
         self.close_error = None
         self.open_warning = 0
+        self.open_warnings = {}
+        self.activation_calls = []
 
     def __setattr__(self, name, value):
         if name in ("UserControl", "Visible", "UserControlBackground"):
@@ -564,9 +609,11 @@ class Application:
         self.documents.append(doc)
         self.active = doc
         self.after_open(doc)
-        return doc, 0, self.open_warning if "mg-magnifying-bracket" in path else 0
+        case = "s1" if "mg-magnifying-bracket" in path else "sm_positive"
+        return doc, 0, self.open_warnings.get((case, kind), self.open_warning if case == "s1" else 0)
 
     def ActivateDoc3(self, path, preferences, option, errors):
+        self.activation_calls.append(path)
         if (preferences, option, errors) != (False, 1, 0):
             raise AssertionError("activation must not request rebuild/preferences")
         self.active = next(doc for doc in self.documents if doc.path == path)
@@ -659,6 +706,8 @@ class Environment:
         self.before_diagnostic = lambda: None
         self.diagnostic_result = lambda feature: recorded_diagnostic("sm_positive" if feature == "BracketMountingTaps" else "b0")
         self.identity_override = None
+        self.path_redirect = None
+        self.copy_fs_attempts = []
 
     def credential(self):
         self.blob_calls.append("ManagedIdentityCredential")
@@ -690,9 +739,13 @@ class Environment:
         return module("fake_container", get_blob_client=get_blob_client, close=close)
 
     def restore_path(self, path):
-        if path.resolve() != path or not path.is_relative_to(self.driver.ROOT / "cad/out"):
-            raise AssertionError("uncertified output path")
-        return path
+        # Same strict unaliased-output policy as repository _restore_path;
+        # Path.resolve is independently fault-injected for ancestor redirection.
+        target = Path(os.path.abspath(path))
+        output_root = self.driver.ROOT / "cad/out"
+        if target == output_root or not target.is_relative_to(output_root) or target.resolve() != target:
+            raise RuntimeError("uncertified output path")
+        return target
 
     def stop(self):
         self.watchdog_events.append("stop")
@@ -798,6 +851,19 @@ class Environment:
 
             original_open, original_mkdir = Path.open, Path.mkdir
             original_text, original_bytes = Path.write_text, Path.write_bytes
+            original_resolve = Path.resolve
+
+            def redirected_resolve(path, *args, **kwargs):
+                target = Path(os.path.abspath(path))
+                if self.path_redirect is not None:
+                    ancestor = root / self.path_redirect
+                    if target.is_relative_to(ancestor):
+                        return root.parent / f"{root.name}-outside" / target.relative_to(ancestor)
+                return original_resolve(path, *args, **kwargs)
+
+            def record_copy_creation(path, operation):
+                if "diagnostic-copies" in Path(path).parts:
+                    self.copy_fs_attempts.append((operation, str(path)))
 
             def owned(path):
                 if not Path(path).resolve().is_relative_to(root):
@@ -805,10 +871,12 @@ class Environment:
 
             def guarded_open(path, mode="r", *args, **kwargs):
                 if any(flag in mode for flag in "wax+"):
+                    record_copy_creation(path, f"open:{mode}")
                     owned(path)
                 return original_open(path, mode, *args, **kwargs)
 
             def guarded_mkdir(path, *args, **kwargs):
+                record_copy_creation(path, "mkdir")
                 owned(path)
                 return original_mkdir(path, *args, **kwargs)
 
@@ -821,6 +889,7 @@ class Environment:
                 return original_bytes(path, *args, **kwargs)
 
             with ExitStack() as stack:
+                stack.enter_context(patch.object(Path, "resolve", redirected_resolve))
                 stack.enter_context(patch.object(driver, "file_identity", identity))
                 stack.enter_context(patch.object(sys, "argv", [str(DRIVER_PATH), "--disposable-source-tree"]))
                 stack.enter_context(patch.object(Path, "open", guarded_open))
@@ -1566,6 +1635,7 @@ class S1Behavior(unittest.TestCase):
             self.assertEqual(positive["state"], "PRESENT")
             self.assertTrue(positive["complete"])
             self.assertEqual(len(positive["positive_count_fields"]), 8)
+            self.assertEqual(len(positive["positive_payload_fields"]), 28)
             self.assertEqual(zero["state"], "OBSERVED_ZERO")
             self.assertTrue(zero["complete"])
             self.assertEqual(zero["positive_count_fields"], [])
@@ -1783,8 +1853,12 @@ class S1Behavior(unittest.TestCase):
                 env.app.prepare_scene = prepare
                 _, report, _ = env.run_driver()
                 evidence = report["cases"][1]["s1"]
-                self.assertEqual(evidence["release_calls"], 1)
+                failed_operation = mode in ("bad_status", "domain_false", "domain_bool_range")
+                self.assertEqual(evidence["release_calls"], 0 if failed_operation else 1)
                 self.assertFalse(evidence["clean_comparison"])
+                if failed_operation:
+                    self.assertFalse(evidence["phases"]["before"]["complete"])
+                    self.assertFalse(evidence["display_generation_permitted"])
                 self.assertEqual(evidence["causal_conclusion"], "NOT_ESTABLISHED")
                 if mode == "arc":
                     self.assertEqual(evidence["selected_edge"]["trimmed_circle"]["state"], "NOT_FULL_OR_CONTRADICTORY")
@@ -1974,6 +2048,254 @@ class S1Behavior(unittest.TestCase):
             self.assertEqual(report["cases"][1]["after_access_thread_ink"]["state"], "UNAVAILABLE")
             self.assertFalse(report["cases"][1]["s1"]["clean_comparison"])
             self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
+
+
+class S1SafetyRepairs(unittest.TestCase):
+    def test_redirected_copy_ancestor_refuses_before_any_creation_or_open(self):
+        # Simulate resolve() through a symlink/junction without creating one or
+        # needing Windows link privileges. The write guard records ATTEMPTS.
+        for ancestor in ("cad/out/diagnostic-copies",
+                         "cad/out/diagnostic-copies/mg-saved-thread-control"):
+            with self.subTest(ancestor=ancestor), Environment().installed() as env:
+                env.path_redirect = ancestor
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertIn("uncertified output path", report["primary_failure"]["message"])
+                self.assertEqual(env.copy_fs_attempts, [])
+                self.assertEqual(env.cache_calls, [])
+                self.assertEqual(env.blob_calls, [])
+                self.assertEqual(env.app.open_calls, [])
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(env.app.documents, [])
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+
+    def test_copy_path_is_recertified_at_direct_ownership_and_cleanup(self):
+        for boundary in ("direct_open", "cleanup"):
+            with self.subTest(boundary=boundary), Environment().installed() as env:
+                env.app.source_mode = "cosmetic"
+                def redirect():
+                    env.path_redirect = "cad/out/diagnostic-copies/mg-saved-thread-control"
+                if boundary == "direct_open":
+                    def after_open(doc):
+                        if doc.kind == 1 and "mg-magnifying-bracket" in doc.path:
+                            redirect()
+                    env.app.after_open = after_open
+                else:
+                    env.app.prepare_scene = lambda scene: setattr(scene, "on_release", redirect)
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.app.close_calls, ["sm-summing-lever.SLDDRW", "sm-summing-lever.SLDPRT"])
+                s1 = report["cases"][1]
+                if boundary == "direct_open":
+                    self.assertEqual(len(env.app.documents), 1)
+                    self.assertEqual(s1["opens"][0]["ownership_state"], "UNAVAILABLE_STRANDED")
+                    self.assertEqual(env.app.scenes[-1].access_calls, 0)
+                else:
+                    self.assertEqual(len(env.app.documents), 2)
+                    self.assertTrue(all(row["status"] == "stranded_owned" for row in s1["closures"]))
+
+    def test_unconfirmed_access_release_or_rollforward_never_generates_after_display(self):
+        for mode in ("access_false", "access_unknown", "access_error", "release_error",
+                     "release_nonvoid", "rolled_back", "rollback_unknown"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                env.app.source_mode = "cosmetic"
+                def prepare(scene):
+                    if mode == "access_false":
+                        scene.access_result = False
+                    elif mode == "access_unknown":
+                        scene.access_result = 1
+                    elif mode == "access_error":
+                        scene.access_result = ProbeError("access failed")
+                    elif mode == "release_error":
+                        scene.release_error = ProbeError("release failed")
+                    elif mode == "release_nonvoid":
+                        release = scene.cosmetic.definition.ReleaseSelectionAccess
+                        def bad_void():
+                            release()
+                            return False
+                        scene.cosmetic.definition.ReleaseSelectionAccess = bad_void
+                    elif mode == "rolled_back":
+                        scene.on_release = lambda: setattr(scene, "accessed", True)
+                    else:
+                        scene.on_release = lambda: setattr(scene.later, "IsRolledBack", lambda: None)
+                env.app.prepare_scene = prepare
+                _, report, _ = env.run_driver()
+                source = report["cases"][1]["s1"]
+                self.assertFalse(source["display_generation_permitted"])
+                self.assertFalse(source["clean_comparison"])
+                self.assertIn("after", source["phases"])
+                self.assertNotIn("after_access_diagnostic", report["cases"][1])
+                self.assertEqual(env.diagnostic_calls, 2)
+                self.assertEqual([Path(path).suffix for path in env.app.activation_calls],
+                                 [".SLDDRW", ".SLDDRW", ".SLDPRT"])
+                self.assertEqual(env.app.scenes[-1].release_calls, 0 if mode.startswith("access_") else 1)
+                self.assertEqual(env.app.documents, [])
+
+    def test_escaping_access_body_baseexception_precedes_release_failure(self):
+        for primary in (KeyboardInterrupt("original interrupt"), SystemExit("original exit")):
+            with self.subTest(primary=type(primary).__name__), Environment().installed() as env:
+                env.app.source_mode = "cosmetic"
+                env.app.prepare_scene = lambda scene: setattr(scene, "release_error", ProbeError("secondary release"))
+                original = env.driver.trimmed_circle_summary
+                interrupted = False
+                def classify(reads):
+                    nonlocal interrupted
+                    if env.app.scenes[-1].accessed and not interrupted:
+                        interrupted = True
+                        trip(primary)  # Outside source_intervention.read(), after actual access True.
+                    return original(reads)
+                with patch.object(env.driver, "trimmed_circle_summary", classify):
+                    code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertTrue(interrupted)
+                self.assertEqual(report["primary_failure"]["operation"], "s1.access_body")
+                self.assertEqual(report["primary_failure"]["type"], type(primary).__name__)
+                source = report["cases"][1]["s1"]
+                self.assertEqual(source["errors"][0]["operation"], "s1.access_body")
+                self.assertTrue(any(row["operation"] == "s1.ReleaseSelectionAccess" for row in source["errors"][1:]))
+                self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
+                self.assertFalse(source["display_generation_permitted"])
+                self.assertEqual(env.diagnostic_calls, 2)
+                root_exit = next(row for row in env.telemetry.exit_errors if row[0] == "build")
+                self.assertIs(root_exit[2], primary)
+                self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(root_exit[3])))
+                self.assertTrue(captures[0]["primary_traceback"]["available"])
+                self.assertEqual(env.app.documents, [])
+
+    def test_positive_sm_counts_without_successful_payloads_cannot_admit_s1(self):
+        for mode in ("reader_errors", "null", "empty", "invalid_value", "stale_errored_rows"):
+            with self.subTest(mode=mode), Environment().installed() as env:
+                diagnostic = recorded_diagnostic("sm_positive")
+                fields = env.driver.thread_ink_summary(diagnostic)["positive_payload_fields"]
+                self.assertEqual(len(fields), 28)
+                for key in fields:
+                    if mode == "reader_errors":
+                        diagnostic["reads"].pop(key)
+                        diagnostic["errors"][key] = "native row reader failed"
+                    elif mode == "stale_errored_rows":
+                        diagnostic["errors"][key] = "row read not successful"
+                    else:
+                        diagnostic["reads"][key] = {"null": None, "empty": [], "invalid_value": [False]}[mode]
+                summary = env.driver.thread_ink_summary(diagnostic)
+                self.assertEqual(summary["state"], "PRESENT")  # Counts still stop any intervention.
+                self.assertEqual(len(summary["positive_count_fields"]), 8)
+                self.assertEqual(summary["positive_payload_fields"], [])
+                env.diagnostic_result = lambda _feature: diagnostic
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(env.diagnostic_calls, 1)
+                self.assertEqual(report["cases"][1]["status"], "not_started")
+                self.assertEqual(len(env.app.open_calls), 2)
+                self.assertEqual(env.blob_calls, [])
+                self.assertEqual(env.app.documents, [])
+
+    def test_successful_sm_payloads_admit_despite_unrelated_optional_reader_error(self):
+        with Environment().installed() as env:
+            env.app.source_mode = "cosmetic"
+            original = env.diagnostic_result
+            def diagnostic(feature):
+                value = original(feature)
+                if feature == "BracketMountingTaps":
+                    value["errors"]["source.CosmeticThreadType"] = "optional source reader unavailable"
+                return value
+            env.diagnostic_result = diagnostic
+            code, report, _ = env.run_driver()
+            self.assertEqual(code, 0)
+            self.assertEqual(len(report["cases"][0]["thread_ink"]["positive_payload_fields"]), 28)
+            self.assertEqual(report["cases"][0]["status"], "observed_with_diagnostic_read_errors")
+            self.assertEqual(env.app.scenes[-1].events, ["access", "release"])
+            self.assertEqual(env.diagnostic_calls, 3)
+
+    def test_distinct_nonselected_line_requires_success_not_circle_classification(self):
+        for phase in ("before", "after"):
+            for mode in ("healthy", "bad_status", "domain_false", "domain_shape", "domain_flags", "evaluation_shape"):
+                with self.subTest(phase=phase, mode=mode), Environment().installed() as env:
+                    env.app.source_mode = "cosmetic"
+                    def prepare(scene):
+                        line = SourceLineEdge(scene)
+                        scene.edges.append(line)
+                        def configure():
+                            if mode == "bad_status":
+                                line.eval_status = 0
+                            elif mode == "domain_false":
+                                line.domain = (False, 0.0, 1.0, False, False)
+                            elif mode == "domain_shape":
+                                line.domain = (True, 0.0, 1.0)
+                            elif mode == "domain_flags":
+                                line.domain = (True, 0.0, 1.0, 0, False)
+                            elif mode == "evaluation_shape":
+                                line.Evaluate2 = lambda _parameter, _derivatives: (0.0, 0.0, 0.0)
+                        if phase == "before":
+                            configure()
+                        else:
+                            scene.on_release = configure
+                    env.app.prepare_scene = prepare
+                    code, report, _ = env.run_driver()
+                    source = report["cases"][1]["s1"]
+                    snapshot = source["phases"][phase]
+                    self.assertEqual(len(snapshot["edges"]), 2)
+                    self.assertEqual(snapshot["edges"][0]["trimmed_circle"]["state"], "FULL_TRIMMED_CIRCLE")
+                    self.assertTrue(snapshot["edges"][0]["operations_complete"])
+                    self.assertIs(snapshot["edges"][1]["reads"]["circle"], False)
+                    self.assertEqual(snapshot["edges"][1]["operations_complete"], mode == "healthy")
+                    if mode == "healthy":
+                        self.assertEqual(code, 0)
+                        self.assertTrue(source["clean_comparison"])
+                        self.assertTrue(source["display_generation_permitted"])
+                        self.assertEqual(env.diagnostic_calls, 3)
+                    else:
+                        self.assertEqual(code, 1)
+                        self.assertFalse(snapshot["complete"])
+                        self.assertFalse(source["clean_comparison"])
+                        self.assertFalse(source["display_generation_permitted"])
+                        self.assertEqual(source["release_calls"], 0 if phase == "before" else 1)
+                        self.assertEqual(env.diagnostic_calls, 2)
+                        self.assertTrue(any("edge[1]" in row["operation"] for row in source["errors"]))
+                    self.assertEqual(env.app.documents, [])
+
+    def test_open_warnings_refuse_at_boundary_including_sm_positive_and_wizard_only(self):
+        for route in ("sm", "s1_cosmetic", "s1_wizard", "s1_positive"):
+            for kind in (1, 3):
+                for warning in (1, None, False, "0"):
+                    with self.subTest(route=route, kind=kind, warning=warning), Environment().installed() as env:
+                        index = 0 if route == "sm" else 1
+                        case = "sm_positive" if index == 0 else "s1"
+                        env.app.source_mode = "wizard_only" if route == "s1_wizard" else "cosmetic"
+                        env.app.open_warnings[(case, kind)] = warning
+                        if route == "s1_positive":
+                            env.diagnostic_result = lambda _feature: recorded_diagnostic("sm_positive")
+                        code, report, _ = env.run_driver()
+                        self.assertEqual(code, 1)
+                        self.assertEqual(env.diagnostic_calls, index)
+                        failed = report["cases"][index]
+                        self.assertEqual(failed["opens"][-1]["warnings"], warning)
+                        self.assertIs(type(failed["opens"][-1]["warnings"]), type(warning))
+                        self.assertEqual(failed["opens"][-1]["ownership_state"], "CERTIFIED_COPY")
+                        self.assertTrue(failed["opens"][-1]["retained_owned"])
+                        self.assertIsNone(failed["diagnostic"])
+                        self.assertEqual(sum(scene.access_calls for scene in env.app.scenes), 0)
+                        self.assertEqual(len(env.app.open_calls), index * 2 + (1 if kind == 1 else 2))
+                        self.assertEqual(len(env.app.close_calls), len(env.app.open_calls))
+                        self.assertEqual(env.app.documents, [])
+
+    def test_warning_does_not_authorize_close_of_unknown_direct_result(self):
+        for index in (0, 1):
+            with self.subTest(case=index), Environment().installed() as env:
+                case = "sm_positive" if index == 0 else "s1"
+                env.app.open_warnings[(case, 1)] = 1
+                def unknown_owner(doc):
+                    if doc.kind == 1 and ("mg-magnifying-bracket" in doc.path) == bool(index):
+                        doc.path = "C:/foreign/uncertified.SLDPRT"
+                env.app.after_open = unknown_owner
+                code, report, _ = env.run_driver()
+                self.assertEqual(code, 1)
+                failed = report["cases"][index]
+                self.assertEqual(failed["opens"][-1]["warnings"], 1)
+                self.assertEqual(failed["opens"][-1]["ownership_state"], "UNAVAILABLE_STRANDED")
+                self.assertFalse(failed["opens"][-1].get("retained_owned", False))
+                self.assertEqual(len(env.app.close_calls), index * 2)
+                self.assertEqual(len(env.app.documents), 1)
+                self.assertEqual(env.diagnostic_calls, index)
 
 
 if __name__ == "__main__":

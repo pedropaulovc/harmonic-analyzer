@@ -149,6 +149,11 @@ CONTRACT = {
         "order": "SM readonly positive, then one S1 disposable-copy access/read/release",
         "selected_edge": "Only a unique real CosmeticThread definition; Wizard alone is UNAVAILABLE",
         "cleanup": "SM clean-only; S1 known-dirty copies only, complete owned inventory and UserControl=True before each close",
+        "admission": "SM requires extracted positive primitive rows; every open requires exact integer zero errors/warnings",
+        "copy_paths": "Strict unaliased cad/out children under trusted ROOT, checked before creation/open and ownership certification",
+        "post_access": "Display generation requires confirmed access, successful VOID release, complete roll-forward and no source read failures",
+        "geometry": "Every physical edge requires successful native domain/evaluation operations independently of circle classification",
+        "failure": "Retain escaping access-body BaseException and original traceback before the single finally release",
         "limitations": "No historical in-memory part hash, flank identity, global telemetry, or hard-crash cleanup guarantee",
     },
     "cases": [SM_POSITIVE, S1],
@@ -182,6 +187,16 @@ def thread_ink_summary(diagnostic):
         and key.endswith((".lines.count", ".polylines.count", ".arcs.count"))
         and type(value) is int and value > 0
     ]
+    positive_payloads = []
+    if isinstance(errors, dict):
+        for count_key in positive:
+            primitive_key = count_key.removesuffix(".count")
+            for index in range(reads[count_key]):
+                key = f"{primitive_key}[{index}]"
+                payload = reads.get(key)
+                if (key not in errors and isinstance(payload, (list, tuple)) and payload
+                        and all(type(value) in (float, int) and math.isfinite(value) for value in payload)):
+                    positive_payloads.append(key)
     missing = []
     for phase in ("before_generation", "after_generation"):
         witnesses = [f"{phase}.threads"]
@@ -208,6 +223,7 @@ def thread_ink_summary(diagnostic):
         "state": "PRESENT" if positive else "OBSERVED_ZERO" if complete else "UNAVAILABLE",
         "complete": complete,
         "positive_count_fields": positive,
+        "positive_payload_fields": positive_payloads,
         "missing_or_invalid_fields": missing,
         "reader_errors_present": not isinstance(errors, dict) or bool(errors),
         "recommendation": "STOP; inspect actual primitives; counts alone never establish recovered flank identity."
@@ -268,7 +284,9 @@ def trimmed_circle_summary(reads):
 def source_intervention(part, intended_name, bind, same, failure, before_access):
     """The only S1 intervention. Native references always remain in this PART context."""
     result = {"state": "UNAVAILABLE", "reads": {}, "errors": [], "phases": {},
-              "access_calls": 0, "release_calls": 0, "causal_conclusion": "NOT_ESTABLISHED"}
+              "access_calls": 0, "release_calls": 0, "access_confirmed": False,
+              "clean_comparison": False, "display_generation_permitted": False,
+              "causal_conclusion": "NOT_ESTABLISHED"}
     body_references = {}
 
     def read(label, reader, *, opaque=False):
@@ -331,6 +349,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
     }
 
     def geometry(edge, label):
+        error_start = len(result["errors"])
         values = {}
         curve = read(f"{label}.curve", lambda: typed(edge.GetCurve(), "ICurve"), opaque=True)
         if curve is not MISSING:
@@ -345,6 +364,16 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                 value = read(f"{label}.{key}", reader)
                 if value is not MISSING:
                     values[key] = value
+            if "curve_domain" in values:
+                def validate_domain():
+                    domain = values["curve_domain"]
+                    require(isinstance(domain, (tuple, list)) and len(domain) == 5,
+                            "curve domain OUT tuple missing")
+                    success, start, end, closed, periodic = domain
+                    require(success is True and type(closed) is bool and type(periodic) is bool,
+                            "curve domain operation failed or flags unavailable")
+                    finite_values([start, end], 2)
+                read(f"{label}.curve_domain.operation", validate_domain)
             params = read(f"{label}.trim", lambda: typed(edge.GetCurveParams3(), "ICurveParamData"), opaque=True)
             if params is not MISSING:
                 for key, expected in (("UMinValue", float), ("UMaxValue", float), ("Sense", bool)):
@@ -360,7 +389,12 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                         value = read(f"{label}.{key}", lambda parameter=parameter: finite_values(edge.Evaluate2(values[parameter], 0), 4))
                         if value is not MISSING:
                             values[key] = value
-        return {"reads": values, "trimmed_circle": trimmed_circle_summary(values)}
+                            read(f"{label}.{key}.operation", lambda value=value: require(
+                                struct.unpack("<II", struct.pack("<d", value[3]))[0] == 1,
+                                "edge evaluation packed success status unavailable",
+                            ))
+        return {"reads": values, "operations_complete": len(result["errors"]) == error_start,
+                "trimmed_circle": trimmed_circle_summary(values)}
 
     def capture(phase):
         error_start = len(result["errors"])
@@ -535,6 +569,7 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         result["access_calls"] = 1
         success = read("AccessSelections", lambda: candidate["definition"].AccessSelections(part, None))
         confirmed = success is True
+        result["access_confirmed"] = confirmed
         if confirmed:
             accessed = capture("accessed")
             edge = read("accessed.selected_edge", lambda: typed(candidate["definition"].Edge, "IEdge"), opaque=True)
@@ -574,6 +609,10 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
                 }
         else:
             result["reason"] = "AccessSelections not confirmed True; no release, retry, or repair."
+    except BaseException as error:
+        # Bookkeeping/classification can escape outside read(). Lock its actual
+        # first cause and original traceback BEFORE finally's release can fail.
+        result["errors"].append(failure("s1.access_body", error, error.__traceback__))
     finally:
         if confirmed:
             result["release_calls"] = 1
@@ -673,6 +712,11 @@ def source_intervention(part, intended_name, bind, same, failure, before_access)
         and selected.get("trimmed_circle", {}).get("state") == "FULL_TRIMMED_CIRCLE"
         and restored.get("trimmed_circle", {}).get("state") == "FULL_TRIMMED_CIRCLE"
         and result["selected_geometry_unchanged"]
+    )
+    result["display_generation_permitted"] = (
+        result["access_confirmed"] is True and result.get("release_returned") is True
+        and after["snapshot"]["complete"] and result["roll_forward_witness"] is True
+        and not result["errors"]
     )
     return result
 
@@ -841,6 +885,17 @@ def main():
             copy_root = ROOT / "cad/out/diagnostic-copies/mg-saved-thread-control" / uuid4().hex
             report["copy_root"] = str(copy_root)
 
+            def certified_copy_path(path):
+                # Reuse the repository's strict unaliased output policy, not a
+                # containment check against an already-redirected resolved root.
+                target = cache._restore_path(Path(path))
+                base = ROOT / "cad/out/diagnostic-copies/mg-saved-thread-control"
+                require(target != base and target.is_relative_to(base),
+                        "copy is outside the trusted diagnostic output tree")
+                require(target == copy_root or target.parent == copy_root,
+                        "copy is outside this unique disposable directory")
+                return target
+
             def inventory(label):
                 rows = []
                 error_start = len(report["errors"])
@@ -970,8 +1025,8 @@ def main():
                     require(len(candidates) == 1, f"{label}: live document has no unique exact-path/type owner")
                     require(canonical(data["path"]) in {canonical(path) for path in targets.values()},
                             f"{label}: owner is not a certified disposable copy")
-                    require(Path(data["path"]).resolve().is_relative_to(copy_root.resolve()),
-                            f"{label}: owned path escaped unique copy directory")
+                    require(certified_copy_path(data["path"]).parent == certified_copy_path(copy_root),
+                            f"{label}: owned path escaped unaliased unique copy directory")
                     index = candidates[0]
                     require(index not in matched, f"{label}: duplicate live owner")
                     require(same(row["native"], owned[index]["native"], f"{label}.live_vs_owned[{index}]"),
@@ -984,7 +1039,7 @@ def main():
                 return rows
 
             def open_native(kind, doc_type):
-                path = targets[kind]
+                path = certified_copy_path(targets[kind])
                 readonly = not (control["case"] == "s1" and kind == "part")
                 options = 3 if readonly else 1
                 row = {"kind": kind, "requested_path": str(path), "options": options}
@@ -994,7 +1049,9 @@ def main():
                 require(isinstance(result, tuple) and len(result) == 3,
                         "early-bound OpenDoc6 did not return document/errors/warnings")
                 raw, errors, warnings = result
+                row.update(errors=errors, warnings=warnings)
                 row["returned_document"] = raw is not None
+                row["ownership_state"] = "UNAVAILABLE_STRANDED" if raw is not None else "NULL"
                 require(raw is not None, f"OpenDoc6 returned no {kind}")
                 doc = _early_bound(raw, "IModelDoc2")
                 for key, reader, expected_type in (
@@ -1013,13 +1070,14 @@ def main():
                 # Never adopt auto-loaded references or arbitrary inventory deltas.
                 if (type(row.get("path")) is str and canonical(row["path"]) == canonical(path)
                         and row.get("type") == doc_type and type(row.get("title")) is str and row["title"]):
+                    certified_copy_path(row["path"])
                     owned.append({"native": doc, "data": {key: row[key] for key in ("path", "title", "type")}})
                     row["retained_owned"] = True
+                    row["ownership_state"] = "CERTIFIED_COPY"
                     report["owned_documents"] = [dict(owner["data"]) for owner in owned]
                 require(row.get("retained_owned") is True, f"OpenDoc6 did not certify the exact {kind} owner")
                 require(type(errors) is int and type(warnings) is int, "OpenDoc6 status codes unavailable")
-                row.update(errors=errors, warnings=warnings)
-                require(errors == 0, f"OpenDoc6 reported {kind} load errors")
+                require(errors == 0 and warnings == 0, f"OpenDoc6 reported {kind} load errors/warnings")
                 require(row.get("read_only") is readonly, f"OpenDoc6 {kind} read-only state differs from fixed protocol")
                 require_owned_inventory(inventory(f"after_open_{kind}"), f"after_open_{kind}")
                 require(not report["errors"], "open readback/ownership collection failed")
@@ -1057,6 +1115,9 @@ def main():
             require(initial_control is True, "control requires actual UserControl=True; no setter/repair permitted")
             report["isolation_gate"] = "accepted"
             try:
+                certified_copy_path(copy_root)
+                for kind in ("part", "drawing"):
+                    certified_copy_path(copy_root / originals[kind].name)
                 # Refuse redirected cache/SAS configuration; keep canonical
                 # archive restore semantics and never mint execution tokens.
                 require(not os.environ.get("HARMONIC_CACHE_SAS"), "SAS is forbidden")
@@ -1079,9 +1140,9 @@ def main():
                 for kind in ("drawing", "part"):
                     attempt(f"staged.{kind}.identity", lambda kind=kind: pinned_identity(control, kind, "staged"))
                 require(not report["errors"], "staged native identity verification failed")
-                copy_root.mkdir(parents=True, exist_ok=False)
+                certified_copy_path(copy_root).mkdir(parents=True, exist_ok=False)
                 for kind in ("part", "drawing"):
-                    target = copy_root / originals[kind].name
+                    target = certified_copy_path(copy_root / originals[kind].name)
                     require(canonical(target) != canonical(originals[kind]), "copy aliases pinned original")
                     with originals[kind].open("rb") as source_stream, target.open("xb") as destination:
                         shutil.copyfileobj(source_stream, destination)
@@ -1224,7 +1285,10 @@ def main():
                         report["s1"] = source_intervention(
                             part, control["feature_name"], _early_bound, same, failure, before_access,
                         )
-                        if report["s1"]["access_calls"]:
+                        if report["errors"]:
+                            report["s1"]["display_generation_permitted"] = False
+                            report["s1"]["clean_comparison"] = False
+                        if report["s1"]["display_generation_permitted"] is True:
                             activate(drawing_model, str(targets["drawing"]), "activate_after_access")
                             report["after_access_diagnostic"] = _mouth_thread_diagnostic(
                                 adapter, section, feature_name=control["feature_name"],
@@ -1236,8 +1300,8 @@ def main():
                             if report["after_access_thread_ink"]["positive_count_fields"]:
                                 report["s1"]["stop"] = "Inspect actual primitives; positive counts do not establish recovered flanks."
                 else:
-                    require(report["thread_ink"]["state"] == "PRESENT",
-                            "SM positive control did not reproduce observed native primitives")
+                    require(bool(report["thread_ink"]["positive_payload_fields"]),
+                            "SM positive control did not extract positive native primitive payloads")
                 report["collection_completed"] = True
             except BaseException as error:
                 failure("collect", error)
