@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import math
 import re
 from pathlib import Path
@@ -12,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+import _supplier_screw_dimensions as supplier_dimensions
 import _supplier_spring_drawing as supplier_drawing
 import _stock_trim_drawing as trim_drawing
 import build_ch_rocker_arm_tl_vn_oblique_leadscrew as part
@@ -1643,3 +1645,451 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     else:
         with pytest.raises(RuntimeError):
             verify()
+
+
+@pytest.fixture
+def supplier_attachment_state(monkeypatch):
+    """Stateful native identities: equal coordinates never imply IsSame."""
+    state = SimpleNamespace(
+        reads=[], messages=[], captures=[], faults={}, log_fault=None,
+        capture_fault=None, warning_fault=None, warnings=[], bound_points=[],
+        id_read_objects=[], predicate_point_objects={},
+    )
+    frame = SimpleNamespace(ArrayData=(
+        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+    ))
+
+    def read(token, member, value):
+        state.reads.append((token, member))
+        fault = state.faults.get((token, member))
+        if isinstance(fault, Exception):
+            raise fault
+        return value if fault is None else fault
+
+    class Sketch:
+        def __init__(self, token):
+            self.token = token
+            self.ModelToSketchTransform = frame
+            self.points = []
+            self.segments = []
+            self.inventory_reads = {11: 0, 10: 0}
+
+        def inventory(self, kind, objects):
+            self.inventory_reads[kind] += 1
+            if self.inventory_reads[kind] > 1:
+                raise AssertionError("diagnostics must not replace the refused inventory")
+            return objects
+
+        def GetSketchPoints2(self):
+            return self.inventory(11, self.points)
+
+        def GetSketchSegments(self):
+            return self.inventory(10, self.segments)
+
+    class Point:
+        Type = 0
+
+        def __init__(self, token, index, xyz, owner, generation=0):
+            self.token, self.index, self.xyz, self.owner = token, index, xyz, owner
+            self.generation = generation
+
+        def GetID(self):
+            # A newly rebound wrapper exposes a different context-local ID.
+            state.id_read_objects.append(self)
+            return read(self.token, "GetID", (self.index, self.generation))
+
+        def GetSketch(self):
+            return read(self.token, "GetSketch", self.owner)
+
+        @property
+        def X(self):
+            return read(self.token, "X", self.xyz[0])
+
+        @property
+        def Y(self):
+            return read(self.token, "Y", self.xyz[1])
+
+        @property
+        def Z(self):
+            return read(self.token, "Z", self.xyz[2])
+
+    class Segment:
+        def __init__(self, token, index, endpoints, owner):
+            self.token, self.index, self.endpoints, self.owner = token, index, endpoints, owner
+
+        def GetType(self):
+            return 0  # swSketchLINE
+
+        def GetID(self):
+            return read(self.token, "GetID", (self.index, 1))
+
+        @property
+        def ConstructionGeometry(self):
+            return read(self.token, "ConstructionGeometry", True)
+
+        def GetStartPoint2(self):
+            return read(self.token, "GetStartPoint2", self.endpoints[0])
+
+        def GetEndPoint2(self):
+            return read(self.token, "GetEndPoint2", self.endpoints[1])
+
+        def GetSketch(self):
+            return read(self.token, "GetSketch", self.owner)
+
+    def typed(value, interface):
+        if interface == "ISketchPoint" and isinstance(value, Point):
+            value = Point(value.token, value.index, value.xyz, value.owner, value.generation + 1)
+            state.bound_points.append(value)
+        return value
+
+    monkeypatch.setattr(supplier_dimensions, "_early_bound", typed)
+
+    source_sketch, view_sketch = Sketch("source-sketch"), Sketch("view-sketch")
+    source_points = [
+        Point(f"source-{index}", index, (index * 0.002, 0.004, 0.0), source_sketch)
+        for index in range(6)
+    ]
+    mapped_points = [
+        Point(f"mapped-{index}", index, point.xyz, view_sketch)
+        for index, point in enumerate(source_points)
+    ]
+    attached = [
+        Point(f"attached-{index}", index, mapped_points[index].xyz, view_sketch)
+        for index in (0, 5)
+    ]
+    source_sketch.points = source_points
+    source_segments = [
+        Segment(f"source-line-{index}", index, source_points[2 * index:2 * index + 2], source_sketch)
+        for index in range(3)
+    ]
+    mapped_segments = [
+        Segment(f"mapped-line-{index}", index, mapped_points[2 * index:2 * index + 2], view_sketch)
+        for index in range(3)
+    ]
+    source_sketch.segments = source_segments
+    feature_reads = []
+
+    def source_specific():
+        feature_reads.append("source-sketch")
+        if len(feature_reads) > 1:
+            raise AssertionError("diagnostics must retain the actual source sketch")
+        return source_sketch
+
+    source_feature = SimpleNamespace(
+        token="source-feature", Name="SupplierReference",
+        GetTypeName2=lambda: "ProfileFeature", GetSpecificFeature2=source_specific,
+    )
+    source_model = SimpleNamespace(
+        GetPathName=lambda: "supplier-source.SLDPRT",
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="SupplierStock"),
+        ),
+        SketchManager=SimpleNamespace(ActiveSketch=None),
+    )
+    def system_values(which_configurations, config_names):
+        # gen_py declares (VT_I4, VT_VARIANT); the documented variant accepts
+        # either one BSTR or a BSTR array, not arbitrary configuration objects.
+        if type(which_configurations) is not int or which_configurations != 3:
+            raise TypeError("GetSystemValue3 requires swSpecifyConfiguration here")
+        if isinstance(config_names, str):
+            names = (config_names,)
+        elif isinstance(config_names, (tuple, list)) and all(type(name) is str for name in config_names):
+            names = tuple(config_names)
+        else:
+            raise TypeError("Config_names must be a BSTR or BSTR array")
+        if names != ("SupplierStock",):
+            raise ValueError("dimension readback requested a different configuration")
+        return (0.600,)
+
+    native_dimension = SimpleNamespace(
+        token="native-dimension", FullName="SupplierStockLength@SupplierReference@supplier-source.SLDPRT",
+        DrivenState=2, GetSystemValue3=system_values,
+        GetFeatureOwner=lambda: source_feature,
+    )
+    mapping_reads = {}
+
+    def corresponding(point):
+        mapping_reads[point.token] = mapping_reads.get(point.token, 0) + 1
+        if mapping_reads[point.token] > 1:
+            raise AssertionError("diagnostics must not replace the refused mapping")
+        return state.mapping[point.token]
+
+    view = SimpleNamespace(
+        token="view", ReferencedDocument=source_model,
+        ReferencedConfiguration="SupplierStock", ModelToViewTransform=frame,
+        GetSketch=lambda: view_sketch, GetCorresponding=corresponding,
+        GetReferencedModelName=lambda: "supplier-source.SLDPRT",
+        GetOrientationName=lambda: "*Front",
+        GetName2=lambda: "SupplierStock",
+    )
+    attachment_reads = []
+
+    def entities():
+        attachment_reads.append("entities")
+        if attachment_reads.count("entities") > 1:
+            raise AssertionError("diagnostics must retain the actual attachments")
+        return state.attached
+
+    def types():
+        attachment_reads.append("types")
+        if attachment_reads.count("types") > 1:
+            raise AssertionError("diagnostics must retain the actual attachment types")
+        return (state.kind,) * len(state.attached)
+
+    annotation = SimpleNamespace(GetAttachedEntities3=entities, GetAttachedEntityTypes=types)
+
+    def dimension(_index):
+        state.reads.append(("display", "GetDimension2"))
+        return native_dimension
+
+    display = SimpleNamespace(GetAnnotation=lambda: annotation, GetDimension2=dimension)
+    drawing = SimpleNamespace(
+        GetPathName=lambda: "refused.SLDDRW", GetEditSheet=lambda: True,
+        ActiveDrawingView=view, SketchManager=SimpleNamespace(ActiveSketch=None),
+    )
+    def native_same(left, right):
+        if not state.reads:
+            for obj in (left, right):
+                if isinstance(obj, Point):
+                    state.predicate_point_objects[id(obj)] = obj
+        return int(left.token == right.token)
+
+
+    adapter = SimpleNamespace(
+        currentModel=drawing,
+        swApp=SimpleNamespace(IsSame=native_same),
+    )
+
+    def log(message):
+        if state.log_fault is not None:
+            raise state.log_fault
+        state.messages.append(message)
+
+    def warn(message):
+        state.warnings.append(message)
+        if state.warning_fault is not None:
+            raise state.warning_fault
+
+    def capture(_adapter, _label, _message, **kwargs):
+        state.captures.append(kwargs)
+        if state.capture_fault is not None:
+            raise state.capture_fault
+        raise kwargs["exception"]
+
+    actual_correspondence = supplier_dimensions._attachment_correspondence
+
+    def observed_correspondence(*args, **kwargs):
+        result = actual_correspondence(*args, **kwargs)
+        state.returned_proof = result
+        state.private_cache = result.get("_failure_native_objects")
+        return result
+
+    monkeypatch.setattr(supplier_dimensions, "_attachment_correspondence", observed_correspondence)
+    monkeypatch.setattr(supplier_dimensions, "_assert_dimension_source", lambda *_args, **_kwargs: source_feature)
+    monkeypatch.setattr(supplier_dimensions._telemetry, "info", log)
+    monkeypatch.setattr(supplier_dimensions._telemetry, "warn", warn)
+    monkeypatch.setattr(supplier_dimensions._seat_forensics, "capture_com_failure", capture)
+    state.adapter, state.view, state.display = adapter, view, display
+    state.source_sketch, state.view_sketch = source_sketch, view_sketch
+    state.source_points, state.mapped_points, state.attached = source_points, mapped_points, attached
+    state.kind = 11
+    state.mapping = dict(zip(
+        (point.token for point in source_points), mapped_points, strict=True,
+    ))
+    state.source_segments, state.mapped_segments = source_segments, mapped_segments
+    state.segment_type = Segment
+    state.native_dimension = native_dimension
+    state.mapping_reads, state.attachment_reads = mapping_reads, attachment_reads
+
+    def verify():
+        supplier_dimensions._assert_source(
+            adapter, view, display, name="SupplierStockLength", feature="SupplierReference",
+        )
+
+    state.verify = verify
+    return state
+
+
+def test_supplier_attachment_equal_xyz_different_identity_still_refuses(
+    supplier_attachment_state,
+) -> None:
+    state = supplier_attachment_state
+    assert state.attached[0].xyz == state.mapped_points[0].xyz
+    assert state.attached[0].token != state.mapped_points[0].token
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch") as refused:
+        state.verify()
+    capture = state.captures[0]
+    assert capture["exception"] is refused.value
+    context = capture["attachment_context"]
+    assert context["attachment_correspondence"]["proven"] is False
+    assert "_failure_native_objects" not in context["attachment_correspondence"]
+    batch = context["failure_native_readback"]
+    assert "read_error" not in batch
+    assert batch["context"]["drawing_edit_sheet"] is True
+    assert batch["context"]["view_name"] == "SupplierStock"
+    assert len(batch["predicate_inventory"]["source"]) == 6
+    assert len(batch["predicate_inventory"]["mapped"]) == 6
+    assert batch["predicate_inventory"]["uncaptured_kinds"]["10"]["status"] == "unavailable"
+    assert {
+        id(point) for point in state.id_read_objects
+    } == set(state.predicate_point_objects)
+    assert all(point.generation == 1 for point in state.id_read_objects)
+    assert state.private_cache == {}
+    point = batch["predicate_inventory"]["source"][0]
+    assert point["id"] == [0, 1]
+    assert point["xyz_native_m"] == {"X": 0.0, "Y": 0.004, "Z": 0.0}
+    assert point["sketch_owner"]["is_same"]["source"] == {
+        "left_to_right": 1, "right_to_left": 1,
+    }
+    comparison = next(
+        row for row in batch["member_comparisons"]
+        if row["left"] == "mapped:11:0" and row["right"] == "attached:0"
+    )
+    assert comparison["is_same"] == {"left_to_right": 0, "right_to_left": 0}
+    assert comparison["sketch_owner_is_same"] == {"left_to_right": 1, "right_to_left": 1}
+    assert batch["native_dimension"]["system_values"] == [0.600]
+    assert batch["native_dimension"]["driven_state"] == 2
+    assert state.source_sketch.inventory_reads == {11: 1, 10: 0}
+    assert set(state.mapping_reads.values()) == {1}
+    assert state.attachment_reads == ["entities", "types"]
+    logged = json.loads(state.messages[0].split(": ", 1)[1])
+    assert logged == json.loads(json.dumps(context, allow_nan=False))
+
+
+@pytest.mark.parametrize(
+    "member,fault,field",
+    [
+        ("GetID", RuntimeError("native ID read failed"), "id"),
+        ("GetID", AttributeError("GetID is unavailable"), "id"),
+        ("X", math.nan, "xyz_native_m"),
+        ("GetSketch", RuntimeError("owner read failed"), "sketch_owner"),
+    ],
+)
+def test_supplier_attachment_optional_getter_failure_keeps_refusal_and_other_fields(
+    supplier_attachment_state, member, fault, field,
+) -> None:
+    state = supplier_attachment_state
+    state.faults[("source-0", member)] = fault
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch") as refused:
+        state.verify()
+    assert state.captures[0]["exception"] is refused.value
+    batch = state.captures[0]["attachment_context"]["failure_native_readback"]
+    assert "read_error" not in batch
+    first = batch["predicate_inventory"]["source"][0]
+    failed_field = first[field]["X"] if member == "X" else first[field]
+    assert failed_field["member"] == f"ISketchPoint.{member}"
+    assert "error_type" in failed_field
+    assert first["xyz_native_m"]["Y"] == 0.004
+    assert batch["predicate_inventory"]["mapped"][0]["id"] == [0, 1]
+    assert batch["attachments"]["members"][0]["id"] == [0, 1]
+    assert batch["native_dimension"]["driven_state"] == 2
+    json.dumps(batch, allow_nan=False)
+    assert state.private_cache == {}
+
+
+@pytest.mark.parametrize("fault", ["logging", "capture_and_warning"])
+def test_supplier_attachment_diagnostic_delivery_failure_preserves_original_refusal(
+    supplier_attachment_state, fault,
+) -> None:
+    state = supplier_attachment_state
+    if fault == "logging":
+        state.log_fault = OSError("diagnostic log sink failed")
+    else:
+        state.capture_fault = OSError("forensic capture failed")
+        state.warning_fault = OSError("warning sink failed")
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch") as refused:
+        state.verify()
+    capture = state.captures[0]
+    assert capture["exception"] is refused.value
+    assert capture["attachment_context"]["failure_native_readback"]["native_dimension"]["driven_state"] == 2
+    assert state.private_cache == {}
+    if fault == "logging":
+        assert capture["attachment_context"]["diagnostic_log_error"]["error_type"] == "OSError"
+    else:
+        assert len(state.warnings) == 1
+
+
+def test_supplier_attachment_success_does_not_read_failure_diagnostics(
+    supplier_attachment_state,
+) -> None:
+    state = supplier_attachment_state
+    state.attached = (state.mapped_points[0], state.mapped_points[5])
+    state.faults[("source-0", "GetID")] = AssertionError("failure-only getter was read on success")
+    state.verify()
+    assert state.reads == []
+    assert state.captures == []
+    assert len(state.messages) == 1
+    assert state.messages[0].startswith("supplier_source_attachment_proof ")
+    assert state.private_cache is None
+    assert "_failure_native_objects" not in state.returned_proof
+
+
+def test_supplier_attachment_cached_segments_keep_independent_endpoint_and_flag_fields(
+    supplier_attachment_state,
+) -> None:
+    state = supplier_attachment_state
+    state.kind = 10
+    state.mapping = dict(zip(
+        (segment.token for segment in state.source_segments), state.mapped_segments, strict=True,
+    ))
+    state.attached = [
+        state.segment_type("attached-line", 0, state.mapped_segments[0].endpoints, state.view_sketch),
+    ]
+    state.faults[("source-line-0", "GetStartPoint2")] = OSError("start point getter failed")
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch") as refused:
+        state.verify()
+    assert state.captures[0]["exception"] is refused.value
+    batch = state.captures[0]["attachment_context"]["failure_native_readback"]
+    first = batch["predicate_inventory"]["source"][0]
+    assert first["construction"] is True
+    assert first["start"]["native"]["member"] == "ISketchLine.GetStartPoint2"
+    assert first["start"]["native"]["error_type"] == "OSError"
+    assert first["end"]["id"] == [1, 1]
+    assert first["end"]["xyz_native_m"] == {"X": 0.002, "Y": 0.004, "Z": 0.0}
+    assert batch["predicate_inventory"]["mapped"][0]["start"]["id"] == [0, 1]
+    assert state.source_sketch.inventory_reads == {11: 0, 10: 1}
+    assert set(state.mapping_reads.values()) == {1}
+    assert batch["native_dimension"]["driven_state"] == 2
+
+
+def test_supplier_attachment_readback_records_both_native_comparison_directions(
+    supplier_attachment_state,
+) -> None:
+    state = supplier_attachment_state
+    ordinary_same = state.adapter.swApp.IsSame
+
+    def asymmetric_same(left, right):
+        if left.token == "mapped-0" and right.token == "attached-0":
+            return 2  # Unsupported only in this direction; never an acceptance shortcut.
+        return ordinary_same(left, right)
+
+    state.adapter.swApp.IsSame = asymmetric_same
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch"):
+        state.verify()
+    batch = state.captures[0]["attachment_context"]["failure_native_readback"]
+    comparison = next(
+        row for row in batch["member_comparisons"]
+        if row["left"] == "mapped:11:0" and row["right"] == "attached:0"
+    )
+    assert comparison["is_same"] == {"left_to_right": 2, "right_to_left": 0}
+
+
+@pytest.mark.parametrize("full_name", [None, object()])
+def test_supplier_attachment_non_json_scalar_is_labelled_without_hiding_refusal(
+    supplier_attachment_state, full_name,
+) -> None:
+    state = supplier_attachment_state
+    state.native_dimension.FullName = full_name
+    with pytest.raises(RuntimeError, match="nominal supplier attachment changed source sketch") as refused:
+        state.verify()
+    capture = state.captures[0]
+    assert capture["exception"] is refused.value
+    batch = capture["attachment_context"]["failure_native_readback"]
+    identity = batch["native_dimension"]["full_name"]
+    assert identity["member"] == "IDimension.FullName"
+    assert "error_type" in identity
+    assert batch["native_dimension"]["system_values"] == [0.600]
+    assert batch["attachments"]["members"][0]["id"] == [0, 1]
+    assert state.private_cache == {}
+    json.dumps(capture["attachment_context"], allow_nan=False)

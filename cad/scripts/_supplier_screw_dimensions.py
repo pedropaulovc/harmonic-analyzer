@@ -199,6 +199,8 @@ def _attachment_correspondence(
             return error(exc)
 
     mapped_members: dict[int, list[Any]] = {}
+    source_members: dict[int, list[Any]] = {}
+    attached_members: dict[int, Any] = {}
     mapping_complete: dict[int, bool] = {}
     for kind in sorted(set(types)):
         source: dict[str, Any] = {
@@ -228,6 +230,7 @@ def _attachment_correspondence(
             source["inventory_error"] = error(exc)
             raw_members = ()
         originals: list[Any] = []
+        source_members[kind] = originals
         for index, raw_member in enumerate(raw_members):
             member: dict[str, Any] = {"index": index}
             source["members"].append(member)
@@ -291,6 +294,7 @@ def _attachment_correspondence(
             continue
         interface = "ISketchSegment" if kind == 10 else "ISketchPoint"
         entity = read_object(proof, "native", interface, lambda: raw_entity)
+        attached_members[index] = entity
         proof["self"] = same(entity, entity)
         comparisons = [same(entity, mapped) for mapped in mapped_members[kind]]
         proof["view_source_entity_is_same"] = comparisons
@@ -325,6 +329,11 @@ def _attachment_correspondence(
     census["proven"] = bool(census["attachments"]) and all(
         proof["proven"] for proof in census["attachments"]
     )
+    if not census["proven"]:
+        # Private, short-lived handoff of the exact refused predicate objects.
+        census["_failure_native_objects"] = {
+            "source": source_members, "mapped": mapped_members, "attached": attached_members,
+        }
     return census
 
 
@@ -457,16 +466,266 @@ def _assert_source(
                 f"{name}: nominal supplier attachment changed source sketch"
             )
     except Exception as exc:
-        context = {"dimension": name, "source_feature": feature}
-        context["attachment_correspondence"] = correspondence
-        context["attachment_error"] = {
-            "error_type": type(exc).__name__,
-            "message": str(exc),
+        cached_objects = correspondence.pop("_failure_native_objects", None)
+        # Read-only refusal evidence, never an alternative identity proof. IDs
+        # are sketch-local; native XYZ coincidence is not identity or a common frame.
+        def read_error(member: str, failure: Exception) -> dict[str, str]:
+            try:
+                message = str(failure)
+            except Exception:
+                message = "<exception message could not be read>"
+            return {
+                "member": member,
+                "error_type": type(failure).__name__,
+                "message": message,
+            }
+
+        def scalar(member: str, read: Callable[[], Any]) -> Any:
+            try:
+                value = read()
+                if value is None:
+                    raise RuntimeError("native scalar getter returned null")
+                return json.loads(json.dumps(value, allow_nan=False))
+            except Exception as failure:
+                return read_error(member, failure)
+
+        def native(
+            row: dict[str, Any], key: str, interface: str,
+            member: str, read: Callable[[], Any],
+        ) -> Any:
+            try:
+                raw = read()
+                obj = _early_bound(_bind(raw, interface), interface)
+                row[key] = {"member": member, "present": obj is not None}
+                return obj
+            except Exception as failure:
+                row[key] = read_error(member, failure)
+                return None
+
+        def same(left: Any, right: Any) -> Any:
+            def compare() -> int:
+                if left is None or right is None:
+                    raise RuntimeError("native comparison operand is unavailable")
+                return int(adapter.swApp.IsSame(left, right))
+            return scalar("ISldWorks.IsSame", compare)
+
+        def both(left: Any, right: Any) -> dict[str, Any]:
+            return {
+                "left_to_right": same(left, right),
+                "right_to_left": same(right, left),
+            }
+
+        def sketch_frame(sketch: Any) -> Any:
+            return scalar(
+                "ISketch.ModelToSketchTransform / IMathTransform.ArrayData",
+                lambda: tuple(float(value) for value in _early_bound(
+                    sketch.ModelToSketchTransform, "IMathTransform",
+                ).ArrayData),
+            )
+
+        context = {
+            "dimension": name,
+            "source_feature": feature,
+            "attachment_correspondence": correspondence,
+            "attachment_error": read_error("attachment proof", exc),
         }
-        _telemetry.info(
-            f"supplier_source_attachment_failure {name}@{feature}: "
-            + json.dumps(context, sort_keys=True, allow_nan=False)
-        )
+        batch: dict[str, Any] = {}
+        context["failure_native_readback"] = batch
+        members: list[tuple[str, int, Any, Any]] = []
+        try:
+            diagnostic_view = native(batch, "view", "IView", "IView", lambda: view)
+            model = native(
+                batch, "source_document", "IModelDoc2",
+                "IView.ReferencedDocument", lambda: diagnostic_view.ReferencedDocument,
+            )
+            drawing = native(
+                batch, "drawing_document", "IModelDoc2",
+                "adapter.currentModel", lambda: adapter.currentModel,
+            )
+            view_sketch = native(
+                batch, "view_sketch", "ISketch", "IView.GetSketch",
+                lambda: diagnostic_view.GetSketch(),
+            )
+            batch["context"] = {
+                "view_name": scalar("IView.GetName2", lambda: diagnostic_view.GetName2()),
+                "view_source_path": scalar("IView.GetReferencedModelName", lambda: diagnostic_view.GetReferencedModelName()),
+                "view_configuration": scalar("IView.ReferencedConfiguration", lambda: diagnostic_view.ReferencedConfiguration),
+                "view_orientation": scalar("IView.GetOrientationName", lambda: diagnostic_view.GetOrientationName()),
+                "source_path": scalar("IModelDoc2.GetPathName", lambda: model.GetPathName()),
+                "source_active_configuration": scalar(
+                    "IModelDoc2.ConfigurationManager / IConfigurationManager.ActiveConfiguration / IConfiguration.Name",
+                    lambda: _early_bound(_early_bound(
+                        model.ConfigurationManager, "IConfigurationManager",
+                    ).ActiveConfiguration, "IConfiguration").Name,
+                ),
+                "drawing_path": scalar("IModelDoc2.GetPathName", lambda: drawing.GetPathName()),
+                "drawing_edit_sheet": scalar("IDrawingDoc.GetEditSheet", lambda: _early_bound(drawing, "IDrawingDoc").GetEditSheet()),
+                "source_feature_name": scalar("IFeature.Name", lambda: source_feature.Name),
+                "source_feature_type": scalar("IFeature.GetTypeName2", lambda: source_feature.GetTypeName2()),
+                "model_to_view": scalar(
+                    "IView.ModelToViewTransform / IMathTransform.ArrayData",
+                    lambda: tuple(float(value) for value in _early_bound(
+                        diagnostic_view.ModelToViewTransform, "IMathTransform",
+                    ).ArrayData),
+                ),
+            }
+            sketches = {"source": source_sketch, "view": view_sketch}
+            for label, document in (("source", model), ("drawing", drawing)):
+                sketches[f"{label}_active"] = native(
+                    batch, f"{label}_active_sketch", "ISketch",
+                    "IModelDoc2.SketchManager / ISketchManager.ActiveSketch",
+                    lambda document=document: _early_bound(
+                        document.SketchManager, "ISketchManager",
+                    ).ActiveSketch,
+                )
+            active_view = native(
+                batch, "active_drawing_view", "IView", "IDrawingDoc.ActiveDrawingView",
+                lambda: _early_bound(drawing, "IDrawingDoc").ActiveDrawingView,
+            )
+            batch["active_drawing_view_is_same"] = both(active_view, diagnostic_view)
+            batch["sketches"] = {
+                label: {"present": sketch is not None, "self": same(sketch, sketch),
+                        "model_to_sketch": sketch_frame(sketch)}
+                for label, sketch in sketches.items()
+            }
+            batch["sketch_comparisons"] = [
+                {"left": left, "right": right, "is_same": both(sketches[left], sketches[right])}
+                for index, left in enumerate(sketches)
+                for right in tuple(sketches)[index + 1:]
+            ]
+
+            def point_fields(point: Any) -> dict[str, Any]:
+                return {
+                    "id": scalar("ISketchPoint.GetID", lambda: tuple(int(value) for value in point.GetID())),
+                    "xyz_native_m": {
+                        axis: scalar(f"ISketchPoint.{axis}", lambda axis=axis: float(getattr(point, axis)))
+                        for axis in ("X", "Y", "Z")
+                    },
+                }
+
+            def entity_fields(raw: Any, kind: int, label: str) -> dict[str, Any]:
+                row: dict[str, Any] = {"label": label, "kind": kind}
+                if kind not in (10, 11):
+                    row["read_error"] = {"member": "IAnnotation.GetAttachedEntityTypes", "unsupported_kind": kind}
+                    return row
+                interface = "ISketchPoint" if kind == 11 else "ISketchSegment"
+                entity = raw  # Already typed by the predicate; do not rebind it.
+                row["native"] = {"member": f"{interface} predicate cache", "present": entity is not None}
+                row["self"] = same(entity, entity)
+                if kind == 11:
+                    row.update(point_fields(entity))
+                    row["type"] = scalar("ISketchPoint.Type", lambda: int(entity.Type))
+                else:
+                    row["id"] = scalar("ISketchSegment.GetID", lambda: tuple(int(value) for value in entity.GetID()))
+                    row["type"] = scalar("ISketchSegment.GetType", lambda: int(entity.GetType()))
+                    row["construction"] = scalar("ISketchSegment.ConstructionGeometry", lambda: entity.ConstructionGeometry)
+                    if row["type"] == 0:  # swSketchLINE; other segment types are labelled, not guessed.
+                        for endpoint, getter in (("start", "GetStartPoint2"), ("end", "GetEndPoint2")):
+                            endpoint_row: dict[str, Any] = {}
+                            point = native(
+                                endpoint_row, "native", "ISketchPoint", f"ISketchLine.{getter}",
+                                lambda getter=getter: getattr(_early_bound(entity, "ISketchLine"), getter)(),
+                            )
+                            endpoint_row.update(point_fields(point))
+                            row[endpoint] = endpoint_row
+                    else:
+                        row["endpoints"] = {"not_read": "ISketchLine endpoints require a readable swSketchLINE type"}
+                owner = native(row, "sketch_owner", "ISketch", f"{interface}.GetSketch", lambda: entity.GetSketch())
+                row["sketch_owner"]["self"] = same(owner, owner)
+                row["sketch_owner"]["model_to_sketch"] = sketch_frame(owner)
+                row["sketch_owner"]["is_same"] = {
+                    key: both(owner, sketch) for key, sketch in sketches.items()
+                }
+                members.append((label, kind, entity, owner))
+                return row
+
+            # These are the exact objects used by the refused predicate. Never
+            # refresh/re-enumerate the sketch or call GetCorresponding again:
+            # a new mapping cannot explain the already-refused cached mapping.
+            batch["predicate_inventory"] = {
+                "scope": "exact cached predicate kinds only; no supplemental point/segment enumeration",
+                "uncaptured_kinds": {
+                    str(kind): {
+                        "status": "unavailable",
+                        "reason": "not inventoried by the refused predicate; no supplemental enumeration attempted",
+                    }
+                    for kind in (10, 11)
+                    if cached_objects is None or kind not in cached_objects["source"]
+                },
+            }
+            if cached_objects is None:
+                batch["predicate_inventory"]["read_error"] = {
+                    "member": "_attachment_correspondence failure cache",
+                    "message": "predicate objects were not returned; no re-enumeration attempted",
+                }
+            else:
+                for group in ("source", "mapped"):
+                    batch["predicate_inventory"][group] = [
+                        entity_fields(raw, kind, f"{group}:{kind}:{index}")
+                        for kind, objects in cached_objects[group].items()
+                        for index, raw in enumerate(objects)
+                    ]
+            attachments: dict[str, Any] = {}
+            batch["attachments"] = attachments
+            attachments["types"] = scalar(
+                "IAnnotation.GetAttachedEntityTypes cached result", lambda: types,
+            )
+            if cached_objects is None:
+                attachments["read_error"] = {
+                    "member": "_attachment_correspondence typed attachment cache",
+                    "message": "no typed predicate attachments returned; raw attachments were not rebound",
+                }
+            else:
+                attachments["members"] = [
+                    entity_fields(cached_objects["attached"].get(index), kind, f"attached:{index}")
+                    for index, kind in enumerate(types)
+                ]
+            batch["member_comparisons"] = [
+                {"left": left[0], "right": right[0],
+                 "is_same": both(left[2], right[2]),
+                 "sketch_owner_is_same": both(left[3], right[3])}
+                for index, left in enumerate(members)
+                for right in members[index + 1:] if left[1] == right[1]
+            ]
+            dimension_row: dict[str, Any] = {}
+            batch["native_dimension"] = dimension_row
+            dimension = native(
+                dimension_row, "native", "IDimension", "IDisplayDimension.GetDimension2",
+                lambda: display.GetDimension2(0),
+            )
+            dimension_row["full_name"] = scalar("IDimension.FullName", lambda: dimension.FullName)
+            dimension_row["self"] = same(dimension, dimension)
+            dimension_row["system_values"] = scalar(
+                "IDimension.GetSystemValue3(swSpecifyConfiguration)",
+                lambda: tuple(float(value) for value in dimension.GetSystemValue3(
+                    3, diagnostic_view.ReferencedConfiguration,  # swSpecifyConfiguration
+                )),
+            )
+            dimension_row["driven_state"] = scalar("IDimension.DrivenState", lambda: int(dimension.DrivenState))
+            owner = native(
+                dimension_row, "feature_owner", "IFeature", "IDimension.GetFeatureOwner",
+                lambda: dimension.GetFeatureOwner(),
+            )
+            dimension_row["feature_owner"]["name"] = scalar("IFeature.Name", lambda: owner.Name)
+            dimension_row["feature_owner"]["is_same"] = both(owner, source_feature)
+        except Exception as failure:
+            # An unexpected diagnostic implementation/binding error is evidence,
+            # never permission to replace the original attachment refusal.
+            batch["read_error"] = read_error("failure_native_readback", failure)
+        finally:
+            # Drop every private COM reference before serialization or delivery,
+            # including when a reader fails. Nothing is retained in the context.
+            members.clear()
+            if cached_objects is not None:
+                cached_objects.clear()
+                cached_objects = None
+        try:
+            _telemetry.info(
+                f"supplier_source_attachment_failure {name}@{feature}: "
+                + json.dumps(context, sort_keys=True, allow_nan=False)
+            )
+        except Exception as failure:
+            context["diagnostic_log_error"] = read_error("supplier_source_attachment_failure logging", failure)
         try:
             # Preserve the refused partial drawing, even if its native dimensions
             # are non-dangling. A forensic snapshot is not source/layout approval.
@@ -482,9 +741,12 @@ def _assert_source(
             )
         except Exception as capture_error:
             if capture_error is not exc:
-                _telemetry.warn(
-                    f"{name}: attachment forensic capture failed: {capture_error}"
-                )
+                try:
+                    _telemetry.warn(
+                        f"{name}: attachment forensic capture failed: {capture_error}"
+                    )
+                except Exception:
+                    pass  # Even warning delivery must preserve the original refusal.
         raise
     _telemetry.info(
         f"supplier_source_attachment_proof {name}@{feature}: "
