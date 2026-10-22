@@ -2118,6 +2118,19 @@ class _CaptureViewSketch:
         return _InspectionTransform(scale, angle=self.angle, origin=origin)
 
 
+class _CaptureNativeDrawingComponent(SimpleNamespace):
+    @property
+    def Visible(self):
+        # Generated section trees may report every node visible even after the
+        # native view's independent hidden-component collection was updated.
+        return True if self.view.generated_visibility_all_true else self._visible
+
+    @Visible.setter
+    def Visible(self, value):
+        self._visible = value
+        self._hidden = not value
+
+
 class _CaptureNativeView(SimpleNamespace):
     def __setattr__(self, name, value):
         if name == "ScaleRatio" and getattr(self, "cropped", False):
@@ -2183,6 +2196,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
         bad_crop=False, bad_section=False, bad_pick=False, bad_attachment=False,
         capture_fit_denominator=4.0,
         capture_edge_defect=None,
+        generated_section_flags_all_true=False,
         selected_types=[], pick_slots=[], reselections=[], binding_calls=[],
         coordinate_picks=[], zoom_centre=None,
         edge_first=False, raw_picks=True, zoomed=False,
@@ -2255,14 +2269,26 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     f"{physical}-{501 + len(leaves) * 17}" if member
                     else spec.instance_name(stem, occurrence)
                 )
-                leaves.append(SimpleNamespace(
+                section_owner = sheet.name == drawing.PIVOT_CAPTURE_SHEET and index in (2, 3)
+                native_owner = SimpleNamespace(**vars(component))
+                native_owner.Name2 = (
+                    f"{source_root.Name2}/{component.Name2}" if section_owner else component.Name2
+                )
+                native_owner.GetParent = lambda: source_root if section_owner else None
+                leaves.append(_CaptureNativeDrawingComponent(
                     Name=(f"Draw54-SectionAssembly-1-1/{component.Name2}"
-                          if sheet.name == drawing.PIVOT_CAPTURE_SHEET and index in (2, 3)
-                          else component.Name2),
-                    Component=component, Visible=True,
-                    GetChildren=lambda: (),
+                          if section_owner else component.Name2),
+                    Component=component, Visible=True, view=view,
+                    native_owner=native_owner, GetChildren=lambda: (),
                 ))
         view.components = leaves
+        view.generated_visibility_all_true = (
+            doc.generated_section_flags_all_true
+            and sheet.name == drawing.PIVOT_CAPTURE_SHEET and index in (2, 3)
+        )
+        view.GetHiddenComponents = lambda: tuple(
+            leaf.native_owner for leaf in leaves if leaf._hidden
+        )
         view.RootDrawingComponent2 = lambda _resolve: SimpleNamespace(GetChildren=lambda: tuple(leaves))
 
         def select_entity(entity, append):
@@ -4560,246 +4586,180 @@ def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
         settled[-1]()
 
 
-@pytest.fixture
-def capture_visibility_probe(monkeypatch):
-    """Read native-shaped channels without placing or accepting any view."""
-    import ast
-
-    messages, writes = [], []
-    state = SimpleNamespace(
-        installed=True, extra=False, parent=True, raw_error=None,
-        hidden_error=None, hidden_none=False,
-    )
-
-    def forbidden(*args, **kwargs):
-        writes.append((args, kwargs))
-        raise AssertionError("visibility probe attempted a native write")
-
-    def guard(value):
-        for name in (
-            "Select", "Select2", "Select4", "SelectEntity", "ActivateView",
-            "ClearSelection2", "EditRebuild3", "ForceRebuild3", "Rebuild",
-            "UpdateViewDisplayGeometry",
-        ):
-            setattr(value, name, forbidden)
-        return value
-
-    class DrawingComponent(SimpleNamespace):
-        @property
-        def Visible(self):
-            if self.key == "parent" and state.raw_error is not None:
-                raise state.raw_error
-            return False if self.key == "root" else getattr(state, self.key)
-
-        @Visible.setter
-        def Visible(self, value):
-            forbidden("raw Visible", value)
-
-    class BoundDrawingComponent:
-        def __init__(self, component):
-            self.component = component
-
-        @property
-        def Visible(self):
-            return (
-                False if self.component.key == "root"
-                else getattr(state, self.component.key)
-            )
-
-        @Visible.setter
-        def Visible(self, value):
-            forbidden("bound Visible", value)
-
-        def __getattr__(self, name):
-            return getattr(self.component, name)
-
-    source = guard(SimpleNamespace(
-        Name2="jig-source-7", GetPathName=lambda: "C:/native/jig.SLDASM",
-        GetParent=lambda: None,
-    ))
-
-    def node(key, parent, children=()):
-        component = guard(SimpleNamespace(
-            Name2=f"{source.Name2}/{key}-1",
-            GetPathName=lambda: f"C:/native/{key}.SLDPRT",
-            GetParent=lambda: parent,
-        ))
-        return guard(DrawingComponent(
-            key=key, Name=f"Draw54-SectionAssembly-1-1/{key}-1",
-            Component=component, GetChildren=lambda: children,
-        ))
-
-    parent = node("parent", source)
-    installed = node("installed", parent.Component)
-    parent.GetChildren = lambda: (installed,)
-    extra = node("extra", source)
-    root = node("root", None, (parent, extra))
-
-    def hidden_components():
-        if state.hidden_error is not None:
-            raise state.hidden_error
-        if state.hidden_none:
-            return None
-        return tuple(
-            item.Component for item in (installed, extra)
-            if not (getattr(state, item.key) and (state.parent if item is installed else True))
+def test_capture_section_hidden_channel_overrides_all_true_generated_flags(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    package.doc.generated_section_flags_all_true = True
+    _scales, settled = drawing._place_package(package.adapter)
+    views = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_CAPTURE_SHEET)
+    support = drawing.capture_support_instances(cluster, 0)
+    installed = support | {spec.instance_name(spec.CARRIER, 0)}
+    for view_index, view in enumerate(views):
+        raw = drawing._view_component_leaves(package.adapter, view, label="native tree")
+        leaves = drawing._capture_view_leaves(
+            package.adapter, view, view_index=view_index, label="jig capture native hidden",
         )
+        expected = support if view_index == 0 else installed
+        assert {leaf.path for leaf in leaves if leaf.visible} == expected
+        if view_index in (2, 3):
+            assert len(raw) == 110 and all(leaf.visible for leaf in raw)
+            hidden = view.GetHiddenComponents()
+            assert len(hidden) == 95
+            assert {owner.Name2 for owner in hidden} == {
+                f"{package.source_root.Name2}/{leaf.path}"
+                for leaf in leaves if not leaf.visible
+            }
+            assert all(owner.GetParent() is package.source_root for owner in hidden)
+        else:
+            assert leaves == raw
+    # The same native channel must serve placement's reading-leaf cache and
+    # the fresh settled proof; no generated-tree visibility is repaired.
+    settled[-1]()
+    assert all(leaf.Visible for view in views[2:] for leaf in view.components)
 
-    view = guard(SimpleNamespace(
-        GetName2=lambda: "DrawingView-Probe",
-        RootDrawingComponent2=lambda _resolve: root,
-        GetHiddenComponents=hidden_components,
-        Position=(0.2, 0.1), ScaleRatio=(1, 4),
-        ReferencedConfiguration="Default",
-    ))
-    doc = guard(SimpleNamespace(selected=[object()], active_view="untouched"))
-    adapter = SimpleNamespace(currentModel=doc)
 
-    def bind(value, interface):
-        return (
-            BoundDrawingComponent(value)
-            if interface == "IDrawingComponent" else value
+@pytest.mark.parametrize("view_index", (2, 3))
+@pytest.mark.parametrize("defect", ("hidden-installed", "missing-hide", "none"))
+def test_capture_section_hidden_channel_keeps_exact_isolation_guard(
+    native_property_package, view_index, defect,
+) -> None:
+    package = native_property_package
+    package.doc.generated_section_flags_all_true = True
+    _scales, settled = drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    hidden = list(view.GetHiddenComponents())
+    carrier_path = spec.instance_name(spec.CARRIER, 0)
+    if defect == "hidden-installed":
+        carrier = next(leaf for leaf in view.components if leaf.Component.Name2 == carrier_path)
+        hidden.append(carrier.native_owner)
+        offending_path = carrier_path
+    elif defect == "missing-hide":
+        removed = hidden.pop()
+        offending_path = next(
+            leaf.Component.Name2 for leaf in view.components if leaf.native_owner is removed
         )
-
-    monkeypatch.setattr(drawing, "_bind", bind)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing._telemetry, "success", messages.append)
-
-    def payloads(stage, channel):
-        prefix = (
-            "jig capture TEMP isolation probe (diagnostic, not a check) "
-            f"{stage} {channel}: "
+    else:
+        offending_path = carrier_path
+    view.GetHiddenComponents = lambda: None if defect == "none" else tuple(hidden)
+    if defect == "none":
+        leaves = drawing._capture_view_leaves(
+            package.adapter, view, view_index=view_index, label="jig capture native hidden",
         )
-        return [
-            ast.literal_eval(message[len(prefix):])
-            for message in messages if message.startswith(prefix)
-        ]
-
-    return SimpleNamespace(
-        adapter=adapter, view=view, state=state, writes=writes,
-        root=root, parent=parent, installed=installed, extra=extra,
-        expected=frozenset((installed.Component.Name2,)), payloads=payloads,
-    )
-
-
-def test_capture_visibility_probe_raw_getter_fault_stays_unknown(capture_visibility_probe):
-    probe = capture_visibility_probe
-    error = RuntimeError("raw Visible getter failed")
-    probe.state.raw_error = error
-    drawing._trace_capture_visibility(
-        probe.adapter, probe.view, probe.expected, stage="post-isolate",
-    )
-    raw, = probe.payloads("post-isolate", "raw")
-    bound, = probe.payloads("post-isolate", "bound")
-    hidden, = probe.payloads("post-isolate", "hidden")
-    metadata, = probe.payloads("post-isolate", "metadata")
-    path = probe.installed.Component.Name2
-    assert raw["unknown"] == [path]
-    assert raw["unknown_count"] == 1
-    assert raw["visible_count"] == 0
-    assert raw["hidden_count"] == 1
-    assert raw["actual"] == [] and raw["missing"] == [path]
-    assert bound["actual"] == [path] and bound["unknown"] == []
-    assert bound["missing"] == [] and bound["extra"] == []
-    assert hidden["hidden_names"] == [probe.extra.Component.Name2]
-    assert hidden["hidden_count"] == 1
-    assert hidden["hidden_result_is_none"] is False
-    assert probe.payloads("post-isolate", "error") == [
-        (probe.parent.Name, "raw_visible", repr(error)),
-    ]
-    assert metadata["read_error_count"] == 1
-    parent_sample, = (
-        sample for sample in metadata["samples"]
-        if sample["name"] == probe.parent.Name
-    )
-    assert parent_sample["raw_visible_error"] == repr(error)
-    assert parent_sample["bound_visible"] is True
-    assert parent_sample["bound_visible_type"] == "bool"
-    assert probe.writes == []
+        assert len(leaves) == 110 and all(leaf.visible for leaf in leaves)
+    with pytest.raises(RuntimeError, match=f"jig capture view {view_index}: wrong visible occurrence isolation") as refusal:
+        settled[-1]()
+    message = str(refusal.value)
+    assert repr(offending_path) in message
+    if defect == "hidden-installed":
+        assert f"missing={[carrier_path]!r}; extra=[]" in message
+    else:
+        assert "missing=[]; extra=[" in message
+    assert all(leaf.Visible for leaf in view.components)
 
 
-def test_capture_visibility_probe_hidden_unsupported_is_explicit(capture_visibility_probe):
-    probe = capture_visibility_probe
-    error = AttributeError("GetHiddenComponents is unsupported")
-    probe.state.hidden_error = error
-    drawing._trace_capture_visibility(
-        probe.adapter, probe.view, probe.expected, stage="post-isolate",
-    )
-    hidden, = probe.payloads("post-isolate", "hidden")
-    assert hidden == {"hidden_error": repr(error)}
-    for channel in ("raw", "bound"):
-        observed, = probe.payloads("post-isolate", channel)
-        assert observed["actual"] == sorted(probe.expected)
-        assert observed["missing"] == [] and observed["extra"] == []
-        assert observed["unknown"] == []
-    assert probe.writes == []
+@pytest.mark.parametrize("view_index", (2, 3))
+@pytest.mark.parametrize("defect", (
+    "unknown", "bare-name", "drawing-root-prefix", "foreign-parent-prefix",
+    "foreign-source-file", "wrong-part-file", "empty-owner-file",
+    "empty-leaf-file", "null-parent", "parent-depth", "empty-parent-name",
+    "empty-parent-file", "parent-read-error", "owner-name-read-error",
+    "owner-file-read-error",
+    "empty-occurrence-path",
+    "hidden-query-error", "hidden-query-unsupported", "hidden-bind-error",
+    "duplicate-hidden", "duplicate-leaf-candidate",
+))
+def test_capture_section_hidden_channel_refuses_unproved_native_identity(
+    native_property_package, monkeypatch, view_index, defect,
+) -> None:
+    package = native_property_package
+    package.doc.generated_section_flags_all_true = True
+    drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    hidden = list(view.GetHiddenComponents())
+    if defect == "empty-occurrence-path":
+        nonsemantic = next(
+            item.native_owner for item in view.components
+            if item._hidden and item.Component.ComponentReference == ""
+        )
+        hidden = [nonsemantic, *(item for item in hidden if item is not nonsemantic)]
+    original = hidden[0]
+    owner = SimpleNamespace(**vars(original))
+    hidden[0] = owner
+    leaf = next(item for item in view.components if item.native_owner is original)
+    root = package.source_root
+    path = leaf.Component.Name2
 
+    def unreadable():
+        raise OSError("native hidden metadata unavailable")
 
-def test_capture_visibility_probe_observes_source_flag_reset_between_stages(
-    capture_visibility_probe,
-):
-    probe = capture_visibility_probe
-    drawing._trace_capture_visibility(
-        probe.adapter, probe.view, probe.expected, stage="post-isolate",
-    )
-    probe.state.extra = True
-    probe.state.hidden_none = True
-    drawing._trace_capture_visibility(
-        probe.adapter, probe.view, probe.expected, stage="final",
-    )
-    for channel in ("raw", "bound"):
-        isolated, = probe.payloads("post-isolate", channel)
-        final, = probe.payloads("final", channel)
-        assert isolated["actual"] == sorted(probe.expected)
-        assert isolated["extra"] == [] and isolated["hidden_count"] == 1
-        assert final["actual"] == sorted((
-            probe.installed.Component.Name2, probe.extra.Component.Name2,
-        ))
-        assert final["extra"] == [probe.extra.Component.Name2]
-        assert final["missing"] == [] and final["hidden_count"] == 0
-        assert final["unknown_count"] == 0
-    isolated_hidden, = probe.payloads("post-isolate", "hidden")
-    final_hidden, = probe.payloads("final", "hidden")
-    assert isolated_hidden["hidden_names"] == [probe.extra.Component.Name2]
-    assert final_hidden["hidden_count"] == 0
-    assert final_hidden["hidden_names"] == []
-    assert final_hidden["hidden_result_is_none"] is True
-    for stage in ("post-isolate", "final"):
-        metadata, = probe.payloads(stage, "metadata")
-        assert metadata["stage"] == stage
-        assert metadata["view"] == "DrawingView-Probe"
-        assert metadata["leaf_count"] == 2
-        assert metadata["node_count"] == 4
-        assert len(metadata["samples"]) == 4
-        assert {sample["name"] for sample in metadata["samples"]} == {
-            item.Name for item in (probe.root, probe.parent, probe.installed, probe.extra)
-        }
-    assert probe.writes == []
+    if defect == "unknown":
+        owner.Name2 = f"{root.Name2}/unknown-occurrence-1"
+    elif defect == "bare-name":
+        owner.Name2 = path
+    elif defect == "drawing-root-prefix":
+        owner.Name2 = leaf.Name
+    elif defect == "foreign-parent-prefix":
+        owner.Name2 = f"foreign-parent/{path}"
+    elif defect == "foreign-source-file":
+        owner.GetParent = lambda: _source_owner(
+            root.Name2, part_file=str(drawing.SOURCE.with_name(f"foreign-{drawing.SOURCE.name}")),
+        )
+    elif defect == "wrong-part-file":
+        owner.GetPathName = lambda: "C:/native/unrelated.SLDPRT"
+    elif defect == "empty-owner-file":
+        owner.GetPathName = lambda: ""
+    elif defect == "owner-file-read-error":
+        owner.GetPathName = unreadable
+    elif defect == "empty-leaf-file":
+        leaf.Component.GetPathName = lambda: ""
+    elif defect == "empty-occurrence-path":
+        leaf.Component.Name2 = ""
+        owner.Name2 = f"{root.Name2}/"
+    elif defect == "null-parent":
+        owner.GetParent = lambda: None
+    elif defect == "parent-depth":
+        owner.GetParent = lambda: _source_owner(
+            root.Name2, part_file=str(drawing.SOURCE), parent=root,
+        )
+    elif defect == "empty-parent-name":
+        owner.GetParent = lambda: _source_owner("", part_file=str(drawing.SOURCE))
+        owner.Name2 = f"/{path}"
+    elif defect == "empty-parent-file":
+        owner.GetParent = lambda: _source_owner(root.Name2, part_file="")
+    elif defect == "parent-read-error":
+        owner.GetParent = unreadable
+    elif defect == "owner-name-read-error":
+        class UnreadableName(SimpleNamespace):
+            @property
+            def Name2(self):
+                return unreadable()
+        owner = UnreadableName(GetPathName=original.GetPathName, GetParent=original.GetParent)
+        hidden[0] = owner
+    elif defect == "hidden-query-error":
+        view.GetHiddenComponents = unreadable
+    elif defect == "hidden-query-unsupported":
+        del view.GetHiddenComponents
+    elif defect == "hidden-bind-error":
+        original_bind = drawing._bind
 
+        def bind(value, interface):
+            if value is owner and interface == "IComponent2":
+                return unreadable()
+            return original_bind(value, interface)
 
-def test_capture_visibility_probe_is_read_only(capture_visibility_probe):
-    probe = capture_visibility_probe
-    doc, view = probe.adapter.currentModel, probe.view
-    before = (
-        dict(vars(probe.state)), tuple(doc.selected), doc.active_view,
-        view.Position, view.ScaleRatio, view.ReferencedConfiguration,
-        tuple((item.Name, item.Component.Name2, item.Visible)
-              for item in (probe.root, probe.parent, probe.installed, probe.extra)),
-    )
-    assert drawing._trace_capture_visibility(
-        probe.adapter, view, probe.expected, stage="read-only",
-    ) is None
-    assert (
-        dict(vars(probe.state)), tuple(doc.selected), doc.active_view,
-        view.Position, view.ScaleRatio, view.ReferencedConfiguration,
-        tuple((item.Name, item.Component.Name2, item.Visible)
-              for item in (probe.root, probe.parent, probe.installed, probe.extra)),
-    ) == before
-    assert probe.writes == []
-    assert probe.payloads("read-only", "error") == []
-    for channel in ("raw", "bound"):
-        observed, = probe.payloads("read-only", channel)
-        assert observed["actual"] == sorted(probe.expected)
+        monkeypatch.setattr(drawing, "_bind", bind)
+    elif defect == "duplicate-hidden":
+        hidden.append(owner)
+    elif defect == "duplicate-leaf-candidate":
+        view.components.append(_CaptureNativeDrawingComponent(**vars(leaf)))
+    if defect not in ("hidden-query-error", "hidden-query-unsupported"):
+        view.GetHiddenComponents = lambda: tuple(hidden)
+    with pytest.raises(RuntimeError, match="jig capture native hidden"):
+        drawing._capture_view_leaves(
+            package.adapter, view, view_index=view_index, label="jig capture native hidden",
+        )
 
 
 @pytest.mark.parametrize("defect", (
@@ -4854,8 +4814,8 @@ def test_capture_settled_isolation_refusal_reports_all_native_view_censuses(
         error = RuntimeError("jig capture isolation census: drawing view has no root component")
         last_record = f"view 3: read_error={error!r}"
 
-    # Keep the actual native leaf reader: mutating IComponent2.Name2 or the
-    # IDrawingComponent visibility must never normalize or repair isolation.
+    # Keep the actual native leaf reader and the section's independent native
+    # hidden collection: neither may normalize or repair occurrence identity.
     assert drawing._view_component_leaves is _drawing_balloons._view_component_leaves
     with pytest.raises(RuntimeError) as refusal:
         settled[-1]()

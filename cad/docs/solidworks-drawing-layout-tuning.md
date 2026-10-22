@@ -264,12 +264,14 @@ paths with the exact installed set. On refusal, record all four views' sorted
 expected, actual, missing and extra paths plus offending drawing-name/path/
 visibility tuples before changing identity or isolation rules. Successful
 edge selection does not prove settled component visibility.
-For the temporary section-visibility diagnosis, also record direct raw and
-bound `IDrawingComponent.Visible` values/errors and the independent
-`IView.GetHiddenComponents` names. Sample after isolation, surface/orientation
-changes, crop/HLR fitting, and the label rebuild without failing earlier or
-changing visibility. Emit separate full channel records to the task log and
-remove this temporary probe and its smoke coverage once the cause is proved.
+Native section-tree `IDrawingComponent.Visible` flags can remain true for all
+110 parts while `IView.GetHiddenComponents` correctly retains the same 95
+excluded occurrences throughout isolation, orientation, crop and label rebuild.
+For sections, derive the visible inventory from that native hidden list, not
+the generated tree flags. Match every hidden owner to one exact view leaf using
+the existing part-file/source-parent proof; reject unknown, duplicate or
+unreadable identities. Ordinary-view visibility and the exact installed-set
+comparison remain unchanged. Do not guess root names or reapply hiding.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture
