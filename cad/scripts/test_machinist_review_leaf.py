@@ -918,7 +918,7 @@ def test_invalid_refresh_carrier_is_not_demoted_to_a_learning_warning(
 @pytest.mark.parametrize("winner,loser", [("FIX", "SHIP"), ("SHIP", "FIX")])
 @pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_losing_review_restores_full_winner_and_rereads_verdict(
-    action, monkeypatch, winner, loser, mode
+    action, monkeypatch, winner, loser, mode, request
 ):
     from test_artifact_cache import _BlockBlobService
 
@@ -942,6 +942,7 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     }), encoding="utf-8")
     (directory / "winner-evidence.json").write_text('{"producer":"A"}', encoding="utf-8")
     winning_archive = cache._pack([directory])
+    request.addfinalizer(winning_archive.close)
     # The first probe misses. Another producer publishes only once our own
     # expensive review has completed, before its conditional publication.
     run = dodo._run_subprocess

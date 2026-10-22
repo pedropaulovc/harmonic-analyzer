@@ -8,6 +8,7 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import io
 import json
@@ -16,6 +17,8 @@ import os
 import subprocess
 import sys
 import tarfile
+import threading
+import time
 import types
 from pathlib import Path
 
@@ -38,7 +41,8 @@ class _FakeBackend:
         self.blobs: dict[str, bytes] = {}
 
     def get(self, key):
-        return self.blobs.get(key)
+        payload = self.blobs.get(key)
+        return None if payload is None else io.BytesIO(payload)
 
     def etag(self, key):
         blob = self.blobs.get(key)
@@ -50,10 +54,36 @@ class _FakeBackend:
                 raise RuntimeError("already exists")
         elif self.etag(key) != replace_etag:
             raise RuntimeError("ETag changed")
-        self.blobs[key] = blob
+        blob.seek(0)
+        self.blobs[key] = blob.read()
 
     def exists(self, key):
         return key in self.blobs
+
+
+def _packed(outputs):
+    with cache._pack(outputs) as archive:
+        return archive.read()
+
+
+def _put_bytes(backend, key, payload, **kwargs):
+    with io.BytesIO(payload) as archive:
+        return backend.put(key, archive, **kwargs)
+
+
+def _get_bytes(backend, key):
+    archive = backend.get(key)
+    if archive is None:
+        return None
+    with archive:
+        return archive.read()
+
+
+@pytest.fixture(autouse=True)
+def private_archive_environment(tmp_path, monkeypatch):
+    # Every test, including actual-SDK socket-free tests, stays off host caches.
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "user"))
+    monkeypatch.delenv("HARMONIC_ARCHIVE_CACHE_ROOT", raising=False)
 
 
 @pytest.fixture
@@ -327,7 +357,7 @@ def test_restore_replaces_absent_outputs_and_whole_owned_directories(
     # Include duplicate/nested inventory entries: deleting the parent must not
     # delete an already-installed child on a later pass.
     outputs = [native, optional, views, canonical, views]
-    fake.blobs["winner"] = cache._pack(outputs)
+    fake.blobs["winner"] = _packed(outputs)
     native.write_bytes(b"loser-native")
     canonical.write_bytes(b"loser-render")
     optional.parent.mkdir()
@@ -361,7 +391,7 @@ def test_restore_keeps_winner_files_missing_from_local_discovery_inventory(
     native.write_bytes(b"winner-native")
     winner_variant = native.parent / "spring-installed-stretch-10.SLDPRT"
     winner_variant.write_bytes(b"winner-spring")
-    fake.blobs["winner"] = cache._pack([native, winner_variant])
+    fake.blobs["winner"] = _packed([native, winner_variant])
     winner_variant.unlink()
     loser_variant = native.parent / "spring-installed-stretch-20.SLDPRT"
     loser_variant.write_bytes(b"loser-spring")
@@ -381,7 +411,7 @@ def test_restore_validates_every_deletion_target_before_removal(
     root = archive_tree
     native = root / "leaf.SLDPRT"
     native.write_bytes(b"winner")
-    fake.blobs["winner"] = cache._pack([native])
+    fake.blobs["winner"] = _packed([native])
     native.write_bytes(b"loser")
     outside = root.parent / "unrelated.txt"
     outside.write_bytes(b"unrelated")
@@ -399,7 +429,7 @@ def test_restore_rejects_aliased_deletion_target_without_deleting_its_sibling(
     root = archive_tree
     native = root / "leaf.SLDPRT"
     native.write_bytes(b"winner")
-    fake.blobs["winner"] = cache._pack([native])
+    fake.blobs["winner"] = _packed([native])
     native.write_bytes(b"loser")
     sibling = root / "unrelated"
     sibling.mkdir()
@@ -461,7 +491,7 @@ def test_restore_stages_complete_payload_before_removing_outputs(
 ):
     native = archive_tree / "leaf.SLDPRT"
     native.write_bytes(b"winner")
-    fake.blobs["winner"] = cache._pack([native])
+    fake.blobs["winner"] = _packed([native])
     native.write_bytes(b"loser")
     original = tarfile.TarFile.makefile
 
@@ -710,13 +740,15 @@ class _BlockBlobService:
                 service.etags[name] = str(int(service.etags.get(name, "0")) + 1)
                 service.uncommitted.pop(name, None)
 
-            def upload_blob(self, data, *, overwrite, metadata, **condition):
+            def upload_blob(self, data, *, length, overwrite, metadata, **condition):
                 service.calls.append(("upload", name, {"overwrite": overwrite, **condition}, metadata))
                 if overwrite:
                     self._condition(**condition)
                 elif name in service.committed:
                     raise RuntimeError("condition failed: already exists")
-                service.committed[name] = [("single", bytes(data))]
+                payload = data.read()
+                assert len(payload) == length
+                service.committed[name] = [("single", payload)]
                 self._published(metadata)
 
             def exists(self):
@@ -728,17 +760,41 @@ class _BlockBlobService:
                 service.calls.append(("etag", name))
                 if name not in service.committed:
                     raise ResourceNotFoundError("missing")
-                return types.SimpleNamespace(etag=service.etags[name])
+                return types.SimpleNamespace(
+                    etag=service.etags[name], metadata=dict(service.metadata[name]),
+                    size=len(service.content(name)),
+                )
 
             def download_blob(self, **kwargs):
                 from azure.core.exceptions import ResourceNotFoundError
 
+                service.calls.append(("download", name, kwargs))
+                assert kwargs["max_concurrency"] == cache._TRANSFER_CONCURRENCY
+                if "etag" in kwargs:
+                    self._condition(
+                        etag=kwargs["etag"], match_condition=kwargs["match_condition"],
+                    )
                 if name not in service.committed:
                     raise ResourceNotFoundError("missing")
                 # Snapshot body and response metadata together, like the SDK.
                 data = service.content(name)
-                properties = types.SimpleNamespace(metadata=dict(service.metadata[name]))
-                return types.SimpleNamespace(readall=lambda: data, properties=properties)
+                properties = types.SimpleNamespace(
+                    metadata=dict(service.metadata[name]), etag=service.etags[name],
+                    size=len(data),
+                )
+
+                def readinto(stream):
+                    service.calls.append(("readinto", name))
+                    assert stream.seekable()
+                    # Out-of-order SDK writes must be hashed only after completion.
+                    split = len(data) // 2
+                    stream.seek(split)
+                    stream.write(data[split:])
+                    stream.seek(0)
+                    stream.write(data[:split])
+                    return len(data)
+
+                return types.SimpleNamespace(readinto=readinto, properties=properties)
 
             def stage_block(self, block_id, data):
                 service.uncommitted.setdefault(name, {})[block_id] = bytes(data)
@@ -782,14 +838,14 @@ def test_interleaved_chunked_publishes_never_commit_a_torn_archive(monkeypatch):
 
     def competing_publish():
         service.on_stage = None
-        backend.put(key, second)
+        _put_bytes(backend, key, second)
 
     service.on_stage = competing_publish
     with pytest.raises(RuntimeError, match="InvalidBlockList|condition failed"):
-        backend.put(key, first)
+        _put_bytes(backend, key, first)
 
     assert service.content(backend._name(key)) == second
-    assert backend.get(key) == second
+    assert _get_bytes(backend, key) == second
 
 
 _LEAF_RESOURCE = "microsoft.applicationId=app,farm.worker=w@1,farm.execution=wf/run/1"
@@ -1524,11 +1580,11 @@ def test_blob_publication_conditions_and_atomic_metadata(monkeypatch, large, ref
     backend = cache._BlobBackend(service)
     key, payload = "c" * 64, b"new native bytes"
     if refresh:
-        backend.put(key, b"old native bytes")
+        _put_bytes(backend, key, b"old native bytes")
         before = backend.etag(key)
     else:
         before = None
-    backend.put(key, payload, replace_etag=before)
+    _put_bytes(backend, key, payload, replace_etag=before)
     name = backend._name(key)
     operation, written_name, condition, metadata = service.calls[-1]
     assert operation == ("commit" if large else "upload")
@@ -1544,11 +1600,11 @@ def test_blob_publication_conditions_and_atomic_metadata(monkeypatch, large, ref
         "archive_sha256": hashlib.sha256(payload).hexdigest(),
         "archive_size": str(len(payload)), "epoch": "4",
     }
-    assert backend.get(key) == payload
+    assert _get_bytes(backend, key) == payload
     winner_etag = service.etags[name]
     with pytest.raises(RuntimeError, match="condition failed"):
-        backend.put(key, b"late writer bytes")
-    assert backend.get(key) == payload
+        _put_bytes(backend, key, b"late writer bytes")
+    assert _get_bytes(backend, key) == payload
     assert service.etags[name] == winner_etag
 
 
@@ -1560,7 +1616,7 @@ def test_download_checks_response_metadata_before_unpack(monkeypatch, fake, fiel
     service = _BlockBlobService()
     backend = cache._BlobBackend(service)
     key = "d" * 64
-    backend.put(key, b"archive")
+    _put_bytes(backend, key, b"archive")
     metadata = service.metadata[backend._name(key)]
     if value is None:
         metadata.pop(field)
@@ -1576,20 +1632,20 @@ def test_download_uses_its_response_not_a_second_head():
     service = _BlockBlobService()
     backend = cache._BlobBackend(service)
     key = "e" * 64
-    backend.put(key, b"old response")
+    _put_bytes(backend, key, b"old response")
     client = service.get_blob_client(backend._name(key))
     original_download = client.download_blob
 
     def concurrent_refresh(**kwargs):
         response = original_download(**kwargs)
-        backend.put(key, b"new canonical", replace_etag=backend.etag(key))
+        _put_bytes(backend, key, b"new canonical", replace_etag=backend.etag(key))
         return response
 
     client.download_blob = concurrent_refresh
     original_client = service.get_blob_client
     service.get_blob_client = lambda _name: client
     try:
-        assert backend.get(key) == b"old response"
+        assert _get_bytes(backend, key) == b"old response"
     finally:
         service.get_blob_client = original_client
 
@@ -1636,7 +1692,7 @@ def test_refresh_never_recaptures_changed_or_absent_snapshot(
     output = tmp_path / "output.bin"
     output.write_bytes(b"refresh")
     if initially_present:
-        fake.put(key, b"original")
+        _put_bytes(fake, key, b"original")
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
         "labels": [label], "reason": "Owner - CAS snapshot",
     }))
@@ -1701,6 +1757,10 @@ def sdk_wire():
         def __init__(self):
             self.requests = []
             self.status = 201
+            self.payload = None
+            self.range_active = 0
+            self.range_peak = 0
+            self.range_lock = threading.Lock()
 
         def send(self, request, **kwargs):
             self.requests.append(request)
@@ -1708,9 +1768,26 @@ def sdk_wire():
             staged = query.get("comp") == ["block"]
             code = 200 if request.method == "HEAD" else 201 if staged else self.status
             body = b""
+            download = request.method == "GET" and self.payload is not None
+            if download:
+                raw_range = request.headers.get("x-ms-range") or request.headers["Range"]
+                start, end = (int(value) for value in raw_range.removeprefix("bytes=").split("-"))
+                end = min(end, len(self.payload) - 1)
+                body = self.payload[start:end + 1]
+                code = 206
+                with self.range_lock:
+                    self.range_active += 1
+                    self.range_peak = max(self.range_peak, self.range_active)
+                # Let the actual SDK's range workers overlap at the transport.
+                time.sleep(0.01)
+                with self.range_lock:
+                    self.range_active -= 1
             response = requests.Response()
             response.status_code = code
-            response.reason = {200: "OK", 201: "Created", 409: "Conflict", 412: "Precondition Failed"}[code]
+            response.reason = {
+                200: "OK", 201: "Created", 206: "Partial Content",
+                409: "Conflict", 412: "Precondition Failed",
+            }[code]
             response.url = request.url
             response.request = request
             response.headers = requests.structures.CaseInsensitiveDict({
@@ -1722,6 +1799,15 @@ def sdk_wire():
                 "Content-Type": "application/xml",
                 "Content-Length": "0",
             })
+            if download:
+                response.headers.update({
+                    "Content-Range": f"bytes {start}-{end}/{len(self.payload)}",
+                    "Content-Length": str(len(body)),
+                    "Content-Type": "application/octet-stream",
+                    "x-ms-meta-archive_sha256": hashlib.sha256(self.payload).hexdigest(),
+                    "x-ms-meta-archive_size": str(len(self.payload)),
+                    "x-ms-meta-epoch": cache._CACHE_EPOCH,
+                })
             if code in (409, 412):
                 error = "BlobAlreadyExists" if code == 409 else "ConditionNotMet"
                 response.headers["x-ms-error-code"] = error
@@ -1747,7 +1833,7 @@ def sdk_wire():
                 "account_name": "offline",
                 "account_key": base64.b64encode(b"offline-test-key-no-credentials").decode(),
             },
-            transport=transport, retry_total=0,
+            transport=transport, retry_total=0, max_single_get_size=cache._ARCHIVE_CACHE_MIN,
         ) as container:
             yield types.SimpleNamespace(
                 container=container, backend=cache._BlobBackend(container), adapter=adapter,
@@ -1773,9 +1859,9 @@ def test_real_azure_sdk_emits_wire_conditions_and_metadata(
     snapshot = backend.etag(key) if refresh else None
     if status != 201:
         with pytest.raises(HttpResponseError):
-            backend.put(key, payload, replace_etag=snapshot)
+            _put_bytes(backend, key, payload, replace_etag=snapshot)
     else:
-        backend.put(key, payload, replace_etag=snapshot)
+        _put_bytes(backend, key, payload, replace_etag=snapshot)
     writes = [
         request for request in adapter.requests
         if request.method == "PUT"
@@ -1816,6 +1902,362 @@ def test_real_sdk_rejects_pre_fix_wildcard_etag_before_adapter(sdk_wire):
             etag="*", match_condition=MatchConditions.IfMissing,
         )
     assert sdk_wire.adapter.requests == []
+
+
+@pytest.fixture
+def archive_store(monkeypatch):
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_MIN", 16)
+    root = cache._archive_cache_root()
+    service = _BlockBlobService()
+    return types.SimpleNamespace(root=root, service=service, backend=cache._BlobBackend(service))
+
+
+def test_large_local_reuse_validates_current_response_without_remaining_body(archive_store):
+    root, service, backend = archive_store.root, archive_store.service, archive_store.backend
+    key, payload = "a" * 64, b"canonical native archive" * 8
+    _put_bytes(backend, key, payload)
+    assert _get_bytes(backend, key) == payload
+    assert _get_bytes(backend, key) == payload
+    assert [call[0] for call in service.calls].count("download") == 2
+    assert [call[0] for call in service.calls].count("readinto") == 1
+    assert not any(call[0] == "etag" for call in service.calls)
+    assert (root / "objects" / hashlib.sha256(payload).hexdigest()).read_bytes() == payload
+    assert list((root / "objects").iterdir()) == [
+        root / "objects" / hashlib.sha256(payload).hexdigest()
+    ]
+
+
+def test_refresh_same_recipe_uses_new_response_identity_not_previous_local_bytes(archive_store):
+    backend, service = archive_store.backend, archive_store.service
+    key = "b" * 64
+    _put_bytes(backend, key, b"old native archive" * 8)
+    assert _get_bytes(backend, key) == b"old native archive" * 8
+    _put_bytes(backend, key, b"NEW native archive" * 8, replace_etag=backend.etag(key))
+    assert _get_bytes(backend, key) == b"NEW native archive" * 8
+    assert [call[0] for call in service.calls].count("readinto") == 2
+
+
+def test_shared_object_is_rehashed_and_corruption_is_downloaded_again(archive_store):
+    backend, root = archive_store.backend, archive_store.root
+    key, payload = "c" * 64, b"native archive" * 8
+    _put_bytes(backend, key, payload)
+    assert _get_bytes(backend, key) == payload
+    path = root / "objects" / hashlib.sha256(payload).hexdigest()
+    path.write_bytes(b"x" * len(payload))  # same length is not integrity
+    assert _get_bytes(backend, key) == payload
+    assert path.read_bytes() == payload
+    assert [call[0] for call in archive_store.service.calls].count("readinto") == 2
+
+
+def test_local_return_is_a_private_snapshot_not_a_reopened_shared_path(archive_store):
+    backend, root = archive_store.backend, archive_store.root
+    key, payload = "d" * 64, b"native identity" * 8
+    _put_bytes(backend, key, payload)
+    assert _get_bytes(backend, key) == payload
+    with backend.get(key) as private:
+        path = root / "objects" / hashlib.sha256(payload).hexdigest()
+        path.write_bytes(b"x" * len(payload))
+        assert private.read() == payload
+    assert _get_bytes(backend, key) == payload  # next caller detects corruption
+
+
+def test_interrupted_download_never_publishes_a_local_object(archive_store, monkeypatch):
+    backend, service, root = archive_store.backend, archive_store.service, archive_store.root
+    key, payload = "e" * 64, b"native archive" * 8
+    _put_bytes(backend, key, payload)
+    client = service.get_blob_client(backend._name(key))
+    original = client.download_blob
+    files = []
+    temporary = cache.tempfile.TemporaryFile
+
+    def tracked_file(*args, **kwargs):
+        file = temporary(*args, **kwargs)
+        files.append(file)
+        return file
+
+    def interrupted(**kwargs):
+        response = original(**kwargs)
+
+        def readinto(stream):
+            stream.write(payload[:10])
+            raise OSError("interrupted")
+
+        response.readinto = readinto
+        return response
+
+    monkeypatch.setattr(cache.tempfile, "TemporaryFile", tracked_file)
+    monkeypatch.setattr(client, "download_blob", interrupted)
+    monkeypatch.setattr(service, "get_blob_client", lambda _name: client)
+    with pytest.raises(OSError, match="interrupted"):
+        backend.get(key)
+    assert files and all(file.closed for file in files)
+    assert not list((root / "objects").iterdir())
+
+
+@pytest.mark.parametrize("error", ["missing", "auth", "precondition"])
+def test_download_azure_errors_are_not_silently_changed(archive_store, monkeypatch, error):
+    from azure.core.exceptions import (
+        ClientAuthenticationError, ResourceModifiedError, ResourceNotFoundError,
+    )
+
+    backend, service = archive_store.backend, archive_store.service
+    client = service.get_blob_client("unused")
+    failure = {
+        "missing": ResourceNotFoundError("missing"),
+        "auth": ClientAuthenticationError("denied"),
+        "precondition": ResourceModifiedError("changed"),
+    }[error]
+
+    def fail(**_kwargs):
+        raise failure
+
+    monkeypatch.setattr(client, "download_blob", fail)
+    monkeypatch.setattr(service, "get_blob_client", lambda _name: client)
+    if error == "missing":
+        assert backend.get("a" * 64) is None
+    else:
+        with pytest.raises(type(failure)):
+            backend.get("a" * 64)
+
+
+def test_concurrent_local_publications_use_unique_temps_and_converge(
+    archive_store, monkeypatch
+):
+    backend, root = archive_store.backend, archive_store.root
+    key, payload = "f" * 64, b"same canonical archive" * 8
+    _put_bytes(backend, key, payload)
+    barrier = threading.Barrier(2)
+    lookup = cache._local_archive
+    replace = cache.os.replace
+    publications = []
+
+    def simultaneous(*args):
+        result = lookup(*args)
+        assert result is None
+        barrier.wait(timeout=10)
+        return result
+
+    def record_replace(source, destination):
+        publications.append(Path(source))
+        return replace(source, destination)
+
+    monkeypatch.setattr(cache, "_local_archive", simultaneous)
+    monkeypatch.setattr(cache.os, "replace", record_replace)
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(lambda _index: _get_bytes(backend, key), range(2)))
+    assert results == [payload, payload]
+    assert len(publications) == len(set(publications)) == 2
+    [path] = (root / "objects").iterdir()
+    assert path.name == hashlib.sha256(payload).hexdigest()
+    assert path.read_bytes() == payload
+
+
+def test_scoped_lru_skips_leases_and_never_deletes_unknown_or_outside_files(
+    archive_store, tmp_path, monkeypatch
+):
+    root = archive_store.root
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", 64)
+    paths = []
+    for index, payload in enumerate((b"A" * 32, b"B" * 32)):
+        digest = hashlib.sha256(payload).hexdigest()
+        cache._save_archive(root, digest, len(payload), io.BytesIO(payload))
+        path = root / "objects" / digest
+        os.utime(path, (index + 1, index + 1))
+        paths.append(path)
+    unrelated = root / "objects" / "keep-me"
+    outside = tmp_path / "native.SLDPRT"
+    unrelated.write_bytes(b"not an archive object")
+    outside.write_bytes(b"native")
+    orphan = root / "objects" / f".{'0' * 64}.{'1' * 32}.tmp"
+    orphan.write_bytes(b"interrupted local publication")
+    with cache._archive_lock(root / "locks" / paths[0].name):
+        payload = b"C" * 32
+        digest = hashlib.sha256(payload).hexdigest()
+        cache._save_archive(root, digest, len(payload), io.BytesIO(payload))
+        assert paths[0].exists()
+        assert not paths[1].exists()
+        assert (root / "objects" / digest).exists()
+    assert not orphan.exists()
+    assert unrelated.read_bytes() == b"not an archive object"
+    assert outside.read_bytes() == b"native"
+
+
+def test_local_reuse_updates_explicit_lru_time(archive_store):
+    backend, root = archive_store.backend, archive_store.root
+    key, payload = "a" * 64, b"native archive" * 8
+    _put_bytes(backend, key, payload)
+    assert _get_bytes(backend, key) == payload
+    path = root / "objects" / hashlib.sha256(payload).hexdigest()
+    os.utime(path, (1, 1))
+    assert _get_bytes(backend, key) == payload
+    assert path.stat().st_mtime > 1
+
+
+def test_object_lease_is_cross_process_and_released_on_process_exit(archive_store):
+    lock = archive_store.root / "locks" / ("a" * 64)
+    code = (
+        "import sys; sys.path.insert(0, sys.argv[1]); import _artifact_cache as c; "
+        "from pathlib import Path; "
+        "lease = c._archive_lock(Path(sys.argv[2]), blocking=False); "
+        "print(lease.__enter__(), flush=True)"
+    )
+
+    def child():
+        return subprocess.run(
+            [sys.executable, "-c", code, str(Path(cache.__file__).parent), str(lock)],
+            check=True, capture_output=True, text=True, timeout=15,
+        ).stdout.strip()
+
+    with cache._archive_lock(lock):
+        assert child() == "False"
+    # The child's intentionally unclosed lease is also released by OS teardown.
+    assert child() == "True"
+    with cache._archive_lock(lock, blocking=False) as acquired:
+        assert acquired
+
+
+@pytest.mark.parametrize("root_kind", ["arbitrary", "relative", "inside-repo"])
+def test_cache_root_rejects_unapproved_or_workspace_paths(
+    tmp_path, monkeypatch, root_kind
+):
+    root = cache._archive_cache_roots()[0]
+    if root_kind == "arbitrary":
+        monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", str(tmp_path / "other"))
+    elif root_kind == "relative":
+        monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", "relative/archive-cache")
+    else:
+        monkeypatch.setattr(cache, "REPO_ROOT", root.parent)
+    with pytest.raises(RuntimeError, match="(unapproved|unsafe) local archive cache"):
+        cache._archive_cache_root()
+
+
+def test_cache_root_absence_disables_local_reuse(monkeypatch):
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    assert cache._archive_cache_root() is None
+
+
+def test_local_cache_rejects_aliases_without_touching_their_target(
+    archive_store, tmp_path
+):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep").write_bytes(b"unrelated")
+    objects = archive_store.root / "objects"
+    objects.rmdir()
+    try:
+        objects.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        objects.mkdir()
+        pytest.skip("symlink creation requires privilege")
+    try:
+        with pytest.raises(RuntimeError, match="unsafe local archive cache"):
+            cache._archive_cache_root()
+        assert (outside / "keep").read_bytes() == b"unrelated"
+    finally:
+        objects.unlink()
+
+
+def test_real_sdk_parallel_readinto_and_bounded_prefix_local_hit(sdk_wire):
+    """Actual locked SDK ranged downloader, not a mocked readinto echo."""
+    backend, adapter = sdk_wire.backend, sdk_wire.adapter
+    adapter.payload = b"canonical native bytes-" * (1024 * 1024)
+    key = "e" * 64
+    assert _get_bytes(backend, key) == adapter.payload
+    first = list(adapter.requests)
+    assert len(first) > 2
+    assert adapter.range_peak > 1
+    assert adapter.range_peak <= cache._TRANSFER_CONCURRENCY
+    assert all(request.method == "GET" for request in first)
+    assert "If-Match" not in first[0].headers
+    assert all(request.headers["If-Match"] == '"snapshot-etag"' for request in first[1:])
+    adapter.requests.clear()
+    assert _get_bytes(backend, key) == adapter.payload
+    [probe] = adapter.requests
+    assert probe.method == "GET"
+    raw_range = probe.headers.get("x-ms-range") or probe.headers["Range"]
+    assert raw_range == f"bytes=0-{cache._ARCHIVE_CACHE_MIN - 1}"
+
+
+def test_large_file_upload_reads_only_bounded_blocks(archive_store, monkeypatch):
+    backend = archive_store.backend
+    monkeypatch.setattr(cache, "_SINGLE_PUT_MAX", 8)
+    monkeypatch.setattr(cache, "_BLOCK_SIZE", 4)
+
+    class BoundedFile(io.BytesIO):
+        def read(self, size=-1):
+            assert 0 <= size <= cache._BLOCK_SIZE
+            return super().read(size)
+
+    payload = b"large result transfer" * 16
+    with BoundedFile(payload) as archive:
+        backend.put("a" * 64, archive)
+    assert archive_store.service.content(backend._name("a" * 64)) == payload
+
+
+def test_local_hydration_keeps_provenance_sidecars_and_share_lock_contract(
+    archive_tree, fake, real_unpack, archive_store, monkeypatch, tmp_path
+):
+    backend = archive_store.backend
+    native = archive_tree / "leaf.SLDPRT"
+    optional = archive_tree / "optional.json"
+    native.write_bytes(b"canonical")
+    key = "b" * 64
+    _put_bytes(backend, key, _packed([native]))
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    monkeypatch.setattr(cache, "_unpack", real_unpack)
+    assert cache.restore(key, [native, optional], "part:leaf")
+    optional.write_bytes(b"loser-only")
+    native.write_bytes(b"loser")
+    assert cache.restore(key, [native, optional], "part:leaf")
+    assert native.read_bytes() == b"canonical"
+    assert not optional.exists()
+    assert cache.last_stored_key("part:leaf") is None
+    assert _events(tmp_path)[-1]["event"] == "restore_hit"
+    assert [call[0] for call in archive_store.service.calls].count("readinto") == 1
+
+    def locked(_blob, _outputs):
+        raise PermissionError(13, "share-locked", str(native))
+
+    monkeypatch.setattr(cache, "_unpack", locked)
+    with pytest.raises(cache.RestoreLocked):
+        cache.restore(key, [native, optional], "part:leaf")
+
+
+def test_local_store_io_failure_does_not_consume_the_verified_download(
+    archive_store, monkeypatch
+):
+    backend = archive_store.backend
+    key, payload = "d" * 64, b"verified result archive" * 8
+    _put_bytes(backend, key, payload)
+
+    def full_disk(_root, _digest, _size, archive):
+        archive.read(10)
+        raise OSError("disk full")
+
+    monkeypatch.setattr(cache, "_save_archive", full_disk)
+    assert _get_bytes(backend, key) == payload
+
+
+@pytest.mark.parametrize("field,value", [("etag", ""), ("size", 1), ("size", True)])
+def test_response_identity_requires_real_length_and_etag(
+    archive_store, monkeypatch, field, value
+):
+    backend, service = archive_store.backend, archive_store.service
+    key, payload = "e" * 64, b"canonical archive" * 8
+    _put_bytes(backend, key, payload)
+    client = service.get_blob_client(backend._name(key))
+    original = client.download_blob
+
+    def damaged(**kwargs):
+        response = original(**kwargs)
+        setattr(response.properties, field, value)
+        return response
+
+    monkeypatch.setattr(client, "download_blob", damaged)
+    monkeypatch.setattr(service, "get_blob_client", lambda _name: client)
+    with pytest.raises(RuntimeError, match="integrity mismatch"):
+        backend.get(key)
+    assert not any(call[0] == "readinto" for call in service.calls)
 
 
 if __name__ == "__main__":

@@ -4874,9 +4874,9 @@ def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
         if initially_present:
             f.emit("assembly", b"old-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            archive = f.cache._pack(f.outputs("assembly"))
-            f.backend.put(root_key, archive)
-            f.backend.put(base_key, archive)
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+                f.backend.put(base_key, archive)
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
         "labels": ["assembly:leaf"], "reason": "Owner - Refresh root and alias",
     }))
@@ -4974,9 +4974,9 @@ def test_root_or_alias_refresh_upload_failure_is_fatal(
         if initially_present:
             f.emit("assembly", b"old-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            archive = f.cache._pack(f.outputs("assembly"))
-            f.backend.put(root_key, archive)
-            f.backend.put(base_key, archive)
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+                f.backend.put(base_key, archive)
     initial_etags = dict(f.service.etags)
     put = f.backend.put
 
@@ -5045,7 +5045,8 @@ def test_ordinary_assembly_shortcut_does_not_walk_explode_closure(
         if shortcut == "hit":
             f.emit("assembly", b"canonical-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            f.backend.put(key, f.cache._pack(f.outputs("assembly")))
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(key, archive)
 
     def remote(label, requested, outputs):
         assert (label, requested) == ("assembly:leaf", key)
