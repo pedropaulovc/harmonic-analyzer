@@ -108,6 +108,34 @@ caption checks and supplier-source preservation guards unchanged. Do not
 shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
 or suppress exhaustion to make the old 12 mm allocation pass.
 
+### Measured native supplier-reference text shelves
+
+`_supplier_reference_text.shelve_reference_text` extracts the proven shared
+clamp's positive-axis shelf sequence. The caller supplies a strict fresh native
+dimension inventory and horizontal/vertical axes; the core has no source-feature
+name convention. It measures every native text fragment, rejects unavailable or
+non-finite geometry, seeds `OffsetText` from the actual arrow station, rebuilds
+and reads back the anchor, enables native offset mode, then moves the entire text
+block beyond the measured physical arrow tail. The existing 2 mm clearance,
+0.2 mm placement settle and native station tolerance remain unchanged.
+
+Use the returned read-only proof in final settled checks. It reacquires the
+inventory and proves physical arrow/witness stations, native offset mode,
+complete text-to-tail separation and the original transverse text position.
+`force` explicitly shelves an authored multi-row reference even when it fits its
+own span; otherwise the native complete-text extent decides. Shelves move only
+in the positive dimension-axis direction. The initial measurement rebuild and
+three batched transition rebuilds are part of the sequence; the proof never
+rebuilds or moves anything.
+
+These native rectangles are not tight printed glyph ink. Retain fraction bars,
+underlines and connectors in every captured record: a legitimate fraction bar
+can intersect the union of native font rectangles. Do not add a fraction
+allowlist or test all strokes against that union. The caller still owns source,
+attachment, value and format checks, complete cell/caption containment, its
+settled layout checks and post-export inspection/audit using actual PDF ink.
+Native shelf separation alone does not prove body or foreign-line clearance.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report
