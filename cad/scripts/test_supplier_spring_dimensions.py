@@ -29,6 +29,7 @@ class _View:
         self.Position = (0.1, 0.1)
         self.ScaleRatio = (1, 1)
         self.kept_positions = {}
+        self.text_positions = {}
 
     def GetAnnotations(self):
         return self.annotations
@@ -76,13 +77,17 @@ def _native_annotation(name, owner, value, band=None):
     )
     native.GetSystemValue3 = lambda option, names: (native.value / 1000,)
     display = SimpleNamespace(
-        GetDimension2=lambda index: native, GetPrimaryTolPrecision2=lambda: 3
+        GetDimension2=lambda index: native, GetPrimaryTolPrecision2=lambda: 3,
+        OffsetText=False,
     )
     annotation = SimpleNamespace(
         name=name,
         GetType=lambda: 4,
         GetSpecificAnnotation=lambda: display,
+        position=(0.0, 0.0, 0.0),
     )
+    annotation.GetPosition = lambda: annotation.position
+    display.GetAnnotation = lambda: annotation
     return annotation
 
 
@@ -111,6 +116,20 @@ def _readback_environment(monkeypatch, module, views):
         ]
 
     monkeypatch.setattr(module, "curate_view_dimensions", curate)
+    if module is disc:
+        def offset_text(adapter, annotations, positions):
+            remaining = dict(positions)
+            for view in views.values():
+                for annotation in view.annotations:
+                    if annotation in annotations and annotation.name in remaining:
+                        xy = remaining.pop(annotation.name)
+                        annotation.GetSpecificAnnotation().OffsetText = True
+                        annotation.position = (*xy, 0.0)
+                        view.text_positions[annotation.name] = xy
+            if remaining:
+                raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
+
+        monkeypatch.setattr(module, "offset_dimension_text", offset_text)
 
 
 def _extension_views(spec):
@@ -297,6 +316,46 @@ def test_disc_final_checks_reacquire_source_and_application_gauges(
     else:
         native.Tolerance.Type = 0 if spec is not pivot else 4
     with pytest.raises(RuntimeError):
+        for check in checks:
+            check()
+
+
+@pytest.mark.parametrize(
+    "spec,name",
+    [
+        (cylinder, "SupplierWorkingHeight"),
+        (cylinder, "SupplierWorkingDeflection"),
+        (pivot, "SupplierWorkingHeight"),
+    ],
+)
+@pytest.mark.parametrize("corruption", ["offset", "position", "nonfinite", "missing"])
+def test_disc_final_check_refuses_application_text_leaving_its_offset_shelf(
+    monkeypatch, spec, name, corruption
+):
+    views = _disc_views(spec)
+    _readback_environment(monkeypatch, disc, views)
+    checks = []
+    disc.supplier_disc_spring_dimensions(
+        object(),
+        views,
+        spec=spec,
+        reference_bounds=_captured_reference_bounds(views),
+        settled_checks=checks,
+    )
+    for check in checks:
+        check()
+    annotation = next(item for item in views["free_right"].annotations if item.name == name)
+    if corruption == "offset":
+        annotation.GetSpecificAnnotation().OffsetText = False
+    elif corruption == "position":
+        annotation.position = (
+            annotation.position[0], annotation.position[1] + 0.003, annotation.position[2]
+        )
+    elif corruption == "nonfinite":
+        annotation.position = (math.nan, *annotation.position[1:])
+    else:
+        annotation.position = ()
+    with pytest.raises(RuntimeError, match="application text (lost|moved)"):
         for check in checks:
             check()
 
@@ -490,10 +549,23 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
         assert views["free_right"].kept_positions[
             "SupplierWorkingHeight"
         ] == pytest.approx((0.31 - radius * 0.5 - 0.014, right_mid_y))
+        assert views["free_right"].text_positions["SupplierWorkingHeight"] == pytest.approx(
+            (0.31, 0.08 + baseline / 2000 - 0.014)
+        )
         if "WORKING_DEFLECTION" in spec.SUPPLIER_APPLICATION_DIMENSIONS:
             assert views["free_right"].kept_positions[
                 "SupplierWorkingDeflection"
             ] == pytest.approx((0.31 + radius * 0.5 + 0.014, right_mid_y))
+            assert views["free_right"].text_positions[
+                "SupplierWorkingDeflection"
+            ] == pytest.approx((0.31, 0.08 + gauge_upper / 2000 + 0.014))
+    assert not views["free_front"].text_positions
+    assert not views["free_top"].text_positions
+    assert all(
+        not annotation.GetSpecificAnnotation().OffsetText
+        for key in ("free_front", "free_top")
+        for annotation in views[key].annotations
+    )
 
 
 @pytest.mark.parametrize(

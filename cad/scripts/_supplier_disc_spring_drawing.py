@@ -1,4 +1,9 @@
-"""Native nominal supplier dimension diagrams, never physical spring replicas."""
+"""Native nominal supplier dimension diagrams, never physical spring replicas.
+
+Application dimensions keep their native dimension lines outside the gauge
+planes. Their full source-formatted text uses separate upper/lower offset
+shelves; the shared cell containment guard still bounds all settled ink.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _com import _early_bound
+from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
@@ -116,14 +122,25 @@ def supplier_disc_spring_dimensions(
         for semantic in ("WORKING_HEIGHT", "WORKING_DEFLECTION")
         if semantic in application
     ]
+    application_text_positions = {}
     if height_sizes:
         x0, y0, x1, y1 = source_bounds["free_right"]
+        # Keep the dimension lines outside the application planes. Offset the
+        # complete native callouts next to their own gauge bands: compressed
+        # height below the baseline, deflection above the free-upper plane.
         placements["free_right"] = {
             semantic: (
-                x0 - 0.014 if index == 0 else x1 + 0.014,
+                x0 - 0.014 if semantic == "WORKING_HEIGHT" else x1 + 0.014,
                 (y0 + y1) / 2.0,
             )
-            for index, semantic in enumerate(height_sizes)
+            for semantic in height_sizes
+        }
+        application_text_positions = {
+            SUPPLIER_DIMENSION_NAMES[semantic]: (
+                (x0 + x1) / 2.0,
+                y0 - 0.014 if semantic == "WORKING_HEIGHT" else y1 + 0.014,
+            )
+            for semantic in height_sizes
         }
     application_labels = {
         "WORKING_HEIGHT": "COMPRESSED HEIGHT",
@@ -166,6 +183,8 @@ def supplier_disc_spring_dimensions(
             references.append(
                 (key, SUPPLIER_DIMENSION_NAMES[semantic], arguments, semantic)
             )
+        if key == "free_right":
+            offset_dimension_text(adapter, imported, application_text_positions)
 
     expected = {key: {} for key in views}
     configurations = {
@@ -193,6 +212,22 @@ def supplier_disc_spring_dimensions(
         )
         for key, name, arguments, semantic in references:
             display = displays[name]
+            if name in application_text_positions:
+                if not bool(display.OffsetText):
+                    raise RuntimeError(
+                        f"{spec.SKU} {semantic}: application text lost its offset shelf"
+                    )
+                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                point = tuple(float(value) for value in (annotation.GetPosition() or ()))
+                if (
+                    len(point) != 3
+                    or not all(map(math.isfinite, point))
+                    or math.dist(point[:2], application_text_positions[name]) > 1e-6
+                ):
+                    raise RuntimeError(
+                        f"{spec.SKU} {semantic}: application text moved from its shelf: "
+                        f"{point!r} != {application_text_positions[name]!r}"
+                    )
             assert_supplier_reference_dimension(adapter, display, **arguments)
             assert_supplier_configuration_value(
                 display,
