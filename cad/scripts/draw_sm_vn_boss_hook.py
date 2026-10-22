@@ -130,7 +130,8 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
     """Use the physical matching eye ID and an explicit nominal thread carrier."""
     eye = None
     circles = []
-    for raw in visible_view_entities(front, 4, label="counter anchor supplier contours"):
+    silhouettes = visible_view_entities(front, 4, label="counter anchor supplier contours")
+    for raw in silhouettes:
         silhouette = _early_bound(raw, "ISilhouetteEdge")
         raw_curve = silhouette.GetCurve()
         if raw_curve is None:
@@ -148,9 +149,73 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
             eye = raw
             break
     if eye is None:
+        def face_readback(raw_face):
+            if raw_face is None:
+                return None
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            feature = _early_bound(face.GetFeature(), "IFeature")
+            return {
+                "feature": str(feature.Name),
+                "torus": tuple(float(value) for value in surface.TorusParams) if surface.IsTorus() else None,
+            }
+
+        silhouette_readbacks = []
+        for raw in silhouettes:
+            silhouette = _early_bound(raw, "ISilhouetteEdge")
+            raw_curve = silhouette.GetCurve()
+            if raw_curve is None:
+                silhouette_readbacks.append({"identity": None, "face": face_readback(silhouette.GetFace())})
+                continue
+            curve = _early_bound(raw_curve, "ICurve")
+            samples = None
+            if curve.IsBcurve():
+                limits = tuple(curve.GetEndParams())
+                if limits[0] is True:
+                    samples = [
+                        tuple(float(value) for value in curve.Evaluate2(
+                            float(limits[1]) + fraction * (float(limits[2]) - float(limits[1])), 0
+                        )[:3])
+                        for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)
+                    ]
+            silhouette_readbacks.append({
+                "identity": int(curve.Identity()),
+                "circle": tuple(float(value) for value in curve.CircleParams) if curve.IsCircle() else None,
+                "face": face_readback(silhouette.GetFace()),
+                "samples": samples,
+            })
+        edge_circles = []
+        exact_id_edges = []
+        edge_kinds = {}
+        edges = visible_view_entities(front, 1, label="counter anchor missing physical ID discriminator")
+        for raw in edges:
+            edge = _early_bound(raw, "IEdge")
+            raw_curve = edge.GetCurve()
+            if raw_curve is None:
+                continue
+            curve = _early_bound(raw_curve, "ICurve")
+            identity = int(curve.Identity())
+            edge_kinds[identity] = edge_kinds.get(identity, 0) + 1
+            if not curve.IsCircle():
+                continue
+            circle = tuple(float(value) for value in curve.CircleParams)
+            edge_circles.append(circle)
+            if (
+                all(abs(value) < 1e-8 for value in circle[:3])
+                and abs(abs(circle[5]) - 1.0) < 1e-8
+                and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
+            ):
+                exact_id_edges.append({
+                    "circle": circle,
+                    "faces": [face_readback(face) for face in (edge.GetTwoAdjacentFaces2() or ())],
+                })
         raise RuntimeError(
             "unchanged counter eye has no exact ID circular silhouette; "
-            f"circles={circles!r}, configuration={front.ReferencedConfiguration!r}"
+            f"silhouettes={silhouette_readbacks!r}, "
+            f"edge_count={len(edges)}, edge_kinds={edge_kinds!r}, "
+            f"edge_circle_count={len(edge_circles)}, edge_circles={edge_circles[:64]!r}, "
+            f"exact_id_edges={exact_id_edges!r}, configuration={front.ReferencedConfiguration!r}, "
+            f"model_to_view={tuple(_early_bound(front.ModelToViewTransform, 'IMathTransform').ArrayData)!r}"
         )
     try:
         _select_view_entity(
