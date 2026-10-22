@@ -1954,6 +1954,18 @@ radius or coordinates. All failure-only formatting/capture readers must leave
 the original decoder exception and traceback intact. These diagnostics do
 not change the acceptance decoder, its cardinality guard or physical proof.
 
+R30b returned `((), None)` for the uncropped MG detail even though the later
+failure-only `GetPolyLineCount5(1)` observed `(36, 1201)` and both components
+were visible. A single count-first preparation is an **empirical experiment**,
+not a documented `GetPolylines7` precondition: the official VBA example calls
+G7 directly, while Count5's explicit sequencing remark names `IGetPolylines6`.
+Freeze both typed nonnegative count outputs before the single G7 call, then
+freeze its exact return before any component reader or decoder. Keep a later
+failure-only count distinct. A positive count cannot rescue an unavailable G7
+channel, prove buffer initialization or relax the edge/record identity guard;
+do not retry, sleep, change the camera or claim the experiment fixed anything
+until fresh native output establishes the actual result.
+
 Raw visible-edge and rendered-polyline handles do not establish a shared
 identity namespace merely because both bind as `IEdge`. The MG interface
 proof uses one documented route: owned drawing seed, owning source Extension

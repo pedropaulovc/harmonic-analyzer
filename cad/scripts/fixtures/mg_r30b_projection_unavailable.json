@@ -1,0 +1,242 @@
+{
+  "provenance": {
+    "source_commit": "4c566913ec72f6654613f957c7c55e58b6c2a53e",
+    "run": "20261022T042857845Z-c9b6248cca0546a497c44401e7fa7f75",
+    "capture_sha256": "45d26e777540f2ccb52db9da24879248ef86aced76c132e42e80690c30cde09e",
+    "scope": "Actual unavailable uncropped G7 return and later failure-only Count5 observation. No pre-G7 count was observed; reusing that count in an authored preparation double is synthetic ordering, not proof of native priming/cause. Existing R29 successful decode/extra-record observations are retained separately."
+  },
+  "captured_at": "2026-10-22T04:41:02+00:00",
+  "message": "GetPolylines7 retval/OUT channel is unavailable at primitive 0, offset 0",
+  "actual_probe": {
+    "stage": "uncropped physical boundaries",
+    "call": "early-bound IView.GetPolylines7(1); optional OUT argument omitted",
+    "return_observed": true,
+    "original_return": {
+      "items": [
+        {
+          "items": [],
+          "length": 0,
+          "type": "builtins.tuple"
+        },
+        {
+          "type": "builtins.NoneType",
+          "value": null
+        }
+      ],
+      "length": 2,
+      "type": "builtins.tuple"
+    },
+    "component_readback": {
+      "drawing_components": [
+        [
+          "mg-magnifying-bracket-1",
+          "mg-magnifying-bracket",
+          true
+        ],
+        [
+          "mg-magnifying-lever-1",
+          "mg-magnifying-lever",
+          true
+        ]
+      ],
+      "errors": [
+        "native observation: RuntimeError: GetPolylines7 retval/OUT channel is unavailable at primitive 0, offset 0"
+      ],
+      "rendered_model_edges": null,
+      "stage": "uncropped physical boundaries",
+      "visible_component_count": 2,
+      "visible_components_observed": true
+    },
+    "view_state": {
+      "configuration": {
+        "type": "builtins.str",
+        "value": "Default"
+      },
+      "cropped": {
+        "type": "builtins.bool",
+        "value": false
+      },
+      "display_mode": {
+        "type": "builtins.int",
+        "value": 2
+      },
+      "facetted_hlr": {
+        "type": "builtins.bool",
+        "value": false
+      },
+      "model_to_view": {
+        "items": [
+          {
+            "ieee754_le": "000000000000f0bf",
+            "repr": "-1.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "205d67cece72ff3c",
+            "repr": "6.982962677686267e-15",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "000000000000f03f",
+            "repr": "1.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "205d67cece72ffbc",
+            "repr": "-6.982962677686267e-15",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "000000000000f0bf",
+            "repr": "-1.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "c5f5285c8fc2cd3f",
+            "repr": "0.23250000000000007",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "b003e78c28ed0ec0",
+            "repr": "-3.8658",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "81305d711644e0bf",
+            "repr": "-0.508311482824425",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000001040",
+            "repr": "4.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0000000000000000",
+            "repr": "0.0",
+            "type": "builtins.float"
+          }
+        ],
+        "length": 16,
+        "type": "builtins.tuple"
+      },
+      "orientation": {
+        "type": "builtins.str",
+        "value": "*Front"
+      },
+      "outline": {
+        "items": [
+          {
+            "ieee754_le": "7c5c37a5bc56e2bf",
+            "repr": "-0.573087999999998",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "eb6b7a50508a963f",
+            "repr": "0.02201200000000007",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "fecf47197101d03f",
+            "repr": "0.2500880000000051",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "85a641d13c80b53f",
+            "repr": "0.0839879999999998",
+            "type": "builtins.float"
+          }
+        ],
+        "length": 4,
+        "type": "builtins.tuple"
+      },
+      "position": {
+        "items": [
+          {
+            "ieee754_le": "bb345eba490ccabf",
+            "repr": "-0.20349999999999632",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "0b42f5770b24eabf",
+            "repr": "-0.8168999998979997",
+            "type": "builtins.float"
+          }
+        ],
+        "length": 2,
+        "type": "builtins.tuple"
+      },
+      "revision": {
+        "type": "builtins.str",
+        "value": "34.4.0"
+      },
+      "scale": {
+        "items": [
+          {
+            "ieee754_le": "0000000000001040",
+            "repr": "4.0",
+            "type": "builtins.float"
+          },
+          {
+            "ieee754_le": "000000000000f03f",
+            "repr": "1.0",
+            "type": "builtins.float"
+          }
+        ],
+        "length": 2,
+        "type": "builtins.tuple"
+      },
+      "view": {
+        "type": "builtins.str",
+        "value": "Drawing View6"
+      }
+    },
+    "post_failure_count5": {
+      "status": "OBSERVED",
+      "value": {
+        "items": [
+          {
+            "type": "builtins.int",
+            "value": 36
+          },
+          {
+            "type": "builtins.int",
+            "value": 1201
+          }
+        ],
+        "length": 2,
+        "type": "builtins.tuple"
+      }
+    }
+  }
+}
