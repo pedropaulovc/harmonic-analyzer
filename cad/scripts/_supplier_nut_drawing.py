@@ -9,7 +9,10 @@ its below-value thread designation through the shared supplier importer.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+import hashlib
+import json
 import math
+from pathlib import Path
 from typing import Any
 
 from _com import _early_bound
@@ -21,7 +24,11 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _supplier_screw_dimensions import _attachment_correspondence, annotate_supplier_screw
+from _supplier_screw_dimensions import (
+    _assert_dimension_source,
+    _attachment_correspondence,
+    annotate_supplier_screw,
+)
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 import _telemetry
 
@@ -116,7 +123,7 @@ def _physical_edges(
 
 def _assert_nominal_carrier(
     adapter: Any, front: Any, display: Any, nominal_major_mm: float
-) -> None:
+) -> dict[str, Any]:
     """Prove the exact source chord and both distinct view-mapped endpoints."""
     model = _early_bound(front, "IView").ReferencedDocument
     if model is None:
@@ -182,6 +189,165 @@ def _assert_nominal_carrier(
     )
     if not correspondence["proven"]:
         raise RuntimeError("supplier nut nominal-major attachment is not its view-mapped source endpoint")
+    return correspondence
+
+
+@_telemetry.traced("drawing.supplier_nut_saved_readback")
+def assert_saved_supplier_nut_nominal(
+    adapter: Any,
+    drawing_path: Path,
+    *,
+    nominal_major_mm: float,
+    source_path: Path,
+    configuration: str,
+) -> None:
+    """Cold-read the saved drawing without saving or changing its source binding.
+
+    ``configuration`` is captured from the original authoring Front view and
+    preserved by the purchased wrapper's settled binding check. It proves
+    persistence of that binding, not an independent catalogue configuration.
+    """
+    drawing_path = Path(drawing_path).resolve()
+    source_path = Path(source_path).resolve()
+    if drawing_path.suffix.lower() != ".slddrw" or not drawing_path.is_file():
+        raise ValueError("supplier nut saved readback requires an existing SLDDRW")
+    if not isinstance(configuration, str) or not configuration.strip():
+        raise ValueError("supplier nut saved readback requires the original configuration")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    if app.GetOpenDocumentByName(str(drawing_path)) is not None:
+        raise RuntimeError("supplier nut saved drawing must be closed before readback")
+    source = app.GetOpenDocumentByName(str(source_path))
+    if source is None:
+        raise RuntimeError("supplier nut saved readback lost its immutable source part")
+    source = _early_bound(source, "IModelDoc2")
+    source_kind = source.GetType()
+    if (
+        type(source_kind) is not int or source_kind != 1
+        or Path(source.GetPathName()).resolve() != source_path
+        or source.IsOpenedReadOnly() is not True
+    ):
+        raise RuntimeError("supplier nut saved readback has the wrong source part")
+    with drawing_path.open("rb") as stream:
+        before_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+    primary: BaseException | None = None
+    acquired: Any = None
+    try:
+        # Strict _early_bound guarantees makepy: [out] I4 values ride the return
+        # tuple. Explicit BYREF VARIANTs would remain unwritten in this binding.
+        opened = app.OpenDoc6(str(drawing_path), 3, 1 | 2, "", 0, 0)
+        if not isinstance(opened, tuple) or len(opened) != 3:
+            raise RuntimeError("supplier nut saved drawing open returned unreadable status")
+        raw, errors, warnings = opened
+        acquired = raw
+        if type(errors) is not int or type(warnings) is not int:
+            raise RuntimeError("supplier nut saved drawing open status is not native integer")
+        if raw is None or errors != 0:
+            raise RuntimeError(f"supplier nut saved drawing open failed ({errors=}, {warnings=})")
+        draw = _early_bound(raw, "IModelDoc2")
+        drawing_kind = draw.GetType()
+        if (
+            type(drawing_kind) is not int or drawing_kind != 3
+            or Path(draw.GetPathName()).resolve() != drawing_path
+            or draw.IsOpenedReadOnly() is not True
+        ):
+            raise RuntimeError("supplier nut saved readback acquired the wrong drawing")
+        loaded = app.GetOpenDocumentByName(str(drawing_path))
+        identity = None if loaded is None else app.IsSame(draw, loaded)
+        if type(identity) is not int or identity != 1:
+            raise RuntimeError("supplier nut saved drawing lost its loaded native identity")
+        adapter.currentModel = draw
+        sheets = tuple(_early_bound(draw, "IDrawingDoc").GetViews() or ())
+        if len(sheets) != 1:
+            raise RuntimeError("supplier nut saved drawing must have one sheet")
+        views = [_early_bound(view, "IView") for view in tuple(sheets[0])[1:]]
+        fronts = [view for view in views if str(view.GetOrientationName()) == "*Front"]
+        if len(fronts) != 1:
+            raise RuntimeError("supplier nut saved drawing must have one Front view")
+        front = fronts[0]
+        referenced = front.ReferencedDocument
+        source_identity = None if referenced is None else app.IsSame(referenced, source)
+        if (
+            Path(front.GetReferencedModelName()).resolve() != source_path
+            or str(front.ReferencedConfiguration) != configuration
+            or type(source_identity) is not int
+            or source_identity != 1
+        ):
+            raise RuntimeError("supplier nut saved Front changed its source/configuration binding")
+        displays = []
+        for raw_annotation in front.GetAnnotations() or ():
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            if int(annotation.GetType()) != 4:  # swDisplayDimension
+                continue
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            if str(native.FullName).split("@")[:2] == [_NOMINAL_MAJOR, FEATURE_BY_PLANE["Front"]]:
+                if int(annotation.Visible) != 1:
+                    raise RuntimeError("supplier nut saved nominal-major dimension is hidden")
+                displays.append(display)
+        if len(displays) != 1:
+            raise RuntimeError("supplier nut saved drawing lost its unique nominal-major dimension")
+        display = displays[0]
+        _assert_dimension_source(
+            adapter, front, display, name=_NOMINAL_MAJOR, feature=FEATURE_BY_PLANE["Front"],
+        )
+        correspondence = _assert_nominal_carrier(adapter, front, display, nominal_major_mm)
+        value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+        if not math.isclose(value, nominal_major_mm / 1000.0, rel_tol=0.0, abs_tol=1e-10):
+            raise RuntimeError("supplier nut saved nominal-major value changed")
+        evidence = {
+            "drawing_path": str(drawing_path),
+            "source_path": str(source_path),
+            "configuration": configuration,
+            "nominal_major_mm": value * 1000.0,
+            "drawing_sha256": before_hash,
+            "open_error_raw": errors,
+            "open_warning_raw": warnings,
+            "attachment_correspondence": correspondence,
+        }
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        cleanup_errors: list[BaseException] = []
+        try:
+            # Only the previously closed target may be ours, including a failed
+            # OpenDoc6 that nevertheless loaded it. Never close a foreign model.
+            loaded = app.GetOpenDocumentByName(str(drawing_path))
+            if loaded is not None:
+                loaded = _early_bound(loaded, "IModelDoc2")
+                loaded_kind = loaded.GetType()
+                if (
+                    type(loaded_kind) is not int or loaded_kind != 3
+                    or Path(loaded.GetPathName()).resolve() != drawing_path
+                ):
+                    raise RuntimeError("supplier nut saved readback refuses to close a foreign document")
+                identity = 1 if acquired is None else app.IsSame(acquired, loaded)
+                if type(identity) is not int or identity != 1:
+                    raise RuntimeError("supplier nut saved readback refuses to close a foreign native identity")
+                title = loaded.GetTitle()
+                if not isinstance(title, str) or not title:
+                    raise RuntimeError("supplier nut saved drawing has no closeable title")
+                app.CloseDoc(title)  # VT_VOID; never save the readback document.
+                if app.GetOpenDocumentByName(str(drawing_path)) is not None:
+                    raise RuntimeError("supplier nut saved readback drawing did not close")
+        except BaseException as error:
+            cleanup_errors.append(error)
+        adapter.currentModel = None  # Clear even when native close itself fails.
+        try:
+            with drawing_path.open("rb") as stream:
+                after_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+            if after_hash != before_hash:
+                raise RuntimeError("supplier nut saved drawing bytes changed during readback")
+        except BaseException as error:
+            cleanup_errors.append(error)
+        if cleanup_errors:
+            failure = primary if primary is not None else cleanup_errors[0]
+            for error in cleanup_errors:
+                if error is not failure:
+                    failure.add_note(f"supplier nut saved readback cleanup also failed: {error!r}")
+            if primary is None:
+                raise failure
+    _telemetry.info("supplier_nut_saved_readback_proof " + json.dumps(evidence, sort_keys=True))
 
 
 @_telemetry.traced("drawing.supplier_nut_dimensions")

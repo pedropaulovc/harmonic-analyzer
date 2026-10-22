@@ -69,6 +69,14 @@ cannot ask for what the authors were told to leave out.
   that inventory mapped through `IView.GetCorresponding`. Complete mapping,
   native self-comparison and known-negative comparisons remain mandatory.
   Raw drawing/model point inequality is not a failed correspondence.
+  After native export closes each purchased-nut drawing, its normal drawing
+  leaf reopens that exact SLDDRW read-only, reacquires Front and its nominal
+  dimension, and repeats the native owner, value and distinct mapped-endpoint
+  proof. The source path and original authoring Front configuration must
+  survive unchanged; this proves binding persistence, not independent catalogue
+  configuration correctness. The reader closes only its own newly opened
+  drawing without saving, verifies unchanged drawing bytes, and remains within
+  the purchased wrapper's source-file preservation guard.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;

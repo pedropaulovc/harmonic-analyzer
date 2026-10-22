@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -11,7 +12,7 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
-from _supplier_nut_drawing import add_supplier_nut_dimensions
+from _supplier_nut_drawing import add_supplier_nut_dimensions, assert_saved_supplier_nut_nominal
 from _supplier_screw_layout import supplier_screw_margins
 import mg_vn_wheel_axle_nut_spec as supplier
 
@@ -47,14 +48,27 @@ def _supplier_dimensions(
 
 async def build(adapter: Any) -> dict[str, str]:
     authored_checks: list[Callable[[], None]] = []
+    source_configuration: str | None = None
 
     def supplier_dimensions(target: Any, views: dict[str, Any]) -> None:
+        nonlocal source_configuration
+        source_configuration = views["*Front"].ReferencedConfiguration
+        if not isinstance(source_configuration, str) or not source_configuration.strip():
+            raise RuntimeError("supplier nut has no authored source configuration")
         authored_checks.append(_supplier_dimensions(target, views))
 
     def assert_settled() -> None:
         if len(authored_checks) != 1:
             raise RuntimeError("supplier nut annotations must be authored exactly once")
         authored_checks[0]()
+
+    def assert_saved(target: Any, path: Path) -> None:
+        if source_configuration is None:
+            raise RuntimeError("supplier nut saved check has no authored source binding")
+        assert_saved_supplier_nut_nominal(
+            target, path, nominal_major_mm=supplier.SUPPLIER_NOMINAL_MAJOR_MM,
+            source_path=SPEC.source, configuration=source_configuration,
+        )
 
     return await build_purchased_fastener_drawing(
         adapter,
@@ -63,6 +77,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_settled,),
+        saved_check=assert_saved,
     )
 
 
