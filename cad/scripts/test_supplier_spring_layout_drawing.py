@@ -325,9 +325,8 @@ class _ReferenceInkView:
         self.correspondence_reads = []
         self._transform = None
         self.drawing_segments = []
-        self.drawing_blocks = self.drawing_user_points = self.centerlines = 0
+        self.drawing_blocks = self.drawing_user_points = 0
         self.drawing_text = ()
-        self.center_mark = None
         self.correspondence = {
             id(self.owner): SimpleNamespace(Visible=1),
             **{id(segment): object() for segment in self.source.GetSketchSegments()},
@@ -369,12 +368,6 @@ class _ReferenceInkView:
             GetSketchTextSegments=lambda: self.drawing_text,
             GetUserPointsCount=lambda: self.drawing_user_points,
         )
-
-    def GetFirstCenterMark2(self):
-        return self.center_mark
-
-    def GetCenterLineCount(self):
-        return self.centerlines
 
     def SetViewPosition(self, position, update):
         assert update is False
@@ -1026,21 +1019,16 @@ def test_reference_projection_accepts_distinct_wrappers_with_proven_native_ident
         ("drawing_blocks", 1),
         ("drawing_text", (object(),)),
         ("drawing_user_points", 1),
-        ("center_mark", object()),
-        ("centerlines", 1),
-        ("centerlines", False),
     ],
 )
-def test_reference_projection_rechecks_added_drawing_ink_and_actual_marks(
+def test_reference_projection_rechecks_added_drawing_sketch_ink(
     reference_scene, attribute, value
 ):
     harness = reference_scene()
     harness.capture()
     events = tuple(harness.model.events)
     setattr(harness.view, attribute, value)
-    with pytest.raises(
-        RuntimeError, match="drawing-sketch geometry|centre mark or centreline"
-    ):
+    with pytest.raises(RuntimeError, match="drawing-sketch geometry"):
         harness.project()
     assert tuple(harness.model.events) == events
 

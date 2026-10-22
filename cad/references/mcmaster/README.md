@@ -1538,6 +1538,9 @@ the presentation path. Native farm renders and visual comparison with the
 supplier reference qualify the resulting sheet, independently of the source
 geometry capture. Native dimension association, value, visibility and
 annotation-containment checks remain mandatory.
+Native centre crosses on supplier circles are legitimate reference aids. The
+existing centre-mark pass turns off template extension lines before fitting and
+again after scale selection, rather than rejecting those marks.
 Source parts are opened with the native silent/read-only option, with actual
 read-only state and path identity checked; a resident writable source is refused.
 Only clean source documents are captured, without saving or clearing their

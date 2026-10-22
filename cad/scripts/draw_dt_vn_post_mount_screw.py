@@ -253,7 +253,7 @@ SHEET_NAMES = ("FINISHED", "SUPPLIER-MAX-ENVELOPE")
 STOCK_SCALE = (2.0, 1.0)
 STOCK_CENTER = (0.235, 0.110)
 STOCK_KEEP = {
-    "SupplierStockLength": (0.235, 0.081),
+    "SupplierStockLength": (0.235, 0.083),
     "SupplierThreadLength": (0.303, 0.151),
     "SupplierThreadMajor": (0.366, 0.116),
 }

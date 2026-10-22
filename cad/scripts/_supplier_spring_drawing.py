@@ -351,17 +351,6 @@ def _assert_reference_view_ink(view: Any, *, label: str) -> None:
         raise RuntimeError(
             f"{label}: unexpected or unreadable additional drawing-sketch geometry"
         )
-    # GetFirstCenterMark2 traverses actual annotation marks; the older count
-    # getters describe legacy feature marks and cannot prove this inventory.
-    centerline_count = view.GetCenterLineCount()
-    if (
-        view.GetFirstCenterMark2() is not None
-        or type(centerline_count) is not int
-        or centerline_count != 0
-    ):
-        raise RuntimeError(
-            f"{label}: supplier reference view contains a centre mark or centreline"
-        )
 
 
 def _reference_features(model: Any, adapter: Any, *, label: str) -> dict[str, Any]:
@@ -1009,6 +998,9 @@ async def build_supplier_spring_drawing(
             label=spec.artifact_stem,
         )
     )
+    # Supplier circles can legitimately acquire native centre crosses. Remove
+    # their template extension lines before fitting, not the useful crosses.
+    _center_marks_without_lines(list(views.values()), cells)
     for prepared_check in preparation_checks or ():
         prepared_check()
 
@@ -1053,12 +1045,8 @@ async def build_supplier_spring_drawing(
                     view_keys=tuple(cell[0] for _, cell in members),
                 )
             scales.update({cell[0]: scale for _, cell in members})
-    center_mark_counts = _center_marks_without_lines(list(views.values()), cells)
+    _center_marks_without_lines(list(views.values()), cells)
     for key in reference_features:
-        if center_mark_counts[key] != 0:
-            raise RuntimeError(
-                f"{key}: supplier reference view acquired native centre marks"
-            )
         _assert_reference_view_ink(views[key], label=f"{spec.artifact_stem} {key}")
     scale = scales["free_front"]
     values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
