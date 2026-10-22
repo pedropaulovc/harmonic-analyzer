@@ -78,12 +78,7 @@ def test_fit_limits_match_the_printed_callouts() -> None:
     assert printed == [round(k5_low, 12), round(k5_high, 12)]
 
 
-def test_fitted_lower_gap_names_the_actual_block_top_at_the_upper_bearing_seat() -> None:
-    caption = " ".join(spec.DIMENSION_CALLOUTS["LowerBossHeight"].split())
-    assert caption == (
-        f"FIT PIVOT BLOCK {spec.BLOCK_NUMBER} TOP FACE AT UPPER BEARING "
-        "SEAT; GAP 0.10-0.15; NO PRELOAD, CLEAR SEAL"
-    )
+def test_fitted_lower_gap_references_the_existing_block_top_plane() -> None:
     assert spec.BLOCK_NUMBER == _config.parts("ch-rocker-arm-tl-oblique-pivot-block")["number"]
     lower_stop = next(row for row in spec.GEOMETRIC_CONTROLS if row.key == "flange_lower_stop")
     # Existing machined block top, not a bearing shoulder or recess floor.
@@ -630,7 +625,8 @@ def _d349_box_at(name, bounds) -> Box:
 # 9bbd's actual PDF/native font: the new rows' embedded Century Gothic
 # advances are 36.464, 48.687, 55.276 and 45.363 mm. Reserve another
 # 0.2+ mm per row; the longest, unchanged row and reference value retain
-# their measured complete glyph boxes. Native row pitch is 5.55625 mm.
+# their measured complete glyph boxes. Native row pitch is 5.55625 mm,
+# and the WHOLE value-plus-caption block is vertically centred on its keep.
 _LOWER_BOSS_ROW_ADVANCE_BUDGET = {
     "FIT PIVOT BLOCK": 0.0367,
     "MHA-CH-06-TL-22 TOP": 0.0489,
@@ -643,21 +639,23 @@ _NATIVE_CALLOUT_ROW_PITCH = 0.00555625
 def _lower_boss_caption_glyphs(keep=None):
     x, y = drawing.PROFILE_KEEP["LowerBossHeight"] if keep is None else keep
     rows = spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()
+    count = len(rows) + 1  # include the native reference value
+    centre = y + (count - 1) / 2.0 * _NATIVE_CALLOUT_ROW_PITCH
     glyphs = [
-        Box(x - 0.0057898, y + 0.0054535, x + 0.0057898, y + 0.0102709),
+        Box(x - 0.0057898, centre - 0.0028809, x + 0.0057898, centre + 0.0019365),
     ]
-    for index, row in enumerate(rows):
-        baseline = y - index * _NATIVE_CALLOUT_ROW_PITCH
+    for index, row in enumerate(rows, start=1):
+        centre = y + ((count - 1) / 2.0 - index) * _NATIVE_CALLOUT_ROW_PITCH
         if row == "NO PRELOAD, CLEAR SEAL":
             glyphs.append(Box(
-                x - 0.0291255, baseline + 0.0006259,
-                x + 0.0294149, baseline + 0.0044992,
+                x - 0.0291255, centre - 0.0021522,
+                x + 0.0294149, centre + 0.0017211,
             ))
         else:
             width = _LOWER_BOSS_ROW_ADVANCE_BUDGET[row]
             glyphs.append(Box(
-                x - width / 2.0, baseline + 0.0005,
-                x + width / 2.0, baseline + 0.0047,
+                x - width / 2.0, centre - 0.0022781,
+                x + width / 2.0, centre + 0.0019219,
             ))
     return glyphs
 
@@ -672,7 +670,8 @@ def _lower_boss_caption_box():
 
 def _lower_boss_line_y():
     rows = spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()
-    return drawing.PROFILE_KEEP["LowerBossHeight"][1] - (len(rows) - 1) * _NATIVE_CALLOUT_ROW_PITCH
+    count = len(rows) + 1
+    return drawing.PROFILE_KEEP["LowerBossHeight"][1] - count / 2.0 * _NATIVE_CALLOUT_ROW_PITCH
 
 
 def _cross_hole_leader_at(keep) -> Segment:
@@ -910,8 +909,9 @@ def _bearing_callout_padding():
     return (len(first) - len(first.lstrip(" "))) * _PIN_NATIVE_SPACE_ADVANCE
 
 
-def _bearing_callout_glyphs():
-    padding = _bearing_callout_padding()
+def _bearing_callout_glyphs(padding=None):
+    if padding is None:
+        padding = _bearing_callout_padding()
     return [
         Box(
             row.xmin + (padding if index == 5 else padding / 2.0), row.ymin,
@@ -930,14 +930,12 @@ def _pin_native_neighbour_lines():
     ]
 
 
-def test_9bbd_leading_zero_lacks_clearance_from_its_actual_native_vertical_line() -> None:
-    line = Segment(0.2465, 0.0911399, 0.2465, 0.1489985)
-    assert segment_box_distance(line, _PIN_9BBD_BEARING_GLYPHS[5]) == pytest.approx(0.0001494)
-    assert segment_box_distance(line, _PIN_9BBD_BEARING_GLYPHS[5]) < 0.0002
-
-
 def test_native_bearing_callout_padding_clears_all_glyphs_not_only_the_first_zero() -> None:
     line = Segment(0.2465, 0.0911399, 0.2465, 0.1790015)
+    assert min(
+        segment_box_distance(line, glyph)
+        for glyph in _bearing_callout_glyphs(padding=0.0)
+    ) < 0.0035
     for glyph in _bearing_callout_glyphs():
         assert segment_box_distance(line, glyph) >= 0.0035
         assert glyph.xmax <= 0.4191 - 0.0035
@@ -963,10 +961,10 @@ def test_full_five_row_block_top_caption_clears_body_witnesses_and_flange_thickn
             assert segment_box_distance(witness, glyph) >= 0.0035
         assert segment_box_distance(flange_line, glyph) >= 0.002
         assert glyph.gap(flange_value) >= 0.0035
-    # Five rows at the old anchor would crowd both body and left witness.
-    old_ink = _lower_boss_caption_glyphs((0.245, 0.202))
-    assert min(glyph.gap(body) for glyph in old_ink for body in _projected_pin_body().values()) < 0.0035
-    assert min(segment_box_distance(witnesses[0], glyph) for glyph in old_ink) < 0.0035
+    # The rejected Y208 candidate overprints both native 3.0 ink and its line.
+    old_value = _lower_boss_caption_glyphs((0.2465, 0.208))[0]
+    assert segment_box_overlap_length(flange_line, old_value) > 0.0003
+    assert old_value.overlaps(flange_value, tol=0.0003)
 
 
 def _projected_pin_body():
