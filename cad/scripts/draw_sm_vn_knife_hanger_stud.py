@@ -29,11 +29,15 @@ from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import add_property_linked_note, property_link
-from _drawing_physical_head_height import assert_native_physical_head_height
+from _drawing_physical_axial_dimension import (
+    add_native_physical_axial_dimension,
+    assert_native_physical_axial_dimension,
+)
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _mcmaster_92314a253 import DIMS as _SUPPLIER_DIMS
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_dimensions import (
@@ -310,19 +314,20 @@ def _head_height_entities(adapter: Any, front: Any) -> tuple[Any, Any]:
 
 @_telemetry.traced("drawing.stud_head_height_assert")
 def _assert_physical_head_height(
-    adapter: Any, front: Any, display: Any, entities: tuple[Any, Any] | None = None
+    adapter: Any, front: Any, display: Any, entities: tuple[Any, Any] | None = None,
+    *, phase: str = "settled",
 ) -> float:
     """Rescan physical stations and prove fresh native value, ownership and geometry."""
     if entities is None:
         entities = _head_height_entities(adapter, front)
     bearing_mm, top_mm = _head_height_points_mm()
-    return assert_native_physical_head_height(
+    return assert_native_physical_axial_dimension(
         adapter, front, display, entities=entities,
         points_m=(
             tuple(value / 1000 for value in bearing_mm),
             tuple(value / 1000 for value in top_mm),
         ),
-        expected_mm=HEAD_H, label="SupplierHeadHeight",
+        expected_mm=HEAD_H, label="SupplierHeadHeight", phase=phase,
     )
 
 
@@ -381,7 +386,7 @@ def _add_physical_head_height(adapter: Any, front: Any, text_xy: tuple[float, fl
             raise RuntimeError("SupplierHeadHeight: AddVerticalDimension2 returned no dimension")
     finally:
         model.ClearSelection2(True)
-    _assert_physical_head_height(adapter, front, display, entities=entities)
+    _assert_physical_head_height(adapter, front, display, entities=entities, phase="creation")
     return display
 
 
@@ -423,6 +428,173 @@ def _add_supplier_references(adapter: Any, front: Any) -> dict[str, Any]:
     return authored
 
 
+def _stock_factory_tip_radius_mm() -> float:
+    # Exact original supplier law: diag_mcmaster_hex_head.HexHeadScrew.tip_chamfer
+    # is pitch * TIP_CHAMFER_PER_PITCH (0.851), not the finished deburr width.
+    return _SUPPLIER_DIMS.major_dia / 2 - _SUPPLIER_DIMS.pitch * 0.851
+
+
+def _stock_native_point(edge: Any, query_m: tuple[float, float, float]) -> tuple[float, ...]:
+    raw = _early_bound(edge, "IEdge").GetClosestPointOn(*query_m)
+    # SDK returns XYZ, UParameter, NotUsed. Validate all used doubles; ignore
+    # the fifth slot, which the SDK explicitly declares unused.
+    if raw is None or len(raw) != 5 or any(
+        isinstance(value, bool) or not isinstance(value, (int, float))
+        or not math.isfinite(value) for value in raw[:4]
+    ):
+        raise RuntimeError("SupplierStockLength: actual trimmed-edge point is unreadable")
+    return tuple(float(value) for value in raw[:3])
+
+
+@_telemetry.traced("drawing.stud_stock_length_stations")
+def _stock_length_stations(adapter: Any, stock: Any) -> tuple[tuple[Any, Any], tuple]:
+    """Resolve fresh outer bearing and original factory tip, including native trim."""
+    label = "SupplierStockLength"
+    stock = _early_bound(stock, "IView")
+    configuration = str(stock.ReferencedConfiguration)
+    if configuration != SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError(f"{label}: view does not reference AS SUPPLIED STOCK")
+    if int(stock.GetDisplayMode2()) != 2:
+        raise RuntimeError(f"{label}: stock view is not hidden-lines-removed")
+    raw_source = stock.ReferencedDocument
+    if raw_source is None:
+        raise RuntimeError(f"{label}: stock view has no native referenced document")
+    source_document = _early_bound(raw_source, "IModelDoc2")
+    source_path = str(source_document.GetPathName() or "")
+    _telemetry.event(
+        "drawing.physical_stock_length_source", label=label,
+        configuration=configuration, native_source_path=source_path,
+    )
+    if (
+        not source_path or not Path(source_path).is_absolute()
+        or Path(source_path).resolve() != SOURCE.resolve()
+    ):
+        raise RuntimeError(f"{label}: native stock source document path changed: {source_path!r}")
+    scan = scan_view_edges(stock, label=f"{label} physical stations")
+    bearing_mm = _head_height_points_mm()[0]
+    bearing_query = tuple(value / 1000 for value in bearing_mm)
+    tip_y = LENGTH - CATALOG_LENGTH
+    tip_radius = _stock_factory_tip_radius_mm()
+    tip_query = (0.0, tip_y / 1000, tip_radius / 1000)
+    tolerance_mm = 1e-5
+    point_tolerance_m = 1e-8
+    bearing_matches, line_details = [], []
+    for item in scan.lines:
+        detail = {"line_mm": item.line, "geometry_error_mm": math.inf}
+        line_details.append(detail)
+        if not all(math.isfinite(value) for point in item.line for value in point):
+            continue
+        # The proven head-bearing contract: exact finite front-right outer
+        # hex side, not the inner runout circle or bearing-face interior.
+        start, end = item.line
+        vector = tuple(b - a for a, b in zip(start, end))
+        length_sq = sum(value * value for value in vector)
+        t = (
+            sum((p - a) * v for p, a, v in zip(bearing_mm, start, vector)) / length_sq
+            if length_sq > 0.0 else 0.0
+        )
+        closest = tuple(a + min(1.0, max(0.0, t)) * v for a, v in zip(start, vector))
+        geometry_error_mm = max(
+            math.dist(closest, bearing_mm),
+            max(abs(point[1] - LENGTH) for point in item.line),
+            max(abs(z - (HEAD_AF - x) / math.sqrt(3)) for x, _y, z in item.line),
+            max(max(0.0, -point[0], point[0] - HEAD_AF / 2) for point in item.line),
+        )
+        detail.update(geometry_error_mm=geometry_error_mm, parameter=t)
+        if (
+            length_sq <= tolerance_mm ** 2 or not 0.0 <= t <= 1.0
+            or geometry_error_mm > tolerance_mm
+        ):
+            continue
+        native_point = _stock_native_point(item.edge, bearing_query)
+        point_error = math.dist(native_point, bearing_query)
+        requery = _stock_native_point(item.edge, native_point)
+        membership_error = math.dist(requery, native_point)
+        detail.update(
+            native_point_m=native_point, point_error_m=point_error,
+            membership_error_m=membership_error,
+        )
+        if max(point_error, membership_error) <= point_tolerance_m:
+            bearing_matches.append((item, native_point))
+    circle_details, tip_matches = [], []
+    for item in scan.circles:
+        detail = {"circle_mm": item.circle, "geometry_error_mm": math.inf}
+        circle_details.append(detail)
+        if not all(math.isfinite(value) for value in item.circle):
+            continue
+        cx, cy, cz, nx, ny, nz, radius = item.circle
+        center_error = max(abs(cx), abs(cy - tip_y), abs(cz))
+        radius_error = abs(radius - tip_radius)
+        axis_length = math.hypot(nx, ny, nz)
+        if axis_length <= 0.0 or not math.isfinite(axis_length):
+            continue
+        axis_error = max(
+            abs(nx / axis_length), abs(nz / axis_length), abs(abs(ny / axis_length) - 1.0)
+        )
+        detail.update(
+            geometry_error_mm=center_error + radius_error + axis_error * tip_radius,
+            center_error_mm=center_error, radius_error_mm=radius_error,
+            axis_error=axis_error,
+        )
+        if center_error > tolerance_mm or radius_error > tolerance_mm or axis_error > 1e-6:
+            continue
+        # Closest to the forward extremum is the frontmost point on this
+        # actual trimmed arc, even when the underlying circle is interrupted.
+        point = _stock_native_point(item.edge, tip_query)
+        plane_error = abs(point[1] - tip_y / 1000)
+        radial_error = abs(math.hypot(point[0], point[2]) - tip_radius / 1000)
+        requery = _stock_native_point(item.edge, point)
+        membership_error = math.dist(requery, point)
+        detail.update(
+            native_point_m=point, plane_error_m=plane_error,
+            radial_error_m=radial_error, membership_error_m=membership_error,
+        )
+        if max(plane_error, radial_error, membership_error) <= point_tolerance_m:
+            tip_matches.append((item, point))
+    line_details.sort(key=lambda row: row["geometry_error_mm"])
+    circle_details.sort(key=lambda row: row["geometry_error_mm"])
+    _telemetry.event(
+        "drawing.physical_stock_length_geometry", label=label, configuration=configuration,
+        bearing_point_mm=bearing_mm, tip_y_mm=tip_y, factory_tip_radius_mm=tip_radius,
+        line_count=len(scan.lines), circle_count=len(scan.circles),
+        lines=line_details[:12], circles=circle_details[:12],
+        bearing_matches=len(bearing_matches), tip_matches=len(tip_matches),
+    )
+    if len(bearing_matches) != 1 or not tip_matches:
+        raise RuntimeError(
+            f"{label}: expected one outer hex bearing and a physical factory tip; "
+            f"bearing={len(bearing_matches)}, tip={len(tip_matches)}; "
+            f"lines={line_details[:12]}; circles={circle_details[:12]}"
+        )
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    tip_matches.sort(key=lambda match: match[1][2], reverse=True)
+    tip, tip_point = tip_matches[0]
+    for other, other_point in tip_matches[1:]:
+        if tip_point[2] - other_point[2] <= point_tolerance_m:
+            if int(app.IsSame(tip.edge, other.edge)) != 1:
+                raise RuntimeError(f"{label}: unresolved distinct factory-tip frontmost tie")
+    bearing, bearing_point = bearing_matches[0]
+    if int(app.IsSame(bearing.edge, tip.edge)) != 0:
+        raise RuntimeError(f"{label}: physical stations are not distinct edges")
+    _telemetry.event(
+        "drawing.physical_stock_length_stations", label=label, configuration=configuration,
+        bearing_line_mm=bearing.line, tip_circle_mm=tip.circle,
+        bearing_point_m=bearing_point, tip_point_m=tip_point,
+    )
+    return (bearing.edge, tip.edge), (bearing_point, tip_point)
+
+
+@_telemetry.traced("drawing.stud_stock_length_assert")
+def _assert_physical_stock_length(
+    adapter: Any, stock: Any, display: Any, *, phase: str = "settled",
+) -> float:
+    entities, points_m = _stock_length_stations(adapter, stock)
+    return assert_native_physical_axial_dimension(
+        adapter, stock, display, entities=entities, points_m=points_m,
+        expected_mm=CATALOG_LENGTH, label="SupplierStockLength", phase=phase,
+    )
+
+
 def _add_stock_reference(adapter: Any) -> tuple[Any, Any, Any]:
     """Show the original 2-inch solid on its own stock-only sheet."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -442,17 +614,10 @@ def _add_stock_reference(adapter: Any) -> tuple[Any, Any, Any]:
         if not set_view_position(adapter, view, *centre):
             raise RuntimeError("cannot position source-stock view")
         set_hidden_lines_removed(adapter, view)
-    picks = model_points_in_view(
-        adapter, stock,
-        (
-            (0.95 * HEAD_AF / 2000, LENGTH / 1000, 0.0),
-            (0.0, (LENGTH - CATALOG_LENGTH) / 1000, 0.0),
-        ),
-        label="as-supplied under-head stock length",
-    )
-    display = add_edge_dimension(
-        adapter, stock, p0=picks[0], p1=picks[1], text_xy=(0.130, 0.160),
-        label="SupplierStockLength", orientation="vertical",
+    entities, points_m = _stock_length_stations(adapter, stock)
+    display = add_native_physical_axial_dimension(
+        adapter, stock, entities=entities, points_m=points_m, text_xy=(0.130, 0.160),
+        expected_mm=CATALOG_LENGTH, label="SupplierStockLength",
     )
     annotation = _format_supplier_reference(adapter, display, "SupplierStockLength")
     # ActivateView("") is documented to return False for sheet activation.
@@ -541,7 +706,9 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                     adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
                 )
                 if name == "SupplierHeadHeight":
-                    _assert_physical_head_height(adapter, view, display)
+                    _assert_physical_head_height(adapter, view, display, phase="settled")
+                elif name == "SupplierStockLength":
+                    _assert_physical_stock_length(adapter, view, display, phase="settled")
                 attached = tuple(annotation.GetAttachedEntities3() or ())
                 actual_kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
                 if len(attached) != len(entities) or actual_kinds != kinds or any(
@@ -558,14 +725,23 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
 
 
-@_telemetry.traced("drawing.stud_head_height_saved")
-def _assert_saved_physical_head_height(adapter: Any, identities: dict, configurations: dict) -> None:
+@_telemetry.traced("drawing.stud_physical_references_saved")
+def _assert_saved_physical_references(adapter: Any, identities: dict, configurations: dict) -> None:
     """Audit only the finalized, closed SLDDRW, read-only; never rebuild or repair."""
     label = "SupplierHeadHeight"
-    full_name, expected_owner, _entities, _kinds = identities[label]
-    expected_configuration = configurations[expected_owner]
-    if not full_name or expected_configuration[0] != SHEET_NAMES[0]:
-        raise RuntimeError(f"{label}: saved identity is not on the finished sheet")
+    labels = ("SupplierHeadHeight", "SupplierStockLength")
+    captured = {}
+    for index, name in enumerate(labels):
+        full_name, expected_owner, _entities, _kinds = identities[name]
+        expected_configuration = configurations[expected_owner]
+        if (
+            not full_name or expected_configuration[0] != SHEET_NAMES[index]
+            or (expected_configuration[1] == SUPPLIER_STOCK_CONFIGURATION) != (index == 1)
+        ):
+            raise RuntimeError(f"{name}: saved identity has the wrong physical sheet/configuration")
+        captured[name] = (full_name, expected_owner, expected_configuration)
+    if len({record[0] for record in captured.values()}) != len(labels):
+        raise RuntimeError(f"{label}: physical references share a native FullName")
     saved_path = Path(OUTPUTS.slddrw).resolve()
     if not saved_path.is_file() or saved_path.suffix.lower() != ".slddrw":
         raise RuntimeError(f"{label}: finalized SLDDRW is missing")
@@ -596,7 +772,7 @@ def _assert_saved_physical_head_height(adapter: Any, identities: dict, configura
         drawing = _early_bound(model, "IDrawingDoc")
         if tuple(drawing.GetSheetNames() or ()) != SHEET_NAMES:
             raise RuntimeError(f"{label}: saved sheet census changed")
-        matches = []
+        matches = {name: [] for name in labels}
         for sheet_name in SHEET_NAMES:
             if not drawing.ActivateSheet(sheet_name):
                 raise RuntimeError(f"{label}: cannot activate saved sheet {sheet_name}")
@@ -610,41 +786,62 @@ def _assert_saved_physical_head_height(adapter: Any, identities: dict, configura
                     if raw_dimension is None:
                         raise RuntimeError(f"{label}: saved dimension has no native identity")
                     dimension = _early_bound(raw_dimension, "IDimension")
-                    if str(dimension.FullName) == full_name:
-                        matches.append((sheet_name, view, display))
+                    for name, (full_name, _owner, _configuration) in captured.items():
+                        if str(dimension.FullName) == full_name:
+                            matches[name].append((sheet_name, view, display))
                 view = view.GetNextView()
-        if len(matches) != 1:
-            raise RuntimeError(f"{label}: saved native FullName census is {len(matches)}, expected 1")
-        sheet_name, front, display = matches[0]
-        raw_annotation = display.GetAnnotation()
-        if raw_annotation is None:
-            raise RuntimeError(f"{label}: saved native dimension has no annotation")
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if (
-            view_name(adapter, front) != expected_owner
-            or view_name(adapter, annotation.Owner) != expected_owner
-            or (sheet_name, str(front.ReferencedConfiguration)) != expected_configuration
-        ):
-            raise RuntimeError(f"{label}: saved native owner/configuration changed")
-        if not drawing.ActivateSheet(sheet_name):
-            raise RuntimeError(f"{label}: cannot reactivate saved finished sheet")
-        if adapter.currentModel is None or int(app.IsSame(adapter.currentModel, model)) != 1:
-            raise RuntimeError(f"{label}: saved reader lost the adapter's exact current drawing")
-        measured = _assert_physical_head_height(adapter, front, display)
-        assert_supplier_reference_dimension(
-            adapter, display, label=label, **SUPPLIER_REFERENCE_DIMENSIONS[label]
-        )
-        native = _early_bound(display.GetDimension2(0), "IDimension")
-        if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-            raise RuntimeError(f"{label}: an unsupported supplier band was added after saving")
-        bearing_point, top_point = _head_height_points_mm()
-        _telemetry.event(
-            "drawing.physical_head_height", phase="after_saved_reopen",
-            full_name=full_name, measured_mm=measured, owner=expected_owner,
-            configuration=str(front.ReferencedConfiguration),
-            bearing_point_mm=bearing_point, top_point_mm=top_point,
-            top_radius_mm=HEAD_AF / 2, open_warning_raw=warnings,
-        )
+        for name, found in matches.items():
+            if len(found) != 1:
+                raise RuntimeError(
+                    f"{name}: saved native FullName census is {len(found)}, expected 1"
+                )
+        for name in labels:
+            full_name, expected_owner, expected_configuration = captured[name]
+            sheet_name, front, display = matches[name][0]
+            raw_annotation = display.GetAnnotation()
+            if raw_annotation is None:
+                raise RuntimeError(f"{name}: saved native dimension has no annotation")
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            if (
+                view_name(adapter, front) != expected_owner
+                or view_name(adapter, annotation.Owner) != expected_owner
+                or (sheet_name, str(front.ReferencedConfiguration)) != expected_configuration
+            ):
+                raise RuntimeError(f"{name}: saved native owner/configuration changed")
+            if not drawing.ActivateSheet(sheet_name):
+                raise RuntimeError(f"{name}: cannot reactivate saved physical-reference sheet")
+            if adapter.currentModel is None or int(app.IsSame(adapter.currentModel, model)) != 1:
+                raise RuntimeError(f"{name}: saved reader lost the adapter's exact current drawing")
+            # Resolve native geometry anew in this opened document. Never compare
+            # either dimension's old COM attachment handles across close/reopen.
+            if name == "SupplierHeadHeight":
+                measured = _assert_physical_head_height(adapter, front, display, phase="saved")
+            else:
+                measured = _assert_physical_stock_length(adapter, front, display, phase="saved")
+            assert_supplier_reference_dimension(
+                adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
+            )
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
+                raise RuntimeError(f"{name}: an unsupported supplier band was added after saving")
+            if name == "SupplierHeadHeight":
+                bearing_point, top_point = _head_height_points_mm()
+                _telemetry.event(
+                    "drawing.physical_head_height", phase="after_saved_reopen",
+                    full_name=full_name, measured_mm=measured, owner=expected_owner,
+                    configuration=str(front.ReferencedConfiguration),
+                    bearing_point_mm=bearing_point, top_point_mm=top_point,
+                    top_radius_mm=HEAD_AF / 2, open_warning_raw=warnings,
+                )
+            else:
+                _telemetry.event(
+                    "drawing.physical_stock_length", phase="after_saved_reopen",
+                    full_name=full_name, measured_mm=measured, owner=expected_owner,
+                    configuration=str(front.ReferencedConfiguration),
+                    bearing_y_mm=LENGTH, tip_y_mm=LENGTH - CATALOG_LENGTH,
+                    factory_tip_radius_mm=_stock_factory_tip_radius_mm(),
+                    open_warning_raw=warnings,
+                )
     finally:
         try:
             reopened = app.GetOpenDocumentByName(path_string)
@@ -770,7 +967,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
     )
-    _assert_saved_physical_head_height(adapter, identities, configurations)
+    _assert_saved_physical_references(adapter, identities, configurations)
     return artifacts
 
 

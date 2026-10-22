@@ -1,4 +1,4 @@
-"""Fresh native proof of the two supplier physical head-height dimensions.
+"""Native physical axial dimensions for supplier heads and stock lengths.
 
 ``Type2 == swLinearDimension`` alone says nothing about sheet orientation.  The
 native arrow records must independently prove a vertical dimension at the exact
@@ -6,16 +6,17 @@ projected physical stations, at the view's current scale, as well as passing the
 unchanged named-edge/native-value assertion.
 
 The 1e-8 m sheet-position bound inherits the recipes' exact physical-edge
-GetClosestPointOn predicate and equals the existing 1e-5 mm model-height
+GetClosestPointOn predicate and equals the existing 1e-5 mm model-length
 precision.  For these sub-metre coordinates it conservatively exceeds IEEE
 double transform roundoff; it is not fitted to a native receipt.  The independent
-model-height tolerance remains unchanged.  The 1e-9 normalized direction bound
+model-length tolerance remains unchanged.  The 1e-9 normalized direction bound
 is an exact-axis numerical check, not an angular layout allowance.
 
 SDK: IDisplayDimension.Type2 / swDimensionType_e.swLinearDimension (2),
 IAnnotation.GetDisplayData, IDisplayData.GetArrowHeadCount / GetArrowHeadAtIndex2
 ([tipXYZ, directionXYZ, width, height, style, normalXYZ]), and IView.ScaleDecimal
-(getter only).  This assertion never selects, modifies, rebuilds, or saves.
+(getter only).  The assertion never selects, modifies, rebuilds, or saves.
+The stock-only creator selects actual model edges through IView.SelectEntity.
 """
 
 from __future__ import annotations
@@ -23,13 +24,15 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from solidworks_mcp.adapters.solidworks.drawing import view_name
+
 from _com import _early_bound
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_projection import model_points_in_view
 import _telemetry
 
 
-__all__ = ["assert_native_physical_head_height"]
+__all__ = ["add_native_physical_axial_dimension", "assert_native_physical_axial_dimension"]
 
 _POSITION_TOL_M = 1e-8
 _DIRECTION_TOL = 1e-9
@@ -51,8 +54,8 @@ def _finite_number(value: Any, name: str) -> float:
     return number
 
 
-@_telemetry.traced("drawing.physical_head_height_native_assert", label_param="label")
-def assert_native_physical_head_height(
+@_telemetry.traced("drawing.physical_axial_dimension_native_assert", label_param="label")
+def assert_native_physical_axial_dimension(
     adapter: Any,
     view: Any,
     display: Any,
@@ -60,7 +63,8 @@ def assert_native_physical_head_height(
     entities: tuple[Any, Any],
     points_m: tuple[tuple[float, float, float], tuple[float, float, float]],
     expected_mm: float,
-    label: str = "SupplierHeadHeight",
+    label: str,
+    phase: str = "settled",
 ) -> float:
     """Return the unchanged shared measured millimetres only if every proof holds.
 
@@ -69,7 +73,7 @@ def assert_native_physical_head_height(
     evidence is bounded, records the failing stage, and chains the original
     binder/getter/proof exception rather than replacing it with diagnostic work.
     """
-    snapshot: dict[str, Any] = {"display_null": display is None}
+    snapshot: dict[str, Any] = {"label": label, "phase": phase, "display_null": display is None}
     stage = "display"
     try:
         if display is None:
@@ -232,7 +236,7 @@ def assert_native_physical_head_height(
         expected_span_m = expected / 1000.0 * scale
         snapshot["expected_span_m"] = expected_span_m
         if not math.isfinite(expected_span_m) or expected_span_m <= 0:
-            raise RuntimeError("scaled physical height must be finite and positive")
+            raise RuntimeError("scaled physical length must be finite and positive")
         stage = "station_projection"
         projected = model_points_in_view(adapter, view, points_m, label=label)
         snapshot["projected_length"] = len(projected)
@@ -251,7 +255,7 @@ def assert_native_physical_head_height(
         if not math.isfinite(projected_span) or projected_span <= 0:
             raise RuntimeError("projected physical station span must be finite and positive")
         if abs(projected_span - expected_span_m) > _POSITION_TOL_M:
-            raise RuntimeError("projected physical station span disagrees with scaled physical height")
+            raise RuntimeError("projected physical station span disagrees with scaled physical length")
         if any(abs(actual - station) > _POSITION_TOL_M
                for actual, station in zip(native_ys, station_ys, strict=True)):
             raise RuntimeError("native arrow tips do not match the projected physical station Ys")
@@ -259,15 +263,203 @@ def assert_native_physical_head_height(
             abs(span_m - projected_span) > _POSITION_TOL_M
             or abs(span_m - expected_span_m) > _POSITION_TOL_M
         ):
-            raise RuntimeError("native arrow span disagrees with projected/scaled physical height")
+            raise RuntimeError("native arrow span disagrees with projected/scaled physical length")
     except Exception as exc:
         reason = str(exc)[:500]
         snapshot.update(
             failure_stage=stage, failure_error_type=type(exc).__name__, failure_error=reason
         )
-        _telemetry.event("drawing.physical_head_height_native_refusal", reason=reason, **snapshot)
+        _telemetry.event("drawing.physical_axial_dimension_native_refusal", reason=reason, **snapshot)
         prefix = "" if reason.startswith(label) else f"{label}: "
         raise RuntimeError(f"{prefix}{reason}; native_snapshot={snapshot!r}") from exc
 
-    _telemetry.event("drawing.physical_head_height_native_proof", **snapshot)
+    _telemetry.event("drawing.physical_axial_dimension_native_proof", **snapshot)
     return measured_mm
+
+
+@_telemetry.traced("drawing.physical_axial_dimension_native_add", label_param="label")
+def add_native_physical_axial_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    entities: tuple[Any, Any],
+    points_m: tuple[tuple[float, float, float], tuple[float, float, float]],
+    text_xy: tuple[float, float],
+    expected_mm: float,
+    label: str,
+) -> Any:
+    """Create a stock dimension from two actual edges in the drawing's view.
+
+    IView.SelectEntity(Entity, AppendFlag) supplies the drawing context for
+    model edges; IEntity.Select4 is deliberately not used.  GetClosestPointOn
+    returns [XYZ, UParameter, NotUsed]: validate the first four finite doubles,
+    ignore the documented unused fifth, and prove the supplied point is on the
+    actual trimmed edge, not merely its underlying curve.
+
+    SetSelectionPoint2(Index, Mark, X, Y, Z) uses world coordinates in the
+    context of its ISelectionMgr.  This manager belongs to the active DRAWING:
+    set projected sheet XY,0, as in the proven head flow, and require the
+    documented GetSelectionPoint2(Index, Mark) to read that same point back.
+    The source-model XYZ stations are independently checked on their edges;
+    they are never compared with drawing-manager selection coordinates.
+    No rebuild, type coercion, repair or alternate selection path is attempted.
+    """
+    snapshot: dict[str, Any] = {"label": label, "phase": "creation"}
+    stage = "model_bind"
+    model = None
+    try:
+        try:
+            model = _early_bound(adapter.currentModel, "IModelDoc2")
+            if model is None:
+                raise RuntimeError("no current drawing model")
+            stage = "physical_inputs"
+            if len(entities) != 2 or any(entity is None for entity in entities):
+                raise ValueError("expected two nonnull named physical edges")
+            if len(points_m) != 2 or any(len(point) != 3 for point in points_m):
+                raise ValueError("expected exactly two physical model XYZ stations")
+            physical_points = tuple(
+                tuple(_finite_number(value, f"physical station {index} coordinate {axis}")
+                      for axis, value in enumerate(point))
+                for index, point in enumerate(points_m)
+            )
+            snapshot["points_m"] = physical_points
+            expected = _finite_number(expected_mm, "expected_mm")
+            if expected <= 0:
+                raise ValueError("expected_mm must be positive")
+            if len(text_xy) != 2:
+                raise ValueError("expected a dimension text sheet XY point")
+            text_point = tuple(_finite_number(value, "text coordinate") for value in text_xy)
+            stage = "application_bind"
+            app = _early_bound(adapter.swApp, "ISldWorks")
+            stage = "physical_distinctness"
+            snapshot["physical_edges_same"] = _native_integer(
+                app.IsSame(entities[0], entities[1]), "physical edges IsSame"
+            )
+            if snapshot["physical_edges_same"] != 0:
+                raise RuntimeError("named physical edges are not provably distinct")
+            closest_points = []
+            snapshot["closest_points_m"] = closest_points
+            for index, (entity, point) in enumerate(zip(entities, physical_points, strict=True), 1):
+                stage = f"physical_edge_{index}"
+                edge = _early_bound(entity, "IEdge")
+                raw_closest = edge.GetClosestPointOn(point[0], point[1], point[2])
+                if raw_closest is None or len(raw_closest) != 5:
+                    raise RuntimeError(f"physical edge {index} closest point must contain five doubles")
+                closest = tuple(
+                    _finite_number(raw_closest[slot], f"physical edge {index} closest point slot {slot}")
+                    for slot in range(4)
+                )
+                closest_points.append(closest[:3])
+                if math.dist(closest[:3], point) > _POSITION_TOL_M:
+                    raise RuntimeError(f"physical station {index} is not on its actual trimmed edge")
+            stage = "station_projection"
+            projected = model_points_in_view(adapter, view, physical_points, label=label)
+            if len(projected) != 2 or any(len(point) != 2 for point in projected):
+                raise RuntimeError("expected exactly two projected physical sheet XY stations")
+            sheet_points = tuple(
+                tuple(_finite_number(value, f"projected station {index} coordinate {axis}")
+                      for axis, value in enumerate(point))
+                for index, point in enumerate(projected)
+            )
+            snapshot["projected_points_m"] = sheet_points
+            stage = "view_bind"
+            native_view = _early_bound(view, "IView")
+            drawing = _early_bound(model, "IDrawingDoc")
+            manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+            stage = "activate_view"
+            name = view_name(adapter, view)
+            snapshot["view_name"] = name
+            if not isinstance(name, str) or not name or drawing.ActivateView(name) is not True:
+                raise RuntimeError("cannot activate exact physical dimension drawing view")
+            stage = "clear_selection"
+            model.ClearSelection2(True)
+            selected = []
+            snapshot["selection_kinds"] = []
+            snapshot["selection_same"] = []
+            for index, entity in enumerate(entities, 1):
+                stage = f"select_edge_{index}"
+                if native_view.SelectEntity(entity, index > 1) is not True:
+                    raise RuntimeError(f"failed to select physical edge {index} in drawing view")
+                stage = f"selection_count_{index}"
+                count = _native_integer(manager.GetSelectedObjectCount2(-1), "selection count")
+                snapshot["selection_count"] = count
+                if count != index:
+                    raise RuntimeError(f"selection count changed at physical edge {index}")
+                stage = f"selection_kind_{index}"
+                kind = _native_integer(manager.GetSelectedObjectType3(index, -1), "selection type")
+                snapshot["selection_kinds"].append(kind)
+                if kind != 1:  # swSelectType_e.swSelEDGES
+                    raise RuntimeError(f"selected physical object {index} is not an EDGE")
+                stage = f"selection_identity_{index}"
+                actual = manager.GetSelectedObject6(index, -1)
+                if actual is None:
+                    raise RuntimeError(f"selected physical edge {index} is null")
+                same = _native_integer(app.IsSame(actual, entity), "selected edge IsSame")
+                snapshot["selection_same"].append(same)
+                if same != 1:
+                    raise RuntimeError(f"wrong selected object at physical edge {index}")
+                if selected and _native_integer(
+                    app.IsSame(selected[0], actual), "selected pair IsSame"
+                ) != 0:
+                    raise RuntimeError("selected physical edges are not provably distinct")
+                selected.append(actual)
+            for index, point in enumerate(sheet_points, 1):
+                stage = f"set_selection_point_{index}"
+                if manager.SetSelectionPoint2(index, -1, point[0], point[1], 0.0) is not True:
+                    raise RuntimeError(f"cannot set physical selection point {index}")
+            # Read the complete list again after both appends and point setters:
+            # neither may silently replace the first selected edge or point.
+            stage = "final_selection_count"
+            snapshot["selection_count"] = _native_integer(
+                manager.GetSelectedObjectCount2(-1), "selection count"
+            )
+            if snapshot["selection_count"] != 2:
+                raise RuntimeError("expected exactly two selected physical edges before creation")
+            selected = []
+            readback_points = []
+            snapshot["selection_points_m"] = readback_points
+            for index, (entity, point) in enumerate(zip(entities, sheet_points, strict=True), 1):
+                stage = f"final_selection_edge_{index}"
+                if _native_integer(manager.GetSelectedObjectType3(index, -1), "selection type") != 1:
+                    raise RuntimeError(f"selected physical object {index} is not an EDGE")
+                actual = manager.GetSelectedObject6(index, -1)
+                if actual is None or _native_integer(
+                    app.IsSame(actual, entity), "selected edge IsSame"
+                ) != 1:
+                    raise RuntimeError(f"wrong selected object at physical edge {index}")
+                if selected and _native_integer(
+                    app.IsSame(selected[0], actual), "selected pair IsSame"
+                ) != 0:
+                    raise RuntimeError("selected physical edges are not provably distinct")
+                selected.append(actual)
+                stage = f"selection_point_{index}"
+                raw_point = manager.GetSelectionPoint2(index, -1)
+                if raw_point is None or len(raw_point) != 3:
+                    raise RuntimeError(f"selection point {index} must contain exactly three doubles")
+                actual_point = tuple(
+                    _finite_number(value, f"selection point {index} coordinate {axis}")
+                    for axis, value in enumerate(raw_point)
+                )
+                readback_points.append(actual_point)
+                if math.dist(actual_point, (*point, 0.0)) > _POSITION_TOL_M:
+                    raise RuntimeError(f"selection point {index} differs from projected physical station")
+            stage = "native_creation"
+            display = model.AddVerticalDimension2(text_point[0], text_point[1], 0.0)
+            snapshot["display_null"] = display is None
+            if display is None:
+                raise RuntimeError("native vertical dimension creation returned null")
+        except Exception as exc:
+            reason = str(exc)[:500]
+            snapshot.update(
+                failure_stage=stage, failure_error_type=type(exc).__name__, failure_error=reason
+            )
+            _telemetry.event("drawing.physical_axial_dimension_native_refusal", reason=reason, **snapshot)
+            raise RuntimeError(f"{label}: {reason}; native_snapshot={snapshot!r}") from exc
+        assert_native_physical_axial_dimension(
+            adapter, view, display, entities=entities, points_m=physical_points,
+            expected_mm=expected_mm, label=label, phase="creation",
+        )
+        return display
+    finally:
+        if model is not None:
+            model.ClearSelection2(True)

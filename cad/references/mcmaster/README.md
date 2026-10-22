@@ -897,11 +897,20 @@ Catalog specifications checked on September 10, 2026:
   `HEAD_H` are checked at insertion, after settling and from the reopened
   read-only saved drawing. These are native model-reference checks, not new
   supplier tolerances or proof that a catalogue-only depiction is vendor CAD.
-  The shared native-height proof requires drawing dimension type 2
-  (`swLinearDimension`) **and** two finite, opposing vertical native arrows.
-  Their witness stations must match the fresh physical-edge projection and
-  their span must equal `HEAD_H` times the native view scale; the type code
-  alone cannot establish verticality.
+  The shared `_drawing_physical_axial_dimension.py` proof requires drawing
+  dimension type 2 (`swLinearDimension`) **and** two finite, opposing vertical
+  native arrows. Their witness stations must match the fresh physical-edge
+  projection and their span must equal the physical axial length times the
+  native view scale; the type code alone cannot establish verticality.
+  The separate original-stock sheet measures 50.8 mm from that same outer hex
+  bearing boundary at `Y=46.7` to the factory tip-face rim at `Y=-4.1`, radius
+  `1.512341666... mm`, not the finished cut end or the factory chamfer's major
+  junction. A fresh HLR scan of the view's exact `AS SUPPLIED STOCK`
+  configuration resolves those physical entities. `IView.SelectEntity` selects
+  them in the drawing view; native selection and attachment identities, exact
+  axial stations and the scaled span must agree. A missing selection, null
+  creation or angular result refuses. Both head and stock references undergo
+  the same strict creation, settled and independently reopened saved-file proof.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1090,13 +1099,22 @@ Catalog specifications checked on September 10, 2026:
   after settling and on the reopened read-only saved drawing. Interior face
   points are not reliable drawing-edge picks, even when their projection
   crosses the apparent rim.
-  The shared `_drawing_physical_head_height.py` proof requires type 2
+  The shared `_drawing_physical_axial_dimension.py` proof requires type 2
   (`swLinearDimension`), not a type-12-or-type-2 alternative, and independently
   proves verticality from both native arrows, projected physical stations and
   the native view scale. Its `1e-8 m` sheet-position bound inherits the exact
   physical-edge pick precision; it is not fitted to a rendered result.
-  The separate native-height tolerance remains `1e-5 mm`. All of these checks
-  run afresh at insertion, after settling and after reopening the saved file.
+  The separate native-length tolerance remains `1e-5 mm`. The original-stock
+  thread reference spans the shoulder's outer end rim at `Y=-12.7`, radius
+  `2.38125 mm`, to the factory tip-face rim at `Y=-22.225`, radius `1.707896 mm`,
+  for exactly 9.525 mm. Its factory chamfer is `0.374904 mm`, not the finished
+  tip's 0.60 mm preparation. Fresh HLR entities from the exact
+  `AS SUPPLIED STOCK` view are selected with `IView.SelectEntity`, not an
+  interior-face coordinate hit test. Native closest points establish actual
+  trimmed-edge membership; an unresolved distinct-edge tie refuses rather
+  than silently substituting a circle, silhouette or finished-tip station.
+  Both head and stock references are checked afresh at creation, after settling
+  and after independently reopening the saved drawing without repair or resave.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

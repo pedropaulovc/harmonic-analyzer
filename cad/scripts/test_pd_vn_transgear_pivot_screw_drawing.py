@@ -525,6 +525,7 @@ class _HeadSelection:
         self.actual = {}
         self.refuse_index = 0
         self.point_result = True
+        self.points = {}
 
     def ClearSelection2(self, _all):
         self.clear_count += 1
@@ -557,7 +558,12 @@ class _HeadSelection:
 
     def SetSelectionPoint2(self, index, mark, x, y, z):
         self.calls.append(("point", index, mark, x, y, z))
+        self.points[index] = (x, y, z)
         return self.point_result
+
+    def GetSelectionPoint2(self, index, mark):
+        assert mark == -1
+        return self.points[index]
 
 
 class _HeadRim:
@@ -587,7 +593,7 @@ class _HeadRim:
 def _physical_head_fixture(monkeypatch):
     """Real recipe/shared measurement logic over explicitly bounded no-COM doubles."""
     import _drawing_edge_dimensions as edge_dimensions
-    import _drawing_physical_head_height as physical_height
+    import _drawing_physical_axial_dimension as physical_height
     from _drawing_edges import ViewEdge, ViewEdges
 
     selection = _HeadSelection()
@@ -666,7 +672,8 @@ def _physical_head_fixture(monkeypatch):
 
     def scan(view, *, label):
         state.scans.append((state.adapter.currentModel, view, label))
-        return ViewEdges(label=label, edges=tuple(state.edges))
+        edges = state.stock.edges if hasattr(state, "stock") and view is state.stock.view else state.edges
+        return ViewEdges(label=label, edges=tuple(edges))
 
     def project(_adapter, view, points, *, label):
         points = tuple(points)
@@ -681,6 +688,7 @@ def _physical_head_fixture(monkeypatch):
         lambda value, _kind, *_members: value,
     )
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(physical_height, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(drawing, "scan_view_edges", scan)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(physical_height, "model_points_in_view", project)
@@ -935,8 +943,7 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
             drawing._assert_physical_head_height(state.adapter, state.front, state.display)
     assert not state.selection.selected
     evidence = state.events[-1]
-    assert evidence[0] == "drawing.physical_head_height_native_refusal"
-    assert "native_snapshot=" in str(refusal.value)
+    assert evidence[0] == "drawing.physical_axial_dimension_native_refusal"
     if fault == "malformed_kinds":
         assert evidence[1]["kinds"] == (1, None)
         assert evidence[1]["kinds_length"] == 2
@@ -950,7 +957,7 @@ def test_physical_head_height_valid_linear_type_requires_native_spatial_proof(
     assert drawing._assert_physical_head_height(
         state.adapter, state.front, state.display, entities=(state.bearing, state.top),
     ) == screw.HEAD_H
-    assert state.events[-1][0] == "drawing.physical_head_height_native_proof"
+    assert state.events[-1][0] == "drawing.physical_axial_dimension_native_proof"
     assert state.projections[-1][1] == drawing._head_height_points()
     assert not state.scans  # Explicit creation pair does not trigger a second scan.
 
@@ -962,7 +969,7 @@ def test_physical_head_height_accepts_exact_edge_bijection_in_reverse_order(monk
         state.adapter, state.front, state.display,
     ) == screw.HEAD_H
     assert len(state.scans) == 1
-    assert state.events[-1][0] == "drawing.physical_head_height_native_proof"
+    assert state.events[-1][0] == "drawing.physical_axial_dimension_native_proof"
 
 
 @pytest.mark.parametrize("missing", ("display", "annotation", "attached", "kinds"))
@@ -977,7 +984,7 @@ def test_physical_head_height_missing_metadata_has_precise_snapshot(monkeypatch,
         state.annotation.GetAttachedEntities3 = lambda: None
     else:
         state.annotation.GetAttachedEntityTypes = lambda: None
-    with pytest.raises(RuntimeError, match="native_snapshot=") as refusal:
+    with pytest.raises(RuntimeError) as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, display, entities=(state.bearing, state.top),
         )
@@ -1015,7 +1022,7 @@ def test_physical_head_height_refusal_bounds_native_metadata(monkeypatch) -> Non
     state.annotation.GetAttachedEntities3 = lambda: BoundedNativeArray("attached", 200, state.top)
     state.annotation.GetAttachedEntityTypes = lambda: BoundedNativeArray("kinds", 300, 46)
     state.display.Type2 = 2
-    with pytest.raises(RuntimeError, match="expected two nonnull actual edge attachments") as refusal:
+    with pytest.raises(RuntimeError, match="expected two nonnull actual edge attachments"):
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
@@ -1025,7 +1032,6 @@ def test_physical_head_height_refusal_bounds_native_metadata(monkeypatch) -> Non
     assert evidence["kinds"] == (46,) * 4
     assert evidence["attached_nulls"] == (False,) * 4
     assert reads == [(name, index) for name in ("attached", "kinds") for index in range(4)]
-    assert "native_snapshot=" in str(refusal.value)
 
 
 def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypatch) -> None:
@@ -1036,7 +1042,7 @@ def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypat
         raise RuntimeError("native display data failed")
 
     state.annotation.GetDisplayData = broken_display_data
-    with pytest.raises(RuntimeError, match="native display data failed.*native_snapshot=") as refusal:
+    with pytest.raises(RuntimeError, match="native display data failed") as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
@@ -1060,7 +1066,7 @@ def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
     else:
         state.display.Type2 = 2
         state.annotation.GetDisplayData = broken_native_read
-    with pytest.raises(RuntimeError, match="native_snapshot=") as refusal:
+    with pytest.raises(RuntimeError, match="native transport failed") as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
@@ -1104,7 +1110,7 @@ def test_physical_head_height_malformed_attachment_array_is_not_silently_accepte
 ) -> None:
     state = _physical_head_fixture(monkeypatch)
     state.annotation.GetAttachedEntities3 = lambda: 7
-    with pytest.raises(RuntimeError, match="has no len.*native_snapshot=") as refusal:
+    with pytest.raises(RuntimeError, match="has no len") as refusal:
         drawing._assert_physical_head_height(
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
@@ -1149,10 +1155,95 @@ def test_supplier_references_route_only_head_height_through_physical_api(monkeyp
     assert calls[2][2]["entity_type"] == "EDGE"
 
 
-def _saved_head_fixture(monkeypatch, tmp_path):
+def _attach_stock_fixture(state):
+    """Two independent native dimensions on real distinct finished/stock views."""
+    source = SimpleNamespace(path=str(drawing.SOURCE.resolve()))
+    view = SimpleNamespace(
+        name="StockFront", mode=2, ReferencedConfiguration=screw.SUPPLIER_STOCK_CONFIGURATION,
+        ScaleDecimal=4.0, dimensions=[],
+        ReferencedDocument=SimpleNamespace(GetPathName=lambda: source.path),
+    )
+    view.GetDisplayMode2 = lambda: view.mode
+    view.GetDisplayDimensions = lambda: tuple(view.dimensions)
+    view.GetNextView = lambda: None
+    shoulder = _HeadRim(state.selection, (
+        0.0, screw.SHOULDER_END_Y, 0.0, 0.0, 1.0, 0.0, screw.SHOULDER_DIA / 2,
+    ))
+    tip_radius = screw.THREAD_MAJOR / 2 - drawing.TIP_CHAMFER
+    tip_y = screw.SHOULDER_END_Y - screw.THREAD_LEN
+    # The surviving trimmed arc need not contain its circle's +Z extremum.
+    tip_point = (tip_radius / math.sqrt(2) / 1000, tip_y / 1000,
+                 tip_radius / math.sqrt(2) / 1000)
+    tip = _HeadRim(state.selection, (
+        0.0, tip_y, 0.0, 0.0, -1.0, 0.0, tip_radius,
+    ), nearest=(*tip_point, 0.25, float("nan")))  # SDK's fifth NotUsed is ignored.
+    points = ((0.0, screw.SHOULDER_END_Y / 1000, screw.SHOULDER_DIA / 2 / 1000), tip_point)
+    annotation = SimpleNamespace(
+        attached=[shoulder, tip], kinds=(1, 1), dangling=False,
+        count=2, Owner=view, OwnerType=0, Visible=1,
+    )
+    annotation.GetAttachedEntities3 = lambda: tuple(annotation.attached)
+    annotation.GetAttachedEntityTypes = lambda: annotation.kinds
+    annotation.GetAttachedEntityCount3 = lambda: annotation.count
+    annotation.IsDangling = lambda: annotation.dangling
+    arrows = [
+        (0.130, 0.190 + 4 * point[1], 0.0, 0.0, direction, 0.0,
+         0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for point, direction in zip(points, (-1.0, 1.0), strict=True)
+    ]
+    annotation.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: len(arrows),
+        GetArrowHeadAtIndex2=lambda index: arrows[index],
+    )
+    tolerance = SimpleNamespace(Type=0)
+    native = SimpleNamespace(
+        SystemValue=screw.THREAD_LEN / 1000, FullName="D1@StockFront", Tolerance=tolerance,
+    )
+    presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierStockThreadLength"]
+    texts = {1: "(", 2: " in)", 4: presentation["callout"]}
+    display = SimpleNamespace(
+        Type2=2, ShowDimensionValue=True, ShowParenthesis=False,
+        GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
+        GetUseDocUnits=lambda: False, GetUnits=lambda: 3,
+        GetPrimaryPrecision2=lambda: presentation["precision"],
+        GetFractionBase=lambda: 1, GetOverride=lambda: False,
+        GetText=lambda index: texts[index],
+    )
+    annotation.GetSpecificAnnotation = lambda: display
+    view.dimensions.append(display)
+
+    def select_entity(edge, append):
+        state.selection.calls.append(("view_select", view, edge, append))
+        return state.selection.select(edge, append, SimpleNamespace(View=view))
+
+    def refuse_model_selection(*_args):
+        raise AssertionError("Stock must select model edges via IView.SelectEntity, never Select4")
+
+    view.SelectEntity = select_entity
+    shoulder.Select4 = tip.Select4 = refuse_model_selection
+    state.stock = SimpleNamespace(
+        view=view, shoulder=shoulder, tip=tip, points=points, annotation=annotation,
+        native=native, display=display, tolerance=tolerance, texts=texts, arrows=arrows,
+        source=source,
+        edges=[state.item(shoulder), state.item(tip)],
+    )
+    return state.stock
+
+
+def _physical_stock_fixture(monkeypatch):
+    state = _physical_head_fixture(monkeypatch)
+    monkeypatch.setattr(drawing, "SOURCE", SCRIPTS / "_offline_pivot_stock_source.SLDPRT")
+    stock = _attach_stock_fixture(state)
+    state.create_result = stock.display
+    return state
+
+
+def _saved_physical_fixture(monkeypatch, tmp_path):
     import _supplier_dimensions as supplier
 
     state = _physical_head_fixture(monkeypatch)
+    monkeypatch.setattr(drawing, "SOURCE", tmp_path / "pivot.SLDPRT")
+    _attach_stock_fixture(state)
     monkeypatch.setattr(supplier, "_early_bound", lambda value, _kind: value)
     path = tmp_path / "pivot.SLDDRW"
     path.touch()
@@ -1162,7 +1253,9 @@ def _saved_head_fixture(monkeypatch, tmp_path):
     finished_sheet = SimpleNamespace(
         GetDisplayDimensions=lambda: (), GetNextView=lambda: state.front,
     )
-    stock_sheet = SimpleNamespace(GetDisplayDimensions=lambda: (), GetNextView=lambda: None)
+    stock_sheet = SimpleNamespace(
+        GetDisplayDimensions=lambda: (), GetNextView=lambda: state.stock.view,
+    )
     state.sheets = dict(zip(drawing.SHEET_NAMES, (finished_sheet, stock_sheet), strict=True))
     state.active_sheet = drawing.SHEET_NAMES[0]
     state.activations = []
@@ -1212,36 +1305,56 @@ def _saved_head_fixture(monkeypatch, tmp_path):
             state.native.FullName, state.front.name,
             (object(), object()), (1, 1),  # Stale live handles MUST NOT be reused.
         ),
+        "SupplierStockThreadLength": (
+            state.stock.native.FullName, state.stock.view.name,
+            (object(), object()), (1, 1),  # Also stale across document close/reopen.
+        ),
     }
     state.configurations = {
         state.front.name: (drawing.SHEET_NAMES[0], state.front.ReferencedConfiguration),
+        state.stock.view.name: (
+            drawing.SHEET_NAMES[1], state.stock.view.ReferencedConfiguration,
+        ),
     }
     return state
 
 
-def test_saved_head_height_reopens_read_only_rescans_proves_and_closes(
+def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
     monkeypatch, tmp_path,
 ) -> None:
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.open_warnings = 2  # Warning telemetry is not a false load error.
-    drawing._assert_saved_physical_head_height(
+    drawing._assert_saved_physical_references(
         state.adapter, state.identities, state.configurations,
     )
     assert state.opens == [(str(state.path), 3, 3, "", 0, 0)]
     assert state.closes == [state.path.name]
     assert state.loaded is None
     assert state.adapter.currentModel is state.previous
-    assert len(state.scans) == 1
-    assert state.scans[0][0] is state.saved
-    assert state.scans[0][1] is state.front
-    assert state.activations == [*drawing.SHEET_NAMES, drawing.SHEET_NAMES[0]]
-    _name, proof = state.events[-1]
+    assert len(state.scans) == 2
+    assert all(scan[0] is state.saved for scan in state.scans)
+    assert [scan[1] for scan in state.scans] == [state.front, state.stock.view]
+    assert state.activations == [*drawing.SHEET_NAMES, *drawing.SHEET_NAMES]
+    proof = next(fields for name, fields in state.events if name == "drawing.pivot_head_height_proof")
     assert proof["phase"] == "after_saved_reopen"
     assert proof["full_name"] == state.native.FullName
     assert proof["measured_head_height_mm"] == pytest.approx(screw.HEAD_H)
     assert proof["attached_circle_params_m"] == (
         state.bearing.GetCurve().CircleParams, state.top.GetCurve().CircleParams,
     )
+    stock_proof = next(
+        fields for name, fields in state.events if name == "drawing.pivot_stock_length_proof"
+    )
+    assert stock_proof["full_name"] == state.stock.native.FullName
+    assert stock_proof["measured_stock_thread_length_mm"] == pytest.approx(screw.THREAD_LEN)
+    assert stock_proof["configuration"] == screw.SUPPLIER_STOCK_CONFIGURATION
+    native_proofs = [
+        fields for name, fields in state.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert {(proof["label"], proof["phase"]) for proof in native_proofs} == {
+        ("SupplierHeadHeight", "saved"), ("SupplierStockThreadLength", "saved"),
+    }
     assert not state.additions and not state.selection.calls
 
 
@@ -1284,7 +1397,7 @@ def test_saved_head_height_reopens_read_only_rescans_proves_and_closes(
 def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
     monkeypatch, tmp_path, fault, message,
 ) -> None:
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     if fault == "open_error":
         state.open_errors = 1
     elif fault == "null_model":
@@ -1323,7 +1436,7 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
     elif fault == "wrong_configuration":
         state.front.ReferencedConfiguration = screw.SUPPLIER_STOCK_CONFIGURATION
     elif fault == "wrong_sheet":
-        state.sheets[drawing.SHEET_NAMES[0]].GetNextView = lambda: None
+        state.sheets[drawing.SHEET_NAMES[0]].GetNextView = lambda: state.stock.view
         state.sheets[drawing.SHEET_NAMES[1]].GetNextView = lambda: state.front
     elif fault == "missing_sheet":
         del state.sheets[drawing.SHEET_NAMES[1]]
@@ -1364,7 +1477,7 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
     elif fault == "close":
         state.close_sticks = True
     with pytest.raises(RuntimeError, match=message):
-        drawing._assert_saved_physical_head_height(
+        drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
         )
     assert state.closes == [state.path.name]
@@ -1376,10 +1489,10 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
 def test_saved_head_height_refuses_an_already_open_drawing_without_closing_it(
     monkeypatch, tmp_path,
 ) -> None:
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.loaded = state.saved
     with pytest.raises(RuntimeError, match="finalize and close"):
-        drawing._assert_saved_physical_head_height(
+        drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
         )
     assert not state.opens and not state.closes
@@ -1388,12 +1501,12 @@ def test_saved_head_height_refuses_an_already_open_drawing_without_closing_it(
 
 
 def test_saved_head_height_requires_the_output_file(monkeypatch, tmp_path) -> None:
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     monkeypatch.setattr(
         drawing, "OUTPUTS", SimpleNamespace(slddrw=tmp_path / "missing.SLDDRW")
     )
     with pytest.raises(RuntimeError, match="saved drawing is missing"):
-        drawing._assert_saved_physical_head_height(
+        drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,
         )
     assert not state.opens and not state.closes
@@ -1409,14 +1522,18 @@ def test_saved_head_height_requires_the_output_file(monkeypatch, tmp_path) -> No
 def test_settled_supplier_census_invokes_fresh_physical_head_proof(
     monkeypatch, tmp_path, fault, message,
 ) -> None:
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.adapter.currentModel = state.saved
     state.identities["SupplierHeadHeight"] = (
         state.native.FullName, state.front.name, (state.bearing, state.top), (1, 1),
     )
+    state.identities["SupplierStockThreadLength"] = (
+        state.stock.native.FullName, state.stock.view.name,
+        (state.stock.shoulder, state.stock.tip), (1, 1),
+    )
     monkeypatch.setattr(
         drawing, "SUPPLIER_REFERENCE_DIMENSIONS",
-        {"SupplierHeadHeight": screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"]},
+        {name: screw.SUPPLIER_REFERENCE_DIMENSIONS[name] for name in state.identities},
     )
     caption = SimpleNamespace(
         GetText=lambda: screw.SUPPLIER_STOCK_TITLE,
@@ -1438,7 +1555,7 @@ def test_settled_supplier_census_invokes_fresh_physical_head_proof(
         drawing._assert_supplier_references(
             state.adapter, state.identities, state.configurations,
         )
-        assert len(state.scans) == 1
+        assert len(state.scans) == 2
     else:
         with pytest.raises(RuntimeError, match=message):
             drawing._assert_supplier_references(
@@ -1446,7 +1563,7 @@ def test_settled_supplier_census_invokes_fresh_physical_head_proof(
             )
 
 
-def test_build_proves_physical_head_after_finalizer_closes_saved_drawing(
+def test_build_proves_both_physical_references_after_finalizer_closes_saved_drawing(
     monkeypatch, tmp_path,
 ) -> None:
     source = tmp_path / "pivot.SLDPRT"
@@ -1553,7 +1670,7 @@ def test_build_proves_physical_head_after_finalizer_closes_saved_drawing(
         events.append("saved-reopen-proof")
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    monkeypatch.setattr(drawing, "_assert_saved_physical_head_height", saved)
+    monkeypatch.setattr(drawing, "_assert_saved_physical_references", saved)
     assert asyncio.run(drawing.build(adapter)) is expected
     assert events == [
         "identities", "finalize", "settled", "closed", "saved-reopen-proof",
@@ -1604,9 +1721,9 @@ def test_physical_head_height_refuses_every_nonlinear_native_type(
 def test_physical_head_height_spatial_proof_is_fresh_at_every_boundary(
     monkeypatch, tmp_path, phase, fault,
 ) -> None:
-    import _drawing_physical_head_height as physical_height
+    import _drawing_physical_axial_dimension as physical_height
 
-    state = _saved_head_fixture(monkeypatch, tmp_path)
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
     if phase != "creation":
         drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
     if fault in ("horizontal", "diagonal", "zero_direction", "same_sign"):
@@ -1655,17 +1772,510 @@ def test_physical_head_height_spatial_proof_is_fresh_at_every_boundary(
     elif fault == "legacy_type":
         state.display.Type2 = 12
 
-    with pytest.raises(RuntimeError, match="native_snapshot="):
+    with pytest.raises(RuntimeError):
         if phase == "creation":
             drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
         elif phase == "settled":
             drawing._assert_physical_head_height(state.adapter, state.front, state.display)
         else:
-            drawing._assert_saved_physical_head_height(
+            drawing._assert_saved_physical_references(
                 state.adapter, state.identities, state.configurations,
             )
-    assert state.events[-1][0] == "drawing.physical_head_height_native_refusal"
+    assert state.events[-1][0] == "drawing.physical_axial_dimension_native_refusal"
     assert not state.selection.selected
     if phase == "saved":
         assert state.closes == [state.path.name]
         assert state.adapter.currentModel is state.previous
+
+
+def test_stock_length_resolves_exact_supplier_stations_and_actual_trimmed_points(monkeypatch) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    # Same plane, wrong boundary: inner shoulder neck and factory major/chamfer junction.
+    distractors = [
+        (0.0, screw.SHOULDER_END_Y, 0.0, 0.0, 1.0, 0.0, screw.THREAD_MAJOR / 2),
+        (0.0, screw.SHOULDER_END_Y - screw.THREAD_LEN + drawing.TIP_CHAMFER,
+         0.0, 0.0, 1.0, 0.0, screw.THREAD_MAJOR / 2),
+        (0.0, screw.TIP_Y, 0.0, 0.0, 1.0, 0.0,
+         screw.THREAD_MAJOR / 2 - screw.CHAMFER_WIDTH),
+    ]
+    stock.edges[:0] = [state.item(_HeadRim(state.selection, circle)) for circle in distractors]
+    entities, points = drawing._stock_length_entities(state.adapter, stock.view)
+    assert entities == (stock.shoulder, stock.tip)
+    assert points == stock.points
+    assert stock.shoulder.circle[1:] == pytest.approx((-12.7, 0, 0, 1, 0, 2.38125))
+    assert stock.tip.circle[1:] == pytest.approx((-22.225, 0, 0, -1, 0, 1.707896))
+    assert (points[0][1] - points[1][1]) * 1000 == pytest.approx(9.525)
+    assert len(stock.tip.probes) == 2
+    assert stock.tip.probes[0] == pytest.approx((0.0, -22.225 / 1000, 1.707896 / 1000))
+    assert stock.tip.probes[1] == stock.points[1]
+    assert points[1][2] < stock.tip.circle[6] / 1000  # Actual surviving arc, not a full-circle guess.
+    assert not state.selection.calls
+
+
+@pytest.mark.parametrize("fault", (
+    "missing_shoulder", "missing_tip", "wrong_shoulder_radius", "wrong_tip_radius",
+    "finished_chamfer_radius", "finished_station", "major_chamfer_station",
+    "wrong_axis", "zero_axis", "nonfinite_circle", "wrong_trim_plane", "wrong_trim_radius",
+    "nonfinite_native_xyz", "nonfinite_native_parameter", "null_native_point",
+    "text_native_coordinate", "boolean_native_parameter",
+    "short_native_point", "long_native_point", "changed_membership",
+    "ambiguous_distinct_edge", "same_entity",
+))
+def test_stock_length_refuses_wrong_geometry_or_unproved_trim(monkeypatch, fault) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    if fault.startswith("missing"):
+        stock.edges.pop(0 if fault == "missing_shoulder" else 1)
+    elif fault in (
+        "wrong_shoulder_radius", "wrong_tip_radius", "finished_chamfer_radius",
+        "finished_station", "major_chamfer_station", "wrong_axis", "zero_axis",
+        "nonfinite_circle",
+    ):
+        index = 0 if fault == "wrong_shoulder_radius" else 1
+        edge = stock.shoulder if index == 0 else stock.tip
+        circle = list(edge.circle)
+        if fault == "wrong_shoulder_radius":
+            circle[6] = screw.THREAD_MAJOR / 2
+        elif fault == "wrong_tip_radius":
+            circle[6] = screw.THREAD_MAJOR / 2
+        elif fault == "finished_chamfer_radius":
+            circle[6] = screw.THREAD_MAJOR / 2 - screw.CHAMFER_WIDTH
+        elif fault == "finished_station":
+            circle[1] = screw.TIP_Y
+        elif fault == "major_chamfer_station":
+            circle[1] += drawing.TIP_CHAMFER
+        elif fault == "wrong_axis":
+            circle[3:6] = (1.0, 0.0, 0.0)
+        elif fault == "zero_axis":
+            circle[3:6] = (0.0, 0.0, 0.0)
+        else:
+            circle[0] = float("nan")
+        stock.edges[index] = state.item(edge, tuple(circle))
+    elif fault == "null_native_point":
+        stock.tip.GetClosestPointOn = lambda *_point: None
+    elif fault == "changed_membership":
+        calls = []
+
+        def changed(*point):
+            calls.append(point)
+            x, y, z = stock.points[1]
+            return (x if len(calls) == 1 else -x, y, z, 0.0, 0.0)
+
+        stock.tip.GetClosestPointOn = changed
+    elif fault == "ambiguous_distinct_edge":
+        stock.edges.append(state.item(_HeadRim(
+            state.selection, stock.tip.circle, nearest=stock.tip.nearest,
+        )))
+    elif fault == "same_entity":
+        stock.edges[1] = state.item(stock.shoulder, stock.tip.circle)
+    else:
+        point = list(stock.tip.nearest)
+        if fault == "wrong_trim_plane":
+            point[1] += 0.0001
+        elif fault == "wrong_trim_radius":
+            point[2] += 0.0001
+        elif fault == "nonfinite_native_xyz":
+            point[0] = float("nan")
+        elif fault == "nonfinite_native_parameter":
+            point[3] = float("inf")
+        elif fault == "text_native_coordinate":
+            point[0] = str(point[0])
+        elif fault == "boolean_native_parameter":
+            point[3] = True
+        elif fault == "short_native_point":
+            point.pop()
+        elif fault == "long_native_point":
+            point.append(0.0)
+        stock.tip.nearest = tuple(point)
+    with pytest.raises(RuntimeError, match="SupplierStockThreadLength"):
+        drawing._stock_length_entities(state.adapter, stock.view)
+    assert not state.additions and not state.selection.calls
+    assert all(
+        len(fields["candidates"]) <= 12 for name, fields in state.events
+        if name == "drawing.pivot_stock_length_edges"
+    )
+
+
+def test_stock_length_chooses_unique_frontmost_actual_edge_not_first_circle(monkeypatch) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    x, y, z = stock.points[1]
+    rear = _HeadRim(state.selection, stock.tip.circle, nearest=(x, y, -z, 0.0, 0.0))
+    stock.edges.insert(0, state.item(rear))
+    # Duplicate wrappers for the SAME native edge do not create a distinct-edge ambiguity.
+    stock.edges.append(state.item(stock.tip))
+    entities, points = drawing._stock_length_entities(state.adapter, stock.view)
+    assert entities == (stock.shoulder, stock.tip)
+    assert points == stock.points
+    evidence = state.events[-1][1]
+    assert evidence["matches"] == 3 and evidence["frontmost_matches"] == 2
+
+
+def test_stock_length_bounds_native_candidate_diagnostics(monkeypatch) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    stock.edges[:0] = [
+        state.item(_HeadRim(state.selection, (
+            0.0, -100.0 - index, 0.0, 0.0, 1.0, 0.0, 5.0 + index,
+        )))
+        for index in range(30)
+    ]
+    drawing._stock_length_entities(state.adapter, stock.view)
+    evidence = state.events[-1][1]
+    assert evidence["configured_source_path"] == str(drawing.SOURCE.resolve())
+    assert evidence["native_source_path"] == stock.source.path
+    assert evidence["configuration"] == screw.SUPPLIER_STOCK_CONFIGURATION
+    assert evidence["candidate_count"] == 32 and len(evidence["candidates"]) == 12
+    actual = evidence["candidates"][0]
+    assert actual["forward_xyz_u"][:3] == stock.points[1]
+    assert actual["membership_xyz_u"][:3] == stock.points[1]
+    assert actual["membership_error_m"] == 0.0
+
+
+@pytest.mark.parametrize("configuration, mode", (
+    ("Default", 2), ("AS SUPPLIED", 2), ("", 2),
+    (screw.SUPPLIER_STOCK_CONFIGURATION, 0),
+    (screw.SUPPLIER_STOCK_CONFIGURATION, 1),
+    (screw.SUPPLIER_STOCK_CONFIGURATION, 3),
+))
+def test_stock_length_requires_actual_stock_configuration_and_hlr_before_scan(
+    monkeypatch, configuration, mode,
+) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    state.stock.view.ReferencedConfiguration = configuration
+    state.stock.view.mode = mode
+    with pytest.raises(RuntimeError, match="configuration|hidden-lines-removed"):
+        drawing._stock_length_entities(state.adapter, state.stock.view)
+    assert not state.scans and not state.selection.calls
+    assert state.events[-1][1]["configuration"] == configuration
+
+
+def _stock_creation_recipe_fixture(monkeypatch):
+    state = _physical_stock_fixture(monkeypatch)
+    state.stock.view.mode = 0
+    state.stock.view.ReferencedConfiguration = "Default"
+    state.stock_iso = SimpleNamespace(ReferencedConfiguration="Default", mode=0)
+    state.recipe_calls = []
+    state.model.ActivateSheet = lambda name: (
+        state.recipe_calls.append(("sheet", name)) or name == drawing.SHEET_NAMES[1]
+    )
+    state.model.EditRebuild3 = lambda: state.recipe_calls.append(("rebuild",)) or True
+    state.model.GetEditSheet = lambda: True
+    monkeypatch.setattr(
+        drawing, "place_view",
+        lambda _adapter, _source, orientation, *_args, **_kwargs: (
+            state.stock.view if orientation == "*Front" else state.stock_iso
+        ),
+    )
+    monkeypatch.setattr(
+        drawing, "set_view_position",
+        lambda _adapter, view, *centre: state.recipe_calls.append(("position", view, centre)) or True,
+    )
+    monkeypatch.setattr(
+        drawing, "set_hidden_lines_removed",
+        lambda _adapter, view: setattr(view, "mode", 2),
+    )
+    monkeypatch.setattr(
+        drawing, "_format_supplier_reference",
+        lambda _adapter, display, label: (
+            state.recipe_calls.append(("format", display, label)) or state.stock.annotation
+        ),
+    )
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda *_args: SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(OwnerType=1)),
+    )
+    return state
+
+
+def test_stock_recipe_uses_view_entity_selection_and_creation_axial_proof(monkeypatch) -> None:
+    state = _stock_creation_recipe_fixture(monkeypatch)
+    stock = state.stock
+    assert drawing._add_stock_reference(state.adapter) == (
+        stock.view, state.stock_iso, stock.annotation,
+    )
+    assert [call for call in state.selection.calls if call[0] == "view_select"] == [
+        ("view_select", stock.view, stock.shoulder, False),
+        ("view_select", stock.view, stock.tip, True),
+    ]
+    assert state.recipe_calls[0:2] == [("sheet", drawing.SHEET_NAMES[1]), ("rebuild",)]
+    assert len(state.scans) == 1
+    assert state.scans[0][1] is stock.view
+    assert state.additions == [(0.130, 0.118, 0.0)]
+    proof = next(
+        fields for name, fields in state.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    )
+    assert proof["phase"] == "creation" and proof["label"] == "SupplierStockThreadLength"
+    assert proof["points_m"] == stock.points
+    assert proof["measured_mm"] == pytest.approx(9.525)
+    assert not state.selection.selected
+
+
+def test_stock_recipe_refuses_failed_configuration_readback_before_selection(monkeypatch) -> None:
+    state = _stock_creation_recipe_fixture(monkeypatch)
+
+    def rebuild():
+        state.stock.view.ReferencedConfiguration = "Default"
+        return True
+
+    state.model.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match="references the faced screw"):
+        drawing._add_stock_reference(state.adapter)
+    assert not state.scans and not state.selection.calls and not state.additions
+
+
+@pytest.mark.parametrize("fault", (
+    "select_first", "select_second", "count", "selection_type", "missing_selected",
+    "wrong_selected", "same_selected", "point_set", "point_read", "point_null",
+    "null_creation", "angular_type", "legacy_vertical_type", "horizontal_type",
+    "wrong_value", "wrong_attachment", "dangling", "horizontal_arrows", "diagonal_arrows",
+))
+def test_stock_recipe_refuses_selection_null_or_invalid_native_creation(monkeypatch, fault) -> None:
+    state = _stock_creation_recipe_fixture(monkeypatch)
+    stock = state.stock
+    if fault.startswith("select_"):
+        state.selection.refuse_index = 1 if fault == "select_first" else 2
+    elif fault == "count":
+        state.selection.count_offset = 1
+    elif fault == "selection_type":
+        state.selection.types[2] = 46
+    elif fault == "missing_selected":
+        state.selection.actual[2] = None
+    elif fault == "wrong_selected":
+        state.selection.actual[2] = object()
+    elif fault == "same_selected":
+        state.selection.actual[2] = stock.shoulder
+    elif fault == "point_set":
+        state.selection.point_result = False
+    elif fault == "point_read":
+        state.selection.GetSelectionPoint2 = lambda *_args: (0.0, 0.0, 0.0)
+    elif fault == "point_null":
+        state.selection.GetSelectionPoint2 = lambda *_args: None
+    elif fault == "null_creation":
+        state.create_result = None
+    elif fault in ("angular_type", "legacy_vertical_type", "horizontal_type"):
+        stock.display.Type2 = {
+            "angular_type": 3, "legacy_vertical_type": 12, "horizontal_type": 11,
+        }[fault]
+    elif fault == "wrong_value":
+        stock.native.SystemValue = screw.FITTED_THREAD_LEN / 1000
+    elif fault == "wrong_attachment":
+        stock.annotation.attached[1] = object()
+    elif fault == "dangling":
+        stock.annotation.dangling = True
+    elif fault in ("horizontal_arrows", "diagonal_arrows"):
+        direction = (1.0, 0.0, 0.0) if fault == "horizontal_arrows" else (0.1, 1.0, 0.0)
+        stock.arrows[0] = (*stock.arrows[0][:3], *direction, *stock.arrows[0][6:])
+    with pytest.raises(RuntimeError, match="SupplierStockThreadLength"):
+        drawing._add_stock_reference(state.adapter)
+    assert not state.selection.selected
+    assert not any(call[0] == "format" for call in state.recipe_calls)
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("fault", (
+    "none", "geometry", "trim", "configuration", "attachment", "null_attachment",
+    "wrong_source", "null_source", "empty_source_path", "relative_source_path",
+    "angular_type", "legacy_type", "value", "horizontal", "diagonal", "wrong_scale",
+    "owner", "missing_native", "missing_dimension", "duplicate_dimension", "presentation",
+))
+def test_stock_physical_proof_is_fresh_in_settled_and_readonly_saved_census(
+    monkeypatch, tmp_path, phase, fault,
+) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    stock = state.stock
+    if phase == "settled":
+        state.adapter.currentModel = state.saved
+        state.identities["SupplierHeadHeight"] = (
+            state.native.FullName, state.front.name, (state.bearing, state.top), (1, 1),
+        )
+        state.identities["SupplierStockThreadLength"] = (
+            stock.native.FullName, stock.view.name, (stock.shoulder, stock.tip), (1, 1),
+        )
+        monkeypatch.setattr(
+            drawing, "SUPPLIER_REFERENCE_DIMENSIONS",
+            {name: screw.SUPPLIER_REFERENCE_DIMENSIONS[name] for name in state.identities},
+        )
+        caption = SimpleNamespace(
+            GetText=lambda: screw.SUPPLIER_STOCK_TITLE,
+            PropertyLinkedText=drawing.property_link("Supplier Reference Title"),
+        )
+        state.sheets[drawing.SHEET_NAMES[1]].GetAnnotations = lambda: (
+            SimpleNamespace(GetType=lambda: 6, OwnerType=1, GetSpecificAnnotation=lambda: caption),
+        )
+    if fault == "geometry":
+        stock.edges.pop()
+    elif fault == "trim":
+        stock.tip.nearest = (0.0, screw.TIP_Y / 1000, 0.0, 0.0, 0.0)
+    elif fault == "configuration":
+        stock.view.ReferencedConfiguration = "Default"
+    elif fault == "wrong_source":
+        stock.source.path = str(tmp_path / "another.SLDPRT")
+    elif fault == "null_source":
+        stock.view.ReferencedDocument = None
+    elif fault == "empty_source_path":
+        stock.source.path = ""
+    elif fault == "relative_source_path":
+        stock.source.path = "pivot.SLDPRT"
+    elif fault == "attachment":
+        stock.annotation.attached[1] = object()
+    elif fault == "null_attachment":
+        stock.annotation.attached[1] = None
+    elif fault in ("angular_type", "legacy_type"):
+        stock.display.Type2 = 3 if fault == "angular_type" else 12
+    elif fault == "value":
+        stock.native.SystemValue = screw.FITTED_THREAD_LEN / 1000
+    elif fault in ("horizontal", "diagonal"):
+        direction = (1.0, 0.0, 0.0) if fault == "horizontal" else (0.1, 1.0, 0.0)
+        stock.arrows[0] = (*stock.arrows[0][:3], *direction, *stock.arrows[0][6:])
+    elif fault == "wrong_scale":
+        stock.view.ScaleDecimal = 2.0
+    elif fault == "owner":
+        stock.annotation.Owner = SimpleNamespace(name=stock.view.name)
+    elif fault == "missing_native":
+        stock.display.GetDimension2 = lambda _index: None
+    elif fault == "missing_dimension":
+        stock.view.dimensions.clear()
+    elif fault == "duplicate_dimension":
+        stock.view.dimensions.append(stock.display)
+    elif fault == "presentation":
+        stock.texts[2] = ")"
+    run = (
+        drawing._assert_supplier_references if phase == "settled"
+        else drawing._assert_saved_physical_references
+    )
+    if fault == "none":
+        run(state.adapter, state.identities, state.configurations)
+        proofs = [
+            fields for name, fields in state.events
+            if name == "drawing.physical_axial_dimension_native_proof"
+        ]
+        assert [(proof["label"], proof["phase"]) for proof in proofs] == [
+            ("SupplierHeadHeight", phase), ("SupplierStockThreadLength", phase),
+        ]
+        assert [scan[1] for scan in state.scans] == [state.front, stock.view]
+    else:
+        with pytest.raises(RuntimeError):
+            run(state.adapter, state.identities, state.configurations)
+    assert not state.additions and not state.selection.calls
+    if phase == "saved":
+        assert state.closes == [state.path.name]
+        assert state.adapter.currentModel is state.previous
+
+
+@pytest.mark.parametrize("fault", (
+    "wrong_full_name", "sheet_duplicate", "wrong_sheet", "wrong_owner",
+    "wrong_annotation_owner", "captured_wrong_sheet", "captured_wrong_configuration",
+    "duplicate_captured_name", "missing_captured_name", "lost_hlr", "source_band",
+))
+def test_saved_stock_exact_inventory_owner_configuration_and_source_guards(
+    monkeypatch, tmp_path, fault,
+) -> None:
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    stock = state.stock
+    if fault == "wrong_full_name":
+        stock.native.FullName = "D99@OtherStock"
+    elif fault == "sheet_duplicate":
+        state.sheets[drawing.SHEET_NAMES[0]].GetDisplayDimensions = lambda: (stock.display,)
+    elif fault == "wrong_sheet":
+        state.sheets[drawing.SHEET_NAMES[1]].GetNextView = lambda: None
+        state.front.dimensions.append(stock.display)
+    elif fault == "wrong_owner":
+        stock.view.name = "OtherStock"
+    elif fault == "wrong_annotation_owner":
+        stock.annotation.Owner = SimpleNamespace(name="OtherStock")
+    elif fault == "captured_wrong_sheet":
+        state.configurations[stock.view.name] = (
+            drawing.SHEET_NAMES[0], screw.SUPPLIER_STOCK_CONFIGURATION,
+        )
+    elif fault == "captured_wrong_configuration":
+        state.configurations[stock.view.name] = (drawing.SHEET_NAMES[1], "Default")
+    elif fault in ("duplicate_captured_name", "missing_captured_name"):
+        state.identities["SupplierStockThreadLength"] = (
+            state.native.FullName if fault == "duplicate_captured_name" else "",
+            stock.view.name, (object(), object()), (1, 1),
+        )
+    elif fault == "lost_hlr":
+        stock.view.mode = 1
+    elif fault == "source_band":
+        stock.tolerance.Type = 2
+    with pytest.raises(RuntimeError):
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+        )
+    assert state.closes == [state.path.name]
+    assert state.adapter.currentModel is state.previous
+    assert not state.additions and not state.selection.calls
+
+
+@pytest.mark.parametrize("fault", (
+    "null_document", "wrong_path", "null_path", "empty_path", "relative_path", "filename_only",
+))
+def test_stock_source_identity_refuses_before_scanning_or_selection(monkeypatch, fault) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    if fault == "null_document":
+        stock.view.ReferencedDocument = None
+    else:
+        stock.source.path = {
+            "wrong_path": str(drawing.SOURCE.with_name("other.SLDPRT").resolve()),
+            "null_path": None,
+            "empty_path": "",
+            "relative_path": f"../{drawing.SOURCE.name}",
+            "filename_only": drawing.SOURCE.name,
+        }[fault]
+    with pytest.raises(RuntimeError, match="native source"):
+        drawing._stock_length_entities(state.adapter, stock.view)
+    assert not state.scans and not state.selection.calls and not state.additions
+    evidence = state.events[-1][1]
+    assert evidence["configured_source_path"] == str(drawing.SOURCE.resolve())
+    if fault == "null_document":
+        assert evidence["referenced_document_null"] is True
+        assert "native_source_path" not in evidence  # Getter was never reached.
+    else:
+        assert evidence["native_source_path"] == stock.source.path
+    assert "configuration" not in evidence  # Path identity is proved first.
+
+
+@pytest.mark.parametrize("query", ("forward", "membership"))
+def test_stock_trim_getter_errors_preserve_cause_and_bounded_actual_evidence(
+    monkeypatch, query,
+) -> None:
+    state = _physical_stock_fixture(monkeypatch)
+    stock = state.stock
+    error = OSError("native trim read failed")
+    calls = []
+
+    def closest(*point):
+        calls.append(point)
+        if query == "forward" or len(calls) == 2:
+            raise error
+        return stock.tip.nearest
+
+    stock.tip.GetClosestPointOn = closest
+    with pytest.raises(RuntimeError, match="native trim query failed") as refusal:
+        drawing._stock_length_entities(state.adapter, stock.view)
+    assert refusal.value.__cause__ is error
+    evidence = state.events[-1][1]
+    assert evidence["query"] == query
+    assert evidence["native_error"] == str(error)
+    assert evidence["native_source_path"] == stock.source.path
+    assert len(evidence["candidates"]) <= 12
+    assert len(state.scans) == 1
+    assert not state.selection.calls and not state.additions
+
+
+@pytest.mark.parametrize("fault", ("null_document", "wrong_path"))
+def test_stock_creation_recipe_requires_exact_native_source_before_selection(
+    monkeypatch, fault,
+) -> None:
+    state = _stock_creation_recipe_fixture(monkeypatch)
+    if fault == "null_document":
+        state.stock.view.ReferencedDocument = None
+    else:
+        state.stock.source.path = str(drawing.SOURCE.with_name("other.SLDPRT").resolve())
+    with pytest.raises(RuntimeError, match="native source"):
+        drawing._add_stock_reference(state.adapter)
+    assert not state.scans and not state.selection.calls and not state.additions

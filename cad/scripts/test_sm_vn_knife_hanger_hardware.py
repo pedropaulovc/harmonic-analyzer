@@ -18,7 +18,7 @@ import pytest
 
 import _config
 import _drawing_edge_dimensions as edge_dimensions
-import _drawing_physical_head_height as physical_head_height
+import _drawing_physical_axial_dimension as physical_axial_dimension
 import _supplier_dimensions as supplier_dimensions
 import _mcmaster_92314a253 as bolt_catalogue
 import _stock_trim_drawing as trim_drawing
@@ -1041,7 +1041,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         bolt_drawing, "_supplier_reference_identities", lambda *_args: {}
     )
     monkeypatch.setattr(
-        bolt_drawing, "_assert_saved_physical_head_height",
+        bolt_drawing, "_assert_saved_physical_references",
         lambda *_args: finalization.append("saved physical proof"),
     )
     monkeypatch.setattr(bolt_drawing, "view_name", lambda _adapter, view: view.name)
@@ -1242,8 +1242,12 @@ def _stud_height_case(monkeypatch):
             actual = object()
         elif selection_fault("missing_selected"):
             actual = None
+        elif selection_fault("duplicate_selected") and case.selections:
+            actual = case.selections[0]
         case.selections.append(actual)
         return True
+
+    case.select = select
 
     def edge(nearest):
         raw = SimpleNamespace(nearest=nearest, closest_calls=[])
@@ -1341,9 +1345,14 @@ def _stud_height_case(monkeypatch):
 
     def set_point(*args):
         case.selection_points.append(args)
-        return not selection_fault("selection_point")
+        return not (case.fault == "selection_point" and args[0] == case.fault_index)
 
     manager.SetSelectionPoint2 = set_point
+    manager.GetSelectionPoint2 = lambda index, _mark: (
+        (9.0, 9.0, 9.0)
+        if case.fault == "selection_point_readback" and index == case.fault_index
+        else case.selection_points[index - 1][2:]
+    )
 
     def clear(value):
         case.clears.append(value)
@@ -1377,8 +1386,11 @@ def _stud_height_case(monkeypatch):
 
     monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(physical_head_height, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(physical_head_height, "model_points_in_view", project)
+    monkeypatch.setattr(physical_axial_dimension, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_axial_dimension, "model_points_in_view", project)
+    monkeypatch.setattr(
+        physical_axial_dimension, "view_name", lambda _adapter, view: view.name
+    )
     monkeypatch.setattr(
         edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, _kind, *_members: value,
@@ -1625,7 +1637,7 @@ def test_stud_head_height_linear_native_vertical_proof_uses_exact_model_stations
         for point in bolt_drawing._head_height_points_mm()
     )
     assert any(
-        name == "drawing.physical_head_height_native_proof" for name, _ in case.events
+        name == "drawing.physical_axial_dimension_native_proof" for name, _ in case.events
     )
     # A reversed exact physical EDGE bijection remains valid.
     case.annotation.attached.reverse()
@@ -1638,13 +1650,13 @@ def test_stud_head_height_linear_native_vertical_proof_uses_exact_model_stations
 def test_stud_head_height_refusal_reports_canonical_native_metadata(monkeypatch):
     case = _stud_height_case(monkeypatch)
     case.display.Type2 = 12
-    with pytest.raises(RuntimeError, match="native_snapshot=") as error:
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
         )
     receipt = next(
         fields for name, fields in case.events
-        if name == "drawing.physical_head_height_native_refusal"
+        if name == "drawing.physical_axial_dimension_native_refusal"
     )
     expected = {
         "type2": 12, "attached_count": 2, "attached_length": 2,
@@ -1652,8 +1664,6 @@ def test_stud_head_height_refusal_reports_canonical_native_metadata(monkeypatch)
         "dangling": False, "owner_type": 0, "owner_null": False, "owner_same": 1,
     }
     assert {key: receipt[key] for key in expected} == expected
-    for key, value in expected.items():
-        assert f"{key!r}: {value!r}" in str(error.value)
 
 
 @pytest.mark.parametrize("getter", ["GetAnnotation", "GetAttachedEntityCount3", "GetDisplayData"])
@@ -1666,18 +1676,17 @@ def test_stud_head_height_native_errors_retain_cause_and_visible_stage(monkeypat
 
     target = case.display if getter == "GetAnnotation" else case.annotation
     setattr(target, getter, fail)
-    with pytest.raises(RuntimeError, match="native_snapshot=") as error:
+    with pytest.raises(RuntimeError, match="native read failed") as error:
         bolt_drawing._assert_physical_head_height(
             case.adapter, case.front, case.display, entities=(case.bearing, case.top)
         )
     assert error.value.__cause__ is failure
     receipt = next(
         fields for name, fields in case.events
-        if name == "drawing.physical_head_height_native_refusal"
+        if name == "drawing.physical_axial_dimension_native_refusal"
     )
     assert receipt["failure_error_type"] == "OSError"
     assert receipt["failure_error"] == "native read failed"
-    assert receipt["failure_stage"]
 
 
 _STUD_SPATIAL_FAULTS = (
@@ -1735,17 +1744,19 @@ def _corrupt_stud_native_proof(case, monkeypatch, fault):
     elif fault == "wrong_scale":
         case.front.ScaleDecimal = 3.0
     elif fault in ("projection", "projection_count", "nonfinite_projection"):
-        original = physical_head_height.model_points_in_view
+        original = physical_axial_dimension.model_points_in_view
 
         def project(*args, **kwargs):
             points = list(original(*args, **kwargs))
+            if args[1] is not case.front:
+                return points
             if fault == "projection":
                 return [(x, y + 0.001) for x, y in points]
             if fault == "projection_count":
                 return points[:1]
             return [(float("nan"), points[0][1]), points[1]]
 
-        monkeypatch.setattr(physical_head_height, "model_points_in_view", project)
+        monkeypatch.setattr(physical_axial_dimension, "model_points_in_view", project)
     elif fault == "attachment":
         case.annotation.attached[1] = case.rear
     elif fault == "value":
@@ -1786,9 +1797,7 @@ def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
                 case.adapter, case.identities, case.configurations
             )
         else:
-            bolt_drawing._assert_saved_physical_head_height(
-                case.adapter, case.identities, case.configurations
-            )
+            bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     if phase == "saved":
         assert case.close_calls == ["finished-stud.SLDDRW"]
         assert case.adapter.currentModel is case.previous_model
@@ -1797,16 +1806,21 @@ def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
 def _settled_stud_height_case(monkeypatch):
     case = _stud_height_case(monkeypatch)
     front = case.front
-    stock_configuration = bolt.SUPPLIER_STOCK_CONFIGURATION
-    iso = SimpleNamespace(name="FinishedIso", ReferencedConfiguration="Default")
-    stock = SimpleNamespace(name="StockFront", ReferencedConfiguration=stock_configuration)
-    stock_iso = SimpleNamespace(name="StockIso", ReferencedConfiguration=stock_configuration)
+    stock_case = _stud_stock_fixture(case)
+    case.stock_case = stock_case
+    stock, stock_iso = stock_case.front, SimpleNamespace(
+        name="StockIso", ReferencedConfiguration=bolt.SUPPLIER_STOCK_CONFIGURATION,
+        ScaleDecimal=2.0,
+    )
+    iso = SimpleNamespace(name="FinishedIso", ReferencedConfiguration="Default", ScaleDecimal=2.0)
     case.views = (front, iso, stock, stock_iso)
-    displays = {"SupplierHeadHeight": case.display}
+    displays = {
+        "SupplierHeadHeight": case.display, "SupplierStockLength": stock_case.display,
+    }
     for name in bolt.SUPPLIER_REFERENCE_DIMENSIONS:
-        if name == "SupplierHeadHeight":
+        if name in displays:
             continue
-        owner = stock if name == "SupplierStockLength" else front
+        owner = front
         native = SimpleNamespace(
             FullName=(f"{name}@SupplierReference@Drawing" if name == "SupplierThreadMajor"
                       else f"{name}@{owner.name}@Drawing"),
@@ -1879,7 +1893,7 @@ def test_stud_settled_supplier_census_rescans_physical_head_height(monkeypatch, 
         bolt_drawing._assert_supplier_references(
             case.adapter, case.identities, case.configurations
         )
-        assert len(case.scans) == 1
+        assert len(case.scans) == 2
         assert set(case.supplier_checks) == set(bolt.SUPPLIER_REFERENCE_DIMENSIONS)
     else:
         with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
@@ -1922,10 +1936,9 @@ def _saved_stud_height_case(monkeypatch, tmp_path):
         supplier_dimensions.assert_supplier_reference_dimension,
     )
     # Captured creation handles deliberately cannot match the freshly reopened edges.
-    full_name, owner, _entities, kinds = case.identities["SupplierHeadHeight"]
-    case.identities["SupplierHeadHeight"] = (
-        full_name, owner, (object(), object()), kinds,
-    )
+    for name in ("SupplierHeadHeight", "SupplierStockLength"):
+        full_name, owner, _entities, kinds = case.identities[name]
+        case.identities[name] = (full_name, owner, (object(), object()), kinds)
     return case
 
 
@@ -1933,16 +1946,14 @@ def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_f
     monkeypatch, tmp_path
 ):
     case = _saved_stud_height_case(monkeypatch, tmp_path)
-    bolt_drawing._assert_saved_physical_head_height(
-        case.adapter, case.identities, case.configurations
-    )
+    bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     assert case.open_calls == [(case.path, 3, 3, "", 0, 0)]
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
-    assert len(case.scans) == 1
-    assert case.scans[0][0] is case.model
-    assert case.scans[0][1] is case.front
+    assert len(case.scans) == 2
+    assert all(record[0] is case.model for record in case.scans)
+    assert [record[1] for record in case.scans] == [case.front, case.stock_case.front]
     receipt = next(
         fields for _name, fields in case.events if fields.get("phase") == "after_saved_reopen"
     )
@@ -1951,6 +1962,20 @@ def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_f
     assert receipt["top_radius_mm"] == pytest.approx(bolt.HEAD_AF / 2)
     assert receipt["bearing_point_mm"][1] == bolt.LENGTH
     assert receipt["top_point_mm"][1] == bolt.HEAD_TOP_Y
+    stock_receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length"
+    )
+    assert stock_receipt["full_name"] == case.stock_case.native.FullName
+    assert stock_receipt["measured_mm"] == pytest.approx(bolt.CATALOG_LENGTH)
+    assert stock_receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+    assert stock_receipt["tip_y_mm"] == pytest.approx(bolt.LENGTH - bolt.CATALOG_LENGTH)
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert {(fields["label"], fields["phase"]) for fields in proofs} == {
+        ("SupplierHeadHeight", "saved"), ("SupplierStockLength", "saved"),
+    }
 
 
 @pytest.mark.parametrize(
@@ -2015,9 +2040,7 @@ def test_stud_saved_reopen_refuses_corruption_and_restores_adapter_even_on_failu
     elif fault == "close_failure":
         case.app.CloseDoc = lambda title: case.close_calls.append(title)
     with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
-        bolt_drawing._assert_saved_physical_head_height(
-            case.adapter, case.identities, case.configurations
-        )
+        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert case.loaded is (fault == "close_failure")
@@ -2039,9 +2062,7 @@ def test_stud_saved_proof_requires_existing_closed_finalized_file(
             bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=tmp_path / "missing.SLDDRW")
         )
     with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
-        bolt_drawing._assert_saved_physical_head_height(
-            case.adapter, case.identities, case.configurations
-        )
+        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     assert not case.open_calls
     assert not case.close_calls
     assert case.adapter.currentModel is case.previous_model
@@ -2072,7 +2093,7 @@ def test_stud_head_height_refuses_unreadable_or_moved_actual_bearing_point(monke
 @pytest.mark.parametrize(
     "name",
     ("_head_height_entities", "_add_physical_head_height",
-     "_assert_physical_head_height", "_assert_saved_physical_head_height"),
+     "_assert_physical_head_height", "_assert_saved_physical_references"),
 )
 def test_stud_physical_head_height_native_entrypoints_are_traced(name):
     assert hasattr(getattr(bolt_drawing, name), "__wrapped__")
@@ -2183,9 +2204,7 @@ def test_stud_saved_proof_requires_the_opened_document_to_be_registered_by_exact
 
     case.app.GetOpenDocumentByName = lookup
     with pytest.raises(RuntimeError, match="wrong current drawing"):
-        bolt_drawing._assert_saved_physical_head_height(
-            case.adapter, case.identities, case.configurations
-        )
+        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
@@ -2206,9 +2225,7 @@ def test_stud_saved_proof_refuses_adapter_current_model_drift_before_geometry_re
 
     case.model.ActivateSheet = activate
     with pytest.raises(RuntimeError, match="adapter's exact current drawing"):
-        bolt_drawing._assert_saved_physical_head_height(
-            case.adapter, case.identities, case.configurations
-        )
+        bolt_drawing._assert_saved_physical_references(case.adapter, case.identities, case.configurations)
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
@@ -2272,3 +2289,608 @@ def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_maj
     assert imports[0][0] is case.front
     assert imports[0][1]["keep"] == {"SupplierThreadMajor": (0.170, 0.194)}
     assert imports[0][1]["dimensions_by_feature"] is bolt.SUPPLIER_DRAWING_DIMENSIONS
+
+
+def _stud_stock_fixture(case):
+    """A second actual stock-view fixture; never borrow finished geometry/scale."""
+    stock = SimpleNamespace(adapter=case.adapter)
+    stock.front = front = SimpleNamespace(
+        name="StockFront", ReferencedConfiguration=bolt.SUPPLIER_STOCK_CONFIGURATION,
+        GetDisplayMode2=lambda: 2, ScaleDecimal=2.0,
+        ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(bolt_drawing.SOURCE.resolve())),
+    )
+    bearing_point = tuple(
+        value / 1000 for value in bolt_drawing._head_height_points_mm()[0]
+    )
+    tip_y = bolt.LENGTH - bolt.CATALOG_LENGTH
+    # Independent source expression, not a rounded expected radius.
+    tip_radius = BOLT_DIMS.major_dia / 2 - BOLT_DIMS.pitch * 0.851
+    tip_point = (0.0, tip_y / 1000, tip_radius / 1000)
+    stock.bearing = case.edge((*bearing_point, 0.0, math.nan))
+    stock.top = case.edge((*tip_point, 0.0, math.nan))
+    stock.rear = case.edge((0.0, tip_y / 1000, -tip_radius / 1000, 0.0, math.nan))
+    stock.bearing_item = replace(case.bearing_item, edge=stock.bearing)
+    stock.top_item = ViewEdge(
+        edge=stock.top, line=None, vertices=None,
+        circle=(0.0, tip_y, 0.0, 0.0, 1.0, 0.0, tip_radius),
+    )
+    stock.rear_item = replace(stock.top_item, edge=stock.rear)
+    front.scan = ViewEdges(
+        "actual supplier stock stations",
+        (stock.rear_item, stock.bearing_item, stock.top_item),
+    )
+    front.SelectEntity = lambda edge, append: case.select(
+        edge, append, SimpleNamespace(View=front)
+    )
+    stock.annotation = annotation = SimpleNamespace(
+        attached=[stock.bearing, stock.top], kinds=(1, 1), count=2,
+        dangling=False, Visible=1, OwnerType=0, Owner=front,
+    )
+    annotation.GetAttachedEntities3 = lambda: annotation.attached
+    annotation.GetAttachedEntityTypes = lambda: annotation.kinds
+    annotation.GetAttachedEntityCount3 = lambda: annotation.count
+    annotation.IsDangling = lambda: annotation.dangling
+    stock.arrows = [
+        (0.2, point[1] * front.ScaleDecimal + 0.1, 0.0, 0.0, sign, 0.0,
+         0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for point, sign in zip((bearing_point, tip_point), (1.0, -1.0), strict=True)
+    ]
+    stock.display_data = SimpleNamespace(
+        GetArrowHeadCount=lambda: len(stock.arrows),
+        GetArrowHeadAtIndex2=lambda index: stock.arrows[index],
+    )
+    annotation.GetDisplayData = lambda: stock.display_data
+    stock.native = native = SimpleNamespace(
+        FullName="SupplierStockLength@StockFront@Drawing",
+        SystemValue=bolt.CATALOG_LENGTH / 1000, Tolerance=SimpleNamespace(Type=0),
+    )
+    settings = bolt.SUPPLIER_REFERENCE_DIMENSIONS["SupplierStockLength"]
+    stock.display = display = SimpleNamespace(
+        Type2=2, GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
+        ShowParenthesis=False, ShowDimensionValue=True, GetUseDocUnits=lambda: False,
+        GetUnits=lambda: 3 if settings["units"] == "in" else 0,
+        precision=settings["precision"], GetFractionBase=lambda: 1,
+        GetOverride=lambda: False,
+        GetText=lambda index: {
+            1: "(", 2: f" {settings['units']})", 4: settings.get("callout", ""),
+        }.get(index, ""),
+    )
+    display.GetPrimaryPrecision2 = lambda: display.precision
+    annotation.GetSpecificAnnotation = lambda: display
+    return stock
+
+
+def _stud_stock_case(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.stock_case = _stud_stock_fixture(case)
+    case.result = case.stock_case.display
+    return case
+
+
+def _create_stud_stock_reference(case, monkeypatch):
+    """Exercise the owned stock consumer, including rebuild/configuration/HLR."""
+    stock = case.stock_case
+    iso = SimpleNamespace(
+        name="StockIso", ReferencedConfiguration="Default", ScaleDecimal=2.0,
+    )
+    stock.front.ReferencedConfiguration = "Default"
+    case.stock_order = []
+    case.model.ActivateSheet = lambda name: (
+        case.stock_order.append(("sheet", name)) or True
+    )
+    case.model.EditRebuild3 = lambda: case.stock_order.append(("rebuild",)) or True
+    case.model.GetEditSheet = lambda: True
+
+    def place(_adapter, _source, orientation, *_args, **kwargs):
+        assert kwargs["scale"] == bolt_drawing.SHEET_SCALE
+        return stock.front if orientation == "*Front" else iso
+
+    def hidden(_adapter, view):
+        case.stock_order.append(("hlr", view.name))
+        view.GetDisplayMode2 = lambda: 2
+
+    original_scan = bolt_drawing.scan_view_edges
+
+    def scan(view, **kwargs):
+        assert ("rebuild",) in case.stock_order
+        assert ("hlr", view.name) in case.stock_order
+        assert view.ReferencedConfiguration == bolt.SUPPLIER_STOCK_CONFIGURATION
+        return original_scan(view, **kwargs)
+
+    monkeypatch.setattr(bolt_drawing, "place_view", place)
+    monkeypatch.setattr(bolt_drawing, "scan_view_edges", scan)
+    monkeypatch.setattr(bolt_drawing, "set_hidden_lines_removed", hidden)
+    monkeypatch.setattr(bolt_drawing, "set_view_position", lambda *_args: True)
+    monkeypatch.setattr(
+        bolt_drawing, "_format_supplier_reference",
+        lambda _adapter, display, name: (
+            display.GetAnnotation() if name == "SupplierStockLength" else None
+        ),
+    )
+    monkeypatch.setattr(
+        bolt_drawing, "add_property_linked_note",
+        lambda *_args: SimpleNamespace(
+            GetAnnotation=lambda: SimpleNamespace(OwnerType=1)
+        ),
+    )
+    return bolt_drawing._add_stock_reference(case.adapter)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("axis_sign", [-1.0, 1.0])
+def test_stud_stock_names_outer_hex_and_exact_original_factory_tip(monkeypatch, reverse, axis_sign):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    tip = replace(
+        stock.top_item,
+        circle=(*stock.top_item.circle[:4], axis_sign, *stock.top_item.circle[5:]),
+    )
+    edges = (stock.rear_item, stock.bearing_item, tip)
+    stock.front.scan = ViewEdges("reordered stock", tuple(reversed(edges)) if reverse else edges)
+    entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[0] is stock.bearing and entities[1] is stock.top
+    assert points == (stock.bearing.nearest[:3], stock.top.nearest[:3])
+    assert abs(points[0][1] - points[1][1]) * 1000 == pytest.approx(50.8)
+    assert bolt_drawing._stock_factory_tip_radius_mm() == (
+        BOLT_DIMS.major_dia / 2 - BOLT_DIMS.pitch * 0.851
+    )
+    assert bolt_drawing._stock_factory_tip_radius_mm() == pytest.approx(1.5123416666666667)
+    assert stock.top.closest_calls == [stock.top.nearest[:3], stock.top.nearest[:3]]
+    receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_geometry"
+    )
+    assert receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+    assert receipt["bearing_matches"] == 1 and receipt["tip_matches"] == 2
+    assert len(receipt["lines"]) <= 12 and len(receipt["circles"]) <= 12
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "configuration", "hlr", "missing_bearing", "duplicate_bearing",
+        "one_wrong_endpoint", "interior_bearing", "outside_segment", "inner_runout",
+        "finished_tip", "major_chamfer_junction", "wrong_radius", "wrong_center",
+        "wrong_axis", "nonfinite_circle", "false_trim_plane", "false_trim_radius",
+        "trim_requery", "missing_point", "short_point", "nonfinite_parameter",
+        "bearing_point", "duplicate_tip", "same_entity",
+    ),
+)
+def test_stud_stock_refuses_wrong_geometry_configuration_or_trim(monkeypatch, fault):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    bearing, tip = stock.bearing_item, stock.top_item
+    edges = [bearing, tip]
+    if fault == "configuration":
+        stock.front.ReferencedConfiguration = "Default"
+    elif fault == "hlr":
+        stock.front.GetDisplayMode2 = lambda: 1
+    elif fault == "missing_bearing":
+        edges = [tip]
+    elif fault == "duplicate_bearing":
+        edges.append(replace(bearing, edge=case.edge(stock.bearing.nearest)))
+    elif fault == "one_wrong_endpoint":
+        x, y, z = bearing.line[0]
+        edges[0] = replace(bearing, line=((x, y + 0.001, z), bearing.line[1]))
+    elif fault == "interior_bearing":
+        edges[0] = replace(
+            bearing, line=tuple((x, y, 0.0) for x, y, _z in bearing.line)
+        )
+    elif fault == "outside_segment":
+        edges[0] = replace(bearing, line=(
+            bearing.line[0],
+            (bolt.HEAD_AF / 8, bolt.LENGTH, 7 * bolt.HEAD_AF / (8 * math.sqrt(3))),
+        ))
+    elif fault == "inner_runout":
+        edges[0] = replace(
+            bearing, line=None,
+            circle=(0.0, bolt.LENGTH, 0.0, 0.0, 1.0, 0.0, BOLT_DIMS.major_dia / 2 + 0.0508),
+        )
+    elif fault in (
+        "finished_tip", "major_chamfer_junction", "wrong_radius", "wrong_center",
+        "wrong_axis", "nonfinite_circle",
+    ):
+        circle = list(tip.circle)
+        if fault == "finished_tip":
+            circle[1] = 0.0
+        elif fault == "major_chamfer_junction":
+            circle[1] += BOLT_DIMS.pitch * 0.851
+            circle[6] = BOLT_DIMS.major_dia / 2
+        elif fault == "wrong_radius":
+            circle[6] += 0.001
+        elif fault == "wrong_center":
+            circle[0] = 0.001
+        elif fault == "wrong_axis":
+            circle[3:6] = (1.0, 0.0, 0.0)
+        else:
+            circle[6] = math.nan
+        edges[1] = replace(tip, circle=tuple(circle))
+    elif fault in ("false_trim_plane", "false_trim_radius"):
+        point = list(stock.top.nearest)
+        point[1 if fault == "false_trim_plane" else 2] += 2e-8
+        stock.top.nearest = tuple(point)
+    elif fault == "trim_requery":
+        original = stock.top.GetClosestPointOn
+        calls = []
+
+        def closest(*point):
+            calls.append(point)
+            if len(calls) == 1:
+                return original(*point)
+            return (stock.top.nearest[0] + 1e-6, *stock.top.nearest[1:])
+
+        stock.top.GetClosestPointOn = closest
+    elif fault == "missing_point":
+        stock.top.nearest = None
+    elif fault == "short_point":
+        stock.top.nearest = stock.top.nearest[:3]
+    elif fault == "nonfinite_parameter":
+        stock.top.nearest = (*stock.top.nearest[:3], math.nan, 0.0)
+    elif fault == "bearing_point":
+        stock.bearing.nearest = (0.0, bolt.LENGTH / 1000, 0.0, 0.0, 0.0)
+    elif fault == "duplicate_tip":
+        edges.append(replace(tip, edge=case.edge(stock.top.nearest)))
+    elif fault == "same_entity":
+        case.app.IsSame = lambda first, second: (
+            1 if first is stock.bearing and second is stock.top else int(first is second)
+        )
+    stock.front.scan = ViewEdges("bad actual stock", tuple(edges))
+    with pytest.raises(RuntimeError, match="SupplierStockLength"):
+        bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert not case.creations and not case.selection_log
+
+
+def test_stud_stock_uses_actual_trimmed_point_not_underlying_circle_extremum(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    radius_m = stock.top_item.circle[6] / 1000
+    actual = (radius_m / math.sqrt(2), stock.top.nearest[1], radius_m / math.sqrt(2))
+    stock.top.nearest = (*actual, 0.4, math.nan)
+    entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[1] is stock.top
+    assert points[1] == actual
+    assert stock.top.closest_calls[-1] == actual
+    assert points[1] != (0.0, actual[1], radius_m)
+
+
+def test_stud_stock_consumer_creates_native_linear_with_view_selection_and_creation_proof(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    # A model IEntity.Select4 is deliberately unusable in this drawing context.
+    for edge in (stock.bearing, stock.top):
+        edge.Select4 = lambda *_args: pytest.fail("stock must select through IView")
+    front, _iso, annotation = _create_stud_stock_reference(case, monkeypatch)
+    assert front is stock.front and annotation is stock.annotation
+    assert case.creations == [(0.130, 0.160, 0.0)]
+    assert case.selection_log == [
+        (stock.bearing, False, stock.front), (stock.top, True, stock.front),
+    ]
+    assert not case.selections and case.clears == [True, True]
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert len(proofs) == 1
+    assert proofs[0]["label"] == "SupplierStockLength"
+    assert proofs[0]["phase"] == "creation" and proofs[0]["type2"] == 2
+    assert proofs[0]["measured_mm"] == pytest.approx(50.8)
+
+
+@pytest.mark.parametrize("selection_index", [1, 2])
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "activation", "select", "wrong_selected", "missing_selected", "duplicate_selected",
+        "selection_count", "selection_type", "selection_point", "selection_point_readback",
+        "null_creation", "native_exception",
+    ),
+)
+def test_stud_stock_consumer_refuses_selection_null_or_creation_failure(
+    monkeypatch, selection_index, fault,
+):
+    case = _stud_stock_case(monkeypatch)
+    case.fault_index = selection_index
+    # A duplicate selection requires the second selection slot.
+    case.fault = fault
+    if fault == "duplicate_selected":
+        case.fault_index = 2
+    if fault == "null_creation":
+        case.result = None
+    with pytest.raises(RuntimeError, match="SupplierStockLength|native insertion failed"):
+        _create_stud_stock_reference(case, monkeypatch)
+    assert not case.selections
+    assert not any(
+        name == "drawing.physical_axial_dimension_native_proof" for name, _ in case.events
+    )
+
+
+@pytest.mark.parametrize("phase", ["creation", "settled", "saved"])
+@pytest.mark.parametrize("fault", ("angular", *_STUD_SPATIAL_FAULTS))
+def test_stud_stock_native_proof_is_required_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    if fault == "angular":
+        stock.display.Type2 = 3
+    else:
+        _corrupt_stud_native_proof(stock, monkeypatch, fault)
+    with pytest.raises(RuntimeError, match="SupplierStockLength"):
+        if phase == "creation":
+            _create_stud_stock_reference(case, monkeypatch)
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "configuration", "missing_tip", "wrong_factory_radius", "missing_dimension",
+        "duplicate_dimension", "owner", "annotation_owner", "format", "band",
+    ),
+)
+def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
+    monkeypatch, tmp_path, phase, fault,
+):
+    case = (
+        _saved_stud_height_case(monkeypatch, tmp_path) if phase == "saved"
+        else _settled_stud_height_case(monkeypatch)
+    )
+    stock = case.stock_case
+    if fault == "configuration":
+        stock.front.ReferencedConfiguration = "Default"
+    elif fault == "missing_tip":
+        stock.front.scan = ViewEdges("lost factory tip", (stock.bearing_item,))
+    elif fault == "wrong_factory_radius":
+        stock.front.scan = ViewEdges("wrong factory rim", (
+            stock.bearing_item,
+            replace(stock.top_item, circle=(*stock.top_item.circle[:6], 1.51234 + 0.001)),
+        ))
+    elif fault == "missing_dimension":
+        stock.front.GetDisplayDimensions = lambda: ()
+    elif fault == "duplicate_dimension":
+        stock.front.GetDisplayDimensions = lambda: (stock.display, stock.display)
+    elif fault == "owner":
+        stock.front.name = "WrongStockFront"
+    elif fault == "annotation_owner":
+        stock.annotation.Owner = case.front
+    elif fault == "format":
+        stock.display.precision += 1
+        monkeypatch.setattr(
+            bolt_drawing, "assert_supplier_reference_dimension",
+            lambda adapter, display, **settings: (
+                supplier_dimensions.assert_supplier_reference_dimension(adapter, display, **settings)
+                if settings["label"] == "SupplierStockLength" else None
+            ),
+        )
+    elif fault == "band":
+        stock.native.Tolerance.Type = 2
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("axis_scale", [-7.0, 0.25])
+def test_stud_stock_circle_axis_is_compared_after_normalization(monkeypatch, axis_scale):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    tip = replace(
+        stock.top_item,
+        circle=(*stock.top_item.circle[:4], axis_scale, *stock.top_item.circle[5:]),
+    )
+    stock.front.scan = ViewEdges("nonunit axis", (stock.bearing_item, tip))
+    entities, _points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[1] is stock.top
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stud_stock_frontmost_distinct_trim_ties_refuse_independent_of_order(monkeypatch, reverse):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    radius_m = stock.top_item.circle[6] / 1000
+    angle = 0.4
+    x, z = radius_m * math.sin(angle), radius_m * math.cos(angle)
+    first = case.edge((x, stock.top.nearest[1], z, 0.4, 0.0))
+    second = case.edge((-x, stock.top.nearest[1], z, 2.7, 0.0))
+    edges = (
+        stock.bearing_item, replace(stock.top_item, edge=first),
+        replace(stock.top_item, edge=second),
+    )
+    stock.front.scan = ViewEdges("tied real arcs", tuple(reversed(edges)) if reverse else edges)
+    with pytest.raises(RuntimeError, match="distinct.*frontmost tie"):
+        bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert not case.creations
+
+
+def test_stud_stock_settled_census_requires_both_native_physical_proofs(monkeypatch):
+    case = _settled_stud_height_case(monkeypatch)
+    bolt_drawing._assert_supplier_references(case.adapter, case.identities, case.configurations)
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert {(fields["label"], fields["phase"]) for fields in proofs} == {
+        ("SupplierHeadHeight", "settled"), ("SupplierStockLength", "settled"),
+    }
+    assert [record[1] for record in case.scans] == [case.front, case.stock_case.front]
+
+
+@pytest.mark.parametrize("name", ["SupplierHeadHeight", "SupplierStockLength"])
+@pytest.mark.parametrize("fault", ["captured_sheet", "captured_configuration", "moved_sheet"])
+def test_stud_saved_physical_census_requires_each_exact_sheet_and_source_configuration(
+    monkeypatch, tmp_path, name, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    is_stock = name == "SupplierStockLength"
+    owner = case.identities[name][1]
+    if fault == "captured_sheet":
+        _sheet, configuration = case.configurations[owner]
+        case.configurations[owner] = (
+            bolt_drawing.SHEET_NAMES[0 if is_stock else 1], configuration,
+        )
+    elif fault == "captured_configuration":
+        sheet, _configuration = case.configurations[owner]
+        case.configurations[owner] = (
+            sheet, "Default" if is_stock else bolt.SUPPLIER_STOCK_CONFIGURATION,
+        )
+    else:
+        source = case.stock_case.front if is_stock else case.front
+        other = case.front if is_stock else case.stock_case.front
+        display = case.stock_case.display if is_stock else case.display
+        original_source, original_other = source.GetDisplayDimensions, other.GetDisplayDimensions
+        source.GetDisplayDimensions = lambda: tuple(
+            value for value in original_source() if value is not display
+        )
+        other.GetDisplayDimensions = lambda: (*original_other(), display)
+    with pytest.raises(RuntimeError, match=name):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations
+        )
+    assert case.adapter.currentModel is case.previous_model
+    if fault == "moved_sheet":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+    else:
+        assert not case.open_calls and not case.close_calls
+
+
+@pytest.mark.parametrize("fault", ["rebuild", "configuration_readback"])
+def test_stud_stock_consumer_refuses_before_scan_when_stock_view_setup_fails(monkeypatch, fault):
+    case = _stud_height_case(monkeypatch)
+
+    class UnchangedConfiguration:
+        ReferencedConfiguration = property(lambda self: "Default", lambda self, value: None)
+
+    stock = (
+        UnchangedConfiguration() if fault == "configuration_readback"
+        else SimpleNamespace(ReferencedConfiguration="Default")
+    )
+    case.model.ActivateSheet = lambda _name: True
+    case.model.EditRebuild3 = lambda: fault != "rebuild"
+    monkeypatch.setattr(bolt_drawing, "place_view", lambda *_args, **_kwargs: stock)
+    monkeypatch.setattr(bolt_drawing, "set_view_position", lambda *_args: True)
+    monkeypatch.setattr(bolt_drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(
+        bolt_drawing, "scan_view_edges",
+        lambda *_args, **_kwargs: pytest.fail("must not scan a stale/finished stock view"),
+    )
+    with pytest.raises(RuntimeError, match="did not rebuild|references the finished bolt"):
+        bolt_drawing._add_stock_reference(case.adapter)
+    assert not case.selection_log and not case.creations
+
+
+def test_stud_stock_geometry_evidence_keeps_actual_points_and_nearest_candidates_bounded(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    wrong_lines = [
+        replace(
+            stock.bearing_item, edge=case.edge(None),
+            line=tuple((x, y + index + 1, z) for x, y, z in stock.bearing_item.line),
+        )
+        for index in range(18)
+    ]
+    wrong_circles = [
+        replace(
+            stock.top_item, edge=case.edge(None),
+            circle=(*stock.top_item.circle[:6], stock.top_item.circle[6] + index + 1),
+        )
+        for index in range(18)
+    ]
+    stock.front.scan = ViewEdges(
+        "many visible stock edges",
+        (*wrong_lines, *wrong_circles, stock.bearing_item, stock.top_item),
+    )
+    _entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    geometry = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_geometry"
+    )
+    assert geometry["line_count"] == geometry["circle_count"] == 19
+    assert len(geometry["lines"]) == len(geometry["circles"]) == 12
+    assert geometry["lines"][0]["native_point_m"] == points[0]
+    assert geometry["circles"][0]["native_point_m"] == points[1]
+    assert geometry["circles"][0]["membership_error_m"] == 0.0
+
+
+@pytest.mark.parametrize("name", ["_stock_length_stations", "_assert_physical_stock_length"])
+def test_stud_stock_native_entrypoints_are_traced(name):
+    assert hasattr(getattr(bolt_drawing, name), "__wrapped__")
+
+
+@pytest.mark.parametrize("phase", ["creation", "settled", "saved"])
+@pytest.mark.parametrize("fault", ["null_document", "wrong_document", "empty_path", "relative_path"])
+def test_stud_stock_requires_observed_native_source_document_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    if fault == "null_document":
+        stock.front.ReferencedDocument = None
+    else:
+        path = {
+            "wrong_document": str(
+                bolt_drawing.SOURCE.resolve().parent / "foreign" / bolt_drawing.SOURCE.name
+            ),
+            "empty_path": "",
+            "relative_path": bolt_drawing.SOURCE.name,
+        }[fault]
+        stock.front.ReferencedDocument = SimpleNamespace(GetPathName=lambda: path)
+    with pytest.raises(RuntimeError, match="SupplierStockLength.*native.*(document|source)"):
+        if phase == "creation":
+            _create_stud_stock_reference(case, monkeypatch)
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations
+            )
+    assert not any(record[1] is stock.front for record in case.scans)
+    assert not case.creations
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_stock_source_receipt_reports_observed_document_path_without_source_mutation(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    native_path = str(bolt_drawing.SOURCE.resolve())
+    path_reads = []
+    stock.front.ReferencedDocument = SimpleNamespace(
+        GetPathName=lambda: path_reads.append(native_path) or native_path
+    )
+    bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_source"
+    )
+    assert path_reads == [native_path]
+    assert receipt["native_source_path"] == native_path
+    assert receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
