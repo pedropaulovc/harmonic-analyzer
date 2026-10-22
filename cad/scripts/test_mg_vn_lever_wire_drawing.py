@@ -898,6 +898,8 @@ def test_native_note_bounds_must_remain_on_sheet_and_clear(
 def _supplier_caption_package(
     monkeypatch, tmp_path, *, offset=(-0.0004, 0.0003), line_advance=0.003879,
     placement_fault=None, settled_fault=None, fault_member="PenWire",
+    mark_members=(), final_mark_kind=None, selection_failure=None, deletion_failure=None,
+    final_inventory="both", enumerator_misses=False,
 ):
     """Run the real stock-caption consumer beside the existing installed views.
 
@@ -915,10 +917,39 @@ def _supplier_caption_package(
     neighbors = []
     telemetry = []
     rebuilds = []
+    selected_marks = []
+    diameter_positions = {}
     document = package.document
     document.ActiveDrawingView = None
     document.ActivateView = lambda _name: True
     document.GetEditSheet = lambda: True
+    document.finalizing = False
+
+    def clear_selection(_all):
+        selected_marks.clear()
+
+    def delete_selected():
+        for mark in selected_marks:
+            if mark.view.sheet != deletion_failure:
+                mark.view.mark_available = False
+
+    document.ClearSelection2 = clear_selection
+    document.EditDelete = delete_selected
+
+    class NativeCenterMark:
+        def __init__(self, view):
+            self.view = view
+
+        def Select2(self, append, mark):
+            assert (append, mark) == (True, 0)
+            if self.view.sheet == selection_failure:
+                return False
+            selected_marks.append(self)
+            return True
+
+    class FalseyMark:
+        def __bool__(self):
+            return False
 
     class StockView:
         def __init__(self, x, y, scale):
@@ -927,6 +958,25 @@ def _supplier_caption_package(
             self.ScaleRatio = tuple(scale)
             self.ReferencedConfiguration = ""
             self.UseSheetScale = 1
+            self.center_mark = NativeCenterMark(self) if self.sheet in mark_members else None
+            self.mark_available = self.center_mark is not None
+
+        def GetFirstCenterMark2(self):
+            if self.sheet == fault_member and (
+                enumerator_misses
+                or document.finalizing and final_inventory == "annotations-only"
+            ):
+                return None
+            return self.center_mark if self.mark_available else None
+
+        def GetAnnotationsByType(self, annotation_type):
+            assert annotation_type == 13  # native swCenterMarkSym, never the diameter
+            if (
+                self.sheet == fault_member and document.finalizing
+                and final_inventory == "enumerator-only"
+            ):
+                return None
+            return (self.center_mark,) if self.mark_available else None
 
         def UpdateViewDisplayGeometry(self):
             pass
@@ -1029,8 +1079,13 @@ def _supplier_caption_package(
         Tolerance=SimpleNamespace(Type=0),
     )
     display = SimpleNamespace(Type2=6, GetDimension2=lambda _index: native)
+
+    def set_diameter_position(x, y, z):
+        diameter_positions[document.active.name] = (x, y, z)
+        return True
+
     diameter = SimpleNamespace(
-        SetPosition=lambda *_args: True, GetSpecificAnnotation=lambda: display,
+        SetPosition=set_diameter_position, GetSpecificAnnotation=lambda: display,
     )
 
     def place(_adapter, _source, orientation, x, y, *, scale):
@@ -1108,6 +1163,19 @@ def _supplier_caption_package(
             note.position = (note.position[0] + 0.100, note.position[1], 0.0)
         elif settled_fault is not None:
             note.fault = settled_fault
+        original_rebuild = document.EditRebuild3
+
+        def final_rebuild():
+            result = original_rebuild()
+            document.finalizing = True
+            if final_mark_kind is not None:
+                view = next(item for item in stock_views if item.sheet == fault_member)
+                assert final_mark_kind in ("bare", "falsey")
+                view.center_mark = FalseyMark() if final_mark_kind == "falsey" else object()
+                view.mark_available = True
+            return result
+
+        document.EditRebuild3 = final_rebuild
         return await finalize(adapter, outputs, **kwargs)
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize_caption)
@@ -1116,6 +1184,7 @@ def _supplier_caption_package(
     package.neighbor_states = neighbors
     package.caption_telemetry = telemetry
     package.caption_rebuilds = rebuilds
+    package.stock_diameter_positions = diameter_positions
     return package
 
 
@@ -1259,3 +1328,104 @@ def test_supplier_caption_rechecks_complete_text_owner_and_extent_after_final_re
         assert note.OwnerType == 0
     else:
         assert member in str(failure.value)
+
+
+def test_supplier_stock_zero_native_center_mark_inventory_passes_and_is_logged(
+    monkeypatch, tmp_path
+):
+    package = _supplier_caption_package(monkeypatch, tmp_path)
+    assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
+    for member in ("LeverWire", "PenWire"):
+        assert (
+            f"{member} supplier stock centre marks after removal: none drawn; "
+            "deleted=0; remaining=0; enumerator_remaining=False"
+        ) in package.caption_telemetry
+        assert (
+            f"{member} supplier stock centre marks after final rebuild: "
+            "remaining=0; enumerator_remaining=False"
+        ) in package.caption_telemetry
+    assert all(view.GetFirstCenterMark2() is None for view in package.stock_views)
+    assert all(view.GetAnnotationsByType(13) is None for view in package.stock_views)
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize("enumerator_misses", (False, True))
+def test_supplier_stock_removes_center_mark_without_touching_circle_diameter_or_neighbors(
+    monkeypatch, tmp_path, member, enumerator_misses
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        enumerator_misses=enumerator_misses,
+    )
+    assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.GetFirstCenterMark2() is None
+    assert view.GetAnnotationsByType(13) is None
+    assert (
+        f"{member} supplier stock centre marks after removal: deleted; "
+        "deleted=1; remaining=0; enumerator_remaining=False"
+    ) in package.caption_telemetry
+    assert view.ScaleRatio == (20, 1)
+    assert view.Position == {"LeverWire": (0.300, 0.155), "PenWire": (0.190, 0.241)}[member]
+    radius = 0.031 * 25.4 / 2000 * 20
+    x, y = view.Position
+    assert view.GetOutline() == pytest.approx((x - radius, y - radius, x + radius, y + radius))
+    assert package.stock_diameter_positions == {
+        "LeverWire": (0.325, 0.168, 0.0), "PenWire": (0.215, 0.252, 0.0),
+    }
+    for _member, before, after in package.neighbor_states:
+        assert before == after
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize(
+    "fault,match",
+    (
+        ("selection", "cannot select supplier stock centre mark"),
+        ("deletion", "supplier stock centre mark survived deletion"),
+    ),
+)
+def test_supplier_stock_native_center_mark_removal_must_succeed(
+    monkeypatch, tmp_path, member, fault, match
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        selection_failure=member if fault == "selection" else None,
+        deletion_failure=member if fault == "deletion" else None,
+    )
+    with pytest.raises(RuntimeError, match=f"{member}: {match}"):
+        asyncio.run(drawing.build(package.adapter))
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.GetAnnotationsByType(13) == (view.center_mark,)
+    if fault == "deletion":
+        assert (
+            f"{member} supplier stock centre marks after removal: refused; "
+            "deleted=unconfirmed; remaining=1; enumerator_remaining=True"
+        ) in package.caption_telemetry
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize("kind", ("bare", "falsey"))
+@pytest.mark.parametrize("inventory", ("both", "annotations-only", "enumerator-only"))
+def test_supplier_stock_final_rebuild_refuses_any_residual_center_mark_without_deleting_it(
+    monkeypatch, tmp_path, member, kind, inventory
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        final_mark_kind=kind, final_inventory=inventory,
+    )
+    with pytest.raises(
+        RuntimeError, match=f"{member}: unexpected supplier stock centre mark after final rebuild",
+    ) as failure:
+        asyncio.run(drawing.build(package.adapter))
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.mark_available  # final refusal must not delete the unexpected annotation
+    remaining = int(inventory != "enumerator-only")
+    enumerator_remaining = inventory != "annotations-only"
+    assert (
+        f"remaining={remaining}; enumerator_remaining={enumerator_remaining}"
+    ) in str(failure.value)
+    assert (
+        f"{member} supplier stock centre marks after final rebuild: "
+        f"remaining={remaining}; enumerator_remaining={enumerator_remaining}"
+    ) in package.caption_telemetry
