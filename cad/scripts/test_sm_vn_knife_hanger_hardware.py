@@ -1773,6 +1773,33 @@ def test_stud_head_height_native_diagnostic_errors_are_not_swallowed(monkeypatch
     )
 
 
+def test_stud_head_height_annotation_read_failure_retains_initial_snapshot_and_cause(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    failure = OSError("native GetAnnotation failed")
+
+    def fail():
+        raise failure
+
+    case.display.GetAnnotation = fail
+    with pytest.raises(RuntimeError, match="native metadata snapshot failed") as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    assert error.value.__cause__ is failure
+    receipt = next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_head_height_native_refusal"
+    )
+    assert receipt == {
+        "reason": "native metadata snapshot failed",
+        "failure_probe_error": {
+            "stage": "annotation", "type": "OSError", "message": "native GetAnnotation failed",
+        },
+    }
+    assert "'failure_probe_error':" in str(error.value)
+    assert "'stage': 'annotation'" in str(error.value)
+
+
 def _settled_stud_height_case(monkeypatch):
     case = _stud_height_case(monkeypatch)
     front = case.front

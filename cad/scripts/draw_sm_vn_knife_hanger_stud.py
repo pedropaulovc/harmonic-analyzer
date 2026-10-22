@@ -316,15 +316,21 @@ def _assert_physical_head_height(
         entities = _head_height_entities(adapter, front)
     if display is None:
         raise RuntimeError("SupplierHeadHeight: native display dimension is null")
-    display = _early_bound(display, "IDisplayDimension")
-    raw_annotation = display.GetAnnotation()
-    if raw_annotation is None:
-        raise RuntimeError("SupplierHeadHeight: native dimension has no annotation")
-    annotation = _early_bound(raw_annotation, "IAnnotation")
-    app = _early_bound(adapter.swApp, "ISldWorks")
     snapshot = {}
-    stage = "type2"
+    stage = "display_bind"
+    reason = "native metadata snapshot failed"
     try:
+        display = _early_bound(display, "IDisplayDimension")
+        stage = "annotation"
+        raw_annotation = display.GetAnnotation()
+        if raw_annotation is None:
+            reason = "native dimension has no annotation"
+            raise RuntimeError(reason)
+        stage = "annotation_bind"
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        stage = "application_bind"
+        app = _early_bound(adapter.swApp, "ISldWorks")
+        stage = "type2"
         snapshot["type2"] = int(display.Type2)
         stage = "attached_count"
         snapshot["attached_count"] = int(annotation.GetAttachedEntityCount3())
@@ -353,7 +359,6 @@ def _assert_physical_head_height(
         snapshot["failure_probe_error"] = {
             "stage": stage, "type": type(exc).__name__, "message": str(exc)[:500],
         }
-        reason = "native metadata snapshot failed"
         _telemetry.event("drawing.stud_head_height_native_refusal", reason=reason, **snapshot)
         raise RuntimeError(f"SupplierHeadHeight: {reason}; native_snapshot={snapshot!r}") from exc
 
