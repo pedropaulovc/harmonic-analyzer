@@ -2813,6 +2813,27 @@ def test_corrupt_lookup_explicitly_requests_replacement(
     assert _get_bytes(backend, "e" * 64) == payload
     assert replacements == [True]
     assert [call[0] for call in archive_store.service.calls].count("readinto") == body_reads
+    spans = exporter.get_finished_spans()
+    summaries = [span for span in spans if span.name == "cache.archive"]
+    assert [
+        (span.attributes["local_lookup_outcome"], span.attributes["local_outcome"])
+        for span in summaries
+    ] == [("corrupt", "persisted"), ("hit", "hit")]
+    assert all("local_reason" not in span.attributes for span in summaries)
+    [lookup] = [
+        span for span in spans
+        if span.name == "cache.local_store"
+        and span.attributes.get("operation") == "lookup"
+        and span.attributes.get("local_outcome") == "corrupt"
+    ]
+    assert lookup.attributes["local_reason"] == "identity_mismatch"
+    [persist] = [
+        span for span in spans
+        if span.name == "cache.local_store"
+        and span.attributes.get("operation") == "persist"
+    ]
+    assert persist.attributes["local_outcome"] == "persisted"
+    assert "local_reason" not in persist.attributes
 
 
 @pytest.mark.parametrize("hash_content", [False, True])

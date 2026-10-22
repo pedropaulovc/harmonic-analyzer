@@ -888,7 +888,8 @@ class _BlobBackend:
                         else:
                             _note_local_store(local, lookup)
             reuse.set_attribute("local_lookup_outcome", lookup)
-            _note_local_store(reuse, lookup)
+            # Reasons stay on phase-specific spans: persistence can change the outcome.
+            reuse.set_attribute("local_outcome", lookup)
             if private is not None:
                 reuse.set_attribute("reused_bytes", size - probe_bytes)
                 return private

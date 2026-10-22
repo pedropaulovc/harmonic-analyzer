@@ -1731,6 +1731,10 @@ payload, not the whole archive on a local hit. Failed transfers whose partial
 body count is unknown are marked `network_bytes_known=false`. The enclosing
 `cache.fetch` reports archive bytes and total fetch work; local-store operations
 and verification have separate timing spans.
+The archive summary keeps lookup and final outcomes, but no aggregate
+`local_reason`: reasons belong to the phase-specific `cache.local_store` spans.
+For example, a corrupt lookup retains its integrity reason without labeling
+successful replacement persistence as corrupt.
 
 Local objects are leaf-writable. Before copying, the reader checks that the
 opened regular file has the authoritative expected length. Every reuse then
@@ -1772,6 +1776,11 @@ retention. It reserves room before writing a publication temp and uses explicit
 mtime updates for LRU order. A host-local lock coordinates capacity admission
 and eviction; cross-process object leases prevent eviction of active readers.
 Each lock acquisition waits at most **50 ms** before skipping optional work.
+These leases are exclusive. Single-leaf workers normally avoid contention, but
+parallel producers can encounter a busy lookup and download the remaining
+remote body again. Busy store or object locks can also skip local persistence.
+This is an intentional bounded-wait tradeoff, not a guarantee that concurrent
+producers share one body download.
 If unleased objects cannot make enough room, persistence is skipped. Archives
 larger than the cap are transferred without being retained locally.
 
