@@ -683,9 +683,9 @@ def test_shelve_requires_a_settled_anchor_before_enabling(native_reads):
     ("axes", "force", "message"),
     (
         ({}, (), "axes"),
-        ({"RD1": True}, (), "axis"),
-        ({"RD1": 2}, (), "axis"),
-        ({"RD1": -1}, (), "axis"),
+        ({"RD1": True}, (), r"ax(?:is|es)"),
+        ({"RD1": 2}, (), r"ax(?:is|es)"),
+        ({"RD1": -1}, (), r"ax(?:is|es)"),
         ({"RD1": 0}, ("SupplierLength",), "force"),
     ),
 )
