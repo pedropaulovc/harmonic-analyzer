@@ -212,6 +212,11 @@ compare full endpoints in either order and their model-space length. Arrow and
 text positions remain sheet-space. Author crop circles with protected
 `AddToDB=True`, select the closed profile explicitly, and read the persisted
 circle's centre and model radius again after refitting or moving the view.
+Refresh native display geometry after HLR/scale changes before measuring a
+candidate's outline. `GetOutline` is a padded view extent, not an exact crop
+circle box. If no scale fits, retain every candidate's native scale, position,
+outline, overflow and persisted circle geometry/transform in the refusal.
+Keep the reserved field, scale ladder and tolerances unchanged.
 
 Inspection callouts identify the existing C-step reading points and limits:
 chamber excess is chamber height minus flange thickness, not a third gap.

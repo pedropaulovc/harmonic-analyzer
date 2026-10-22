@@ -2677,14 +2677,48 @@ def _assert_capture_crop(adapter: Any, view: Any, index: int) -> None:
 
 
 def _fit_capture_view(adapter: Any, view: Any, region: tuple[float, float, float, float], ladder: Sequence[tuple[float, float]], *, margin: float = 0.0, label: str) -> tuple[float, float]:
+    view = _early_bound(view, "IView")
+    candidates = []
     for scale in ladder:
         _set_view_scale(adapter, view, scale, label=label)
-        _shift, misses = ring_fit_shift(_view_outline(view, label=label), region, grow=margin)
+        # HLR and scale changes need current geometry, not a pending repaint.
+        view.UpdateViewDisplayGeometry()  # VT_VOID
+        outline = _view_outline(view, label=label)
+        _shift, misses = ring_fit_shift(outline, region, grow=margin)
         if not misses:
             _center_view_outline(adapter, view, _region_center(region), label=label)
             _assert_view_on_sheet(view, margin=margin, bounds=region, label=label)
             return scale
-    raise RuntimeError(f"{label}: no measured scale fits its reserved field")
+        cropped = bool(view.IsCropped())
+        crop_circles = []
+        sketch_transform = None
+        if cropped:
+            sketch = _early_bound(view.GetSketch(), "ISketch")
+            transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+            sketch_transform = tuple(float(value) for value in transform.ArrayData)
+            inverse = _early_bound(transform.Inverse(), "IMathTransform")
+            utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+            for raw in sketch.GetSketchSegments() or ():
+                segment = _early_bound(raw, "ISketchSegment")
+                if int(segment.GetType()) != 1 or bool(segment.ConstructionGeometry):
+                    continue
+                centre, radius = native_circle_geometry(segment, label=label)
+                sheet_centre = _inspection_transform_point(utility, inverse, centre)
+                sheet_rim = _inspection_transform_point(utility, inverse, (centre[0] + radius, centre[1], centre[2]))
+                crop_circles.append({
+                    "sketch_centre": centre, "sketch_radius": radius,
+                    "sheet_centre": sheet_centre, "sheet_radius": math.dist(sheet_centre, sheet_rim),
+                })
+        candidates.append({
+            "scale": tuple(float(value) for value in view.ScaleRatio),
+            "position": tuple(float(value) for value in view.Position),
+            "outline": outline, "overflows": misses, "cropped": cropped,
+            "crop_circles": crop_circles, "sketch_transform": sketch_transform,
+        })
+    raise RuntimeError(
+        f"{label}: no measured scale fits its reserved field; "
+        f"field={region!r}; margin={margin!r}; candidates={candidates!r}"
+    )
 
 
 def _orient_capture_section(adapter: Any, view: Any, axis: Sequence[float]) -> None:

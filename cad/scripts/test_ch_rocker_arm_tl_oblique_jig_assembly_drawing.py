@@ -3422,6 +3422,76 @@ def test_capture_fit_exhaustion_refuses_before_any_bom(native_property_package) 
     assert not package.doc.bom_inserted
 
 
+def test_capture_fit_refreshes_native_display_geometry_at_each_candidate_scale(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
+    native_outline = locator.GetOutline
+    refreshed = []
+
+    def refresh():
+        refreshed.append(tuple(locator.ScaleRatio))
+        return None  # Native UpdateViewDisplayGeometry is VT_VOID.
+
+    def outline():
+        box = native_outline()
+        # Until the native display cache is refreshed at the current scale,
+        # it still exposes an oversized pre-change view. The refreshed 1:4
+        # extent also genuinely misses; 1:5 is the first measured fit.
+        if not refreshed or refreshed[-1] != tuple(locator.ScaleRatio) or locator.ScaleRatio[1] == 4:
+            return (*box[:3], box[3] + 0.1)
+        return box
+
+    locator.UpdateViewDisplayGeometry = refresh
+    locator.GetOutline = outline
+    scale = drawing._fit_capture_view(
+        package.adapter, locator, drawing.CAPTURE_VIEW_REGIONS[1],
+        ((1, 4), (1, 5), (1, 6)), label="jig capture locator",
+    )
+    assert scale == (1, 5)
+    assert refreshed == [(1.0, 4.0), (1.0, 5.0)]
+    assert _inside(native_outline(), drawing.CAPTURE_VIEW_REGIONS[1])
+
+
+def test_capture_fit_refusal_reports_each_native_outline_and_persisted_crop(
+    native_property_package,
+) -> None:
+    import ast
+
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
+    circle = package.doc.crop_circles[0]
+    locator.GetOutline = lambda: (0.1, 0.1, 0.3, 0.3)
+    field = drawing.CAPTURE_VIEW_REGIONS[1]
+    with pytest.raises(RuntimeError, match="no measured scale fits its reserved field") as failure:
+        drawing._fit_capture_view(
+            package.adapter, locator, field, ((1, 4), (1, 5), (1, 6)),
+            label="jig capture locator",
+        )
+    message = str(failure.value)
+    assert f"field={field!r}; margin=0.0;" in message
+    candidates = ast.literal_eval(message.split("; candidates=", 1)[1])
+    assert [candidate["scale"] for candidate in candidates] == [(1.0, 4.0), (1.0, 5.0), (1.0, 6.0)]
+    for candidate in candidates:
+        assert candidate["position"] == tuple(locator.Position)
+        assert candidate["outline"] == (0.1, 0.1, 0.3, 0.3)
+        assert candidate["overflows"] == ["width 200.0 mm > 54.0 mm", "height 200.0 mm > 41.0 mm"]
+        assert candidate["cropped"] is True
+        assert len(candidate["sketch_transform"]) == 16
+        crop, = candidate["crop_circles"]
+        assert crop["sketch_centre"] == circle.centre
+        assert crop["sketch_radius"] == circle.radius
+        assert crop["sheet_radius"] == pytest.approx(0.055 / candidate["scale"][1])
+        ratio = candidate["scale"][0] / candidate["scale"][1]
+        expected_centre = tuple(
+            locator.Position[i] + ratio * locator.crop[0][i] for i in (0, 1)
+        )
+        assert crop["sheet_centre"] == pytest.approx((*expected_centre, 0.0))
+
+
 @pytest.mark.parametrize("defect", ("section-xyz", "persisted-crop"))
 def test_capture_native_proof_is_called_by_real_finalizer_after_rebuild(
     native_property_package, defect,
