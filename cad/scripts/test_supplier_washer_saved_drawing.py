@@ -639,6 +639,8 @@ def test_saved_corruption_is_refused_by_real_native_assertions(saved_washer, fau
     else:
         case.fresh[case.side].displays.remove(thickness)
         case.fresh["*Right"].displays.append(thickness)
+        thickness.view = case.fresh["*Right"]
+        thickness.annotation.Owner = case.fresh["*Right"]
     case.invalidate()
     with pytest.raises(RuntimeError, match=message):
         case.proof.saved_check(case.adapter, case.path)
