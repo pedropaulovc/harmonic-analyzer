@@ -560,43 +560,42 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
 
 
 class _SupplierStockNativeView:
-    """Recorded stale outline; refreshed curve/ink boxes below are synthetic."""
+    """Recorded retained frame; the optional fresh-frame shape is synthetic."""
 
-    def __init__(self):
-        self.Position = (0.190, 0.243)
-        self.refreshed = False
+    def __init__(self, *, fresh=False, move_annotations=True):
+        self.Position = (0.183, 0.2626)
         self.refreshes = 0
-        self.refresh_outline = True
         self.ReferencedDocument = object()
         self.outline_override = None
+        self.curve_offset = 0.0 if fresh else -0.0201
+        self.frame_half = (0.035588, 0.006388) if fresh else (0.005988, 0.026088)
+        self.annotations = []
+        self.move_annotations = move_annotations
+        self.moves = []
 
     def reference_bounds(self):
-        dx = self.Position[0] - 0.190
-        dy = self.Position[1] - 0.243
-        return (0.170 + dx, 0.2372 + dy, 0.230 + dx, 0.2388 + dy)
+        x, y = self.Position
+        y += self.curve_offset
+        return (x - 0.030, y - 0.0008, x + 0.030, y + 0.0008)
 
     def UpdateViewDisplayGeometry(self):
-        self.refreshed = True
         self.refreshes += 1
 
     def GetOutline(self):
         if self.outline_override is not None:
             return self.outline_override
-        if self.refreshed and self.refresh_outline:
-            x0, y0, x1, y1 = self.reference_bounds()
-            return (x0 - 0.002, y0 - 0.003, x1 + 0.004, y1 + 0.005)
-        dx = self.Position[0] - 0.190
-        dy = self.Position[1] - 0.243
-        return (
-            0.184012 + dx,
-            0.216912 + dy,
-            0.195988 + dx,
-            0.269088 + dy,
-        )
+        x, y = self.Position
+        half_x, half_y = self.frame_half
+        return (x - half_x, y - half_y, x + half_x, y + half_y)
 
     def SetViewPosition(self, position, move_children):
         assert move_children is False
+        self.moves.append((self.Position, tuple(position)))
+        dx, dy = position[0] - self.Position[0], position[1] - self.Position[1]
         self.Position = tuple(position)
+        if self.move_annotations:
+            for annotation in self.annotations:
+                annotation.translate(dx, dy)
         return True
 
 
@@ -607,60 +606,53 @@ def test_supplier_stock_recorded_native_outline_refuses_original_center(
     monkeypatch.setattr(draw, "double_array", tuple)
     monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
     view = _SupplierStockNativeView()
-    drawing = SimpleNamespace(EditRebuild3=lambda: True)
-    outline = view.GetOutline()
-    assert outline[2] - outline[0] == pytest.approx(0.011976)
-    assert outline[3] - outline[1] == pytest.approx(0.052176)
-    assert outline[3] > draw.BORDER[3]
-    assert outline[3] > draw.SUPPLIER_STOCK_FIELD[3]
+    view.Position = (0.190, 0.243)
+    # rolling-ready line 37: the retained frame, not the source sketch.
+    assert view.GetOutline() == pytest.approx(
+        (0.184012, 0.216912, 0.195988, 0.269088)
+    )
+    assert view.GetOutline()[3] > draw.BORDER[3]
+    assert view.GetOutline()[3] > draw.SUPPLIER_STOCK_FIELD[3]
     with pytest.raises(RuntimeError, match="view leaves the drawable sheet"):
-        draw._center_view(drawing, view, (0.190, 0.243), "supplier stock gauges")
+        draw._center_view(
+            SimpleNamespace(EditRebuild3=lambda: True),
+            view, (0.190, 0.243), "supplier stock gauges",
+        )
 
 
-@pytest.mark.parametrize("refresh_outline", (True, False))
-def test_supplier_stock_centers_actual_curves_but_retains_native_outline_guard(
-    monkeypatch, refresh_outline,
+def test_supplier_stock_centers_recorded_native_frame_not_offset_source_curves(
+    monkeypatch,
 ) -> None:
     monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(draw, "double_array", tuple)
-    messages = []
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
     view = _SupplierStockNativeView()
-    view.refresh_outline = refresh_outline
-
-    def bounds():
-        view.UpdateViewDisplayGeometry()
-        return view.reference_bounds()
-
-    def center():
-        draw._center_view(
-            SimpleNamespace(EditRebuild3=lambda: True),
-            view,
-            draw.SUPPLIER_STOCK_CENTER,
-            "supplier stock gauges",
-            read_bounds=bounds,
-        )
-
-    if refresh_outline:
-        center()
-        assert draw._inside(view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
-    else:
-        # Actual source-curve bounds never excuse a stale outline leaving the sheet.
-        with pytest.raises(RuntimeError, match="view leaves the drawable sheet"):
-            center()
-    x0, y0, x1, y1 = view.reference_bounds()
-    assert ((x0 + x1) / 2.0, (y0 + y1) / 2.0) == pytest.approx(
-        draw.SUPPLIER_STOCK_CENTER
+    # layout1859 line 41 records BOTH independent bounds after geometry refresh.
+    assert view.GetOutline() == pytest.approx(
+        (0.177012, 0.236512, 0.188988, 0.288688)
     )
+    assert view.reference_bounds() == pytest.approx(
+        (0.153, 0.2417, 0.213, 0.2433)
+    )
+    before = view.GetOutline()
+    view.UpdateViewDisplayGeometry()
+    assert view.GetOutline() == before  # No invented refresh/shrink behavior.
+    draw._center_view(
+        SimpleNamespace(EditRebuild3=lambda: True), view,
+        draw.SUPPLIER_STOCK_CENTER, "supplier stock gauges",
+    )
+    assert view.Position == pytest.approx((0.183, 0.2365))
+    assert view.GetOutline() == pytest.approx(
+        (0.177012, 0.210412, 0.188988, 0.262588)
+    )
+    assert view.reference_bounds() == pytest.approx(
+        (0.153, 0.2156, 0.213, 0.2172)
+    )
+    assert draw._inside(view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
+    assert draw._inside(view.reference_bounds(), draw.SUPPLIER_STOCK_FIELD)
+    x0, y0, x1, y1 = view.reference_bounds()
     assert (x1 - x0, y1 - y0) == pytest.approx((0.060, 0.0016))
-    assert view.refreshes == 2
-    assert len(messages) == 1
-    assert f"geometry_bounds_m={(x0, y0, x1, y1)!r}" in messages[0]
-    assert f"native_outline_m={view.GetOutline()!r}" in messages[0]
-    assert f"requested_center_m={draw.SUPPLIER_STOCK_CENTER!r}" in messages[0]
-    assert "target_position_m=" in messages[0]
-    if not refresh_outline:
-        assert "failure=RuntimeError(" in messages[0]
+    assert (y0 + y1) / 2.0 - view.Position[1] == pytest.approx(-0.0201)
+    assert view.refreshes == 1
 
 
 @pytest.mark.parametrize(
@@ -672,7 +664,7 @@ def test_supplier_stock_centers_actual_curves_but_retains_native_outline_guard(
         ("outline", "invalid view outline"),
     ),
 )
-def test_supplier_stock_center_refusal_records_actual_and_target(
+def test_supplier_stock_center_refusal_records_native_frame_and_target(
     monkeypatch, fault, reason
 ) -> None:
     messages = []
@@ -681,12 +673,9 @@ def test_supplier_stock_center_refusal_records_actual_and_target(
     monkeypatch.setattr(draw._telemetry, "info", messages.append)
     view = _SupplierStockNativeView()
     if fault == "position":
+        view.outline_override = view.GetOutline()
         view.Position = (math.nan, 0.243)
-        def bounds():
-            return (0.170, 0.2372, 0.230, 0.2388)
-    else:
-        bounds = view.reference_bounds
-    if fault == "set":
+    elif fault == "set":
         view.SetViewPosition = lambda *_args: False
     elif fault == "drift":
         view.SetViewPosition = lambda *_args: True
@@ -694,56 +683,165 @@ def test_supplier_stock_center_refusal_records_actual_and_target(
         view.outline_override = (math.nan, 0.0, 1.0, 1.0)
     with pytest.raises(RuntimeError, match=reason):
         draw._center_view(
-            SimpleNamespace(EditRebuild3=lambda: True),
-            view,
-            draw.SUPPLIER_STOCK_CENTER,
-            "supplier stock gauges",
-            read_bounds=bounds,
+            SimpleNamespace(EditRebuild3=lambda: True), view,
+            draw.SUPPLIER_STOCK_CENTER, "supplier stock gauges",
         )
     assert len(messages) == 1
-    assert "geometry_bounds_m=(" in messages[0]
+    assert "native_outline_m=" in messages[0]
     assert f"requested_center_m={draw.SUPPLIER_STOCK_CENTER!r}" in messages[0]
     assert "actual_center_m=" in messages[0]
     assert "failure=RuntimeError(" in messages[0]
 
 
 @pytest.fixture
-def supplier_stock_inset(monkeypatch):
-    """Fake native capture/ink boundaries; run the real local placement/guards."""
+def supplier_stock_inset(monkeypatch, request):
+    """Recorded frame offset and synthetic two-row native glyph/stroke data."""
+    options = getattr(request, "param", {})
     monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(draw, "double_array", tuple)
-    view = _SupplierStockNativeView()
+    view = _SupplierStockNativeView(
+        fresh=options.get("fresh", False),
+        move_annotations=options.get("move_annotations", True),
+    )
+    rebuilds, redraws = [], []
     drawing = SimpleNamespace(
         EditRebuild3=lambda: True,
+        GraphicsRedraw2=lambda: redraws.append("redraw"),
         ActivateView=lambda name: name == "",
         GetEditSheet=lambda: True,
         ActiveDrawingView=None,
     )
     adapter = SimpleNamespace(currentModel=drawing)
-    events, cells, messages, extent_reads, allowance_reads = [], [], [], [], []
+    events, messages, allowance_reads, annotation_cells = [], [], [], []
+    projections, geometry_reads, reacquisitions = [], [], []
+    caption_position = [0.140, 0.264, 0.007]
+    caption_moves, caption_extents = [], []
     monkeypatch.setattr(draw._telemetry, "info", messages.append)
 
     def caption_extent():
-        extent_reads.append("extent")
-        return (0.140, 0.210, 0.0, 0.212, 0.219, 0.0)
+        x, y, z = caption_position
+        extent = (x + 0.0012, y - 0.004, z, x + 0.0732, y + 0.005, z)
+        caption_extents.append(extent)
+        return extent
 
-    caption_annotation = SimpleNamespace(OwnerType=1)
+    def set_caption_position(*position):
+        caption_moves.append(position)
+        caption_position[:] = position
+        return True
+
+    caption_annotation = SimpleNamespace(
+        OwnerType=1, GetPosition=lambda: tuple(caption_position),
+        SetPosition2=set_caption_position,
+    )
     note = SimpleNamespace(
         GetText=lambda: draw.SUPPLIER_STOCK_CAPTION,
-        GetAnnotation=lambda: caption_annotation,
-        GetExtent=caption_extent,
+        GetAnnotation=lambda: caption_annotation, GetExtent=caption_extent,
     )
-    ink = [
-        (0.153, 0.247, 0.213, 0.257),
-        (0.164, 0.225, 0.202, 0.235),
-        (0.225, 0.229, 0.235, 0.259),
-    ]
+
+    def source_centers():
+        x, y = view.Position
+        origin = y + view.curve_offset - 0.0004
+        return {
+            "SupplierStockLength": (x, origin),
+            "SupplierStockDiameter": (x, origin),
+            "SupplierThreadPitch": (x, origin + 0.0012),
+        }
+
+    class Annotation:
+        def __init__(self, display, name):
+            self.display, self.name = display, name
+            self.position = (1.0, 1.0, 0.0)
+            self.line_anchor = None
+            self.moves = []
+            self.omit_callout = False
+            self.extra_lines = []
+
+        def SetPosition2(self, x, y, z):
+            self.moves.append((self.display.OffsetText, (x, y, z)))
+            self.position = (x, y, z)
+            if not self.display.OffsetText:
+                self.line_anchor = (x, y)
+            return True
+
+        def GetPosition(self):
+            return self.position
+
+        def translate(self, dx, dy):
+            x, y, z = self.position
+            self.position = (x + dx, y + dy, z)
+            if self.line_anchor is not None:
+                x, y = self.line_anchor
+                self.line_anchor = (x + dx, y + dy)
+
+        def texts(self):
+            extra = options.get("glyph_extra", 0.0)
+            shift_x, shift_y = options.get("glyph_shift", (0.0, 0.0))
+            callout = spec.SUPPLIER_REFERENCE_FORMATS[self.name][3]
+            if self.name == "SupplierStockDiameter":
+                rows = [
+                    ("Ø8 mm", 0.004, -0.006, 0.012, math.pi / 2),
+                    (callout, 0.0, -0.015 - extra / 2, 0.030 + extra, math.pi / 2),
+                ]
+            else:
+                length = self.name == "SupplierStockLength"
+                rows = [
+                    ("600 mm" if length else "2 mm",
+                     -0.007 if length else -0.004, 0.002, 0.014, 0.0),
+                    (callout, -0.015 if length else -0.016,
+                     (-0.004 if length else -0.005) - extra,
+                     0.030 if length else 0.032, 0.0),
+                ]
+            x, y, z = self.position
+            return [
+                {"t": text, "pos": (x + rx + shift_x, y + ry + shift_y, z),
+                 "h": 0.003, "w": width, "ang": angle, "ref": 1}
+                for text, rx, ry, width, angle in rows[:1 if self.omit_callout else 2]
+            ]
+
+        def text_box(self):
+            return draw.display_box({"texts": self.texts()})
+
+        def lines(self):
+            x, y = source_centers()[self.name]
+            ax, ay = self.line_anchor
+            text = self.text_box()
+            if self.name == "SupplierStockDiameter":
+                ends = ((x, y - 0.0004), (x, y + 0.0004))
+                arrows = ((ax, ends[0][1]), (ax, ends[1][1]))
+                leader = ((ax, y), (text.xmin, text.ymin))
+            else:
+                half = 0.030 if self.name == "SupplierStockLength" else 0.0001
+                ends = ((x - half, y), (x + half, y))
+                arrows = ((ends[0][0], ay), (ends[1][0], ay))
+                leader = ((x, ay), (text.center()[0], text.ymin))
+            segments = [*zip(ends, arrows, strict=True), arrows, leader, *self.extra_lines]
+            return [
+                [0.0, 0.0, 0.0, 0.0, a[0], a[1], 0.0, b[0], b[1], 0.0]
+                for a, b in segments
+            ]
+
+    displays, annotations = {}, {}
+    for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS:
+        display = SimpleNamespace(OffsetText=False)
+        annotation = Annotation(display, name)
+        display.GetAnnotation = lambda annotation=annotation: annotation
+        displays[name], annotations[name] = display, annotation
+    view.annotations = list(annotations.values())
+
+    def annotation_geometry(_adapter, annotation):
+        geometry_reads.append(annotation.name)
+        return {"texts": annotation.texts(), "lines": annotation.lines()}, []
+
+    def project(_adapter, native_view, points, **_kwargs):
+        assert native_view is view
+        projections.append(points)
+        origin = view.Position[1] + view.curve_offset - 0.0004
+        return [(view.Position[0] + x * 0.1, origin + y * 0.1) for x, y, _z in points]
 
     def placed(_adapter, source, orientation, *center, scale):
-        assert source == str(draw.SOURCE)
-        assert orientation == "*Front"
-        assert center == draw.SUPPLIER_STOCK_CENTER
-        assert scale == (1, 10)
+        assert source == str(draw.SOURCE) and orientation == "*Front"
+        assert center == draw.SUPPLIER_STOCK_CENTER and scale == (1, 10)
+        view.Position = center
         return view
 
     def capture(_adapter, native_draw, views, **kwargs):
@@ -760,37 +858,50 @@ def supplier_stock_inset(monkeypatch):
     def bounds(_adapter, native_view, **kwargs):
         assert native_view is view and kwargs["capture"] == "native capture"
         allowance_reads.append(kwargs["allow_presentation_dirty"])
-        if kwargs["allow_presentation_dirty"]:
-            assert "format" in events
-        else:
-            assert events == ["capture"]
+        assert ("format" in events) == kwargs["allow_presentation_dirty"]
         view.UpdateViewDisplayGeometry()
         return view.reference_bounds()
 
     def annotate(_adapter, views, **kwargs):
-        assert views == {"*Front": view}
+        assert views == {"*Front": view} and events == ["capture"]
         assert kwargs["dimensions"] is spec.SUPPLIER_REFERENCE_DIMENSIONS
         assert kwargs["formats"] is spec.SUPPLIER_REFERENCE_FORMATS
         assert kwargs["starts"] is spec.SUPPLIER_REFERENCE_STARTS
         assert kwargs["units"] is spec.SUPPLIER_REFERENCE_UNITS
-        assert events == ["capture"]
         events.append("format")
         kwargs["settled_checks"].append(lambda: events.append("source check"))
+        return displays
+
+    def reacquire(_adapter, views, **kwargs):
+        assert views == {"*Front": view}
+        assert kwargs["expected"] == {"*Front": {
+            name: "SupplierReference" for name in displays
+        }}
+        assert kwargs["configurations"] == {
+            "*Front": spec.SUPPLIER_STOCK_CONFIGURATION
+        }
+        reacquisitions.append("native inventory")
+        return displays
 
     def add_caption(_adapter, text, *xy):
         assert text == draw.SUPPLIER_STOCK_CAPTION
         assert xy == draw.SUPPLIER_STOCK_CAPTION_XY
         return note
 
-    def native_fit(_adapter, native_view, cell, **_kwargs):
+    def annotations_fit(_adapter, native_view, cell, **_kwargs):
         assert native_view is view
-        cells.append(cell)
-        if not all(draw._inside(box, cell) for box in (view.GetOutline(), *ink)):
-            raise RuntimeError("supplier native outline/annotation leaves its cell")
+        annotation_cells.append(cell)
+        for annotation in annotations.values():
+            data, _refused = annotation_geometry(adapter, annotation)
+            ink = draw.display_box(data)
+            if not draw._inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), cell):
+                raise RuntimeError("supplier annotation leaves its caption-free cell")
 
     monkeypatch.setattr(draw, "place_view", placed)
     monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(draw, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        draw, "rebuild_drawing", lambda *_args, label: rebuilds.append(label)
+    )
     monkeypatch.setattr(
         draw, "_show_hidden_owners",
         lambda _adapter, _view, owners, **_kwargs: list(owners),
@@ -798,82 +909,264 @@ def supplier_stock_inset(monkeypatch):
     monkeypatch.setattr(draw, "_capture_reference_views", capture)
     monkeypatch.setattr(draw, "_reference_view_bounds", bounds)
     monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
+    monkeypatch.setattr(draw, "reacquire_supplier_dimensions", reacquire)
+    monkeypatch.setattr(draw, "model_points_in_view", project)
+    monkeypatch.setattr(draw, "annotation_display", annotation_geometry)
     monkeypatch.setattr(draw, "add_note", add_caption)
-    monkeypatch.setattr(draw, "assert_supplier_view_fits", native_fit)
-    settled = draw._add_supplier_stock_inset(adapter)
-    return SimpleNamespace(
-        settled=settled, view=view, note=note, owner=caption_annotation,
-        events=events, cells=cells, ink=ink, messages=messages,
-        extent_reads=extent_reads, allowance_reads=allowance_reads,
+    monkeypatch.setattr(draw, "assert_supplier_annotations_fit", annotations_fit)
+    state = SimpleNamespace(
+        view=view, note=note, owner=caption_annotation, events=events,
+        messages=messages, allowance_reads=allowance_reads,
+        annotations=annotations, displays=displays, projections=projections,
+        annotation_cells=annotation_cells, caption_position=caption_position,
+        caption_moves=caption_moves, caption_extents=caption_extents,
+        redraws=redraws, rebuilds=rebuilds, geometry_reads=geometry_reads,
+        reacquisitions=reacquisitions, adapter=adapter,
+    )
+
+    def create():
+        state.settled = draw._add_supplier_stock_inset(adapter)
+        return state.settled
+
+    state.create = create
+    if not options.get("defer", False):
+        create()
+    return state
+
+
+def test_supplier_stock_caption_seats_complete_extent_not_insertion_point(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    before = draw._box(state.caption_extents[0], label="before", kind="note")
+    after = draw._box(state.caption_extents[1], label="after", kind="note")
+    assert before == pytest.approx((0.1412, 0.260, 0.2132, 0.269))
+    assert not draw._inside(before, draw.SUPPLIER_STOCK_FIELD)
+    assert after == pytest.approx((0.140, 0.255, 0.212, 0.264))
+    assert draw._inside(after, draw.SUPPLIER_STOCK_FIELD)
+    assert state.caption_moves == [pytest.approx((0.1388, 0.259, 0.007))]
+    assert state.caption_moves[0][2] == 0.007
+    assert state.note.GetText() == (
+        "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
     )
 
 
 @pytest.mark.parametrize(
-    "fault", (None, "outline", "annotation", "caption", "owner", "config", "scale")
+    "supplier_stock_inset",
+    [
+        {"fresh": fresh, "glyph_extra": extra, "glyph_shift": shift}
+        for fresh in (False, True)
+        for extra in (0.0, 0.0005, 0.001)
+        for shift in ((0.0, 0.0), (0.006, -0.004))
+    ],
+    indirect=True,
 )
-def test_supplier_stock_reserves_actual_caption_and_complete_native_ink(
+def test_supplier_stock_jointly_places_actual_frame_and_complete_measured_glyphs(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    state.settled()
+    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
+    caption = draw._box(state.caption_extents[-1], label="caption", kind="note")
+    ink_field = (0.135, 0.208, 0.245, caption[1] - draw.SUPPLIER_STOCK_CAPTION_GAP)
+    assert draw._inside(state.view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
+    assert draw._inside(state.view.reference_bounds(), ink_field)
+    for name, record in records.items():
+        ink = record["ink"]
+        assert draw._inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), ink_field)
+        assert record["display"].OffsetText is True
+        assert len(record["data"]["texts"]) == 2  # Includes SetText(4), not just value.
+        assert name in state.geometry_reads
+    draw._assert_supplier_stock_clearance(records)
+    assert len(state.view.moves) == 1  # One joint view translation, no fit/retry.
+    assert state.events == ["capture", "format", "source check"]
+    assert state.allowance_reads == [False, True, True, True]
+    assert len(state.annotation_cells) == 2  # After movement and after final rebuild.
+    assert state.redraws == ["redraw"] * 5  # Includes freshness after final rebuild.
+    assert len(state.rebuilds) == 7  # Distinct source/format/measurement/move barriers.
+    assert "supplier stock captured:" in state.messages[0]
+    assert any("joint placement before:" in row for row in state.messages)
+    assert "curve_frame_offset_m=" in state.messages[-1]
+    frame, curves = state.view.GetOutline(), state.view.reference_bounds()
+    offset_y = (curves[1] + curves[3] - frame[1] - frame[3]) / 2
+    assert offset_y == pytest.approx(state.view.curve_offset)
+
+
+def test_supplier_stock_shelves_use_complete_pitch_height_and_length_below_row(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
+    pitch, length = records["SupplierThreadPitch"], records["SupplierStockLength"]
+    diameter = records["SupplierStockDiameter"]
+    assert state.projections == [[
+        (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.012, 0.0),
+    ]]
+    assert pitch["text"].height == pytest.approx(0.010)
+    assert length["text"].height == pytest.approx(0.009)
+    length_line = state.annotations["SupplierStockLength"].line_anchor[1]
+    assert length_line - pitch["text"].ymax == pytest.approx(draw.SUPPLIER_STOCK_PLACE_AIR)
+    assert length["text"].ymin - length_line == pytest.approx(draw.SUPPLIER_STOCK_PLACE_AIR)
+    assert diameter["text"].xmin - state.view.reference_bounds()[2] == pytest.approx(
+        draw.SUPPLIER_STOCK_GAUGE_GAP + draw.SUPPLIER_STOCK_PLACE_AIR
+    )
+
+
+@pytest.mark.parametrize(
+    "frame,expected",
+    (
+        # Recorded layout1859 frame and actual captured source bounds below.
+        ((0.177012, 0.236512, 0.188988, 0.288688), (0.0, -0.026906)),
+        # Synthetic refreshed frame centered on exactly those source curves.
+        ((0.147412, 0.236112, 0.218588, 0.248888), (0.002794, -0.026706)),
+    ),
+)
+def test_supplier_stock_joint_translation_uses_midpoint_of_both_actual_constraints(
+    monkeypatch, frame, expected,
+) -> None:
+    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
+    curves = (0.153, 0.2417, 0.213, 0.2433)
+    # Synthetic complete dimension footprints, not after-fix native export proof.
+    records = {
+        "SupplierStockLength": {"ink": draw.Box(0.153, 0.2421, 0.213, 0.2771)},
+        "SupplierStockDiameter": {"ink": draw.Box(0.183, 0.2417, 0.227, 0.2773)},
+        "SupplierThreadPitch": {"ink": draw.Box(0.167, 0.2433, 0.199, 0.2603)},
+    }
+    shift = draw._supplier_stock_translation(
+        frame, curves, records, (0.140, 0.255, 0.212, 0.264)
+    )
+    assert shift == pytest.approx(expected)
+
+
+def test_supplier_stock_joint_translation_refuses_incompatible_actual_envelopes(
+    monkeypatch,
+) -> None:
+    messages = []
+    monkeypatch.setattr(draw._telemetry, "info", messages.append)
+    frame = (0.177012, 0.208, 0.188988, 0.265)
+    curves = (0.153, 0.220, 0.213, 0.2216)
+    # Both boxes individually fit their field sizes; their permitted moves do not intersect.
+    records = {"SupplierStockLength": {"ink": draw.Box(0.153, 0.220, 0.213, 0.260)}}
+    with pytest.raises(RuntimeError, match="no joint frame/ink translation") as error:
+        draw._supplier_stock_translation(frame, curves, records, (0.14, 0.255, 0.212, 0.264))
+    for key in (
+        "source_curve_bounds_m=", "native_outline_m=", "curve_frame_offset_m=",
+        "annotation_ink_m=", "caption_box_m=", "ink_field_m=",
+        "permitted_dx_m=", "permitted_dy_m=",
+    ):
+        assert key in str(error.value) and key in messages[-1]
+
+
+@pytest.mark.parametrize(
+    "supplier_stock_inset", [{"glyph_extra": 0.002, "defer": True}], indirect=True
+)
+def test_supplier_stock_refuses_infeasible_measured_two_row_glyph_heights(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    with pytest.raises(RuntimeError, match="no joint frame/ink translation"):
+        state.create()
+    assert "permitted_dx_m=" in state.messages[-1]
+    assert "permitted_dy_m=" in state.messages[-1]
+    assert "annotation_ink_m=" in state.messages[-1]
+
+
+@pytest.mark.parametrize(
+    "supplier_stock_inset", [{"move_annotations": False, "defer": True}], indirect=True
+)
+def test_supplier_stock_refuses_native_annotations_not_moving_with_owned_view(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    with pytest.raises(RuntimeError, match="did not translate with its view"):
+        state.create()
+    assert any("joint placement before:" in row for row in state.messages)
+    assert "source_curve_bounds_m=" in state.messages[-1]
+    assert "curve_frame_offset_m=" in state.messages[-1]
+
+
+@pytest.mark.parametrize("fault", ("text", "stroke"))
+def test_supplier_stock_checks_pairwise_native_glyph_and_stroke_clearance(
+    supplier_stock_inset, fault,
+) -> None:
+    state = supplier_stock_inset
+    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
+    pitch = records["SupplierThreadPitch"]["text"]
+    length = records["SupplierStockLength"]
+    if fault == "text":
+        length["text"] = pitch
+        reason = "supplier text clearance"
+    else:
+        x, y = pitch.center()
+        length["data"] = {"lines": [[0, 0, 0, 0, x, y, 0, x + 0.001, y, 0]]}
+        reason = "supplier stroke/text clearance"
+    with pytest.raises(RuntimeError, match=reason):
+        draw._assert_supplier_stock_clearance(records)
+
+
+def test_supplier_stock_final_stroke_collision_refuses_even_without_box_drift(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    pitch = state.annotations["SupplierThreadPitch"].text_box()
+    x, y = pitch.center()
+    state.annotations["SupplierStockLength"].extra_lines.append(
+        ((x, y), (x + 0.001, y))
+    )
+    with pytest.raises(RuntimeError, match="supplier stroke/text clearance"):
+        state.settled()
+
+
+def test_supplier_stock_requires_length_below_callout_native_glyphs(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    state.annotations["SupplierStockLength"].omit_callout = True
+    with pytest.raises(RuntimeError, match="incomplete native supplier text/ink"):
+        state.settled()
+
+
+@pytest.mark.parametrize(
+    "fault", ("outline", "annotation", "caption", "text", "owner", "config", "scale")
+)
+def test_supplier_stock_final_guards_refuse_native_drift_and_caption_changes(
     supplier_stock_inset, fault,
 ) -> None:
     state = supplier_stock_inset
     if fault == "outline":
-        state.view.outline_override = (0.150, 0.210, 0.220, 0.250)
+        state.view.outline_override = (0.150, 0.210, 0.220, 0.267)
     elif fault == "annotation":
-        state.ink[1] = (0.164, 0.215, 0.202, 0.225)
+        annotation = state.annotations["SupplierStockLength"]
+        annotation.translate(0.001, 0.0)
     elif fault == "caption":
-        state.note.GetExtent = lambda: (0.140, 0.205, 0.0, 0.212, 0.219, 0.0)
+        state.note.GetExtent = lambda: (0.140, 0.260, 0.0, 0.212, 0.269, 0.0)
+    elif fault == "text":
+        state.note.GetText = lambda: draw.SUPPLIER_STOCK_CAPTION + " "
     elif fault == "owner":
         state.owner.OwnerType = 0
     elif fault == "config":
         state.view.ReferencedConfiguration = "Default"
     elif fault == "scale":
         state.view.ScaleRatio = (1, 20)
-    if fault is None:
+    with pytest.raises(RuntimeError) as error:
         state.settled()
-        assert state.events == ["capture", "format", "source check"]
-        assert state.cells == [pytest.approx((0.135, 0.222, 0.245, 0.265))]
-        assert state.extent_reads == ["extent"]
-        assert state.allowance_reads == [False, False, True]
-        assert "source_curve_bounds_m=" in state.messages[-1]
-        assert "native_outline_m=" in state.messages[-1]
-        assert "caption_box_m=" in state.messages[-1]
-        assert "ink_field_m=" in state.messages[-1]
-    else:
-        with pytest.raises(RuntimeError) as error:
-            state.settled()
-        if fault not in ("config", "scale"):
-            assert "source_curve_bounds_m=" in str(error.value)
-            assert "native_outline_m=" in str(error.value)
-            assert "caption_box_m=" in str(error.value)
-            assert "ink_field_m=" in str(error.value)
-            assert "source_curve_bounds_m=" in state.messages[-1]
-            assert "native_outline_m=" in state.messages[-1]
+    if fault not in ("config", "scale"):
+        for key in ("source_curve_bounds_m=", "native_outline_m=", "caption_box_m=", "ink_field_m="):
+            assert key in str(error.value) and key in state.messages[-1]
 
 
 def test_supplier_stock_curve_caption_refusal_is_independent_of_native_outline(
     supplier_stock_inset,
 ) -> None:
     state = supplier_stock_inset
-    ink_field = (0.135, 0.219 + draw.SUPPLIER_STOCK_CAPTION_GAP, 0.245, 0.265)
-    # Synthetic stale relation, NOT the recorded rolling-v44 outline: its
-    # outline and annotations fit, but independently captured curves do not.
-    state.view.outline_override = state.view.GetOutline()
-    curve_box = (0.150, 0.219, 0.210, 0.243)
+    curve_box = (0.150, 0.254, 0.210, 0.255)
     state.view.reference_bounds = lambda: curve_box
-    assert all(
-        draw._inside(box, ink_field)
-        for box in (state.view.GetOutline(), *state.ink)
-    )
+    assert draw._inside(state.view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
     with pytest.raises(RuntimeError, match="curves left their caption-free field") as error:
         state.settled()
-    assert f"curve_bounds_m={curve_box!r}" in str(error.value)
-    assert f"ink_field_m={ink_field!r}" in str(error.value)
-    assert "caption_box_m=(0.14, 0.21, 0.212, 0.219)" in str(error.value)
+    assert f"source_curve_bounds_m={curve_box!r}" in str(error.value)
     assert f"native_outline_m={state.view.GetOutline()!r}" in str(error.value)
-    assert state.cells == []  # Removing only the curve guard makes this test fail.
-    assert state.extent_reads == ["extent"]
-    assert f"source_curve_bounds_m={curve_box!r}" in state.messages[-1]
-    assert f"native_outline_m={state.view.GetOutline()!r}" in state.messages[-1]
-    assert f"ink_field_m={ink_field!r}" in state.messages[-1]
+    assert len(state.annotation_cells) == 1  # Final refusal precedes the annotation guard.
 
 
 @pytest.fixture
@@ -1072,6 +1365,8 @@ def test_leadscrew_hash_guard_covers_read_only_open_failure(
 def test_supplier_stock_field_and_neighbor_views_are_not_layout_escape_hatches() -> None:
     assert draw.SUPPLIER_STOCK_FIELD == (0.135, 0.208, 0.245, 0.265)
     assert draw.SUPPLIER_STOCK_SCALE == (1, 10)
+    assert draw.SUPPLIER_STOCK_CENTER == (0.183, 0.2365)
+    assert draw.SUPPLIER_STOCK_CAPTION_XY == (0.140, 0.264)
     assert draw.SUPPLIER_STOCK_CAPTION == (
         "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
     )

@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -51,12 +50,15 @@ from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_hidden_sketches import _show_hidden_owners
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+from _drawing_layout_audit import annotation_display
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_audit import _display_segments, display_box
+from _layout_geometry import Box, segment_box_distance
 from _rebuild import active_configuration_name
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
@@ -65,12 +67,13 @@ from _purchased_fastener_drawing import (
     _inside,
     _open_supplier_source_read_only,
     _source_file_sha256,
-    assert_supplier_view_fits,
+    assert_supplier_annotations_fit,
 )
 from _supplier_spring_drawing import (
     _capture_reference_views,
     _preserve_reference_source_file,
     _reference_view_bounds,
+    reacquire_supplier_dimensions,
 )
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
@@ -124,14 +127,18 @@ MAIN_CENTER = (0.195, 0.160)
 # from the right border, its outline spans y 0.081 .. 0.251, between the
 # title block's top (0.0651) and the top border (0.2667).
 ISO_CENTER = (0.390, 0.166)
-# Targets for the independently captured zero-body supplier sketch and caption.
-# These positions are not native fit evidence: final guards retain the native
-# outline, complete annotation ink and the caption's separate reserved region.
-SUPPLIER_STOCK_CENTER = (0.183, 0.2425)
+# Initial seed only. Final placement intersects the actual native-frame and
+# complete source/annotation ink constraints; no retained frame offset is assumed.
+SUPPLIER_STOCK_CENTER = (0.183, 0.2365)
 SUPPLIER_STOCK_SCALE = (1, 10)
 SUPPLIER_STOCK_FIELD = (0.135, 0.208, 0.245, 0.265)
-SUPPLIER_STOCK_CAPTION_XY = (0.140, 0.219)
+SUPPLIER_STOCK_CAPTION_XY = (0.140, 0.264)
 SUPPLIER_STOCK_CAPTION_GAP = 0.003
+# Paper-space clearances, independent of the view/frame's model-space origin.
+SUPPLIER_STOCK_GAUGE_GAP = 0.003
+SUPPLIER_STOCK_TEXT_GAP = 0.003
+SUPPLIER_STOCK_PLACE_AIR = 0.004  # 1 mm settling reserve above the strict 3 mm gap.
+SUPPLIER_STOCK_MOVE_TOLERANCE = 1e-6  # Same center readback precision as _center_view.
 SUPPLIER_STOCK_CAPTION = (
     "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
 )
@@ -437,22 +444,14 @@ def _center_view(
     view: Any,
     center: tuple[float, float],
     label: str,
-    *,
-    read_bounds: Callable[[], tuple[float, float, float, float]] | None = None,
 ) -> None:
-    """Centre captured geometry without substituting it for native outline guards.
-
-    Captured supplier curves provide an independent reference point; native
-    readback must still establish outline/annotation fit after configuration
-    selection. No successful refresh or exported layout is inferred here.
-    """
+    """Center the native frame without replacing its strict outline guard."""
     view = _early_bound(view, "IView")
-    bounds_reader = read_bounds or (lambda: _outline(view, label))
-    box = native_outline = position = target = None
+    box = position = target = None
     phase = "read initial bounds"
     failure = None
     try:
-        box = bounds_reader()
+        box = _outline(view, label)
         phase = "read view position"
         position = tuple(float(value) for value in view.Position)
         if len(position) != 2 or not all(map(math.isfinite, position)):
@@ -466,31 +465,29 @@ def _center_view(
             raise RuntimeError(f"{label}: failed to position the view")
         draw.EditRebuild3()
         phase = "read centered bounds"
-        box = bounds_reader()
-        phase = "read native outline"
-        native_outline = box if read_bounds is None else _outline(view, label)
-        phase = "check geometry center"
+        box = _outline(view, label)
+        phase = "check native frame center"
         if (
             abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
             or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
         ):
             raise RuntimeError(f"{label}: view failed to centre: {box!r}")
         phase = "check native sheet outline"
-        if not _inside_sheet(native_outline):
+        if not _inside_sheet(box):
             raise RuntimeError(
-                f"{label}: view leaves the drawable sheet: {native_outline!r}"
+                f"{label}: view leaves the drawable sheet: {box!r}"
             )
     except BaseException as error:
         failure = error
         raise
     finally:
-        if read_bounds is not None or failure is not None:
+        if failure is not None:
             actual_center = (
                 None if box is None else ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
             )
             _telemetry.info(
-                f"{label}: centering phase={phase!r}; geometry_bounds_m={box!r}; "
-                f"native_outline_m={native_outline!r}; initial_position_m={position!r}; "
+                f"{label}: centering phase={phase!r}; native_outline_m={box!r}; "
+                f"initial_position_m={position!r}; "
                 f"actual_center_m={actual_center!r}; "
                 f"requested_center_m={center!r}; target_position_m={target!r}; "
                 f"failure={failure!r}"
@@ -959,14 +956,202 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
     return annotations
 
 
-def _add_supplier_stock_inset(adapter: Any):
-    """Target a captured supplier diagram and reserve its measured caption.
+def _measure_supplier_stock_dimensions(adapter: Any, view: Any) -> dict[str, dict]:
+    """Reacquire all three native gauges, including their below-callout glyphs."""
+    displays = reacquire_supplier_dimensions(
+        adapter,
+        {"*Front": view},
+        expected={"*Front": {
+            name: FEATURE_BY_PLANE["Front"]
+            for name, _, _ in supplier.SUPPLIER_REFERENCE_DIMENSIONS
+        }},
+        configurations={"*Front": supplier.SUPPLIER_STOCK_CONFIGURATION},
+    )
+    records = {}
+    for name, display in displays.items():
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        data, refused = annotation_display(adapter, annotation)
+        text = display_box({"texts": data.get("texts", ())})
+        ink = display_box(data)
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        callout = supplier.SUPPLIER_REFERENCE_FORMATS[name][3]
+        printed = "".join(str(row.get("t", "")) for row in data.get("texts", ()))
+        if (
+            refused or text is None or ink is None or len(position) != 3
+            or not all(map(math.isfinite, position))
+            or any(
+                not all(map(math.isfinite, (box.xmin, box.ymin, box.xmax, box.ymax)))
+                or box.width <= 0 or box.height <= 0
+                for box in (text, ink)
+            )
+            or "".join(callout.split()) not in "".join(printed.split())
+        ):
+            raise RuntimeError(
+                f"{name}: incomplete native supplier text/ink: {refused!r}; "
+                f"position_m={position!r}; native_text={printed!r}"
+            )
+        records[name] = {
+            "display": display, "annotation": annotation, "position": position,
+            "data": data, "text": text, "ink": ink,
+        }
+    return records
 
-    Capture precedes dimension formatting, while the read-only source is clean.
-    Saved-hidden owner, zero-body and correspondence proofs remain independent
-    of the native outline. Captured curves guide centering, not a claim that
-    refresh or complete native fit has been proven; final readback checks the
-    curves, native outline, annotations and separate caption region.
+
+def _assert_supplier_stock_clearance(records: dict[str, dict]) -> None:
+    """Check glyph-to-glyph and actual stroke-to-other-glyph air, not white boxes."""
+    for index, (name, record) in enumerate(records.items()):
+        for other_name, other in tuple(records.items())[index + 1:]:
+            if record["text"].gap(other["text"]) < SUPPLIER_STOCK_TEXT_GAP:
+                raise RuntimeError(
+                    f"supplier text clearance: {name}={record['text']!r}, "
+                    f"{other_name}={other['text']!r}"
+                )
+        for segment in _display_segments(record["data"]):
+            for other_name, other in records.items():
+                if name != other_name and (
+                    segment_box_distance(segment, other["text"])
+                    < SUPPLIER_STOCK_TEXT_GAP
+                ):
+                    raise RuntimeError(
+                        f"supplier stroke/text clearance: {name} {segment!r} "
+                        f"crowds {other_name}={other['text']!r}"
+                    )
+
+
+def _place_supplier_stock_dimensions(
+    adapter: Any, view: Any, displays: dict[str, Any],
+    curve_bounds: tuple[float, float, float, float],
+) -> None:
+    """Arrange measured complete glyph blocks around the three source gauges.
+
+    Source-relative paper gaps set line stations. All text, including the
+    length's below-callout row, is offset above/right of those lines using its
+    measured box; the annotation insertion point is not a glyph-box corner.
+    The caller's caption-format rebuild settles these final text moves too.
+    """
+    rows = supplier.SUPPLIER_REFERENCE_DIMENSIONS
+    points = []
+    for name, value, orientation in rows:
+        x, y = supplier.SUPPLIER_REFERENCE_STARTS[name]
+        if orientation == "horizontal":
+            x += value / 2.0
+        else:
+            y += value / 2.0
+        points.append((x / 1000.0, y / 1000.0, 0.0))
+    centers = dict(zip(
+        (name for name, _, _ in rows),
+        model_points_in_view(
+            adapter, view, points, label="leadscrew supplier gauge centers"
+        ),
+        strict=True,
+    ))
+    pitch_line = curve_bounds[3] + SUPPLIER_STOCK_GAUGE_GAP
+    diameter_line = curve_bounds[2] + SUPPLIER_STOCK_GAUGE_GAP
+    anchors = {
+        "SupplierStockLength": (centers["SupplierStockLength"][0], pitch_line),
+        "SupplierStockDiameter": (
+            diameter_line, centers["SupplierStockDiameter"][1]
+        ),
+        "SupplierThreadPitch": (centers["SupplierThreadPitch"][0], pitch_line),
+    }
+    for name, anchor in anchors.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        display.OffsetText = False
+        if display.OffsetText or not annotation.SetPosition2(*anchor, 0.0):
+            raise RuntimeError(f"{name}: cannot place supplier gauge line")
+    rebuild_drawing(adapter, label="leadscrew supplier gauge line anchors")
+    for display in displays.values():
+        display.OffsetText = True
+        if not display.OffsetText:
+            raise RuntimeError("cannot enable native supplier text offset")
+    rebuild_drawing(adapter, label="leadscrew supplier native text format")
+    adapter.currentModel.GraphicsRedraw2()
+    records = _measure_supplier_stock_dimensions(adapter, view)
+    pitch_top = (
+        pitch_line + SUPPLIER_STOCK_PLACE_AIR
+        + records["SupplierThreadPitch"]["text"].height
+    )
+    length_line = pitch_top + SUPPLIER_STOCK_PLACE_AIR
+    length = records["SupplierStockLength"]
+    length["display"].OffsetText = False
+    if not length["annotation"].SetPosition2(
+        centers["SupplierStockLength"][0], length_line, 0.0
+    ):
+        raise RuntimeError("cannot place supplier length line above pitch glyphs")
+    length["display"].OffsetText = True
+    if not length["display"].OffsetText:
+        raise RuntimeError("cannot offset supplier length text")
+    for name, record in records.items():
+        annotation = record["annotation"]
+        position = tuple(float(value) for value in annotation.GetPosition())
+        text = record["text"]
+        if name == "SupplierStockLength":
+            # Carry its measured glyph-to-insertion offset, not a font baseline.
+            moved_x = position[0] - record["position"][0]
+            moved_y = position[1] - record["position"][1]
+            text = Box(text.xmin + moved_x, text.ymin + moved_y,
+                       text.xmax + moved_x, text.ymax + moved_y)
+        x_shift = (
+            diameter_line + SUPPLIER_STOCK_PLACE_AIR - text.xmin
+            if name == "SupplierStockDiameter"
+            else centers[name][0] - text.center()[0]
+        )
+        bottom = (
+            curve_bounds[3] + SUPPLIER_STOCK_PLACE_AIR
+            if name == "SupplierStockDiameter"
+            else (length_line if name == "SupplierStockLength" else pitch_line)
+            + SUPPLIER_STOCK_PLACE_AIR
+        )
+        if not annotation.SetPosition2(
+            position[0] + x_shift, position[1] + bottom - text.ymin, position[2]
+        ):
+            raise RuntimeError(f"{name}: cannot place measured supplier glyph block")
+
+
+def _supplier_stock_translation(
+    native_outline: tuple, curve_bounds: tuple, records: dict[str, dict],
+    caption_box: tuple,
+) -> tuple[float, float]:
+    """Intersect the frame/full-field and complete-ink/caption-free translations."""
+    ink = Box(*curve_bounds)
+    for record in records.values():
+        ink = ink.union(record["ink"])
+    field = SUPPLIER_STOCK_FIELD
+    ink_field = (
+        field[0], field[1], field[2], caption_box[1] - SUPPLIER_STOCK_CAPTION_GAP
+    )
+    dx = (
+        max(field[0] - native_outline[0], ink_field[0] - ink.xmin),
+        min(field[2] - native_outline[2], ink_field[2] - ink.xmax),
+    )
+    dy = (
+        max(field[1] - native_outline[1], ink_field[1] - ink.ymin),
+        min(field[3] - native_outline[3], ink_field[3] - ink.ymax),
+    )
+    offset = (
+        (curve_bounds[0] + curve_bounds[2] - native_outline[0] - native_outline[2]) / 2,
+        (curve_bounds[1] + curve_bounds[3] - native_outline[1] - native_outline[3]) / 2,
+    )
+    detail = (
+        f"source_curve_bounds_m={curve_bounds!r}; native_outline_m={native_outline!r}; "
+        f"curve_frame_offset_m={offset!r}; annotation_ink_m={ink!r}; "
+        f"caption_box_m={caption_box!r}; ink_field_m={ink_field!r}; "
+        f"permitted_dx_m={dx!r}; permitted_dy_m={dy!r}"
+    )
+    _telemetry.info(f"supplier stock joint placement before: {detail}")
+    if dx[0] > dx[1] or dy[0] > dy[1]:
+        raise RuntimeError(f"supplier stock has no joint frame/ink translation; {detail}")
+    return ((dx[0] + dx[1]) / 2, (dy[0] + dy[1]) / 2)
+
+
+def _add_supplier_stock_inset(adapter: Any):
+    """Jointly place the actual native frame and complete supplier diagram ink.
+
+    Capture precedes formatting while the source is clean. Hidden-owner,
+    zero-body and per-segment correspondence proofs remain independent of the
+    measured frame/curve offset. Measured glyph shelves and one feasible joint
+    translation retain strict native-frame, complete-ink and caption bounds.
     """
     view = _early_bound(
         place_view(
@@ -1023,15 +1208,18 @@ def _add_supplier_stock_inset(adapter: Any):
             allow_presentation_dirty=allow_presentation_dirty,
         )
 
-    _center_view(
-        adapter.currentModel,
-        view,
-        SUPPLIER_STOCK_CENTER,
-        "supplier stock gauges",
-        read_bounds=lambda: reference_bounds(allow_presentation_dirty=False),
+    curve_bounds = reference_bounds(allow_presentation_dirty=False)
+    native_outline = _outline(view, "supplier stock captured frame")
+    captured_offset = (
+        (curve_bounds[0] + curve_bounds[2] - native_outline[0] - native_outline[2]) / 2,
+        (curve_bounds[1] + curve_bounds[3] - native_outline[1] - native_outline[3]) / 2,
+    )
+    _telemetry.info(
+        f"supplier stock captured: source_curve_bounds_m={curve_bounds!r}; "
+        f"native_outline_m={native_outline!r}; curve_frame_offset_m={captured_offset!r}"
     )
     checks = []
-    annotate_supplier_screw(
+    displays = annotate_supplier_screw(
         adapter,
         {"*Front": view},
         dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
@@ -1040,6 +1228,7 @@ def _add_supplier_stock_inset(adapter: Any):
         units=supplier.SUPPLIER_REFERENCE_UNITS,
         settled_checks=checks,
     )
+    _place_supplier_stock_dimensions(adapter, view, displays, curve_bounds)
     draw.ActivateView("")
     if not draw.GetEditSheet() or draw.ActiveDrawingView is not None:
         raise RuntimeError("cannot restore sheet context for supplier stock caption")
@@ -1048,32 +1237,108 @@ def _add_supplier_stock_inset(adapter: Any):
     )
     if note is None:
         raise RuntimeError("cannot add leadscrew supplier stock caption")
+    # INote insertion coordinates need not equal its complete extent corner.
+    # Seat the measured block at the target without changing its formatting.
+    rebuild_drawing(adapter, label="leadscrew supplier caption format")
+    adapter.currentModel.GraphicsRedraw2()
+    caption = _early_bound(note, "INote")
+    caption_box = _box(
+        caption.GetExtent(), label="supplier stock caption", kind="note"
+    )
+    caption_annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
+    position = tuple(
+        float(value) for value in (caption_annotation.GetPosition() or ())
+    )
+    if len(position) != 3 or not all(map(math.isfinite, position)):
+        raise RuntimeError(
+            f"supplier stock caption has invalid position: {position!r}; "
+            f"caption_box_m={caption_box!r}"
+        )
+    target = (
+        position[0] + SUPPLIER_STOCK_CAPTION_XY[0] - caption_box[0],
+        position[1] + SUPPLIER_STOCK_CAPTION_XY[1] - caption_box[3],
+        position[2],
+    )
+    if not caption_annotation.SetPosition2(*target):
+        raise RuntimeError(
+            f"cannot seat supplier stock caption: {position!r} -> {target!r}; "
+            f"caption_box_m={caption_box!r}"
+        )
+    rebuild_drawing(adapter, label="leadscrew supplier caption position")
+    before_curves = reference_bounds(allow_presentation_dirty=True)
+    adapter.currentModel.GraphicsRedraw2()
+    before_frame = _outline(view, "supplier stock joint placement")
+    seated_caption = _box(
+        caption.GetExtent(), label="seated supplier stock caption", kind="note"
+    )
+    _telemetry.info(
+        f"supplier stock caption: position_m={position!r} -> {target!r}; "
+        f"caption_box_m={caption_box!r} -> {seated_caption!r}"
+    )
+    if not _inside(seated_caption, SUPPLIER_STOCK_FIELD):
+        curve_bounds, native_outline = before_curves, before_frame
+        ink_field = (
+            SUPPLIER_STOCK_FIELD[0], SUPPLIER_STOCK_FIELD[1],
+            SUPPLIER_STOCK_FIELD[2],
+            seated_caption[1] - SUPPLIER_STOCK_CAPTION_GAP,
+        )
+        detail = (
+            f"source_curve_bounds_m={curve_bounds!r}; "
+            f"native_outline_m={native_outline!r}; "
+            f"caption_box_m={seated_caption!r}; ink_field_m={ink_field!r}"
+        )
+        _telemetry.info(f"supplier stock gauges caption seating refused: {detail}")
+        raise RuntimeError(f"seated supplier stock caption left its field; {detail}")
 
-    def settled() -> None:
-        for check_source in checks:
-            check_source()
-        if (
-            str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
-            or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE
-            or view.UseSheetScale != 0
+    before_records = _measure_supplier_stock_dimensions(adapter, view)
+    dx, dy = _supplier_stock_translation(
+        before_frame, before_curves, before_records, seated_caption
+    )
+    _assert_supplier_stock_clearance(before_records)
+    view_position = tuple(float(value) for value in (view.Position or ()))
+    if len(view_position) != 2 or not all(map(math.isfinite, view_position)):
+        raise RuntimeError(f"supplier stock has invalid view position: {view_position!r}")
+    if not view.SetViewPosition(
+        double_array([view_position[0] + dx, view_position[1] + dy]), False
+    ):
+        raise RuntimeError("cannot apply joint supplier frame/ink translation")
+    rebuild_drawing(adapter, label="leadscrew supplier joint frame/ink placement")
+
+    def assert_translation(label: str, before: tuple, after: tuple) -> None:
+        movement = (dx, dy, dx, dy) if len(before) == 4 else (dx, dy, 0.0)
+        expected = tuple(value + delta for value, delta in zip(before, movement, strict=True))
+        if len(after) != len(expected) or any(
+            abs(actual - wanted) > SUPPLIER_STOCK_MOVE_TOLERANCE
+            for actual, wanted in zip(after, expected, strict=True)
         ):
-            raise RuntimeError("leadscrew supplier stock configuration/scale changed")
-        curve_bounds = native_outline = caption_box = ink_field = None
+            raise RuntimeError(
+                f"{label}: native ink did not translate with its view; "
+                f"before_m={before!r}; expected_m={expected!r}; actual_m={after!r}"
+            )
+
+    def placed_readback(stage: str) -> None:
+        curve_bounds = native_outline = caption_box = ink_field = records = offset = None
         try:
             caption = _early_bound(note, "INote")
             annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
-            caption_extent = caption.GetExtent()
             curve_bounds = reference_bounds(allow_presentation_dirty=True)
+            adapter.currentModel.GraphicsRedraw2()
             native_outline = _outline(view, "supplier stock gauges settled")
+            caption_extent = caption.GetExtent()
+            offset = (
+                (curve_bounds[0] + curve_bounds[2] - native_outline[0] - native_outline[2]) / 2,
+                (curve_bounds[1] + curve_bounds[3] - native_outline[1] - native_outline[3]) / 2,
+            )
             caption_box = _box(
                 caption_extent, label="supplier stock caption", kind="note"
             )
             ink_field = (
                 SUPPLIER_STOCK_FIELD[0],
-                caption_box[3] + SUPPLIER_STOCK_CAPTION_GAP,
+                SUPPLIER_STOCK_FIELD[1],
                 SUPPLIER_STOCK_FIELD[2],
-                SUPPLIER_STOCK_FIELD[3],
+                caption_box[1] - SUPPLIER_STOCK_CAPTION_GAP,
             )
+            records = _measure_supplier_stock_dimensions(adapter, view)
             if (
                 str(caption.GetText() or "").replace("\r", "") != SUPPLIER_STOCK_CAPTION
                 or int(annotation.OwnerType) != 1
@@ -1086,25 +1351,59 @@ def _add_supplier_stock_inset(adapter: Any):
                 raise RuntimeError(
                     "leadscrew supplier stock curves left their caption-free field"
                 )
-            assert_supplier_view_fits(
+            if not _inside(native_outline, SUPPLIER_STOCK_FIELD):
+                raise RuntimeError(
+                    f"leadscrew supplier native frame leaves its field: {native_outline!r}"
+                )
+            assert_translation("supplier native frame", before_frame, native_outline)
+            assert_translation("supplier source curves", before_curves, curve_bounds)
+            for name, record in records.items():
+                assert_translation(
+                    name, before_records[name]["position"], record["position"]
+                )
+                for kind in ("text", "ink"):
+                    before = before_records[name][kind]
+                    after = record[kind]
+                    assert_translation(
+                        f"{name} {kind}",
+                        (before.xmin, before.ymin, before.xmax, before.ymax),
+                        (after.xmin, after.ymin, after.xmax, after.ymax),
+                    )
+                if not record["display"].OffsetText:
+                    raise RuntimeError(f"{name}: supplier text lost its native offset")
+            _assert_supplier_stock_clearance(records)
+            assert_supplier_annotations_fit(
                 adapter,
                 view,
                 ink_field,
-                label="leadscrew nominal supplier stock gauges",
+                label="leadscrew nominal supplier stock gauges below caption",
             )
         except RuntimeError as error:
             raise RuntimeError(
                 f"{error}; source_curve_bounds_m={curve_bounds!r}; "
-                f"native_outline_m={native_outline!r}; caption_box_m={caption_box!r}; "
-                f"ink_field_m={ink_field!r}"
+                f"native_outline_m={native_outline!r}; curve_frame_offset_m={offset!r}; "
+                f"caption_box_m={caption_box!r}; ink_field_m={ink_field!r}"
             ) from error
         finally:
             _telemetry.info(
-                "supplier stock gauges settled: "
-                f"source_curve_bounds_m={curve_bounds!r}; "
-                f"native_outline_m={native_outline!r}; caption_box_m={caption_box!r}; "
-                f"ink_field_m={ink_field!r}"
+                f"supplier stock gauges {stage}: "
+                f"source_curve_bounds_m={curve_bounds!r}; native_outline_m={native_outline!r}; "
+                f"curve_frame_offset_m={offset!r}; caption_box_m={caption_box!r}; "
+                f"ink_field_m={ink_field!r}; translation_m={(dx, dy)!r}"
             )
+
+    placed_readback("after joint placement")
+
+    def settled() -> None:
+        for check_source in checks:
+            check_source()
+        if (
+            str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
+            or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE
+            or view.UseSheetScale != 0
+        ):
+            raise RuntimeError("leadscrew supplier stock configuration/scale changed")
+        placed_readback("settled")
 
     return settled
 
