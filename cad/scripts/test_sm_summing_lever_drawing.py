@@ -282,6 +282,7 @@ def _native_knife_height(monkeypatch, identity):
         selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
         precision=2, document_precision=2, tolerance=SimpleNamespace(Type=0),
         activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
+        view_activate=True, refuse_pick=None, extra_pick_after=None, null_dimension=False,
     )
     view = SimpleNamespace(ScaleRatio=(1.0, 1.0))
 
@@ -289,9 +290,13 @@ def _native_knife_height(monkeypatch, identity):
         entity = SimpleNamespace()
 
         def select(append, data):
-            assert data.View is view and append == bool(state.selected)
-            state.selected.append(entity)
+            assert data.View is view and append == (name == "plate top")
             state.picks.append(name)
+            if state.refuse_pick == name:
+                return False  # native refusal: call recorded, selection unchanged
+            state.selected.append(entity)
+            if state.extra_pick_after == name:
+                state.selected.append(object())
             return True
 
         entity.Select4 = select
@@ -319,19 +324,21 @@ def _native_knife_height(monkeypatch, identity):
         GetDimension2=lambda _index: NativeDimension(), GetAnnotation=lambda: annotation,
         GetPrimaryPrecision2=lambda: state.precision,
     )
-    view.GetAnnotationCount = lambda: 1
-    view.GetAnnotations = lambda: (annotation,)
+    state.inventory, state.annotation_count = [annotation], 1
+    view.GetAnnotationCount = lambda: state.annotation_count
+    view.GetAnnotations = lambda: state.inventory
     manager = SimpleNamespace(
         CreateSelectData=SimpleNamespace, GetSelectedObjectCount2=lambda _mark: len(state.selected),
     )
 
     def create(*position):
-        assert state.selected == [point, edge]
         state.placements.append(position)
+        if state.null_dimension or state.selected != [point, edge]:
+            return None
         return display
 
     identity.currentModel = SimpleNamespace(
-        ActivateView=lambda _name: True, ActivateSheet=lambda _name: state.activate,
+        ActivateView=lambda _name: state.view_activate, ActivateSheet=lambda _name: state.activate,
         ClearSelection2=lambda _all: state.selected.clear(), SelectionManager=manager,
         AddVerticalDimension2=create,
         Extension=SimpleNamespace(GetUserPreferenceInteger=lambda *_args: state.document_precision),
@@ -370,6 +377,52 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
         check()
 
 
+@pytest.mark.parametrize("damage", ["view", "point_refusal", "edge_refusal", "point_count", "edge_count"])
+def test_knife_height_refuses_selection_before_attempting_native_dimension(monkeypatch, identity, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    if damage == "view":
+        case.state.view_activate = False
+    elif damage.endswith("_refusal"):
+        case.state.refuse_pick = "height.end" if damage == "point_refusal" else "plate top"
+    else:
+        case.state.extra_pick_after = "height.end" if damage == "point_count" else "plate top"
+    with pytest.raises(RuntimeError, match="activate VIEW F|selection failed"):
+        case.capture()
+    assert case.state.placements == [], "bad native selection must not reach AddVerticalDimension2"
+    assert case.state.selected == [], "failed insertion must release its native selections"
+    # False-return/no-effect selection also has a wrong count. Those independent
+    # guards legitimately mask one another; this is a pre-creation behavior
+    # contract, not a claim to isolate the return guard from the count guard.
+
+
+def test_knife_height_refuses_missing_native_dimension_before_reading_it(monkeypatch, identity):
+    case = _native_knife_height(monkeypatch, identity)
+    case.state.null_dimension = True
+    with pytest.raises(RuntimeError, match="native vertical dimension was not created"):
+        case.capture()
+    assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
+    assert case.state.selected == []
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("damage", ["missing", "duplicate", "count", "shape"])
+def test_knife_height_refuses_inconsistent_native_view_inventory(monkeypatch, identity, settled, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture() if settled else case.capture
+    if damage == "missing":
+        case.state.inventory = [object()]  # same count, no owned annotation
+    elif damage == "duplicate":
+        case.state.inventory = [case.annotation, case.annotation]
+        case.state.annotation_count = 2
+    elif damage == "count":
+        case.state.annotation_count = 0  # nonempty native array disagrees
+    else:
+        case.state.inventory = None
+    with pytest.raises(RuntimeError, match="not visible and owned by VIEW F"):
+        check()
+
+
+
 @pytest.mark.parametrize("settled", [False, True])
 @pytest.mark.parametrize("damage", ["crest", "plate", "attachment", "value", "band", "precision", "owner", "hidden", "dangling", "sheet"])
 def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypatch, identity, settled, damage):
@@ -399,7 +452,9 @@ def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypat
         check()
 
 
-@pytest.mark.parametrize("damage", [None, "missing", "duplicate", "crest", "transform", "correspondence"])
+@pytest.mark.parametrize("damage", [
+    None, "missing", "duplicate", "crest", "transform", "correspondence", "nonconstruction", "sketch_owner",
+])
 def test_theoretical_vertex_is_the_existing_height_endpoint_not_a_coincident_flank(monkeypatch, identity, damage):
     state = SimpleNamespace(shift=0.0, mapped=[], correspondence=True)
     half = sm_summing_lever_spec.HEX_H / 2000.0
@@ -458,6 +513,10 @@ def test_theoretical_vertex_is_the_existing_height_endpoint_not_a_coincident_fla
         state.shift = -0.00002
     elif damage == "correspondence":
         state.correspondence = False
+    elif damage == "nonconstruction":
+        height.ConstructionGeometry = False
+    elif damage == "sketch_owner":
+        vertex.GetSketch = lambda: object()
     if damage is not None:
         with pytest.raises(RuntimeError):
             drawing._theoretical_knife_vertex_in_view(identity, view)
