@@ -12,7 +12,8 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
   native source measurements remain independently checked.
 * TOP and BOTTOM, turned and pinned into third-angle projection above and
   below the front (corners up and down, the flats square to the sheet): the
-  flats (stock REF) over the top view, and each tap's native callout.
+  controlled stock flats above and to the right of the top view, and each tap's
+  native callout.
 * SECTION A-A, cut on the hex axis through the corners from the front: the
   bore through the corners, both blind taps in solid lines and the floor
   between the rod tap and the bore, under the part's material crosshatch
@@ -162,9 +163,12 @@ RIGHT_KEEP = {
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (0.165, 0.145),
 }
-# Keep the native AF tolerance and its supplied-stock below-text above the hex
-# (top extent 239.5 mm), inside the actual 266.7 mm inner border.
-TOP_KEEP = {"HexAf": (TOP_CENTER[0], 0.255)}
+# R29's whole supplied-stock paragraph must clear BOTH native AF witnesses
+# (x65.95/104.05 mm) and the right arrow tail (to x110.4), not just the value.
+# At x152 its native text extent predicts x113.7698..190.2302 mm; keeping y255
+# leaves the highest ink at y259.4993, below the 266.7 mm inner border.
+# A left shift cannot fit the 76.4604 mm native row in the 53.25 mm border lane.
+TOP_KEEP = {"HexAf": (0.152, 0.255)}
 RIGHT_LOCATION_KEEP = {
     # Move R27's whole three-row label right, away from A and the height witness.
     # Keep its vertical station: raising the flat witness crosses A (R21).

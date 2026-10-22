@@ -1827,6 +1827,14 @@ just their numeric values, clear of borders, section markers and neighbours.
 Source-coordinate predictions are not native layout proof: inspect the final
 whole PNG and require the unchanged native annotation/ink audit.
 
+For TOP AF below-text, budget the whole stock qualifier against **both**
+native witnesses and the complete arrow-tail envelope. R29's right witness
+touched the `S` in `SUPPLIED` despite the controlling AF value being clear.
+Moving the paragraph left would cross the other witness and clip the border;
+place it beyond the measured right-hand tail, then recheck native routing
+and the whole page. Translating old ink bounds is only a placement budget,
+not proof that the new native arrows or final aggregate box are clear.
+
 R21 export completed with the upper 6.35 extension line touching
 the left stroke of the upper A cutting-plane label. Clearance above an arrow
 does not prove clearance from its label: inspect the actual glyph ink against
@@ -1908,6 +1916,21 @@ an ignored size field nor residual zeros prove geometry. Do not special-case a
 record index, the observed size 17 or the observed residual length 34. A null
 return channel is unavailable, not an observed empty array; decoder success
 still does not replace actual model-edge identity or final render inspection.
+
+If a cropped return has more complete records than edge slots, retain the
+refusal: R29 had twelve numerical records but eleven returned slots. Capture
+the single raw return, including IEEE-754 values and null slots, **before**
+optional descriptions or native readers can fail. Independently inventory
+well-formed numerical records for diagnostics only; do not prefix-pair slots,
+skip a crop-congruent contour or treat a numeric count as native authority.
+`RAW_SLOT_OBSERVATION` records typed native capabilities, source/component
+correspondence and isolated reader failures without claiming rendered ink.
+Read `GetPolyLineCount5(1)` and `GetXform()` independently; unavailable counts,
+OUT channels or transforms stay unavailable. Retain an actual authored crop
+handle only in its scoped view context, never reconstruct its identity from
+radius or coordinates. All failure-only formatting/capture readers must leave
+the original decoder exception and traceback intact. These diagnostics do
+not change the acceptance decoder, its cardinality guard or physical proof.
 
 Raw visible-edge and rendered-polyline handles do not establish a shared
 identity namespace merely because both bind as `IEdge`. The MG interface

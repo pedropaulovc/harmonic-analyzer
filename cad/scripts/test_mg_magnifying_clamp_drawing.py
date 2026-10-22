@@ -794,12 +794,67 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
     drawing.set_dimension_callouts(state.adapter, curated, {"HexAf": spec.STOCK_AF_CALLOUT})
     assert curated == [state.annotation]
     # Assert the settled consumer readback, not a rebuild call-count contract.
-    assert state.annotation.GetPosition() == (0.085, 0.255, 0.0)
+    assert state.annotation.GetPosition() == (0.152, 0.255, 0.0)
     assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
     assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
                       state.annotation.Owner, tuple(state.points))
     assert state.display.GetPrimaryPrecision2() == state.display.GetPrimaryTolPrecision2() == 2
     assert state.display.ShowParenthesis is False
+
+    # Actual R29 cd438278 native-layout-evidence.json / PDF ink, audit SHA256
+    # fce09c3fee08c0cf2e627da4bba96081860e36d7a8bcb3a8560941e2e8b9c3e6.
+    # Translation budgets the WHOLE paragraph against frozen native primitives;
+    # it is not proof of the next native text/arrow/tail routing or audit result.
+    value = Box(0.0733910, 0.2559339, 0.0970945, 0.2594993)
+    qualifier = Box(0.0474324, 0.2500044, 0.1229876, 0.2539430)
+    # Include the wider native text extent/baseline AND the actual ink height.
+    paragraph = Box(0.0467698, 0.2494437, 0.1232302, 0.2594993)
+    witnesses = (
+        Segment(0.06595, 0.2294985, 0.06595, 0.2504438, "ext-line"),
+        Segment(0.10405, 0.2294985, 0.10405, 0.2504438, "ext-line"),
+    )
+    assert segment_box_overlap_length(witnesses[1], qualifier) > 0.0
+    # The audit's recorded 0.2394 mm overlap uses its own ink padding; do not
+    # replace it with the unpadded segment/box intersection above.
+    left_proposal = Box(qualifier.xmin - 0.035, qualifier.ymin,
+                        qualifier.xmax - 0.035, qualifier.ymax)
+    assert segment_box_overlap_length(witnesses[0], left_proposal) > 0.0
+    assert left_proposal.xmin < 0.0127  # x50 also crosses the inner border.
+    assert paragraph.xmax - paragraph.xmin > 0.06595 - 0.0127
+
+    x, y, _z = state.annotation.GetPosition()
+    dx, dy = x - 0.085, y - 0.255
+    assert dy == 0.0  # Raising the whole annotation also raises its witnesses.
+    moved = tuple(Box(b.xmin + dx, b.ymin, b.xmax + dx, b.ymax)
+                  for b in (value, qualifier, paragraph))
+    native_lines = (
+        *witnesses,
+        Segment(0.10405, 0.2494438, 0.1104, 0.2494438, "dim-line"),
+        Segment(0.10405, 0.2494438, 0.06595, 0.2494438, "dim-line"),
+        Segment(0.06595, 0.2494438, 0.0596, 0.2494438, "dim-line"),
+    )
+    for arrow_x, direction in ((0.10405, 1.0), (0.06595, -1.0)):
+        arrow = (arrow_x, 0.2494438, -0.04395, direction, 0.0, 0.0,
+                 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0)
+        assert all(segment_box_distance(segment, box) > 0.003
+                   for segment in arrowhead_segments(arrow) for box in moved)
+    assert all(segment_box_distance(segment, box) > 0.003
+               for segment in native_lines for box in moved)
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    assert moved[2].xmin - 0.0127 > 0.100
+    assert template.width_m - 0.0127 - moved[2].xmax > 0.228
+    assert template.height_m - 0.0127 - moved[2].ymax > 0.007
+    neighbors = (
+        Box(0.060362, 0.189915, 0.109638, 0.245085),  # TOP outline
+        # Conservative union of the actual top-tap leader and both text rows.
+        Box(0.0816779, 0.2168172, 0.2220517, 0.2320527),
+        Box(0.0652137, 0.1761622, 0.0710726, 0.1823344),  # upper A ink
+        Box(0.0387871, 0.1841558, 0.0473203, 0.1877211),  # diagonal 6.35
+        Box(0.222415, 0.120162, 0.277585, 0.219838),  # section outline
+        Box(0.3353594, 0.2414083, 0.3937131, 0.2449736),  # iso caption
+    )
+    assert all(box.gap(neighbor) > 0.004 for box in moved for neighbor in neighbors)
+    assert moved[1].ymin - neighbors[1].ymax > 0.0179
 
 
 def test_unchanged_envelope_row_keeps_r28_blank_lane_clearance():
