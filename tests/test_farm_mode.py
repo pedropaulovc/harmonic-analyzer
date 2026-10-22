@@ -2804,6 +2804,8 @@ def test_check_pytest_process_isolates_parent_publication_ownership(tmp_path):
         stdout_path.read_text(encoding="utf-8", errors="replace")
         + stderr_path.read_text(encoding="utf-8", errors="replace")
     )
+    refusals = child_log.read_text(encoding="utf-8")
+    assert not refusals, refusals
     assert result.returncode == 0, output[-8000:]
     assert "2 passed" in output, output[-8000:]
     assert sentinel.read_text(encoding="utf-8") == "the enclosing build owns this root"

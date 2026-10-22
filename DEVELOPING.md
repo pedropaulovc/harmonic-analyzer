@@ -292,6 +292,8 @@ collection and before each test. Tests may explicitly set their own temporary
 request root and ownership afterward. The publication-ownership regression in
 `tests/test_farm_mode.py` checks collection and per-test isolation, leaves the
 inherited root untouched, and permits an explicit fixture-owned result record.
+Its guard log stays private and must be empty after the nested process exits,
+including session-fixture teardown.
 
 ### Finite stock-envelope endpoint reuse
 
