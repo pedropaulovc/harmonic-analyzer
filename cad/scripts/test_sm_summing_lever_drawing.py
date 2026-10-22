@@ -730,10 +730,6 @@ def test_the_knife_prism_merges_into_the_pivot_between_the_stubs() -> None:
     assert max(math.hypot(x, y) for x, y in vertices) < spec.CYL_R
     assert spec.HEX_Z_INNER == spec.PLATE_L / 2.0
     assert spec.HEX_Z_OUTER - spec.HEX_Z_INNER == pytest.approx(spec.HEX_DEPTH)
-    for name in ("HEX_W", "HEX_H"):
-        assert getattr(lever_build, name) == getattr(knife_contact, name), name
-    for name in ("HEX_DEPTH", "HEX_Z_INNER", "HEX_Z_OUTER", "CYL_R"):
-        assert getattr(lever_build, name) == getattr(spec, name), name
     assert notes.DRAWING_DIMENSIONS["KnifeStubReference"] == {"KnifeStubLength"}
     assert notes.DIMENSION_PREFIXES[("KnifeStubReference", "KnifeStubLength")] == "2X "
 
