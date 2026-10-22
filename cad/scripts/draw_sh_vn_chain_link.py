@@ -28,6 +28,12 @@ SPEC = DRAWINGS_BY_NAME["sh_vn_chain_link"]
 PART_STEM = SPEC.artifact_stem
 # Pitch is a native model dimension on the nominal supplier diagram.
 ITEM = "ANSI #25 ROLLER CHAIN"
+# The 40-mm Top band needs room for the actual width gauge, not a 4-mm slot
+# left by the generic family padding. Keep the wider left text shelf reserved.
+_CHAIN_SUPPLIER_MARGINS = {
+    **SUPPLIER_MARGINS,
+    "free_top": (0.050, 0.010, 0.045, 0.010),
+}
 _MEMBER_QUANTITIES = parts(PART_STEM)["configuration_quantities"]
 VARIANTS = (
     ("InnerLink", f"INSTALLED INNER LINK, QTY {_MEMBER_QUANTITIES['InnerLink']}"),
@@ -41,7 +47,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=annotate_chain_stock,
-        supplier_margins=SUPPLIER_MARGINS,
+        supplier_margins=_CHAIN_SUPPLIER_MARGINS,
         stock_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
         prepare_views=prepare_chain_diagrams,
         supplier_reference_features=SOURCE_FEATURES,

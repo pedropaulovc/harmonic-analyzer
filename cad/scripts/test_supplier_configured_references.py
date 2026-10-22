@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _drawing_dimensions as drawing_dimensions
 import _supplier_chain_dimensions as chain_dimensions
 import _supplier_chain_stock as chain_stock
 import _supplier_spring_drawing as supplier_drawing
@@ -31,6 +32,7 @@ class _Display:
     def __init__(self, name, owner, value_mm):
         self.native = _NativeDimension(name, owner, value_mm)
         self.options = None
+        self.OffsetText = False
 
     def GetDimension2(self, index):
         assert index == 0
@@ -40,12 +42,19 @@ class _Display:
 class _Annotation:
     def __init__(self, display):
         self.display = display
+        self.position = self.line_position = (0.0, 0.0, 0.0)
 
     def GetType(self):
         return 4
 
     def GetSpecificAnnotation(self):
         return self.display
+
+    def SetPosition2(self, x, y, z):
+        self.position = (x, y, z)
+        if not self.display.OffsetText:
+            self.line_position = self.position
+        return True
 
 
 class _View:
@@ -131,11 +140,18 @@ def _chain_sheet(
         supplier_drawing, "iter_views", lambda _adapter: tuple(views.values())
     )
     monkeypatch.setattr(supplier_drawing, "view_name", lambda _adapter, view: view.Name)
+    for module in (chain_dimensions, drawing_dimensions):
+        monkeypatch.setattr(
+            module,
+            "dimension_name",
+            lambda _adapter, annotation: annotation.display.native.FullName.split("@")[0],
+        )
     monkeypatch.setattr(
-        chain_dimensions,
-        "dimension_name",
-        lambda _adapter, annotation: annotation.display.native.FullName.split("@")[0],
+        drawing_dimensions._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_members: value,
     )
+    monkeypatch.setattr(drawing_dimensions, "rebuild_drawing", lambda *_args, **_kwargs: None)
 
     def curate(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
         owner = (
@@ -148,6 +164,8 @@ def _chain_sheet(
         view.annotations = [
             _Annotation(_Display(name, owner, values[name])) for name in keep
         ]
+        for name, annotation in zip(keep, view.annotations, strict=True):
+            annotation.SetPosition2(*keep[name], 0.0)
         return view.annotations
 
     def present(_adapter, display, **options):
@@ -165,7 +183,7 @@ def _chain_sheet(
         chain_dimensions, "assert_supplier_reference_dimension", assert_presentation
     )
     checks = chain_dimensions.annotate_chain_stock(
-        SimpleNamespace(),
+        SimpleNamespace(_attempt=lambda operation: operation()),
         views,
         connecting=connecting,
         reference_bounds=reference_bounds,
@@ -205,6 +223,7 @@ def test_supplier_inventory_retains_exact_nominals_and_reacquires_rebuilt_annota
             name, owner, _ = old.native.FullName.split("@")
             new = _Display(name, owner, old.native.value_mm)
             new.options = dict(old.options)
+            new.OffsetText = old.OffsetText
             replacements.append(_Annotation(new))
             old.native.value_mm = -1.0
         view.annotations = replacements
@@ -309,6 +328,35 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
+
+
+def test_chain_roller_width_shelves_text_without_moving_its_native_line(monkeypatch):
+    views, settled = _chain_sheet(
+        monkeypatch, connecting=False, scale=(5.0, 1.0)
+    )
+    annotation = views["free_top"].annotations[0]
+    line = views["free_top"].dimension_positions[chain_stock.WIDTH_DIMENSION]
+    assert annotation.display.OffsetText is True
+    assert annotation.line_position == pytest.approx((*line, 0.0))
+    assert annotation.position == pytest.approx((line[0] - 0.024, line[1], 0.0))
+    settled()
+    annotation.display.OffsetText = False
+    with pytest.raises(RuntimeError, match="roller width text returned"):
+        settled()
+
+
+def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
+    import draw_sh_vn_chain_link as chain_drawing
+
+    cells = supplier_drawing.supplier_fit_cells(
+        supplier_drawing.supplier_state_cells(0.08, maximum=False),
+        chain_drawing._CHAIN_SUPPLIER_MARGINS,
+        label="chain reference",
+    )
+    top = next(box for name, _center, box in cells if name == "free_top")
+    available_height = top[3] - top[1]
+    assert chain_stock.ROLLER_WIDTH / 1000 * 5 < available_height
+    assert chain_stock.ROLLER_WIDTH / 1000 * 8 > available_height
 
 
 def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):

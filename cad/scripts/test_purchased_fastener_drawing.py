@@ -5715,6 +5715,14 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
         "view-owner",
         "feature-membership",
         "model-dimension",
+        "dimension-map-null",
+        "dimension-map-error",
+        "dimension-map-foreign",
+        "dimension-map-unsupported",
+        "mapped-dimension-null",
+        "mapped-dimension-foreign",
+        "mapped-dimension-unsupported",
+        "source-dimension-unsupported",
         "attachment-owner",
         "null-attachment",
         "source-sketch-error",
@@ -5771,7 +5779,12 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         GetSketchSegments=lambda: (),
     )
     raw_source_display = object()
-    source_display = SimpleNamespace(GetDimension2=lambda _index: case.native)
+    source_dimension = SimpleNamespace(**vars(case.native))
+    source_annotation = object()
+    source_display = SimpleNamespace(
+        GetDimension2=lambda _index: source_dimension,
+        GetAnnotation=lambda: source_annotation,
+    )
     source_feature = SimpleNamespace(
         Name="SupplierReference",
         GetTypeName2=lambda: "ProfileFeature",
@@ -5789,7 +5802,7 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
 
     monkeypatch.setattr(screws, "_bind", bind_source_display)
     model = SimpleNamespace(
-        Parameter=lambda _name: case.native,
+        Parameter=lambda _name: source_dimension,
         FeatureByName=lambda _name: source_feature,
     )
     # A distinct IFeature wrapper is not the native source-dimension proof.
@@ -5804,18 +5817,22 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         id(source): mapped
         for source, mapped in zip(source_points, drawing_points, strict=True)
     }
+    forward_map[id(source_annotation)] = case.annotation
     case.view.GetCorresponding = lambda obj: forward_map.get(id(obj))
     annotations = [case.annotation]
     case.view.GetAnnotations = lambda: annotations
-    adapter = SimpleNamespace(
-        views=[case.view],
-        swApp=SimpleNamespace(
-            IsSame=lambda left, right: int(
-                getattr(left, "native_identity", left)
-                is getattr(right, "native_identity", right)
-            )
-        ),
-    )
+    def same(left, right):
+        # MSC returns swObjectUnsupported across source/drawing dimensions.
+        if (left is case.native and right is source_dimension) or (
+            left is source_dimension and right is case.native
+        ):
+            return 2
+        return int(
+            getattr(left, "native_identity", left)
+            is getattr(right, "native_identity", right)
+        )
+
+    adapter = SimpleNamespace(views=[case.view], swApp=SimpleNamespace(IsSame=same))
     settings = dict(
         dimensions=(("Length", 11.1125, "horizontal"),),
         formats={"Length": (3, "length", None, None)},
@@ -5848,6 +5865,40 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         source_display.GetDimension2 = lambda _index: different_dimension
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
+    elif drift == "dimension-map-null":
+        forward_map[id(source_annotation)] = None
+    elif drift == "dimension-map-error":
+        def unreadable_annotation_mapping(obj):
+            if obj is source_annotation:
+                raise RuntimeError("source annotation mapping unreadable")
+            return forward_map.get(id(obj))
+
+        case.view.GetCorresponding = unreadable_annotation_mapping
+    elif drift == "dimension-map-foreign":
+        forward_map[id(source_annotation)] = SimpleNamespace(
+            GetSpecificAnnotation=lambda: case.display,
+        )
+    elif drift in ("mapped-dimension-null", "mapped-dimension-foreign"):
+        mapped_native = None if drift == "mapped-dimension-null" else object()
+        mapped_annotation = SimpleNamespace(
+            native_identity=case.annotation,
+            GetSpecificAnnotation=lambda: SimpleNamespace(
+                GetDimension2=lambda _index: mapped_native,
+            ),
+        )
+        forward_map[id(source_annotation)] = mapped_annotation
+    elif drift in (
+        "dimension-map-unsupported", "mapped-dimension-unsupported",
+        "source-dimension-unsupported",
+    ):
+        target = (
+            case.annotation if drift == "dimension-map-unsupported"
+            else source_dimension if drift == "source-dimension-unsupported"
+            else case.native
+        )
+        adapter.swApp.IsSame = lambda left, right: (
+            2 if left is right is target else same(left, right)
+        )
     elif drift in {"attachment-owner", "capture-error"}:
         case.annotation.entities = (
             SimpleNamespace(native_identity=object()),
@@ -5946,6 +5997,14 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         "view-owner",
         "feature-membership",
         "model-dimension",
+        "dimension-map-null",
+        "dimension-map-error",
+        "dimension-map-foreign",
+        "dimension-map-unsupported",
+        "mapped-dimension-null",
+        "mapped-dimension-foreign",
+        "mapped-dimension-unsupported",
+        "source-dimension-unsupported",
         "configuration",
         "orientation",
     }

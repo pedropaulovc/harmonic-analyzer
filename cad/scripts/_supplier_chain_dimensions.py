@@ -13,6 +13,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _com import _early_bound
+from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
@@ -140,6 +141,15 @@ def annotate_chain_stock(
             }
             supplier_reference_dimension(adapter, display, **options[name])
         options_by_view[key] = options
+        if key == "free_top" and not connecting:
+            # Keep the native vertical line/witnesses where curation put them;
+            # shelf the complete two-row width label to their left.
+            width_x, width_y = positions[stock.WIDTH_DIMENSION]
+            offset_dimension_text(
+                adapter,
+                imported,
+                {stock.WIDTH_DIMENSION: (width_x - 0.024, width_y)},
+            )
 
     expected = {
         key: {
@@ -177,5 +187,13 @@ def annotate_chain_stock(
                         f"{name}: unprovided supplier tolerance appeared"
                     )
                 assert_supplier_reference_dimension(adapter, display, **presentation)
+                if (
+                    name == stock.WIDTH_DIMENSION
+                    and not connecting
+                    and display.OffsetText is not True
+                ):
+                    raise RuntimeError(
+                        f"{name}: roller width text returned to its native dimension line"
+                    )
 
     return (settled,)

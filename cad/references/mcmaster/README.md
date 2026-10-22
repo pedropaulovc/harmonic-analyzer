@@ -1414,6 +1414,9 @@ Catalog specifications checked on September 10, 2026:
   installed pins or bushes. The connector additionally has its own .030-in
   plate and .335-in overall-pin references; `FOR ROLLER` references are
   application gauges, not rollers physically present on the connector.
+  The shared chain sheet shelves roller-width text off its native dimension
+  line and reserves a taller geometry lane for the nominal diagrams; fitting
+  still selects an existing standard scale from the actual source curves.
   Original member geometry, path axes, quantities, export identities and the
   two-foot cut instructions are retained. Evidence and immutable source hashes:
   `C:/src/dt-logs/vn-supplier-dimensions-20261019/SupplierSpringsChains/chain-audit.md`.
