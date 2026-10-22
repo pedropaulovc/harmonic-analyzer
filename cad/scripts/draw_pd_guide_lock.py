@@ -143,13 +143,13 @@ DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # between that edge and the right view.
 HOLE_CALLOUT_XY = (0.233, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
-# pd_vn_guide_lock_screw_spec spends these coordinate bands against the
-# rail's tap position in LOCK_SET_OFFSET; this is a screw-clearance set window,
-# not a locating/reamed fit and not a support-bar hole pattern.
+# The rail's Ø0.20 position zone and this plate's independent X/Y bands share
+# screw clearance in pd_vn_guide_lock_screw_spec.POSITION_RADIAL / LOCK_SET_OFFSET.
+# Nominal float does not remove relative pitch error: both screws must pass
+# through the same plate into the rail taps. Retain the source-owned bands.
 HOLE_MATE_CALLOUT = (
     f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS\n"
-    f"{_config.parts('pd-platen-guide')['number']} PLATEN GUIDE\n"
-    "CLEARANCE FOR BIAS SETTING"
+    f"PATTERN FITS {_config.parts('pd-platen-guide')['number']} TAPS"
 )
 
 

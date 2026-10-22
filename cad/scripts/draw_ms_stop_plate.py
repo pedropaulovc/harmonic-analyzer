@@ -9,6 +9,8 @@ The model-owned pilot and finished drill callouts identify the matched block,
 the physical registration edges and the web function of the absolute locations.
 Their text is shelved to the right of the measured extension lines; the cover
 thickness retains the screw-engagement stack and moves left of its witnesses.
+The overall-height line stands clear of the hole-height text, and the finished
+clearance callout explicitly separates the pair before drilling this plate.
 Separate native chamfer size and angle retain their model-owned precision.
 """
 
@@ -54,7 +56,7 @@ FRONT_CENTER = (0.175, 0.170)
 RIGHT_CENTER = (0.345, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
-    "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
+    "PlateLength": (0.175, 0.235), "PlateHeight": (0.090, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
@@ -159,8 +161,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # imported pilot. Two adjacent native callouts avoid an unverified note
     # dimension-link format while keeping both 2X quantities and sizes live.
     # Both leaders stay right of the overall-height and hole-location lanes.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.285, 0.132),
-                           label="two cover clearance holes", process="THEN DRILL")
+    add_native_hole_callout(
+        adapter, front, edge_xy=edge, callout_xy=(0.285, 0.132),
+        label="two cover clearance holes", process="SEPARATE PAIR;\nDRILL PLATE ONLY",
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
     assert_manufacturing_dimensions(

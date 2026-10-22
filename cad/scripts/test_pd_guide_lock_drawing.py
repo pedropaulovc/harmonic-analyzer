@@ -49,6 +49,30 @@ def test_hole_contract_is_part_owned_and_resolved() -> None:
     )
 
 
+def test_loose_setting_does_not_remove_the_two_screw_pitch_fit() -> None:
+    """Common translation/rotation cannot change either rigid centre distance.
+
+    At independent permitted X extremes, the proposed ±0.13 coordinates
+    cannot pass both screws even before the full radial/skew stack is spent.
+    This necessary pitch condition does not select a new acceptable band.
+    """
+    import pd_platen_guide_spec as guide
+    import pd_vn_guide_lock_screw_spec as screw
+
+    xs = [x for x, _ in pd_guide_lock_spec.HOLE_XY]
+    nominal_pitch = max(xs) - min(xs)
+    tap_radial = float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]) / 2.0
+    screw_pitch_min = nominal_pitch - 2.0 * tap_radial
+    pair_clearance = blind_cut_dia_mm(pd_guide_lock_spec.HOLE_SPEC) - screw.SHANK_DIA
+
+    def pitch_margin(coordinate_band):
+        lock_pitch_max = nominal_pitch + 2.0 * coordinate_band
+        return pair_clearance - (lock_pitch_max - screw_pitch_min)
+
+    assert pitch_margin(pd_guide_lock_spec.HOLE_LOCATION_BAND) >= 0.0
+    assert pitch_margin(0.13) < 0.0
+
+
 def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
     assert pd_guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"

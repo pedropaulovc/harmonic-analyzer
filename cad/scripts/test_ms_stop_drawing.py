@@ -139,6 +139,17 @@ def test_rebate_text_blocks_fit_between_recorded_native_lanes(name, left, right)
     assert center + half < right
 
 
+def test_plate_overall_height_line_stands_clear_of_hole_height_text() -> None:
+    """The 6d native PDF's complete hole-height label fits in a 20 mm box.
+
+    Its leading 4 touched the overall-height line. Reserve a 3 mm paper gap
+    outside the whole text envelope rather than pinning either coordinate.
+    """
+    height_line_x = plate_drawing.FRONT_KEEP["PlateHeight"][0]
+    hole_height_text_x = plate_drawing.FRONT_KEEP["PlateFromHeadFace"][0]
+    assert height_line_x + 0.003 < hole_height_text_x - 0.010
+
+
 def test_analytic_volume_has_no_merged_thumbscrew_or_hidden_extra_wall() -> None:
     assert spec.BLOCK_CHAMFER_VOLUME == spec.ROOF_END_CHAMFER**2 * spec.BLOCK_DEPTH
     assert spec.THUMB_HOLE_VOLUME == pytest.approx(math.pi * (spec.THUMB_TAP_DRILL / 2.0)**2 * spec.FLOOR_THICKNESS)
@@ -825,62 +836,71 @@ def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
     assert spec.PLATE_TAP_WINDOW_WEB_MIN - (printed_band_mm(1) - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < 1.5
 
 
-def _window_reference_seat(monkeypatch, *, reject_construction=False):
-    """Use the real location/anchor helpers over an offline sketch boundary."""
+def _stop_reference_seat(monkeypatch, *, initial_add_to_db=False, point_failure=None):
+    """Exercise real point registration, dimensions and anchoring at the COM seam."""
     features = {}
 
     def result(data=True):
         return SimpleNamespace(is_success=True, data=data)
 
-    class Segment:
+    class Manager:
         def __init__(self):
-            self.construction = False
+            self.AddToDB = initial_add_to_db
 
-        @property
-        def ConstructionGeometry(self):  # noqa: N802 - COM property name
-            return self.construction
-
-        @ConstructionGeometry.setter
-        def ConstructionGeometry(self, value):  # noqa: N802 - COM property name
-            if not reject_construction:
-                self.construction = value
+        def CreatePoint(self, x, y, z):  # noqa: N802 - native API name
+            assert self.AddToDB
+            if point_failure == "null":
+                return None
+            if point_failure == "raise":
+                raise RuntimeError("native point failed")
+            return SimpleNamespace(X=x, Y=y, Z=z)
 
     class Adapter:
         def __init__(self):
-            self.currentSketchManager = SimpleNamespace(AddToDB=False)
+            self.currentSketchManager = Manager()
             self._sketch_entities = {}
             self.dimensions = []
-            self.lines = {}
+            self.points = {}
             self.constraints = []
             self.planes = []
+            self.defined = []
+            self.exited = 0
 
         def _attempt(self, fn, default=None):
             return fn()
+
+        def _register_sketch_entity(self, prefix, entity):
+            assert prefix == "Point"
+            ref = f"Point_{len(self.points) + 1}"
+            self._sketch_entities[ref] = entity
+            self.points[ref] = (entity.X * 1000.0, entity.Y * 1000.0)
+            assert entity.Z == 0.0
+            return ref
 
         async def create_sketch(self, plane):
             self.planes.append(plane)
             return result()
 
-        async def add_line(self, x1, y1, x2, y2):
-            assert self.currentSketchManager.AddToDB
-            self.lines["line"] = ((x1, y1), (x2, y2))
-            self._sketch_entities["line"] = Segment()
-            return result("line")
+        async def add_line(self, *_args):
+            raise AssertionError("a point-only reference must not author line ink")
 
         async def add_sketch_constraint(self, *args):
             self.constraints.append(args)
             return result()
 
         async def add_sketch_dimension(self, first, second, kind, value):
+            assert first in self.points
+            assert second == "origin" or second in self.points
             dimension = SimpleNamespace(first=first, second=second, kind=kind, value_mm=value)
             self.dimensions.append(dimension)
             return result(dimension)
 
         async def exit_sketch(self):
+            self.exited += 1
             return result()
 
     async def fully_defined(adapter, feature):
-        assert feature == "ReferenceWindowWidth"
+        adapter.defined.append(feature)
 
     def name_feature(adapter, feature):
         features[feature] = adapter.dimensions
@@ -900,39 +920,42 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
     return Adapter()
 
 
+@pytest.mark.parametrize("initial_add_to_db", [False, True])
 @pytest.mark.parametrize("width,height,roof", [(8.4, 14.1, 2.1), (8.7, 15.0, 2.4)])
 def test_window_width_reference_owns_real_roof_endpoints_and_shared_global_equations(
-    monkeypatch, width, height, roof
+    monkeypatch, width, height, roof, initial_add_to_db
 ) -> None:
     monkeypatch.setattr(spec, "WINDOW_WIDTH", width)
     monkeypatch.setattr(spec, "BLOCK_HEIGHT", height)
     monkeypatch.setattr(spec, "ROOF_THICKNESS", roof)
     monkeypatch.setattr(spec, "WINDOW_Y_MAX", height - roof)
-    adapter = _window_reference_seat(monkeypatch)
+    adapter = _stop_reference_seat(monkeypatch, initial_add_to_db=initial_add_to_db)
     equations = dict(asyncio.run(stop_geom.window_width_reference(adapter)))
     assert adapter.planes == ["Right"]
-    assert adapter.lines == {"line": ((0.0, height - roof), (-width, height - roof))}
-    assert adapter._sketch_entities["line"].ConstructionGeometry
-    assert not adapter.currentSketchManager.AddToDB
+    assert adapter.points["Point_1"] == pytest.approx((0.0, height - roof))
+    assert adapter.points["Point_2"] == pytest.approx((-width, height - roof))
+    assert len(adapter.points) == 2
+    assert adapter.currentSketchManager.AddToDB is initial_add_to_db
+    assert adapter.defined == ["ReferenceWindowWidth"] and adapter.exited == 1
     width_dimension, station = adapter.dimensions
     assert (width_dimension.first, width_dimension.second, width_dimension.kind) == (
-        "line.start", "line.end", "horizontal_distance",
+        "Point_1", "Point_2", "horizontal_distance",
     )
     assert width_dimension.value_mm == width
     assert width_dimension.Name == "WindowWidth"
     assert (station.first, station.second, station.kind, station.value_mm) == (
-        "line.start", "origin", "vertical_distance", height - roof,
+        "Point_1", "origin", "vertical_distance", height - roof,
     )
     assert station.Name == "WindowRoofStation"
-    assert ("line", None, "horizontal") in adapter.constraints
-    assert ("line.start", "origin", "vertical_points") in adapter.constraints
+    assert ("Point_1", "Point_2", "horizontal_points") in adapter.constraints
+    assert ("Point_1", "origin", "vertical_points") in adapter.constraints
     assert equations == {
         "WindowWidth@ReferenceWindowWidth": '"WindowWidth"',
         "WindowRoofStation@ReferenceWindowWidth": '"BlockHeight" - "RoofThickness"',
     }
     model_center = (spec.BLOCK_LENGTH / 2000.0, height / 2000.0, spec.BLOCK_DEPTH / 2000.0)
     side = _StopView("*Left", block_drawing.RIGHT_CENTER, (4.0, 1.0), model_center)
-    model_points = [(0.0, y / 1000.0, -x / 1000.0) for x, y in adapter.lines["line"]]
+    model_points = [(0.0, y / 1000.0, -x / 1000.0) for x, y in adapter.points.values()]
     projected = [side.ModelToViewTransform.apply(point) for point in model_points]
     assert projected[0][0] == pytest.approx(0.293)
     assert projected[1][0] == pytest.approx(0.293 + width * 0.004)
@@ -940,11 +963,62 @@ def test_window_width_reference_owns_real_roof_endpoints_and_shared_global_equat
     assert 0.293 <= projected[0][0] < projected[1][0] <= 0.337
 
 
-def test_window_width_reference_refuses_unapplied_construction_flag(monkeypatch) -> None:
-    adapter = _window_reference_seat(monkeypatch, reject_construction=True)
-    with pytest.raises(RuntimeError, match="construction flag rejected"):
-        asyncio.run(stop_geom.window_width_reference(adapter))
-    assert adapter.dimensions == []
+@pytest.mark.parametrize("initial_add_to_db", [False, True])
+@pytest.mark.parametrize("width,height,roof", [(8.4, 14.1, 2.1), (8.7, 15.0, 2.4)])
+def test_roof_reference_keeps_finished_edge_stations_and_dimension_equations(
+    monkeypatch, width, height, roof, initial_add_to_db
+) -> None:
+    monkeypatch.setattr(spec, "WINDOW_WIDTH", width)
+    monkeypatch.setattr(spec, "WINDOW_Z_MAX", width)
+    monkeypatch.setattr(spec, "BLOCK_HEIGHT", height)
+    monkeypatch.setattr(spec, "ROOF_THICKNESS", roof)
+    monkeypatch.setattr(spec, "WINDOW_Y_MAX", height - roof)
+    adapter = _stop_reference_seat(monkeypatch, initial_add_to_db=initial_add_to_db)
+    equations = dict(asyncio.run(stop_geom.roof_reference(adapter)))
+    assert adapter.planes == ["Right"]
+    assert adapter.points["Point_1"] == pytest.approx((-width, height - roof))
+    assert adapter.points["Point_2"] == pytest.approx((-width, height))
+    assert len(adapter.points) == 2
+    assert adapter.currentSketchManager.AddToDB is initial_add_to_db
+    assert adapter.defined == ["RoofThicknessReference"] and adapter.exited == 1
+    thickness, depth_station, roof_station = adapter.dimensions
+    assert (thickness.first, thickness.second, thickness.kind, thickness.value_mm) == (
+        "Point_1", "Point_2", "vertical_distance", roof,
+    )
+    assert thickness.Name == "RoofThickness"
+    assert (depth_station.kind, depth_station.value_mm) == ("horizontal_distance", width)
+    assert (roof_station.kind, roof_station.value_mm) == ("vertical_distance", height - roof)
+    assert depth_station.first == roof_station.first == "Point_1"
+    assert depth_station.second == roof_station.second == "origin"
+    assert ("Point_1", "Point_2", "vertical_points") in adapter.constraints
+    assert equations == {
+        "RoofThickness@RoofThicknessReference": '"RoofThickness"',
+        "RoofDepthStation@RoofThicknessReference": '"WindowWidth"',
+        "RoofWindowStation@RoofThicknessReference": '"BlockHeight" - "RoofThickness"',
+    }
+    model_center = (spec.BLOCK_LENGTH / 2000.0, height / 2000.0, spec.BLOCK_DEPTH / 2000.0)
+    side = _StopView("*Left", block_drawing.RIGHT_CENTER, (4.0, 1.0), model_center)
+    projected = [
+        side.ModelToViewTransform.apply((0.0, y / 1000.0, -x / 1000.0))
+        for x, y in adapter.points.values()
+    ]
+    assert projected[0][0] == pytest.approx(projected[1][0])
+    assert projected[1][1] - projected[0][1] == pytest.approx(roof * 0.004)
+
+
+@pytest.mark.parametrize("reference", [stop_geom.window_width_reference, stop_geom.roof_reference])
+@pytest.mark.parametrize("point_failure", ["null", "raise"])
+@pytest.mark.parametrize("initial_add_to_db", [False, True])
+def test_point_only_references_restore_database_state_on_point_failure(
+    monkeypatch, reference, point_failure, initial_add_to_db
+) -> None:
+    adapter = _stop_reference_seat(
+        monkeypatch, initial_add_to_db=initial_add_to_db, point_failure=point_failure,
+    )
+    with pytest.raises(RuntimeError, match="cannot create reference point|native point failed"):
+        asyncio.run(reference(adapter))
+    assert adapter.currentSketchManager.AddToDB is initial_add_to_db
+    assert adapter.points == {} and adapter.dimensions == []
 
 
 @pytest.mark.parametrize("reject_mark", [False, True])
@@ -1057,7 +1131,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     async def save(adapter, part_name):
         return {"part": part_name}
 
-    reference_adapter = _window_reference_seat(monkeypatch)
+    reference_adapter = _stop_reference_seat(monkeypatch)
     monkeypatch.setattr(block, "set_global", set_global)
     monkeypatch.setattr(block, "drive_dimension", drive)
     monkeypatch.setattr(block, "window_width_reference", reference)

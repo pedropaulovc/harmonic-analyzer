@@ -54,20 +54,41 @@ async def location_reference(
     name_dimensions(adapter, feature, list(names))
 
 
+def _reference_point(adapter: Any, xy_mm: tuple[float, float], label: str) -> str:
+    """Register a native point without inference, as on the TL nut bracket."""
+    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        point = manager.CreatePoint(xy_mm[0] / 1000.0, xy_mm[1] / 1000.0, 0.0)
+    finally:
+        manager.AddToDB = previous
+    if point is None:
+        raise RuntimeError(f"{label}: cannot create reference point")
+    return adapter._register_sketch_entity("Point", point)
+
+
 @_telemetry.traced("sketch.stop_window_width")
 async def window_width_reference(adapter: Any) -> list[tuple[str, str]]:
     """Own the rebate span on its real roof edge, not the cut-depth vector.
 
-    Right-plane local X is -Z. The chord therefore runs from the cover's
-    Z=0 edge to the rebate's Z=WindowWidth edge at the roof station. It is
-    construction-only: editing the shared globals moves both cut and witness.
+    Right-plane local X is -Z. These two native points therefore occupy the
+    cover's Z=0 edge and the rebate's Z=WindowWidth edge at the roof station.
+    No connecting line: the drawing must show the owner to import dimensions,
+    and its former construction chord obscured the actual slot ceiling.
     """
     feature = "ReferenceWindowWidth"
-    await location_reference(
-        adapter, feature=feature, plane="Right",
-        spans=(-spec.WINDOW_WIDTH,), station=spec.WINDOW_Y_MAX,
-        names=("WindowWidth", "WindowRoofStation"),
-    )
+    check(feature, await adapter.create_sketch("Right"))
+    cover = _reference_point(adapter, (0.0, spec.WINDOW_Y_MAX), feature)
+    back = _reference_point(adapter, (-spec.WINDOW_WIDTH, spec.WINDOW_Y_MAX), feature)
+    check(feature, await adapter.add_sketch_constraint(cover, back, "horizontal_points"))
+    await dimension_between(adapter, cover, back,
+                            "horizontal_distance", spec.WINDOW_WIDTH, feature)
+    await anchor_point_to_origin(adapter, cover, 0.0, spec.WINDOW_Y_MAX, feature)
+    await ensure_fully_defined(adapter, feature)
+    check(feature, await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    name_dimensions(adapter, feature, ["WindowWidth", "WindowRoofStation"])
     return [
         (f"WindowWidth@{feature}", '"WindowWidth"'),
         (f"WindowRoofStation@{feature}", '"BlockHeight" - "RoofThickness"'),
@@ -116,23 +137,20 @@ def author_hole_precision(adapter: Any, feature_name: str) -> None:
 
 @_telemetry.traced("sketch.stop_roof_thickness")
 async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
-    """Direct roof thickness from the finished roof to the rebate roof edge."""
+    """Direct roof thickness on the same finished edges, with no printed chord.
+
+    The points replace only the former reference segment's endpoints. Their
+    vertical relation, native dimensions and shared equations retain the exact
+    roof/back-wall station without a dashed line above the rebate back wall.
+    """
     feature = "RoofThicknessReference"
     check(feature, await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    line = check(feature, await adapter.add_line(
-        -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX,
-        -spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT,
-    ))
-    set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not segment.ConstructionGeometry:
-        raise RuntimeError("roof reference construction flag rejected")
-    check(feature, await adapter.add_sketch_constraint(line, None, "vertical"))
-    await dimension_between(adapter, f"{line}.start", f"{line}.end",
+    lower = _reference_point(adapter, (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), feature)
+    upper = _reference_point(adapter, (-spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT), feature)
+    check(feature, await adapter.add_sketch_constraint(lower, upper, "vertical_points"))
+    await dimension_between(adapter, lower, upper,
                             "vertical_distance", spec.ROOF_THICKNESS, feature)
-    await anchor_point_to_origin(adapter, f"{line}.start",
+    await anchor_point_to_origin(adapter, lower,
                                  -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX, feature)
     await ensure_fully_defined(adapter, feature)
     check(feature, await adapter.exit_sketch())
