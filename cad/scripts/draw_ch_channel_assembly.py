@@ -51,6 +51,7 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
+    position_bom_balloon,
 )
 from _drawing_common import (
     DrawingOutputs,
@@ -234,6 +235,7 @@ EXPLODED_CAPTION = "\n".join(
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
         "NORTH; ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE.",
         f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
+        "KEEPER HARDWARE: DETAIL C.",
     )
 )
 
@@ -615,8 +617,8 @@ def _exploded(
 
 
 # At 1:7 the exploded view shows the small hardware at the bracket and keeper
-# ends too small and dark to tell apart (r7 machinist review), so each north
-# end (the instances the balloons pin) is enlarged, exploded, beside the BOM.
+# ends too small and dark to tell apart, so each north end is enlarged,
+# exploded, beside the BOM. The keeper hardware is ballooned on DETAIL C.
 # Each detail is centred on its exploded bore centre; the radii hold the
 # exploded set screw, hold-down or foot screw and (the bracket's) the north
 # washer, 29 to 40 mm from those centres in the isometric (estimated from the
@@ -667,6 +669,21 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+# The 1:7 north keeper projects onto the dark lever bank. Moving only its
+# balloon circles cannot expose either screw. Route the same three validated
+# BOM rows to the existing isolated 1:2 DETAIL C instead, keeping their exact
+# north occurrences. Circle centres fit between the BOM and right border,
+# above DETAIL C's caption and below DETAIL B's caption.
+KEEPER_BALLOON_POSITIONS = {
+    stem: (NORTH_KEEPER_DETAIL.centre[0] + dx, NORTH_KEEPER_DETAIL.centre[1] + dy)
+    for stem, (dx, dy) in {
+        explode.KEEPER: (0.020, -0.013),
+        explode.KEEPER_FOOT_SCREW: (-0.021, 0.015),
+        explode.KEEPER_SET_SCREW: (0.019, 0.020),
+    }.items()
+}
+# Required by the existing insert-and-ring API; final circles use the offsets above.
+KEEPER_INITIAL_RING_MARGIN = 0.006
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
 # rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
@@ -1356,9 +1373,9 @@ def _place_assembled_sheet(adapter: Any) -> None:
 def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
 ) -> Callable[[], None]:
-    """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    BOM row on the family's north-most instance; returns the check that proves
-    every balloon again after the last rebuild."""
+    """The exploded isometric and complete BOM, with keeper hardware ballooned
+    in the existing isolated DETAIL C. Every row retains its north-most
+    instance; the returned check proves all nineteen after the last rebuild."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1391,22 +1408,18 @@ def _place_exploded_sheet(
     landings = add_component_bom_balloons(
         adapter,
         exploded,
-        items=items,
+        items=tuple(row for row in items if row[0] not in KEEPER_BALLOON_POSITIONS),
         anchors={
             stem: BalloonAnchor(
                 point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
                 instance=north_instances[stem],
             )
             for stem in BOM_COMPONENTS
+            if stem not in KEEPER_BALLOON_POSITIONS
         },
         label="channel exploded-view BOM coverage",
         margin=BALLOON_MARGIN,
     )
-    if len(landings) != len(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"channel exploded view carries {len(landings)} balloons, "
-            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
-        )
     bom_bottom, _ = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -1415,13 +1428,61 @@ def _place_exploded_sheet(
         exploded_caption_xy(bom_bottom),
         label="exploded-view caption",
     )
-    # After the balloons, so the boundary circles are never picked as a
-    # component's edge.
+    # Resolve the main-view anchors before adding its boundary sketch circles.
+    # Detail balloons select their own native component edges in their isolated view.
     _mark_exploded_details(adapter, exploded)
     _add_north_end_trail(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
-    for detail in EXPLODED_DETAILS:
-        _exploded_detail(adapter, detail)
+    detail_views = {
+        detail: _exploded_detail(adapter, detail) for detail in EXPLODED_DETAILS
+    }
+    keeper_view = detail_views.get(NORTH_KEEPER_DETAIL)
+    if keeper_view is None:
+        raise RuntimeError("channel keeper BOM coverage requires DETAIL C")
+    keeper_items = tuple(row for row in items if row[0] in KEEPER_BALLOON_POSITIONS)
+    keeper_landings = add_component_bom_balloons(
+        adapter,
+        keeper_view,
+        items=keeper_items,
+        anchors={
+            stem: BalloonAnchor(instance=north_instances[stem])
+            for stem, _item in keeper_items
+        },
+        label="channel DETAIL C keeper BOM coverage",
+        margin=KEEPER_INITIAL_RING_MARGIN,
+    )
+    # Ray visibility excludes occluders but does not know the drawing crop.
+    # The target must also lie inside the unchanged detail circle.
+    radius = NORTH_KEEPER_DETAIL.crop_radius_mm * NORTH_KEEPER_DETAIL.mm
+    for landing in keeper_landings:
+        if landing.sheet_xy is None:
+            raise RuntimeError(
+                f"channel DETAIL C: {landing.stem} on {landing.instance} "
+                "has an unproven listed-edge landing"
+            )
+        if math.hypot(
+            landing.sheet_xy[0] - NORTH_KEEPER_DETAIL.centre[0],
+            landing.sheet_xy[1] - NORTH_KEEPER_DETAIL.centre[1],
+        ) > radius:
+            raise RuntimeError(
+                f"channel DETAIL C: {landing.stem} on {landing.instance} "
+                f"lands at {landing.sheet_xy!r}, outside its crop"
+            )
+    items_by_stem = dict(keeper_items)
+    for landing in keeper_landings:
+        position_bom_balloon(
+            adapter,
+            [landing.note],
+            item_number=items_by_stem[landing.stem],
+            position_xy=KEEPER_BALLOON_POSITIONS[landing.stem],
+            label="channel DETAIL C keeper balloons",
+        )
+    landings.extend(keeper_landings)
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"channel sheet carries {len(landings)} balloons, "
+            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
+        )
     _activate_sheet(adapter, SHEET_NAMES[1])
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("channel exploded caption rebuild failed")
@@ -1624,7 +1685,7 @@ def _mark_detail(
         raise RuntimeError(f"failed to letter the {label}")
 
 
-def _exploded_detail(adapter: Any, detail: BankView) -> None:
+def _exploded_detail(adapter: Any, detail: BankView) -> Any:
     """One enlarged, exploded hardware cluster: placed, isolated, cropped to
     its circle and labelled under it."""
     view = _placed_bank_view(adapter, detail)
@@ -1632,6 +1693,7 @@ def _exploded_detail(adapter: Any, detail: BankView) -> None:
     _activate_view(adapter, view, label=detail.title)
     if add_note(adapter, detail.label_text, *detail.crop_label_xy) is None:
         raise RuntimeError(f"failed to label {detail.title}")
+    return view
 
 
 def _mark_exploded_details(adapter: Any, exploded: Any) -> None:
