@@ -192,21 +192,32 @@ def assert_supplier_pin_model_reference(
     # so source presentation is authored/read here without that drawing guard.
     measured_mm = abs(float(dimension.SystemValue)) * 1000.0
     prefix = "(<MOD-DIAM>" if kwargs["presentation"] == "diameter" else "("
-    if (
-        not math.isfinite(measured_mm)
-        or not math.isclose(measured_mm, kwargs["expected_mm"], rel_tol=0.0, abs_tol=1e-5)
-        or display.GetUseDocUnits()
-        or int(display.GetUnits()) != {"mm": 0, "in": 3}[source.units]
-        or int(display.GetFractionBase()) != 1  # swDECIMAL
-        or int(display.GetPrimaryPrecision2()) != kwargs["precision"]
-        or display.ShowParenthesis
-        or display.GetOverride()
-        or not display.ShowDimensionValue
-        or str(display.GetText(1) or "") != prefix
-        or str(display.GetText(2) or "") != f" {source.units})"
-        or str(display.GetText(4) or "") != (kwargs["callout"] or "")
+    if not math.isfinite(measured_mm) or not math.isclose(
+        measured_mm, kwargs["expected_mm"], rel_tol=0.0, abs_tol=1e-5
     ):
-        raise RuntimeError(f"{source.sku}: {name} native source value/presentation changed")
+        raise RuntimeError(
+            f"{source.sku}: {name} native source value/presentation changed "
+            f"(native_value_mm: actual={measured_mm!r}, expected={kwargs['expected_mm']!r})"
+        )
+    presentation_fields = (
+        ("use_document_units", lambda: bool(display.GetUseDocUnits()), False),
+        ("units", lambda: int(display.GetUnits()), {"mm": 0, "in": 3}[source.units]),
+        ("fraction_base", lambda: int(display.GetFractionBase()), 1),
+        ("primary_precision", lambda: int(display.GetPrimaryPrecision2()), kwargs["precision"]),
+        ("show_parentheses", lambda: bool(display.ShowParenthesis), False),
+        ("override", lambda: bool(display.GetOverride()), False),
+        ("show_native_value", lambda: bool(display.ShowDimensionValue), True),
+        ("prefix", lambda: str(display.GetText(1) or ""), prefix),
+        ("suffix", lambda: str(display.GetText(2) or ""), f" {source.units})"),
+        ("below_callout", lambda: str(display.GetText(4) or ""), kwargs["callout"] or ""),
+    )
+    for field, read, expected in presentation_fields:
+        actual = read()
+        if actual != expected:
+            raise RuntimeError(
+                f"{source.sku}: {name} native source value/presentation changed "
+                f"({field}: actual={actual!r}, expected={expected!r})"
+            )
     # Native imported dimensions may carry a drawing-context document suffix.
     # The resolved model owner plus dimension/feature names establish identity.
     expected_owner = [name, feature]

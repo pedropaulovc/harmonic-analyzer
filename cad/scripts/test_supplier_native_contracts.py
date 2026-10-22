@@ -289,3 +289,142 @@ def test_pin_reader_interrupt_does_not_skip_independent_fields_or_replace_origin
 
 def test_pin_logging_interrupt_does_not_replace_original_failure(monkeypatch):
     _refused_pin(monkeypatch, log_interrupt=True)
+
+
+def _nut_carrier(monkeypatch, *, defect=None):
+    import _supplier_nut_drawing as nuts
+
+    monkeypatch.setattr(nuts, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(nuts, "_bind", lambda value, _interface: value)
+    source_points = tuple(
+        SimpleNamespace(X=x, Y=0.0, Z=0.0) for x in (-0.003175, 0.003175)
+    )
+    # Same coordinates, deliberately different native identity namespaces.
+    view_points = tuple(SimpleNamespace(**vars(point)) for point in source_points)
+    foreign_point = SimpleNamespace(**vars(view_points[0]))
+    attachments = list(view_points)
+    if defect == "source_geometry":
+        source_points[0].Y = 0.001
+    elif defect == "raw_source_attachment":
+        attachments = list(source_points)
+    elif defect == "foreign_attachment":
+        attachments[0] = foreign_point
+    elif defect == "duplicate_attachment":
+        attachments[1] = attachments[0]
+    elif defect == "extra_attachment":
+        attachments.append(foreign_point)
+    elif defect == "duplicate_mapping":
+        view_points = (view_points[0], view_points[0])
+
+    segment = SimpleNamespace(
+        GetType=lambda: 0, ConstructionGeometry=True,
+        GetStartPoint2=lambda: source_points[0], GetEndPoint2=lambda: source_points[1],
+    )
+    sketch = SimpleNamespace(GetSketchSegments=lambda: (segment,))
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+    owner = object() if defect == "source_owner" else feature
+    native = SimpleNamespace(
+        FullName="ThreadNominalMajor@SupplierReference@part",
+        GetFeatureOwner=lambda: owner, Tolerance=SimpleNamespace(Type=0),
+    )
+    source_native = SimpleNamespace(FullName=native.FullName)
+    source_display = SimpleNamespace(Type2=2)
+    monkeypatch.setattr(nuts, "_named_dimensions", lambda *_args, **_kwargs: {
+        "ThreadNominalMajor": (source_display, source_native),
+    })
+    model = SimpleNamespace(FeatureByName=lambda _name: feature)
+
+    def corresponding(point):
+        for index, source_point in enumerate(source_points):
+            if point is source_point:
+                return None if defect == "missing_mapping" else view_points[index]
+        raise AssertionError("mapping input is not an actual source endpoint")
+
+    view = SimpleNamespace(ReferencedDocument=model, GetCorresponding=corresponding)
+    annotation = SimpleNamespace(GetAttachedEntities3=lambda: tuple(attachments))
+    display = SimpleNamespace(
+        Type2=2, GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
+    )
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    return nuts, adapter, view, display
+
+
+def test_nut_carrier_accepts_exact_view_correspondence_not_raw_part_identity(monkeypatch):
+    nuts, adapter, view, display = _nut_carrier(monkeypatch)
+    nuts._assert_nominal_carrier(adapter, view, display, 6.35)
+
+
+@pytest.mark.parametrize("defect", [
+    "source_geometry", "source_owner", "raw_source_attachment", "foreign_attachment",
+    "duplicate_attachment", "extra_attachment", "duplicate_mapping", "missing_mapping",
+])
+def test_nut_carrier_refuses_wrong_geometry_owner_or_view_endpoint(monkeypatch, defect):
+    nuts, adapter, view, display = _nut_carrier(monkeypatch, defect=defect)
+    with pytest.raises(RuntimeError):
+        nuts._assert_nominal_carrier(adapter, view, display, 6.35)
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("use_document_units", True), ("units", 0), ("fraction_base", 2),
+    ("primary_precision", 1), ("show_parentheses", True), ("override", True),
+    ("show_native_value", False), ("prefix", "("), ("suffix", ")"),
+    ("below_callout", "WRONG"),
+])
+def test_pin_presentation_refusal_names_first_actual_field_without_reading_later(
+    monkeypatch, field, bad,
+):
+    import _supplier_pin_model as pins
+
+    source = SimpleNamespace(
+        sku="supplier-pin", units="in", diameter_mm=2.38125, diameter_precision=3,
+        diameter_band=(-0.01, 0.01), diameter_uses_limits=False,
+        diameter_deviations_mm=(-0.01, 0.01),
+    )
+    native = SimpleNamespace(SystemValue=source.diameter_mm / 1000.0)
+    fields = {
+        "use_document_units": False, "units": 3, "fraction_base": 1,
+        "primary_precision": 3, "show_parentheses": False, "override": False,
+        "show_native_value": True, "prefix": "(<MOD-DIAM>", "suffix": " in)",
+        "below_callout": "",
+    }
+    getters = {
+        "GetUseDocUnits": "use_document_units", "GetUnits": "units",
+        "GetFractionBase": "fraction_base", "GetPrimaryPrecision2": "primary_precision",
+        "GetOverride": "override",
+    }
+    properties = {
+        "ShowParenthesis": "show_parentheses", "ShowDimensionValue": "show_native_value",
+    }
+    order = tuple(fields)
+
+    def read(name):
+        if order.index(name) > order.index(field):
+            raise AssertionError("a later native reader masked the original refusal")
+        return bad if name == field else fields[name]
+
+    class Display:
+        Type2 = 6
+
+        def GetDimension2(self, _index):
+            return native
+
+        def GetText(self, index):
+            return read({1: "prefix", 2: "suffix", 4: "below_callout"}[index])
+
+        def __getattr__(self, name):
+            if name in getters:
+                return lambda: read(getters[name])
+            if name in properties:
+                return read(properties[name])
+            raise AttributeError(name)
+
+    feature = object()
+    model = SimpleNamespace(FeatureByName=lambda _name: feature)
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(pins, "_named_dimensions", lambda *_args, **_kwargs: {
+        pins.DIAMETER_DIMENSION: (None, native),
+    })
+    with pytest.raises(RuntimeError, match=rf"native source value/presentation changed \({field}:"):
+        pins.assert_supplier_pin_model_reference(
+            None, model, Display(), pins.DIAMETER_FEATURE, source,
+        )

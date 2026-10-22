@@ -9189,3 +9189,197 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
     assert note_fits_cell((2.0, 3.0, 8.0, 7.0), rows, (1.0, 2.0, 9.0, 8.0)) is (
         rows == 1
     )
+
+
+def _washer_import_native(monkeypatch, *, defect=None):
+    """Native-I/O doubles; run the real body, source, band and import guards."""
+    import _supplier_washer_drawing as washer
+    import _supplier_washer_model as model_helpers
+
+    for module in (washer, model_helpers):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(model_helpers, "_bind", lambda value, _interface: value)
+    monkeypatch.setattr(model_helpers, "double_array", lambda value: value)
+    values = {washer.OUTER_DIAMETER: 12.7, washer.BORE_DIAMETER: 6.35, washer.THICKNESS: 1.5875}
+    precision = dict.fromkeys(values, 3)
+    bands = {label: (value - 0.05, value + 0.05, "bilateral") for label, value in values.items()}
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = tuple(values)
+
+        def MultiplyTransform(self, transform):
+            x, y, z = self.ArrayData
+            return Point((x, 0.0, -y) if transform == "Top" else (x, y, z))
+
+    adapter = SimpleNamespace(swApp=SimpleNamespace(
+        IsSame=lambda left, right: int(left is right),
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+    ))
+    source_entities = {}
+    features = {}
+    for label in values:
+        if label == washer.THICKNESS:
+            points = tuple(SimpleNamespace(X=0.00635, Y=y, Z=0.0) for y in (0.0, 0.0015875))
+            segment = SimpleNamespace(
+                ConstructionGeometry=True, GetType=lambda: 0,
+                GetStartPoint2=lambda: points[0], GetEndPoint2=lambda: points[1],
+            )
+            segments, source_entities[label] = (segment,), points
+            plane = "Front"
+        else:
+            if washer.OUTER_DIAMETER in source_entities:
+                source_entities[label] = (segments[1],)
+                continue
+            circles = []
+            for diameter in (12.7, 6.35):
+                circles.append(SimpleNamespace(
+                    ConstructionGeometry=True, GetType=lambda: 1, IsCircle=lambda: 1,
+                    GetCenterPoint2=lambda: SimpleNamespace(X=0.0, Y=0.0, Z=0.0),
+                    GetRadius=lambda diameter=diameter: diameter / 2000.0,
+                ))
+            segments, source_entities[label] = tuple(circles), (circles[0],)
+            plane = "Top"
+        sketch = SimpleNamespace(
+            GetSketchSegments=lambda segments=segments: segments,
+            ModelToSketchTransform=SimpleNamespace(Inverse=lambda plane=plane: plane),
+        )
+        feature_name = washer.SOURCE_DIMENSIONS[label][0]
+        features[feature_name] = SimpleNamespace(GetSpecificFeature2=lambda sketch=sketch: sketch)
+    rims = []
+    for diameter in (12.7, 6.35):
+        for y in (0.0, 0.0015875):
+            curve = SimpleNamespace(
+                IsCircle=lambda: True, CircleParams=(0.0, y, 0.0, 0.0, 1.0, 0.0, diameter / 2000.0),
+            )
+            rims.append(SimpleNamespace(GetCurve=lambda curve=curve: curve))
+    model = SimpleNamespace(
+        FeatureByName=lambda name: features[name],
+        GetBodies2=lambda *_args: (SimpleNamespace(GetEdges=lambda: rims),),
+    )
+    mapped = {id(entity): SimpleNamespace() for entities in source_entities.values() for entity in entities}
+    def view():
+        return SimpleNamespace(
+            ReferencedDocument=model, GetOutline=lambda: (0.1, 0.1, 0.12, 0.12),
+            GetCorresponding=lambda entity: mapped.get(id(entity)),
+        )
+
+    views = {"*Front": view(), "*Top": view()}
+    sources, imports = {}, {}
+    for label, value in values.items():
+        feature_name, name = washer.SOURCE_DIMENSIONS[label]
+        for collection, imported in ((sources, False), (imports, True)):
+            case = _supplier_native(monkeypatch, value=value / 1000.0,
+                                    kind=2 if label == washer.THICKNESS else 6)
+            case.native.FullName = f"{name}@{feature_name}@stock"
+            case.native.GetFeatureOwner = lambda feature_name=feature_name: features[feature_name]
+            case.native.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.00005,
+                                                    GetMaxValue=lambda: 0.00005)
+            case.display.GetPrimaryTolPrecision2 = lambda: 3
+            case.display.GetNameForSelection = lambda name=name: f"{name}@View"
+            case.state.use_doc = imported
+            case.display.GetUseDocUnits = lambda state=case.state: state.use_doc
+            original_units = case.display.SetUnits2
+
+            def set_units(use_doc, *args, case=case, original_units=original_units):
+                case.state.use_doc = use_doc
+                return original_units(use_doc, *args)
+
+            case.display.SetUnits2 = set_units
+            if not imported:
+                case.state.unit, case.state.precision = 3, 3
+                case.text.update({1: "(" if label == washer.THICKNESS else "(<MOD-DIAM>",
+                                  2: " in)", 4: ""})
+            case.annotation.entities = tuple(
+                mapped[id(entity)] if imported else entity for entity in source_entities[label]
+            )
+            case.annotation.Owner = views["*Front" if label == washer.THICKNESS else "*Top"]
+            collection[label] = case
+    monkeypatch.setattr(model_helpers, "_named_dimensions", lambda _adapter, _feature, names, **_kwargs: {
+        name: (sources[label].display, sources[label].native)
+        for label, (_feature, name) in washer.SOURCE_DIMENSIONS.items() if name in names
+    })
+    imported_calls = []
+
+    def import_annotations(_adapter, _view, *, keep, **_kwargs):
+        imported_calls.append(tuple(keep))
+        if defect == "source_import_mutation":
+            sources[washer.THICKNESS].state.use_doc = True
+        return [imports[label].annotation for label, (_feature, name)
+                in washer.SOURCE_DIMENSIONS.items() if name in keep]
+
+    monkeypatch.setattr(washer, "curate_view_dimensions", import_annotations)
+    monkeypatch.setattr(washer, "dimension_name",
+                        lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetNameForSelection().split("@")[0])
+    if defect == "source_band":
+        sources[washer.THICKNESS].native.Tolerance.Type = 0
+    elif defect == "import_value":
+        imports[washer.THICKNESS].native.SystemValue *= 2.0
+    elif defect == "source_geometry":
+        points[0].X += 0.001
+    elif defect == "import_band":
+        imports[washer.THICKNESS].native.Tolerance.Type = 0
+    return SimpleNamespace(
+        helper=washer, source_helper=model_helpers, adapter=adapter, model=model, views=views,
+        sources=sources, imports=imports, mapped=mapped, entities=source_entities,
+        precision=precision, bands=bands, imported_calls=imported_calls,
+        kwargs=dict(axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+                    units="in", precision=precision, bands=bands),
+    )
+
+
+def test_washer_import_formats_drawing_display_without_changing_source_values_or_bands(monkeypatch):
+    case = _washer_import_native(monkeypatch)
+    before = {label: (vars(native.state).copy(), native.text.copy(), native.native.SystemValue,
+                      native.native.Tolerance.Type) for label, native in case.sources.items()}
+    case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    for label, imported in case.imports.items():
+        case.helper.assert_supplier_reference_dimension(
+            case.adapter, imported.display, label=label, units="in", precision=3,
+            expected_mm=case.kwargs["thickness_mm"] if label == case.helper.THICKNESS else (
+                case.kwargs["outer_mm"] if label == case.helper.OUTER_DIAMETER else case.kwargs["bore_mm"]
+            ), presentation="length" if label == case.helper.THICKNESS else "diameter",
+        )
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display,
+            view=case.views["*Front" if label == case.helper.THICKNESS else "*Top"],
+            label=label, axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+    after = {label: (vars(native.state).copy(), native.text.copy(), native.native.SystemValue,
+                     native.native.Tolerance.Type) for label, native in case.sources.items()}
+    assert after == before
+
+
+@pytest.mark.parametrize("defect", [
+    "source_band", "source_geometry", "import_value", "import_band", "source_import_mutation",
+])
+def test_washer_import_never_repairs_source_or_import_value_band_and_geometry(monkeypatch, defect):
+    case = _washer_import_native(monkeypatch, defect=defect)
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    if defect.startswith("source_") and defect != "source_import_mutation":
+        assert case.imported_calls == []
+
+
+@pytest.mark.parametrize("defect", ["missing", "duplicate", "foreign", "raw_source", "extra"])
+def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypatch, defect):
+    case = _washer_import_native(monkeypatch)
+    label = case.helper.THICKNESS
+    imported = case.imports[label]
+    entities = list(imported.annotation.entities)
+    if defect == "missing":
+        case.mapped.pop(id(case.entities[label][0]))
+    elif defect == "duplicate":
+        case.mapped[id(case.entities[label][1])] = entities[0]
+    elif defect == "foreign":
+        entities[0] = SimpleNamespace()
+    elif defect == "raw_source":
+        entities = list(case.entities[label])
+    else:
+        entities.append(SimpleNamespace())
+    imported.annotation.entities = tuple(entities)
+    with pytest.raises(RuntimeError):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display, view=case.views["*Front"],
+            label=label, axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )

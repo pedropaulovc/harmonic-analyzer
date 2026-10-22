@@ -15,7 +15,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 
 import _telemetry
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimensions
 from _feature_tree import name_last_feature
@@ -165,14 +165,15 @@ def _assert_point(actual: tuple[float, ...], expected: tuple[float, ...], label:
 
 
 def assert_supplier_washer_source_attachment(
-    adapter: Any, model: Any, display: Any, *, label: str,
+    adapter: Any, model: Any, display: Any, *, view: Any | None, label: str,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
-    visible: bool = False,
 ) -> None:
     """Resolve the named owner's actual geometry independently of the import.
 
     A diameter must attach to its exact construction circle. Thickness must
     attach to the two points of the sole line at the physical OD flank.
+    ``view=None`` checks the part's own display. A drawing import instead maps
+    those same independently checked entities into its exact owning view.
     """
     feature_name, dimension_name = SOURCE_DIMENSIONS[label]
     raw = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
@@ -239,15 +240,28 @@ def assert_supplier_washer_source_attachment(
                                   if math.isclose(diameter, expected_mm, rel_tol=0.0, abs_tol=1e-6))
         if int(display.Type2) != 6:
             raise RuntimeError(f"{label}: source diameter lost its native diameter type")
+    interface = "ISketchPoint" if label == THICKNESS else "ISketchSegment"
+    if view is not None:
+        drawing_entities = []
+        for entity in expected_entities:
+            mapped = _early_bound(view, "IView").GetCorresponding(entity)
+            if mapped is None:
+                raise RuntimeError(f"{label}: source entity is unavailable in its drawing view")
+            drawing_entities.append(_early_bound(_bind(mapped, interface), interface))
+        if len(drawing_entities) == 2 and int(adapter.swApp.IsSame(*drawing_entities)) != 0:
+            raise RuntimeError(f"{label}: mapped source endpoints are not distinct")
+        expected_entities = tuple(drawing_entities)
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     attached = list(annotation.GetAttachedEntities3() or ())
     for entity in expected_entities:
         matches = [i for i, item in enumerate(attached)
-                   if item is not None and int(adapter.swApp.IsSame(item, entity)) == 1]
+                   if item is not None and int(adapter.swApp.IsSame(
+                       _early_bound(_bind(item, interface), interface), entity
+                   )) == 1]
         if len(matches) != 1:
             raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
         attached.pop(matches[0])
-    if attached or annotation.IsDangling() or (visible and int(annotation.Visible) != 1):
+    if attached or annotation.IsDangling() or (view is not None and int(annotation.Visible) != 1):
         raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
 
 
@@ -343,26 +357,26 @@ async def author_supplier_washer_references(
     _finish_reference(adapter, dims, THICKNESS_FEATURE, (THICKNESS,), values=values, units=units,
                       precision=precision, bands=bands, bore_callout=bore_callout)
     assert_supplier_washer_references(
-        adapter, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+        adapter, adapter.currentModel, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
         units=units, precision=precision, bands=bands, bore_callout=bore_callout,
     )
 
 
 @_telemetry.traced("part.assert_supplier_washer_source")
 def assert_supplier_washer_references(
-    adapter: Any, *, axis: Literal["y", "z"], bore_mm: float,
+    adapter: Any, model: Any, *, axis: Literal["y", "z"], bore_mm: float,
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
 ) -> None:
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
-    part = _early_bound(adapter.currentModel, "IPartDoc")
+    part = _early_bound(model, "IPartDoc")
     for label, band in bands.items():
         feature, name = SOURCE_DIMENSIONS[label]
         raw = part.FeatureByName(feature)
         display, _ = _named_dimensions(adapter, feature, {name}, feature=raw)[name]
         assert_supplier_washer_source_attachment(
-            adapter, part, display, label=label, axis=axis, bore_mm=bore_mm,
+            adapter, part, display, view=None, label=label, axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm,
         )
         _assert_supplier_washer_presentation(
