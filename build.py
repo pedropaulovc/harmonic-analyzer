@@ -45,17 +45,23 @@ import json
 import os
 import subprocess
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from doit.cmd_base import get_loader, tasks_and_deps_iter
-from doit.cmdparse import CmdParseError
-from doit.control import TaskControl
-from doit.doit_cmd import DoitMain
+# Capture the dependency-import boundary before loading doit and the scanner.
+_BUILD_IMPORT_STARTED = time.perf_counter()
 
-from cad.scripts._undefined_names import scan_undefined_names
+from doit.cmd_base import get_loader, tasks_and_deps_iter  # noqa: E402
+from doit.cmdparse import CmdParseError  # noqa: E402
+from doit.control import TaskControl  # noqa: E402
+from doit.doit_cmd import DoitMain  # noqa: E402
+
+from cad.scripts._undefined_names import scan_undefined_names  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
+# Read as an AST literal by the pool; changing it changes the graph contract.
+SELECTIVE_EXECUTION_CAPABILITY = "canonical-closure-v1"
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
 _EXECUTORS = ("local", "farm")
 _DEFAULT_FARM_PARALLELISM = "8"
@@ -160,13 +166,36 @@ def _parser() -> argparse.ArgumentParser:
         help="required refresh audit reason: nonblank single-line text, no control "
         "characters, at most 160 characters",
     )
+    for option in ("graph", "task", "identity"):
+        parser.add_argument(f"--farm-execution-{option}", help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    build_import_seconds = time.perf_counter() - _BUILD_IMPORT_STARTED
     parser = _parser()
     options, doit_args = parser.parse_known_args(argv)
     doit_args = list(doit_args)
+    selected_options = (
+        options.farm_execution_graph,
+        options.farm_execution_task,
+        options.farm_execution_identity,
+    )
+    selected_mode = any(value is not None for value in selected_options)
+    if selected_mode:
+        from cad.scripts._selected_execution import (
+            SelectedExecutionError, SelectedTaskLoader, validate_invocation,
+        )
+
+        try:
+            if not all(selected_options):
+                raise SelectedExecutionError("internal execution requires graph, task and identity together")
+            if options.executor != "local":
+                raise SelectedExecutionError("internal execution requires the local executor")
+            validate_invocation(doit_args, options.farm_execution_task)
+        except SelectedExecutionError as problem:
+            print(f"farm execution: {problem}", file=sys.stderr)
+            return 2
     refresh_labels = list(dict.fromkeys(
         label.strip()
         for option in options.force_cache_refresh
@@ -208,7 +237,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     # --executor must win over an inherited HARMONIC_EXECUTOR.
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
-    if options.executor == "farm":
+    if selected_mode:
+        try:
+            selected_loader = SelectedTaskLoader(
+                REPO_ROOT, Path(options.farm_execution_graph),
+                options.farm_execution_task, options.farm_execution_identity,
+                capability=SELECTIVE_EXECUTION_CAPABILITY,
+                isolate_tasks=_isolated_tasks,
+                build_import_seconds=build_import_seconds,
+            )
+        except SelectedExecutionError as problem:
+            print(f"farm execution: {problem}", file=sys.stderr)
+            return 2
+        main_class = _RefreshDoitMain if refresh_labels else DoitMain
+        doit = main_class(task_loader=selected_loader)
+    elif options.executor == "farm":
         doit = _FarmDoitMain()
         doit.display_name = options.display_name
     elif refresh_labels:
