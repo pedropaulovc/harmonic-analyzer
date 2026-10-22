@@ -2399,9 +2399,11 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
     from unittest.mock import AsyncMock
 
     import _com
+    import _component_references as references
     from _test_stubbed_build import stub_seat
 
     monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     table = magnifier_bom.table
     for row in magnifier_bom.cells:
         row.insert(3, "VENDOR SKU" if row is magnifier_bom.cells[0] else "-")
@@ -2427,6 +2429,8 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         keep=(
             "build", "validate_bom_number_property",
             "component_identity", "component_reference_names",
+            "_validate_source", "_source_sha256",
+            "_assert_source_identity", "_source_dirty_tracer",
         ),
     )
     seat._early_bound.side_effect = lambda value, _interface: value
@@ -2452,33 +2456,7 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         drawing, "_assert_bom_clears_reference_field", lambda _table: None
     )
     seat.finalize_drawing.return_value = {"drawing": "offline.SLDDRW"}
-    identity = (
-        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-    )
-    source_components = []
-    for stem in notes.BOM_ORDER:
-        for index in range(notes.QUANTITIES[stem]):
-            source_components.append(SimpleNamespace(
-                Name2=f"{stem}-{index + 1}",
-                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
-                ReferencedConfiguration=(
-                    "LeverWire" if stem == notes.WIRE else "Default"
-                ),
-                ComponentReference="LeverWire:1" if stem == notes.WIRE else "",
-                GetTotalTransform=lambda _presentation: SimpleNamespace(
-                    ArrayData=identity
-                ),
-            ))
-    source_model = SimpleNamespace(
-        ConfigurationManager=SimpleNamespace(
-            ActiveConfiguration=SimpleNamespace(Name="Default")
-        ),
-        GetExplodedViewNames2=lambda configuration: (
-            drawing.EXPLODED_VIEW_NAMES[configuration],
-        ),
-        GetComponents=lambda _top_level: tuple(source_components),
-    )
+    source_model = _ExplodeSource()
     adapter = SimpleNamespace(
         open_model=AsyncMock(), currentModel=source_model
     )
@@ -2770,6 +2748,7 @@ def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, muta
 def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     """Native readbacks are fixed independently of the recipe being authored."""
     import _mg_magnifier_explode as author
+    import _component_references as references
     from solidworks_mcp.adapters import com_variant
 
     monkeypatch.setattr(
@@ -2802,6 +2781,7 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
             (-0.16999999, 0.350, -0.400),
         ),
         "stationary-1": ((0.100, 0.200, 0.300),) * 5,
+        "sh-vn-music-wire-73": ((0.075, 0.200, 0.300),) * 5,
     }
     requests = (
         (0.030, ("slider-1", "slider-2"), "X", False),
@@ -2836,6 +2816,12 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     components = {
         name: SimpleNamespace(
             Name2=name,
+            ComponentReference=(
+                "LeverWire:1" if name == "sh-vn-music-wire-73" else ""
+            ),
+            ReferencedConfiguration=(
+                "LeverWire" if name == "sh-vn-music-wire-73" else "Default"
+            ),
             GetPathName=lambda name=name: f"C:/parts/{name.rsplit('-', 1)[0]}.SLDPRT",
             GetTotalTransform=lambda presentation, name=name: transform(
                 name, state.stage if presentation and state.exploded else 0
@@ -2927,6 +2913,7 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
         state.published.append(properties)
 
     monkeypatch.setattr(author, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(com_variant, "null_callout", lambda: None)
     monkeypatch.setattr(
         author, "_global_directions",
@@ -2958,6 +2945,7 @@ def test_actual_mg_author_publishes_final_measured_offsets(monkeypatch, configur
         "slider-1": (0.04200003, -0.02500002, 0.00700004),
         "slider-2": (0.03000001, 0.0, 0.0),
         "stationary-1": (0.0, 0.0, 0.0),
+        "sh-vn-music-wire-73": (0.0, 0.0, 0.0),
     }
     assert set(payload["offsets_m"]) == set(expected)
     for name, vector in expected.items():
