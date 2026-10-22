@@ -443,7 +443,7 @@ CAPTURE_READING_REGION = (
 )
 CAPTURE_VIEW_REGIONS = (
     CAPTURE_EXPLODED_REGION,
-    (0.224, 0.222, 0.278, 0.263),
+    (0.224, 0.220, 0.278, 0.263),
     (0.278, 0.119, 0.364, 0.211),
     (0.360, 0.226, 0.403, 0.261),
 )
@@ -2604,8 +2604,8 @@ def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], 
     return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-65.0, 65.0))
 
 
-def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> None:
-    """Reuse the paper-drive native circular crop in this view's sketch."""
+def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> Any:
+    """Create the native crop and retain its exact selected profile."""
     view = _early_bound(view, "IView")
     draw = adapter.currentModel
     if not _early_bound(draw, "IDrawingDoc").ActivateView(str(view.GetName2())):
@@ -2641,10 +2641,11 @@ def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], rad
     view.UpdateViewDisplayGeometry()
     if status != 1 or not bool(view.IsCropped()):
         raise RuntimeError(f"{label}: native crop failed ({status=})")
+    return _early_bound(circle, "ISketchSegment")
 
 
-def _assert_capture_crop(adapter: Any, view: Any, index: int) -> None:
-    """Read the persisted circle in its current view-sketch/model frame."""
+def _assert_capture_crop(adapter: Any, view: Any, index: int, profile: Any) -> None:
+    """Read the retained selected circle through its actual native owner."""
     label = f"jig capture view {index} crop"
     origin = tuple(value / 1000.0 for value in spec.PIVOT_PIN_ORIGINS[0])
     if index == 1:
@@ -2658,16 +2659,13 @@ def _assert_capture_crop(adapter: Any, view: Any, index: int) -> None:
     else:
         raise ValueError(f"{label}: not an assembled crop view")
     bound = _early_bound(view, "IView")
-    sketch = _early_bound(bound.GetSketch(), "ISketch")
-    circles = []
-    for raw in sketch.GetSketchSegments() or ():
-        segment = _early_bound(raw, "ISketchSegment")
-        if int(segment.GetType()) == 1 and not bool(segment.ConstructionGeometry):
-            circles.append(segment)
-    if len(circles) != 1:
-        raise RuntimeError(f"{label}: expected one persisted native crop circle")
-    actual_centre, actual_radius = native_circle_geometry(circles[0], label=label)
-    # Refit scales and moved view origins invalidate old paper/sketch maps.
+    segment = _early_bound(profile, "ISketchSegment")
+    actual_centre, actual_radius = native_circle_geometry(segment, label=label)
+    sketch = _early_bound(segment.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"{label}: retained native crop circle has no sketch owner")
+    # Crop2 absorbs the profile; read its current owner, not view-sketch members.
+    # Moved view origins invalidate old paper/sketch maps.
     point = model_point_in_view(adapter, bound, anchor, label=label)
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -2676,11 +2674,21 @@ def _assert_capture_crop(adapter: Any, view: Any, index: int) -> None:
         raise RuntimeError(f"{label}: persisted native crop centre or model radius changed")
 
 
-def _fit_capture_view(adapter: Any, view: Any, region: tuple[float, float, float, float], ladder: Sequence[tuple[float, float]], *, margin: float = 0.0, label: str) -> tuple[float, float]:
+def _fit_capture_view(adapter: Any, view: Any, region: tuple[float, float, float, float], ladder: Sequence[tuple[float, float]], *, crop_profile: Any = None, margin: float = 0.0, label: str) -> tuple[float, float]:
     view = _early_bound(view, "IView")
+    cropped = bool(view.IsCropped())
+    if cropped:
+        if len(ladder) != 1:
+            raise RuntimeError(f"{label}: cropped view requires one pre-authored scale")
+        ratio = tuple(float(value) for value in view.ScaleRatio)
+        if len(ratio) != 2 or abs(ratio[0] / ratio[1] - ladder[0][0] / ladder[0][1]) > 1e-9:
+            raise RuntimeError(f"{label}: cropped view scale differs from its pre-authored scale")
+        if crop_profile is None:
+            raise RuntimeError(f"{label}: cropped view lost its selected native profile")
     candidates = []
     for scale in ladder:
-        _set_view_scale(adapter, view, scale, label=label)
+        if not cropped:
+            _set_view_scale(adapter, view, scale, label=label)
         # HLR and scale changes need current geometry, not a pending repaint.
         view.UpdateViewDisplayGeometry()  # VT_VOID
         outline = _view_outline(view, label=label)
@@ -2689,26 +2697,24 @@ def _fit_capture_view(adapter: Any, view: Any, region: tuple[float, float, float
             _center_view_outline(adapter, view, _region_center(region), label=label)
             _assert_view_on_sheet(view, margin=margin, bounds=region, label=label)
             return scale
-        cropped = bool(view.IsCropped())
         crop_circles = []
         sketch_transform = None
         if cropped:
-            sketch = _early_bound(view.GetSketch(), "ISketch")
+            segment = _early_bound(crop_profile, "ISketchSegment")
+            centre, radius = native_circle_geometry(segment, label=label)
+            sketch = _early_bound(segment.GetSketch(), "ISketch")
+            if sketch is None:
+                raise RuntimeError(f"{label}: retained native crop circle has no sketch owner")
             transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
             sketch_transform = tuple(float(value) for value in transform.ArrayData)
             inverse = _early_bound(transform.Inverse(), "IMathTransform")
             utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-            for raw in sketch.GetSketchSegments() or ():
-                segment = _early_bound(raw, "ISketchSegment")
-                if int(segment.GetType()) != 1 or bool(segment.ConstructionGeometry):
-                    continue
-                centre, radius = native_circle_geometry(segment, label=label)
-                sheet_centre = _inspection_transform_point(utility, inverse, centre)
-                sheet_rim = _inspection_transform_point(utility, inverse, (centre[0] + radius, centre[1], centre[2]))
-                crop_circles.append({
-                    "sketch_centre": centre, "sketch_radius": radius,
-                    "sheet_centre": sheet_centre, "sheet_radius": math.dist(sheet_centre, sheet_rim),
-                })
+            sheet_centre = _inspection_transform_point(utility, inverse, centre)
+            sheet_rim = _inspection_transform_point(utility, inverse, (centre[0] + radius, centre[1], centre[2]))
+            crop_circles.append({
+                "sketch_centre": centre, "sketch_radius": radius,
+                "sheet_centre": sheet_centre, "sheet_radius": math.dist(sheet_centre, sheet_rim),
+            })
         candidates.append({
             "scale": tuple(float(value) for value in view.ScaleRatio),
             "position": tuple(float(value) for value in view.Position),
@@ -2849,11 +2855,14 @@ def _assert_capture_coverage(landings: Sequence[BalloonLanding], stems: Sequence
 def _assert_capture_sheet(
     adapter: Any, views: Sequence[Any], scales: Sequence[tuple[float, float]],
     records: Sequence[tuple[Any, ...]], landings: Sequence[BalloonLanding] = (),
+    *, crop_profiles: Sequence[Any],
 ) -> None:
     sheet = _activate_sheet(adapter, PIVOT_CAPTURE_SHEET)
     actual_views = tuple(sheet.GetViews() or ())
     if len(views) != 4 or len(actual_views) != 4 or any(int(adapter.swApp.IsSame(a, b)) != 1 for a, b in zip(actual_views, views)):
         raise RuntimeError("jig capture: expected exactly four ordered native model views")
+    if len(crop_profiles) != 3:
+        raise RuntimeError("jig capture: expected three selected native crop profiles")
     cluster = next(c for c in CLUSTERS if c.sheet == PIVOT_CAPTURE_SHEET)
     installed = capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
     for index, (view, scale, region) in enumerate(zip(views, scales, CAPTURE_VIEW_REGIONS, strict=True)):
@@ -2868,7 +2877,7 @@ def _assert_capture_sheet(
         if index:
             if not bool(bound.IsCropped()):
                 raise RuntimeError(f"jig capture view {index}: assembled reading view lost its crop")
-            _assert_capture_crop(adapter, bound, index)
+            _assert_capture_crop(adapter, bound, index, crop_profiles[index - 1])
         if index and any(bool(_early_bound(note, "INote").IsBomBalloon()) for note in (bound.GetNotes() or ())):
             raise RuntimeError(f"jig capture view {index}: assembled reading views must remain unballooned")
         _assert_view_on_sheet(view, margin=BALLOON_RING_REACH if index == 0 else 0.0,
@@ -2936,7 +2945,7 @@ def _assert_capture_sheet(
             raise RuntimeError("jig capture: balloon leaves exploded field")
 
 
-def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...], tuple[tuple[float, float], ...], tuple[tuple[Any, ...], ...]]:
+def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...], tuple[tuple[float, float], ...], tuple[tuple[Any, ...], ...], tuple[Any, ...]]:
     _activate_sheet(adapter, cluster.sheet)
     exploded = _place_named_view(adapter, spec.ISOMETRIC_VIEW, _region_center(CAPTURE_EXPLODED_REGION), cluster.scale, label="jig capture exploded")
     set_high_quality_shaded_with_edges(adapter, exploded, label="jig capture exploded")
@@ -2951,15 +2960,16 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
     isolate_drawing_view_components(adapter, locator, visible_stems=installed, label="jig capture locator")
     origin = tuple(v / 1000.0 for v in spec.PIVOT_PIN_ORIGINS[0])
     centre = model_point_in_view(adapter, locator, origin, label="jig capture locator")
-    _crop_capture_view(adapter, locator, centre, 0.055 / 4.0, label="jig capture locator")
+    locator_profile = _crop_capture_view(adapter, locator, centre, 0.055 / 4.0, label="jig capture locator")
     set_hidden_lines_removed(adapter, locator)
-    locator_scale = _fit_capture_view(adapter, locator, CAPTURE_VIEW_REGIONS[1], ((1, 4), (1, 5), (1, 6)), label="jig capture locator")
+    locator_scale = _fit_capture_view(adapter, locator, CAPTURE_VIEW_REGIONS[1], (CAPTURE_LOCATOR_SCALE,), crop_profile=locator_profile, label="jig capture locator")
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(locator.GetName2())):
         raise RuntimeError("jig capture: could not activate locator caption owner")
-    if add_note(adapter, f"ASSEMBLED PLAN {_scale_text(locator_scale)}", 0.224, 0.222, height=CAPTURE_NOTE_HEIGHT) is None:
+    if add_note(adapter, f"ASSEMBLED PLAN {_scale_text(locator_scale)}", 0.224, 0.220, height=CAPTURE_NOTE_HEIGHT) is None:
         raise RuntimeError("jig capture: failed to place locator scale caption")
     views = [exploded, locator]
     scales = [scale, locator_scale]
+    crop_profiles = [locator_profile]
     for index, letter in enumerate(("A", "B"), start=2):
         points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
         view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
@@ -2979,14 +2989,15 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
             anchor = tuple(v / 1000.0 for v in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
             radius = 0.014
         centre = model_point_in_view(adapter, view, anchor, label=f"jig capture crop {letter}")
-        _crop_capture_view(adapter, view, centre, radius, label=f"jig capture section {letter}")
+        profile = _crop_capture_view(adapter, view, centre, radius, label=f"jig capture section {letter}")
         set_hidden_lines_removed(adapter, view)
-        scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], ((1, 1), (1, 2)), label=f"jig capture section {letter}"))
+        scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], ((1, 1),), crop_profile=profile, label=f"jig capture section {letter}"))
         position_section_caption(adapter, view, CAPTURE_SECTION_CAPTIONS[index - 2], label=f"jig capture {letter}")
         views.append(view)
+        crop_profiles.append(profile)
     records = _place_capture_readings(adapter, views)
-    _assert_capture_sheet(adapter, views, scales, records)
-    return tuple(views), tuple(scales), records
+    _assert_capture_sheet(adapter, views, scales, records, crop_profiles=crop_profiles)
+    return tuple(views), tuple(scales), records, tuple(crop_profiles)
 
 
 def _balloon_cluster(
@@ -3176,7 +3187,7 @@ def _place_package(
     capture_cluster = next(
         cluster for cluster in CLUSTERS if cluster.sheet == PIVOT_CAPTURE_SHEET
     )
-    capture_views, capture_scales, capture_records = _place_capture_sheet(adapter, capture_cluster)
+    capture_views, capture_scales, capture_records, capture_profiles = _place_capture_sheet(adapter, capture_cluster)
     placed = [
         (cluster, capture_views[0], capture_scales[0]) if cluster is capture_cluster
         else (cluster, *_place_cluster_view(adapter, cluster))
@@ -3223,7 +3234,7 @@ def _place_package(
     capture_landings = [
         landing for landing in landings if landing.stem in capture_cluster.stems
     ]
-    _assert_capture_sheet(adapter, capture_views, capture_scales, capture_records, capture_landings)
+    _assert_capture_sheet(adapter, capture_views, capture_scales, capture_records, capture_landings, crop_profiles=capture_profiles)
     _place_steps_notes(adapter)
     _place_capture_notes(adapter)
     # The fitted reference can select 1:25 or 1:30. Author paper-only sketch
@@ -3268,7 +3279,8 @@ def _place_package(
         kit_note_settled,
         inspection_settled,
         lambda: _assert_capture_sheet(
-            adapter, capture_views, capture_scales, capture_records, capture_landings
+            adapter, capture_views, capture_scales, capture_records, capture_landings,
+            crop_profiles=capture_profiles,
         ),
     )
 

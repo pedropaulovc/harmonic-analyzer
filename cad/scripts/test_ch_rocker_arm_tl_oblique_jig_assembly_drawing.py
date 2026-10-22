@@ -2066,27 +2066,37 @@ class _CaptureViewTransform:
 
 
 class _CaptureViewSketch:
-    def __init__(self, view):
+    def __init__(self, view, *, sketch_origin=None, scale_ratio=None):
         self.view = view
         self.segments = []
-        self.sketch_origin = None
+        self.sketch_origin = sketch_origin
+        self.scale_ratio = scale_ratio
+        self.angle = 0.37
 
     def GetSketchSegments(self):
         return tuple(self.segments)
 
     @property
     def ModelToSketchTransform(self):
-        scale = self.view.ScaleRatio[1] / self.view.ScaleRatio[0]
-        rotation = _InspectionTransform(scale, angle=0.37, origin=(0.0, 0.0, 0.0))
+        numerator, denominator = self.scale_ratio or self.view.ScaleRatio
+        scale = denominator / numerator
+        rotation = _InspectionTransform(scale, angle=self.angle, origin=(0.0, 0.0, 0.0))
         position = rotation.apply((*self.view.Position, 0.0))
         if self.sketch_origin is None:
             # The first native read retains the nonidentity authored transform.
             self.sketch_origin = tuple(
                 position[i] + (-0.013, 0.021, 0.0)[i] for i in range(3)
             )
-        # A view sketch moves/scales with its owner; persisted geometry does not.
+        # Absorbed crop owners retain their authored scale but follow position.
         origin = tuple(self.sketch_origin[i] - position[i] for i in range(3))
-        return _InspectionTransform(scale, angle=0.37, origin=origin)
+        return _InspectionTransform(scale, angle=self.angle, origin=origin)
+
+
+class _CaptureNativeView(SimpleNamespace):
+    def __setattr__(self, name, value):
+        if name == "ScaleRatio" and getattr(self, "cropped", False):
+            self.post_crop_scale_writes.append(tuple(value))
+        super().__setattr__(name, value)
 
 
 @pytest.fixture
@@ -2161,11 +2171,12 @@ def native_property_package(monkeypatch):
     def create_view(model_path, orientation, x, y, z):
         sheet = doc.sheets[doc.active]
         index = len(sheet.views)
-        view = SimpleNamespace(
+        view = _CaptureNativeView(
             model_path=model_path, Sheet=sheet, Position=(x, y),
             ScaleRatio=(1.0, 1.0), ReferencedDocument=source,
             ReferencedConfiguration=drawing.ASSEMBLY_VIEW_CONFIGURATION,
             exploded=False, Angle=0.0, cropped=False, crop=None, notes=[],
+            crop_scale=None, crop_outline_size=None, post_crop_scale_writes=[],
             mode=_drawing_common._SW_SHADED_EDGES, section=None,
             model_origin=tuple(v / 1000.0 for v in spec.PIVOT_PIN_ORIGINS[0]),
             right=spec.VIEW_AXES[orientation][0], up=spec.VIEW_AXES[orientation][1],
@@ -2207,13 +2218,27 @@ def native_property_package(monkeypatch):
             assert any(circle is segment for segment in view.sketch.segments)
             assert circle.GetType() == 1 and circle.IsCircle() == 1
             assert not circle.ConstructionGeometry
-            inverse = view.sketch.ModelToSketchTransform.Inverse()
+            inverse = circle.GetSketch().ModelToSketchTransform.Inverse()
             centre = inverse.apply(circle.centre)
             edge = inverse.apply((circle.centre[0] + circle.radius,
                                   circle.centre[1], circle.centre[2]))
             radius = math.dist(centre, edge)
             ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
             view.crop = (tuple((centre[i] - view.Position[i]) / ratio for i in (0, 1)), radius / ratio)
+            view.crop_scale = tuple(view.ScaleRatio)
+            view.crop_outline_size = (2.0 * radius, 2.0 * radius)
+            if sheet.name == drawing.PIVOT_CAPTURE_SHEET and index == 1:
+                # d1c: the selected 1:4 locator's native padded outline was
+                # 43.8842 x 41.5158 mm, unchanged by later reported 1:5/1:6.
+                view.crop_outline_size = (2.0 * radius + 0.0163842,
+                                          2.0 * radius + 0.0140158)
+            owner = _CaptureViewSketch(
+                view, sketch_origin=view.sketch.sketch_origin,
+                scale_ratio=view.crop_scale,
+            )
+            owner.segments.append(circle)
+            view.sketch.segments.remove(circle)
+            circle.owner = owner
             doc.crop_calls.append((view, circle))
             view.cropped = not doc.bad_crop
             return doc.crop_status
@@ -2247,11 +2272,12 @@ def native_property_package(monkeypatch):
                 if view.ScaleRatio[1] < doc.capture_fit_denominator:
                     box = (box[0], box[1], box[2] + 0.3, box[3])
             if view.crop is not None:
-                offset, radius = view.crop
-                ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+                offset, _radius = view.crop
+                ratio = view.crop_scale[0] / view.crop_scale[1]
                 centre = tuple(view.Position[i] + ratio * offset[i] for i in (0, 1))
-                box = (centre[0] - radius*ratio, centre[1] - radius*ratio,
-                       centre[0] + radius*ratio, centre[1] + radius*ratio)
+                width, height = view.crop_outline_size
+                box = (centre[0] - width / 2.0, centre[1] - height / 2.0,
+                       centre[0] + width / 2.0, centre[1] + height / 2.0)
             if (doc.oversized == sheet.name
                     or (sheet.name == drawing.CARTRIDGE_SHEET
                         and view.ScaleRatio[1] < doc.inspection_fit_denominator)):
@@ -2325,8 +2351,9 @@ def native_property_package(monkeypatch):
         circle = SimpleNamespace(
             centre=centre, radius=math.dist(centre, edge),
             ConstructionGeometry=False, GetType=lambda: 1, IsCircle=lambda: 1,
-            GetSketch=lambda: view.sketch,
+            owner=view.sketch,
         )
+        circle.GetSketch = lambda: circle.owner
         circle.GetCenterPoint2 = lambda: SimpleNamespace(
             X=circle.centre[0], Y=circle.centre[1], Z=circle.centre[2],
         )
@@ -2866,14 +2893,19 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
         view = sheet.views[index]
         circle = package.doc.crop_circles[index - 1]
         assert package.doc.crop_calls[index - 1] == (view, circle)
-        assert circle.GetSketch() is view.sketch
+        owner = circle.GetSketch()
+        assert owner is not view.sketch and owner.view is view
+        assert any(segment is circle for segment in owner.GetSketchSegments())
+        assert not any(segment is circle for segment in view.GetSketch().GetSketchSegments())
+        assert tuple(view.ScaleRatio) == view.crop_scale
+        assert view.post_crop_scale_writes == []
         assert circle.GetType() == circle.IsCircle() == 1
         assert circle.ConstructionGeometry is False
         point = circle.GetCenterPoint2()
         assert (point.X, point.Y, point.Z) == circle.centre
         assert circle.GetRadius() == circle.radius
         assert view.crop[1] == pytest.approx(model_radius)
-    assert [segment.GetType() for segment in locator.sketch.GetSketchSegments()] == [1, 0, 0]
+    assert [segment.GetType() for segment in locator.sketch.GetSketchSegments()] == [0, 0]
     assert package.doc.SketchManager.AddToDB is False
     for section, letter in ((main.GetSection(), "A"), (bolt.GetSection(), "B")):
         assert section.GetView() is locator
@@ -3055,11 +3087,7 @@ def test_capture_section_proof_refuses_actual_sketch_endpoint_counterexamples(
         )
     with pytest.raises(RuntimeError, match="native cut plane misses its model reading axes"):
         drawing._assert_capture_section(package.adapter, parent, view, letter)
-    refusal = (
-        "persisted native crop centre or model radius changed"
-        if defect == "current-sketch-transform"
-        else "native cut plane misses its model reading axes"
-    )
+    refusal = "native cut plane misses its model reading axes"
     with pytest.raises(RuntimeError, match=refusal):
         settled[-1]()
 
@@ -3161,60 +3189,174 @@ def test_capture_native_crop_boundary_uses_explicit_view_owned_selection_not_las
     native_property_package,
 ) -> None:
     package = native_property_package
-    drawing._place_package(package.adapter)
     doc = package.doc
-    views = doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
-    view, circle = views[1], doc.crop_circles[0]
     assert doc.ActivateSheet(drawing.PIVOT_CAPTURE_SHEET)
+    view = doc.CreateDrawViewFromModelView3(
+        "capture-fixture.SLDASM", spec.PLAN_VIEW, 0.250, 0.240, 0.0,
+    )
+    other_view = doc.CreateDrawViewFromModelView3(
+        "capture-fixture.SLDASM", spec.PLAN_VIEW, 0.350, 0.240, 0.0,
+    )
+    view.ScaleRatio = (1, 4)
     assert doc.ActivateView(view.GetName2())
-    doc.ClearSelection2(True)
+    transform = view.sketch.ModelToSketchTransform
+    centre = transform.apply((*view.Position, 0.0))
+    edge = transform.apply((view.Position[0] + 0.055 / 4.0, view.Position[1], 0.0))
     manager = doc.SketchManager
     previous = manager.AddToDB
     manager.AddToDB = True
     try:
-        other = manager.CreateCircle(*circle.centre, circle.centre[0] + circle.radius * 0.8,
-                                     circle.centre[1], circle.centre[2])
+        circle = manager.CreateCircle(*centre, *edge)
+        other = manager.CreateCircle(*centre, centre[0] + circle.radius * 0.8,
+                                     centre[1], centre[2])
     finally:
         manager.AddToDB = previous
     assert other is not circle and doc.selected == []
     with pytest.raises(ValueError):
         view.Crop2(False, False, 1)
     data = doc.SelectionManager.CreateSelectData()
-    data.View = views[2]
+    data.View = other_view
     assert circle.Select4(False, data) is False
     assert doc.selected == []
     data.View = view
     assert circle.Select4(False, data) is True
+    assert other.Select4(True, data) is True
+    with pytest.raises(ValueError):
+        view.Crop2(False, False, 1)
+    assert circle.Select4(False, data) is True
     assert view.Crop2(False, False, 1) == 1
     assert doc.crop_calls[-1] == (view, circle)
     assert view.crop[1] == pytest.approx(0.055)
-    assert other.Select4(True, data) is True
-    assert len(doc.selected) == 2
-    with pytest.raises(ValueError):
-        view.Crop2(False, False, 1)
+    assert circle.GetSketch() is not view.sketch
+    assert view.sketch.GetSketchSegments() == (other,)
+    doc.ClearSelection2(True)
+    assert circle.Select4(False, data) is False
+    assert doc.selected == []
     assert other.Select4(False, data) is True
-    assert doc.selected == [other]
     assert view.Crop2(False, False, 1) == 1
     assert doc.crop_calls[-1] == (view, other)
     assert view.crop[1] == pytest.approx(0.055 * 0.8)
+    assert other.GetSketch() is not view.sketch
+    assert view.sketch.GetSketchSegments() == ()
+
+
+def test_capture_crop_returns_the_selected_profile_after_native_absorption(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    doc = package.doc
+    assert doc.ActivateSheet(drawing.PIVOT_CAPTURE_SHEET)
+    view = doc.CreateDrawViewFromModelView3(
+        "capture-fixture.SLDASM", spec.PLAN_VIEW, 0.250, 0.240, 0.0,
+    )
+    view.ScaleRatio = (1, 4)
+    creation_transform = view.GetSketch().ModelToSketchTransform.ArrayData
+    manager = doc.SketchManager
+    create = manager.CreateCircle
+
+    def create_with_unselected_successor(*coordinates):
+        selected = create(*coordinates)
+        create(*selected.centre, selected.centre[0] + selected.radius * 0.8,
+               selected.centre[1], selected.centre[2])
+        return selected
+
+    manager.CreateCircle = create_with_unselected_successor
+    profile = drawing._crop_capture_view(
+        package.adapter, view, tuple(view.Position), 0.055 / 4.0,
+        label="retained native crop boundary",
+    )
+    selected, unselected = doc.crop_circles
+    assert profile is selected and profile is not unselected
+    assert doc.crop_calls == [(view, selected)]
+    assert view.crop[1] == pytest.approx(0.055)
+    assert profile.GetSketch() is not view.GetSketch()
+    assert profile.GetSketch().ModelToSketchTransform.ArrayData == creation_transform
+    assert view.GetSketch().GetSketchSegments() == (unselected,)
+    assert manager.AddToDB is False
+    drawing._assert_capture_crop(package.adapter, view, 1, profile)
+
+
+def test_capture_measured_locator_outline_keeps_bounded_field_and_caption_clearance(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
+    outline = locator.GetOutline()
+    field = drawing.CAPTURE_VIEW_REGIONS[1]
+    # Native d1c padded extent, not the selected circle's ideal paper diameter.
+    assert (outline[2] - outline[0], outline[3] - outline[1]) == pytest.approx(
+        (0.0438842, 0.0415158),
+    )
+    assert _inside(outline, field) and _inside_sheet(outline)
+    horizontal = (outline[0] - field[0], field[2] - outline[2])
+    vertical = (outline[1] - field[1], field[3] - outline[3])
+    assert all(0.00505 < gap < 0.00507 for gap in horizontal)
+    assert all(0.00073 < gap < 0.00075 for gap in vertical)
+    caption = next(note for note in locator.notes if note.GetText().startswith("ASSEMBLED PLAN "))
+    assert tuple(caption.position) == (0.224, 0.220, 0.0)
+    extent = caption.GetExtent()
+    assert 0.00073 < outline[1] - extent[4] < 0.00075
+    assert not _overlap(outline, (extent[0], extent[1], extent[3], extent[4]))
+    settled[-1]()
+
+
+@pytest.mark.parametrize("oversized", ("width", "height"))
+def test_capture_fixed_locator_fit_keeps_strict_measured_field_bounds(
+    native_property_package, oversized,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
+    profile = package.doc.crop_circles[0]
+    width, height = locator.crop_outline_size
+    locator.crop_outline_size = (
+        0.0540158 if oversized == "width" else width,
+        0.0430158 if oversized == "height" else height,
+    )
+    with pytest.raises(RuntimeError, match="no measured scale fits its reserved field"):
+        drawing._fit_capture_view(
+            package.adapter, locator, drawing.CAPTURE_VIEW_REGIONS[1], ((1, 4),),
+            crop_profile=profile, label="jig capture locator boundary",
+        )
+    assert tuple(locator.ScaleRatio) == (1, 4)
+    assert locator.post_crop_scale_writes == []
 
 
 @pytest.mark.parametrize("view_index", (1, 2, 3))
-@pytest.mark.parametrize("change", ("position", "scale"))
-def test_capture_native_crop_geometry_stays_view_attached_during_recenter_or_refit(
-    native_property_package, view_index, change,
+def test_capture_crop_proof_refuses_a_missing_retained_profile(
+    native_property_package, view_index,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    profile = package.doc.crop_circles[view_index - 1]
+    assert view.IsCropped() is True
+    with pytest.raises(RuntimeError, match="native fence is not a sketch arc"):
+        drawing._assert_capture_crop(package.adapter, view, view_index, None)
+    drawing._assert_capture_crop(package.adapter, view, view_index, profile)
+
+
+@pytest.mark.parametrize("view_index", (1, 2, 3))
+def test_capture_retained_crop_owner_tracks_recenter_independently_of_view_sketch(
+    native_property_package, view_index,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
     view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
     circle = package.doc.crop_circles[view_index - 1]
+    owner = circle.GetSketch()
     authored = (circle.centre, circle.radius)
-    if change == "position":
-        view.Position = (view.Position[0] + 0.001, view.Position[1] - 0.002)
-    else:
-        view.ScaleRatio = (view.ScaleRatio[0], view.ScaleRatio[1] * 2.0)
-    drawing._assert_capture_crop(package.adapter, view, view_index)
+    before = owner.ModelToSketchTransform.ArrayData
+    view.Position = (view.Position[0] + 0.001, view.Position[1] - 0.002)
+    assert owner.ModelToSketchTransform.ArrayData != before
+    drawing._assert_capture_crop(package.adapter, view, view_index, circle)
+    # The original view-owned sketch is no longer the crop's geometry frame.
+    origin = view.sketch.sketch_origin
+    view.sketch.sketch_origin = (origin[0] + 0.001, origin[1], origin[2] + 0.001)
+    drawing._assert_capture_crop(package.adapter, view, view_index, circle)
     assert (circle.centre, circle.radius) == authored
+    assert view.post_crop_scale_writes == []
 
 
 @pytest.mark.parametrize("view_index", (1, 2, 3))
@@ -3223,14 +3365,18 @@ def test_capture_native_crop_geometry_stays_view_attached_during_recenter_or_ref
     ("centre-z", "persisted native crop centre or model radius changed"),
     ("radius", "persisted native crop centre or model radius changed"),
     ("paper-as-sketch", "persisted native crop centre or model radius changed"),
-    ("current-sketch-transform", "persisted native crop centre or model radius changed"),
-    ("missing", "expected one persisted native crop circle"),
-    ("extra", "expected one persisted native crop circle"),
-    ("line-not-arc", "expected one persisted native crop circle"),
-    ("construction", "expected one persisted native crop circle"),
+    ("owner-transform-x", "persisted native crop centre or model radius changed"),
+    ("owner-transform-z", "persisted native crop centre or model radius changed"),
+    ("disconnected-handle", "retained native crop handle is disconnected"),
+    ("missing-owner", "retained native crop circle has no sketch owner"),
+    ("missing-centre", "native circle has no centre point"),
+    ("nonfinite-centre", "invalid native circle centre"),
+    ("nonfinite-radius", "invalid native circle centre"),
+    ("zero-radius", "invalid native circle centre"),
+    ("line-not-arc", "native fence is not a sketch arc"),
     ("noncircle", "native fence is not a complete circle"),
 ))
-def test_capture_settled_crop_proof_reads_fresh_persisted_geometry_not_flags_or_notes(
+def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
     native_property_package, view_index, defect, refusal,
 ) -> None:
     package = native_property_package
@@ -3248,39 +3394,41 @@ def test_capture_settled_crop_proof_reads_fresh_persisted_geometry_not_flags_or_
     elif defect == "radius":
         circle.radius += 0.001
     elif defect == "paper-as-sketch":
-        inverse = view.sketch.ModelToSketchTransform.Inverse()
+        inverse = circle.GetSketch().ModelToSketchTransform.Inverse()
         edge = inverse.apply((circle.centre[0] + circle.radius,
                               circle.centre[1], circle.centre[2]))
         circle.centre = inverse.apply(circle.centre)
         circle.radius = math.dist(circle.centre, edge)
-    elif defect == "current-sketch-transform":
-        origin = view.sketch.sketch_origin
-        view.sketch.sketch_origin = (origin[0], origin[1], origin[2] + 0.001)
-    elif defect == "missing":
-        view.sketch.segments.remove(circle)
-    elif defect == "extra":
-        package.doc.ActivateSheet(drawing.PIVOT_CAPTURE_SHEET)
-        assert package.doc.ActivateView(view.GetName2())
-        manager = package.doc.SketchManager
-        previous = manager.AddToDB
-        manager.AddToDB = True
-        try:
-            other = manager.CreateCircle(*circle.centre, circle.centre[0] + circle.radius,
-                                         circle.centre[1], circle.centre[2])
-        finally:
-            manager.AddToDB = previous
-        assert other is not circle
+    elif defect in {"owner-transform-x", "owner-transform-z"}:
+        owner = circle.GetSketch()
+        axis = 0 if defect == "owner-transform-x" else 2
+        owner.sketch_origin = tuple(
+            value + (0.001 if i == axis else 0.0)
+            for i, value in enumerate(owner.sketch_origin)
+        )
+    elif defect == "disconnected-handle":
+        def disconnected():
+            raise RuntimeError("retained native crop handle is disconnected")
+        circle.GetType = disconnected
+    elif defect == "missing-owner":
+        circle.owner = None
+    elif defect == "missing-centre":
+        circle.GetCenterPoint2 = lambda: None
+    elif defect == "nonfinite-centre":
+        circle.centre = (circle.centre[0], circle.centre[1], math.nan)
+    elif defect == "nonfinite-radius":
+        circle.radius = math.inf
+    elif defect == "zero-radius":
+        circle.radius = 0.0
     elif defect == "line-not-arc":
         circle.GetType = lambda: 0
-    elif defect == "construction":
-        circle.ConstructionGeometry = True
     else:
         circle.IsCircle = lambda: 0
     assert view.IsCropped() is True
     assert view.crop == rendered_crop and view.GetOutline() == outline
     assert tuple(note.world for note in package.doc.attached_notes) == targets
     with pytest.raises(RuntimeError, match=refusal):
-        drawing._assert_capture_crop(package.adapter, view, view_index)
+        drawing._assert_capture_crop(package.adapter, view, view_index, circle)
     with pytest.raises(RuntimeError, match=refusal):
         settled[-1]()
 
@@ -3422,40 +3570,65 @@ def test_capture_fit_exhaustion_refuses_before_any_bom(native_property_package) 
     assert not package.doc.bom_inserted
 
 
-def test_capture_fit_refreshes_native_display_geometry_at_each_candidate_scale(
+def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale(
     native_property_package,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
-    locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
-    native_outline = locator.GetOutline
+    exploded = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[0]
+    assert exploded.IsCropped() is False
+    native_outline = exploded.GetOutline
     refreshed = []
 
     def refresh():
-        refreshed.append(tuple(locator.ScaleRatio))
+        refreshed.append(tuple(exploded.ScaleRatio))
         return None  # Native UpdateViewDisplayGeometry is VT_VOID.
 
     def outline():
         box = native_outline()
-        # Until the native display cache is refreshed at the current scale,
-        # it still exposes an oversized pre-change view. The refreshed 1:4
-        # extent also genuinely misses; 1:5 is the first measured fit.
-        if not refreshed or refreshed[-1] != tuple(locator.ScaleRatio) or locator.ScaleRatio[1] == 4:
-            return (*box[:3], box[3] + 0.1)
+        # Until refreshed, the native cache retains an oversized pre-change
+        # view. The refreshed 1:4 also misses; uncropped 1:5 first fits.
+        if not refreshed or refreshed[-1] != tuple(exploded.ScaleRatio) or exploded.ScaleRatio[1] == 4:
+            return (*box[:3], box[3] + 0.3)
         return box
 
-    locator.UpdateViewDisplayGeometry = refresh
-    locator.GetOutline = outline
+    exploded.UpdateViewDisplayGeometry = refresh
+    exploded.GetOutline = outline
     scale = drawing._fit_capture_view(
-        package.adapter, locator, drawing.CAPTURE_VIEW_REGIONS[1],
-        ((1, 4), (1, 5), (1, 6)), label="jig capture locator",
+        package.adapter, exploded, drawing.CAPTURE_VIEW_REGIONS[0],
+        ((1, 4), (1, 5), (1, 6)), label="jig capture exploded",
     )
     assert scale == (1, 5)
     assert refreshed == [(1.0, 4.0), (1.0, 5.0)]
-    assert _inside(native_outline(), drawing.CAPTURE_VIEW_REGIONS[1])
+    assert _inside(native_outline(), drawing.CAPTURE_VIEW_REGIONS[0])
 
 
-def test_capture_fit_refusal_reports_each_native_outline_and_persisted_crop(
+@pytest.mark.parametrize("view_index, ladder, has_profile, refusal", (
+    (1, ((1, 4), (1, 5), (1, 6)), True, "cropped view requires one pre-authored scale"),
+    (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
+    (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
+    (1, ((1, 4),), False, "cropped view lost its selected native profile"),
+))
+def test_capture_cropped_fit_refuses_rescaling_or_a_lost_selected_profile(
+    native_property_package, view_index, ladder, has_profile, refusal,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    circle = package.doc.crop_circles[view_index - 1]
+    before = (tuple(view.ScaleRatio), tuple(view.Position), view.GetOutline())
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._fit_capture_view(
+            package.adapter, view, drawing.CAPTURE_VIEW_REGIONS[view_index], ladder,
+            crop_profile=circle if has_profile else None, label="jig capture fixed crop",
+        )
+    assert (tuple(view.ScaleRatio), tuple(view.Position), view.GetOutline()) == before
+    assert view.post_crop_scale_writes == []
+
+
+
+
+def test_capture_cropped_fit_refusal_reports_actual_owner_geometry_at_authored_scale(
     native_property_package,
 ) -> None:
     import ast
@@ -3464,32 +3637,40 @@ def test_capture_fit_refusal_reports_each_native_outline_and_persisted_crop(
     drawing._place_package(package.adapter)
     locator = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[1]
     circle = package.doc.crop_circles[0]
+    owner = circle.GetSketch()
+    origin = locator.sketch.sketch_origin
+    locator.sketch.sketch_origin = (origin[0] + 0.001, origin[1], origin[2] + 0.001)
     locator.GetOutline = lambda: (0.1, 0.1, 0.3, 0.3)
     field = drawing.CAPTURE_VIEW_REGIONS[1]
+    assert field == (0.224, 0.220, 0.278, 0.263)
+    assert (field[2] - field[0], field[3] - field[1]) == pytest.approx((0.054, 0.043))
     with pytest.raises(RuntimeError, match="no measured scale fits its reserved field") as failure:
         drawing._fit_capture_view(
-            package.adapter, locator, field, ((1, 4), (1, 5), (1, 6)),
-            label="jig capture locator",
+            package.adapter, locator, field, ((1, 4),),
+            crop_profile=circle, label="jig capture locator",
         )
     message = str(failure.value)
     assert f"field={field!r}; margin=0.0;" in message
     candidates = ast.literal_eval(message.split("; candidates=", 1)[1])
-    assert [candidate["scale"] for candidate in candidates] == [(1.0, 4.0), (1.0, 5.0), (1.0, 6.0)]
-    for candidate in candidates:
-        assert candidate["position"] == tuple(locator.Position)
-        assert candidate["outline"] == (0.1, 0.1, 0.3, 0.3)
-        assert candidate["overflows"] == ["width 200.0 mm > 54.0 mm", "height 200.0 mm > 41.0 mm"]
-        assert candidate["cropped"] is True
-        assert len(candidate["sketch_transform"]) == 16
-        crop, = candidate["crop_circles"]
-        assert crop["sketch_centre"] == circle.centre
-        assert crop["sketch_radius"] == circle.radius
-        assert crop["sheet_radius"] == pytest.approx(0.055 / candidate["scale"][1])
-        ratio = candidate["scale"][0] / candidate["scale"][1]
-        expected_centre = tuple(
-            locator.Position[i] + ratio * locator.crop[0][i] for i in (0, 1)
-        )
-        assert crop["sheet_centre"] == pytest.approx((*expected_centre, 0.0))
+    candidate, = candidates
+    assert candidate["scale"] == (1.0, 4.0)
+    assert candidate["position"] == tuple(locator.Position)
+    assert candidate["outline"] == (0.1, 0.1, 0.3, 0.3)
+    assert candidate["overflows"] == ["width 200.0 mm > 54.0 mm", "height 200.0 mm > 43.0 mm"]
+    assert candidate["cropped"] is True
+    assert candidate["sketch_transform"] == owner.ModelToSketchTransform.ArrayData
+    assert candidate["sketch_transform"] != locator.sketch.ModelToSketchTransform.ArrayData
+    crop, = candidate["crop_circles"]
+    assert crop["sketch_centre"] == circle.centre
+    assert crop["sketch_radius"] == circle.radius
+    inverse = owner.ModelToSketchTransform.Inverse()
+    sheet_centre = inverse.apply(circle.centre)
+    sheet_rim = inverse.apply((circle.centre[0] + circle.radius, *circle.centre[1:]))
+    assert crop["sheet_centre"] == pytest.approx(sheet_centre)
+    assert crop["sheet_radius"] == pytest.approx(math.dist(sheet_centre, sheet_rim))
+    assert crop["sheet_radius"] == pytest.approx(0.055 / 4.0)
+    assert tuple(locator.ScaleRatio) == (1, 4)
+    assert locator.post_crop_scale_writes == []
 
 
 @pytest.mark.parametrize("defect", ("section-xyz", "persisted-crop"))

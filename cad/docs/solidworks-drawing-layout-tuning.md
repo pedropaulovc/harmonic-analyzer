@@ -210,13 +210,20 @@ settled-landing proofs, with exactly the two intended bearing attachments.
 paper coordinates. Read the parent's current sketch transform on every replay;
 compare full endpoints in either order and their model-space length. Arrow and
 text positions remain sheet-space. Author crop circles with protected
-`AddToDB=True`, select the closed profile explicitly, and read the persisted
-circle's centre and model radius again after refitting or moving the view.
-Refresh native display geometry after HLR/scale changes before measuring a
-candidate's outline. `GetOutline` is a padded view extent, not an exact crop
-circle box. If no scale fits, retain every candidate's native scale, position,
-outline, overflow and persisted circle geometry/transform in the refusal.
-Keep the reserved field, scale ladder and tolerances unchanged.
+`AddToDB=True` and select the closed profile explicitly. Retain that exact native
+segment and read its centre, model radius and current `ISketchSegment.GetSketch`
+owner after moves/rebuilds: `Crop2` consumes the profile, so enumerating
+`IView.GetSketch` is not authoritative. The retained segment must remain
+accessible; do not invent a crop-feature getter or fallback if it does not.
+Set assembled views' final scales before authoring their crops (locator 1:4,
+sections 1:1); do not walk a scale ladder after `Crop2`. Refresh native display
+geometry after HLR/scale changes before measuring the outline. `GetOutline` is
+a padded view extent, not an exact crop circle box. The locator's 54 x 43 mm
+field accommodates its measured 43.884 x 41.516 mm native extent; its caption
+moves down with the field's lower edge, without moving neighboring labels.
+If a view does not fit, retain its native scale, position, outline, overflow and
+selected profile geometry/owner transform in the refusal. Keep strict native
+outline, label-clearance and geometry tolerances.
 
 Inspection callouts identify the existing C-step reading points and limits:
 chamber excess is chamber height minus flange thickness, not a third gap.
