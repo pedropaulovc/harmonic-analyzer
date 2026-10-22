@@ -31,8 +31,10 @@ from _layout_audit import (
 )
 from _printed_tolerance import drilled_oversize_mm
 from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
     AnnotationGeometry,
     Box,
+    segment_box_distance,
     Segment,
     SheetGeometry,
     find_border_breaches,
@@ -920,6 +922,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert native_thread.note.GetText() == native_thread.writes[0]
         assert native_thread.note.GetAnnotation().Visible == 1
         assert native_thread.note.GetAnnotation().GetPosition() == (*drawing.DETAIL_THREAD_NOTE_XY, 0.0)
+        _assert_detail_thread_ink_routes(annotations, native_thread.note, project, detail)
         assert all(state.note.GetAnnotation().Visible == 3 for state in other_threads)
         assert all(state.writes == [] and "UNC-2A" in state.note.GetText() for state in other_threads)
         assert native_thread.note.GetAnnotation().Owner is detail
@@ -935,6 +938,69 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
     assert hemisphere.selection_attempts == 1
     assert front.entity_kinds == [3, 4]
+
+def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
+    """R10 measured glyph/witness replay, not proof of a new native font/leader.
+
+    Retained R10 detail ink is recorded in the pre-cutover replay. Its glyph
+    advances/row offsets expose the unwrapped mate row crossing the tip witness.
+    Transfer those envelopes to the actual recipe's one native note and native
+    dimension station. The new native callout still needs a full ink audit.
+    """
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    region = DrawableRegion.from_margins(
+        template.width_m, template.height_m,
+        left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
+    )
+    values = {
+        name: annotation.GetSpecificAnnotation().GetDimension().SystemValue
+        for name, annotation in annotations.items()
+    }
+    root = project(None, detail, (
+        values["OverallLength"] - values["ThreadLength"], values["RodDia"] / 2.0, 0.0,
+    ))
+    tip = project(None, detail, (values["OverallLength"], values["RodDia"] / 2.0, 0.0))
+    x, y, _z = native_note.GetAnnotation().GetPosition()
+    text = native_note.GetText()
+    assert text.splitlines() == [
+        f"{joint.THREAD} UNC", "45° ENTRY CHAMFER", "MATES MHA-MG-01", "BRACKET",
+    ]
+    dx, dy = x - 0.273, y - 0.213
+    rows = (
+        Box(0.2736628 + dx, 0.2090349 + dy, 0.2982645 + dx, 0.2129736 + dy),
+        # R10 same-font advances: shape45.4869mm; conservative46mm envelope.
+        Box(x, 0.2048825 + dy, x + 0.046, 0.2088479 + dy),
+        Box(x + 0.0002567, 0.2048825 + dy - 0.0045257,
+            x + 0.0423395, 0.2084479 + dy - 0.0045257),
+        # BRACKET measured19.5154mm; conservative20.5mm envelope.
+        Box(x, 0.2048825 + dy - 2 * 0.0045257,
+            x + 0.0205, 0.2084479 + dy - 2 * 0.0045257),
+    )
+    lx, ly, _z = annotations["ThreadLength"].GetPosition()
+    length = AnnotationGeometry(
+        label="ThreadLength", kind="dim", owner="detail",
+        text_boxes=(Box(lx - 0.0051559, ly - 0.0018442, lx + 0.0056694, ly + 0.0017211),),
+        segments=(
+            Segment(root[0], root[1] + 0.001, root[0], ly - 0.0017781, "ext-line"),
+            Segment(tip[0], tip[1] + 0.001, tip[0], ly - 0.0017781, "ext-line"),
+            Segment(root[0], ly - 0.0027781, tip[0], ly - 0.0027781, "dim-line"),
+        ),
+    )
+    # The R10 unwrapped mate/BRACKET row spans64.3701mm. It crosses the
+    # source-derived tip witness at this recipe station; do not lose this control.
+    unwrapped = AnnotationGeometry(
+        label="native detail thread", kind="note", owner="detail",
+        text_boxes=(Box(x + 0.0002567, rows[2].ymin, x + 0.0646268, rows[2].ymax),),
+    )
+    before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, unwrapped))
+    assert any(item.a == unwrapped.label for item in find_text_on_line(before))
+    wrapped = AnnotationGeometry(label=unwrapped.label, kind="note", owner="detail", text_boxes=rows)
+    after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, wrapped))
+    assert find_text_on_line(after) == []
+    assert find_text_on_text(after) == []
+    assert find_border_breaches(after) == []
+    assert min(segment_box_distance(witness, row) for witness in length.segments[:2] for row in rows) >= ARROW_TEXT_CLEARANCE_M
+
 
 
 def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front):
@@ -1182,7 +1248,7 @@ def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_
     assert state.entities == original_entities and state.entity_types == attachment_types
     assert state.writes == [state.note.GetText()]
     assert state.writes == [spec.PRINT_THREAD_CALLOUT.replace("\n", "\r\n")]
-    assert joint.THREAD in state.note.GetText() and "MATES MHA-MG-01 BRACKET" in state.note.GetText()
+    assert joint.THREAD in state.note.GetText() and "MATES MHA-MG-01 BRACKET" in " ".join(state.note.GetText().split())
     assert "2A" not in state.note.GetText()
     assert state.model_thread.ThreadCallout == original_model_text
     assert state.model_thread.thread_class == "2A"

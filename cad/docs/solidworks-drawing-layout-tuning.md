@@ -1925,6 +1925,13 @@ Keep captions outside the complete actual IView.GetOutline and retain ordinary
 whole-dimension text, witness/arrow and sheet/title-block clearance checks.
 Native export success alone is not physical-visibility or layout acceptance.
 
+The lever's single native Detail A thread callout prints four rows: thread,
+entry chamfer, mate ID, then `BRACKET`. Keep the last word wrapped so the mate
+row does not cross the thread-length tip witness; do not restore a detached
+manual copy. The R10 glyph/witness replay is only an offline collision control.
+The current native note's actual font, leader, complete ink and neighbouring
+dimension clearance remain required native export/audit checks.
+
 The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel.
 R22 wrapping of only that CHECK cleared the actual glyphs but left a gating
 keep-out for the aggregate note rectangle, whose width came from a preceding
