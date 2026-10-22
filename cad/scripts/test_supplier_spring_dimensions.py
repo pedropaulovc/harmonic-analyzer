@@ -10,7 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 
+import _config
 import _drawing_leaders as leaders
+import _supplier_dimensions as supplier
 import _supplier_disc_spring_drawing as disc
 import _supplier_extension_spring as extension
 import _supplier_spring_drawing as layout
@@ -21,6 +23,7 @@ import dt_vn_cylinder_bank_spring_spec as cylinder
 import pd_vn_transgear_pivot_spring_spec as pivot
 import sm_vn_counter_spring_spec as counter
 import vn_disc_spring_supplier_stock as stock
+from test_purchased_fastener_drawing import _supplier_native
 from test_supplier_spring_layout_drawing import (
     _ReferenceInkView,
     _sibling_view,
@@ -330,6 +333,159 @@ def _disc_views(spec):
     return views
 
 
+@pytest.fixture
+def disc_recipe_native(monkeypatch):
+    """Run each recipe's real formatter and settled proof on existing native fakes."""
+    def build(module_name):
+        recipe = importlib.import_module(module_name)
+        spec = recipe.supplier_spec
+        views = _disc_views(spec)
+        _readback_environment(monkeypatch, disc, views)
+        cases = {}
+        for view in views.values():
+            for annotation in view.annotations:
+                original = annotation.GetSpecificAnnotation()
+                native = original.GetDimension2(0)
+                case = _supplier_native(
+                    monkeypatch, value=native.value / 1000,
+                    kind=6 if annotation.name in (
+                        "SupplierID", "SupplierOD", "SupplierShaftDia"
+                    ) else 11,
+                )
+                # Keep the spring fixture's source owner, configured SI value,
+                # tolerance and position; reuse the existing presentation fake.
+                case.display.GetDimension2 = original.GetDimension2
+                case.display.GetPrimaryTolPrecision2 = original.GetPrimaryTolPrecision2
+                case.display.GetAnnotation = lambda annotation=annotation: annotation
+                case.display.OffsetText = False
+                annotation.Visible, annotation.OwnerType, annotation.Owner = 1, 0, view
+                annotation.IsDangling = case.annotation.IsDangling
+                annotation.GetAttachedEntities3 = case.annotation.GetAttachedEntities3
+                annotation.GetAttachedEntityCount3 = case.annotation.GetAttachedEntityCount3
+                annotation.GetAttachedEntityTypes = case.annotation.GetAttachedEntityTypes
+                annotation.GetSpecificAnnotation = lambda display=case.display: display
+                case.native, case.annotation = native, annotation
+                case.attachments = tuple(annotation.GetAttachedEntities3())
+                cases[annotation.name] = case
+        monkeypatch.setattr(
+            disc, "supplier_reference_dimension", supplier.supplier_reference_dimension
+        )
+        monkeypatch.setattr(
+            disc, "assert_supplier_reference_dimension",
+            supplier.assert_supplier_reference_dimension,
+        )
+        adapter, result = object(), {"offline": "native presentation"}
+        settings = {}
+
+        async def capture(actual_adapter, drawing_spec, **kwargs):
+            assert actual_adapter is adapter and drawing_spec is recipe.SPEC
+            settings.update(kwargs)
+            kwargs["supplier_dimensions"](
+                adapter, views, reference_bounds=_captured_reference_bounds(views)
+            )
+            return result
+
+        monkeypatch.setattr(recipe, "build_supplier_spring_drawing", capture)
+        assert asyncio.run(recipe.build(adapter)) is result
+        return SimpleNamespace(
+            recipe=recipe, spec=spec, views=views, cases=cases,
+            checks=settings["settled_checks"],
+        )
+
+    return build
+
+
+@pytest.mark.parametrize(
+    "module_name,callouts",
+    [
+        (
+            "draw_dt_vn_cylinder_bank_spring",
+            {"SupplierWorkingHeight": "COMPRESSED HEIGHT",
+             "SupplierWorkingDeflection": "DEFLECTION"},
+        ),
+        (
+            "draw_pd_vn_transgear_pivot_spring",
+            {"SupplierWorkingHeight": "COMPRESSED HEIGHT", "SupplierShaftDia": "FOR SHAFT"},
+        ),
+        ("draw_ch_vn_rocker_bank_spring", {"SupplierID": "SEE NOTE 1"}),
+    ],
+    ids=["cylinder", "pivot", "rocker"],
+)
+def test_disc_recipe_id_flag_preserves_native_supplier_presentation(
+    disc_recipe_native, module_name, callouts
+):
+    sheet = disc_recipe_native(module_name)
+    for check in sheet.checks:
+        check()
+    assert sheet.checks
+    for semantic, precision in sheet.spec.SUPPLIER_DRAWING_PRECISION.items():
+        name = stock.SUPPLIER_DIMENSION_NAMES[semantic]
+        case = sheet.cases[name]
+        assert case.text == {
+            1: "(<MOD-DIAM>" if semantic in ("ID", "OD", "SHAFT_DIA") else "(",
+            2: " in)",
+            4: callouts.get(name, ""),
+        }
+        assert case.state.unit == 3 and case.state.precision == precision
+        assert case.display.ShowDimensionValue and not case.display.GetOverride()
+        assert case.native.GetSystemValue3(3, refs.SUPPLIER_DIAGRAM_CONFIGURATION) == (
+            getattr(sheet.spec, semantic) / 1000,
+        )
+        assert tuple(case.annotation.GetAttachedEntities3()) == case.attachments
+        assert case.annotation.Owner.ReferencedConfiguration == refs.SUPPLIER_DIAGRAM_CONFIGURATION
+    assert sheet.cases["SupplierID"].native.FullName == "SupplierID@DiscSupplierPlan@Source"
+
+
+def test_rocker_id_flag_links_single_exact_numbered_binding_requirement(disc_recipe_native):
+    sheet = disc_recipe_native("draw_ch_vn_rocker_bank_spring")
+    notes = _config.parts(sheet.recipe.SPEC.artifact_stem)["installation_notes"]
+    requirement = "REJECT ANY SPRING THAT BINDS WHEN SLID ALONG MHA-CH-05."
+    assert notes.splitlines() == [
+        "INSTALLATION - ON MHA-CH-05, BETWEEN THE MHA-CH-VN-56 WASHER AND THE",
+        "SOUTH MHA-CH-08 EAR, AS ASSEMBLED ON MHA-CH-00.",
+        f"1. {requirement}",
+    ]
+    assert notes.count(requirement) == 1
+    assert {
+        name: case.text[4] for name, case in sheet.cases.items() if case.text[4]
+    } == {"SupplierID": "SEE NOTE 1"}
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["missing_flag", "wrong_flag", "precision", "parentheses", "override",
+     "attachment", "source_owner", "configuration", "value", "source_band"],
+)
+def test_rocker_flag_participates_in_settled_native_proof(disc_recipe_native, corruption):
+    sheet = disc_recipe_native("draw_ch_vn_rocker_bank_spring")
+    for check in sheet.checks:
+        check()
+    case = sheet.cases["SupplierID"]
+    if corruption == "missing_flag":
+        case.text[4] = ""
+    elif corruption == "wrong_flag":
+        case.text[4] = "SEE NOTE 2"
+    elif corruption == "precision":
+        case.state.precision += 1
+    elif corruption == "parentheses":
+        case.text[1] = "<MOD-DIAM>"
+    elif corruption == "override":
+        case.display.GetOverride = lambda: True
+    elif corruption == "attachment":
+        case.annotation.GetAttachedEntities3 = lambda: ()
+    elif corruption == "source_owner":
+        case.native.FullName = "SupplierID@InstalledAnnulus@Source"
+    elif corruption == "configuration":
+        sheet.views["free_top"].ReferencedConfiguration = "OriginalInstalled"
+    elif corruption == "value":
+        case.native.value += 0.01
+    else:
+        case.native.Tolerance.Type = 0
+    with pytest.raises(RuntimeError):
+        for check in sheet.checks:
+            check()
+
+
 @pytest.mark.parametrize("spec,count", [(cylinder, 6), (rocker, 4), (pivot, 6)])
 @pytest.mark.parametrize(
     "corruption", ["owner", "config", "value", "missing", "extra", "band"]
@@ -346,6 +502,7 @@ def test_disc_final_checks_reacquire_source_and_application_gauges(
         spec=spec,
         reference_bounds=_captured_reference_bounds(views),
         settled_checks=checks,
+        **({"id_callout": "SEE NOTE 1"} if spec is rocker else {}),
     )
     assert sum(len(view.annotations) for view in views.values()) == count
     for check in checks:

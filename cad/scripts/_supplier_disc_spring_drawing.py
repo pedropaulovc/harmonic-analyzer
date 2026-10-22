@@ -141,6 +141,7 @@ def supplier_disc_spring_dimensions(
     *,
     spec: Any,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
+    id_callout: str | None = None,
     settled_checks: list[Callable[[], None]] | None = None,
 ) -> None:
     """Import native nominal sizes from explicitly nonphysical diagrams.
@@ -149,6 +150,7 @@ def supplier_disc_spring_dimensions(
     dimensions, not a wave/bow reconstruction or the installed annulus/cone.
     Working-height/deflection planes and nominal mating-shaft circles are
     separate application gauges, not an invented loaded spring or bore.
+    The optional ID flag links an existing installation requirement, not a new size.
     """
     references = []
     placements = {}
@@ -210,11 +212,13 @@ def supplier_disc_spring_dimensions(
             )
             for semantic in height_sizes
         }
-    application_labels = {
+    reference_labels = {
         "WORKING_HEIGHT": "COMPRESSED HEIGHT",
         "WORKING_DEFLECTION": "DEFLECTION",
         "SHAFT_DIA": "FOR SHAFT",
     }
+    if id_callout is not None:
+        reference_labels["ID"] = id_callout
 
     for key, positions in placements.items():
         keep = {
@@ -245,8 +249,8 @@ def supplier_disc_spring_dimensions(
                     "diameter" if semantic in ("ID", "OD", "SHAFT_DIA") else "length"
                 ),
             }
-            if semantic in application_labels:
-                arguments["callout"] = application_labels[semantic]
+            if semantic in reference_labels:
+                arguments["callout"] = reference_labels[semantic]
             supplier_reference_dimension(adapter, display, **arguments)
             if key == "free_top":
                 set_near_side_diameter(annotation, arguments["label"])

@@ -10,7 +10,7 @@ ch-vn-rocker-bank-spring:
   installation_notes: |-
     INSTALLATION - ON MHA-CH-05, BETWEEN THE MHA-CH-VN-56 WASHER AND THE
     SOUTH MHA-CH-08 EAR, AS ASSEMBLED ON MHA-CH-00.
-    REJECT ANY SPRING THAT BINDS WHEN SLID ALONG MHA-CH-05.
+    1. REJECT ANY SPRING THAT BINDS WHEN SLID ALONG MHA-CH-05.
   quantity: 1
   tolerance_class: machined_block
   process: purchased
