@@ -1688,7 +1688,8 @@ enable Python UTF-8 mode, so default-encoding reads use UTF-8 independently of t
 host locale.
 
 Exit 0 means source-input enumeration completed; 3 means required source inputs
-were unavailable; 2 means a tool error. Optional `--durations` accepts measured
+were unavailable; 2 means a tool error. Error reports preserve multiline diagnostic
+text inside a fenced block and neutralize embedded backticks. Optional `--durations` accepts measured
 evidence as `{"source":"evidence identifier","durations_seconds":{"part:fr_top_frame":12.5}}`;
 without it, work estimates are unavailable. The informational PR workflow runs
 the reporter in a networkless, read-only container and publishes JSON and Markdown
