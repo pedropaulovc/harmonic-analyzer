@@ -429,6 +429,53 @@ def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
         drawing.face_rim(_drawing_edges.ViewEdges(label="edge", edges=()), frame)
 
 
+@pytest.mark.parametrize(
+    "radius, root_z, end_z",
+    (
+        (spec.SPIGOT_DIA / 2.0, 0.0, spec.SPIGOT_LENGTH),
+        (spec.HUB_DIA / 2.0, -spec.FLANGE_THICK, drawing.HUB_FRONT_Z),
+    ),
+)
+@pytest.mark.parametrize("fault", (None, "root missing", "ambiguous", "one face"))
+def test_corner_root_retains_the_exact_root_not_the_visible_free_end(
+    monkeypatch, radius: float, root_z: float, end_z: float, fault: str | None,
+) -> None:
+    """Visible terminal rims only navigate topology; they never replace roots."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+
+    def circle_edge(z):
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(0.0, 0.0, z / 1000.0, 0.0, 0.0, 1.0, radius / 1000.0),
+        )
+        return SimpleNamespace(GetCurve=lambda: curve)
+
+    root_edge = circle_edge(root_z)
+    free_edge = circle_edge(end_z)
+    cylinder_edges = [free_edge]
+    if fault != "root missing":
+        cylinder_edges.append(root_edge)
+    if fault == "ambiguous":
+        cylinder_edges.append(circle_edge(root_z))
+    faces = [
+        SimpleNamespace(GetEdges=lambda: cylinder_edges),
+        SimpleNamespace(GetEdges=lambda: [free_edge]),
+    ]
+    free_edge.GetTwoAdjacentFaces2 = lambda: faces[:1] if fault == "one face" else faces
+    terminal = _drawing_edges.ViewEdge(
+        edge=free_edge, line=None,
+        circle=(0.0, 0.0, end_z, 0.0, 0.0, 1.0, radius), vertices=None,
+    )
+    visible = _drawing_edges.ViewEdges(label="visible terminal only", edges=(terminal,))
+    root = drawing.FaceFrame("actual model root", root_z, radius, -radius)
+    if fault is None:
+        assert drawing.corner_root_rim(visible, root, end_z) is root_edge
+    else:
+        expected = "expected two faces" if fault == "one face" else "matched"
+        with pytest.raises(RuntimeError, match=expected):
+            drawing.corner_root_rim(visible, root, end_z)
+
+
 def _surface_face(
     identity: int, parameters: tuple[float, ...], *, flipped: bool = False
 ):

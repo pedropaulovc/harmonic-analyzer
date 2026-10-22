@@ -640,3 +640,98 @@ def test_settled_projection_notes_use_native_ink_and_attached_state(
     else:
         with pytest.raises(RuntimeError):
             drawing._assert_projection_notes_clear(adapter, notes)
+
+
+@pytest.mark.parametrize(
+    "name, xy_mm, direction",
+    [
+        (f"plate_hole_{index}_position", xy, 1.0)
+        for index, xy in enumerate(geometry.SCREW_HOLES, 1)
+    ] + [("knob_projected_axis", (0.0, 0.0), -1.0)],
+)
+def test_projected_axis_runs_the_real_control_and_projection_path(
+    monkeypatch, name: str, xy_mm: tuple[float, float], direction: float,
+) -> None:
+    """Exercise real control lookup and mm-to-sheet math, not native ink."""
+    from types import SimpleNamespace
+
+    import _drawing_projection as projection
+
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
+    model_to_sheet = lambda xyz: (0.200 + xyz[0] * scale,
+                                  0.100 + xyz[2] * scale, 0.0)
+    sheet_to_sketch = lambda xyz: (xyz[0] - 0.030, xyz[1] + 0.020, xyz[2])
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            # double_array supplies a typed pywin32 VARIANT on Windows;
+            # its SAFEARRAY payload is .value, not the wrapper itself.
+            self.ArrayData = tuple(getattr(coordinates, "value", coordinates))
+
+        def MultiplyTransform(self, transform):
+            return MathPoint(transform.apply(self.ArrayData))
+
+    utility = SimpleNamespace(CreatePoint=MathPoint)
+    lines = []
+
+    def create_line(*coordinates):
+        start = SimpleNamespace(**dict(zip("XYZ", coordinates[:3])))
+        end = SimpleNamespace(**dict(zip("XYZ", coordinates[3:])))
+        line = SimpleNamespace(
+            GetStartPoint2=lambda: start, GetEndPoint2=lambda: end, Color=-1,
+        )
+        lines.append((tuple(coordinates), line))
+        return line
+
+    manager = SimpleNamespace(AddToDB=False, CreateCenterLine=create_line)
+    activated, rebuilt = [], []
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility),
+        currentModel=SimpleNamespace(
+            ActivateView=lambda label: activated.append(label) or True,
+            ClearSelection2=lambda _all: None, SketchManager=manager,
+        ),
+        _get_attr_or_call=lambda obj, member: (
+            getattr(obj, member)() if callable(getattr(obj, member))
+            else getattr(obj, member)
+        ),
+    )
+    view = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(
+            ModelToSketchTransform=SimpleNamespace(apply=sheet_to_sketch),
+        ),
+        ModelToViewTransform=SimpleNamespace(apply=model_to_sheet),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "side-on section")
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing",
+        lambda _adapter, *, label: rebuilt.append(label),
+    )
+    monkeypatch.setattr(
+        projection, "_com_invoke",
+        lambda obj, _interface, member, *args: (
+            getattr(obj, member)(*args) if callable(getattr(obj, member))
+            else getattr(obj, member)
+        ),
+    )
+
+    drawing._projected_axis_graphic(
+        adapter, view, name=name, xy_mm=xy_mm, direction=direction,
+    )
+
+    control = next(control for control in spec.GEOMETRIC_CONTROLS if control.key == name)
+    assert control.projected_zone_height_mm is not None
+    expected = tuple(
+        coordinate
+        for z_mm in (0.0, direction * control.projected_zone_height_mm)
+        for coordinate in sheet_to_sketch(model_to_sheet(
+            (xy_mm[0] / 1000.0, xy_mm[1] / 1000.0, z_mm / 1000.0),
+        ))
+    )
+    assert len(lines) == 1
+    assert lines[0][0] == pytest.approx(expected)
+    assert lines[0][1].Color == 0
+    assert manager.AddToDB is False
+    assert activated == ["side-on section"]
+    assert rebuilt == [f"plate {name} projected axis"]

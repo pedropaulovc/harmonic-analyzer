@@ -37,6 +37,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
     set_reference_dimension,
+    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_notes import add_property_linked_note, property_link
@@ -114,8 +115,9 @@ END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.026),
     "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0215),
     "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.075),
-    "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
-    "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
+    # Keep the opposing outside-arrow tails off the other pattern's text.
+    "PinPosY": (END_CENTER[0] - HALF_OD - 0.027, END_CENTER[1] + PIN_R / 2.0 + 0.003),
+    "PinNegY": (END_CENTER[0] - HALF_OD - 0.027, END_CENTER[1] - PIN_R / 2.0 - 0.003),
 }
 # SolidWorks prints "SECTION A-A / SCALE 4:1" under the section, its top
 # 16.6 mm under the view's lower edge and centred on it (measured on run
@@ -124,14 +126,16 @@ END_KEEP = {
 # pointer to its sheet note; the pilot's text stands right of its short
 # span. The overall reference reads above the section, and the rear entry
 # break above its rear edge wholly left of the overall's rear witness line.
-# The outside diameter reads right of the pilot's.
-_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
+# The full native qualifier boxes need their own outboard columns, not
+# merely separate value centres. Keep both length texts at least 2.4 mm below the
+# body's lower diameter witness line (actual 146d9f142 sheet metrics).
+_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.007
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
     "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
-    "CollarDia": (_PILOT_X + 0.047, SIDE_CENTER[1]),
-    "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.048, SIDE_CENTER[1] + HALF_OD + 0.048),
+    "CollarDia": (_PILOT_X + 0.115, SIDE_CENTER[1]),
+    "PilotDia": (_PILOT_X + 0.043, SIDE_CENTER[1]),
+    "BoreEntryBreak": (_REAR_X - 0.048, SIDE_CENTER[1] + HALF_OD + 0.045),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
@@ -177,7 +181,9 @@ DIMENSION_CALLOUTS_BELOW = {
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
     "BoreEntryBreak": BORE_ENTRY_BREAK_CALLOUT,
 }
-ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
+# Beside the isometric, above the OD's upper witness: a caption beneath
+# the isometric would be struck by the newly outboard diameter line.
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.075, ISO_CENTER[1] + 0.020)
 # The part's two notes, then the drawing's two fitted-length notes, in one
 # block; the actual fit procedure is linked to its assembly step.
 NOTES_XY = (0.016, 0.085)
@@ -334,6 +340,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    # The pilot model carries the fitted nominal, not a supplied working
+    # size. Note 3 owns the unchanged supply minimum and fitted limits.
+    set_reference_dimensions(adapter, side_annotations, {"PilotLength"})
     _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the collar end view")

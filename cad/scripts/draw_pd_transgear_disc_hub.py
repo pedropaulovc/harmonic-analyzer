@@ -331,6 +331,42 @@ def face_rim(edges: ViewEdges, frame: FaceFrame) -> ViewEdge:
     return matches[0]
 
 
+def corner_root_rim(
+    edges: ViewEdges, root: FaceFrame, free_end_station_mm: float
+) -> Any:
+    """Find the actual root through its turned cylinder's visible free-end rim.
+
+    In the edge view the root circle projects inside the flange-face line,
+    so the visible-edge census contains the free-end rim, not the root.
+    The free end's two adjacent faces still own the exact model root edge;
+    retain the root's authored radius and station rather than moving the
+    arrow to the free end or attaching it to the flange's outer circle.
+    """
+    free_end = FaceFrame(
+        root.label, free_end_station_mm, root.rim_radius_mm, root.landing_x_mm
+    )
+    rim = face_rim(edges, free_end)
+    faces = tuple(face for face in rim.edge.GetTwoAdjacentFaces2() or () if face is not None)
+    if len(faces) != 2:
+        raise RuntimeError(f"{root.label}: expected two faces at the free-end rim")
+    circles = []
+    for face in faces:
+        for raw_edge in _early_bound(face, "IFace2").GetEdges() or ():
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            raw = tuple(float(value) for value in curve.CircleParams)
+            circle = (*[value * 1000.0 for value in raw[:3]], *raw[3:6], raw[6] * 1000.0)
+            circles.append(ViewEdge(edge=edge, line=None, circle=circle, vertices=None))
+    return face_rim(
+        ViewEdges(label=f"{root.label} adjacent-face rims", edges=tuple(circles)), root
+    ).edge
+
+
 def controlled_face(rim: ViewEdge, frame: FaceFrame) -> Any:
     """The face ``frame`` controls, of the two its rim joins (the face and the
     turned diameter it ends): the one plane matching ``frame.face``.  Two
@@ -540,12 +576,12 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     # Existing R0.1 limits belong at the two flange roots. Their source-
     # linked text moves out of the notes; the sharp model is unchanged.
-    for property_name, radius, station, note_xy in (
-        ("Spigot Corner Callout", SPIGOT_DIA / 2.0, 0.0, (0.290, 0.100)),
-        ("Hub Corner Callout", HUB_DIA / 2.0, -FLANGE_THICK, (0.290, 0.084)),
+    for property_name, radius, station, free_end_station, note_xy in (
+        ("Spigot Corner Callout", SPIGOT_DIA / 2.0, 0.0, SPIGOT_LENGTH, (0.290, 0.100)),
+        ("Hub Corner Callout", HUB_DIA / 2.0, -FLANGE_THICK, HUB_FRONT_Z, (0.290, 0.084)),
     ):
         root = FaceFrame(property_name, station, radius, -radius)
-        edge = face_rim(side_edges, root).edge
+        edge = corner_root_rim(side_edges, root, free_end_station)
         (landing,) = model_points_in_view(
             adapter,
             side,

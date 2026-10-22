@@ -143,13 +143,24 @@ SECTION_KEEP = {
     "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
-COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
+COUNTERSINK_ANGLE_TEXT_XY = (0.284, _section_y(0.0) - 0.008)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
 # would run into the dish chord.
-DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
-DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": CSK_QUALIFIER}
+DIMENSION_CALLOUTS_ABOVE = {
+    "HeadDia": KNURL_CALLOUT,
+    "CountersinkHalfAngle": "HALF INCLUDED ANGLE",
+}
+# These cones admit the stud and bound lost nut-thread engagement; they
+# are not a countersunk-head seat. The MAX is an actual limit, so rounding
+# its three-place spelling or doubling the half-angle band changes function.
+DIMENSION_CALLOUTS_BELOW = {
+    "CountersinkDia": (
+        f"{CSK_QUALIFIER}\nSTUD ENTRY: MHA-PD-08\nLIMITS THREAD LOSS"
+    ),
+    "CountersinkHalfAngle": "THREAD ENGAGEMENT\nMHA-PD-08 KNOB-SHAFT STUD",
+}
 
 
 def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:

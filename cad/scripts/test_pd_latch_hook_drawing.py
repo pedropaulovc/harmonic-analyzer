@@ -14,6 +14,13 @@ import draw_pd_latch_hook as drawing
 import pd_latch_hook_geometry as geom
 import pd_latch_hook_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES
+from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
+    Box,
+    Segment,
+    point_segment_distance,
+    segment_box_distance,
+)
 from _test_stubbed_build import offline_adapter, stub_seat
 
 
@@ -635,6 +642,125 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
                 line_name,
                 name,
             )
+
+
+@pytest.mark.parametrize("leader_miss", (0.000299, 0.0006))
+def test_removed_view_arrow_clears_native_root_and_the_whole_layout(
+    monkeypatch, leader_miss,
+) -> None:
+    """Exercise the real arrow authoring, including native-format readback
+    and optional squaring; compare its resulting ink with the whole sheet."""
+    requested = {}
+    state = {}
+    text_format = SimpleNamespace(
+        CharHeight=0.003, IsHeightSpecifiedInPts=lambda: False,
+    )
+    format_writes = []
+
+    def set_format(index, use_document, value):
+        format_writes.append((index, use_document, value.CharHeight))
+        state["format"] = value
+        return True
+
+    def leader_points(_index):
+        return (*state["start"], 0.0, *state["tip"], 0.0)
+
+    def set_position(x, y, z):
+        old_x, old_y, _old_z = state["position"]
+        start_x, start_y = state["start"]
+        state["start"] = (start_x + x - old_x, start_y + y - old_y)
+        state["position"] = (x, y, z)
+        return True
+
+    annotation = SimpleNamespace(
+        GetTextFormat=lambda _index: state["format"],
+        SetTextFormat=set_format,
+        GetLeaderPointsAtIndex=leader_points,
+        GetPosition=lambda: state["position"],
+        SetPosition2=set_position,
+    )
+
+    def add_leader_note(_adapter, _text, **kwargs):
+        requested.update(kwargs)
+        text_x, text_y = kwargs["text_xy"]
+        # 146d9f142 native evidence (2026-10-22): the text-end leader
+        # begins about 2.1 mm below its note anchor and may miss the tip's
+        # X by up to the production squaring tolerance.
+        state.update(
+            format=text_format,
+            position=(text_x, text_y, 0.0),
+            start=(text_x - leader_miss, text_y - 0.0021),
+            tip=kwargs["attach_xy"],
+        )
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    monkeypatch.setattr(drawing, "add_leader_note", add_leader_note)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    drawing._bottom_view_arrow(object(), object())
+
+    assert format_writes == [(0, False, 0.005)]
+    assert state["tip"] == requested["attach_xy"]
+    assert requested["attach_xy"][0] == requested["text_xy"][0]
+    assert requested["attach_xy"][1] > requested["text_xy"][1]  # +Y viewing ray
+    assert abs(state["start"][0] - state["tip"][0]) <= 0.0003
+    p, q = state["start"], state["tip"]
+    leader = Segment(*p, *q)
+
+    # Actual 146d9f142 RootR glyph bounds from the retained failed task log.
+    native_root_ink = Box(0.2184, 0.2165, 0.2271, 0.2201)
+    failed_ray = Segment(0.2268, 0.2058, 0.2271, 0.2259)
+    assert segment_box_distance(failed_ray, native_root_ink) == 0.0
+    boxes = {
+        **{name: Box(*box) for name, box in {**_texts(), **_notes()}.items()},
+        "146d RootR ink": native_root_ink,
+    }
+    for name, box in boxes.items():
+        assert segment_box_distance(leader, box) >= ARROW_TEXT_CLEARANCE_M, name
+
+    lines = {
+        **_front_lines(),
+        **_overall_lines(),
+        **_bottom_lines(drawing.BOTTOM_KEEP),
+        **_bend_leader(drawing.BOTTOM_KEEP["InsideBendR"]),
+    }
+    pin = drawing.FRONT_KEEP["PinHoleDia"]
+    hole = drawing._front(*geom.PIN_HOLE_L)
+    u = sum(
+        (pin[i] - hole[i]) / drawing._S * geom.ARM_U[i] for i in range(2)
+    )
+    for side in (-1, 1):
+        n = side * geom.PIN_HOLE_DIA / 2.0
+        lines[f"pin extension {side}"] = (
+            drawing._front(*drawing._on(geom.PIN_HOLE_L, -0.5, n)),
+            drawing._front(*drawing._on(geom.PIN_HOLE_L, u - 1.0, n)),
+        )
+    lines["pin dimension"] = (lines["pin extension -1"][1], pin)
+    # HISTORICAL, not observed on 146d: 062316620Z's native RootR leader.
+    # RootR's source geometry and annotation position have not changed.
+    lines.update({
+        "historical RootR radial": ((0.2122785, 0.2245229), (0.2150948, 0.2156055)),
+        "historical RootR extension": ((0.211375, 0.2273837), (0.2122785, 0.2245229)),
+        "historical RootR underline": ((0.2150948, 0.2156055), (0.2285677, 0.2156055)),
+    })
+    for name, (r, s) in lines.items():
+        assert not _crosses(p, q, r, s), name
+        other = Segment(*r, *s)
+        assert min(
+            point_segment_distance(p, other),
+            point_segment_distance(q, other),
+            point_segment_distance(r, leader),
+            point_segment_distance(s, leader),
+        ) >= ARROW_TEXT_CLEARANCE_M, name
+
+    # A ten-millimetre square overbounds the native five-millimetre letter.
+    height = text_format.CharHeight
+    letter = Box(p[0] - height, p[1] - height, p[0] + height, p[1] + height)
+    for name, box in boxes.items():
+        assert letter.gap(box) >= ARROW_TEXT_CLEARANCE_M, name
+    for region in (*_part_regions(), _iso_box()):
+        assert segment_box_distance(leader, Box(*region)) >= ARROW_TEXT_CLEARANCE_M
+        assert letter.gap(Box(*region)) >= ARROW_TEXT_CLEARANCE_M
 
 
 class _Display:

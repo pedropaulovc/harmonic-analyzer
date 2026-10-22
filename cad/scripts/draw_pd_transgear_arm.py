@@ -519,7 +519,7 @@ def _projected_axis_graphics(adapter: Any, section: Any) -> None:
         for index, station in enumerate(PLATE_TAP_STATIONS, 1)
     ]
     zones.append(("feed_stud_projected_axis", PIN_STATION, -1.0))
-    controls = {control.name: control for control in GEOMETRIC_CONTROLS}
+    controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     for label, station, direction in zones:
         height = controls[label].projected_zone_height_mm
         if height is None:

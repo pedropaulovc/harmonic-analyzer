@@ -262,11 +262,11 @@ OVERALL_TEXT_XY = _right(24.0, -55.0)
 
 def _bottom_view_arrow(adapter: Any, right: Any) -> None:
     """Identify removed VIEW A by its +Y viewing direction, not its page position."""
-    tip = _right(-7.0, -3.0)
+    tip = _right(-9.5, -3.0)
     note = add_leader_note(
         adapter,
         "A",
-        text_xy=_right(-7.0, -15.0),
+        text_xy=_right(-9.5, -15.0),
         attach_xy=tip,
         view=right,
         label="removed bottom view A viewing arrow",

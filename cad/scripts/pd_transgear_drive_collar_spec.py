@@ -206,9 +206,13 @@ BORE_ENTRY_BREAK_LEG_MAX = max(
 )
 # The two selected edges are the rear opening's arc and flat, not two ends.
 # Retain BOTH LEGS: the existing wall/drive bounds spend both physical legs.
+# This is also an upper-controlled D-flat preservation feature: at 46 deg
+# the 0.250 maximum leg grows to 0.258883, below the 0.270 profile-depth
+# ceiling. A minimum-only break would discard that authored drive budget.
 BORE_ENTRY_BREAK_CALLOUT = (
     f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG\n"
-    "REAR END ONLY; ARC AND FLAT\nBOTH LEGS\nCLEARS MHA-PD-08 SHAFT CORNER"
+    "REAR END ONLY; ARC AND FLAT\nBOTH LEGS\nCLEARS MHA-PD-08 SHAFT CORNER\n"
+    "RETAINS D-FLAT DRIVE"
 )
 # Spend both turned-surface axes independently; no perfect common-axis credit.
 NECK_D_BORE_AIR_MIN = (

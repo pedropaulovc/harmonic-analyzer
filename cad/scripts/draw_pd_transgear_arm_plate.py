@@ -381,7 +381,7 @@ def _projected_axis_graphic(
     and bypass inference snaps. The native model FCF, not this graphic,
     remains the numerical control.
     """
-    control = next(control for control in GEOMETRIC_CONTROLS if control.name == name)
+    control = next(control for control in GEOMETRIC_CONTROLS if control.key == name)
     height = control.projected_zone_height_mm
     if height is None:
         raise RuntimeError(f"plate {name} has no native projected height")

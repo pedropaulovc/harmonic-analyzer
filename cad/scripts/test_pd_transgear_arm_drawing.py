@@ -9,10 +9,12 @@ import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _drawing_projection as projection
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_latch_hook_geometry as hook
@@ -556,6 +558,107 @@ def test_projected_tap_note_boxes_clear_each_other_and_the_title_block() -> None
         or first[3] + 0.002 < second[1]
         or second[3] + 0.002 < first[1]
     )
+
+
+def test_projected_axes_resolve_real_controls_and_transform_complete_zones(monkeypatch) -> None:
+    """Exercise the real arm graphics body and projection math without COM."""
+    class MathTransform:
+        """A non-callable dispatch-shaped transform, not a zero-arg method."""
+        def __init__(self, map_point):
+            self.map_point = map_point
+
+        def apply(self, coordinates):
+            return self.map_point(coordinates)
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            # Real double_array returns VARIANT(VT_ARRAY | VT_R8) on Windows,
+            # and a plain numeric list where pywin32 is unavailable.
+            self.ArrayData = tuple(getattr(coordinates, "value", coordinates))
+
+        def MultiplyTransform(self, transform):
+            return MathPoint(transform.apply(self.ArrayData))
+
+    class MathUtility:
+        def CreatePoint(self, coordinates):
+            return MathPoint(coordinates)
+
+    class SketchLine:
+        def __init__(self, start, end):
+            self.start = SimpleNamespace(**dict(zip("XYZ", start)))
+            self.end = SimpleNamespace(**dict(zip("XYZ", end)))
+            self.Color = 1
+
+        def GetStartPoint2(self):
+            return self.start
+
+        def GetEndPoint2(self):
+            return self.end
+
+    class SketchManager:
+        def __init__(self):
+            self.AddToDB = False
+            self.lines = []
+
+        def CreateCenterLine(self, x1, y1, z1, x2, y2, z2):
+            assert self.AddToDB is True
+            line = SketchLine((x1, y1, z1), (x2, y2, z2))
+            self.lines.append(line)
+            return line
+
+    def attr_or_call(obj, name, *args):
+        value = getattr(obj, name)
+        return value(*args) if callable(value) else value
+
+    # A genuine affine model→sheet→view-sketch path: source Z projects
+    # rearward down the sheet, then the sketch transform removes its 2:1 scale.
+    model_to_sheet = MathTransform(
+        lambda xyz: (0.040 + 2.0 * xyz[0], 0.150 - 2.0 * xyz[2], 0.0)
+    )
+    sheet_to_sketch = MathTransform(
+        lambda xyz: ((xyz[0] - 0.010) / 2.0, (xyz[1] + 0.020) / 2.0, xyz[2])
+    )
+    manager = SketchManager()
+    native_draw = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=manager,
+    )
+    view = SimpleNamespace(
+        GetName2=lambda: "Section C-C",
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=sheet_to_sketch),
+        ModelToViewTransform=model_to_sheet,
+    )
+    adapter = SimpleNamespace(
+        currentModel=native_draw,
+        swApp=SimpleNamespace(GetMathUtility=lambda: MathUtility()),
+        _get_attr_or_call=attr_or_call,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        projection, "_com_invoke",
+        lambda obj, _interface, member, *args: attr_or_call(obj, member, *args),
+    )
+
+    # Do not replace GEOMETRIC_CONTROLS: real dataclass identity/height lookup
+    # must happen before native line creation (the former .name defect failed here).
+    drawing._projected_axis_graphics(adapter, view)
+
+    expected = [
+        (station, -geometry.CLAMP_TAP_PROJECTED_HEIGHT_MM)
+        for station in geometry.PLATE_TAP_STATIONS
+    ]
+    expected.append((geometry.PIN_STATION, spec.REGISTRATION.S_PROJECTED_HEIGHT_MM))
+    assert len(manager.lines) == len(expected)
+    for line, (station, signed_height) in zip(manager.lines, expected, strict=True):
+        start = tuple(getattr(line.start, axis) for axis in "XYZ")
+        end = tuple(getattr(line.end, axis) for axis in "XYZ")
+        assert start == pytest.approx((station / 1000.0 + 0.015, 0.085, 0.0))
+        assert end == pytest.approx((start[0], 0.085 + signed_height / 1000.0, 0.0))
+        assert end[1] - start[1] == pytest.approx(signed_height / 1000.0)
+        assert line.Color == 0
+    assert manager.AddToDB is False
 
 
 # "\u2316 \u00d80.050 A B C" as rendered on the stack sheet (1c103499e).
