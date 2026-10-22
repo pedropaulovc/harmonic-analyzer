@@ -239,10 +239,13 @@ missing, ambiguous or unreadable section edge remains a diagnostic refusal.
 
 The `cfcfbd3175be` native run returned zero occurrence-listed edges at the
 first C2 station; this does not establish that the drawn section geometry is
-absent. A temporary diagnostic-only pass samples all thirteen unchanged
-stations with the frame assembly's narrow-zoom pick pattern, recording native
-selection type, both ownership channels, raw-dispatch binding failures, curve
-endpoints and independent part-local/assembly-world closest-point results.
+absent. The `9d3905dea289` probe picked at all fourteen unchanged stations,
+but each pick had two selection slots; its single-slot gate prevented any
+ownership or geometry readback. The temporary diagnostic now records each of
+the first four slots independently, including raw interface/binding errors,
+native view identity, both edge-ownership channels, curve endpoints and
+part-local/assembly-world closest-point results. It uses the frame assembly's
+existing narrow-zoom pattern, not inferred identities for the two slots.
 It never supplies an accepted edge or creates a label: the original exact-edge
 refusal remains unconditional. Do not infer a geometry frame from an owner name.
 

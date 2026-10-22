@@ -2793,72 +2793,107 @@ def _probe_capture_reading_picks(adapter: Any, views: Sequence[Any]) -> None:
                 ))
             count = int(manager.GetSelectedObjectCount2(-1))
             evidence["count"] = count
-            if count != 1:
-                continue
-            native_type = int(manager.GetSelectedObjectType3(1, -1))
-            entity = manager.GetSelectedObject6(1, -1)
-            evidence["native_type"] = native_type
-            evidence["entity_python_type"] = type(entity).__name__
-            evidence["entity_has_oleobj"] = getattr(entity, "_oleobj_", None) is not None
-            if native_type != 1 or entity is None:
-                continue
-            owners = {}
-            try:
-                owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent()
-                owners["entity"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
-                evidence["entity_owner"] = str(owners["entity"].Name2) if owner is not None else None
-            except Exception as exc:
-                evidence["entity_owner_or_binding_error"] = repr(exc)
-            try:
-                owner = manager.GetSelectedObjectsComponent4(1, -1)
-                evidence["component4_python_type"] = type(owner).__name__
-                evidence["component4_has_oleobj"] = getattr(owner, "_oleobj_", None) is not None
-                if owner is not None:
-                    interface = getattr(owner, "_oleobj_", owner).GetTypeInfo().GetDocumentation(-1)[0]
-                    evidence["component4_interface"] = interface
-                    if interface == "IDrawingComponent":
-                        owner = _early_bound(_bind(owner, interface), interface).Component
-                    elif interface != "IComponent2":
-                        raise RuntimeError(f"unresolved Component4 native interface {interface!r}")
-                owners["component4"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
-                evidence["component4_owner"] = str(owners["component4"].Name2) if owner is not None else None
-            except Exception as exc:
-                evidence["component4_owner_or_binding_error"] = repr(exc)
-            transforms = {}
-            for channel, owner in owners.items():
-                if owner is None:
-                    continue
+            evidence["uninspected_slots"] = max(0, count - 4)
+            slots = []
+            evidence["selected_slots"] = slots
+            for index in range(1, min(count, 4) + 1):
+                slot: dict[str, Any] = {"index": index}
+                slots.append(slot)
+                native_type, entity = None, None
                 try:
-                    transform = _early_bound(_bind(owner.Transform2, "IMathTransform"), "IMathTransform")
-                    values = tuple(float(value) for value in transform.ArrayData)
-                    evidence[f"{channel}_transform2"] = values
-                    if len(values) != 16:
-                        raise RuntimeError("incomplete native component transform")
-                    transforms[channel] = values
+                    native_type = int(manager.GetSelectedObjectType3(index, -1))
+                    slot["native_type"] = native_type
                 except Exception as exc:
-                    evidence[f"{channel}_transform_or_binding_error"] = repr(exc)
-            edge = _early_bound(_bind(entity, "IEdge"), "IEdge")
-            try:
-                curve = edge.GetCurve()  # Required before GetCurveParams2.
-                evidence["curve_endpoints_m"] = (
-                    tuple(float(value) for value in (edge.GetCurveParams2() or ()))[:6]
-                    if curve is not None else None
-                )
-            except Exception as exc:
-                evidence["curve_or_binding_error"] = repr(exc)
-            for frame, target in (("local", local), ("world", world)):
+                    slot["native_type_error"] = repr(exc)
                 try:
-                    closest = tuple(float(value) for value in (edge.GetClosestPointOn(*target) or ()))
-                    evidence[f"closest_{frame}_m"] = closest[:3]
-                    evidence[f"closest_{frame}_parameter"] = closest[3] if len(closest) > 3 else None
-                    evidence[f"distance_{frame}_mm"] = math.dist(closest[:3], target) * 1000.0
-                    for channel, values in transforms.items():
-                        evidence[f"closest_{frame}_via_{channel}_world_m"] = tuple(
-                            values[12] * sum(closest[j] * values[i + 3 * j] for j in range(3)) + values[9 + i]
-                            for i in range(3)
+                    entity = manager.GetSelectedObject6(index, -1)
+                    slot["entity_python_type"] = type(entity).__name__
+                    slot["entity_has_oleobj"] = getattr(entity, "_oleobj_", None) is not None
+                except Exception as exc:
+                    slot["selected_object_error"] = repr(exc)
+                if entity is not None:
+                    try:
+                        slot["entity_interface"] = (
+                            getattr(entity, "_oleobj_", entity).GetTypeInfo().GetDocumentation(-1)[0]
                         )
-                except Exception as exc:
-                    evidence[f"closest_{frame}_error"] = repr(exc)
+                    except Exception as exc:
+                        slot["entity_interface_error"] = repr(exc)
+                if native_type == 12 and entity is not None:  # swSelDRAWINGVIEWS
+                    try:
+                        selected_view = _early_bound(_bind(entity, "IView"), "IView")
+                        slot["drawing_view_name"] = str(selected_view.GetName2())
+                    except Exception as exc:
+                        slot["drawing_view_or_binding_error"] = repr(exc)
+                    try:
+                        slot["drawing_view_is_same"] = int(adapter.swApp.IsSame(
+                            _early_bound(_bind(entity, "IView"), "IView"), view
+                        ))
+                    except Exception as exc:
+                        slot["drawing_view_identity_or_binding_error"] = repr(exc)
+                elif native_type == 1 and entity is not None:  # swSelEDGES
+                    owners = {}
+                    try:
+                        owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent()
+                        owners["entity"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+                        slot["entity_owner"] = str(owners["entity"].Name2) if owner is not None else None
+                    except Exception as exc:
+                        slot["entity_owner_or_binding_error"] = repr(exc)
+                    try:
+                        owner = manager.GetSelectedObjectsComponent4(index, -1)
+                        slot["component4_python_type"] = type(owner).__name__
+                        slot["component4_has_oleobj"] = getattr(owner, "_oleobj_", None) is not None
+                        if owner is not None:
+                            interface = getattr(owner, "_oleobj_", owner).GetTypeInfo().GetDocumentation(-1)[0]
+                            slot["component4_interface"] = interface
+                            if interface == "IDrawingComponent":
+                                owner = _early_bound(_bind(owner, interface), interface).Component
+                            elif interface != "IComponent2":
+                                raise RuntimeError(f"unresolved Component4 native interface {interface!r}")
+                        owners["component4"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+                        slot["component4_owner"] = str(owners["component4"].Name2) if owner is not None else None
+                    except Exception as exc:
+                        slot["component4_owner_or_binding_error"] = repr(exc)
+                    transforms = {}
+                    for channel, owner in owners.items():
+                        if owner is not None:
+                            try:
+                                transform = _early_bound(_bind(owner.Transform2, "IMathTransform"), "IMathTransform")
+                                values = tuple(float(value) for value in transform.ArrayData)
+                                slot[f"{channel}_transform2"] = values
+                                if len(values) != 16:
+                                    raise RuntimeError("incomplete native component transform")
+                                transforms[channel] = values
+                            except Exception as exc:
+                                slot[f"{channel}_transform_or_binding_error"] = repr(exc)
+                    edge = None
+                    try:
+                        edge = _early_bound(_bind(entity, "IEdge"), "IEdge")
+                    except Exception as exc:
+                        slot["edge_binding_error"] = repr(exc)
+                    if edge is not None:
+                        try:
+                            curve = edge.GetCurve()  # Required before GetCurveParams2.
+                            slot["curve_endpoints_m"] = (
+                                tuple(float(value) for value in (edge.GetCurveParams2() or ()))[:6]
+                                if curve is not None else None
+                            )
+                        except Exception as exc:
+                            slot["curve_or_binding_error"] = repr(exc)
+                        for frame, target in (("local", local), ("world", world)):
+                            try:
+                                closest = tuple(float(value) for value in (edge.GetClosestPointOn(*target) or ()))
+                                slot[f"closest_{frame}_m"] = closest[:3]
+                                slot[f"closest_{frame}_parameter"] = closest[3] if len(closest) > 3 else None
+                                slot[f"distance_{frame}_mm"] = math.dist(closest[:3], target) * 1000.0
+                                for channel, values in transforms.items():
+                                    slot[f"closest_{frame}_via_{channel}_world_m"] = tuple(
+                                        values[12] * sum(closest[j] * values[i + 3 * j] for j in range(3)) + values[9 + i]
+                                        for i in range(3)
+                                    )
+                            except Exception as exc:
+                                slot[f"closest_{frame}_error"] = repr(exc)
+                else:
+                    slot["edge_channels_not_queried"] = "not a readable native EDGE selection"
         except Exception as exc:
             evidence["pick_or_binding_error"] = repr(exc)
         finally:
