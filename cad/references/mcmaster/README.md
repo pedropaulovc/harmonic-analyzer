@@ -1594,7 +1594,7 @@ the complete sketch's fully-defined guard. Head angles use a native angular
 dimension between the two actual construction rays, with the text point mapped
 from their owning sketch plane, and require exact driving-angle readback.
 Y-axis dowels and X-axis spring pins use native linear measurements of the
-complete axial span between their two end rims. Both imported end conditions
+complete axial span between their two end rims. Both drawing-created end conditions
 must remain `None`: neither orthographic edge-on span uses an arc-center
 setter. Exact end-rim attachments, full source length, native type and the
 bandless reference remain checked after layout.
