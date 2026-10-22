@@ -244,6 +244,16 @@ qualifier. `GetText` is therefore not printed-ink proof. Keep the accepted
 short-engagement fact attached to the native floor dimension and inspect
 its full exported text, witnesses and neighbouring ink.
 
+Retain the D-D depth line, text shelf and projected witnesses for a read-only
+check after the final rebuild, along with all three capture-wing offset
+line/text placements on sheet 2. Keep the f441 origin handoff and existing
+placement guards; the settled checks must refuse drift, not reposition it.
+The `cf3fd16025ab` native leaf also exposed a wrong witness-gap origin:
+`HoleRow1Y` ends at the carriage row's `BOLT_X`, not the block's +X face.
+The accepted gap therefore started the witness 10.5 paper mm short of its
+clear lane. Compute it from that actual row endpoint; still require the
+rebuilt witness to clear the complete A letter by 2 mm and remain visible.
+
 ### TL-30 capture-cap functional sheets
 
 The `d349b99300c6` native cap drawing imported all 32 model dimensions, including

@@ -9,13 +9,14 @@ ch-rocker-arm-tl-oblique-pivot-cap:
   process: >-
     Machine from 5/8 x 2-1/2-in steel flat at least 3-1/2 in long, retaining
     underside material for the integral registers: finished body height is
-    11.50 mm, with nominal overall height 12.50 mm including the bosses.
+    11.60 mm, with nominal overall height 12.60 mm including the bosses.
     Mill the underside block-seating plane
     around the two bosses rather than facing them away. Locate their native
-    signed X/Y coordinates (-4.500,-24.000) and (+4.500,+24.000) mm from the
+    signed X/Y coordinates (-2.500,-24.000) and (+2.500,+24.000) mm from the
     actual flange-pocket axis. Finish each boss to diameter 6.00 +/-0.10 mm
     and projection 1.000 mm below the seating plane at the printed ordinary
-    three-place tolerance. Chamfer only each free-end edge 0.20 mm MAX;
+    three-place tolerance. Chamfer only each free-end edge to the title-block
+    edge-break MAX;
     leave the root unrelieved, with no undercut. The bosses are part of the
     original stock, not fitted pins. Mill the centered outline, underside
     flange chamber, through journal aperture and cap-bolt clearance pattern.
@@ -24,12 +25,8 @@ ch-rocker-arm-tl-oblique-pivot-cap:
     from the actual flange-pocket axis at the block seating face. Recess the
     four NAS1352N5H12 screw heads and open each head recess over its full
     width to the nearest X edge at the same depth. Below each head seat,
-    mill the coaxial flat-bottom underhead entry relief to its native
-    diameter and three-place depth. Do not substitute a drill-point void.
-    The localized relief has a positive annular neck, not the general
-    body-floor thickness; the joint procedure must account for this neck
-    and the actual head-bearing land rather than applying generic
-    full-preload screw torque. Mill the
+    machine one cylindrical through bore that also clears the sourced
+    underhead fillet, with no intermediate entry shelf. Mill the
     separate shallow X-pair channels for twisted wire and bent tails. Fit the
     chamber depth to the actual MHA-CH-06-TL-23 flange, including local face
     variation, with all screws fully seated. The complete opposing-stop

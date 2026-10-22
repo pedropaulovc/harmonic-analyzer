@@ -1036,6 +1036,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
     if failure == "off-witness":
         tips[0][0] += 0.000002  # Two micrometres must fail the unchanged 1 µm guard.
     moves = []
+    rebuilds = []
     events = []
     logs = []
     setter_error = RuntimeError("native SetPosition2 rejected text placement")
@@ -1158,6 +1159,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         return "CapRegisterDepth"
 
     def rebuild(_adapter, *, label):
+        rebuilds.append(label)
         if failure == "offset-resets" and display.OffsetText and moves and moves[-1][0]:
             display.OffsetText = False
 
@@ -1191,7 +1193,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
     witnesses = ((0.349, 0.117), (0.345, 0.117))
 
     def place():
-        drawing._position_register_depth(
+        return drawing._position_register_depth(
             adapter, [annotation],
             line_xy=line_xy,
             text_positions={"CapRegisterDepth": text_xy},
@@ -1199,7 +1201,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         )
 
     if reason is None:
-        place()
+        settled = place()
         for tip, expected in zip(
             sorted(tips), ((0.345, 0.105, 0.0371), (0.349, 0.105, 0.0371)), strict=True
         ):
@@ -1207,6 +1209,43 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         assert position == pytest.approx((*text_xy, 0.0))
         assert display.OffsetText is True
         assert [offset for offset, _position in moves] == [False, True]
+        placed_position = tuple(position)
+        placed_tips = [tuple(tip) for tip in tips]
+        placed_rebuilds = tuple(rebuilds)
+        # Re-solve readbacks independently of the setters. Each late drift
+        # must refuse without attempting another move, toggle or rebuild.
+        for drift, expected_reason in (
+            ("line", "text_move_changed_dimension_line"),
+            ("witness", "arrow_witness_mismatch"),
+            ("text", "text_origin_missed_shelf"),
+            ("offset", "offset_text_not_enabled"),
+        ):
+            position[:] = placed_position
+            for tip, original in zip(tips, placed_tips, strict=True):
+                tip[:] = original
+            display._offset_text = True
+            if drift == "line":
+                for tip in tips:
+                    tip[1] += 0.000002
+            elif drift == "witness":
+                tips[0][0] += 0.000002
+            elif drift == "text":
+                position[0] += 0.000002
+            else:
+                display._offset_text = False
+            with pytest.raises(RuntimeError) as raised:
+                settled()
+            failure_state = json.loads(str(raised.value))
+            assert failure_state["stage"] == "settled"
+            assert failure_state["reason"] == expected_reason
+            assert moves == [(False, (*line_xy, 0.0)), (True, (*text_xy, 0.0))]
+            assert tuple(rebuilds) == placed_rebuilds
+        position[:] = placed_position
+        for tip, original in zip(tips, placed_tips, strict=True):
+            tip[:] = original
+        display._offset_text = True
+        settled()
+        assert tuple(rebuilds) == placed_rebuilds
     else:
         with pytest.raises(RuntimeError) as raised:
             place()
@@ -1535,19 +1574,156 @@ def test_f441_lower_cap_pattern_caption_clears_the_complete_lower_y_ink() -> Non
     assert min(box[1] for box in moved) > 0.066  # title block top
 
 
-def test_f441_plan_station_columns_and_upper_witness_clear_section_a() -> None:
-    # Captured native A letter origin/height and actual PDF glyph box. The
-    # square native envelope budgets the entire glyph, not only its origin.
-    label = (0.1886492, 0.1781075 - 0.00635, 0.1886492 + 0.00635, 0.1781075)
+def test_cf3_plan_upper_witness_uses_the_actual_row_endpoint(monkeypatch) -> None:
+    # cf3's accepted 11.124150 mm gap left the witness crossing A. Keep its
+    # measured X175.375 origin independent of the production endpoint choice.
+    label = (
+        0.188649150266125, 0.171757501372,
+        0.194999150266125, 0.178107501372,
+    )
     glyph = (0.188905, 0.1717465, 0.194764, 0.1779187)
-    old_witness = ((0.186125, 0.1725), (0.201875, 0.1725))
-    assert distance_to_box(old_witness, glyph) == 0.0
-    gap = drawing._lower_row_witness_gap(label, 0.185875, 0.200875)
-    moved_witness = ((0.185875 + gap, 0.1725), old_witness[1])
-    assert 0.200875 - moved_witness[0][0] >= 0.002
-    assert distance_to_box(moved_witness, glyph) >= 0.002
+
+    class DisplayDimension:
+        def __init__(self):
+            self.gaps = {0: (True, 0.001), 1: (False, 0.011124150266125)}
+
+        def GetDimension2(self, _configuration):
+            return dimension
+
+        def SetWitnessLineGap(self, index, use_doc, gap):
+            self.gaps[index] = (use_doc, gap)
+            return True
+
+        def GetWitnessLineGap(self, index, _use_doc, _gap):
+            return (True, *self.gaps[index])
+
+    dimension = SimpleNamespace(
+        FullName="HoleRow1Y@TopBoreProfile@ch-rocker-arm-tl-oblique-pivot-block",
+        SystemValue=0.007,
+    )
+    display = DisplayDimension()
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display,
+        IsDangling=lambda: False,
+    )
+    cut = SimpleNamespace(
+        GetTextInfo=lambda: (
+            0.188649150266125, 0.178107501372, 0.0,
+            0.040, 0.178107501372, 0.0,
+        ),
+        GetTextFormat=lambda: SimpleNamespace(CharHeight=0.00635),
+    )
+    section = SimpleNamespace(GetSection=lambda: cut)
+
+    def on_plan(point):
+        return (0.155875 + 0.0015 * point[0], 0.192 + 0.0015 * point[1])
+
+    def native_segments(_annotation):
+        # The native gap is measured from the actual row, even if the caller
+        # mistakenly budgets it from the block face. Do not use BOLT_X here.
+        return [(
+            (0.175375 + display.gaps[1][1], 0.1724999999475),
+            (0.20187499987549998, 0.1724999999475),
+        )]
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: "HoleRow1Y")
+    monkeypatch.setattr(drawing, "dimension_segments", native_segments)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    assert distance_to_box(native_segments(annotation)[0], glyph) == 0.0
+
+    drawing._plan_lower_row_witness(None, [annotation], section, on_plan, place=True)
+    witness = native_segments(annotation)[0]
+    assert witness[0][0] == pytest.approx(0.196999150266125)
+    assert distance_to_box(witness, label) >= 0.002 - 1e-8
+    assert distance_to_box(witness, glyph) >= 0.002
+    assert 0.200875 - witness[0][0] >= 0.002
+    drawing._plan_lower_row_witness(None, [annotation], section, on_plan, place=False)
     with pytest.raises(RuntimeError, match="no clear, visible"):
-        drawing._lower_row_witness_gap(label, 0.185875, label[2] + 0.003)
+        drawing._lower_row_witness_gap(label, 0.175375, label[2] + 0.003)
+
+
+@pytest.mark.parametrize("name", ["WingAxisReach", "CapTapLeftX", "CapTapRightX"])
+@pytest.mark.parametrize("drift", ["line", "skew", "text", "offset", "arrow-count"])
+def test_capture_offset_layout_refuses_late_native_drift_without_repositioning(
+    monkeypatch, name, drift
+) -> None:
+    # These readbacks have no positioning setters. Late native re-solves
+    # alter the displayed ink independently of the requested line/text lanes.
+    states = {}
+    annotations = []
+
+    def on_capture(point):
+        return (0.195 + 0.002 * point[0], 0.190 + 0.002 * point[1])
+
+    class DisplayData:
+        def __init__(self, state):
+            self.state = state
+
+        def GetArrowHeadCount(self):
+            return len(self.state.tips)
+
+        def GetArrowHeadAtIndex2(self, index):
+            return (*self.state.tips[index], 1.0, 0.0, 0.0,
+                    0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0)
+
+    class DisplayDimension:
+        def __init__(self, state):
+            self.state = state
+
+        @property
+        def OffsetText(self):
+            return self.state.offset
+
+        def GetDisplayData(self):
+            return DisplayData(self.state)
+
+    class Annotation:
+        def __init__(self, dimension_name, state):
+            self.name = dimension_name
+            self.state = state
+
+        def GetSpecificAnnotation(self):
+            return DisplayDimension(self.state)
+
+        def GetPosition(self):
+            return tuple(self.state.position)
+
+    for dimension_name, text_xy in drawing.CAPTURE_TEXT_POSITIONS.items():
+        line_x, line_y = on_capture(drawing.CAPTURE_KEEP[dimension_name])
+        state = SimpleNamespace(
+            position=[*text_xy, 0.0],
+            tips=[[line_x - 0.010, line_y, 0.0], [line_x + 0.010, line_y, 0.0]],
+            offset=True,
+        )
+        states[dimension_name] = state
+        annotations.append(Annotation(dimension_name, state))
+
+    def unexpected_rebuild(*_args, **_kwargs):
+        pytest.fail("a settled capture check must not rebuild or reposition the drawing")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "rebuild_drawing", unexpected_rebuild)
+    drawing._assert_capture_text_layout(None, annotations, on_capture)
+    state = states[name]
+    if drift == "line":
+        for tip in state.tips:
+            tip[1] += 0.000002
+    elif drift == "skew":
+        # Stay inside the 1 µm lane band to isolate the 0.1 µm axis guard.
+        state.tips[0][1] += 0.0000005
+    elif drift == "text":
+        state.position[0] += 0.000002
+    elif drift == "offset":
+        state.offset = False
+    else:
+        state.tips.pop()
+    with pytest.raises(RuntimeError, match=f"{name} lost its native offset line/text layout"):
+        drawing._assert_capture_text_layout(None, annotations, on_capture)
+
+
+def test_f441_plan_station_columns_clear_the_complete_neighboring_text() -> None:
 
     # Every actual text row and BOTH edges of each native arrow are retained.
     captured = {

@@ -7,6 +7,7 @@ import json
 import math
 import re
 import sys
+from collections.abc import Callable
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -1006,12 +1007,12 @@ def _plan_lower_row_witness(
         raise RuntimeError("A cutting-line letters have no finite native text bounds")
     right = max((texts[:3], texts[3:]), key=lambda point: point[0])
     box = (right[0], right[1] - height, right[0] + height, right[1])
-    attachment = on_plan((BLOCK_X1, -BOLT_Y, _H))
+    attachment = on_plan((BOLT_X, -BOLT_Y, _H))
     column_x = on_plan(PLAN_KEEP["HoleRow1Y"])[0]
     gap = _lower_row_witness_gap(box, attachment[0], column_x)
-    # TopBoreProfile emits datum -> row point, so upper witness is index 1.
-    # f441: letter upper-left (188.6492,178.1075), height6.35 mm,
-    # attachment X185.875 => gap11.1242 mm; 4.8758 mm witness remains.
+    # TopBoreProfile emits datum -> row.end at BOLT_X, not BLOCK_X1.
+    # cf3 native used the face 7 model mm too far right: its gap read back
+    # correctly, but the witness started 10.5 paper mm short of its clear lane.
     if place:
         if display.SetWitnessLineGap(1, False, gap) is not True:
             raise RuntimeError("7.000 upper witness gap was refused")
@@ -1175,8 +1176,8 @@ def _position_register_depth(
     line_xy: tuple[float, float],
     text_positions: dict[str, tuple[float, float]],
     witnesses: tuple[tuple[float, float], tuple[float, float]],
-) -> None:
-    """Prime the native origin for the shared offset/text handoff."""
+) -> Callable[[], None]:
+    """Prime the native origin; retain its read-only settled line/text proof."""
     matches = [
         annotation for annotation in annotations
         if dimension_name(adapter, annotation) == "CapRegisterDepth"
@@ -1322,6 +1323,18 @@ def _position_register_depth(
         if state["arrow_y_spread_m"] > axis_tolerance_m:
             refuse(state, "dimension_arrows_skewed")
 
+    def check_layout(stage: str = "settled") -> None:
+        state = observe(stage)
+        require_arrows(state)
+        if state["section_witness_y_spread_m"] > axis_tolerance_m:
+            refuse(state, "section_witnesses_skewed")
+        if not state["offset_text"]:
+            refuse(state, "offset_text_not_enabled")
+        if any(abs(miss) > tolerance_m for miss in state["line_y_misses_m"]):
+            refuse(state, "text_move_changed_dimension_line")
+        if state["text_distance_m"] > tolerance_m:
+            refuse(state, "text_origin_missed_shelf")
+
     state = observe("pre_line")
     if state["section_witness_y_spread_m"] > axis_tolerance_m:
         refuse(state, "section_witnesses_skewed")
@@ -1366,18 +1379,12 @@ def _position_register_depth(
             observe("text_move_exception", tolerate_read_errors=True),
             "offset_text_helper_failed", cause=exc,
         )
-    state = observe("post_text")
-    require_arrows(state)
-    if not state["offset_text"]:
-        refuse(state, "offset_text_not_enabled")
-    if any(abs(miss) > tolerance_m for miss in state["line_y_misses_m"]):
-        refuse(state, "text_move_changed_dimension_line")
-    if state["text_distance_m"] > tolerance_m:
-        refuse(state, "text_origin_missed_shelf")
+    check_layout("post_text")
+    return check_layout
 
 
-def _register_section_sheet(adapter: Any) -> Any:
-    """Native D-D; return its independent cutting-line parent for the note census."""
+def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
+    """Return D-D's note-census parent and its retained native layout check."""
     plan = place_view(
         adapter, str(SOURCE), "*Front", *REGISTER_SECTION_PLAN_CENTER, scale=CAPTURE_SCALE
     )
@@ -1409,7 +1416,7 @@ def _register_section_sheet(adapter: Any) -> Any:
     assert_imported_precision(
         adapter, annotations, {name: DRAWING_PRECISION_BY_NAME[name] for name in REGISTER_SECTION_KEEP},
     )
-    _position_register_depth(
+    check_depth = _position_register_depth(
         adapter, annotations,
         line_xy=keep["CapRegisterDepth"],
         text_positions=text_positions,
@@ -1421,7 +1428,7 @@ def _register_section_sheet(adapter: Any) -> Any:
     position_section_caption(adapter, section, caption_xy, label="pivot block D")
     if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
         raise RuntimeError("failed to identify the register-ordinate sheet")
-    return plan
+    return plan, check_depth
 
 
 def _side_screw_sheet(adapter: Any) -> Any:
@@ -1457,6 +1464,35 @@ def _side_screw_sheet(adapter: Any) -> Any:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     return side
 
+
+
+def _assert_capture_text_layout(adapter: Any, annotations: list[Any], on_capture: Any) -> None:
+    """Read back the three horizontal offset lines and their complete text origins."""
+    for name, text_xy in CAPTURE_TEXT_POSITIONS.items():
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"capture wing needs exactly one native {name}")
+        annotation = _early_bound(matches[0], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = tuple(float(value) for value in annotation.GetPosition())
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        tips = [
+            tuple(float(value) for value in data.GetArrowHeadAtIndex2(index)[:2])
+            for index in range(int(data.GetArrowHeadCount()))
+        ]
+        line_xy = on_capture(CAPTURE_KEEP[name])
+        if (
+            not bool(display.OffsetText)
+            or math.dist(position[:2], text_xy) > 1e-6
+            or len(tips) != 2
+            or any(abs(tip[1] - line_xy[1]) > 1e-6 for tip in tips)
+            or abs(tips[0][1] - tips[1][1]) > 1e-7
+        ):
+            raise RuntimeError(
+                f"{name} lost its native offset line/text layout: "
+                f"position={position}, text_xy={text_xy}, "
+                f"arrow_tips={tips}, line_xy={line_xy}, OffsetText={display.OffsetText}"
+            )
 
 
 def _wing_axis_manufacturing_dimension(
@@ -1618,6 +1654,7 @@ async def build(adapter: Any) -> dict[str, str]:
         location="above",
     )
     offset_dimension_text(adapter, capture_annotations, CAPTURE_TEXT_POSITIONS)
+    _assert_capture_text_layout(adapter, capture_annotations, on_capture)
     for name in ("WingAxisReach", "WingHalfWidth"):
         _wing_axis_manufacturing_dimension(adapter, capture_annotations, name)
     tap_x, tap_y = part_spec.CAP_TAP_POINTS[1]
@@ -1635,7 +1672,8 @@ async def build(adapter: Any) -> dict[str, str]:
     thread_note_views.append(_register_recess_sheet(adapter))
     if not ddoc.ActivateSheet(SHEET_NAMES[3]):
         raise RuntimeError("cannot activate register-depth sheet")
-    thread_note_views.append(_register_section_sheet(adapter))
+    register_plan, check_register_depth = _register_section_sheet(adapter)
+    thread_note_views.append(register_plan)
     if not ddoc.ActivateSheet(SHEET_NAMES[4]):
         raise RuntimeError("cannot activate nut-bracket interface sheet")
     thread_note_views.append(_side_screw_sheet(adapter))
@@ -1648,6 +1686,10 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("cannot recheck the capture-wing authorities")
         for name in ("WingAxisReach", "WingHalfWidth"):
             _wing_axis_manufacturing_dimension(adapter, capture_annotations, name)
+        _assert_capture_text_layout(adapter, capture_annotations, on_capture)
+        if not ddoc.ActivateSheet(SHEET_NAMES[3]):
+            raise RuntimeError("cannot recheck the register-depth layout")
+        check_register_depth()
 
     return await finalize_drawing(
         adapter,

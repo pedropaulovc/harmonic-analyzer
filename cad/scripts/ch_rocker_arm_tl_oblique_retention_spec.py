@@ -39,7 +39,9 @@ PIN_STOP_FACE_MEASUREMENT_DIAMETER = 35.0
 PIN_BOSS_DIAMETER = 12.70
 PIN_BOSS_DIAMETER_PLACES = 2
 PIN_LOWER_BOSS_HEIGHT = 1.15  # REF; fit to actual upper inner-race face
+# C2 independently accepts both normal rim gaps, as well as chamber excess.
 PIN_LOWER_GAP = (0.10, 0.15)
+PIN_UPPER_GAP = (0.10, 0.15)
 PIN_UPPER_BOSS_HEIGHT = 12.35  # flange top to carrier seat; +12.5 mm work-height change
 PIN_UPPER_BOSS_PLACES = 2
 PIN_CARRIER_JOURNAL_LENGTH = 24.5
