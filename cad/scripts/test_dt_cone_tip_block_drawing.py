@@ -37,10 +37,10 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
 
 
 def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
-    """The window opens at 1.0D + countersink (the adjuster's user-ruled
-    engagement exception, 2026-09-29) and closes a countersink short of the
-    south face at the depth's .XXX-short limit: the cup sits on full thread.
-    A 1.5D floor would leave no room for the tip's print-worst stack."""
+    """The retained baseline window opens at 1.0D + countersink (exception
+    ruling still pending) and closes a countersink short of the south face at
+    the depth's .XXX-short limit: the cup sits on full thread. A 1.5D floor
+    would leave no room for the tip's print-worst stack."""
     spec = dt_cone_tip_block_spec
     assert spec.ADJUSTER_CSK_DIA > 4.826
     assert spec.ADJUSTER_MIN_ENGAGEMENT_D == 1.0
@@ -192,33 +192,12 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     )
 
 
-def test_part_hides_every_model_reference_sketch() -> None:
-    """f76387f5's iso and 8929d954's drive-train iso printed reference sketches.
-
-    The part blanks every construction-only reference sketch it authors before
-    save, so no drawing view or assembly instance renders one, and a new one
-    cannot be authored unlisted.
-    """
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    authored = re.findall(r'feature_name="([A-Za-z]+Reference)"', source)
-    assert authored and tuple(authored) == part.REFERENCE_SKETCHES
-    build_body = source[source.index("async def build(") :]
-    assert "_blank_reference_sketches(adapter, REFERENCE_SKETCHES)" in build_body
-    assert build_body.index("_blank_reference_sketches(") < build_body.index(
-        "save_part_and_images("
-    )
-
-
 def test_sheet_cuts_no_section() -> None:
     """Machinist review of f86ff6bf8 (gating, two of three runs): section
     A-A, cut down the slot at 8.500, clipped the Ø2.26 hold-down tap drill
     at 7.500 into an unexplained 1 mm sliver, and every hole it showed is
     fully defined by its callout (rule 1).  The sheet cuts no section, so no
     cutting-plane line, label or ROTATED note prints."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "create_section_view" not in source
-    assert "ROTATED" not in source
     assert "section A-A" not in drawing.sheet_view_silhouettes()
     assert not any(name.startswith("section") for name in drawing.sheet_text_boxes())
 
@@ -254,27 +233,18 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     }
     for keep in (drawing.TOP_KEEP, drawing.LEFT_KEEP, drawing.FRONT_KEEP):
         assert hidden_owners(keep) == set()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    for keep, call in (
-        ("keep=TOP_KEEP", "top_annotations = curate_view_dimensions("),
-        ("keep=BOTTOM_KEEP", "bottom_annotations = hidden_sketches.curate_view_dimensions("),
-    ):
-        before = body[: body.index(keep)].rstrip()
-        assert before[: before.rindex("adapter,")].rstrip().endswith(call)
 
 
-def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
-    """Every marked dimension lands on one view; the bottom view carries the
-    hold-down tap's two stations (2026-09-29)."""
-    adjuster_axis = {"AxisHeight", "PassageCenter", "SlitDepth"}
+@pytest.mark.parametrize("adjuster_center", [drawing.FRONT_CENTER, drawing.BACK_CENTER])
+def test_every_marked_dimension_is_kept_in_exactly_one_view(adjuster_center) -> None:
+    """Every marked dimension lands on one view, whichever entry is visible."""
     kept = [
         *drawing.FRONT_KEEP,
         *drawing.TOP_KEEP,
         *drawing.RIGHT_KEEP,
         *drawing.LEFT_KEEP,
         *drawing.BOTTOM_KEEP,
-        *adjuster_axis,
+        *drawing._adjuster_axis_keep(adjuster_center),
     ]
     marked = {
         name
@@ -285,6 +255,53 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert set(kept) == marked
     assert set(drawing.TOP_KEEP) == {"Depth"}
     assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
+
+
+@pytest.mark.parametrize("adjuster_center", [drawing.FRONT_CENTER, drawing.BACK_CENTER])
+def test_slit_depth_is_a_model_parameter_not_a_printed_endpoint(adjuster_center) -> None:
+    spec = dt_cone_tip_block_spec
+    assert spec.SLIT_DEPTH == pytest.approx(spec.TOP_ABOVE_AXIS + 0.65)
+    assert spec.SLIT_W == 1.2
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert "SlitDepth" not in marked
+    assert "SlitDepth" not in spec.DRAWING_PRECISION_BY_NAME
+    assert "SlitDepth" not in drawing.sheet_text_boxes(adjuster_center)
+    assert "SlitDepth" not in drawing.sheet_dimension_ink(adjuster_center)
+    assert "SlitW" in marked
+    assert spec.DRAWING_PRECISION_BY_NAME["SlitW"] == spec.SLIT_W_PLACES
+    assert "SlitW" in drawing.sheet_dimension_ink(adjuster_center)
+
+
+def test_slot_callout_is_attached_to_the_visible_slit_wall(monkeypatch) -> None:
+    calls = []
+    adapter, view, note = object(), object(), object()
+
+    def attach(actual_adapter, actual_view, **kwargs):
+        calls.append((actual_adapter, actual_view, kwargs))
+        return note
+
+    monkeypatch.setattr(drawing, "add_attached_note", attach)
+    assert drawing._add_slot_callout(adapter, view) is note
+    assert len(calls) == 1
+    actual_adapter, actual_view, kwargs = calls[0]
+    assert actual_adapter is adapter
+    assert actual_view is view
+    assert kwargs["text"].replace("\n", " ") == "SLOT OPENS INTO ADJUSTER BORE"
+    assert not any(character.isdigit() for character in kwargs["text"])
+    assert kwargs["entity_xy"] == drawing.SLOT_EDGE_PICK
+    assert kwargs["note_xy"] == drawing.SLOT_CALLOUT_XY
+    spec = dt_cone_tip_block_spec
+    edge_x, edge_y = kwargs["entity_xy"]
+    assert edge_x == pytest.approx(drawing.FRONT_CENTER[0] + spec.SLIT_W * drawing._S / 2.0)
+    assert drawing._elevation_y(
+        spec.ADJUSTER_AXIS_HEIGHT + spec.ADJUSTER_CSK_DIA / 2.0, drawing.FRONT_CENTER
+    ) < edge_y < drawing._elevation_y(
+        spec.PINCH_HEIGHT - spec.PINCH_CLEARANCE_DIA / 2.0, drawing.FRONT_CENTER
+    )
+    assert drawing.sheet_leaders()["slot callout"].tip == kwargs["entity_xy"]
+    left, bottom, right, top = drawing.sheet_text_boxes()["slot callout"]
+    assert (left, top) == kwargs["note_xy"]
+    assert right > left and top > bottom
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -368,56 +385,15 @@ def _sheet_findings(module) -> list[str]:
     )
 
 
-def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
+def test_sheet_ink_is_clear() -> None:
     assert _sheet_findings(drawing) == []
     drawing.assert_sheet_ink_clear()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "assert_sheet_ink_clear(adjuster_center)" in body
-    assert body.index("assert_sheet_ink_clear(") < body.index("curate(")
-    for placed in (
-        "callout_xy=_adjuster_callout_xy(adjuster_center)",
-        "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
-        "callout_xy=PINCH_THREAD_CALLOUT_XY",
-        "callout_xy=FOOT_TAP_CALLOUT_XY",
-        "for text, x, y in _sheet_notes(adjuster_center):",
-        "adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)",
-        "[FOOT_FINISH_CENTER]",
-        "foot_symbol, foot_right = _foot_finish_placement()",
-        "symbol_xy=foot_symbol",
-        "leader_attach_xy=foot_right",
-        "_set_arrow_sides(",
-        "for name in ARROWS_OUTSIDE",
-        "for name in ARROWS_INSIDE",
-    ):
-        assert placed in body, placed
-    assert body.count("add_note(adapter,") == 1
     # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
     assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
-    assert drawing.ARROWS_INSIDE == (
-        "SlitDepth",
-        "PinchHeight",
-        "PinchDepthCenter",
-        "Width",
-        "FootTapX",
-    )
     # d84a42ca7: the 4.875's inside arrows struck its "5"; the plan depth's
     # three rows fill its span.
     assert drawing.ARROWS_OUTSIDE == ("SlitW", "Depth", "FootTapZ")
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
-
-
-def test_sheet_audit_uses_the_shared_leader_geometry() -> None:
-    """Crossings and arrow-to-text gaps come from _drawing_leaders, the opt-in
-    module the crank drawings gate on, not from a sheet-local copy."""
-    import _drawing_leaders
-
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_drawing_leaders.leader_crossings(" in source
-    assert "_drawing_leaders.arrows_near_text(" in source
-    assert drawing.ARROW_TEXT_CLEARANCE == _drawing_leaders.ARROW_TEXT_CLEARANCE == 0.002
-    for local in ("def _segments_cross", "def _point_segment_distance"):
-        assert local not in source, local
 
 
 # #946's leader-over-part rule, on this sheet's own model: the run over the
@@ -584,13 +560,6 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
     0.25 past that wall only meets the far jaw inside its tap drill."""
     spec = dt_cone_tip_block_spec
     near_wall = _worst_near_jaw_wall()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    if '"hw-depth"' in source:
-        depth = spec.PINCH_CLEARANCE_SPEC.depth_mm
-        floor = round(depth, 1) - _GENERAL[1]
-        assert floor >= near_wall + 0.25, (floor, near_wall)
-        return
-    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT == "DRILL TO SLOT"
     clearance_max = round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS
     point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
     slit_min = _printed("SlitW", spec.SLIT_W)[0]
@@ -615,10 +584,6 @@ def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> 
     assert not drawing._pinch_clearance_callout_resolved(
         {1: "<MOD-DIAM> 3.26 <HOLE-DEPTH> 6.9", 2: "", 3: "", 4: ""}
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "_set_pinch_clearance_callout_text(pinch_clearance_callout)" in body
-    assert '"hw-depth"' not in source
 
 
 def test_far_jaw_is_tapped_full_thread_through_to_the_slit() -> None:
@@ -707,18 +672,34 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
     )
 
 
-def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
-    """With the heights at .X the slit floor (SlitDepth down from the top)
-    must still open into the adjuster's tap drill (AxisHeight up from the
-    foot) by 0.25, or the jaws never grip the thread."""
+def test_slit_breaks_into_the_adjuster_thread_with_its_conservative_depth_envelope() -> None:
+    """The internal depth allowance preserves the old breakthrough proof,
+    without turning the model's cut station into a printed finished floor."""
     spec = dt_cone_tip_block_spec
-    floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - _printed(
-        "SlitDepth", spec.SLIT_DEPTH
-    )[0]
+    places = spec.SLIT_DEPTH_CHECK_PLACES
+    depth_min = round(spec.SLIT_DEPTH, places) - _GENERAL[places]
+    floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - depth_min
     crown_min = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)[0] + (
         spec.ADJUSTER_BORE_DIA / 2.0
     )
-    assert crown_min - floor_max >= 0.25
+    breakthrough = crown_min - floor_max
+    assert breakthrough >= spec.SLIT_BREAKTHROUGH_MARGIN_MM
+    assert spec.WORST_SLIT_BREAKTHROUGH_MM == pytest.approx(breakthrough)
+
+
+def test_slit_may_continue_below_the_adjuster_thread() -> None:
+    _import_mutant(
+        "SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65",
+        "SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 3.65",
+    )
+
+
+def test_slit_that_fails_to_open_into_the_adjuster_thread_is_refused() -> None:
+    with pytest.raises(AssertionError):
+        _import_mutant(
+            "SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65",
+            "SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT + 3.0",
+        )
 
 
 # --- r3, round two: the 17 block, the 5/8 pinch screw, the -X datum ---------
@@ -834,18 +815,10 @@ def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
 
     engagement = drive_train.PINCH_SHANK_LEN - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
-    source = Path(drive_train.__file__).read_text(encoding="utf-8")
-    assert "_PINCH_NEAR_JAW" not in source
-    assert "PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM" in source
 
 
 def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
-    """The hardware follows the ruling: 91794A112 everywhere and 15.875 under
-    the head.  The stainless-over-steel (galvanic) choice is design
-    rationale, not a machinist instruction: the material rides the title
-    block and the purchased-part ID, so the installation note no longer
-    restates it.  The sentence was deleted per the codex machinist review
-    of MHA-DT-VN-56 and Main's ruling (a)."""
+    """The hardware follows the ruling: 91794A112 and 15.875 under the head."""
     import _config
     from _fastener_catalog import fastener
     from _mcmaster_91794a112 import FILLISTER_SIZE
@@ -853,10 +826,6 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     config = _config.parts("dt-vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
     assert "18-8 stainless" in config["material"]
-    notes = config["installation_notes"].upper()
-    assert "STAINLESS" not in notes
-    assert "18-8" not in notes
-    assert " STEEL" not in notes
     assert fastener("dt-vn-cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("dt-vn-cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH

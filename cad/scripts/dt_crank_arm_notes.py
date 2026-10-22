@@ -2,6 +2,11 @@ r"""Crank-arm drawing prose -- the hub-seat, seam and pivot callouts on its shee
 
 Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
 ``crank_hub_notes``), so a wording edit re-keys the drawing, never the part.
+
+The arm's by-eye punched witness aligns with the crankshaft-dome witness when
+refitting the arm/hub after gear service (``cad/config/dimensions.yaml``,
+Chapter 11 construction notes). It has no controlled location, diameter or depth;
+its function belongs on the existing feature-attached drawing callout.
 """
 
 from __future__ import annotations
@@ -50,5 +55,10 @@ PIVOT_TAP_ROWS = (
 )
 # The punched fiducial is flagged at the mark, not in the general notes
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
-# undimensioned hole).
-FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
+# undimensioned hole). Name its reassembly purpose without controlling its spot.
+FIDUCIAL_CALLOUT = (
+    "PUNCH FIDUCIAL MARK;\n"
+    "LOCATE BY EYE\n"
+    "ALIGN WITH MHA-DT-11 MARK\n"
+    "WHEN REFITTING CRANK"
+)

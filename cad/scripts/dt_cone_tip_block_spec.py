@@ -1,4 +1,10 @@
-r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing."""
+r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing.
+
+SLIT_DEPTH drives the unchanged model cut, not a finished floor dimension:
+the nominal cut-depth station is already inside the through adjuster bore.
+The drawing controls the slit width and states that the slit opens into that
+bore. Below the thread the slit may run on; no exact termination is required.
+"""
 
 from __future__ import annotations
 
@@ -87,7 +93,9 @@ PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
 PINCH_DEPTH_PLACES = 1
 SLIT_W_PLACES = 2
-SLIT_DEPTH_PLACES = 1
+# Retain the former one-place depth envelope as a conservative engineering
+# breakthrough check only, not a printed tolerance or a termination limit.
+SLIT_DEPTH_CHECK_PLACES = 1
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.2
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
@@ -260,13 +268,14 @@ for _name, _web in (
         raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
-# The slit must open into the adjuster thread or its jaws never grip it: the
-# slit floor (SlitDepth down from the top) stays under the tap-drill crown
-# (AxisHeight up from the foot) at the printed extremes.  Below the thread the
-# slit may run on: the jaws only lengthen.
+# The slit must open into the adjuster thread or its jaws never grip it. Keep
+# the model's conservative lower-depth envelope under the tap-drill crown
+# (AxisHeight up from the foot) at the printed block/axis extremes. This check
+# does not turn the cut station in the bore void into a finished floor.
+# Below the thread the slit may run on: the jaws only lengthen.
 SLIT_BREAKTHROUGH_MARGIN_MM = 0.25
 WORST_SLIT_BREAKTHROUGH_MM = (_axis_limits[0] + ADJUSTER_BORE_DIA / 2.0) - (
-    _height_limits[1] - _printed_limits(SLIT_DEPTH, SLIT_DEPTH_PLACES)[0]
+    _height_limits[1] - _printed_limits(SLIT_DEPTH, SLIT_DEPTH_CHECK_PLACES)[0]
 )
 if WORST_SLIT_BREAKTHROUGH_MM < SLIT_BREAKTHROUGH_MARGIN_MM - 1e-9:
     raise AssertionError(
@@ -501,7 +510,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # r3: the pinch-hole centre from the foot, no longer chained off the axis.
     "PinchHeightReference": {"PinchHeight"},
     "SlitProfile": {"SlitW"},
-    "TopSlit": {"SlitDepth"},
     # 2026-09-29: the hold-down tap's stations on the foot (hidden reference
     # sketches; the tap's size and depths print on its Hole Wizard callout).
     "FootTapXReference": {"FootTapX"},
@@ -524,7 +532,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchDepthReference": {"PinchDepthCenter": PINCH_DEPTH_PLACES},
     "PinchHeightReference": {"PinchHeight": PINCH_HEIGHT_PLACES},
     "SlitProfile": {"SlitW": SLIT_W_PLACES},
-    "TopSlit": {"SlitDepth": SLIT_DEPTH_PLACES},
     "FootTapXReference": {"FootTapX": FOOT_TAP_X_PLACES},
     "FootTapZReference": {"FootTapZ": FOOT_TAP_Z_PLACES},
 }
@@ -538,7 +545,6 @@ _STACK_GRADES = {
     ("PinchDepthReference", "PinchDepthCenter"): PINCH_DEPTH_PLACES,
     ("PinchHeightReference", "PinchHeight"): PINCH_HEIGHT_PLACES,
     ("SlitProfile", "SlitW"): SLIT_W_PLACES,
-    ("TopSlit", "SlitDepth"): SLIT_DEPTH_PLACES,
     ("FootTapXReference", "FootTapX"): FOOT_TAP_X_PLACES,
     ("FootTapZReference", "FootTapZ"): FOOT_TAP_Z_PLACES,
 }

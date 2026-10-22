@@ -70,6 +70,15 @@ geometry is casting-shaped, not milling-shaped.
      The presentation does not establish chuck access
      to either collar face or prescribe a workholding arrangement.
 
+- **Cone-tip-block slit (MHA-DT-21):** the model's `SLIT_DEPTH` cut station is
+  inside the through adjuster bore, where there is no finished floor edge.
+  The drawing therefore does not print the former 15.2 depth. Its existing
+  slit-width dimension remains, and a leader attached to the visible slit
+  wall states `SLOT OPENS INTO ADJUSTER BORE`. This is a connectivity
+  requirement, not an exact stop at the bore: below the thread the slit may
+  run on. The modeled depth and width, conservative breakthrough assertion
+  and permitted overrun are unchanged; no cutting process is prescribed.
+
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |
   |---|---|---|
@@ -79,6 +88,14 @@ geometry is casting-shaped, not milling-shaped.
   | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
   | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
+
+- **Crank-arm reassembly witness (MHA-DT-06):** the by-eye punched mark aligns
+  with the matching witness on the MHA-DT-11 crankshaft dome when refitting the
+  arm/hub after gear service. Chapter 11 in `cad/config/dimensions.yaml` records
+  these as undimensioned witnesses, not machined dimples: do not add controlled
+  location, diameter or depth. The existing feature-attached callout in
+  `dt_crank_arm_notes.FIDUCIAL_CALLOUT` states the purpose and retains
+  `LOCATE BY EYE`.
 
 - **Casting-vs-bar substitution:** `fr-rocker-arm-support` is a benign stock
   substitution; the **`sm-summing-lever` now explicitly uses a machined-from-solid

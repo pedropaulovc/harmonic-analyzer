@@ -1,4 +1,10 @@
-r"""Create the simplicity-policy machinist drawing for the cone tip block."""
+r"""Create the simplicity-policy machinist drawing for the cone tip block.
+
+The slit opens into the adjuster bore. Its modelled cut-depth station lies in
+the bore void, not on a finished edge, so it is not a printed dimension. A
+leader attached to a visible slit wall states the connection; it does not
+require the slit to terminate at the bore or prohibit its permitted overrun.
+"""
 
 from __future__ import annotations
 
@@ -37,7 +43,7 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_leader_notes import add_leader_note
+from _drawing_leader_notes import add_attached_note, add_leader_note
 import _drawing_leaders
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -65,7 +71,6 @@ from dt_cone_tip_block_spec import (
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
-    SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
     printed_value_text,
@@ -153,30 +158,17 @@ TEXT_CLEARANCE = 0.0015
 ROUND_OUT = 0.0001
 
 # The adjuster's hole callout stands between the adjuster elevation and the
-# right view.  #946 / MHA-DT-21: at 9a0f50b1c it stood below-right of the hole
-# and its leader climbed ~28 mm over the front view to the rim, ~16 mm
-# further than the hole's approach from the right face, reading as an edge of
-# the part.  The short way in, from the right face, is SLOT DEPTH's: its
-# lower extension line leaves the slit floor 0.97 mm under the hole centre
-# and runs out to its value, so the callout stands under that line with its
-# ADJUSTER ENTRY name over it (review: named above the thread callout it
-# describes): the name's top an arrow clearance (plus half an arrowhead)
-# under the line, clear of the 15.2's lower arrow, and the callout a text
-# clearance under the name.  Its leader leaves the shoulder's left end at
-# ADJUSTER_LEADER_ANGLE: at 45 deg the run over the part is 4.4 mm longer
-# than the hole's approach, past Main's ~4 mm brief (swing's RD2 fix,
-# 4dda16fd5, left 3.8); at 3:2, 40 deg made it 3.2.  At 2:1 the hole's
-# approach from the right face grows to 13.8 mm and 40 deg runs 4.25 over it,
-# so the leader drops to 37 deg (3.5).  Every degree shallower slides the
-# right-hand views ~1.2 mm further right.  Hole callouts' extents (every
-# line plus the shoulder) are measured on the I31 render like the rest of the
-# sheet's ink (see "Sheet ink audit").
+# right view. Its name sits above the thread callout, 3.7 mm below the hole's
+# axis. This sheet placement is independent of the slit cut-depth parameter:
+# that station is inside the bore void and leaves no finished edge.
+# The leader approaches from the right at 37 degrees to keep its run over the
+# part short. Hole-callout extents include each line and the shoulder (I31).
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
 # The name's ink from its upper-left corner (287c: 36.3 x 3.4 mm).
 ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0365, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
-ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
-ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
+ADJUSTER_ENTRY_DROP = 0.0037
+ADJUSTER_ENTRY_Y = _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER) - ADJUSTER_ENTRY_DROP
 ADJUSTER_SHOULDER_Y = (
     ADJUSTER_ENTRY_Y
     - ADJUSTER_ENTRY_EXTENT[1]
@@ -220,10 +212,6 @@ SLIT_TEXT_OFFSET = (
 # value the text keeps to one line (SolidWorks drops multi-line text placed
 # above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
-    # The slit's depth only has to break into the adjuster bore: its floor
-    # stands inside the bore, so the line ends where no edge is left
-    # (machinist reviews of d84a42ca7 and cd1153854, minor).
-    "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
     # stack).  Separate the full number at the existing font size; the whole
@@ -239,11 +227,9 @@ DIMENSION_CALLOUTS_ABOVE = {
     # The adjuster axis across the block: the shaft tip's lateral stack.
     "PassageCenter": "LOCATES MHA-DT-04 TIP",
 }
-# Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
-# print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
-# DEPTH).  A value and its rows centre on the dimension's point; a
-# horizontal dimension with a row over its value prints its line 4.5 mm
-# under that point (the 3.97's stacked deviations, 287c).
+# Callout rows stack 4.55 mm at the existing document font. A value and its
+# rows centre on the dimension's point; a horizontal dimension with a row
+# above its value prints its line 4.5 mm under that point (287c).
 CALLOUT_GLYPH_WIDTH = 0.00253
 TEXT_ROW_HEIGHT = 0.00455
 TWO_ROW_LINE_DROP = 0.0045
@@ -251,6 +237,22 @@ TWO_ROW_LINE_DROP = 0.0045
 
 def _callout_half_width(text: str) -> float:
     return max(len(line) for line in text.split("\n")) * CALLOUT_GLYPH_WIDTH / 2.0
+
+
+# The slit wall between the adjuster mouth and pinch bore is a visible edge in
+# the front elevation. The note names connectivity, not a depth or an end stop.
+SLOT_CALLOUT = "SLOT OPENS INTO\nADJUSTER BORE"
+SLOT_EDGE_PICK = (
+    FRONT_CENTER[0] + SLIT_W * _S / 2.0,
+    _elevation_y((ADJUSTER_AXIS_HEIGHT + PINCH_HEIGHT) / 2.0, FRONT_CENTER),
+)
+SLOT_CALLOUT_XY = (FRONT_CENTER[0] + 0.036, SLOT_EDGE_PICK[1] + 0.007)
+SLOT_CALLOUT_EXTENT = (
+    0.0,
+    len(SLOT_CALLOUT.split("\n")) * TEXT_ROW_HEIGHT,
+    2.0 * _callout_half_width(SLOT_CALLOUT),
+    0.0,
+)
 
 
 # Left of the adjuster elevation, stepping out from the part: the axis
@@ -290,15 +292,11 @@ PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
 # vertical dimension prints no line between them.
 ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
-# Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
-# tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its span holds the two-line
-# value and both arrows inside.  The pinch depth's span holds its two 3.4 mm
-# arrows: with no outside tail right of the hole-centre witness, the pinch
-# clearance callout's leader passes there (leader-crosses-line, af13c8ff8).
-# The width and FootTapX hold theirs inside too, so no tail runs toward the
-# bottom view's callout.
+# The pinch depth's span holds its two 3.4 mm arrows: with no outside tail
+# right of the hole-centre witness, the pinch-clearance leader passes there
+# (leader-crosses-line, af13c8ff8). The width and FootTapX hold theirs inside
+# too, so no tail runs toward the bottom view's callout.
 ARROWS_INSIDE = (
-    "SlitDepth",
     "PinchHeight",
     "PinchDepthCenter",
     "Width",
@@ -442,10 +440,6 @@ def _adjuster_axis_keep(
             adjuster_center[0] + minus_x_side * BLOCK_X * _S / 4.0,
             _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
         ),
-        "SlitDepth": (
-            adjuster_center[0] + 0.043,
-            _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
-        ),
     }
 
 
@@ -546,8 +540,6 @@ _VALUE_EXTENTS = {
             ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             ("PassageCenter", BLOCK_X / 2.0, DIMENSION_CALLOUTS_ABOVE["PassageCenter"]),
-            # "15.2" over its callout line.
-            ("SlitDepth", SLIT_DEPTH, DIMENSION_CALLOUTS["SlitDepth"]),
         )
     },
 }
@@ -603,7 +595,7 @@ VIEW_C_LEADER_DX = -0.0005
 # 1.0-1.3 mm past the line.  An outside arrow's arrowhead and tail run
 # 6.3-6.4 mm past its extension line; an inside arrowhead is 3.4 mm long and
 # about 0.6 mm across.  A vertical dimension with its arrows outside prints
-# no line between them (the 12.0, 8.42, 10.7, 5.56, 3.50, 15.2 on 287c).
+# no line between them.
 OUTSIDE_ARROW_RUN = 0.0064
 HORIZONTAL_LINE_DROP = 0.0028
 EXTENSION_GAP = 0.0005
@@ -706,6 +698,7 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
     )
     boxes["foot tap callout"] = _extent_box(FOOT_TAP_CALLOUT_XY, FOOT_TAP_CALLOUT_EXTENT)
     boxes["foot finish"] = _extent_box(_foot_finish_placement()[0], FOOT_FINISH_EXTENT)
+    boxes["slot callout"] = _extent_box(SLOT_CALLOUT_XY, SLOT_CALLOUT_EXTENT)
     for label, (text_xy, _tip) in (("view B letter", VIEW_B_ARROW), ("view C letter", VIEW_C_ARROW)):
         boxes[label] = _extent_box(text_xy, VIEW_LETTER_EXTENT)
     for text, x, y in _sheet_notes(adjuster_center):
@@ -842,13 +835,6 @@ def sheet_dimension_ink(
         "PassageCenter": (
             h, (ax - plus_x * half_x, ax), (top, top), drop("PassageCenter"), out
         ),
-        "SlitDepth": (
-            v,
-            (_elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, adjuster_center), top),
-            (ax + slit, ax + half_x),
-            keeps["SlitDepth"][0],
-            out,
-        ),
         "Depth": (
             v,
             (_plan_y(Z_NORTH), _plan_y(Z_SOUTH)),
@@ -966,6 +952,10 @@ def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[s
         "view C letter": Leader(
             (view_c_text[0] + VIEW_C_LEADER_DX, view_c_text[1] - VIEW_LETTER_HEIGHT / 2.0),
             view_c_tip,
+        ),
+        "slot callout": Leader(
+            (SLOT_CALLOUT_XY[0], SLOT_CALLOUT_XY[1] - SLOT_CALLOUT_EXTENT[1] / 2.0),
+            SLOT_EDGE_PICK,
         ),
     }
 
@@ -1109,6 +1099,18 @@ def assert_sheet_ink_clear(adjuster_center: tuple[float, float] = FRONT_CENTER) 
             + "\n".join(f"  - {finding}" for finding in findings)
         )
     _telemetry.debug("cone-tip-block sheet ink clear")
+
+
+def _add_slot_callout(adapter: Any, view: Any) -> Any:
+    """Attach the bore-connectivity requirement to the visible slit wall."""
+    return add_attached_note(
+        adapter,
+        view,
+        text=SLOT_CALLOUT,
+        entity_xy=SLOT_EDGE_PICK,
+        note_xy=SLOT_CALLOUT_XY,
+        label="slit opens into adjuster bore",
+    )
 
 
 def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
@@ -1744,6 +1746,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for text, x, y in _sheet_notes(adjuster_center):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add the {text.lower()!r} note")
+    _add_slot_callout(adapter, front)
     # C1 verdict (2026-09-23): the native projected-view arrow is not
     # switchable through the documented API -- IProjectionArrow.Visible is
     # get-only and no document preference or IView member sets it; only the

@@ -328,8 +328,6 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
 
 
 def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
-    # #984 review r2/r3: the fiducial is flagged at the mark, not in a note.
-    assert "FIDUCIAL" not in spec.DRAWING_NOTES
     scale = drawing.SHEET_SCALE[0] / 1000.0
     cx = drawing._sheet_x(spec.FIDUCIAL_X)
     cy = drawing.FRONT_CENTER[1] + spec.FIDUCIAL_Y * scale

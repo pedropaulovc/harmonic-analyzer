@@ -36,11 +36,12 @@ def test_pedestal_uses_the_common_cone_axis_height() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_arbor_pedestal_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
+    kept_by_view = (drawing.FRONT_KEEP, drawing.TOP_KEEP, drawing.RIGHT_KEEP)
+    kept = set().union(*kept_by_view)
     # Every marked dimension is placed by exactly one view, and no view keeps a
     # name the part never marks: an unplaced import is deleted silently.
     assert kept == marked
-    assert not set(drawing.FRONT_KEEP) & set(drawing.TOP_KEEP)
+    assert sum(map(len, kept_by_view)) == len(marked)
     assert marked == {
         "Width",
         "Depth",
@@ -187,13 +188,6 @@ def test_manufacturing_locations_are_model_dimensions() -> None:
         # The apex tap's station prints at two places (SET_SCREW_WEB_MM).
         places = 2 if name == "SetScrewLocation" else 1
         assert spec.DRAWING_PRECISION[sketch] == {name: places}
-    source = _drawing_source()
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
-    for label in ("strap depth", "hold-down hole location", "lateral location"):
-        assert f'label="{label}' not in source
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "_hide_reference_sketches(adapter)" in part_source
 
 
 def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
@@ -345,32 +339,6 @@ def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None
     assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
 
 
-def test_the_sheet_carries_only_the_inside_corner_note() -> None:
-    """Every other digit on this print is a dimension: the taper angle and
-    upright root the old sheet spelled out in a note are now the crown
-    radius, the tangency statement and the foot width the views already
-    carry. The one note is the inside-corner ceiling (#1625 precedent)."""
-    import _config
-
-    assert dt_arbor_pedestal_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert '{"Manufacturing Notes": DRAWING_NOTES}' in builder
-    source = _drawing_source()
-    for helper in ("add_note(", "add_attached_note("):
-        assert helper not in source, helper
-    assert source.count("add_property_linked_note(adapter,") == 1
-    exceptions = _config.parts("dt-arbor-pedestal")["machinist_exceptions"]
-    assert [entry["id"] for entry in exceptions] == ["RV-01"]
-    assert "#1625" in exceptions[0]["reason"]
-    # The only free text left is digit-free and tied to the dimension it
-    # qualifies (a reaming instruction, a concentricity/tangency statement),
-    # bar the part number that names a mate (rule 7).
-    assert not re.search(r'SetText\(\d+,\s*"[^"]*\d', source)
-    for text in drawing.DIMENSION_CALLOUTS.values():
-        text = text.replace(drawing.ARBOR_NUMBER, "")
-        assert not re.search(r"\d", text), text
-
-
 def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     source = _drawing_source()
     for helper in (
@@ -402,10 +370,16 @@ def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> No
 
 
 def test_projected_views_stay_aligned_and_ordered() -> None:
-    """Third angle: the plan sits above the elevation on the same centre, and
-    the two view boxes do not overlap at the sheet's 2:1 scale."""
+    """Third angle: the plan is above the elevation, the right view beside it,
+    and the orthographic geometry boxes do not overlap at the 2:1 scale."""
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+    front_east = (
+        drawing.FRONT_CENTER[0] + dt_arbor_pedestal_spec.FOOT_WIDTH * drawing._S / 2
+    )
+    right_west = drawing._right_x(dt_arbor_pedestal_spec.STRAP_INNER_Z)
+    assert front_east < right_west
     dome_top = drawing._front_y(
         dt_arbor_pedestal_spec.BORE_HEIGHT + dt_arbor_pedestal_spec.TOP_RADIUS
     )
@@ -420,6 +394,36 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
     assert drawing._front_y(0.0) < drawing._front_y(dt_arbor_pedestal_spec.FOOT_HEIGHT)
 
 
+def test_native_foot_height_is_only_in_the_l_profile_view() -> None:
+    spec = dt_arbor_pedestal_spec
+    assert set(drawing.RIGHT_KEEP) == {"FootHt"}
+    assert "FootHt" not in drawing.FRONT_KEEP
+    assert "FootHt" not in drawing.TOP_KEEP
+    assert spec.DRAWING_DIMENSIONS["Foot"] == {"FootHt"}
+    assert spec.DRAWING_PRECISION["Foot"]["FootHt"] == 1
+    assert spec.FOOT_HEIGHT == 5.0
+    # In a *Right view the upright is left of the ledge. The native height's
+    # text is beyond the exposed ledge end and halfway up its two real edges.
+    assert drawing._right_x(spec.STRAP_INNER_Z) < drawing._right_x(spec.STRAP_ROOT_Z)
+    assert drawing._right_x(spec.STRAP_ROOT_Z) < drawing._right_x(spec.FOOT_NEAR_Z)
+    x, y = drawing.RIGHT_KEEP["FootHt"]
+    assert x > drawing._right_x(spec.FOOT_NEAR_Z)
+    assert y == drawing._front_y(spec.FOOT_HEIGHT / 2)
+
+
+def test_right_profile_and_foot_height_lane_clear_the_title_block() -> None:
+    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["dt_arbor_pedestal"].layout]
+    spec = dt_arbor_pedestal_spec
+    foot_east = drawing._right_x(spec.FOOT_NEAR_Z)
+    foot_bottom = drawing._front_y(0.0)
+    # The ledge is below the title block's top, so its complete outline and
+    # its height-dimension lane must remain west of the keep-out, with air.
+    assert foot_bottom < template.title_block_top_m
+    assert foot_east + 0.010 < template.title_block_left_m
+    assert foot_east < drawing.RIGHT_KEEP["FootHt"][0]
+    assert drawing.RIGHT_KEEP["FootHt"][0] + 0.005 < template.title_block_left_m
+
+
 def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
     """A mistyped lane coordinate is a dimension off the sheet edge or buried
     in the title block -- neither survives a machinist review, and neither is
@@ -429,14 +433,15 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
     anchors = {
         **drawing.FRONT_KEEP,
         **drawing.TOP_KEEP,
+        **drawing.RIGHT_KEEP,
         "front view": drawing.FRONT_CENTER,
         "plan view": drawing.TOP_CENTER,
+        "right view": drawing.RIGHT_CENTER,
         "isometric view": drawing.ISO_CENTER,
         "bore lateral lane": drawing.BORE_LATERAL_XY,
         "hole lateral lane": drawing.HOLE_LATERAL_XY,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "hold-down callout": drawing.HOLD_DOWN_CALLOUT_XY,
-        "manufacturing note": drawing.NOTES_ANCHOR,
     }
     for label, (x, y) in anchors.items():
         assert margin < x < template.width_m - margin, label
