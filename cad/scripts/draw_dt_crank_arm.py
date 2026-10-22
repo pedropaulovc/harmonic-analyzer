@@ -34,6 +34,14 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_annotation_extent import (
+    CalloutInk,
+    callout_ink,
+    require_clear,
+    require_inside,
+    require_leader_clear,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -52,10 +60,12 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
+from _drawing_layout_collect import _leader_segments_of, _note_element
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
     dimension_text_points,
+    leader_crossings,
     points_inside,
     set_near_side_diameter,
 )
@@ -260,8 +270,8 @@ SEAM_EDGE_PICK = (
     + AXIAL_PIN_DIA / 2.0 * math.sin(math.pi / 4.0) * SHEET_SCALE[0] / 1000.0,
 )
 SEAM_CALLOUT_XY = (0.104, 0.250)
-# The punched fiducial's rim, picked on its upper-left flank toward the
-# callout standing above the boss end, clear of the hub seat's leader.
+# The punched fiducial's rim, picked on its upper-left flank.
+# Its purpose note stays west of the hub-seat leader and AnchorOffset text.
 FIDUCIAL_EDGE_PICK = (
     _sheet_x(FIDUCIAL_X - FIDUCIAL_MODEL_DIA / 2.0 * math.cos(math.pi / 4.0)),
     FRONT_CENTER[1]
@@ -322,6 +332,57 @@ def _texts_off_the_part(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.event("drawing.texts_off_part", inside=str(inside))
     if inside:
         raise RuntimeError(f"dimension text inside the arm silhouette {ARM_SILHOUETTE}: {inside}")
+
+
+def _fiducial_note_clear(
+    adapter: Any, note: Any, front_annotations: list[Any], anchor_callout: Any
+) -> None:
+    """Prove the expanded purpose note clears the arm and adjacent native ink."""
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    element = _note_element(adapter, annotation, "punched fiducial callout")
+    if element is None:
+        raise RuntimeError("punched fiducial callout has no measurable native extent")
+    box = (element.xmin, element.ymin, element.xmax, element.ymax)
+    require_inside("punched fiducial callout", box, sheet_region(adapter))
+    neighbours = [
+        callout_ink(
+            adapter, _named(adapter, front_annotations, "HubSeatDia"),
+            label="hub seat callout",
+        ),
+        callout_ink(
+            adapter, _early_bound(anchor_callout, "IDisplayDimension").GetAnnotation(),
+            label="anchor tap callout",
+        ),
+    ]
+    require_clear(
+        "punched fiducial callout",
+        box,
+        {"arm silhouette": ARM_SILHOUETTE, **{ink.label: ink.text for ink in neighbours}},
+    )
+    for ink in neighbours:
+        require_leader_clear(ink, {"punched fiducial callout": box})
+    leader = _leader_segments_of(
+        adapter, annotation, label="punched fiducial callout", kind="note", owner="front"
+    )
+    if not leader:
+        raise RuntimeError("punched fiducial callout has no measurable leader")
+    require_leader_clear(
+        CalloutInk("punched fiducial callout", box, tuple(leader)),
+        {ink.label: ink.text for ink in neighbours},
+    )
+    crossings = leader_crossings(
+        {
+            "punched fiducial": [
+                ((segment.x0, segment.y0), (segment.x1, segment.y1))
+                for segment in leader
+            ],
+            "HubSeatDia": dimension_segments(
+                _named(adapter, front_annotations, "HubSeatDia")
+            ),
+        }
+    )
+    if crossings:
+        raise RuntimeError(f"punched fiducial and hub-seat leaders cross: {crossings}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -459,9 +520,9 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=SEAM_CALLOUT_XY,
         label="MHA-DT-VN-59 seam callout",
     )
-    # The punched fiducial is flagged at the mark itself, from the clear
-    # band above the boss end.
-    add_attached_note(
+    # Retain the feature attachment and west-side note lane, with the expanded
+    # rendered extent and neighbouring leaders proved clear below.
+    fiducial_note = add_attached_note(
         adapter,
         front,
         text=FIDUCIAL_CALLOUT,
@@ -469,6 +530,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=FIDUCIAL_CALLOUT_XY,
         label="punched fiducial callout",
     )
+    _fiducial_note_clear(adapter, fiducial_note, front_annotations, anchor_callout)
     # Handle pivot tap (MHA-DT-32): above and just right of the arm, arrow on
     # the hole's top rim, clear of the full principal view.  Thread and tap
     # drill ride the native callout; the class is the title block's.  The

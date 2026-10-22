@@ -36,7 +36,7 @@ def test_pedestal_uses_the_common_cone_axis_height() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_arbor_pedestal_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
-    kept_by_view = (drawing.FRONT_KEEP, drawing.TOP_KEEP, drawing.RIGHT_KEEP)
+    kept_by_view = (drawing.FRONT_KEEP, drawing.TOP_KEEP, drawing.LEFT_KEEP)
     kept = set().union(*kept_by_view)
     # Every marked dimension is placed by exactly one view, and no view keeps a
     # name the part never marks: an unplaced import is deleted silently.
@@ -370,16 +370,16 @@ def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> No
 
 
 def test_projected_views_stay_aligned_and_ordered() -> None:
-    """Third angle: the plan is above the elevation, the right view beside it,
+    """Third angle: the plan is above the elevation, the left view to its west,
     and the orthographic geometry boxes do not overlap at the 2:1 scale."""
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
-    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
-    front_east = (
-        drawing.FRONT_CENTER[0] + dt_arbor_pedestal_spec.FOOT_WIDTH * drawing._S / 2
+    assert drawing.LEFT_CENTER[1] == drawing.FRONT_CENTER[1]
+    front_west = (
+        drawing.FRONT_CENTER[0] - dt_arbor_pedestal_spec.FOOT_WIDTH * drawing._S / 2
     )
-    right_west = drawing._right_x(dt_arbor_pedestal_spec.STRAP_INNER_Z)
-    assert front_east < right_west
+    left_east = drawing._left_x(dt_arbor_pedestal_spec.STRAP_INNER_Z)
+    assert left_east < front_west
     dome_top = drawing._front_y(
         dt_arbor_pedestal_spec.BORE_HEIGHT + dt_arbor_pedestal_spec.TOP_RADIUS
     )
@@ -396,32 +396,71 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
 
 def test_native_foot_height_is_only_in_the_l_profile_view() -> None:
     spec = dt_arbor_pedestal_spec
-    assert set(drawing.RIGHT_KEEP) == {"FootHt"}
+    assert set(drawing.LEFT_KEEP) == {"FootHt"}
     assert "FootHt" not in drawing.FRONT_KEEP
     assert "FootHt" not in drawing.TOP_KEEP
     assert spec.DRAWING_DIMENSIONS["Foot"] == {"FootHt"}
     assert spec.DRAWING_PRECISION["Foot"]["FootHt"] == 1
     assert spec.FOOT_HEIGHT == 5.0
-    # In a *Right view the upright is left of the ledge. The native height's
-    # text is beyond the exposed ledge end and halfway up its two real edges.
-    assert drawing._right_x(spec.STRAP_INNER_Z) < drawing._right_x(spec.STRAP_ROOT_Z)
-    assert drawing._right_x(spec.STRAP_ROOT_Z) < drawing._right_x(spec.FOOT_NEAR_Z)
-    x, y = drawing.RIGHT_KEEP["FootHt"]
-    assert x > drawing._right_x(spec.FOOT_NEAR_Z)
+    # In a *Left view the upright is east of the ledge: +Z projects right.
+    # The native height's text is west of the exposed ledge end and halfway
+    # up its two real edges.
+    assert drawing._left_x(spec.STRAP_INNER_Z) > drawing._left_x(spec.STRAP_ROOT_Z)
+    assert drawing._left_x(spec.STRAP_ROOT_Z) > drawing._left_x(spec.FOOT_NEAR_Z)
+    x, y = drawing.LEFT_KEEP["FootHt"]
+    assert x < drawing._left_x(spec.FOOT_NEAR_Z)
     assert y == drawing._front_y(spec.FOOT_HEIGHT / 2)
 
 
-def test_right_profile_and_foot_height_lane_clear_the_title_block() -> None:
+def test_left_profile_and_foot_height_lane_clear_the_frame_and_title_block() -> None:
     template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["dt_arbor_pedestal"].layout]
     spec = dt_arbor_pedestal_spec
-    foot_east = drawing._right_x(spec.FOOT_NEAR_Z)
+    foot_west = drawing._left_x(spec.FOOT_NEAR_Z)
+    foot_east = drawing._left_x(spec.STRAP_INNER_Z)
     foot_bottom = drawing._front_y(0.0)
-    # The ledge is below the title block's top, so its complete outline and
-    # its height-dimension lane must remain west of the keep-out, with air.
+    # Both orthographic feet are below the title block's top; their complete
+    # outlines stay to its west. The native 5.0 uses the open western lane.
     assert foot_bottom < template.title_block_top_m
     assert foot_east + 0.010 < template.title_block_left_m
-    assert foot_east < drawing.RIGHT_KEEP["FootHt"][0]
-    assert drawing.RIGHT_KEEP["FootHt"][0] + 0.005 < template.title_block_left_m
+    front_east = drawing.FRONT_CENTER[0] + spec.FOOT_WIDTH * drawing._S / 2.0
+    assert front_east + 0.010 < template.title_block_left_m
+    assert drawing.LEFT_KEEP["FootHt"][0] < foot_west
+    assert drawing.LEFT_KEEP["FootHt"][0] - 0.005 > 0.0127
+
+
+def test_native_dimension_text_measurement_covers_every_display_run(monkeypatch) -> None:
+    from math import pi
+    from types import SimpleNamespace
+
+    # Native dimension text may have independent value, tolerance and callout
+    # runs. Include rotation so this cannot regress to an anchor-only box.
+    runs = [
+        ("9.55", (0.220, 0.134), 0.0035, 0, 0.0),
+        ("+0.03", (0.230, 0.138), 0.0025, 0, 0.0),
+        ("FIT", (0.220, 0.127), 0.0035, 0, 0.0),
+        ("5.0", (0.026, 0.060), 0.0035, 0, pi / 2.0),
+    ]
+    data = SimpleNamespace(
+        GetTextCount=lambda: len(runs),
+        GetTextAtIndex=lambda i: runs[i][0],
+        GetTextPositionAtIndex=lambda i: (*runs[i][1], 0.0),
+        GetTextHeightAtIndex=lambda i: runs[i][2],
+        GetTextRefPositionAtIndex=lambda i: runs[i][3],
+        GetTextAngleAtIndex=lambda i: runs[i][4],
+    )
+    display = SimpleNamespace(GetDisplayData=lambda: data)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    box = drawing._dimension_text_box(annotation, "native dimension")
+    assert box[0] == 0.026
+    assert box[1] == 0.060
+    assert box[2] > 0.230
+    assert box[3] == 0.138
+
+    runs[:] = runs[-1:]
+    rotated = drawing._dimension_text_box(annotation, "vertical foot height")
+    assert rotated[2] > 0.029
+    assert rotated[3] > 0.060
 
 
 def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
@@ -433,10 +472,10 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
     anchors = {
         **drawing.FRONT_KEEP,
         **drawing.TOP_KEEP,
-        **drawing.RIGHT_KEEP,
+        **drawing.LEFT_KEEP,
         "front view": drawing.FRONT_CENTER,
         "plan view": drawing.TOP_CENTER,
-        "right view": drawing.RIGHT_CENTER,
+        "left view": drawing.LEFT_CENTER,
         "isometric view": drawing.ISO_CENTER,
         "bore lateral lane": drawing.BORE_LATERAL_XY,
         "hole lateral lane": drawing.HOLE_LATERAL_XY,

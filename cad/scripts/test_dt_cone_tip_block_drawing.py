@@ -272,36 +272,26 @@ def test_slit_depth_is_a_model_parameter_not_a_printed_endpoint(adjuster_center)
     assert "SlitW" in drawing.sheet_dimension_ink(adjuster_center)
 
 
-def test_slot_callout_is_attached_to_the_visible_slit_wall(monkeypatch) -> None:
-    calls = []
-    adapter, view, note = object(), object(), object()
-
-    def attach(actual_adapter, actual_view, **kwargs):
-        calls.append((actual_adapter, actual_view, kwargs))
-        return note
-
-    monkeypatch.setattr(drawing, "add_attached_note", attach)
-    assert drawing._add_slot_callout(adapter, view) is note
-    assert len(calls) == 1
-    actual_adapter, actual_view, kwargs = calls[0]
-    assert actual_adapter is adapter
-    assert actual_view is view
-    assert kwargs["text"].replace("\n", " ") == "SLOT OPENS INTO ADJUSTER BORE"
-    assert not any(character.isdigit() for character in kwargs["text"])
-    assert kwargs["entity_xy"] == drawing.SLOT_EDGE_PICK
-    assert kwargs["note_xy"] == drawing.SLOT_CALLOUT_XY
+def test_slot_callout_leader_enters_the_visible_slit_from_above() -> None:
     spec = dt_cone_tip_block_spec
-    edge_x, edge_y = kwargs["entity_xy"]
-    assert edge_x == pytest.approx(drawing.FRONT_CENTER[0] + spec.SLIT_W * drawing._S / 2.0)
-    assert drawing._elevation_y(
-        spec.ADJUSTER_AXIS_HEIGHT + spec.ADJUSTER_CSK_DIA / 2.0, drawing.FRONT_CENTER
-    ) < edge_y < drawing._elevation_y(
-        spec.PINCH_HEIGHT - spec.PINCH_CLEARANCE_DIA / 2.0, drawing.FRONT_CENTER
-    )
-    assert drawing.sheet_leaders()["slot callout"].tip == kwargs["entity_xy"]
+    model_x, model_y, model_z = drawing.SLOT_EDGE_MODEL_POINT
+    assert model_x == pytest.approx(spec.SLIT_W / 2.0)
+    assert model_z == pytest.approx(spec.BLOCK_Z / 2.0)
+    assert spec.PINCH_HEIGHT + spec.PINCH_CLEARANCE_DIA / 2.0 < model_y < spec.BLOCK_HEIGHT
+    edge_x, edge_y = drawing.SLOT_EDGE_PICK
+    assert edge_x == pytest.approx(drawing.FRONT_CENTER[0] + model_x * drawing._S)
+    assert edge_y == pytest.approx(drawing._elevation_y(model_y, drawing.FRONT_CENTER))
+    leader = drawing.sheet_leaders()["slot callout"]
+    assert leader.tip == drawing.SLOT_EDGE_PICK
+    run, rise = leader.start[0] - edge_x, leader.start[1] - edge_y
+    assert run > 0.0 and rise > 0.0
+    assert math.radians(30.0) <= math.atan2(rise, run) <= math.radians(60.0)
+    front = drawing.sheet_view_silhouettes()["front"]
+    assert leader.start[1] > front[3]
+    over = _run_inside(leader.segment(), front)
+    assert over - (front[3] - edge_y) <= LEADER_DETOUR_TARGET
     left, bottom, right, top = drawing.sheet_text_boxes()["slot callout"]
-    assert (left, top) == kwargs["note_xy"]
-    assert right > left and top > bottom
+    assert left > front[2] and right > left and top > bottom
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -520,7 +510,9 @@ def test_the_slid_view_row_fits_the_sheet() -> None:
 
 def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
     detours = _leader_detours(drawing)
-    assert {"adjuster callout", "pinch clearance callout", "pinch thread callout"} <= set(detours)
+    assert {
+        "adjuster callout", "pinch clearance callout", "pinch thread callout", "slot callout"
+    } <= set(detours)
     long_way = {name: d for name, d in detours.items() if d[2] > LEADER_DETOUR_TARGET}
     assert long_way == {}
 
@@ -672,19 +664,19 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
     )
 
 
-def test_slit_breaks_into_the_adjuster_thread_with_its_conservative_depth_envelope() -> None:
-    """The internal depth allowance preserves the old breakthrough proof,
-    without turning the model's cut station into a printed finished floor."""
+def test_nominal_cad_slit_envelope_keeps_its_internal_breakthrough_reserve() -> None:
+    """This arithmetic checks model robustness, not the acceptance margin of
+    every slot made to the connectivity-only print."""
     spec = dt_cone_tip_block_spec
-    places = spec.SLIT_DEPTH_CHECK_PLACES
+    places = spec.SLIT_CAD_DEPTH_CHECK_PLACES
     depth_min = round(spec.SLIT_DEPTH, places) - _GENERAL[places]
     floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - depth_min
     crown_min = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)[0] + (
         spec.ADJUSTER_BORE_DIA / 2.0
     )
     breakthrough = crown_min - floor_max
-    assert breakthrough >= spec.SLIT_BREAKTHROUGH_MARGIN_MM
-    assert spec.WORST_SLIT_BREAKTHROUGH_MM == pytest.approx(breakthrough)
+    assert breakthrough >= spec.SLIT_CAD_BREAKTHROUGH_RESERVE_MM
+    assert spec.SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM == pytest.approx(breakthrough)
 
 
 def test_slit_may_continue_below_the_adjuster_thread() -> None:

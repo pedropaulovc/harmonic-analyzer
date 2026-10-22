@@ -935,7 +935,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 3 (tip-adjuster-set 'THREAD MHA-DT-VN-55 ... "
             "BACK OFF 1/8 TURN; TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT'); cone_tip_block_spec "
-            "SLIT_FLOOR / WORST_SLIT_BREAKTHROUGH_MM (slit opens into the adjuster thread), "
+            "SLIT_FLOOR / SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM (nominal-CAD robustness only; "
+            "the print requires the slit to open into the adjuster bore, not a numeric margin), "
             "PINCH_THREAD; build_dt_drive_train_assembly.py parallel_mate 'adjuster anti-spin "
             "(pinch-locked)'; pending exception ruling #975 MHA-DT-VN-55 ('the pinch screw across the slit "
             "locks it'); cone_stack_end_play.SHAFT_END_PLAY"

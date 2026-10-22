@@ -93,9 +93,10 @@ PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
 PINCH_DEPTH_PLACES = 1
 SLIT_W_PLACES = 2
-# Retain the former one-place depth envelope as a conservative engineering
-# breakthrough check only, not a printed tolerance or a termination limit.
-SLIT_DEPTH_CHECK_PLACES = 1
+# Internal nominal-CAD robustness envelope, retained from the former depth
+# grade. It is not a printed tolerance, termination limit or manufacturing
+# guarantee of a particular breakthrough amount.
+SLIT_CAD_DEPTH_CHECK_PLACES = 1
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.2
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
@@ -268,19 +269,20 @@ for _name, _web in (
         raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
-# The slit must open into the adjuster thread or its jaws never grip it. Keep
-# the model's conservative lower-depth envelope under the tap-drill crown
-# (AxisHeight up from the foot) at the printed block/axis extremes. This check
-# does not turn the cut station in the bore void into a finished floor.
+# The print requires only connectivity: the slit opens into the adjuster bore.
+# Retain the former arithmetic as a nominal-CAD robustness check, combining
+# printed block/axis extremes with an internal lower-depth envelope. Its
+# reserve is NOT a manufacturing acceptance margin: depth no longer prints,
+# and a conforming slot may open into the bore by less than this reserve.
 # Below the thread the slit may run on: the jaws only lengthen.
-SLIT_BREAKTHROUGH_MARGIN_MM = 0.25
-WORST_SLIT_BREAKTHROUGH_MM = (_axis_limits[0] + ADJUSTER_BORE_DIA / 2.0) - (
-    _height_limits[1] - _printed_limits(SLIT_DEPTH, SLIT_DEPTH_CHECK_PLACES)[0]
+SLIT_CAD_BREAKTHROUGH_RESERVE_MM = 0.25
+SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM = (_axis_limits[0] + ADJUSTER_BORE_DIA / 2.0) - (
+    _height_limits[1] - _printed_limits(SLIT_DEPTH, SLIT_CAD_DEPTH_CHECK_PLACES)[0]
 )
-if WORST_SLIT_BREAKTHROUGH_MM < SLIT_BREAKTHROUGH_MARGIN_MM - 1e-9:
+if SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM < SLIT_CAD_BREAKTHROUGH_RESERVE_MM - 1e-9:
     raise AssertionError(
-        f"slit floor can stop {WORST_SLIT_BREAKTHROUGH_MM:.3f} short of breaking "
-        f"into the adjuster thread (< {SLIT_BREAKTHROUGH_MARGIN_MM})"
+        f"modelled slit depth envelope leaves {SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM:.3f} "
+        f"breakthrough (< internal CAD reserve {SLIT_CAD_BREAKTHROUGH_RESERVE_MM})"
     )
 # r3 blocker (codex FIX review of 72ab): the Ø3.26 near-jaw clearance printed
 # 6.9 blind, a .X depth whose 6.1 floor stops short of a near jaw the print

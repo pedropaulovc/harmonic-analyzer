@@ -39,7 +39,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_edges import visible_view_entities
+from _drawing_edges import scan_view_edges, visible_view_entities
 from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -239,19 +239,29 @@ def _callout_half_width(text: str) -> float:
     return max(len(line) for line in text.split("\n")) * CALLOUT_GLYPH_WIDTH / 2.0
 
 
-# The slit wall between the adjuster mouth and pinch bore is a visible edge in
-# the front elevation. The note names connectivity, not a depth or an end stop.
+# Pick the front mouth's visible slit wall just below the top. The leader
+# enters from above at 45 degrees, rather than reading as a nearly horizontal
+# edge across the block face. The note names connectivity, not an end stop.
 SLOT_CALLOUT = "SLOT OPENS INTO\nADJUSTER BORE"
+SLOT_EDGE_MODEL_POINT = (SLIT_W / 2.0, BLOCK_HEIGHT - 2.0, Z_NORTH)
 SLOT_EDGE_PICK = (
-    FRONT_CENTER[0] + SLIT_W * _S / 2.0,
-    _elevation_y((ADJUSTER_AXIS_HEIGHT + PINCH_HEIGHT) / 2.0, FRONT_CENTER),
+    FRONT_CENTER[0] + SLOT_EDGE_MODEL_POINT[0] * _S,
+    _elevation_y(SLOT_EDGE_MODEL_POINT[1], FRONT_CENTER),
 )
-SLOT_CALLOUT_XY = (FRONT_CENTER[0] + 0.036, SLOT_EDGE_PICK[1] + 0.007)
+# Existing note measurements range up to 2.77 mm per glyph; round outward,
+# independently of the narrower dimension-value font.
+SLOT_NOTE_GLYPH_WIDTH = 0.0028
 SLOT_CALLOUT_EXTENT = (
     0.0,
     len(SLOT_CALLOUT.split("\n")) * TEXT_ROW_HEIGHT,
-    2.0 * _callout_half_width(SLOT_CALLOUT),
+    max(len(line) for line in SLOT_CALLOUT.split("\n")) * SLOT_NOTE_GLYPH_WIDTH,
     0.0,
+)
+SLOT_CALLOUT_XY = (
+    FRONT_CENTER[0] + 0.036,
+    SLOT_EDGE_PICK[1]
+    + FRONT_CENTER[0] + 0.036 - SLOT_EDGE_PICK[0]
+    + SLOT_CALLOUT_EXTENT[1] / 2.0,
 )
 
 
@@ -1102,12 +1112,16 @@ def assert_sheet_ink_clear(adjuster_center: tuple[float, float] = FRONT_CENTER) 
 
 
 def _add_slot_callout(adapter: Any, view: Any) -> Any:
-    """Attach the bore-connectivity requirement to the visible slit wall."""
+    """Attach to the independently resolved front slit-wall edge."""
+    edge = scan_view_edges(view, label="front slit wall").exact_line_through(
+        SLOT_EDGE_MODEL_POINT, label="slit opens into adjuster bore"
+    ).edge
     return add_attached_note(
         adapter,
         view,
         text=SLOT_CALLOUT,
         entity_xy=SLOT_EDGE_PICK,
+        attached_to=edge,
         note_xy=SLOT_CALLOUT_XY,
         label="slit opens into adjuster bore",
     )

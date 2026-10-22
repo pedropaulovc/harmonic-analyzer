@@ -334,7 +334,7 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     x, y = drawing.FIDUCIAL_EDGE_PICK
     r = spec.FIDUCIAL_MODEL_DIA / 2.0 * scale
     assert (x - cx) ** 2 + (y - cy) ** 2 == pytest.approx(r**2)
-    # The note stands above the arm's top edge, left of the hub-seat leader.
+    # The note stands above the arm, west of the hub-seat leader.
     assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
     assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
 

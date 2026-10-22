@@ -76,8 +76,11 @@ geometry is casting-shaped, not milling-shaped.
   slit-width dimension remains, and a leader attached to the visible slit
   wall states `SLOT OPENS INTO ADJUSTER BORE`. This is a connectivity
   requirement, not an exact stop at the bore: below the thread the slit may
-  run on. The modeled depth and width, conservative breakthrough assertion
-  and permitted overrun are unchanged; no cutting process is prescribed.
+  run on. The modeled depth and width and permitted overrun are unchanged.
+  The retained `SLIT_CAD_ENVELOPE_BREAKTHROUGH_MM` assertion checks nominal
+  CAD robustness against its internal depth allowance; its 0.25 mm reserve
+  is not a printed manufacturing acceptance margin. The print requires only
+  that the slot opens into the bore, and prescribes no cutting process.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |

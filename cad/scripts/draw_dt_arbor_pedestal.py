@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the cylinder-arbor pedestal.
 
-The aligned front, top and right orthographics show the tapered upright and
+The aligned left, front and top orthographics show the tapered upright and
 its L-profile foot; the native FootHt dimension belongs on the visible ledge
-in the right view. The shaded isometric supplements these manufacturing views.
+in the left view. The shaded isometric supplements these manufacturing views.
 """
 
 from __future__ import annotations
@@ -23,12 +23,19 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _config
 from _check import check
 from _com import _early_bound
-from _drawing_annotation_extent import place_callout_clear, require_clear
+from _drawing_annotation_extent import (
+    gdt_box,
+    place_callout_clear,
+    require_clear,
+    require_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -42,10 +49,11 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
+from _layout_geometry import estimate_text_box
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -91,10 +99,9 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The part spans model y 0 (foot seat) to 55.45 (dome top); centre the front
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
-# above the elevation and the right view horizontally aligned with it; the
-# isometric balances the orthographic group on the right. The right profile's
-# entire foot, not just its height annotation, stays west of the title block;
-# the bore callout sits west of the front to leave the two profiles distinct.
+# above the elevation and the left view horizontally aligned to its west.
+# This leaves both feet and the foot-height lane west of the title block,
+# while the front's bore and crown annotations keep their open eastern lanes.
 # The crown-to-plan band and the plan's dimension lanes clear the
 # sheet border: lateral-location lane 0.045, elevation 0.055..0.165, crown
 # text ~0.173, plan 0.186..0.242, hole lateral lane 0.250, foot-width lane
@@ -105,9 +112,9 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.108, 0.110)
+FRONT_CENTER = (0.170, 0.110)
 TOP_CENTER = (FRONT_CENTER[0], 0.214)
-RIGHT_CENTER = (0.176, FRONT_CENTER[1])
+LEFT_CENTER = (0.070, FRONT_CENTER[1])
 ISO_CENTER = (0.325, 0.155)
 
 
@@ -128,9 +135,13 @@ def _top_y(model_z: float) -> float:
     return TOP_CENTER[1] - (model_z - FOOT_MID_Z) * _S
 
 
-def _right_x(model_z: float) -> float:
-    """Sheet X in the right view: model +Z projects left, as in third angle."""
-    return RIGHT_CENTER[0] - (model_z - FOOT_MID_Z) * _S
+def _left_x(model_z: float) -> float:
+    """Sheet X in the left view: model +Z projects right, as in third angle.
+
+    The standard *Left looks opposite *Right: its upright is east of the
+    exposed ledge. Both views retain model +Y up, aligned with the front.
+    """
+    return LEFT_CENTER[0] + (model_z - FOOT_MID_Z) * _S
 
 
 # Lanes for the two lateral locations: below the seat in the elevation (the
@@ -144,17 +155,16 @@ HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 
 # bore; the plan carries the foot rectangle, the strap band and the hold-down
 # hole. Nested left lanes work outward from the shorter span (journal axis,
 # then overall reference) off the one datum a machinist actually clamps to --
-# the seat. The right view carries the foot height on the visible ledge.
+# the seat. The left view carries the foot height on the visible ledge.
 FRONT_KEEP = {
-    "BoreHeight": (FRONT_CENTER[0] - 0.074, _front_y(BORE_HEIGHT / 2.0)),
-    # West of the elevation, above the bore-height witness and between the
-    # height lanes and the tapered flank. This leaves the right profile clear.
-    "BoreDia": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT) + 0.011),
+    "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
+    # East of the elevation in an open lane, not between height witnesses.
+    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
-    # Above both profiles, below the plan: value plus tangency suffix.
+    # Above the front, below the plan: value plus tangency suffix.
     "DomeRadius": (
         FRONT_CENTER[0] + 0.063,
-        _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.010,
+        _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008,
     ),
 }
 TOP_KEEP = {
@@ -188,11 +198,11 @@ TOP_KEEP = {
     ),
     "HoleLateral": HOLE_LATERAL_XY,
 }
-RIGHT_KEEP = {
+LEFT_KEEP = {
     # The native foot extrusion height, not a second sheet-made dimension.
-    # Its witnesses leave the ledge's visible top and bottom edges to a
-    # short outboard lane, still wholly west of the title-block keep-out.
-    "FootHt": (_right_x(FOOT_NEAR_Z) + 0.006, _front_y(FOOT_HEIGHT / 2.0)),
+    # Its witnesses leave the exposed ledge's real top and bottom edges to
+    # the west, clear of the frame, the upright and the title block.
+    "FootHt": (_left_x(FOOT_NEAR_Z) - 0.016, _front_y(FOOT_HEIGHT / 2.0)),
 }
 # X on this part starts on a FEATURE, never the symmetry axis (drawing-guidelines.md rule 10 (dimension from a real feature)):
 # the bore in the elevation and the hold-down hole in the plan are both
@@ -224,7 +234,7 @@ SET_SCREW_PROCESS = "TAP"
 SET_SCREW_EXTENT = "TO BORE"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The overall height's lane, left of the elevation.
-OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.086, FRONT_CENTER[1])
+OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.058, FRONT_CENTER[1])
 # Sheet Y of the elevation's crown apex and of the plan's far face: the tap
 # callout sits in the band between them, left of the hole, so its leader
 # drops left out of the plan under the left lane instead of crossing the
@@ -440,6 +450,96 @@ def _prove_set_screw_callout_clear(adapter: Any, display: Any) -> None:
     require_clear(ink.label, ink.text, set_screw_callout_above())
 
 
+def _dimension_text_box(annotation: Any, label: str) -> tuple[float, float, float, float]:
+    """Box every native display-text run, including the value and fit rows.
+
+    As in draw_dt_cone_gear_shaft, positions, heights and angles are read back;
+    text widths use the existing layout estimator because COM supplies none.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    boxes = []
+    for index in range(int(data.GetTextCount())):
+        anchor = [float(value) for value in data.GetTextPositionAtIndex(index)]
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        box = estimate_text_box(
+            str(data.GetTextAtIndex(index) or ""),
+            anchor=(anchor[0], anchor[1]),
+            height=float(data.GetTextHeightAtIndex(index)),
+            reference=reference if 0 <= reference <= 5 else 0,
+            angle=float(data.GetTextAngleAtIndex(index)),
+        )
+        if box is not None:
+            boxes.append(box)
+    if not boxes:
+        raise RuntimeError(f"{label} draws no text to measure")
+    return (
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
+
+
+def _prove_bore_callout_clear(
+    adapter: Any, annotations: list[Any], finish: Any, left: Any, iso: Any
+) -> None:
+    """Read back the complete bore callout and conservative finish envelope."""
+    rebuild_drawing(adapter, label="measure pedestal bore callout")
+    neighbours = {
+        label: tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+        for label, view in (("left profile", left), ("isometric", iso))
+    }
+    front_west = FRONT_CENTER[0] - FOOT_WIDTH * _S / 2.0
+    front_east = FRONT_CENTER[0] + FOOT_WIDTH * _S / 2.0
+    neighbours["front silhouette"] = (
+        front_west, _front_y(0.0), front_east, _CROWN_APEX_Y
+    )
+    finish_box = gdt_box(adapter, finish.GetAnnotation(), label="arbor bore finish")
+    region = sheet_region(adapter)
+    require_inside("arbor bore finish", finish_box, region)
+    require_clear("arbor bore finish", finish_box, neighbours)
+    neighbours.update(
+        {
+            "arbor bore finish": finish_box,
+            "bore-height upper witness": _line_box(
+                FRONT_KEEP["BoreHeight"][0], _front_y(BORE_HEIGHT),
+                FRONT_CENTER[0], _front_y(BORE_HEIGHT),
+            ),
+            "overall-height upper witness": _line_box(
+                OVERALL_HEIGHT_XY[0], _CROWN_APEX_Y, FRONT_CENTER[0], _CROWN_APEX_Y
+            ),
+        }
+    )
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) == "BoreDia":
+            box = _dimension_text_box(annotation, "arbor bore callout")
+            require_inside("arbor bore callout", box, region)
+            require_clear("arbor bore callout", box, neighbours)
+            return
+    raise RuntimeError("front view has no imported BoreDia to check")
+
+
+def _prove_foot_height_clear(adapter: Any, annotations: list[Any]) -> None:
+    """Measure the native 5.0 text, rather than treating its anchor as ink."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) == "FootHt":
+            box = _dimension_text_box(annotation, "foot height")
+            require_inside("foot height", box, sheet_region(adapter))
+            require_clear(
+                "foot height",
+                box,
+                {"title block": (
+                    template.title_block_left_m, 0.0,
+                    template.width_m, template.title_block_top_m,
+                )},
+            )
+            return
+    raise RuntimeError("left view has no imported FootHt to check")
+
+
 def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     """Rewrite the native tap callout's definition parts (5..8).
 
@@ -594,11 +694,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
+    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    # The bore and holes are defined by their front/plan callouts. The right
+    # The bore and holes are defined by their front/plan callouts. The left
     # view shows the external L profile; hidden holes add no useful shape.
-    for view in (front, top, right, iso):
+    for view in (front, top, left, iso):
         set_hidden_lines_removed(adapter, view)
 
     # The strap band, hold-down station and lateral locations are owned by
@@ -619,16 +719,16 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
+    left_annotations = curate_view_dimensions(
         adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
+        left,
+        keep=LEFT_KEEP,
+        view_label="left",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
+    imported_annotations = [*front_annotations, *top_annotations, *left_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
-    for view, label in ((front, "front"), (top, "plan"), (right, "right")):
+    for view, label in ((front, "front"), (top, "plan"), (left, "left")):
         view.SetDisplayTangentEdges2(0)
         if int(view.GetDisplayTangentEdges2()) != 0:
             raise RuntimeError(f"failed to hide {label}-view tangent edges")
@@ -644,13 +744,12 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     foot_entity, bore_entity, dome_entity = _front_entities(adapter, front)
-    # The bore callout is west of the front; its finish symbol sits east,
-    # close to the crown and clear of the neighbouring right-view upright.
-    # Its leader still lands on the bore's real 3 o'clock rim.
-    add_surface_finish(
+    # The finish stays above the bore's 3 o'clock landing, in the front's
+    # open eastern lane. The opposite-side diameter callout runs below it.
+    bore_finish = add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.025, _front_y(BORE_HEIGHT) + 0.010),
+        symbol_xy=(FRONT_CENTER[0] + 0.037, _front_y(BORE_HEIGHT) + 0.010),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         char_height=0.0025,
@@ -661,7 +760,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     # Under the seat's east half, right of the bore lateral's centreline
-    # witness. The foot-height dimension now lives on the right view.
+    # witness. The foot-height dimension now lives on the left view.
     add_surface_finish(
         adapter,
         front,
@@ -715,12 +814,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
-    for view in (front, top, right):
+    for view in (front, top, left):
         set_hidden_lines_removed(adapter, view)
     # The part authored every imported dimension's decimal places; prove the
     # import kept them instead of falling back to the sheet's two-place
     # default (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the sheet may not rewrite them).
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    _prove_bore_callout_clear(adapter, front_annotations, bore_finish, left, iso)
+    _prove_foot_height_clear(adapter, left_annotations)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
