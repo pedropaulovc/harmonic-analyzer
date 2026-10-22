@@ -80,11 +80,12 @@ def _get_bytes(backend, key):
 
 
 @pytest.fixture(autouse=True)
-def private_archive_environment(tmp_path, monkeypatch):
+def private_archive_environment(tmp_path, tmp_path_factory, monkeypatch):
     # Every test, including actual-SDK socket-free tests, stays off host caches.
     # Some fixtures make all of tmp_path their synthetic repo; keep the profile
-    # in a per-test sibling tree so the real non-overlap guard remains enabled.
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path.parent / "archive-users" / tmp_path.name))
+    # in a pytest-owned sibling tree so the real non-overlap guard remains enabled.
+    # A short, unique factory name leaves room for full digest/temp basenames on Windows.
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("archive")))
     monkeypatch.delenv("HARMONIC_ARCHIVE_CACHE_ROOT", raising=False)
     monkeypatch.setattr(cache.tempfile, "tempdir", str(tmp_path))
 
@@ -2395,7 +2396,7 @@ def test_real_directory_aliases_never_discard_remote_bytes_or_write_targets(
     if os.name == "nt":
         subprocess.run(
             ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
-            check=True, capture_output=True, text=True,
+            check=True, text=True,
         )
     else:
         alias.symlink_to(target, target_is_directory=True)
