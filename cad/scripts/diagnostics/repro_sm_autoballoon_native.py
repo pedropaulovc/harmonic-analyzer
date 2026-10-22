@@ -135,6 +135,41 @@ def _sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def _source_checkpoint(report, phase, opened=None, model=None):
+    """Watch only the original assembly; this says nothing about part-file writes."""
+    if report is None:
+        return
+    primary = active_exception()
+    checkpoints = report.setdefault("source_checkpoints", [])
+    record = {"phase": phase, "stage": report.get("stage"),
+              "before_sha256": checkpoints[-1].get("after_sha256") if checkpoints
+              else report["source_sha256"], "after_sha256": None, **(opened or {})}
+    checkpoints.append(record)
+    try:
+        record["after_sha256"] = _sha(report["source_assembly"])
+        if record["after_sha256"] != report["source_sha256"]:
+            if "source_changed_at" not in report:
+                report["source_changed_at"] = phase
+                after = Path(report["source_before"]).with_name("source-after.SLDASM")
+                shutil.copyfile(report["source_assembly"], after)
+                report["source_after"] = str(after)
+            # Do not issue more observation COM calls after a detected source write.
+            snapshot = report.get("source_after", "not retained; see first change error")
+            raise RuntimeError(f"cached source changed at {phase}; source-after snapshot: {snapshot}")
+        if model is not None:
+            state = {"actual_path": model.GetPathName(),
+                     "opened_read_only": model.IsOpenedReadOnly(),
+                     "document_state_observed_at": phase}
+            record.update(state)
+            if opened is not None:
+                opened.update(state)
+    except BaseException as error:
+        record["error"] = "".join(traceback.format_exception(error))
+        if primary is None:
+            raise
+        primary.add_note(f"source checkpoint {phase}: " + record["error"])
+
+
 def _owned(path, root):
     path, root = Path(path).resolve(), Path(root).resolve()
     if not path.is_relative_to(root) or path == root:
@@ -143,11 +178,22 @@ def _owned(path, root):
 
 
 def _close_all(sw):
+    # Production package_native discards by nonempty title before the clean backstop.
+    for _ in range(500):
+        document = sw.IActiveDoc2
+        if document is None:
+            break
+        title = document.GetTitle()
+        if not title:
+            raise RuntimeError("refusing empty-title CloseDoc, which no-ops on assemblies")
+        sw.CloseDoc(title)
+    if sw.IActiveDoc2 is not None:
+        raise RuntimeError("owned seat still occupied after 500 title-based discards")
     if not sw.CloseAllDocuments(True) or sw.GetFirstDocument() is not None:
         raise RuntimeError("owned seat did not close all documents")
 
 
-def _open(sw, path, kind, *, options=1):
+def _open(sw, path, kind, *, options=1, observation=None):
     # Early-bound retval followed by the two [in,out] LONGs; never omit 0,0.
     result = sw.OpenDoc6(str(Path(path).resolve()), kind, options, "", 0, 0)
     if type(result) is not tuple or len(result) != 3:
@@ -155,7 +201,16 @@ def _open(sw, path, kind, *, options=1):
     model, errors, warnings = result
     if model is None or type(errors) is not int or type(warnings) is not int or errors:
         raise RuntimeError(f"OpenDoc6 failed: errors={errors!r}, warnings={warnings!r}")
-    return _cast(model, "IModelDoc2")
+    model = _cast(model, "IModelDoc2")
+    state = {"requested_path": str(Path(path).resolve()), "actual_path": model.GetPathName(),
+             "errors": errors, "warnings": warnings,
+             "opened_read_only": model.IsOpenedReadOnly(), "document_state_observed_at": "open"}
+    if observation is not None:
+        observation.update(state)
+    print(json.dumps({"native_open": state}), flush=True)
+    if not state["actual_path"] or Path(state["actual_path"]).resolve() != Path(path).resolve():
+        raise RuntimeError(f"OpenDoc6 returned the wrong document: {state!r}")
+    return model
 
 
 def _values(transform):
@@ -255,19 +310,34 @@ def _packing_app(sw):
     return app
 
 
-def _pack(sw, assembly, destination):
+def _pack(sw, assembly, destination, *, source_watch=None):
     """Pack native references into a new owned folder; no source SaveAs."""
     destination = Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=False)
-    _close_all(sw)
+    opened = {}
+    _source_checkpoint(source_watch, "before_initial_discard", opened)
+    try:
+        _close_all(sw)
+    finally:
+        _source_checkpoint(source_watch, "after_initial_discard", opened)
     silent, readonly = _constants(sw, ("swOpenDocOptions_Silent", "swOpenDocOptions_ReadOnly"))
-    _open(sw, assembly, 2, options=silent | readonly)
+    _source_checkpoint(source_watch, "before_open", opened)
+    try:
+        source = _open(sw, assembly, 2, options=silent | readonly, observation=opened)
+    finally:
+        _source_checkpoint(source_watch, "after_open", opened)
+    if opened["opened_read_only"] is not True:
+        raise RuntimeError(f"PackAndGo source did not open read-only: {opened!r}")
     app = _packing_app(sw)
     active = app.IActiveDoc2
     if not active or Path(str(active.GetPathName())).resolve() != Path(assembly).resolve():
         raise RuntimeError("PackAndGo active document is not the opened read-only source")
     extension = active.Extension
-    pack = extension.GetPackAndGo()
+    _source_checkpoint(source_watch, "before_GetPackAndGo", opened, source)
+    try:
+        pack = extension.GetPackAndGo()
+    finally:
+        _source_checkpoint(source_watch, "after_GetPackAndGo", opened, source)
     if not pack:
         raise RuntimeError("comtypes GetPackAndGo returned no interface")
     pack.IncludeDrawings = False
@@ -287,7 +357,11 @@ def _pack(sw, assembly, destination):
     paths = [str(_owned(str(path), destination)) for path in saved[0]]
     if len(paths) != len(names[0]) or len(set(paths)) != len(paths):
         raise RuntimeError("PackAndGo path count/collision")
-    statuses = extension.SavePackAndGo(pack)
+    _source_checkpoint(source_watch, "before_SavePackAndGo", opened, source)
+    try:
+        statuses = extension.SavePackAndGo(pack)
+    finally:
+        _source_checkpoint(source_watch, "after_SavePackAndGo", opened, source)
     if (type(statuses) not in (tuple, list) or len(statuses) != len(paths)
             or any(type(code) is not int or code != 0 for code in statuses)):
         raise RuntimeError(f"PackAndGo save statuses: {statuses!r}")
@@ -297,7 +371,12 @@ def _pack(sw, assembly, destination):
              if Path(str(old)).resolve() == Path(assembly).resolve()]
     if len(roots) != 1:
         raise RuntimeError("PackAndGo did not identify the owned assembly")
-    _close_all(sw)
+    _source_checkpoint(source_watch, "before_discard", opened, source)
+    try:
+        _close_all(sw)
+    finally:
+        # The live pointer is no longer readable; retain explicitly dated pre-close state.
+        _source_checkpoint(source_watch, "after_discard", opened)
     return roots[0]
 
 
@@ -415,7 +494,13 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
     feature.PartConfigurationGrouping, feature.DisplayAsOneItem = 2, True
     configurations = feature.GetConfigurations(False, None)
     if (type(configurations) is not tuple or len(configurations) != 2
-            or tuple(configurations[0]) != (CONFIG,) or tuple(configurations[1]) != (True,)):
+            or type(configurations[0]) not in (tuple, list)
+            or type(configurations[1]) not in (tuple, list)
+            or len(configurations[0]) != len(configurations[1])
+            or any(not isinstance(name, str) or not name for name in configurations[0])
+            or any(type(visible) is not bool for visible in configurations[1])
+            or tuple(name for name, visible in zip(*configurations, strict=True)
+                     if visible) != (CONFIG,)):
         raise RuntimeError(f"BOM configuration byref shape/state: {configurations!r}")
     if feature.PartConfigurationGrouping != 2 or feature.DisplayAsOneItem is not True:
         raise RuntimeError("BOM grouping did not bind")
@@ -424,6 +509,7 @@ def _attempt(sw, assembly, drawing_template, bom_template, out_dir, index, basel
     original = extension.GetUserPreferenceInteger(preference, no_option)
     hwnd = _cast(sw.Frame(), "IFrame").GetHWndx64()
     row = {"index": index, "seat_pid": sw.GetProcessID(), "view_pose": pose,
+           "bom_configurations": configurations,
            "native_calls": 0, "secondary_errors": [], "stage": "normal_options"}
     try:
         if not extension.SetUserPreferenceInteger(preference, no_option, normal):
@@ -610,11 +696,14 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
     if any(not path.is_file() for path in (assembly, drawing_template, bom_template)):
         raise FileNotFoundError("native assembly and both actual templates are required")
     out_dir.mkdir(parents=True, exist_ok=True)
-    if (out_dir / "result.json").exists() or (out_dir / "repro.zip").exists():
+    source_before = out_dir / "source-before.SLDASM"
+    if any(path.exists() for path in (out_dir / "result.json", out_dir / "repro.zip", source_before)):
         raise RuntimeError("a new capture directory is required for each execution")
-    source_hash = _sha(assembly)
+    # Retain the original bytes before ANY COM in this diagnostic, including GetProcessID.
+    shutil.copyfile(assembly, source_before)
+    source_hash = _sha(source_before)
     report = {"diagnostic_only_never_merge": True, "source_assembly": str(assembly),
-              "source_sha256": source_hash, "seat_pid": sw_app.GetProcessID(),
+              "source_sha256": source_hash, "source_before": str(source_before), "seat_pid": None,
               "requested_cases": list(cases), "cases": [], "native_calls": 0,
               "errors": [], "stop_reason": "incomplete", "next_action": "none"}
     prior = None
@@ -630,19 +719,27 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
         report["prior_cases"] = prior["cases"]
     selected = None
     try:
+        _source_checkpoint(report, "before_COM")
+        report["seat_pid"] = sw_app.GetProcessID()
         report["stage"] = "load_binding"
         _load_binding(sw_app)
         report["stage"] = "pack_seed"
-        owned_seed = _pack(sw_app, assembly, out_dir / "owned-seed")
+        owned_seed = _pack(sw_app, assembly, out_dir / "owned-seed", source_watch=report)
         report["stage"] = "read_seed"
-        baseline_fixture = _fixture(sw_app, owned_seed)
+        try:
+            baseline_fixture = _fixture(sw_app, owned_seed)
+        finally:
+            _source_checkpoint(report, "after_fixture")
         if baseline_fixture["component_count"] != 16:
             raise RuntimeError("full SM seed must contain the actual16 component instances")
         seed_pose = prior["seed_pose"] if prior is not None else None
         seed_omissions = None
         for case in cases:
             report["stage"] = f"prepare_case:{case}"
-            target, fixture = _prepare_case(sw_app, owned_seed, case, out_dir, baseline_fixture)
+            try:
+                target, fixture = _prepare_case(sw_app, owned_seed, case, out_dir, baseline_fixture)
+            finally:
+                _source_checkpoint(report, f"after_prepare_case:{case}")
             result = {"case": case, "assembly": str(target), "fixture": fixture,
                       "attempts": [], "spring_omissions": 0}
             report["cases"].append(result)
@@ -654,6 +751,7 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
                                    target.parent, index, seed_pose)
                 result["attempts"].append(attempt)
                 report["native_calls"] += attempt["native_calls"]
+                _source_checkpoint(report, f"after_attempt:{case}:{index}")
                 if "error" in attempt or attempt["secondary_errors"]:
                     raise RuntimeError("native attempt/cleanup failed; retained primary/secondary evidence")
                 if seed_pose is None:
@@ -709,9 +807,14 @@ def run(sw_app, *, assembly, drawing_template, bom_template, out_dir,
             _close_all(sw_app)
         except BaseException as error:
             report["errors"].append("final close: " + "".join(traceback.format_exception(error)))
-        report["cached_source_unchanged"] = _sha(assembly) == source_hash
+        try:
+            _source_checkpoint(report, "after_final_discard")
+        except BaseException as error:
+            report["errors"].append("final source check: " + "".join(traceback.format_exception(error)))
+        report["source_after_sha256"] = report["source_checkpoints"][-1]["after_sha256"]
+        report["cached_source_unchanged"] = report["source_after_sha256"] == source_hash
         if not report["cached_source_unchanged"]:
-            report["errors"].append("cached source changed during owned-copy diagnostic")
+            report["errors"].append("cached source changed or could not be verified during owned-copy diagnostic")
         (out_dir / "result.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     raise SmMinimalReproStop(report)
 
