@@ -4917,7 +4917,7 @@ cite = [
 [gauges.arm-outline-template]
 name = "arm outline template (MHA-CH-06), shop-made"
 kind = "profile_gauge"
-# Basis: gauges.arm-outline-template.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_outline_template_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-13; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: gauges.arm-outline-template.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_outline_template_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-13; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "plate", supply = "made", shape = "box", at_mm = [-145.984, -7.75, 0.0], size_mm = [291.967, 29.241, 3.175], note = "outline envelope; the arcs, tip lands and tapered ends are inside it", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "pivot-hole", shape = "cylinder", void = true, at_mm = [0.0, 0.0, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 6.5, length_mm = 3.175, locates = "pin gauge in the rocker's pivot bore", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -4976,7 +4976,7 @@ source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-in
 # Local frame: origin at the centre of the stack's underside on the riser block, +X along the
 # blank, +Z up; the shim pack fills the bottom and the ground piece sits on it, its top face
 # bearing on the work. Four off (S1 at X -158/-60/+60/+158, S4 at X -120/-45/+45/+120).
-# Basis: fixtures.strap-shim-stack.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_strap_shim_stack_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-11; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: fixtures.strap-shim-stack.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_strap_shim_stack_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-11; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "stack", shape = "box", supply = "bought", shim = true, at_mm = [-10.0, -6.0, 0.0], size_mm = [20.0, 12.0, 2.71875], locates = "work underside (S1 raw lower face; S4 S3-faced strap face, datum B)", bears = "face", note = "3/32 in ground flat + shim to the measured gap M - 5.219; 2.71875 is the nominal for a 7.9375 blank (ASSUMED placeholder, checklist A1)", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
 ]
@@ -4988,8 +4988,10 @@ solids = [
 # 3/4 in long, 5/16 in across flats) clamps the stack. The TL CAD parts are retired (Numbers
 # reserved); the solids below carry the kit's geometry inline.
 # Local frame: stud axis Z, Z0 on the upper hub face (P02), lower hub face at Z-7.0565.
-# Bands of the retired TL-04/TL-05 prints (the limit facts below were kept inside them),
-# against the arm's hub OD Ø9.69-10.71, hub coaxiality Ø0.10 to A and pivot bore Ø6.50-6.53:
+# Shop-process acceptance retained from fcfc947c4:cad/scripts/ch_rocker_arm_tl_filing_button_spec.py
+# and ch_rocker_arm_tl_filing_stud_spec.py (former TL-04/TL-05 bands), checked by
+# test_process_shop.py against this inventory and the live rocker.
+# The arm's hub OD is Ø9.69-10.71, hub coaxiality Ø0.10 to A and pivot bore Ø6.50-6.53:
 #   button OD 10.070-10.330; button bore 6.505-6.515 (lapped, slides on the stud by hand);
 #   stud body 6.485-6.490; button OD runout to its bore 0.025 TIR.
 #   Centre shift (docs/rules-coordinates.md manual_arc), worst case of those bands:
@@ -5012,7 +5014,7 @@ solids = [
 [fixtures.hub-filing-buttons]
 name = "hub filing buttons and stud, MHA-CH-06 (shop-made)"
 kind = "filing_buttons"
-# Basis: fixtures.hub-filing-buttons.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_filing_stud_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-05, which owned the whole stack with TL-04's buttons; Numbers reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: fixtures.hub-filing-buttons.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_filing_stud_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-05, which owned the whole stack with TL-04's buttons; Numbers reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "upper button", shape = "cylinder", at_mm = [0.0, 0.0, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 10.2, length_mm = 4.0, label = "hub buttons", locates = "upper hub face (P02) and the file's stop for the upper hub OD", note = "O1 drill rod, hardened and tempered; bore, faces and O.D. lapped", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "upper button bore", shape = "cylinder", at_mm = [0.0, 0.0, -0.5], axis = [0.0, 0.0, 1.0], dia_mm = 6.51, length_mm = 5.0, void = true, cuts = ["upper button"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -5047,13 +5049,17 @@ note = "Shop-made, formerly TL CAD parts MHA-CH-06-TL-04 (two buttons: O1, harde
 # rocker's frame `top` (pivot axis X0 Y0). AUTHOR'S CHOICE dimensions. verify = false is an
 # ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see
 # local://rocker-measurement-checklist.md B2): assumed made from offcuts as drawn.
+# Shop-process acceptance retained from fcfc947c4:cad/scripts/ch_rocker_arm_tl_filing_stand_spec.py
+# STEP = 0.44 and STEP_BAND = (+0.05, -0.05): pedestal top 0.39-0.49 above each
+# end-block top. Pedestal diameter retains the former .XX band; end-block length
+# the .X band. test_process_shop.py checks these against the live hub and arm.
 [fixtures.rocker-filing-stand]
 name = "rocker filing stand (end blocks + hub pedestal), MHA-CH-06 S5"
 kind = "custom"
 shop_made = true
 verify = false
 note = "Shop-made from steel offcuts (material not yet chosen: shop gap); end blocks 20 x 38.1 x 30, pedestal Ø9.5 x 30.44 (its top 0.4405 above the end blocks), all set on the fitting bench and clamped to it; check the pedestal top against the end blocks with the height gauge before use"
-# Basis: fixtures.rocker-filing-stand.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_filing_stand_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-12; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: fixtures.rocker-filing-stand.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_filing_stand_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-12; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "bench top", shape = "box", supply = "existing", at_mm = [-250.0, -80.0, -60.0], size_mm = [500.0, 160.0, 30.0], note = "fitting bench top, drawn for clearance", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "left end block", shape = "box", at_mm = [-168.0, -12.4, -30.0], size_mm = [20.0, 38.099999999999994, 30.0], label = "end blocks", locates = "raw blank underside, left end", note = "low-carbon steel offcut", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -5094,7 +5100,7 @@ note = "Shop-made from the approved 1018 CR 3/4 x 1-1/2 bar: six blocks lying fl
 # The six blocks are two lengths of one design: 36 long (four: end and outer) and 45 long
 # (two: inner), each back face at Y-12.4 and top at Z0; the table and its three T-slots
 # (PM-30MV manual v3 2020-10 p6) are drawn for clearance only.
-# Basis: fixtures.rocker-riser-blocks.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_riser_block_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-10; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: fixtures.rocker-riser-blocks.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_riser_block_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-10; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "table", supply = "existing", shape = "box", at_mm = [-419.1, -97.975, -68.5], size_mm = [838.2, 209.55, 50.0], note = "PM-30MV table 33 x 8.25 in (maker spec), drawing depth 50; centred under the bar", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "table slot 1 neck", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, -63.69999999999999, -32.5], size_mm = [840.2, 14.0, 15.0], note = "PM-30MV manual p6 slot section; X/top overrun is model extent only", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
@@ -5132,7 +5138,7 @@ shop_made = true
 # The bar slot sits 13.0 from the set-screw side and 9.50 deep; point holes reamed with the
 # 0.251 in over-size reamer; #8-32 x 1 in SHCS pinch clamps (drawing-guideline departures
 # from the trial route, recorded when the kit had CAD).
-# Basis: tools.rocker-trammel.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_trammel_spec.PRECHIPS_SOLIDS (the kit spec for MHA-CH-06-TL-14/15/16/18; Numbers reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: tools.rocker-trammel.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_trammel_spec.py PRECHIPS_SOLIDS (the kit spec for MHA-CH-06-TL-14/15/16/18; Numbers reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "bar", shape = "box", at_mm = [0.0, -3.175, -9.5], size_mm = [914.4, 6.35, 6.35], supply = "bought", note = "1018 cold-finished 1/4 in square bar, used uncut and undrilled", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "pivot block", shape = "box", at_mm = [0.0, -13.0, -19.05], size_mm = [50.0, 38.1, 19.05], note = "MHA-CH-06-TL-14, 1018 3/4 x 1-1/2 bar", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -5178,7 +5184,7 @@ kind = "setting_bar"
 # Frame: origin on the H0 axis at the seat face; +X along the bar to H800 and H816; +Y out
 # of the seat face (the bar occupies Y -6.35..0); Z across the bar, centred. Each seat is a
 # 60 degree #2 centre-drill cone over a 5/64 in pilot drilled through.
-# Basis: gauges.rocker-trammel-setting-bar.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_trammel_setting_bar_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-17; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: gauges.rocker-trammel-setting-bar.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_trammel_setting_bar_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-17; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "bar", shape = "box", note = "1018 CF 1/4 x 1 flat, supply length; seats on the top face", at_mm = [-49.19999999999999, -6.35, -12.7], size_mm = [914.4, 6.35, 25.4], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "h0-seat", shape = "cylinder", label = "H0", note = "60 deg #2 centre-drill seat over a 5/64 pilot drilled through", at_mm = [0.0, 0.0, 0.0], axis = [0.0, -1.0, 0.0], dia_mm = 1.98, length_mm = 6.35, void = true, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -5227,7 +5233,7 @@ name = "Trial shop-made rocker trammel pivot plate, 1018 offcut with a No. 2 cen
 kind = "custom"
 shop_made = true
 verify = true
-# Basis: fixtures.trammel-pivot-plate.solids: formerly spliced at bind time from the retired TL CAD spec ch_rocker_arm_tl_trammel_pivot_plate_spec.PRECHIPS_SOLIDS (MHA-CH-06-TL-19; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
+# Basis: fixtures.trammel-pivot-plate.solids: formerly spliced at bind time from fcfc947c4:cad/scripts/ch_rocker_arm_tl_trammel_pivot_plate_spec.py PRECHIPS_SOLIDS (MHA-CH-06-TL-19; Number reserved, cad/docs/subsystem-identities.md), now inline with the same values. at_mm/axis are design coordinates, not surveyed measurements; the #1413 placeholder provenance is unchanged.
 solids = [
   { name = "pivot plate", shape = "box", at_mm = [0.0, 0.0, -38.1], size_mm = [50.0, 19.05, 38.1], note = "MHA-CH-06-TL-19, 1018 3/4 x 1-1/2 bar offcut; No. 2 centre-drilled 60 degree seat on the top face for the pivot point (MHA-CH-06-TL-18)", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   { name = "seat pilot", shape = "cylinder", at_mm = [25.0, 13.05, -19.05], axis = [0.0, 1.0, 0.0], dia_mm = 1.98, length_mm = 6.0, void = true, cuts = ["pivot plate"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
