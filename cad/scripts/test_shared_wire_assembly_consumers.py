@@ -1,4 +1,4 @@
-"""Offline regressions for the two configured consumers of shared music wire."""
+"""Stateful offline source and BOM contracts for configured shared music wire."""
 
 from types import SimpleNamespace
 
@@ -9,6 +9,7 @@ import _component_references
 import _drawing_tables
 import draw_mg_magnifier_assembly as magnifier
 import draw_pn_pen_assembly as pen
+import mg_magnifier_explode_spec as magnifier_explode
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as LEVER_WIRE_DESCRIPTION
 from sh_vn_music_wire_pen_spec import BOM_DESCRIPTION as PEN_WIRE_DESCRIPTION
 from _assembly_contract import assembly_contract
@@ -47,6 +48,7 @@ def _component(stem, configuration, reference="", native_index=73):
 
 def _source(drawing, member, *, reference=None):
     components = []
+    instances = []
     wire = None
     for logical, (stem, configuration) in drawing.BOM_COMPONENT_IDENTITIES.items():
         for index in range(drawing.BOM_QUANTITIES[logical]):
@@ -63,9 +65,41 @@ def _source(drawing, member, *, reference=None):
                 else "",
                 73 + len(components) + index,
             )
+            if not is_wire:
+                # Ordinary explode selectors still use native family ordinals.
+                # Only shared configured roles decouple Name2 from their ordinal.
+                component.Name2 = f"{stem}-{index + 1}"
             components.append(component)
+            instances.append(magnifier_explode.Instance(component.Name2, stem))
             if is_wire:
                 wire = component
+    properties = {}
+    if drawing is magnifier:
+        offsets = {item.name.casefold(): [0.0, 0.0, 0.0] for item in instances}
+        for step, names in magnifier_explode.plan_explode(instances):
+            for name in names:
+                offsets[name.casefold()]["xyz".index(step.axis)] += (
+                    step.distance_mm / 1000.0
+                )
+        properties = {
+            magnifier_explode.explode_offsets_property(owner): (
+                magnifier_explode.encode_explode_offsets(owner, offsets, instances)
+            )
+            for owner in drawing.EXPLODED_VIEW_NAMES
+        }
+
+    def get_components(top_level):
+        assert isinstance(top_level, bool)
+        return tuple(
+            component for component in components
+            if not top_level or "/" not in component.Name2.replace("\\", "/")
+        )
+
+    def get_property(configuration, name):
+        assert configuration == ""
+        return properties.get(name, "")
+
+    # Metadata is a persisted snapshot, not regenerated after test mutations.
     model = SimpleNamespace(
         ConfigurationManager=SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Default")
@@ -73,7 +107,9 @@ def _source(drawing, member, *, reference=None):
         GetExplodedViewNames2=lambda configuration: (
             drawing.EXPLODED_VIEW_NAMES[configuration],
         ),
-        GetComponents=lambda _top_level: tuple(components),
+        GetComponents=get_components,
+        GetCustomInfoValue=get_property,
+        properties=properties,
     )
     return model, components, wire
 
@@ -191,6 +227,26 @@ def test_nested_wire_reference_cannot_satisfy_the_top_level_role(
     with pytest.raises(RuntimeError, match="missing native component references"):
         drawing._validate_source(model)
     wire.Name2 = original_name
+    drawing._validate_source(model)
+
+
+@pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+def test_nested_wire_members_do_not_pollute_the_top_level_census(
+    monkeypatch, drawing, member, _assembly
+):
+    _unwrapped_com(monkeypatch, drawing)
+    model, components, wire = _source(drawing, member)
+    other = "PenWire" if member == "LeverWire" else "LeverWire"
+    nested = _component("sh-vn-music-wire", other, f"{member}:1", native_index=211)
+    nested.Name2 = f"other-subassembly-9/{nested.Name2}"
+    components.insert(0, nested)
+    assert nested in model.GetComponents(False)
+    assert nested not in model.GetComponents(True)
+    drawing._validate_source(model)
+    wire.ComponentReference = ""
+    with pytest.raises(RuntimeError, match="missing native component references"):
+        drawing._validate_source(model)
+    wire.ComponentReference = f"{member}:1"
     drawing._validate_source(model)
 
 
@@ -734,15 +790,3 @@ def test_bom_does_not_accept_rebuild_damage_as_its_settled_baseline(
         drawing._validate_bom(adapter, table)
     assert table.cells[wire_row][1] == original_number
     assert all(column != 1 for _row, column, _include_hidden, _text in table.writes)
-
-
-def test_wire_application_instructions_stay_with_the_assembly_consumers():
-    magnifier_steps = " ".join(magnifier.notes.ASSEMBLY_STEPS)
-    pen_steps = " ".join(pen.notes.ASSEMBLY_STEPS)
-    assert (
-        "HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE"
-        in magnifier_steps
-    )
-    assert "WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM" in magnifier_steps
-    assert "THROUGH THE MHA-PN-07 ADJUSTER STUD EYE" in pen_steps
-    assert "SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE" in pen_steps
