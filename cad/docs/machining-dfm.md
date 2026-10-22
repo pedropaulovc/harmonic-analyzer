@@ -643,6 +643,15 @@ ends, dimension line, witnesses and controlling value/band do not move.
 The six-sheet layout and L's crop, reference and caption stay unchanged.
 Native ink must establish the caption/border and depth-arrow clearances and
 the jog's own-arrow/witness routing; estimated gaps are not acceptance.
+The top-frame recipe sets and reads back drawing-document wireframe curve
+quality (Custom, value 100, high curve quality enabled) before creating views.
+This per-drawing tessellation control is independent of the views' precise
+HLR mode (`Faceted=False`); it does not change geometry, dimensions, tolerance
+exceptions, crops or scales. In particular, the longitudinal 15.264 and
+7.632 ±0.13 controls remain distinct from the transverse **0.05 SLOT WIDTH
+ONLY** requirement. Successful preference readback or offline tests do not
+prove smooth exported ink: inspection of the resulting native drawing and
+actual exported vector PDF, including DETAIL L's curves, is required.
 
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores
