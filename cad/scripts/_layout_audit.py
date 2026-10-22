@@ -3925,10 +3925,28 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # "view-edges-missing": the recorded front/right PDFs used the ambiguous
 # 0.18 mm family, outside the retained calibration and selected template
 # edge bands. Keep this exemption until fleet evidence supports enforcement.
+# Keep every raw supplier-reference finding in the report. Stacked fractions
+# can trigger extension-through-own-text through their merged PDF row even
+# when the individual printed glyphs clear the fraction bar.
+_SUPPLIER_REFERENCE_ENFORCED_KINDS = frozenset(
+    {
+        "text-clearance",
+        "text-on-line",
+        "dim-line-through-own-text",
+        "text-on-view",
+        "arrow-near-text",
+    }
+)
+
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),
         "sm-knife-mount": GATING_KINDS - {"view-edges-missing"},
+        "mg-vn-wheel-axle-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-adjust-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-hanger-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-hanger-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "sm-vn-boss-hook-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
     }
 )
 
