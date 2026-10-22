@@ -556,6 +556,9 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         assert ink["MountingY0"].text[1] > .08635
         assert items["MountingY0"].OffsetText
         assert ink["TapFromSide"].text[0] > max(line[0] for line in lines["TapFromSide"][:2])
+        # R35's X-only jog still failed its native own-ink check. Also clear
+        # the real historical witnesses' Y band, without inventing its new jog.
+        assert ink["TapFromSide"].text[1] > max(max(line[1], line[3]) for line in lines["TapFromSide"][:2])
         assert items["TapFromSide"].OffsetText
 
 
