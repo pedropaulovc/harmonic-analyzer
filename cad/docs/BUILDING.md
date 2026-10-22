@@ -156,10 +156,12 @@ digest and remote cache key, even with its native execution identity unchanged;
 unrelated purchased drawings retain their keys. Keep these reads module-qualified
 (`_config.parts(SPEC.source.stem)`): `from _config import parts` forces conservative
 whole-config dependency expansion.
-The drawing-closure ownership guard checks these sheets through their registered
-native source, not a drawing-filename exemption. It also rejects foreign helper
-arguments, checks supplier callers' registered `SPEC`, and requires the simplified
-part wrapper to forward its caller's part name unchanged.
+For direct `_config.parts(SPEC.source.stem)` reads, the drawing-closure ownership
+guard requires the drawing's registered native source and an unshadowed `SPEC`,
+not a drawing-filename exemption. It checks registered `SPEC` arguments to
+`build_supplier_spring_drawing` and requires the simplified part wrapper to
+forward its caller's part name unchanged. These caller checks do not cover the
+purchased-variant or purchased-fastener drawing builders.
 
 Each part task declares and caches all member STEP/PNG files together with its
 `reports/part-neutral/<stem>.json` certificate. The certificate records the

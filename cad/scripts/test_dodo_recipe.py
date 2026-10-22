@@ -336,6 +336,30 @@ def _registered_source_row(tree: ast.Module) -> str | None:
     ]
     if not imported or len(bindings) != 1:
         return None
+    # Only the one module assignment may bind SPEC. AST name stores cover
+    # assignments, loops, with-targets and comprehensions; parameters, imports,
+    # definitions, exception handlers and pattern captures bind names separately.
+    if sum(
+        isinstance(node, ast.Name) and node.id == "SPEC"
+        and isinstance(node.ctx, (ast.Store, ast.Del))
+        for node in ast.walk(tree)
+    ) != 1:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.arg) and node.arg == "SPEC":
+            return None
+        if isinstance(node, ast.alias) and (
+            (node.asname or node.name.split(".")[0]) == "SPEC" or node.name == "*"
+        ):
+            return None
+        if isinstance(
+            node,
+            (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+             ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
+        ) and node.name == "SPEC":
+            return None
+        if isinstance(node, ast.MatchMapping) and node.rest == "SPEC":
+            return None
     value = bindings[0]
     if not (
         isinstance(value, ast.Subscript)
@@ -454,6 +478,57 @@ def test_drawing_source_rows_require_the_selected_registered_native(
 
 
 @pytest.mark.parametrize(
+    "filename", ("draw_sh_vn_music_wire.py", "draw_sh_vn_thumb_screw.py"),
+)
+@pytest.mark.parametrize(
+    "shadow",
+    (
+        "SPEC = foreign_spec\n",
+        "def read(SPEC):\n    return _config.parts(SPEC.source.stem)\n",
+        "def read(*, SPEC):\n    return _config.parts(SPEC.source.stem)\n",
+        "read = lambda SPEC: _config.parts(SPEC.source.stem)\n",
+        "def read():\n    SPEC = foreign_spec\n    return _config.parts(SPEC.source.stem)\n",
+        "for SPEC in foreign_specs:\n    pass\n",
+        "with foreign_context() as SPEC:\n    pass\n",
+        "rows = [SPEC for SPEC in foreign_specs]\n",
+        "try:\n    pass\nexcept Exception as SPEC:\n    pass\n",
+        "match foreign_spec:\n    case SPEC:\n        pass\n",
+        "match foreign_spec:\n    case [*SPEC]:\n        pass\n",
+        "match foreign_spec:\n    case {**SPEC}:\n        pass\n",
+        "import foreign_spec as SPEC\n",
+        "from foreign_module import SPEC\n",
+        "def SPEC():\n    pass\n",
+        "class SPEC:\n    pass\n",
+        "del SPEC\n",
+    ),
+)
+def test_registered_source_row_rejects_shadowed_spec(
+    monkeypatch, tmp_path, filename, shadow
+):
+    import _buildgraph as bg
+
+    script = tmp_path / filename
+    valid = (
+        "from _drawing_registry import DRAWINGS_BY_NAME\nimport _config\n"
+        "SPEC = DRAWINGS_BY_NAME['fixture']\n"
+        "def read():\n    return _config.parts(SPEC.source.stem)\n"
+    )
+    spec = SimpleNamespace(script=script, part=filename.removeprefix("draw_").removesuffix(".py"))
+    monkeypatch.setitem(
+        globals(), "_load_dodo",
+        lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
+    )
+    monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    script.write_text(valid, encoding="utf-8")
+    assert _registered_source_row(ast.parse(valid)) == "fixture"
+    test_drawing_closures_read_no_foreign_dynamic_part_row()
+    script.write_text(valid + shadow, encoding="utf-8")
+    assert _registered_source_row(ast.parse(valid + shadow)) is None
+    with pytest.raises(AssertionError):
+        test_drawing_closures_read_no_foreign_dynamic_part_row()
+
+
+@pytest.mark.parametrize(
     "filename",
     ("draw_sh_vn_chain_link.py", "draw_sh_vn_music_wire.py", "draw_sh_vn_thumb_screw.py"),
 )
@@ -468,11 +543,10 @@ def test_registered_drawing_readers_reject_foreign_helper_calls(
     import _buildgraph as bg
 
     script = tmp_path / filename
-    script.write_text(
+    valid = (
         "from _drawing_registry import DRAWINGS_BY_NAME\nimport _config\n"
         "SPEC = DRAWINGS_BY_NAME['fixture']\n"
-        "_config.parts(SPEC.source.stem)\n" + call + "\n",
-        encoding="utf-8",
+        "_config.parts(SPEC.source.stem)\n"
     )
     spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
     monkeypatch.setitem(
@@ -480,6 +554,9 @@ def test_registered_drawing_readers_reject_foreign_helper_calls(
         lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    script.write_text(valid, encoding="utf-8")
+    test_drawing_closures_read_no_foreign_dynamic_part_row()
+    script.write_text(valid + call + "\n", encoding="utf-8")
     with pytest.raises(AssertionError):
         test_drawing_closures_read_no_foreign_dynamic_part_row()
 
@@ -494,11 +571,10 @@ def test_supplier_drawing_call_requires_own_registered_spec(
 
     script = tmp_path / "draw_fixture.py"
     argument = f"spec={selected}" if keyword_call else selected
-    script.write_text(
+    candidate = (
         "from _drawing_registry import DRAWINGS_BY_NAME\n"
         f"SPEC = DRAWINGS_BY_NAME[{registered!r}]\n"
-        f"build_supplier_spring_drawing(adapter, {argument})\n",
-        encoding="utf-8",
+        f"build_supplier_spring_drawing(adapter, {argument})\n"
     )
     spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
     monkeypatch.setitem(
@@ -506,6 +582,15 @@ def test_supplier_drawing_call_requires_own_registered_spec(
         lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: ())
+    valid_argument = "spec=SPEC" if keyword_call else "SPEC"
+    script.write_text(
+        "from _drawing_registry import DRAWINGS_BY_NAME\n"
+        "SPEC = DRAWINGS_BY_NAME['fixture']\n"
+        f"build_supplier_spring_drawing(adapter, {valid_argument})\n",
+        encoding="utf-8",
+    )
+    test_drawing_closures_read_no_foreign_dynamic_part_row()
+    script.write_text(candidate, encoding="utf-8")
     if registered == "fixture" and selected == "SPEC":
         test_drawing_closures_read_no_foreign_dynamic_part_row()
     else:
@@ -523,11 +608,10 @@ def test_simplified_part_wrapper_requires_exact_passthrough(
     script = tmp_path / "draw_fixture.py"
     script.write_text("", encoding="utf-8")
     wrapper = tmp_path / "_simplified_part.py"
-    wrapper.write_text(
+    candidate = (
         "async def save_simplified_part(adapter, part_name):\n"
         f"    await save_part_and_images(adapter, {selected})\n"
-        + ("save_part_and_images(adapter, foreign_part)\n" if extra_call else ""),
-        encoding="utf-8",
+        + ("save_part_and_images(adapter, foreign_part)\n" if extra_call else "")
     )
     spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
     monkeypatch.setitem(
@@ -535,6 +619,13 @@ def test_simplified_part_wrapper_requires_exact_passthrough(
         lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: (wrapper,))
+    wrapper.write_text(
+        "async def save_simplified_part(adapter, part_name):\n"
+        "    await save_part_and_images(adapter, part_name)\n",
+        encoding="utf-8",
+    )
+    test_drawing_closures_read_no_foreign_dynamic_part_row()
+    wrapper.write_text(candidate, encoding="utf-8")
     if selected == "part_name" and not extra_call:
         test_drawing_closures_read_no_foreign_dynamic_part_row()
     else:
@@ -552,13 +643,12 @@ def test_supplier_row_reader_requires_unmodified_source_binding(
     script = tmp_path / "draw_fixture.py"
     script.write_text("", encoding="utf-8")
     supplier = tmp_path / "_supplier_spring_drawing.py"
-    supplier.write_text(
+    candidate = (
         "import _config\n"
         "async def build_supplier_spring_drawing(adapter, spec):\n"
         f"    source = {binding}\n"
         + ("    source = foreign_spec.source\n" if rebind else "")
-        + "    return _config.parts(source.stem)\n",
-        encoding="utf-8",
+        + "    return _config.parts(source.stem)\n"
     )
     spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
     monkeypatch.setitem(
@@ -566,6 +656,15 @@ def test_supplier_row_reader_requires_unmodified_source_binding(
         lambda: SimpleNamespace(DRAWINGS_BY_NAME={"fixture": spec}),
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: (supplier,))
+    supplier.write_text(
+        "import _config\n"
+        "async def build_supplier_spring_drawing(adapter, spec):\n"
+        "    source = spec.source\n"
+        "    return _config.parts(source.stem)\n",
+        encoding="utf-8",
+    )
+    test_drawing_closures_read_no_foreign_dynamic_part_row()
+    supplier.write_text(candidate, encoding="utf-8")
     if binding == "spec.source" and not rebind:
         test_drawing_closures_read_no_foreign_dynamic_part_row()
     else:
