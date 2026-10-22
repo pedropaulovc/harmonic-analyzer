@@ -190,6 +190,30 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             logical = "cad/config/parts/" + row["stem"] + ".yaml"
             self.assertEqual(identity.source_aliases({sealed})[logical], sealed)
 
+    def test_retired_tooling_is_reserved_history_not_a_current_projection_or_registry(self):
+        cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
+        identity = CurrentNativeIdentity()
+        retired = cad_map["retired_identities"]
+        self.assertEqual(len(retired), 18)
+        active_numbers = {target["number"] for row in cad_map["parts_and_assemblies"]
+                          for target in row["new_identities"]}
+        for row in retired:
+            self.assertEqual(row["status"], "retired")
+            self.assertNotIn(row["old_stem"], identity.sources)
+            self.assertNotIn(row["old_stem"], identity.stems)
+            for target in row["new_identities"]:
+                stem = target["stem"]
+                with self.subTest(stem=stem):
+                    self.assertNotIn(stem, identity.stems)
+                    self.assertNotIn(stem, {current for _, current in identity.targets})
+                    self.assertNotIn(target["number"], active_numbers)
+                    for reserved_stem in {row["old_stem"], stem}:
+                        self.assertFalse((ROOT / "cad/config/parts" / (reserved_stem + ".yaml")).exists())
+                    sealed = "cad/config/parts/" + row["old_stem"] + ".yaml"
+                    self.assertNotIn("cad/config/parts/" + stem + ".yaml", identity.source_aliases({sealed}))
+                    unknown = PREFIX + "ch-channel/" + stem + "-1"
+                    self.assertEqual(identity.project_path(unknown), unknown)
+
     def test_parent_scoped_paths_are_idempotent_and_keep_configuration(self):
         for parent in ("dt-drive-train", "fr-frame", "pd-paper-drive"):
             path = PREFIX + parent + "/vn-fillister-screw--T006-7"

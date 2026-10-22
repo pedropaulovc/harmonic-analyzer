@@ -4,9 +4,15 @@ This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
 `shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.2.0`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
-currently empty. The rocker plan is migrated to prechips 0.1.2 and the
-merged shop fixtures but held from enrollment until its traveler reaches exit 0
-(step 6 below). The legacy shaft and cone plans remain tracked as provenance,
+currently empty. The rocker plan is a **HELD REFERENCE ROUTE**, migrated to
+prechips 0.1.2 but not enrolled or qualified for machining. The 2026-10-21
+standalone-tooling retirement removed its former tooling CAD, including the
+physical outline template still required by the historical S5/S7 route.
+Inventory collision envelopes and the analytic rocker-profile checks are not
+replacement fabrication CAD or evidence of a fabricated, qualified gauge.
+Before enrollment, qualify the required physical tooling and revalidate the
+route against current geometry and the pinned prechips, then obtain traveler
+exit 0 (step 6 below). The legacy shaft and cone plans remain tracked as provenance,
 but are stale against the pinned prechips and are not run or shipped. Do not
 enroll one merely because its plan file exists. `_process_plans.MIGRATED_PLANS`
 records migrated plans, including the held rocker; `revision_stems()` is the
@@ -47,6 +53,12 @@ registered spec-driven fixture whose TL spec exports `PRECHIPS_SOLIDS` in the
 fixture frame, derived from the same constants used to build its SolidWorks
 part. Never supply both `cad` and `solids`, and do not maintain a second set of
 fixture dimensions in the inventory.
+
+The held rocker's retired standalone tooling is a historical exception, not
+registered spec-driven CAD: its inline inventory solids support retained
+process/clearance checks only. They do not restore deleted builders, drawings
+or physical-gauge qualification. Re-establish and qualify any required tooling
+before using or enrolling that route.
 
 `bind_shop` writes the generated inventory under
 `cad/out/travelers/_shop/inventory.toml`, inserts the spec's primitives and

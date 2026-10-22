@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib.util
 import hashlib
@@ -1036,7 +1037,7 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
         export_models.assert_gallery_inputs_current(manifest)
 
 
-@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_filing_button"])
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_oblique_pivot_pin"])
 def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
@@ -1107,12 +1108,20 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
 def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """A multi-configuration part's bundle and neutral STEPs carry every configuration."""
+    """A test-only multi-configuration bundle carries every declared configuration."""
     import export_features
     import features_bound
     from _export_feature_faces import face_name
 
-    stem = "ch_rocker_arm_tl_riser_block"
+    from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
+
+    # Reuse real feature declarations; simulate configurations only in this test.
+    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    original = export_features.step_configurations
+    monkeypatch.setattr(
+        export_features, "step_configurations",
+        lambda selected: ("Default", INSTALLED_CONFIG) if selected == stem else original(selected),
+    )
     dashed = stem.replace("_", "-")
     native = tmp_path / "sldprt" / f"{dashed}.SLDPRT"
     native.parent.mkdir()
@@ -1121,7 +1130,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
 
     class Doc:
         def __init__(self) -> None:
-            self.active = "L036"  # the saved configuration
+            self.active = "Default"  # the saved configuration
 
         @property
         def ConfigurationManager(self):
@@ -1173,19 +1182,19 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
 
     assert export_models.main() == 0
     assert saves == [
-        (f"{dashed}.STEP", "L036", False),
-        (f"{dashed}-L036.STEP", "L036", True),
-        (f"{dashed}-L045.STEP", "L045", True),
+        (f"{dashed}.STEP", "Default", False),
+        (f"{dashed}-Default.STEP", "Default", True),
+        (f"{dashed}-{INSTALLED_CONFIG}.STEP", INSTALLED_CONFIG, True),
     ]
     manifest, step = export_features.bundle_paths(stem, tmp_path)
     configured = export_features.configuration_step_paths(stem, tmp_path)
-    assert list(configured) == ["L036", "L045"]
+    assert list(configured) == ["Default", INSTALLED_CONFIG]
     assert {path for path in manifest.parent.iterdir()} == {manifest, step, *configured.values()}
 
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", (stem,))
     staged = features_bound.stage_feature_steps(tmp_path, tmp_path / "step")
     assert {path.name for path in staged} == {
-        f"{dashed}.STEP", f"{dashed}-L036.STEP", f"{dashed}-L045.STEP",
+        f"{dashed}.STEP", f"{dashed}-Default.STEP", f"{dashed}-{INSTALLED_CONFIG}.STEP",
     }
     for cfg, path in configured.items():
         assert (tmp_path / "step" / path.name).read_bytes() == path.read_bytes()
@@ -1199,6 +1208,26 @@ def test_single_configuration_parts_declare_no_configuration_steps() -> None:
     assert export_features.configuration_step_paths("ch_pivot_shaft") == {}
 
 
+def test_configuration_steps_require_explicit_spec_opt_in(monkeypatch) -> None:
+    import export_features
+    from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
+
+    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    # Surviving feature owners do not opt into extra configuration STEP exports.
+    assert export_features.step_configurations(stem) == ()
+    original = export_features.source_tree
+    spec_path = Path(export_features.__file__).parent / f"{stem}_spec.py"
+    declaration = ast.parse(
+        f"FEATURE_STEP_CONFIGURATIONS = {('Default', INSTALLED_CONFIG)!r}"
+    )
+    monkeypatch.setattr(
+        export_features, "source_tree",
+        lambda path: declaration if path == spec_path else original(path),
+    )
+    # Bypass the production cache so the test-only declaration cannot leak.
+    assert export_features.step_configurations.__wrapped__(stem) == ("Default", INSTALLED_CONFIG)
+
+
 
 @pytest.fixture
 def produced_feature_bundles(tmp_path: Path, monkeypatch):
@@ -1206,7 +1235,7 @@ def produced_feature_bundles(tmp_path: Path, monkeypatch):
     import export_features
     from _export_feature_faces import face_name
 
-    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_filing_button")
+    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_oblique_pivot_pin")
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", stems)
     colors = {}
     digests = {}

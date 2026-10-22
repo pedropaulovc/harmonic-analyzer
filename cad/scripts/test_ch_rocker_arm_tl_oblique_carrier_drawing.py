@@ -169,16 +169,6 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert number == "MHA-CH-06-TL-21"
 
 
-def test_jig_does_not_import_the_retiring_trammel_kit() -> None:
-    for module in (part, drawing, spec):
-        source = open(module.__file__, encoding="utf-8").read()
-        assert not re.search(
-            r"^\s*(from|import)\s+(_trammel_block|ch_rocker_arm_tl_trammel_)",
-            source,
-            re.MULTILINE,
-        )
-
-
 def test_cl_dowel_is_a_press_in_its_finished_hole() -> None:
     # Bought Ø6 m6 dowel (6.004/6.012) in the in-place N7 hole (5.984/5.996).
     assert spec.CL_DOWEL_INTERFERENCE == (0.008, 0.028)

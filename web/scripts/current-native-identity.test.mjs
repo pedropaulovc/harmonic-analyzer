@@ -30,6 +30,21 @@ async function isolatedProjection(t, fixtureTable) {
   return import(pathToFileURL(join(directory, 'current-native-identity.mjs')).href)
 }
 const path = (parent, name) => `ha-harmonic-analyzer/${parent}/${name}`
+const retiredTooling = [
+  ['ch-rocker-arm', 'CH-06', [
+    ['filing-button', '04'], ['filing-stud', '05'], ['riser-block', '10'], ['strap-shim-stack', '11'],
+    ['filing-stand', '12'], ['outline-template', '13'], ['trammel-pivot-block', '14'],
+    ['trammel-scriber-block', '15'], ['trammel-scriber-point', '16'], ['trammel-setting-bar', '17'],
+    ['trammel-pivot-point', '18'], ['trammel-pivot-plate', '19'],
+  ]],
+  ['ch-pivot-bracket', 'CH-08', [['ledge', '01'], ['angle-plate', '02']]],
+  ['dt-cone-pivot-post', 'DT-05', [['bond-cradle', '01'], ['saw-cradle', '02'], ['cap-jaw-button', '03'], ['soft-jaw', '04']]],
+].flatMap(([parent, category, tools]) => tools.map(([tool, sequence]) => ({
+  old_stem: `${parent}-tl-${tool}`,
+  old_number: `MHA-${category.replace('-', '-0')}-TL-${sequence}`,
+  new_identities: [{ stem: `${parent}-tl-${tool}`, number: `MHA-${category}-TL-${sequence}` }],
+  status: 'retired',
+})))
 
 test('current table pins exact historical/current source maps and a distinct semantic projection digest', async () => {
   assert.equal(sha256(JSON.stringify(table)), CURRENT_NATIVE_IDENTITY_MAP_SHA256)
@@ -71,6 +86,16 @@ test('current authority authenticates the actual files rather than copies of the
   const currentCad = 'cad/config/current-identity-map.json'
   await writeFile(join(directory, currentCad), Buffer.concat([bytes.get(currentCad), Buffer.from('\n')]))
   await assert.rejects(() => validateCurrentNativeIdentityInputs(webRoot), /current CAD map SHA256 mismatch/)
+  await writeFile(join(directory, currentCad), bytes.get(currentCad))
+  const reactivated = structuredClone(cadMap)
+  reactivated.parts_and_assemblies.push(reactivated.retired_identities.shift())
+  await writeFile(join(directory, currentCad), JSON.stringify(reactivated))
+  await assert.rejects(() => validateCurrentNativeIdentityInputs(webRoot), /current CAD map SHA256 mismatch/)
+  await writeFile(join(directory, currentCad), bytes.get(currentCad))
+  const registry = join(directory, 'cad/config/parts', `${retiredTooling[0].old_stem}.yaml`)
+  await mkdir(join(registry, '..'), { recursive: true })
+  await writeFile(registry, `number: ${retiredTooling[0].new_identities[0].number}\n`)
+  await assert.rejects(() => validateCurrentNativeIdentityInputs(webRoot), /retired identity still has a part registry/)
 })
 
 test('a real checkout with core.autocrlf=true preserves both raw-pinned maps and current authority', async t => {
@@ -122,6 +147,49 @@ test('every active projected row equals CAD and historical-only occurrences stay
   assert.throws(() => validateCurrentNativeIdentityProjection(addedHistorical, cadMap), /exactly the three historical/)
 })
 
+test('retired tooling keeps exactly its frozen old/current reservations without a current Number lookup', () => {
+  assert.deepEqual(cadMap.retired_identities, retiredTooling)
+  for (const row of retiredTooling) {
+    const current = row.new_identities[0]
+    assert.ok(!table.nativeIdentities.some(active => active.sourceStem === row.old_stem
+      || active.identities.some(target => target.stem === current.stem || target.number === current.number)))
+    for (const number of [row.old_number, current.number]) {
+      assert.throws(() => projectCurrentNativeNumber(number, current.stem), /unknown native identity/)
+    }
+    const unknown = path('ch-channel', `${current.stem}-1`)
+    assert.equal(projectCurrentNativePath(unknown), unknown) // Unknown non-vendor tokens are not a current lookup.
+  }
+})
+
+test('retired stems and Numbers cannot reappear through active rows, aliases or archive-only exceptions', () => {
+  const reservation = cadMap.retired_identities[0]
+  const activeAgain = structuredClone(cadMap)
+  activeAgain.parts_and_assemblies.push(structuredClone(reservation))
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, activeAgain), /active identity collides with retired/)
+  for (const field of ['stem', 'number']) {
+    const reused = structuredClone(cadMap)
+    reused.parts_and_assemblies[0].new_identities[0][field] = reservation.new_identities[0][field]
+    assert.throws(() => validateCurrentNativeIdentityProjection(table, reused), /active identity collides with retired/)
+  }
+  const activeProjection = structuredClone(table)
+  activeProjection.nativeIdentities.push({
+    sourceStem: reservation.old_stem, sourceNumber: reservation.old_number, identities: reservation.new_identities,
+  })
+  assert.throws(() => validateCurrentNativeIdentityProjection(activeProjection, cadMap), /projected identity reactivates retired/)
+  const alias = structuredClone(cadMap)
+  alias.historical_current_aliases[0].old_stem = reservation.old_stem
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, alias), /alias reactivates a retired/)
+  const archive = structuredClone(table)
+  archive.archiveOnlyVendors.push({
+    sourceStem: reservation.old_stem, sourceNumber: reservation.old_number,
+    ...reservation.new_identities[0], status: 'archive-only', registry: null, builder: null,
+  })
+  assert.throws(() => validateCurrentNativeIdentityProjection(archive, cadMap), /projected identity reactivates retired/)
+  const duplicate = structuredClone(cadMap)
+  duplicate.retired_identities.push(structuredClone(reservation))
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, duplicate), /colliding retired identity/)
+})
+
 test('target collisions and conflicting source Numbers are rejected while target stems may be scoped to different parents', async t => {
   const duplicate = structuredClone(table)
   duplicate.machineVendors[0].identities.push({ ...duplicate.machineVendors[0].identities[0] })
@@ -155,7 +223,6 @@ test('all split vendors resolve by their immediate parent rather than one arbitr
 test('two-digit Numbers preserve geometry/configuration qualifiers and purchased tooling scope', () => {
   assert.equal(projectCurrentNativeNumber('MHA-DT-003-T006', 'dt-cone-gear'), 'MHA-DT-03-T006')
   assert.equal(projectCurrentNativeNumber('MHA-HA-000', 'ha-harmonic-analyzer'), 'MHA-HA-00')
-  assert.equal(projectCurrentNativeNumber('MHA-DT-005-TL-01', 'dt-cone-pivot-post-tl-bond-cradle'), 'MHA-DT-05-TL-01')
   assert.equal(projectCurrentNativeNumber('MHA-CH-006-TL-30', 'ch-rocker-arm-tl-oblique-rail', 'ch-rocker-arm-tl-oblique-jig'), 'MHA-CH-06-TL-VN-50')
   assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'fr-frame'), 'MHA-FR-VN-50')
   assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'pd-paper-drive'), 'MHA-PD-VN-52')

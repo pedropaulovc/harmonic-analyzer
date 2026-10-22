@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,11 +17,45 @@ const archivedOnly = new Set([
   'vn-pedestal-hold-down-screw/ch-channel/ch-vn-pedestal-hold-down-screw',
 ])
 
-/** Only active rows must equal CAD; the three explicitly retired archive occurrences are not registry entries. */
+/** Active rows equal current CAD; retired reservations and three archive occurrences are not live identities. */
 export function validateCurrentNativeIdentityProjection(table, cadMap, archivedMap) {
-  if (cadMap.schema_version !== 1 || !Array.isArray(cadMap.parts_and_assemblies)) fail('invalid current CAD map')
+  if (cadMap.schema_version !== 1 || !Array.isArray(cadMap.parts_and_assemblies)
+    || !Array.isArray(cadMap.retired_identities)) fail('invalid current CAD map')
+  const reservedStems = new Set(), reservedNumbers = new Set()
+  for (const row of cadMap.retired_identities) {
+    if (row.status !== 'retired' || !Array.isArray(row.new_identities) || !row.new_identities.length
+      || [row.old_stem, ...row.new_identities.map(target => target.stem)]
+        .some(stem => typeof stem !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(stem))
+      || [row.old_number, ...row.new_identities.map(target => target.number)]
+        .some(number => typeof number !== 'string' || !number.startsWith('MHA-'))) fail('invalid retired identity reservation')
+    for (const stem of new Set([row.old_stem, ...row.new_identities.map(target => target.stem)])) {
+      if (reservedStems.has(stem)) fail(`colliding retired identity stem ${stem}`)
+      reservedStems.add(stem)
+    }
+    for (const number of new Set([row.old_number, ...row.new_identities.map(target => target.number)])) {
+      if (reservedNumbers.has(number)) fail(`colliding retired identity Number ${number}`)
+      reservedNumbers.add(number)
+    }
+  }
+  for (const row of cadMap.parts_and_assemblies) {
+    if (row.status === 'retired'
+      || [row.old_stem, ...row.new_identities.map(target => target.stem)].some(stem => reservedStems.has(stem))
+      || [row.old_number, ...row.new_identities.map(target => target.number)].some(number => reservedNumbers.has(number))) {
+      fail(`active identity collides with retired reservation ${row.old_stem}`)
+    }
+  }
+  if (cadMap.historical_current_aliases.some(row => [row.old_stem, row.prior_current_stem, row.current_stem]
+    .some(stem => reservedStems.has(stem)))) fail('historical alias reactivates a retired identity')
   const currentRows = [...table.machineVendors, ...table.nativeIdentities,
     ...table.toolingVendors.map(row => ({ sourceStem: row.sourceStem, sourceNumber: row.sourceNumber, identities: [row] }))]
+  for (const row of [...currentRows, ...table.archiveOnlyVendors.map(target => ({
+    sourceStem: target.sourceStem, sourceNumber: target.sourceNumber, identities: [target],
+  }))]) {
+    if ([row.sourceStem, ...row.identities.map(target => target.stem)].some(stem => reservedStems.has(stem))
+      || [row.sourceNumber, ...row.identities.map(target => target.number)].some(number => reservedNumbers.has(number))) {
+      fail(`projected identity reactivates retired reservation ${row.sourceStem}`)
+    }
+  }
   const expected = sorted(cadMap.parts_and_assemblies.map(row => ({
     sourceStem: row.old_stem, sourceNumber: row.old_number, kind: row.kind ?? 'part', identities: sorted(row.new_identities.map(identity)),
   })))
@@ -56,5 +90,18 @@ export async function validateCurrentNativeIdentityInputs(webRoot = WEB_ROOT) {
   if (table.sourceMapSha256 !== NATIVE_IDENTITY_MAP_SHA256) fail('historical map pin differs')
   const currentBytes = await readFile(resolve(webRoot, '../cad/config/current-identity-map.json'))
   if (sha256(currentBytes) !== table.currentRegistryMapSha256) fail('current CAD map SHA256 mismatch')
-  validateCurrentNativeIdentityProjection(table, JSON.parse(currentBytes), archivedMap)
+  const cadMap = JSON.parse(currentBytes)
+  validateCurrentNativeIdentityProjection(table, cadMap, archivedMap)
+  for (const row of cadMap.retired_identities) {
+    for (const stem of new Set([row.old_stem, ...row.new_identities.map(target => target.stem)])) {
+      const registry = resolve(webRoot, '../cad/config/parts', `${stem}.yaml`)
+      try {
+        await access(registry)
+      } catch (error) {
+        if (error.code === 'ENOENT') continue
+        throw error
+      }
+      fail(`retired identity still has a part registry ${stem}`)
+    }
+  }
 }

@@ -19,10 +19,11 @@ Bundles are read straight from the GitHub release zips over HTTP range
 requests -- only the central directory and the needed members are fetched,
 never the whole 460 MB asset.
 
-The current identity map projects prior category identities, composed with the
-sealed historical map for archived releases. A shared prior vendor member can
-pair with every current parent-specific clone without merging those clones.
-Configuration suffixes and actual cache basenames are retained on both sides.
+The current identity map projects active and retired prior category identities,
+composed with the sealed historical map for archived releases. Retirement reserves
+release identities; it does not remove their historical pairings. A shared prior
+vendor member can pair with every parent-specific clone without merging those
+clones. Configuration suffixes and actual cache basenames are retained on both sides.
 Overlapping identities in one bundle are rejected; new, deleted and renamed
 members are separate from geometry verdicts. ``--parts`` accepts any mapped
 historical or current spelling, but only members paired in both bundles.
@@ -57,18 +58,34 @@ def _check_stems(*stems):
 
 
 def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP):
-    """Map historical/prior stems to all current targets, without changing either map."""
+    """Map historical/prior stems to active or retired targets for comparisons only."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1:
         raise ValueError("release diff current identity map requires schema_version 1")
     mapping = {}
     targets = set()
-    for row in payload["parts_and_assemblies"]:
+    prior_numbers, target_numbers = set(), set()
+    # Retired rows remain release provenance, not a source of active API entries.
+    rows = payload["parts_and_assemblies"] + payload.get("retired_identities", [])
+    for row in rows:
         old = row["old_stem"]
         current = tuple(identity["stem"] for identity in row["new_identities"])
         _check_stems(old, *current)
         if not current or old in mapping or len(set(current)) != len(current) or targets.intersection(current):
             raise ValueError(f"duplicate or empty current identity map entry: {old!r}, {current!r}")
+        # Minimal stem-only maps remain useful for offline comparisons. Real rows
+        # also reserve Numbers, independently in the prior and target namespaces.
+        prior_number = row.get("old_number")
+        if prior_number is not None:
+            if prior_number in prior_numbers:
+                raise ValueError(f"duplicate prior identity Number: {prior_number!r}")
+            prior_numbers.add(prior_number)
+        for identity in row["new_identities"]:
+            number = identity.get("number")
+            if number is not None:
+                if number in target_numbers:
+                    raise ValueError(f"duplicate target identity Number: {number!r}")
+                target_numbers.add(number)
         mapping[old] = current
         targets.update(current)
 

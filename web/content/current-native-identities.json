@@ -980,7 +980,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "7bf507012a82266b5a4ff6d3bbfa21a6042898e61882c9a204f6b53adffc27db",
+  "currentRegistryMapSha256": "99b0d58093dd8129c70693610e6661f2cc6939426cc835f4afba65026e40c4fc",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-nut-bracket",
@@ -1073,16 +1073,6 @@
       ]
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-filing-stud",
-      "sourceNumber": "MHA-CH-006-TL-05",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-stud",
-          "number": "MHA-CH-06-TL-05"
-        }
-      ]
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-base-bar",
       "sourceNumber": "MHA-CH-006-TL-20",
       "identities": [
@@ -1123,26 +1113,6 @@
       ]
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-filing-button",
-      "sourceNumber": "MHA-CH-006-TL-04",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-button",
-          "number": "MHA-CH-06-TL-04"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-filing-stand",
-      "sourceNumber": "MHA-CH-006-TL-12",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-stand",
-          "number": "MHA-CH-06-TL-12"
-        }
-      ]
-    },
-    {
       "sourceStem": "pd-transgear-feed-pinion",
       "sourceNumber": "MHA-PD-010",
       "identities": [
@@ -1159,16 +1129,6 @@
         {
           "stem": "pd-transgear-front-bushing",
           "number": "MHA-PD-25"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-pivot-bracket-tl-ledge",
-      "sourceNumber": "MHA-CH-008-TL-01",
-      "identities": [
-        {
-          "stem": "ch-pivot-bracket-tl-ledge",
-          "number": "MHA-CH-08-TL-01"
         }
       ]
     },
@@ -1249,16 +1209,6 @@
         {
           "stem": "ch-fulcrum-shaft",
           "number": "MHA-CH-04"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-pivot-bracket-tl-angle-plate",
-      "sourceNumber": "MHA-CH-008-TL-02",
-      "identities": [
-        {
-          "stem": "ch-pivot-bracket-tl-angle-plate",
-          "number": "MHA-CH-08-TL-02"
         }
       ]
     },
@@ -1883,52 +1833,12 @@
       ]
     },
     {
-      "sourceStem": "dt-cone-pivot-post-tl-soft-jaw",
-      "sourceNumber": "MHA-DT-005-TL-04",
-      "identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-soft-jaw",
-          "number": "MHA-DT-05-TL-04"
-        }
-      ]
-    },
-    {
       "sourceStem": "dt-cone-pivot-post",
       "sourceNumber": "MHA-DT-005",
       "identities": [
         {
           "stem": "dt-cone-pivot-post",
           "number": "MHA-DT-05"
-        }
-      ]
-    },
-    {
-      "sourceStem": "dt-cone-pivot-post-tl-cap-jaw-button",
-      "sourceNumber": "MHA-DT-005-TL-03",
-      "identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-cap-jaw-button",
-          "number": "MHA-DT-05-TL-03"
-        }
-      ]
-    },
-    {
-      "sourceStem": "dt-cone-pivot-post-tl-saw-cradle",
-      "sourceNumber": "MHA-DT-005-TL-02",
-      "identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-saw-cradle",
-          "number": "MHA-DT-05-TL-02"
-        }
-      ]
-    },
-    {
-      "sourceStem": "dt-cone-pivot-post-tl-bond-cradle",
-      "sourceNumber": "MHA-DT-005-TL-01",
-      "identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-bond-cradle",
-          "number": "MHA-DT-05-TL-01"
         }
       ]
     },
@@ -2013,76 +1923,6 @@
       ]
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-trammel-setting-bar",
-      "sourceNumber": "MHA-CH-006-TL-17",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-setting-bar",
-          "number": "MHA-CH-06-TL-17"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-trammel-scriber-point",
-      "sourceNumber": "MHA-CH-006-TL-16",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-scriber-point",
-          "number": "MHA-CH-06-TL-16"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-trammel-pivot-point",
-      "sourceNumber": "MHA-CH-006-TL-18",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-point",
-          "number": "MHA-CH-06-TL-18"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-trammel-scriber-block",
-      "sourceNumber": "MHA-CH-006-TL-15",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-scriber-block",
-          "number": "MHA-CH-06-TL-15"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-strap-shim-stack",
-      "sourceNumber": "MHA-CH-006-TL-11",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-strap-shim-stack",
-          "number": "MHA-CH-06-TL-11"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-trammel-pivot-block",
-      "sourceNumber": "MHA-CH-006-TL-14",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-block",
-          "number": "MHA-CH-06-TL-14"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-trammel-pivot-plate",
-      "sourceNumber": "MHA-CH-006-TL-19",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-plate",
-          "number": "MHA-CH-06-TL-19"
-        }
-      ]
-    },
-    {
       "sourceStem": "sm-knife-mount",
       "sourceNumber": "MHA-SM-002",
       "identities": [
@@ -2099,26 +1939,6 @@
         {
           "stem": "sm-summing-lever",
           "number": "MHA-SM-03"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-outline-template",
-      "sourceNumber": "MHA-CH-006-TL-13",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-outline-template",
-          "number": "MHA-CH-06-TL-13"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-riser-block",
-      "sourceNumber": "MHA-CH-006-TL-10",
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-riser-block",
-          "number": "MHA-CH-06-TL-10"
         }
       ]
     },

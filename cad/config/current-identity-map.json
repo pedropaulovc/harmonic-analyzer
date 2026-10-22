@@ -304,16 +304,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-filing-stud",
-      "old_number": "MHA-CH-006-TL-05",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-stud",
-          "number": "MHA-CH-06-TL-05"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-base-bar",
       "old_number": "MHA-CH-006-TL-20",
       "new_identities": [
@@ -354,26 +344,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-filing-button",
-      "old_number": "MHA-CH-006-TL-04",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-button",
-          "number": "MHA-CH-06-TL-04"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-filing-stand",
-      "old_number": "MHA-CH-006-TL-12",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-filing-stand",
-          "number": "MHA-CH-06-TL-12"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-transgear-feed-pinion",
       "old_number": "MHA-PD-010",
       "new_identities": [
@@ -390,16 +360,6 @@
         {
           "stem": "pd-transgear-front-bushing",
           "number": "MHA-PD-25"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-pivot-bracket-tl-ledge",
-      "old_number": "MHA-CH-008-TL-01",
-      "new_identities": [
-        {
-          "stem": "ch-pivot-bracket-tl-ledge",
-          "number": "MHA-CH-08-TL-01"
         }
       ]
     },
@@ -480,16 +440,6 @@
         {
           "stem": "ch-fulcrum-shaft",
           "number": "MHA-CH-04"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-pivot-bracket-tl-angle-plate",
-      "old_number": "MHA-CH-008-TL-02",
-      "new_identities": [
-        {
-          "stem": "ch-pivot-bracket-tl-angle-plate",
-          "number": "MHA-CH-08-TL-02"
         }
       ]
     },
@@ -1690,16 +1640,6 @@
       ]
     },
     {
-      "old_stem": "dt-cone-pivot-post-tl-soft-jaw",
-      "old_number": "MHA-DT-005-TL-04",
-      "new_identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-soft-jaw",
-          "number": "MHA-DT-05-TL-04"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-cone-pivot-post",
       "old_number": "MHA-DT-005",
       "new_identities": [
@@ -1717,26 +1657,6 @@
           "parent": "dt-drive-train",
           "stem": "dt-vn-crank-hub-pin",
           "number": "MHA-DT-VN-59"
-        }
-      ]
-    },
-    {
-      "old_stem": "dt-cone-pivot-post-tl-cap-jaw-button",
-      "old_number": "MHA-DT-005-TL-03",
-      "new_identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-cap-jaw-button",
-          "number": "MHA-DT-05-TL-03"
-        }
-      ]
-    },
-    {
-      "old_stem": "dt-cone-pivot-post-tl-saw-cradle",
-      "old_number": "MHA-DT-005-TL-02",
-      "new_identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-saw-cradle",
-          "number": "MHA-DT-05-TL-02"
         }
       ]
     },
@@ -1759,16 +1679,6 @@
           "parent": "sm-summing",
           "stem": "sm-vn-counter-spring",
           "number": "MHA-SM-VN-51"
-        }
-      ]
-    },
-    {
-      "old_stem": "dt-cone-pivot-post-tl-bond-cradle",
-      "old_number": "MHA-DT-005-TL-01",
-      "new_identities": [
-        {
-          "stem": "dt-cone-pivot-post-tl-bond-cradle",
-          "number": "MHA-DT-05-TL-01"
         }
       ]
     },
@@ -1968,26 +1878,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-trammel-setting-bar",
-      "old_number": "MHA-CH-006-TL-17",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-setting-bar",
-          "number": "MHA-CH-06-TL-17"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-trammel-scriber-point",
-      "old_number": "MHA-CH-006-TL-16",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-scriber-point",
-          "number": "MHA-CH-06-TL-16"
-        }
-      ]
-    },
-    {
       "old_stem": "vn-boss-hook",
       "old_number": "MHA-VN-001",
       "new_identities": [
@@ -2006,26 +1896,6 @@
           "parent": "ch-channel",
           "stem": "ch-vn-bracket-hold-down-screw",
           "number": "MHA-CH-VN-57"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-trammel-pivot-point",
-      "old_number": "MHA-CH-006-TL-18",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-point",
-          "number": "MHA-CH-06-TL-18"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-trammel-scriber-block",
-      "old_number": "MHA-CH-006-TL-15",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-scriber-block",
-          "number": "MHA-CH-06-TL-15"
         }
       ]
     },
@@ -2057,36 +1927,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-strap-shim-stack",
-      "old_number": "MHA-CH-006-TL-11",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-strap-shim-stack",
-          "number": "MHA-CH-06-TL-11"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-trammel-pivot-block",
-      "old_number": "MHA-CH-006-TL-14",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-block",
-          "number": "MHA-CH-06-TL-14"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-trammel-pivot-plate",
-      "old_number": "MHA-CH-006-TL-19",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-trammel-pivot-plate",
-          "number": "MHA-CH-06-TL-19"
-        }
-      ]
-    },
-    {
       "old_stem": "sm-knife-mount",
       "old_number": "MHA-SM-002",
       "new_identities": [
@@ -2114,26 +1954,6 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-t-nut",
           "number": "MHA-CH-06-TL-VN-59"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-outline-template",
-      "old_number": "MHA-CH-006-TL-13",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-outline-template",
-          "number": "MHA-CH-06-TL-13"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-riser-block",
-      "old_number": "MHA-CH-006-TL-10",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-riser-block",
-          "number": "MHA-CH-06-TL-10"
         }
       ]
     },
@@ -2409,6 +2229,206 @@
         }
       ],
       "kind": "assembly"
+    }
+  ],
+  "retired_identities": [
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-button",
+      "old_number": "MHA-CH-006-TL-04",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-button",
+          "number": "MHA-CH-06-TL-04"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-stud",
+      "old_number": "MHA-CH-006-TL-05",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-stud",
+          "number": "MHA-CH-06-TL-05"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-riser-block",
+      "old_number": "MHA-CH-006-TL-10",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-riser-block",
+          "number": "MHA-CH-06-TL-10"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-strap-shim-stack",
+      "old_number": "MHA-CH-006-TL-11",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-strap-shim-stack",
+          "number": "MHA-CH-06-TL-11"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-stand",
+      "old_number": "MHA-CH-006-TL-12",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-stand",
+          "number": "MHA-CH-06-TL-12"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-outline-template",
+      "old_number": "MHA-CH-006-TL-13",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-outline-template",
+          "number": "MHA-CH-06-TL-13"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-block",
+      "old_number": "MHA-CH-006-TL-14",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-block",
+          "number": "MHA-CH-06-TL-14"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-scriber-block",
+      "old_number": "MHA-CH-006-TL-15",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-scriber-block",
+          "number": "MHA-CH-06-TL-15"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-scriber-point",
+      "old_number": "MHA-CH-006-TL-16",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-scriber-point",
+          "number": "MHA-CH-06-TL-16"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-setting-bar",
+      "old_number": "MHA-CH-006-TL-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-setting-bar",
+          "number": "MHA-CH-06-TL-17"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-point",
+      "old_number": "MHA-CH-006-TL-18",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-point",
+          "number": "MHA-CH-06-TL-18"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-plate",
+      "old_number": "MHA-CH-006-TL-19",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-plate",
+          "number": "MHA-CH-06-TL-19"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-pivot-bracket-tl-ledge",
+      "old_number": "MHA-CH-008-TL-01",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-bracket-tl-ledge",
+          "number": "MHA-CH-08-TL-01"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-pivot-bracket-tl-angle-plate",
+      "old_number": "MHA-CH-008-TL-02",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-bracket-tl-angle-plate",
+          "number": "MHA-CH-08-TL-02"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-bond-cradle",
+      "old_number": "MHA-DT-005-TL-01",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-bond-cradle",
+          "number": "MHA-DT-05-TL-01"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-saw-cradle",
+      "old_number": "MHA-DT-005-TL-02",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-saw-cradle",
+          "number": "MHA-DT-05-TL-02"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-cap-jaw-button",
+      "old_number": "MHA-DT-005-TL-03",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-cap-jaw-button",
+          "number": "MHA-DT-05-TL-03"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-soft-jaw",
+      "old_number": "MHA-DT-005-TL-04",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-soft-jaw",
+          "number": "MHA-DT-05-TL-04"
+        }
+      ],
+      "status": "retired"
     }
   ],
   "historical_current_aliases": [
