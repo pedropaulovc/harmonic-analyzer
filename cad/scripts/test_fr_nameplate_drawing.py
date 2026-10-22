@@ -19,7 +19,8 @@ import fr_nameplate_drawing_spec as print_spec
 import fr_nameplate_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from _release_artwork import bundle_path
 from _mcmaster_90114a511 import HEAD_DIA
 

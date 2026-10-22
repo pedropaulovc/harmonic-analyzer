@@ -140,7 +140,7 @@ Traps that cost 8 probe rounds — do not re-learn:
   through path → the placement is a **3D sketch** whose single point takes
   MODEL coords directly (`SetCoords`, no ModelToSketchTransform). Probe
   `diag_hole_wizard_cyl.py`: #9 through Ø12 shaft removed 228.39 vs 228.41
-  analytic. Production helper `_holes.wizard_hole_on_cylinder` (through-all,
+  analytic. Production helper `_cylindrical_holes.wizard_hole_on_cylinder` (through-all,
   single point, largest-cylinder-face pick); diametral removal volume =
   `cross_hole_volume_mm3` (numeric perpendicular cylinder∩cylinder).
 - Table enumeration: `swApp.GetHoleStandardsData(type)` early-bound gives

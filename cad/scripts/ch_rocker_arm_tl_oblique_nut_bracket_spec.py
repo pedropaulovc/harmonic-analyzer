@@ -105,9 +105,10 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
-# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_drilled_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 
 # --- Identity ---------------------------------------------------------------

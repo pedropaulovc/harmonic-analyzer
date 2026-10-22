@@ -41,9 +41,4 @@ PART_TEMPLATE = CAD_ROOT / "templates" / "harmonic-analyzer.PRTDOT"
 IN = 25.4  # inch -> mm
 
 
-# Roller-chain link component prefixes; contact between two of these is an
-# articulating-mechanism contact, not an interference fault (check_no_interference).
-_CHAIN_LINK_PREFIXES = ("pd-vn-chain-inner-link", "pd-vn-chain-outer-link")
-
-
 DEFAULT_VIEWS = ("isometric",)

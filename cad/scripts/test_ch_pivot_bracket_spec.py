@@ -10,7 +10,7 @@ import build_ch_pivot_bracket as bracket_build
 import ch_pivot_bracket_spec as bracket
 import _mcmaster_91375a106 as set_screw
 from _hole_spec import TAP_DRILL_MM, blind_cut_dia_mm
-from _holes import cross_hole_volume_mm3
+from _cylindrical_holes import cross_hole_volume_mm3
 
 
 def test_apex_tap_is_the_set_screws_thread_through_to_the_bore() -> None:

@@ -61,7 +61,7 @@ from _drawing_tolerances import (
 from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _gear import ToothedDisc, pattern_about_z
-from _holes import cross_hole_volume_mm3
+from _cylindrical_holes import cross_hole_volume_mm3
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (

@@ -88,10 +88,9 @@ from dt_arbor_pedestal_spec import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _visibility import blank_reference_geometry
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _holes import (
     DIAMETER_TOLERANCE_MM,
-    cross_hole_volume_mm3,
-    wizard_hole_on_cylinder,
     wizard_holes,
 )
 import _telemetry

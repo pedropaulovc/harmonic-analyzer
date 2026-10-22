@@ -70,7 +70,8 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 
 SUPPLIER = "ZYLtech Engineering"

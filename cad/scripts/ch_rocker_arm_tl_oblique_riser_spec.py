@@ -69,7 +69,9 @@ import _config
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 _X = printed_band_mm(1)
 _XX = printed_band_mm(2)

@@ -66,7 +66,8 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from pd_vn_platen_clip_screw_spec import (
     HEAD_DIA,
     HEAD_DIA_MIN,

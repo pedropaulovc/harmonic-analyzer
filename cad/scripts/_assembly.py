@@ -19,13 +19,14 @@ import _config
 import _telemetry
 from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
+from _chain_component_identity import _CHAIN_LINK_PREFIXES
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
 from _custom_properties import apply_custom_properties
 from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
-from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
+from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT
 from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
 from _saved_display_data import assert_saved_display_data
 from _simplified_identity import components_identity

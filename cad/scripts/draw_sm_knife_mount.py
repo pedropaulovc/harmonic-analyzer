@@ -86,21 +86,16 @@ import _telemetry
 from build_sm_knife_mount import BORE_CENTRE_DEPTH
 from sm_knife_mount_spec import (
     BLK_BOT,
-    BLK_HALF_X,
     BLK_TOP,
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
-    HOLE_ROW_FACE_DISTANCE,
     PIN_HOLE_CALLOUT,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_PAIR_CALLOUT,
-    PIN_HOLE_SIDE_DISTANCE,
-    PIN_HOLE_SPAN,
-    PIN_HOLE_X,
     R_BORE,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
@@ -111,10 +106,17 @@ from sm_knife_mount_spec import (
     STUD_TAP_THREAD_DEPTH,
     STUD_TAP_THREAD_DEPTH_BAND,
     STUD_TAP_THREAD_DEPTH_PLACES,
-    SUPPORT_Z_THICK,
     SURFACE_FINISHES,
     TAP_CALLOUT_REASON,
     TAP_DRILL_CALLOUT,
+)
+from sm_knife_mount_interface import (
+    BLK_HALF_X,
+    HOLE_ROW_FACE_DISTANCE,
+    PIN_HOLE_SIDE_DISTANCE,
+    PIN_HOLE_SPAN,
+    PIN_HOLE_X,
+    SUPPORT_Z_THICK,
 )
 
 

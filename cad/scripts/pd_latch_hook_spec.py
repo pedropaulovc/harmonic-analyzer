@@ -58,7 +58,9 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
+from _printed_angular_tolerance import angular_band_deg
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_deviations
 from pd_latch_hook_geometry import (
     ARM_Z0,
     ARM_Z1,

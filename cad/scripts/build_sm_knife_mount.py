@@ -65,7 +65,7 @@ from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from sm_summing_lever_spec import HEX_H, HEX_W
+from sm_knife_contact import HEX_H, HEX_W
 from _fit_deviations import deviations
 from _holes import (
     blind_hole_volume_mm3,
@@ -81,7 +81,6 @@ from _drawing_marks import (
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (
-    BLK_HALF_X,
     BORE_DIA_BAND,
     BORE_DIA_PLACES,
     DRAWING_DIMENSIONS,
@@ -91,13 +90,17 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_DIA_PLACES,
-    PIN_HOLE_X,
-    PIN_HOLE_XS,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_SPEC,
     STUD_THREAD,
     SURFACE_FINISHES,
+)
+from sm_knife_mount_interface import (
+    BLK_HALF_X,
+    PIN_HOLE_X,
+    PIN_HOLE_XS,
+    SUPPORT_Z_THICK,
 )
 import sm_knife_mount_spec
 
@@ -122,8 +125,7 @@ TOP_CLEAR = 0.25  # hex top vertex hangs this far below the bore upper inner wal
 BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR)
 
 # --- block (bearing body, held to the crossbar) ----------------------------
-SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-# BLK_HALF_X (25.4 across) is the spec's: the dowel pattern's webs size it.
+# BLK_HALF_X (25.4 across) and SUPPORT_Z_THICK are the shared top-seat interface.
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 

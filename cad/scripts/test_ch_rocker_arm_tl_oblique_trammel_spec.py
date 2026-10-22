@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 import _process_plans as plans
-import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
@@ -66,9 +66,9 @@ def test_outputs_are_derived_not_typed() -> None:
 
 
 def test_inputs_come_from_the_rocker_spec() -> None:
-    assert trammel.R_INNER == rocker.R_TOP == 800.0
+    assert trammel.R_INNER == rocker_outline.R_TOP == 800.0
     assert trammel.R_OUTER == rocker_interface.R_BOTTOM == 816.0
-    assert rocker.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
+    assert rocker_outline.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
     assert trammel.HUB_TO_TOP_EDGE == pytest.approx(8.25)
     assert trammel.ALPHA_DEG == 16.4405
 

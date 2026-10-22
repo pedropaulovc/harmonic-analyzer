@@ -20,7 +20,8 @@ from dataclasses import dataclass
 import math
 
 import _config
-from _printed_tolerance import angular_band_deg, printed_deviations
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_deviations
 import pd_platen_rack_spec as rack
 
 OPERATING_LIMIT_PLACES = 2

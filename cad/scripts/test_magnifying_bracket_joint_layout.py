@@ -15,7 +15,7 @@ import build_mg_magnifying_bracket as bracket
 import build_sm_summing_assembly as summing
 import _cone_axis_constants as installation
 import magnifying_bracket_joint_layout as joint
-import sm_knife_mount_spec as knife_mount
+import sm_knife_mount_interface as mount_interface
 import sm_summing_lever_spec as lever
 import sm_summing_lever_profile as lever_profile
 import mg_vn_magnifying_bracket_screw_spec as screw
@@ -57,7 +57,7 @@ def test_side_plate_is_flush_and_taller_without_moving_the_arm() -> None:
     assert back - front == pytest.approx(joint.SIDE_PLATE_THICKNESS)
     assert joint.SIDE_PLATE_MACHINE_X == (-3.0, 45.0)
     mount_back = (
-        installation.SUMMING_Z - summing.HEX_Z_MID + knife_mount.SUPPORT_Z_THICK / 2.0
+        installation.SUMMING_Z - summing.HEX_Z_MID + mount_interface.SUPPORT_Z_THICK / 2.0
     )
     assert front - mount_back == pytest.approx(0.6835, abs=1e-4)
     # Their plan projections may overlap; positive axial air keeps them separate.
@@ -103,7 +103,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert flush_reach > joint.THREAD_DEPTH
     head_air = (
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
-        - (KNIFE[0] + knife_mount.BLK_HALF_X)
+        - (KNIFE[0] + mount_interface.BLK_HALF_X)
     )
     # The 25.4-wide knife mount's +X face stands at -2.3 (KNIFE x -15).
     assert head_air == pytest.approx(1.522)

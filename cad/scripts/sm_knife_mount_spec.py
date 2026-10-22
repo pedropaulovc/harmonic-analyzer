@@ -2,12 +2,12 @@ r"""Knife-mount dimensional contract -- the single source of truth shared by the
 part build (``build_sm_knife_mount.py``) and its manufacturing drawing
 (``draw_sm_knife_mount.py``).
 
-PURE DATA, no SolidWorks/COM imports.  Nothing else consumes this part's
-nominals (no assembly imports ``build_sm_knife_mount``), so one ``_spec`` module is
-right here.  The block/bore geometry is derived in the build from the summing-
-assembly layout; the fixed values are mirrored here for the drawing's view math,
-and the offline lockstep test asserts the part marks and the drawing keeps
-EXACTLY ``DRAWING_DIMENSIONS``.
+PURE DATA, no SolidWorks/COM imports. The top-seat footprint and fit constants
+live in ``sm_knife_mount_interface`` so the top frame does not depend on this
+module's bore/rocking and tap-web calculations. The build derives the block's
+height from the assembly layout; the fixed height here mirrors its view math.
+The offline lockstep test asserts the part marks and the drawing keeps EXACTLY
+``DRAWING_DIMENSIONS``.
 
 NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
@@ -29,17 +29,32 @@ import sm_vn_knife_mount_dowel_spec as DOWEL
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_drilled_tolerance import drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
-from sm_summing_lever_spec import HEX_H, HEX_W
+from sm_knife_contact import HEX_H, HEX_W
+from sm_knife_mount_interface import (
+    BLK_HALF_X,
+    BLOCK_SIZE_PLACES,
+    BLOCK_SIZE_TOL,
+    HOLE_ROW_FACE_DISTANCE,
+    HOLE_ROW_FACE_PLACES,
+    HOLE_ROW_FACE_TOL,
+    MOUNTING_GEOMETRIC_TOLERANCES_MM,
+    PIN_HOLE_COUNT,
+    PIN_HOLE_HALF_SPAN_TOL,
+    PIN_HOLE_SIDE_DISTANCE,
+    PIN_HOLE_SIDE_PLACES,
+    PIN_HOLE_SIDE_TOL,
+    PIN_HOLE_SPAN,
+    PIN_HOLE_SPAN_PLACES,
+    PIN_HOLE_SPAN_TOL,
+    PIN_HOLE_X,
+    PIN_HOLE_X_TOL,
+)
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
-# Block half-width, owned here (the build reads it): 25.4 across, the .X
-# width that keeps the -X dowel's far-side web at 2.0 round the 15.264 span
-# (PIN_HOLE_FAR_SIDE_WEB below; 25.319 is the least).
-BLK_HALF_X = 12.7
-SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
 BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
 BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
@@ -54,8 +69,6 @@ SURFACE_FINISHES = (
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
 # General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
-_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # The Ø12 bore is REAMED through (Ra 1.6 on its knife seat is a reamed
 # finish, not a drilled one) to an explicit +0.03/0 band (the MHA-DT-16
@@ -65,17 +78,12 @@ BORE_DIA_BAND = (0.03, 0.0)
 BORE_DIA_PLACES = 2
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
 BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
-# The block's overall sizes print one place (.X, drawing-guidelines.md rule 17 (walls and webs): every web below
-# holds at that band); the stacks judge the block at those limits.
-BLOCK_SIZE_PLACES = 1
-BLOCK_SIZE_TOL = _X  # 0.8
 BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
     "knife-bore perpendicularity": "0.05",
-    "knife-hanger tap position": "0.15",
-    "dowel hole pattern position": "0.13",
+    **MOUNTING_GEOMETRIC_TOLERANCES_MM,
 }
 # The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge system): ⌖Ø0.20 locates it to the top
 # seat (datum A) and the dowel pattern (datum B); a stacked ⊥Ø0.05|B holds
@@ -87,19 +95,6 @@ KNIFE_BORE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-bore position"])
 KNIFE_BORE_ORIENTATION_TOL = float(
     GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"]
 )
-# The #10-24 tap's position to the top seat and the dowel pattern (A|B): the
-# bolt axis the crossbar's #10 clearance hole must float round
-# (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.075 zone radius
-# is one term of HANGER_SCREW_MISMATCH (hypot(0.316, 0.264) = 0.412) inside
-# the hole's 0.6095 radial float with the drill drift's 0.194 over the
-# printed grip's thickest 37.01, 0.0039 spare.
-# A screw through a clearance hole needs no tighter zone than that float
-# admits (drawing-guidelines.md rule 5), and Ø0.15 is the largest two-place
-# zone it admits: the float closes at Ø0.1556; Ø0.16 leaves -0.0031 and
-# Ø0.25 -0.067.  Plain face dimensions instead, even at .XXX (+/-0.13 each
-# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.074: the frame is
-# functional.
-STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
 
 
 def free_rock_deg(
@@ -115,7 +110,7 @@ def free_rock_deg(
     block's depth (tolerance-gdt-assessment §5.4: the knife mount's bore is
     controlled to its mounting face and its key).
 
-    The hex trunnion (``sm_summing_lever_spec`` HEX_W x HEX_H, vertex up)
+    The hex trunnion (``sm_knife_contact`` HEX_W x HEX_H, vertex up)
     rocks about its top vertex on the bore crown; its upper shoulder sits at
     (hex_w/2, -shoulder_drop) from the ridge, ``shoulder_drop`` hex_h/4 on
     the nominal profile (a flank at its angle-band limit raises it).
@@ -346,42 +341,14 @@ BOLT_NUMBER = "MHA-SM-VN-52"
 TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
 TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
 
-# MHA-SM-VN-53 dowels: two blind flat-bottom reamed holes in the top seat at
-# DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
-# The pair is the sheet's datum B (the orientation that keys the block against
-# turning about its screw); the crossbar takes one in a round slip hole, the
-# other in a slot along the dowel line, so the pattern never overconstrains.
-# The reamed holes hold the press of the stock dowel, as the MHA-PD-18
-# latch-pin hole holds the same 1/8 series' (``pd_transgear_arm_geometry``).
-PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.632
-PIN_HOLE_XS = (-PIN_HOLE_X, PIN_HOLE_X)
-PIN_HOLE_COUNT = len(PIN_HOLE_XS)
-if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
-    raise AssertionError("the knife mount reams one hole per MHA-SM-VN-53 dowel")
-# The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
-# pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the
-# frame itself prints 2X under it too, so B is plainly the two-hole pattern,
-# not one hole.  The sheet
-# prints its span BASIC between the two hole axes, centred on the block, and
-# positions the tap and the bore to A|B.  Each hole's station from the
-# pattern centre varies by the zone's radius, and from the tap axis by that
-# plus the tap's zone radius.
-PIN_HOLE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"])
-PIN_HOLE_SPAN = DOWEL.SPAN  # 15.264 BASIC
-PIN_HOLE_SPAN_PLACES = DOWEL.SPAN_PLACES
-PIN_HOLE_SPAN_TOL = PIN_HOLE_POSITION_TOL  # 0.13: the span's worst variation
-PIN_HOLE_HALF_SPAN_TOL = PIN_HOLE_SPAN_TOL / 2.0  # 0.065
-PIN_HOLE_X_TOL = PIN_HOLE_HALF_SPAN_TOL + STUD_TAP_POSITION_TOL / 2.0  # 0.14
+# MHA-SM-VN-53: two blind flat-bottom reamed holes in the top seat, the
+# interface module's keyed pair. The reamed holes hold the stock dowel's press.
 PIN_HOLE_DIA = DOWEL.DIA  # 3.175
 PIN_HOLE_DIA_BAND = (0.0, -0.010)
 PIN_HOLE_DIA_PLACES = 3
 PIN_HOLE_DEPTH = DOWEL.PRESS_DEPTH  # 9.5
 PIN_HOLE_DEPTH_PLACES = DOWEL.PRESS_DEPTH_PLACES
 DOWEL_NUMBER = "MHA-SM-VN-53"
-if PIN_HOLE_SPAN_TOL != DOWEL.SPAN_TOL or PIN_HOLE_SPAN_PLACES != 3:
-    raise AssertionError(
-        "the dowel pattern's zone must be the span variation the stacks take"
-    )
 # (loosest, tightest) press from the ream band and the catalogue band:
 # 0.00254..0.01762, printed rounded outward to four places.
 PIN_PRESS_INTERFERENCE = (
@@ -401,18 +368,6 @@ if PIN_PRESS_PRINTED != (0.0025, 0.0177):
 # Worst-case webs round each dowel hole (largest ream, station off by its
 # band).
 _PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0
-# The pattern is located on the block's outside faces at general tolerance
-# (blind machinist review, 2026-10-09: nothing tied the dowel/tap/bore family
-# to the faces), both in the top view: the +X dowel hole's axis from the +X
-# side face (.XX, the BASIC span chains on to the -X hole) and the -X hole's
-# axis from the front face (.X).  The row's square to the front face is the
-# title block's angular tolerance.
-PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.068, prints 5.07
-PIN_HOLE_SIDE_PLACES = 2
-PIN_HOLE_SIDE_TOL = _XX  # 0.51
-HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.0
-HOLE_ROW_FACE_PLACES = 1
-HOLE_ROW_FACE_TOL = _X  # 0.8
 _ANGULAR_TOL_DEG = float(_config.title_block("angular")["value_deg"])  # 1.0
 # To the +X side face: 5.068 - 0.51 - 1.5875 = 2.97.
 PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX

@@ -440,7 +440,7 @@ _PEN_ALLOWED_PAIRS = {
 def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> float:
     """Volume a tube pin lying diametrally across a solid shaft shares with it:
     the perpendicular-cylinder intersection at its OD less that at its ID.
-    _holes.cross_hole_volume_mm3's trapezoid integral, restated so every
+    _cylindrical_holes.cross_hole_volume_mm3's trapezoid integral, restated so every
     assembly's recipe stays clear of the Hole Wizard helpers."""
 
     def solid(pin_d: float, n: int = 20001) -> float:
@@ -662,8 +662,8 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # link closes the chain at station 67, whose forward pin is pin 0 on the
     # T24's pitch circle, the same seated-chain mesh the gate allows every
     # MHA-PD-VN-50/51 link on a mounted removable. Its family is deliberately
-    # not in _paths._CHAIN_LINK_PREFIXES, which would re-key all 373 leaves;
-    # follow-up harmonic-analyzer#1457 moves it there and deletes this row.
+    # not in _chain_component_identity._CHAIN_LINK_PREFIXES; follow-up
+    # harmonic-analyzer#1457 moves it there and deletes this row.
     # Two bodies, 3.512 + 2.105 = 5.617 mm^3 on run 20261015T010201208Z
     # (assembly:pd_paper_drive); the reading plus ten percent, so a deeper
     # seat or a clash with any other part still fails.

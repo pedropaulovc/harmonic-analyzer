@@ -11,7 +11,8 @@ it imports geometry from, so the drawing contract must NOT live here.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------

@@ -105,7 +105,8 @@ import math
 
 
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 INCH = 25.4

@@ -27,7 +27,8 @@ from __future__ import annotations
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from mg_rod_clamp_joint import (
     ENGAGEMENT_MIN,
     ROD_TAP_DRILL_DEPTH_MAX,

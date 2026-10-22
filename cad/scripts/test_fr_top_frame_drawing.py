@@ -27,6 +27,7 @@ from fr_frame_attachment_spec import (
 )
 from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER
 from _surface_finish import SEAT_UM
+import sm_knife_mount_interface as mount_interface
 import fr_top_frame_spec as spec
 import fr_tube_frame_spec
 
@@ -785,13 +786,11 @@ def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
     # Each print-worst hull holds the nominal block and reaches at least the
     # unskewed stack: D's .X location band, the hanger's centring zone, half
     # the dowel slip and the worse .X row-to-face reach.
-    import sm_knife_mount_spec as mount
-
     reach = max(
-        mount.HOLE_ROW_FACE_DISTANCE + mount.HOLE_ROW_FACE_TOL,
-        mount.SUPPORT_Z_THICK
-        + mount.BLOCK_SIZE_TOL
-        - (mount.HOLE_ROW_FACE_DISTANCE - mount.HOLE_ROW_FACE_TOL),
+        mount_interface.HOLE_ROW_FACE_DISTANCE + mount_interface.HOLE_ROW_FACE_TOL,
+        mount_interface.SUPPORT_Z_THICK
+        + mount_interface.BLOCK_SIZE_TOL
+        - (mount_interface.HOLE_ROW_FACE_DISTANCE - mount_interface.HOLE_ROW_FACE_TOL),
     )
     band = spec.PRINTED_LINEAR_BAND_MM[1]
     slip = spec.HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
@@ -802,8 +801,8 @@ def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
         hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
         nominal = [
             (
-                part.HANGER_X + sx * mount.BLK_HALF_X,
-                station + sz * mount.SUPPORT_Z_THICK / 2.0,
+                part.HANGER_X + sx * mount_interface.BLK_HALF_X,
+                station + sz * mount_interface.SUPPORT_Z_THICK / 2.0,
             )
             for sx in (-1.0, 1.0)
             for sz in (-1.0, 1.0)
@@ -4100,9 +4099,8 @@ def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
         "SCREW AXIS, SAME Z;",
         "MATCHES MHA-SM-02",
     ]
-    import sm_knife_mount_spec as knife_mount
 
-    assert spec.HANGER_PIN_X == knife_mount.PIN_HOLE_X
+    assert spec.HANGER_PIN_X == mount_interface.PIN_HOLE_X
 
 
 def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:

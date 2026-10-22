@@ -50,7 +50,8 @@ from typing import NamedTuple
 
 import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_tolerance import printed_band_mm
 import pn_pen_rod_spec as rod
 import pn_vn_pen_marker_spec as marker
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw

@@ -39,12 +39,9 @@ import math
 import textwrap
 
 from _fit_ream_h7 import REAM_H7
-from _printed_tolerance import (
-    angular_band_deg,
-    drilled_oversize_mm,
-    printed_band_mm,
-    printed_deviations,
-)
+from _printed_angular_tolerance import angular_band_deg
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _sprocket_seat_geometry import (
     DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_LENGTH_GRADE,

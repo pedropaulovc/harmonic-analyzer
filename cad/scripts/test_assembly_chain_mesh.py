@@ -17,6 +17,7 @@ import _assembly
 import _chain
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
+from _chain_component_identity import _CHAIN_LINK_PREFIXES
 from _chain_mounts import mounted_wheels
 
 
@@ -577,7 +578,7 @@ def test_the_connecting_link_has_no_generic_chain_exemption(observations) -> Non
     """It is not a gate chain-link family: its one T24 mesh is a bounded exact
     pair (test_pd_paper_drive_interference_contracts); any other touch fails."""
     connecting = _link("pd-vn-chain-connecting-link-1")
-    assert not connecting.Name2.startswith(_assembly._CHAIN_LINK_PREFIXES)
+    assert not connecting.Name2.startswith(_CHAIN_LINK_PREFIXES)
     for other in (_link("pd-vn-chain-inner-link-1"), _wheel("knob")):
         with pytest.raises(RuntimeError, match="interference"):
             _check(_Adapter(_Interference([connecting, other])))

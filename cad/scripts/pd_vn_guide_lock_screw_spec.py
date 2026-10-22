@@ -40,7 +40,8 @@ import _config
 import pd_guide_lock_spec as lock
 import pd_platen_guide_spec as guide
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_deviations
 from _mcmaster_91792a108 import IN, PAN_HEAD_SIZE, PART_NO
 
 SKU = PART_NO
