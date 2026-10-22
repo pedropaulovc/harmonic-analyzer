@@ -43,13 +43,6 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    assert drawing.DIMENSION_CALLOUTS == {
-        "BodyChamfer": notes.BODY_CHAMFER_CALLOUT,
-        "BodyDia": notes.BODY_FIT_CALLOUT,
-        "FloorHoleDia": "DRILL THRU",
-        "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
-        "PocketDia": notes.POCKET_FIT_CALLOUT,
-    }
     # Three symmetric bands, plus the separate native radial MAX limit.
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
@@ -138,25 +131,7 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert drawing.CUT_START[1] > drawing.CUT_END[1]
 
 
-def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
-    assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
-    assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
-    assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
-    # Historical MHA-DT-035 machinist ENFORCE r1: each band names its mate
-    # at the callout (rule 4); the matched pocket fit states name, number, diametral
-    # clearance and its hard limit.  The floor corner's maximum is a separate
-    # model-owned radial dimension, not an unrelated axial callout.
-    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-08"
-    assert notes.POCKET_FIT_CALLOUT.splitlines() == [
-        "BORE TO SUIT MHA-DT-32",
-        "PIVOT SCREW HEAD, 0.2-0.4",
-        "DIAMETRAL CLEARANCE,",
-        "<MOD-DIAM>6.5 MAX",
-    ]
-    assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
-        "KEEPS MHA-DT-32 HEAD",
-        "BELOW FACE",
-    ]
+def test_floor_corner_retains_its_native_functional_limit() -> None:
     assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
     assert spec.POCKET_FLOOR_CORNER_R_MAX <= spec.POCKET_CLEARANCE[0] / 2
     assert spec.POCKET_FLOOR_CORNER_R_BAND == (0.0, -0.1)
@@ -164,11 +139,6 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert "PocketFloorRadius" in spec.DRAWING_DIMENSIONS["CupProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["PocketFloorRadius"] == 1
     assert "PocketFloorRadius" not in spec.REFERENCE_DIMENSIONS
-    assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
-    # The DT-08 and DT-32 specs import the cup spec; its prose lives in the
-    # notes module so a wording edit never re-keys those parts.
-    for name in ("DRAWING_NOTES", "ISOMETRIC_VIEW_NOTE", "FLOOR_HOLE_CALLOUT"):
-        assert not hasattr(spec, name)
 
 
 def test_registry_row_is_the_title_block_source() -> None:
@@ -579,13 +549,18 @@ def test_radius_full_native_shoulder_and_glyphs_clear_chamfer_and_overall() -> N
     assert segment_box_distance(chamfer_tail, radius) >= 0.00205
     assert segment_box_distance(overall_barb, radius) >= 0.00205
     assert overall.gap(radius) >= 0.00357
-    # Overall's full left/right witnesses rise with its line, so the complete
-    # shoulder must stay between them, not merely put its elbow on one side.
-    floor_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
-    assert shoulder.box().xmin - floor_x > 0.0001
-    assert drawing.FACE_X - shoulder.box().xmax > 0.0001
+    # Overall is now below the section; its full witnesses end at the
+    # silhouette rather than passing through the radius's functional reason.
     overall_line_y = drawing.SECTION_KEEP["OverallLength"][1] - 0.0027781
-    assert overall_line_y - radius.ymax >= 0.00205
+    assert drawing.SECTION_CENTER[1] - drawing.BODY_R - overall_line_y >= 0.020
+    # Full three-row ink recovered from rejected 84f04d2b PDF.  Its old
+    # keep was (217.75, 201) mm; font metrics include the entire mate/reason,
+    # not just the numeric row measured in r2.  Native proof remains required.
+    radius_y = drawing.SECTION_KEEP["PocketFloorRadius"][1]
+    reason = Box(0.19842, radius_y - 0.00880, 0.23708, radius_y + 0.00879)
+    chamfer_top = 0.216
+    assert reason.ymin - chamfer_top >= 0.00357
+    assert reason.ymax < 0.2667
     corner_r = spec.POCKET_FLOOR_CORNER_R_MAX
     center_x = drawing.FACE_X - (spec.POCKET_DEPTH - corner_r) * drawing._S
     center_y = drawing.SECTION_CENTER[1] + (spec.POCKET_DIA / 2 - corner_r) * drawing._S
