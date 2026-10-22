@@ -11,7 +11,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _config import parts
+import _config
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_chain_dimensions import (
@@ -34,7 +34,7 @@ _CHAIN_SUPPLIER_MARGINS = {
     **SUPPLIER_MARGINS,
     "free_top": (0.050, 0.010, 0.045, 0.010),
 }
-_MEMBER_QUANTITIES = parts(PART_STEM)["configuration_quantities"]
+_MEMBER_QUANTITIES = _config.parts(SPEC.source.stem)["configuration_quantities"]
 VARIANTS = (
     ("InnerLink", f"INSTALLED INNER LINK, QTY {_MEMBER_QUANTITIES['InnerLink']}"),
     ("OuterLink", f"INSTALLED OUTER LINK, QTY {_MEMBER_QUANTITIES['OuterLink']}"),
