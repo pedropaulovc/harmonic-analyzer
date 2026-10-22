@@ -1,12 +1,19 @@
-"""A native supplier stock circle, never a dimension on the installed wire."""
+"""A native supplier stock circle, never a dimension on the installed wire.
+
+Stock captions use the supplier sheet's standard 3 mm lettering. Seat their
+measured complete extents, not their insertion points, below the stock circle;
+the unchanged field guard rechecks the whole caption after the final rebuild.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import isfinite
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
+import _telemetry
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -24,7 +31,9 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _purchased_fastener_drawing import (
+    _box, _inside, _literal_note, assert_supplier_view_fits,
+)
 from _supplier_spring_drawing import (
     assert_supplier_configuration_value,
     reacquire_supplier_dimensions,
@@ -91,9 +100,49 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
     drawing.ActivateView("")
     if not drawing.GetEditSheet() or drawing.ActiveDrawingView is not None:
         raise RuntimeError("cannot restore sheet context for stock caption")
-    note = add_note(adapter, STOCK_CAPTION, *caption)
-    if note is None:
-        raise RuntimeError("cannot create supplier stock caption")
+    note = _literal_note(adapter, STOCK_CAPTION, *caption)
+    # Use the supplier sheet's standard 3 mm note, not the document default.
+    # Its insertion point is not its measured upper-left extent; seat the
+    # complete four-line block below the circle without moving either member.
+    rebuild_drawing(adapter, label=f"{member} supplier stock caption format")
+    adapter.currentModel.GraphicsRedraw2()
+    bounds = _box(note.GetExtent(), label=f"{member} stock caption", kind="note")
+    caption_annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (caption_annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(map(isfinite, position)):
+        raise RuntimeError(
+            f"{member}: supplier stock caption has invalid position: {position!r}; "
+            f"extent_m={bounds!r}; reserved_m={STOCK_FIELDS[member]!r}"
+        )
+    target = (
+        position[0] + caption[0] - bounds[0],
+        position[1] + caption[1] - bounds[3],
+        position[2],
+    )
+    if not caption_annotation.SetPosition2(*target):
+        raise RuntimeError(
+            f"{member}: cannot position supplier stock caption: "
+            f"position_m={position!r} -> {target!r}; extent_m={bounds!r}; "
+            f"reserved_m={STOCK_FIELDS[member]!r}"
+        )
+    rebuild_drawing(adapter, label=f"{member} supplier stock caption position")
+    adapter.currentModel.GraphicsRedraw2()
+    positioned = _box(note.GetExtent(), label=f"{member} stock caption", kind="note")
+    placed_position = tuple(
+        float(value) for value in (caption_annotation.GetPosition() or ())
+    )
+    placement = (
+        f"position_m={position!r} -> {placed_position!r}; "
+        f"extent_m={bounds!r} -> {positioned!r}; reserved_m={STOCK_FIELDS[member]!r}"
+    )
+    _telemetry.info(
+        f"{member} supplier stock caption: {placement}", configuration=member,
+    )
+    if not _inside(positioned, STOCK_FIELDS[member]):
+        raise RuntimeError(
+            f"{member}: supplier stock caption leaves its reserved field: "
+            f"extent_m={positioned!r}; {placement}"
+        )
 
     def settled() -> None:
         if (str(view.ReferencedConfiguration) != SUPPLIER_REFERENCE_CONFIGURATION
@@ -126,10 +175,15 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
         assert_supplier_view_fits(
             adapter, view, STOCK_FIELDS[member], label=f"{member} supplier stock",
         )
-        if not _inside(
-            _box(_early_bound(note, "INote").GetExtent(), label="stock caption", kind="note"),
-            STOCK_FIELDS[member],
-        ):
-            raise RuntimeError(f"{member}: supplier stock caption leaves its reserved field")
+        final_bounds = _box(
+            _early_bound(note, "INote").GetExtent(),
+            label=f"{member} stock caption", kind="note",
+        )
+        if not _inside(final_bounds, STOCK_FIELDS[member]):
+            raise RuntimeError(
+                f"{member}: supplier stock caption leaves its reserved field: "
+                f"extent_m={final_bounds!r}; reserved_m={STOCK_FIELDS[member]!r}; "
+                f"placement: {placement}"
+            )
 
     return settled
