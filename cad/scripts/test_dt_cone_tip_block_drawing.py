@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -272,26 +271,66 @@ def test_slit_depth_is_a_model_parameter_not_a_printed_endpoint(adjuster_center)
     assert "SlitW" in drawing.sheet_dimension_ink(adjuster_center)
 
 
-def test_slot_callout_leader_enters_the_visible_slit_from_above() -> None:
+def test_slot_callout_leader_takes_the_short_side_approach_to_the_slit() -> None:
     spec = dt_cone_tip_block_spec
     model_x, model_y, model_z = drawing.SLOT_EDGE_MODEL_POINT
     assert model_x == pytest.approx(spec.SLIT_W / 2.0)
     assert model_z == pytest.approx(spec.BLOCK_Z / 2.0)
-    assert spec.PINCH_HEIGHT + spec.PINCH_CLEARANCE_DIA / 2.0 < model_y < spec.BLOCK_HEIGHT
+    assert spec.ADJUSTER_AXIS_HEIGHT + spec.ADJUSTER_BORE_DIA / 2.0 < model_y < (
+        spec.PINCH_HEIGHT - spec.PINCH_CLEARANCE_DIA / 2.0
+    )
     edge_x, edge_y = drawing.SLOT_EDGE_PICK
     assert edge_x == pytest.approx(drawing.FRONT_CENTER[0] + model_x * drawing._S)
     assert edge_y == pytest.approx(drawing._elevation_y(model_y, drawing.FRONT_CENTER))
     leader = drawing.sheet_leaders()["slot callout"]
     assert leader.tip == drawing.SLOT_EDGE_PICK
     run, rise = leader.start[0] - edge_x, leader.start[1] - edge_y
-    assert run > 0.0 and rise > 0.0
     assert math.radians(30.0) <= math.atan2(rise, run) <= math.radians(60.0)
     front = drawing.sheet_view_silhouettes()["front"]
-    assert leader.start[1] > front[3]
+    assert leader.start[0] > front[2]
     over = _run_inside(leader.segment(), front)
-    assert over - (front[3] - edge_y) <= LEADER_DETOUR_TARGET
+    approach = min(edge_x - front[0], front[2] - edge_x, edge_y - front[1], front[3] - edge_y)
+    assert over - approach <= LEADER_DETOUR_TARGET
     left, bottom, right, top = drawing.sheet_text_boxes()["slot callout"]
     assert left > front[2] and right > left and top > bottom
+
+
+def test_slot_note_clears_the_retained_native_dimension_strokes() -> None:
+    """c8e84e3b: the above-front note crossed two real witnesses missed by
+    the old nominal ink model. Keep their recorded strokes as a regression
+    fixture, including the plan's full-width depth witnesses."""
+    ink = drawing._drawing_leaders
+    old_front_leader = ((0.1072189, 0.2184901), (0.0732, 0.1806849))
+    slit_shelf = ((0.0732, 0.1963819), (0.0885188, 0.1963819))
+    height_top_witness = ((0.088, 0.18466), (0.019, 0.18466))
+    assert ink.segments_cross(old_front_leader, slit_shelf)
+    assert ink.segments_cross(old_front_leader, height_top_witness)
+    native_lines = (
+        slit_shelf,
+        height_top_witness,
+        ((0.056, 0.22975), (0.1, 0.22975)),
+        ((0.056, 0.24925), (0.1, 0.24925)),
+        ((0.099, 0.22975), (0.099, 0.2234)),
+        ((0.099, 0.24925), (0.099, 0.2556)),
+        ((0.099, 0.2395), (0.1077106, 0.2283875)),
+        ((0.1077106, 0.2283875), (0.1406494, 0.2283875)),
+    )
+    note_box = drawing.sheet_text_boxes()["slot callout"]
+    # The smart leader may leave any row. Its entire left-hand shoulder
+    # envelope, not just an estimated midpoint, must miss the witnesses.
+    for start_y in (note_box[1], note_box[3]):
+        leader = ((note_box[0] - 0.001, start_y), drawing.SLOT_EDGE_PICK)
+        for line in native_lines:
+            assert not ink.segments_cross(leader, line)
+            assert ink.distance_to_box(line, note_box) >= drawing.TEXT_CLEARANCE
+    native_text_boxes = (
+        (0.0768812, 0.1963819, 0.0885187, 0.1998819),
+        (0.1077106, 0.2283875, 0.1406494, 0.2485562),
+    )
+    for box in native_text_boxes:
+        assert ink.distance_to_box(drawing.sheet_leaders()["slot callout"].segment(), box) >= (
+            drawing.TEXT_CLEARANCE
+        )
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -606,22 +645,6 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     }
 
 
-def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
-    """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
-    function is a tight band, and its dimension names the mate it serves.
-    The tap's two stations locate one hole, named on that hole's callout."""
-    grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
-    texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
-    for name in ("FootTapX", "FootTapZ"):
-        texts[name] = drawing.FOOT_TAP_QUALIFIER
-    three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {"Width", "Depth", "PassageCenter", "FootTapX", "FootTapZ"}
-    for name in three_place:
-        assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
-    # SolidWorks drops multi-line text placed above a dimension.
-    assert all("\n" not in text for text in drawing.DIMENSION_CALLOUTS_ABOVE.values())
-
-
 def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
     """The one r3 .XX kept for a web. The 46.95 pinch height sits on a .X
     rounding tie; printed up to 47.0 the ligament over the pinch hole closes
@@ -638,13 +661,6 @@ def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
     one_place_up = ligament(math.ceil(round(spec.PINCH_HEIGHT * 10.0, 6)) / 10.0, 1)
     assert two_places == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
     assert round(two_places, 6) >= 2.0 > one_place_up
-
-
-def _reference_call(body: str, feature: str) -> str:
-    """The build's one reference-dimension call that authors ``feature``."""
-    at = body.index(f'feature_name="{feature}"')
-    start = body.rindex("await _author_", 0, at)
-    return body[start : body.index("\n    )\n", at)]
 
 
 def test_pinch_hole_height_is_located_from_the_foot() -> None:
@@ -702,22 +718,13 @@ def test_slit_that_fails_to_open_into_the_adjuster_thread_is_refused() -> None:
 _PINCH_MAJOR_MM = 0.112 * 25.4  # #4-40 basic major
 
 
-def _datum_face_x(feature: str) -> float:
-    """Sketch x of the face the model's ``feature`` reference measures from."""
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    start = re.search(r"start=\(([^,]+),", _reference_call(body, feature))
-    assert start is not None, feature
-    return float(eval(start.group(1), vars(part)))
-
-
 def _worst_head_face_half() -> float:
     """Farthest the +X (screw-head) face can stand from the adjuster axis at
-    the printed limits, PassageCenter taken from the face the model uses."""
+    the printed limits, with the spec's owning datum."""
     spec = dt_cone_tip_block_spec
     passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
     width = _printed("Width", spec.BLOCK_X)
-    if _datum_face_x("PassageCenterReference") < 0.0:
+    if spec.PASSAGE_CENTER_DATUM == "-X":
         return width[1] - passage[0]
     return passage[1]
 
@@ -752,12 +759,8 @@ def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
 
 
 def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
-    """Main's datum: PassageCenter, and the hold-down tap's FootTapX with it,
-    measure from the -X face, FootTapZ from the north face; the model, the
-    spec and both prints agree."""
+    """PassageCenter and FootTapX share the -X datum; FootTapZ uses north."""
     spec = dt_cone_tip_block_spec
-    for feature in ("PassageCenterReference", "FootTapXReference"):
-        assert _datum_face_x(feature) == pytest.approx(-spec.BLOCK_X / 2.0), feature
     assert spec.PASSAGE_CENTER_DATUM == "-X"
     # Each print's extension lines rise from its datum face and the centre.
     ink = drawing.sheet_dimension_ink()

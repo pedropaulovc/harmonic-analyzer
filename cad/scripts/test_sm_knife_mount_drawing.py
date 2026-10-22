@@ -505,21 +505,38 @@ def test_dowel_frame_leader_lands_apart_from_the_dowel_diameter_leader() -> None
     assert "        edge_xy=pin_frame_rim,\n        leader_attach_xy=pin_frame_rim,\n" in body
 
 
-def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
-    # 5ff8fba5d render: the 29.6 dimension line ran 3.62 mm through the
-    # Ø12.00 THRU text, and the Ø line crossed the bore and the view to a
-    # shoulder left of it.  The text now sits in the band between the height
-    # line and the block's -X face, at least 5 mm clear of each, and the Ø
-    # is drawn as one arrow on the near rim.
-    height_x, _ = drawing.FRONT_KEEP["BlockHeight"]
-    x, y = drawing.FRONT_KEEP["BoreDia"]
-    face_x = drawing._sheet_x(-mount_interface.BLK_HALF_X)
-    assert x - drawing.BORE_DIA_TEXT_HALF_WIDTH > height_x + 0.005
-    assert x + drawing.BORE_DIA_TEXT_HALF_WIDTH < face_x - 0.005
-    # Above the bore centre, so the leader descends to the upper-left rim.
-    assert y > drawing._front_y(sm_knife_mount_spec.BORE_CY)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_near_side_diameter(bore_dia[0], "knife-bore diameter")' in source
+def test_bore_callout_clears_the_height_text_and_its_shoulder() -> None:
+    """Translate exact e8bb native ink, not the retired nominal-width guess."""
+    # drawing-sm_knife_mount.task.log, attempt 2, e8bb2307315c, 2026-10-22:
+    # the bore band had only 0.73 mm air from 29.6, and its horizontal
+    # shoulder crossed 1.45 mm of the height text. Recipe anchors were
+    # height=(50,140), bore=(71,154.38), in sheet millimetres.
+    height_x, height_y = drawing.FRONT_KEEP["BlockHeight"]
+    bore_x, bore_y = drawing.FRONT_KEEP["BoreDia"]
+    height_dx, height_dy = height_x * 1000 - 50, height_y * 1000 - 140
+    bore_dx, bore_dy = bore_x * 1000 - 71, bore_y * 1000 - 154.38
+    height_box = (
+        45.6 + height_dx,
+        138.2 + height_dy,
+        54.3 + height_dx,
+        141.7 + height_dy,
+    )
+    bore_box = (
+        53.3 + bore_dx,
+        142.5 + bore_dy,
+        88.9 + bore_dx,
+        146.0 + bore_dy,
+    )
+    shoulder = (
+        (90.7 + bore_dx, 141.5 + bore_dy),
+        (52.9 + bore_dx, 141.5 + bore_dy),
+    )
+    # Full 4 mm horizontal air is conservative against the native audit's
+    # 1.78 mm threshold and keeps the entire shoulder right of the text.
+    assert bore_box[0] - height_box[2] >= 4.0
+    assert min(point[0] for point in shoulder) - height_box[2] >= 4.0
+    assert height_box[0] > 12.7 + 5.0  # left inner border
+    assert bore_y > drawing._front_y(sm_knife_mount_spec.BORE_CY)
 
 
 def test_the_template_alone_centre_marks_the_bore() -> None:

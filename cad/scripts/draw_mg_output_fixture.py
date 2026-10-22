@@ -70,6 +70,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
 from _drawing_leader_notes import add_attached_note
@@ -348,14 +349,16 @@ SHOULDER_RADIUS_TEXT_XY = {
     side: (x + SHOULDER_RADIUS_RUN_IN, y + SHOULDER_RADIUS_BLOCK_DROP)
     for side, (x, y) in SHOULDER_RADIUS_ELBOWS.items()
 }
-# A separate attached mate note leaves the owner's compact FULL R / LIMIT
-# stack and its material-arc proof unchanged. Pick the lower face-side arc;
-# the note and its leader lie right of the axial dimensions below the view.
-GROOVE_WIRE_PICK_XY = (
-    _side_x(GROOVE_X + GROOVE_RADIUS / math.sqrt(2.0)),
-    _side_y(-GROOVE_CENTRE_R + GROOVE_RADIUS / math.sqrt(2.0)),
+# The lower groove-mouth leader crossed the shoulder's reason row on e8bb.
+# Use the free-end mouth's upper pole instead: a specific circular IEdge,
+# not the nearby torus silhouette. The native right-hand note exit is seated
+# from its measured 59.7236 mm width in the empty band above the side view.
+GROOVE_WIRE_PICK_MM = (
+    GROOVE_X - GROOVE_HALF_OPENING,
+    0.0,
+    -SPIGOT_DIA / 2.0,
 )
-GROOVE_WIRE_NOTE_XY = (_FACE_SHEET_X + 0.028, SIDE_CENTER[1] - 0.048)
+GROOVE_WIRE_NOTE_XY = (0.050, 0.232)
 # In the lower-arc layout the spigot's length's shoulder-side witness (its
 # first reference, build_mg_output_fixture._turned_profile) starts 3 mm
 # under the corner, clear of the radius's arrow.
@@ -1591,11 +1594,25 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: a for name, a in side_by_name.items() if name != "ShoulderRadius"},
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
+    groove_wire_edge = scan_view_edges(
+        side, label="output-fixture lever-wire groove mouth"
+    ).circle_at(
+        (GROOVE_WIRE_PICK_MM[0], 0.0, 0.0),
+        SPIGOT_DIA / 2.0,
+        axis=(1.0, 0.0, 0.0),
+        label="free-end circular mouth of the lever-wire groove",
+    ).edge
     add_attached_note(
         adapter,
         side,
         text=GROOVE_WIRE_CALLOUT,
-        entity_xy=GROOVE_WIRE_PICK_XY,
+        entity=groove_wire_edge,
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            side,
+            tuple(value / 1000.0 for value in GROOVE_WIRE_PICK_MM),
+            label="upper pole of the lever-wire groove's free-end mouth",
+        ),
         note_xy=GROOVE_WIRE_NOTE_XY,
         label="lever-wire seat in the output-fixture groove",
     )

@@ -85,9 +85,9 @@ FRONT_CENTER = (0.155, 0.175)
 # between it and the bar end.
 RIGHT_CENTER = (0.340, 0.175)
 ISO_CENTER = (0.320, 0.095)
-# Label the actual +Z back-face edge in the Right view, clear of the front
-# view's height callout. Keep orientation separate from the axle fit block.
-AXLE_ORIENTATION_NOTE_XY = (RIGHT_CENTER[0] + 0.015, RIGHT_CENTER[1] + 0.055)
+# e8bb's upper note leader crossed the height callout. The measured three
+# rows fit beside the end view, above the depth callout, at this position.
+AXLE_ORIENTATION_NOTE_XY = (RIGHT_CENTER[0] + 0.025, RIGHT_CENTER[1] + 0.0088)
 
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
@@ -275,7 +275,9 @@ async def build(adapter: Any) -> dict[str, str]:
             process="DRILL",
         )
 
-    back_face_point_mm = (BAR_LENGTH / 2.0, 0.0, BAR_DEPTH / 2.0)
+    # Stay on the same +Z back-face IEdge, 0.25 mm below its upper vertex.
+    # This landing keeps the leader above BarDepth's witnesses (top Y179).
+    back_face_point_mm = (BAR_LENGTH / 2.0, BAR_SIDE / 2.0 - 0.25, BAR_DEPTH / 2.0)
     back_face_edge = scan_view_edges(
         right, label="wheel-bar back-face edge"
     ).exact_line_through(

@@ -175,16 +175,14 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
 
 
-# The 29.6 height's dimension line stands at sheet x 0.050, 41 mm off the
-# block's -X face, and the bore's Ø, its ream band and REAM THRU sit in the
-# band between them: the 5ff8fba5d render ran the height line (then x 0.063)
-# 3.62 mm through the Ø (text 58.5..75.3 mm).  BORE_DIA_TEXT_HALF_WIDTH is
-# half the banded line: the 20261009T204136744Z render's Ø12.00 (16.2 mm)
-# plus a stacked +0.03/0.00 at the dowel band's 2.05 mm a character.
-BORE_DIA_TEXT_HALF_WIDTH = 0.0135
+# Keep the height's native text left of the full bore callout and shoulder.
+# The e8bb23073 native audit measured the bore text at x53.3..88.9 mm and
+# its shoulder ending at x52.9; height text at x45.6..54.3 crossed it.
+# Moving only the height line from x50 to x44 predicts 5.0 mm text air and
+# 4.6 mm shoulder air, without changing the bore's native leader or band.
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.065, FRONT_CENTER[1]),
+    "BlockHeight": (FRONT_CENTER[0] - 0.071, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.044, _front_y(BORE_CY) + 0.026),
 }
 # The dowel hole's floor depth stands right of the section, level with the

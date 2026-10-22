@@ -19,6 +19,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
@@ -44,6 +45,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
+from _drawing_layout_audit import annotation_display
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
@@ -53,11 +55,12 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
 from _drawing_sections import create_section_view
 from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _layout_audit import display_box, ink_key, ink_spans
 from _layout_geometry import Box, estimate_text_box
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
@@ -372,39 +375,34 @@ _GROOVE_DIA_X = _HUB_DIA_X - _DIA_TEXT_HALF - _TEXT_OFF_LINE
 # text, above the hub's extension lines and under the rim bore.
 _SPOKE_ROW = SECTION_CENTER[1] + HUB_DIA / 2000.0 + 0.0055
 _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
-# The hub's three axial sizes below the rim, one row each, all from the
-# spigot's faced front end (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and all texts right of it except
-# the overall's; each text OUTSIDE its span so no extension line runs
-# through a text (run 7: four extension-through-own-text findings).
-# Nearest the part the spigot length ("9.00 +0.10/0"), whose band keeps the
-# drum from standing proud (DRUM_RECESS); then the web's centre plane
-# ("12.5"), which the rim and its groove share, its extension line rising
-# from the axis left of the spigot step's, so the row above stops short of
-# it; last the overall ("19.60 ±0.10"), which holds the axle's nut stack,
-# left of the back face above the A-A caption.  Each band's need, and the
-# plane the 12.5 locates, stands over its value (CALLOUTS_ABOVE), its text
-# centred clear of the face it leaves.  The two right-hand sizes keep their
-# arrows inside their spans, so no tail reaches a neighbouring extension
-# line (run 11).
+# The hub's axial sizes start on the spigot's faced front end
+# (drawing-guidelines.md rule 11). HubFrontZ locates the common web/rim/groove
+# plane 15.51 mm from that face (printed 15.5), not from a mid-air origin:
+# the retained native witnesses are x264.8 (faced end) and x249.29 (plane).
+# The 8.0 rim and 4.0 web are symmetric widths about the located plane.
 #
-# _HUB_ROWS are the dimension lines.  A text block centres on its point, so
-# a callout over the value lifts the point half a line more than
-# _ONE_LINE_UP / _STACK_UP (run 14: each line printed 2.8 mm under its
-# estimate).  The overall's row stays where run 14 printed it, over the
-# caption; the plane's runs 5.4 mm above it; the spigot length's stands
-# 11.9 mm over the plane's, so its block clears the plane's two-line block
-# by the layout audit's text separation (run 17: 2.73 mm apart at a 10.4 mm
-# step, under the 3.57 mm it needs).
+# The original single-line ABOVE reasons printed, but e8bb's two-line ABOVE
+# strings survived GetText/display data and disappeared from the PDF. Use
+# the native BELOW lane, as draw_dt_crank_drive_gear does for its stack.
+# The mate drawing numbers and the source-backed purposes survive intact:
+# DRUM_RECESS keeps the drum below the spigot; mg_wheel_group's hub stack
+# keeps the axle locknut on full thread. These are presentation, not bands.
+SPIGOT_LENGTH_CALLOUT = "MHA-MG-10 DRUM\nNOT PROUD"
+WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
+HUB_LENGTH_CALLOUT = "MHA-MG-07 AXLE\nLOCKNUT FULL THREAD"
+# Only the unchanged single-line centre callout uses the historic estimate.
+# The two changed blocks are seeded here, then seated from native per-run
+# widths and bboxes by _seat_axial_callouts, never by character counts.
 _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
 )
-SPIGOT_LENGTH_CALLOUT = "MG-WHEEL-DRUM\nMHA-MG-10 NOT PROUD"
-WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
-HUB_LENGTH_CALLOUT = "MHA-MG-07 AXLE\nLOCKNUT ON FULL THREAD"
-# Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
-# 2.6 mm a character), so a callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
+_AXIAL_AIR = 0.0036
+# The exact retained PDF cap boxes stand 0.934 mm above DisplayData's
+# baseline and top out 1.000 mm above its h=3.5 mm box. Reserve 1.2 mm above
+# native text; final PDF ink is independently required inside the same lane.
+_AXIAL_INK_TOP = 0.0012
 ARROWS_INSIDE = ("SpigotLength", "HubFrontZ")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SECTION_KEEP = {
@@ -425,11 +423,9 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE,
     ),
     "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 3, _SPOKE_ROW + _ONE_LINE_UP),
-    "SpigotLength": _beside(
-        _section_x(HUB_FRONT_Z),
-        1,
-        max(map(len, SPIGOT_LENGTH_CALLOUT.splitlines())) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[0] + _STACK_UP + 2.0 * _ABOVE_UP,
+    "SpigotLength": (
+        _section_x(HUB_FRONT_Z) + 0.030,
+        _HUB_ROWS[0] + _STACK_UP,
     ),
     "HubFrontZ": _beside(
         _section_x(HUB_FRONT_Z),
@@ -437,11 +433,9 @@ SECTION_KEEP = {
         len(WEB_CENTER_CALLOUT) + _CALLOUT_MARGIN_CHARS,
         _HUB_ROWS[1] + _ONE_LINE_UP + _ABOVE_UP,
     ),
-    "HubLength": _beside(
-        _section_x(HUB_BACK_Z),
-        -1,
-        max(map(len, HUB_LENGTH_CALLOUT.splitlines())) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[2] + _STACK_UP + 2.0 * _ABOVE_UP,
+    "HubLength": (
+        _section_x(HUB_BACK_Z) - 0.030,
+        _HUB_ROWS[2] + _STACK_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at run
     # 13's 35 deg, so the stub it draws past the arc leaves the rim's back
@@ -511,16 +505,15 @@ DIMENSION_CALLOUTS = {
     "RimFilletR": "12X",
     "Tie1HoleDia": "TIE 1",
     "Tie2HoleDia": "TIE 2",
+    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
+    "HubLength": HUB_LENGTH_CALLOUT,
 }
-# The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø; each axial band's need, and the plane the 12.5
-# locates, stands over its value.
+# The tie holes' operation and the unchanged numeric location's plane label
+# stand above their values. Multiline axial reasons use BELOW instead.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
     "Tie2HoleDia": "DRILL THRU",
-    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubFrontZ": WEB_CENTER_CALLOUT,
-    "HubLength": HUB_LENGTH_CALLOUT,
 }
 # Three note lines, top-left anchored, under the two tie blocks and left of
 # the title block.
@@ -667,6 +660,134 @@ def _assert_text_off_iso(adapter: Any, annotations: list[Any], iso: Any) -> None
         f"wheel dimension text clears the isometric {iso_box.format_mm()} by "
         f"{nearest * 1000:.1f} mm"
     )
+
+
+def _native_axial_text(adapter: Any, annotation: Any, *, label: str) -> tuple[dict[str, Any], Box]:
+    """Measured native text envelope; refuse missing widths, never estimate."""
+    data, errors = annotation_display(adapter, annotation)
+    texts = [row for row in data.get("texts", ()) if str(row["t"]).strip()]
+    if errors or not texts:
+        raise RuntimeError(f"{label}: unavailable native text metrics: {errors!r}")
+    for row in texts:
+        width = float(row.get("w", 0.0))
+        if not math.isfinite(width) or width <= 0.0:
+            raise RuntimeError(f"{label}: no native width for {row['t']!r}")
+    box = display_box({"texts": texts})
+    if box is None or not all(math.isfinite(v) for v in box.mm()):
+        raise RuntimeError(f"{label}: invalid native text envelope {box!r}")
+    return data, Box(box.xmin, box.ymin, box.xmax, box.ymax + _AXIAL_INK_TOP)
+
+
+def _inside_axial_lane(box: Box, lane: Box) -> bool:
+    return (
+        box.xmin >= lane.xmin - 1e-6 and box.xmax <= lane.xmax + 1e-6
+        and box.ymin >= lane.ymin - 1e-6 and box.ymax <= lane.ymax + 1e-6
+    )
+
+
+def _require_axial_callouts(
+    adapter: Any, named: dict[str, Any], lanes: dict[str, Box]
+) -> None:
+    """Read native compartments and settled bounds, not a claim of PDF ink."""
+    for name, lane in lanes.items():
+        display = _early_bound(named[name].GetSpecificAnnotation(), "IDisplayDimension")
+        expected = DIMENSION_CALLOUTS[name]
+        if str(display.GetText(3) or "") or str(display.GetText(4) or "") != expected:
+            raise RuntimeError(f"{name}: native below callout did not persist")
+        data, box = _native_axial_text(adapter, named[name], label=name)
+        drawn = [str(row["t"]).strip() for row in data["texts"]]
+        if any(drawn.count(line) != 1 for line in expected.splitlines()):
+            raise RuntimeError(f"{name}: native below callout rows are missing: {drawn!r}")
+        if not _inside_axial_lane(box, lane):
+            raise RuntimeError(
+                f"{name}: native text {box.format_mm()} outside lane {lane.format_mm()}"
+            )
+        _telemetry.info(
+            f"wheel {name}: native below text {box.format_mm()}, lane {lane.format_mm()}"
+        )
+
+
+def _seat_axial_callouts(
+    adapter: Any, annotations: list[Any], front: Any, section: Any, iso: Any
+) -> tuple[dict[str, Any], dict[str, Box]]:
+    """Seat two below blocks in measured lanes without moving witness stations."""
+    named = {
+        dimension_name(adapter, item): _early_bound(item, "IAnnotation")
+        for item in annotations
+    }
+    front_box = Box(*_early_bound(front, "IView").GetOutline())
+    iso_box = Box(*_early_bound(iso, "IView").GetOutline())
+    _, spigot_dia = _native_axial_text(adapter, named["SpigotDia"], label="spigot fit")
+    _, centre = _native_axial_text(adapter, named["HubFrontZ"], label="web/rim centre")
+    groove, _ = _native_axial_text(
+        adapter, named["GrooveBottomDia"], label="groove bottom"
+    )
+    lines = groove.get("lines", ())
+    if not lines:
+        raise RuntimeError("wheel groove bottom has no native dimension lines")
+    # Its vertical Ø line ends at the lower groove edge (retained y116.2);
+    # the overall block stays below it, not underneath that live line.
+    groove_floor = min(float(row[index]) for row in lines for index in (5, 8))
+    captions = [
+        _early_bound(item.GetSpecificAnnotation(), "INote")
+        for raw in _early_bound(section, "IView").GetAnnotations() or ()
+        if (item := _early_bound(raw, "IAnnotation")).GetType() == 6
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(f"wheel section caption inventory changed: {len(captions)}")
+    caption = tuple(float(value) for value in captions[0].GetExtent())
+    if len(caption) != 6 or not all(math.isfinite(value) for value in caption):
+        raise RuntimeError(f"wheel section caption has no native extent: {caption!r}")
+    lanes = {
+        "SpigotLength": Box(
+            _section_x(HUB_FRONT_Z) + _AXIAL_AIR,
+            centre.ymax + _AXIAL_AIR,
+            iso_box.xmin - ISO_CLEAR,
+            spigot_dia.ymin - _AXIAL_AIR,
+        ),
+        "HubLength": Box(
+            front_box.xmax + _AXIAL_AIR,
+            caption[4] + _AXIAL_AIR,
+            _section_x(HUB_BACK_Z) - _AXIAL_AIR,
+            groove_floor - _AXIAL_AIR,
+        ),
+    }
+    for name, lane in lanes.items():
+        _, box = _native_axial_text(adapter, named[name], label=name)
+        if box.width > lane.width or box.height > lane.height:
+            raise RuntimeError(
+                f"{name}: measured text {box.format_mm()} will not fit {lane.format_mm()}"
+            )
+        # Both blocks face their own witness stations, outside ALL axial
+        # witnesses: right of the spigot end, left of the hub back face.
+        dx = lane.xmin - box.xmin if name == "SpigotLength" else lane.xmax - box.xmax
+        dy = lane.ymax - box.ymax
+        position = tuple(float(value) for value in named[name].GetPosition())
+        if not named[name].SetPosition2(position[0] + dx, position[1] + dy, position[2]):
+            raise RuntimeError(f"{name}: native below text placement refused")
+    rebuild_drawing(adapter, label="wheel measured axial callout lanes")
+    _require_axial_callouts(adapter, named, lanes)
+    return named, lanes
+
+
+def _require_axial_pdf_ink(lanes: dict[str, Box]) -> None:
+    """Require actual exported glyph boxes, even when the audit is REPORT."""
+    report = json.loads(layout_report_path(PART_STEM).read_text(encoding="utf-8"))
+    sheets = report["sheets"]
+    if len(sheets) != 1:
+        raise RuntimeError("wheel axial ink requires its single manufacturing sheet")
+    spans = ink_spans(sheets[0])
+    for name, lane in lanes.items():
+        for line in DIMENSION_CALLOUTS[name].splitlines():
+            matches = [
+                span for span in spans
+                if span.key == ink_key(line) and _inside_axial_lane(span.box, lane)
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"{name}: expected one printed PDF row {line!r} inside "
+                    f"{lane.format_mm()}, found {len(matches)}"
+                )
 
 
 def _orient_section(adapter: Any, section: Any) -> None:
@@ -967,6 +1088,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The matched fits' Ø are reference nominals: "(Ø14.00)", "(Ø4.80)".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    # A fresh source must not retain either obsolete ABOVE compartment.
+    set_dimension_callouts(
+        adapter, annotations, {"SpigotLength": "", "HubLength": ""}, location="above"
+    )
     offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
     _set_arrows_inside(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
@@ -1041,6 +1166,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     round_radius = _add_round_radius(adapter, section, section_edges)
     rebuild_drawing(adapter, label="wheel dimension layout")
+    axial_annotations, axial_lanes = _seat_axial_callouts(
+        adapter, annotations, front, section, iso
+    )
     _assert_text_off_iso(
         adapter,
         [
@@ -1056,13 +1184,18 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085
     )
 
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Magnifying Wheel Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _require_axial_callouts(adapter, axial_annotations, axial_lanes),
+        ),
     )
+    _require_axial_pdf_ink(axial_lanes)
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

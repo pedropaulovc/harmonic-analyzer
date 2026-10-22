@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -145,6 +146,139 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+@pytest.fixture
+def supplier_text_shelves(monkeypatch):
+    import _drawing_dimensions as formatting
+    import draw_ch_rocker_arm_tl_vn_oblique_cl_dowel as drawing
+
+    # Exact 6d68291fd native positions and complete text bounds, sheet metres.
+    # Primitive translation below tests a placement contract, not a rerender.
+    recorded = {
+        "SupplierDowelLength": (
+            (0.103412, 0.1335, 0.0001),
+            (0.0814373, 0.1253866),
+            0.103412,
+        ),
+        "SupplierDowelDiameter": (
+            (0.115, 0.218412, -0.0099),
+            (0.0880743, 0.1419257),
+            0.10565,
+        ),
+    }
+
+    class Display:
+        def __init__(self, name, value):
+            self.native = SimpleNamespace(Name=name, SystemValue=value / 1000.0)
+            self.position = recorded[name][0]
+            self.Type2 = 12 if name == "SupplierDowelLength" else 11
+            self._offset = False
+            self.fault = None
+
+        @property
+        def OffsetText(self):
+            return self._offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            if self.fault != "ignore-offset":
+                self._offset = value
+
+        def GetAnnotation(self):
+            return self
+
+        def GetSpecificAnnotation(self):
+            return self
+
+        def GetDimension(self):
+            return self.native
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition2(self, x, y, z):
+            if self.fault == "refuse-position":
+                return False
+            if self.fault != "ignore-position":
+                self.position = (x, y, z)
+            return True
+
+        def SetText(self, *_args):
+            raise AssertionError("a supplier text shelf cannot rewrite dimension text")
+
+    displays = {
+        name: Display(name, value)
+        for name, value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS
+    }
+    original = {
+        name: (display.native, display.native.SystemValue)
+        for name, display in displays.items()
+    }
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=lambda: True),
+        _attempt=lambda operation: operation(),
+        _get_attr_or_call=lambda obj, name: getattr(obj, name),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        formatting._sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj
+    )
+    return SimpleNamespace(
+        drawing=drawing,
+        adapter=adapter,
+        displays=displays,
+        original=original,
+        recorded=recorded,
+    )
+
+
+def test_native_supplier_text_shelves_clear_recorded_line_and_view_geometry(
+    supplier_text_shelves,
+) -> None:
+    state = supplier_text_shelves
+    positions = state.drawing._shelve_supplier_text(state.adapter, state.displays)
+
+    for name, display in state.displays.items():
+        original_position, (left, right), native_line_left = state.recorded[name]
+        dx = display.GetPosition()[0] - original_position[0]
+        assert left + dx >= 0.025  # purchased orthographic cell's left edge
+        assert right + dx + 0.002 <= native_line_left
+        assert display.GetPosition()[1] == original_position[1]
+        assert display.OffsetText
+        native, value = state.original[name]
+        assert display.native is native
+        assert display.native.SystemValue == value
+    state.drawing._assert_supplier_text_positions(state.displays, positions)
+
+
+@pytest.mark.parametrize(
+    "fault", ("ignore-offset", "refuse-position", "ignore-position", "wrong-carrier")
+)
+def test_supplier_text_shelf_refuses_native_transition_failures(
+    supplier_text_shelves, fault
+) -> None:
+    state = supplier_text_shelves
+    display = state.displays["SupplierDowelLength"]
+    display.fault = fault
+    if fault == "wrong-carrier":
+        display.Type2 = 3  # angular: OffsetText's linear-carrier contract does not apply
+    with pytest.raises(RuntimeError):
+        state.drawing._shelve_supplier_text(state.adapter, state.displays)
+
+
+@pytest.mark.parametrize("drift", ("position", "offset"))
+def test_settled_supplier_text_shelf_refuses_drift(supplier_text_shelves, drift) -> None:
+    state = supplier_text_shelves
+    positions = state.drawing._shelve_supplier_text(state.adapter, state.displays)
+    display = state.displays["SupplierDowelDiameter"]
+    if drift == "position":
+        x, y, z = display.GetPosition()
+        display.position = (x + 0.001, y, z)
+    else:
+        display.OffsetText = False
+    with pytest.raises(RuntimeError, match="supplier text shelf did not persist"):
+        state.drawing._assert_supplier_text_positions(state.displays, positions)
 
 
 @pytest.mark.parametrize("carrier_sign", (-1.0, 1.0))

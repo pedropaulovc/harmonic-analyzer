@@ -239,11 +239,12 @@ def _callout_half_width(text: str) -> float:
     return max(len(line) for line in text.split("\n")) * CALLOUT_GLYPH_WIDTH / 2.0
 
 
-# Pick the front mouth's visible slit wall just below the top. The leader
-# enters from above at 45 degrees, rather than reading as a nearly horizontal
-# edge across the block face. The note names connectivity, not an end stop.
+# Attach to the front slit wall between the adjuster bore and pinch hole.
+# The c8e84e3b native render's above-front leader crossed the 1.20 shelf
+# and overall-height top witness. This lower landing and note enter from
+# the right, clear of both. The note names connectivity, not an end stop.
 SLOT_CALLOUT = "SLOT OPENS INTO\nADJUSTER BORE"
-SLOT_EDGE_MODEL_POINT = (SLIT_W / 2.0, BLOCK_HEIGHT - 2.0, Z_NORTH)
+SLOT_EDGE_MODEL_POINT = (SLIT_W / 2.0, BLOCK_HEIGHT - 10.0, Z_NORTH)
 SLOT_EDGE_PICK = (
     FRONT_CENTER[0] + SLOT_EDGE_MODEL_POINT[0] * _S,
     _elevation_y(SLOT_EDGE_MODEL_POINT[1], FRONT_CENTER),
@@ -257,12 +258,10 @@ SLOT_CALLOUT_EXTENT = (
     max(len(line) for line in SLOT_CALLOUT.split("\n")) * SLOT_NOTE_GLYPH_WIDTH,
     0.0,
 )
-SLOT_CALLOUT_XY = (
-    FRONT_CENTER[0] + 0.036,
-    SLOT_EDGE_PICK[1]
-    + FRONT_CENTER[0] + 0.036 - SLOT_EDGE_PICK[0]
-    + SLOT_CALLOUT_EXTENT[1] / 2.0,
-)
+SLOT_CALLOUT_XY = (FRONT_CENTER[0] + 0.036, 0.188)
+# Same text/font/leader side as c8e84e3b: its actual shoulder relative to
+# IAnnotation.GetPosition, rather than a guessed multiline-block midpoint.
+SLOT_CALLOUT_LEADER_OFFSET = (-0.0007811, -0.0015199)
 
 
 # Left of the adjuster elevation, stepping out from the part: the axis
@@ -964,7 +963,10 @@ def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[s
             view_c_tip,
         ),
         "slot callout": Leader(
-            (SLOT_CALLOUT_XY[0], SLOT_CALLOUT_XY[1] - SLOT_CALLOUT_EXTENT[1] / 2.0),
+            (
+                SLOT_CALLOUT_XY[0] + SLOT_CALLOUT_LEADER_OFFSET[0],
+                SLOT_CALLOUT_XY[1] + SLOT_CALLOUT_LEADER_OFFSET[1],
+            ),
             SLOT_EDGE_PICK,
         ),
     }

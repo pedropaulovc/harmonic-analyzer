@@ -60,6 +60,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
+from _drawing_layout_audit import annotation_display
 from _drawing_layout_collect import _leader_segments_of, _note_element
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -279,9 +280,9 @@ FIDUCIAL_EDGE_PICK = (
     * SHEET_SCALE[0]
     / 1000.0,
 )
-# The measured five-line block was 37.6 mm tall at y=0.196 and overlapped
-# the arm. Use four short rows, raised 6 mm within the measured clear band
-# below the hub-seat text/shoulder at y=0.2111; native extent checks remain.
+# Keep the short purpose note in the west lane below the hub-seat shoulder
+# at y=0.2111. INote.GetExtent includes the attached leader's landing here;
+# measure text runs separately rather than mistaking that union for text height.
 FIDUCIAL_CALLOUT_XY = (0.016, 0.202)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
@@ -345,8 +346,57 @@ def _fiducial_note_clear(
     element = _note_element(adapter, annotation, "punched fiducial callout")
     if element is None:
         raise RuntimeError("punched fiducial callout has no measurable native extent")
-    box = (element.xmin, element.ymin, element.xmax, element.ymax)
-    require_inside("punched fiducial callout", box, sheet_region(adapter))
+    extent = (element.xmin, element.ymin, element.xmax, element.ymax)
+    require_inside("punched fiducial callout and leader", extent, sheet_region(adapter))
+    required_reads = (
+        "GetTextCount", "GetTextAtIndex", "GetTextPositionAtIndex",
+        "GetTextHeightAtIndex", "GetTextRefPositionAtIndex", "GetTextAngleAtIndex",
+    )
+    display, read_errors = annotation_display(adapter, annotation)
+    runs = [run for run in display.get("texts", ()) if str(run.get("t", "")).strip()]
+    _telemetry.info(
+        f"punched fiducial native extent={extent}, text runs={runs}, "
+        f"display read errors={read_errors}"
+    )
+    if any(
+        accessor in name for name in read_errors for accessor in required_reads
+    ):
+        raise RuntimeError(f"fiducial text geometry readback refused: {read_errors}")
+    if not runs:
+        raise RuntimeError("punched fiducial callout has no rendered text runs")
+    vertical = []
+    for run in runs:
+        position = run.get("pos", ())
+        height = float(run.get("h") or 0.0)
+        reference = int(run.get("ref", -1))
+        angle = float(run.get("ang") or 0.0)
+        if (
+            len(position) != 3
+            or not all(math.isfinite(float(value)) for value in position)
+            or not math.isfinite(height)
+            or height <= 0.0
+            or not math.isfinite(angle)
+            or abs(angle) > 1e-6
+            or reference not in range(6)
+            or "\n" in str(run["t"])
+        ):
+            raise RuntimeError(f"unsupported fiducial text-run geometry: {run}")
+        # swTextPosition_e: upper left/right/centre = 0/3/5,
+        # lower left/right = 1/4, centre = 2. Heights are native metres.
+        y = float(position[1])
+        bottom = y - height if reference in (0, 3, 5) else (
+            y - height / 2.0 if reference == 2 else y
+        )
+        vertical.append((bottom, bottom + height))
+    # Retain GetExtent's entire X span conservatively: no font-width estimate
+    # or dependence on unproven text-only width semantics for this note.
+    box = (
+        extent[0], min(bottom for bottom, _top in vertical),
+        extent[2], max(top for _bottom, top in vertical),
+    )
+    if box[1] < extent[1] - 0.001 or box[3] > extent[3] + 0.001:
+        raise RuntimeError(f"fiducial text runs are not in sheet space: {box}, {extent}")
+    _telemetry.info(f"punched fiducial text-only vertical bounds={box}")
     neighbours = [
         callout_ink(
             adapter, _named(adapter, front_annotations, "HubSeatDia"),

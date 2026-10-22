@@ -10,6 +10,7 @@ from collections.abc import Callable
 
 import _telemetry
 from _com import _early_bound
+from _drawing_dimensions import offset_dimension_text
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
@@ -21,6 +22,55 @@ import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as part
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_cl_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "Ø6 X 20 M6 DOWEL PIN (DIN 6325)"
+
+# Exact 6d68291fd native audit: the Front label ends at x125.3866 mm,
+# beyond both its x103.412 dimension line and the x109.412 view outline.
+# Top's full diameter/tolerance label ends at x141.9257, over witnesses at
+# x112/118 and an outside-arrow tail starting at x105.65. Shelf the COMPLETE
+# native text blocks left, following _supplier_chain_dimensions' width label.
+# These shifts leave 3.0254 mm to Front's line and 3.7243 mm to Top's tail;
+# text still fits the purchased cells. Keep all source references and bands.
+# Fresh native ink/review must prove these predicted gaps after regeneration.
+_REFERENCE_TEXT_SHIFTS_M = {
+    "SupplierDowelLength": (-0.025, 0.0),
+    "SupplierDowelDiameter": (-0.040, 0.0),
+}
+
+
+def _assert_supplier_text_positions(
+    displays: dict[str, Any], positions: dict[str, tuple[float, float]]
+) -> None:
+    for name, expected in positions.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        actual = tuple(float(value) for value in annotation.GetPosition())
+        if not bool(display.OffsetText) or len(actual) < 2 or not all(
+            math.isclose(actual[index], value, rel_tol=0.0, abs_tol=1e-5)
+            for index, value in enumerate(expected)
+        ):
+            raise RuntimeError(
+                f"{name}: supplier text shelf did not persist: {actual!r} != {expected!r}"
+            )
+
+
+def _shelve_supplier_text(
+    adapter: Any, displays: dict[str, Any]
+) -> dict[str, tuple[float, float]]:
+    annotations = []
+    positions = {}
+    for name, (dx, dy) in _REFERENCE_TEXT_SHIFTS_M.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        if int(display.Type2) not in (2, 11, 12):
+            raise RuntimeError(f"{name}: supplier text shelf requires a linear carrier")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        origin = tuple(float(value) for value in annotation.GetPosition())
+        if len(origin) < 2 or not all(math.isfinite(value) for value in origin[:2]):
+            raise RuntimeError(f"{name}: supplier text has no finite native position")
+        positions[name] = (origin[0] + dx, origin[1] + dy)
+        annotations.append(annotation)
+    offset_dimension_text(adapter, annotations, positions)
+    _assert_supplier_text_positions(displays, positions)
+    return positions
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -65,6 +115,7 @@ async def build(adapter: Any) -> dict[str, str]:
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
         _assert_supplier_bands(displays)
+        text_positions = _shelve_supplier_text(adapter, displays)
 
         def assert_references() -> None:
             fresh = assert_supplier_screw(
@@ -75,6 +126,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 units=part.SUPPLIER_REFERENCE_UNITS,
             )
             _assert_supplier_bands(fresh)
+            _assert_supplier_text_positions(fresh, text_positions)
             model = _early_bound(views["*Front"], "IView").ReferencedDocument
             radii = _cylinder_radii_mm(model, 1, label=part.SKU)
             if not math.isclose(2.0 * max(radii), part.DIA, rel_tol=0.0, abs_tol=1e-6):
