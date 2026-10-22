@@ -237,6 +237,15 @@ floor or roof. Enumeration does not prove ownership: retain the selected
 entity's actual occurrence/type and final attachment/landing readbacks. A
 missing, ambiguous or unreadable section edge remains a diagnostic refusal.
 
+The `cfcfbd3175be` native run returned zero occurrence-listed edges at the
+first C2 station; this does not establish that the drawn section geometry is
+absent. A temporary diagnostic-only pass samples all thirteen unchanged
+stations with the frame assembly's narrow-zoom pick pattern, recording native
+selection type, both ownership channels, raw-dispatch binding failures, curve
+endpoints and independent part-local/assembly-world closest-point results.
+It never supplies an accepted edge or creates a label: the original exact-edge
+refusal remains unconditional. Do not infer a geometry frame from an owner name.
+
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture
 have distinct headings in that print order, without new acceptance criteria.

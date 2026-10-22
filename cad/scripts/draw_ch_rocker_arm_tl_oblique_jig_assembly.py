@@ -56,7 +56,7 @@ import _telemetry
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_common import (
@@ -92,6 +92,7 @@ from _drawing_tables import (
     validate_bom_number_property,
 )
 from _drawing_sections import create_section_view
+from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
 from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _section_axis import position_section_caption
 from _drawing_view_configuration import (
@@ -2765,6 +2766,109 @@ def _capture_overlap(a: Sequence[float], b: Sequence[float]) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
+def _probe_capture_reading_picks(adapter: Any, views: Sequence[Any]) -> None:
+    """Diagnose all fixed stations; never supply an edge to the drawing."""
+    draw = adapter.currentModel
+    manager = _early_bound(_bind(draw.SelectionManager, "ISelectionMgr"), "ISelectionMgr")
+    for reading in capture_readings():
+        label = f"jig capture {reading.text.splitlines()[0]}"
+        view = views[reading.view_index]
+        local = tuple(value / 1000.0 for value in reading.local_mm)
+        world = _capture_world_point(reading)
+        evidence: dict[str, Any] = {
+            "expected_owner": spec.instance_name(reading.stem, reading.index),
+            "local_m": local,
+            "world_m": world,
+        }
+        try:
+            point = model_point_in_view(adapter, view, world, label=label)
+            evidence["sheet_m"] = point
+            if not _early_bound(draw, "IDrawingDoc").ActivateView(str(view.GetName2())):
+                raise RuntimeError("failed to activate diagnostic reading view")
+            draw.ClearSelection2(True)
+            _early_bound(view, "IView").UpdateViewDisplayGeometry()
+            with _zoomed_on(adapter, point, _HIT_ZOOM_HALF):
+                evidence["picked"] = bool(draw.Extension.SelectByID2(
+                    "", "EDGE", *point, 0.0, False, 0, null_callout(), 0
+                ))
+            count = int(manager.GetSelectedObjectCount2(-1))
+            evidence["count"] = count
+            if count != 1:
+                continue
+            native_type = int(manager.GetSelectedObjectType3(1, -1))
+            entity = manager.GetSelectedObject6(1, -1)
+            evidence["native_type"] = native_type
+            evidence["entity_python_type"] = type(entity).__name__
+            evidence["entity_has_oleobj"] = getattr(entity, "_oleobj_", None) is not None
+            if native_type != 1 or entity is None:
+                continue
+            owners = {}
+            try:
+                owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent()
+                owners["entity"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+                evidence["entity_owner"] = str(owners["entity"].Name2) if owner is not None else None
+            except Exception as exc:
+                evidence["entity_owner_or_binding_error"] = repr(exc)
+            try:
+                owner = manager.GetSelectedObjectsComponent4(1, -1)
+                evidence["component4_python_type"] = type(owner).__name__
+                evidence["component4_has_oleobj"] = getattr(owner, "_oleobj_", None) is not None
+                if owner is not None:
+                    interface = getattr(owner, "_oleobj_", owner).GetTypeInfo().GetDocumentation(-1)[0]
+                    evidence["component4_interface"] = interface
+                    if interface == "IDrawingComponent":
+                        owner = _early_bound(_bind(owner, interface), interface).Component
+                    elif interface != "IComponent2":
+                        raise RuntimeError(f"unresolved Component4 native interface {interface!r}")
+                owners["component4"] = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+                evidence["component4_owner"] = str(owners["component4"].Name2) if owner is not None else None
+            except Exception as exc:
+                evidence["component4_owner_or_binding_error"] = repr(exc)
+            transforms = {}
+            for channel, owner in owners.items():
+                if owner is None:
+                    continue
+                try:
+                    transform = _early_bound(_bind(owner.Transform2, "IMathTransform"), "IMathTransform")
+                    values = tuple(float(value) for value in transform.ArrayData)
+                    evidence[f"{channel}_transform2"] = values
+                    if len(values) != 16:
+                        raise RuntimeError("incomplete native component transform")
+                    transforms[channel] = values
+                except Exception as exc:
+                    evidence[f"{channel}_transform_or_binding_error"] = repr(exc)
+            edge = _early_bound(_bind(entity, "IEdge"), "IEdge")
+            try:
+                curve = edge.GetCurve()  # Required before GetCurveParams2.
+                evidence["curve_endpoints_m"] = (
+                    tuple(float(value) for value in (edge.GetCurveParams2() or ()))[:6]
+                    if curve is not None else None
+                )
+            except Exception as exc:
+                evidence["curve_or_binding_error"] = repr(exc)
+            for frame, target in (("local", local), ("world", world)):
+                try:
+                    closest = tuple(float(value) for value in (edge.GetClosestPointOn(*target) or ()))
+                    evidence[f"closest_{frame}_m"] = closest[:3]
+                    evidence[f"closest_{frame}_parameter"] = closest[3] if len(closest) > 3 else None
+                    evidence[f"distance_{frame}_mm"] = math.dist(closest[:3], target) * 1000.0
+                    for channel, values in transforms.items():
+                        evidence[f"closest_{frame}_via_{channel}_world_m"] = tuple(
+                            values[12] * sum(closest[j] * values[i + 3 * j] for j in range(3)) + values[9 + i]
+                            for i in range(3)
+                        )
+                except Exception as exc:
+                    evidence[f"closest_{frame}_error"] = repr(exc)
+        except Exception as exc:
+            evidence["pick_or_binding_error"] = repr(exc)
+        finally:
+            try:
+                draw.ClearSelection2(True)
+            except Exception as exc:
+                evidence["clear_selection_error"] = repr(exc)
+            _telemetry.info(f"{label}: diagnostic_only_pick={evidence!r}")
+
+
 def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[Any, ...], ...]:
     records = []
     leaves_by_view = {}
@@ -2812,6 +2916,11 @@ def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[A
             if error_sq <= 1e-14:  # ViewEdges.exact_line_through's 1e-8 mm².
                 matches.append((edge, distance_mm))
         if len(matches) != 1:
+            # A diagnostic pick must never bypass this exact-edge refusal.
+            try:
+                _probe_capture_reading_picks(adapter, views)
+            except Exception as exc:
+                _telemetry.info(f"{label}: diagnostic-only probe aborted: {exc!r}")
             raise RuntimeError(
                 f"{label}: requires one exact occurrence edge, got {len(matches)}; "
                 f"edge_count={len(edges_by_occurrence[key])}; "
