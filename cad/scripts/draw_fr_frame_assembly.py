@@ -712,20 +712,27 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
 
 
 def _inset_edge_candidates(
-    adapter: Any, view: Any, *, stem: str, target_mm: float, y_mm: float
-) -> list[tuple[Any, str, tuple[float, float]]]:
-    """Linear model edges of ``stem`` at machine x ``target_mm`` and y ``y_mm``.
+    adapter: Any,
+    view: Any,
+    *,
+    stem: str,
+    target_mm: float,
+    window_mm: float = NAMEPLATE_INSET_PICK_TOLERANCE_MM,
+) -> list[tuple[Any, str, float, tuple[float, float]]]:
+    """Level linear model edges of ``stem`` within ``window_mm`` of machine x ``target_mm``.
 
     Read from the view's referenced assembly, never from the drawing's
     display lists: on this section ``IView::GetVisibleComponents`` returns no
     component (r4, run 20261015T024651004Z) and ``GetVisibleEntities2`` no edge
     (r5, run 20261015T042140629Z). Each solid body's edges are read in part
     metres and placed with the component's native transform. Returns
-    ``(edge, instance name, machine z range in metres)`` for every edge whose
-    two ends both lie within ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of the
-    target x and y.
+    ``(edge, instance name, machine y, machine z range)`` in metres for every
+    edge whose two ends both lie within ``window_mm`` of the target x and
+    within ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of one machine y (a line
+    along z), nearest x first.
     """
     tolerance_m = NAMEPLATE_INSET_PICK_TOLERANCE_MM / 1000.0
+    window_m = window_mm / 1000.0
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     assembly = _early_bound(model, "IAssemblyDoc")
     found = []
@@ -760,14 +767,14 @@ def _inset_edge_candidates(
                 start, end = (
                     _transform_point(transform, key[i : i + 3]) for i in (0, 3)
                 )
-                if all(
-                    abs(point[0] - target_mm / 1000.0) <= tolerance_m
-                    and abs(point[1] - y_mm / 1000.0) <= tolerance_m
-                    for point in (start, end)
-                ):
+                miss_m = max(abs(point[0] - target_mm / 1000.0) for point in (start, end))
+                if miss_m <= window_m and abs(start[1] - end[1]) <= tolerance_m:
                     z_range = (min(start[2], end[2]), max(start[2], end[2]))
-                    found.append((edge, name, z_range))
-    return found
+                    found.append(
+                        (miss_m, edge, name, (start[1] + end[1]) / 2.0, z_range)
+                    )
+    found.sort(key=lambda row: row[0])
+    return [row[1:] for row in found]
 
 
 def _read_selected_inset_edge(
@@ -807,21 +814,24 @@ def _pick_inset_edge(
     label: str,
     stem: str,
     target_mm: float,
-    y_mm: float,
     stations_m: Sequence[float],
 ) -> Any:
     """Select ``label``'s edge in ``view`` from the model's geometry and prove it.
 
-    The candidates (:func:`_inset_edge_candidates`) are the edges of ``stem``
-    on the target x at the mount-plane y; the first station in ``stations_m``
-    that exactly one of them spans chooses it, so a segmented edge resolves
-    deterministically and an ambiguous station is skipped, not guessed. The
-    chosen edge is selected through the view by entity, never by a sheet
-    coordinate, and the selection is read back to its owner and machine x
-    before it is used; a read-back off target fails the sheet naming it.
+    The candidates (:func:`_inset_edge_candidates`) are the level edges of
+    ``stem`` on the target x. The plan section looks down machine -y, so of
+    the candidates spanning a station the highest one is the outline the
+    sheet draws there (the plate's top face over its underside; the deck
+    end's chamfer edge over the foot of its end face); the first station in
+    ``stations_m`` where exactly one candidate is highest chooses it, so a
+    segmented edge resolves deterministically and an ambiguous station is
+    skipped, not guessed. The chosen edge is selected through the view by
+    entity, never by a sheet coordinate, and the selection is read back to its
+    owner and machine x before it is used; a read-back off target fails the
+    sheet naming it.
     """
     candidates = _inset_edge_candidates(
-        adapter, view, stem=stem, target_mm=target_mm, y_mm=y_mm
+        adapter, view, stem=stem, target_mm=target_mm
     )
     tolerance_m = NAMEPLATE_INSET_PICK_TOLERANCE_MM / 1000.0
     chosen = None
@@ -829,30 +839,42 @@ def _pick_inset_edge(
         spanning = [
             row
             for row in candidates
-            if row[2][0] - tolerance_m <= z_m <= row[2][1] + tolerance_m
+            if row[3][0] - tolerance_m <= z_m <= row[3][1] + tolerance_m
         ]
-        if len(spanning) == 1:
-            chosen = (z_m, spanning[0])
+        if not spanning:
+            continue
+        top = max(row[2] for row in spanning)
+        highest = [row for row in spanning if row[2] >= top - tolerance_m]
+        if len(highest) == 1:
+            chosen = (z_m, highest[0])
             break
     if chosen is None:
+        # Name what IS there: the level edges within 5 mm of the target x.
+        nearby = _inset_edge_candidates(
+            adapter, view, stem=stem, target_mm=target_mm, window_mm=5.0
+        )
         listed = "; ".join(
-            f"{name} z {z0 * 1000.0:g}..{z1 * 1000.0:g} mm"
-            for _edge, name, (z0, z1) in candidates
+            f"{name} y {y * 1000.0:.3f} z {z0 * 1000.0:g}..{z1 * 1000.0:g} mm"
+            for _edge, name, y, (z0, z1) in candidates
+        ) or "none"
+        near = "; ".join(
+            f"{name} y {y * 1000.0:.3f} z {z0 * 1000.0:g}..{z1 * 1000.0:g} mm"
+            for _edge, name, y, (z0, z1) in nearby
         ) or "none"
         raise RuntimeError(
             f"nameplate inset {label}: no station in "
-            f"{tuple(z * 1000.0 for z in stations_m)} mm is spanned by exactly one "
-            f"{stem} edge at machine x {target_mm:g} mm, y {y_mm:g} mm; "
-            f"candidates: {listed}"
+            f"{tuple(z * 1000.0 for z in stations_m)} mm has exactly one highest "
+            f"{stem} edge at machine x {target_mm:g} mm; candidates: {listed}; "
+            f"level {stem} edges within 5 mm of x {target_mm:g}: {near}"
         )
-    z_m, (edge, name, _z_range) = chosen
+    z_m, (edge, name, y_m, _z_range) = chosen
     _select_view_entity(adapter, view, "EDGE", None, label=label, entity=edge)
     selected, owner, xs = _read_selected_inset_edge(adapter)
     hit = xs is not None and all(
         abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
     )
     reading = (
-        f"{name} z {z_m * 1000.0:g} mm: {owner}"
+        f"{name} y {y_m * 1000.0:.3f} z {z_m * 1000.0:g} mm: {owner}"
         + ("" if xs is None else f" at machine x {xs[0]:.3f}/{xs[1]:.3f} mm")
     )
     _telemetry.info(
@@ -864,6 +886,7 @@ def _pick_inset_edge(
         label=label,
         instance=name,
         owner=owner,
+        machine_y_mm=y_m * 1000.0,
         station_z_mm=z_m * 1000.0,
         candidates=len(candidates),
         machine_x_mm=xs,
@@ -881,9 +904,9 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
     """Dimension step 9's nameplate inset from the deck end in plan section B-B.
 
     Both edges come from the model's geometry (:func:`_pick_inset_edge`): the
-    plate's lower edge and the deck end at the mount-plane y, each selected
-    through the view by entity and read back to its machine x before the
-    dimension is made between them. The measured value is still checked
+    plate's lower edge and the deck end, each the highest level edge on its
+    machine x, selected through the view by entity and read back to its
+    machine x before the dimension is made between them. The measured value is still checked
     against ``NAMEPLATE_END_INSET``.
     """
     targets = (
@@ -921,7 +944,6 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
             label=name,
             stem=stem,
             target_mm=target_mm,
-            y_mm=y_mm,
             stations_m=NAMEPLATE_INSET_PICK_Z_M,
         )
         for name, stem, target_mm in targets
