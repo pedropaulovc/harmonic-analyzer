@@ -158,8 +158,9 @@ unrelated purchased drawings retain their keys. Keep these reads module-qualifie
 whole-config dependency expansion.
 For direct `_config.parts(SPEC.source.stem)` reads, the drawing-closure ownership
 guard requires the drawing's registered native source and an unshadowed `SPEC`,
-not a drawing-filename exemption. It checks registered `SPEC` arguments to
-`build_supplier_spring_drawing` and requires the simplified part wrapper to
+not a drawing-filename exemption. The same unshadowed registered `SPEC` binding
+is required for `build_supplier_spring_drawing` arguments, including supplier-only
+sheets without direct configuration reads. The simplified part wrapper must
 forward its caller's part name unchanged. These caller checks do not cover the
 purchased-variant or purchased-fastener drawing builders.
 
