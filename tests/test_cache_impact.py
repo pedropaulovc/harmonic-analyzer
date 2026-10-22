@@ -10,6 +10,7 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -374,10 +375,35 @@ def test_tool_errors_produce_artifacts_and_nonzero_status(tmp_path):
     assert "No impact conclusion is available" in md_path.read_text()
 
 
-def test_revision_discovery_rejects_source_tree_writes(source_fixture, tmp_path):
+@pytest.mark.skipif(not hasattr(os, "fchmod"), reason="descriptor chmod is unavailable")
+def test_revision_discovery_allows_real_descriptor_chmod_in_isolated_output(source_fixture, base_snapshot, tmp_path):
     def mutate(root):
         path = root / "dodo.py"
-        path.write_text(path.read_text(encoding="utf-8") + "\n(REPO_ROOT / 'unexpected').write_text('not allowed')\n", encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8") + """
+_impact_descriptor_path = CAD_OUT / "descriptor-chmod.txt"
+_impact_descriptor_path.parent.mkdir(parents=True, exist_ok=True)
+with _impact_descriptor_path.open("wb") as _impact_descriptor:
+    os.fchmod(_impact_descriptor.fileno(), 0o600)
+    _impact_descriptor.write(b"descriptor chmod completed")
+""", encoding="utf-8")
+    head = changed_snapshot(source_fixture, tmp_path, mutate)
+    output = tmp_path / "source/cad/out/descriptor-chmod.txt"
+    assert output.read_bytes() == b"descriptor chmod completed"
+    if os.name == "posix":
+        assert output.stat().st_mode & 0o777 == 0o600
+    report = impact.compare(base_snapshot, head, BASE_SHA, HEAD_SHA)
+    assert report["complete"]
+    assert all(count == 0 for count in report["counts"].values())
+
+
+@pytest.mark.parametrize("operation", [
+    "(REPO_ROOT / 'unexpected').write_text('not allowed')",
+    "(SCRIPTS_DIR / 'impact_dimensions.py').chmod(0o600)",
+])
+def test_revision_discovery_rejects_source_tree_writes(source_fixture, tmp_path, operation):
+    def mutate(root):
+        path = root / "dodo.py"
+        path.write_text(path.read_text(encoding="utf-8") + f"\n{operation}\n", encoding="utf-8")
     with pytest.raises(impact.ImpactError, match="outside isolated state"):
         changed_snapshot(source_fixture, tmp_path, mutate)
     assert not (tmp_path / "source/unexpected").exists()

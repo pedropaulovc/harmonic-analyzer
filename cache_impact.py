@@ -167,6 +167,9 @@ def _restrict_worker_writes(state: Path, output: Path) -> None:
                 or flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)
             ):
                 paths = (path,)
+        elif event == "os.chmod" and isinstance(args[0], int):
+            # fchmod reports its existing descriptor here, not a filesystem path.
+            return
         elif event in {"os.mkdir", "os.remove", "os.rmdir", "os.chmod"}:
             paths = args[:1]
         elif event in {"os.rename", "os.link", "os.symlink"}:
