@@ -83,6 +83,27 @@ zero real findings in those classes. Do not switch the whole fleet to `GATE`,
 demote a genuine collision, loosen thresholds, or add a runtime allowance to
 get one drawing through.
 
+### Purchased screw end views and fixed native outline padding
+
+An annotated end view can exhaust the standard scale ladder without any scale
+or centering defect. On source `6bdd304e8f12`, the carriage screw's 24 native fit
+events (2026-10-22, worker `swmaker00000a@10`) rejected Top at all eight scales.
+Its standard Top band is 64 mm high; the two existing 26 mm annotation lanes
+leave a 12 mm geometry cell. The refreshed Top outline is 18.176 mm at 1:1,
+14.676 mm at 1:2, 12.926 mm at 1:4 and 12.051 mm at 1:8: a scaled 7 mm end
+profile plus 11.176 mm of fixed native padding. Even the smallest permitted
+scale exceeds the cell by 0.051 mm. No centering move was attempted.
+
+The six oblique-jig carriage, block, bracket, rail, clamp and lever screw
+recipes select the existing `tall_top` layout, as the shared clamp-screw sheet
+already does. It gives Top a 96 mm band and, with the same lanes, a 44 mm
+geometry cell. It also lowers the bottom-row cells, so the fitter must measure
+all orthographic views and choose their largest common standard scale anew.
+Keep the lane budgets, independent-scale readback, strict native containment,
+caption checks and supplier-source preservation guards unchanged. Do not
+shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
+or suppress exhaustion to make the old 12 mm allocation pass.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report

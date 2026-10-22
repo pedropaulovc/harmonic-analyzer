@@ -27,6 +27,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        view_layout="tall_top",
         supplier_dimensions=partial(
             annotate_supplier_screw,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,

@@ -29,6 +29,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        view_layout="tall_top",
         number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=partial(
             annotate_supplier_screw,

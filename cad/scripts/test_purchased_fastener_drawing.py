@@ -6202,6 +6202,110 @@ def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room
     assert top[3] - top[1] == pytest.approx(0.050 if layout == "tall_top" else 0.018)
 
 
+@pytest.mark.parametrize(
+    "member", ("carriage", "block", "bracket", "rail", "clamp", "lever")
+)
+def test_oblique_screw_recipes_reserve_tall_top_without_changing_supplier_lanes(
+    monkeypatch, member
+):
+    from importlib import import_module
+
+    from _supplier_screw_layout import supplier_screw_margins
+
+    recipe = import_module(f"draw_ch_rocker_arm_tl_vn_oblique_{member}_screw")
+    supplier = recipe.supplier
+    received = []
+    adapter = object()
+
+    async def reference_sheet(actual_adapter, spec, **options):
+        assert actual_adapter is adapter
+        assert spec is recipe.SPEC
+        received.append(options)
+        return {"pdf": "native-proof-required.pdf"}
+
+    monkeypatch.setattr(recipe, "build_purchased_fastener_drawing", reference_sheet)
+    assert asyncio.run(recipe.build(adapter)) == {"pdf": "native-proof-required.pdf"}
+    assert len(received) == 1
+    options = received[0]
+    assert callable(options["supplier_dimensions"])
+    assert options["settled_checks"] is not None
+    assert options["supplier_margins"] == supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+    cells = purchased.fastener_view_cells(0.073, layout=options["view_layout"])
+    fitted = purchased.supplier_fit_cells(
+        cells, options["supplier_margins"], label=member
+    )
+    top = next(bounds for name, _, bounds in fitted if name == "*Top")
+    # The standard band's two 26 mm annotation lanes leave only 12 mm.
+    # Keep both lanes; the existing tall band must leave 44 mm for native bounds.
+    assert top[3] - top[1] == pytest.approx(0.044)
+
+
+def test_carriage_native_top_padding_floor_requires_tall_top_band(monkeypatch, tmp_path):
+    import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    # Actual 24 precenter events from source 6bdd304e8f12, worker swmaker00000a@10,
+    # 2026-10-22T17:08:04..06Z, drawing:ch_rocker_arm_tl_vn_oblique_carriage_screw.
+    # This reproduces their measured outline-size law, not physical-body bounds.
+    class CarriageView(_View):
+        @property
+        def Position(self):
+            return self._center
+
+        def GetOutline(self):
+            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+            width = 0.007 * ratio + 0.011176
+            profile = 0.007 if self._orientation == "*Top" else 0.0243131355832212
+            height = profile * ratio + 0.011176
+            x, y = self._center
+            return x - width / 2, y - height / 2, x + width / 2, y + height / 2
+
+        def SetViewPosition(self, position, move_children):
+            assert move_children is False
+            self._center = tuple(position)
+            return True
+
+    records = _native_fit_records(monkeypatch)
+    margins = supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+
+    def members(layout):
+        outer = purchased.fastener_view_cells(0.073, layout=layout)[:3]
+        fitted = purchased.supplier_fit_cells(outer, margins, label="carriage")
+        return [
+            (CarriageView(name, tmp_path / "carriage.SLDPRT", center), cell)
+            for (name, center, _), cell in zip(outer, fitted, strict=True)
+        ]
+
+    standard = members("standard")
+    with pytest.raises(RuntimeError, match="no project-standard scale"):
+        purchased._fit_group(_Drawing(), standard)
+    rejected = [
+        state
+        for name, state in records
+        if name == "drawing.purchased_fit_candidate" and state["view_key"] == "*Top"
+    ]
+    assert len(records) == 24 and len(rejected) == len(purchased._SCALES)
+    assert all(state["reason"] == "precenter_size" for state in rejected)
+    assert rejected[-1]["height_m"] == pytest.approx(0.012051)
+    assert rejected[-1]["height_excess_m"] == pytest.approx(0.000051)
+    tall = members("tall_top")
+    assert purchased._fit_group(_Drawing(), tall) == (1, 2)
+    for view, (_name, center, bounds) in tall:
+        outline = view.GetOutline()
+        assert purchased._inside(outline, bounds)
+        assert ((outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2) == (
+            pytest.approx(center)
+        )
+
+
 def test_clamp_tall_top_cells_and_captions_clear_each_other_border_and_title_block():
     from itertools import combinations
 
