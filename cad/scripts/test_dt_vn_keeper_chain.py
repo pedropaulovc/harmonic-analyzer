@@ -374,7 +374,7 @@ def test_scalar_viewed_configuration_owner_readback_repeated_reacquisition(keepe
         "units": "in",
         "configuration": _VIEWED_CONFIGURATION,
         "precision": 0,
-        "expected_mm": _BEAD_MM,
+        "expected_mm": pytest.approx(_BEAD_MM, rel=0, abs=1e-12),
         "presentation": "diameter",
         "fraction_denominator": 32,
         "callout": "CATALOGUE BEAD SIZE",
