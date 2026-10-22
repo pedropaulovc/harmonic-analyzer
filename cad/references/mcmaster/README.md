@@ -1642,6 +1642,10 @@ namespace. Their independently checked part entities are mapped through the
 exact owning view's `GetCorresponding`; native one-to-one identity, distinct
 endpoints and no extra attachments are required there. Direct comparison
 between a part object and a drawing object is not an attachment proof.
+The imported washer dimension's feature owner must also equal that source
+feature mapped into the exact drawing view. A part display instead retains its
+part-feature owner. Missing mappings and wrong owners fail; matching names,
+values or feature types cannot replace the same-context native identity check.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical

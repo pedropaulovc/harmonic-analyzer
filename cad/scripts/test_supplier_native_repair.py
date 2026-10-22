@@ -244,6 +244,68 @@ def _assert_washer_source_attachment(case, label, display):
     )
 
 
+@pytest.mark.parametrize("label", (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+))
+def test_washer_owner_identity_uses_the_part_or_exact_view_namespace(monkeypatch, label):
+    from test_purchased_fastener_drawing import _washer_import_native
+
+    case = _washer_import_native(monkeypatch)
+    source = case.sources[label]
+    imported = case.imports[label]
+    orientation = "*Front" if label == case.helper.THICKNESS else "*Top"
+    view = case.views[orientation]
+    source_owner = source.native.GetFeatureOwner()
+    imported_owner = imported.native.GetFeatureOwner()
+    assert case.adapter.swApp.IsSame(source_owner, imported_owner) == 0
+    assert case.adapter.swApp.IsSame(view.GetCorresponding(source_owner), imported_owner) == 1
+    for display, owner_view in ((source.display, None), (imported.display, view)):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, display, view=owner_view, label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+
+
+@pytest.mark.parametrize("defect", (
+    "foreign_mapping", "missing_mapping", "part_owner", "missing_owner",
+    "native_name", "source_name", "native_type",
+))
+def test_washer_view_owner_requires_native_identity_not_matching_metadata(monkeypatch, defect):
+    case, label, display = _washer_failure_case(monkeypatch)
+    source = case.sources[label]
+    imported = case.imports[label]
+    feature_name = case.source_helper.THICKNESS_FEATURE
+    feature = case.model.FeatureByName(feature_name)
+    if defect == "foreign_mapping":
+        case.mapped[id(feature)] = SimpleNamespace(Name=feature_name, GetTypeName2=lambda: "ProfileFeature")
+    elif defect == "missing_mapping":
+        case.mapped.pop(id(feature))
+    elif defect == "part_owner":
+        imported.native.GetFeatureOwner = lambda: feature
+    elif defect == "missing_owner":
+        imported.native.GetFeatureOwner = lambda: None
+    elif defect == "native_name":
+        imported.native.FullName = "Other@SupplierWasherThicknessReference@stock"
+    elif defect == "source_name":
+        source.native.FullName = "Other@SupplierWasherThicknessReference@stock"
+    else:
+        imported.display.Type2 = 6
+    with pytest.raises(RuntimeError, match="named model witness"):
+        _assert_washer_source_attachment(case, label, display)
+
+
+def test_washer_part_owner_cannot_be_replaced_with_a_drawing_owner(monkeypatch):
+    case, label, _display = _washer_failure_case(monkeypatch)
+    source = case.sources[label]
+    mapped_owner = case.imports[label].native.GetFeatureOwner()
+    source.native.GetFeatureOwner = lambda: mapped_owner
+    with pytest.raises(RuntimeError, match="named model witness"):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, source.display, view=None, label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+
+
 def test_washer_owner_failure_reports_remaining_context_despite_an_independent_reader_error(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
     observations = []
