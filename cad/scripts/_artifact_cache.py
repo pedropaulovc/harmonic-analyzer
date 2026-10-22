@@ -108,12 +108,14 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import contextlib
+import errno
 import hashlib
-import io
 import json
 import os
+import re
 import secrets
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -121,6 +123,7 @@ import threading
 import time
 import unicodedata
 from pathlib import Path
+from typing import BinaryIO
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
 # packed OUTPUT set, the pack format, or a build-logic change not captured by any
@@ -393,13 +396,21 @@ def key_input_paths(label: str, key: str) -> list[str] | None:
 _PACK_LEVEL = 6
 
 
-def _pack(outputs: list[Path]) -> bytes:
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=_PACK_LEVEL) as tar:
-        for out in outputs:
-            if out.exists():
-                tar.add(str(out), arcname=_rel(out))
-    return buf.getvalue()
+def _pack(outputs: list[Path]) -> BinaryIO:
+    """Return an owned, seekable archive; the caller closes its private file."""
+    archive = tempfile.TemporaryFile(mode="w+b")
+    try:
+        with tarfile.open(
+            name="", fileobj=archive, mode="w:gz", compresslevel=_PACK_LEVEL,
+        ) as tar:
+            for out in outputs:
+                if out.exists():
+                    tar.add(str(out), arcname=_rel(out))
+        archive.seek(0)
+        return archive
+    except BaseException:
+        archive.close()
+        raise
 
 
 def _restore_path(path: Path) -> Path:
@@ -414,7 +425,7 @@ def _restore_path(path: Path) -> Path:
     return target
 
 
-def _unpack(blob: bytes, outputs: list[Path]) -> None:
+def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
     # Validate EVERY deletion target before touching any of them. Collapsing
     # overlaps preserves directory ownership without deleting shared parents.
     owned = sorted({_restore_path(Path(output)) for output in outputs})
@@ -422,7 +433,8 @@ def _unpack(blob: bytes, outputs: list[Path]) -> None:
         path for path in owned
         if not any(parent in owned for parent in path.parents)
     ]
-    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+    blob.seek(0)
+    with tarfile.open(fileobj=blob, mode="r:gz") as tar:
         members = tar.getmembers()
         if not members:
             raise RuntimeError("empty cache archive has no canonical outputs")
@@ -501,14 +513,314 @@ _TRANSFER_CONCURRENCY = 8
 _SINGLE_PUT_MAX = 64 * 1024 * 1024
 _BLOCK_SIZE = 4 * 1024 * 1024
 
+# Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded
+# by this size; larger local hits discard that prefix and reuse verified disk
+# bytes. 8 MiB is a conservative memory/probe policy, not a network-speed claim.
+_ARCHIVE_CACHE_MIN = 8 * 1024 * 1024
+_ARCHIVE_CACHE_CAP = 16 * 1024 * 1024 * 1024
+_ARCHIVE_LOCK_WAIT_S = 0.05
+_WORKER_ARCHIVE_ROOT = Path("C:/ProgramData/solidworks-pool/archive-cache/v1")
+_HASH_NAME = re.compile(r"[0-9a-f]{64}")
+_OBJECT_TEMP_NAME = re.compile(r"\.[0-9a-f]{64}\.[0-9a-f]{32}\.tmp")
+
+
+def _archive_cache_roots() -> tuple[Path, ...]:
+    local = os.environ.get("LOCALAPPDATA")
+    producer = (Path(local) / "harmonic-analyzer" / "archive-cache" / "v1") if local else None
+    return (*((producer,) if producer is not None else ()), _WORKER_ARCHIVE_ROOT)
+
+
+class _LocalArchiveRefused(RuntimeError):
+    """Reject optional store access without rejecting verified remote bytes."""
+
+    def __init__(self, reason: str, message: str | None = None):
+        self.reason = reason
+        super().__init__(message if message is not None else reason)
+
+
+def _archive_object_lock(root: Path, digest: str) -> Path:
+    # Fixed 256 shards bound lease-file growth. Never unlink a lock inode:
+    # competing opens could otherwise acquire different locks for one object.
+    return root / "locks" / f"object-{digest[:2]}"
+
+
+def _note_local_store(span, outcome: str) -> str:
+    span.set_attribute("local_outcome", outcome)
+    reason = {
+        "disabled": "not_configured", "small": "below_threshold",
+        "oversize": "size_limit", "corrupt": "identity_mismatch",
+        "busy": "lock_busy", "persist_skipped_busy": "lock_busy",
+        "persist_skipped_capacity": "capacity",
+    }.get(outcome)
+    if reason:
+        span.set_attribute("local_reason", reason)
+        _debug_log(f"local archive {outcome} ({reason})")
+    return outcome
+
+
+def _local_store_problem(span, operation: str, exc: OSError | _LocalArchiveRefused) -> str:
+    outcome = "refused" if isinstance(exc, _LocalArchiveRefused) else "unavailable"
+    _note_local_store(span, outcome)
+    span.set_attribute("local_reason", exc.reason if isinstance(exc, _LocalArchiveRefused) else "io_error")
+    _warn(f"local archive {operation} skipped ({exc!r})")
+    return outcome
+
+
+def _unalias(path: Path) -> Path:
+    absolute = Path(os.path.abspath(path))
+    if (
+        path.drive.startswith("\\\\") or not path.is_absolute()
+        or absolute != path or path.resolve() != path
+    ):
+        raise _LocalArchiveRefused("unsafe_path", f"unsafe local archive cache path: {path}")
+    return path
+
+
+def _archive_cache_root() -> Path | None:
+    allowed = _archive_cache_roots()
+    raw = os.environ.get("HARMONIC_ARCHIVE_CACHE_ROOT")
+    # Workers supply their validated root explicitly. Ordinary producers have a
+    # per-user default; absent LOCALAPPDATA and configuration disables reuse.
+    root = Path(raw) if raw else (allowed[0] if os.environ.get("LOCALAPPDATA") else None)
+    if root is None:
+        return None
+    _unalias(root)
+    repo = REPO_ROOT.resolve()
+    if root not in allowed or root.is_relative_to(repo) or repo.is_relative_to(root):
+        raise _LocalArchiveRefused("unapproved_root", f"unapproved local archive cache root: {root}")
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("objects", "locks"):
+        child = _unalias(root / name)
+        child.mkdir(exist_ok=True)
+        _unalias(child)
+    return _unalias(root)
+
+
+@contextlib.contextmanager
+def _archive_lock(path: Path, *, blocking: bool = True):
+    """Short, bounded cross-process leases for optional cache work.
+
+    Stable lock files are never removed: unlinking a locked inode permits split
+    locks on POSIX. A busy store must not hold a valid remote restore hostage.
+    """
+    _unalias(path)
+    with path.open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if not handle.tell():
+            handle.write(b"\0")
+            handle.flush()
+        deadline = time.monotonic() + (_ARCHIVE_LOCK_WAIT_S if blocking else 0)
+        while True:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                    raise
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    yield False
+                    return
+                time.sleep(min(0.01, remaining))
+        try:
+            yield True
+        finally:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _archive_size(archive: BinaryIO) -> int:
+    position = archive.tell()
+    archive.seek(0, os.SEEK_END)
+    size = archive.tell()
+    archive.seek(position)
+    return size
+
+
+def _archive_identity(archive: BinaryIO) -> tuple[str, int]:
+    archive.seek(0)
+    digest = hashlib.sha256()
+    size = 0
+    while chunk := archive.read(_BLOCK_SIZE):
+        digest.update(chunk)
+        size += len(chunk)
+    archive.seek(0)
+    return digest.hexdigest(), size
+
+
+def _archive_copy(
+    source: BinaryIO, destination: BinaryIO, expected_size: int, *, hash_content: bool = True,
+) -> tuple[str | None, int]:
+    """Bound copies by authoritative length, even if a shared source grows.
+
+    Shared objects always get hashed. Only persistence of an already-verified
+    process-owned download disables the redundant second hash pass.
+    """
+    source.seek(0)
+    digest = hashlib.sha256() if hash_content else None
+    size = 0
+    while size < expected_size:
+        chunk = source.read(min(_BLOCK_SIZE, expected_size - size))
+        if not chunk:
+            break
+        destination.write(chunk)
+        if digest is not None:
+            digest.update(chunk)
+        size += len(chunk)
+    if source.read(1):
+        size += 1  # detect growth, but never copy excess bytes into the temp
+    destination.flush()
+    destination.seek(0)
+    return digest.hexdigest() if digest is not None else None, size
+
+
+def _local_archive(root: Path, digest: str, size: int) -> tuple[BinaryIO | None, str]:
+    path = _unalias(root / "objects" / digest)
+    with _archive_lock(_archive_object_lock(root, digest)) as acquired:
+        if not acquired:
+            return None, "busy"
+        try:
+            before = path.stat()
+        except FileNotFoundError:
+            return None, "miss"
+        if not stat.S_ISREG(before.st_mode) or before.st_size != size:
+            return None, "corrupt"
+        with path.open("rb") as source:
+            opened = os.fstat(source.fileno())
+            if not stat.S_ISREG(opened.st_mode) or opened.st_size != size:
+                return None, "corrupt"
+            private = tempfile.TemporaryFile(mode="w+b")
+            try:
+                actual = _archive_copy(source, private, size)
+                if actual != (digest, size):
+                    private.close()
+                    return None, "corrupt"
+                # Touch failure cannot discard verified, process-owned bytes.
+                with _phase("cache.local_store", operation="touch") as touch:
+                    try:
+                        os.utime(_unalias(path), None)
+                    except (OSError, _LocalArchiveRefused) as exc:
+                        _local_store_problem(touch, "touch", exc)
+                    else:
+                        _note_local_store(touch, "touched")
+                return private, "hit"
+            except BaseException:
+                private.close()
+                raise
+
+
+def _evict_archives(root: Path, *, reserve: int = 0, reason: str = "admission") -> bool:
+    """Under the host lock, make room using only unleased NEW regular objects."""
+    objects = _unalias(root / "objects")
+    with _phase("cache.local_eviction", reserve_bytes=reserve, reason=reason) as eviction:
+        entries = []
+        skipped = 0
+        busy = 0
+        evicted = 0
+        for path in objects.iterdir():
+            temporary = _OBJECT_TEMP_NAME.fullmatch(path.name)
+            if not temporary and not _HASH_NAME.fullmatch(path.name):
+                continue
+            try:
+                safe = _unalias(path)
+                info = safe.stat()
+                if not stat.S_ISREG(info.st_mode):
+                    skipped += 1
+                    continue
+                if temporary:
+                    # All live publishers hold the same store lock.
+                    safe.unlink(missing_ok=True)
+                else:
+                    entries.append((info.st_mtime_ns, safe, info.st_size))
+            except (OSError, _LocalArchiveRefused) as exc:
+                skipped += 1
+                _debug_log(f"local archive eviction entry skipped ({exc!r})")
+        total = sum(size for _, _, size in entries)
+        for _, path, size in sorted(entries):
+            if total + reserve <= _ARCHIVE_CACHE_CAP:
+                break
+            try:
+                with _archive_lock(_archive_object_lock(root, path.name), blocking=False) as acquired:
+                    if not acquired:
+                        skipped += 1
+                        busy += 1  # Includes conservative skips for shard collisions.
+                        continue
+                    _unalias(path).unlink(missing_ok=True)
+                    total -= size
+                    evicted += size
+            except (OSError, _LocalArchiveRefused) as exc:
+                skipped += 1
+                _debug_log(f"local archive eviction entry skipped ({exc!r})")
+        eviction.set_attribute("skipped_entries", skipped)
+        eviction.set_attribute("busy_entries", busy)
+        eviction.set_attribute("evicted_bytes", evicted)
+        eviction.set_attribute("capacity_available", total + reserve <= _ARCHIVE_CACHE_CAP)
+        return total + reserve <= _ARCHIVE_CACHE_CAP
+
+
+def _save_archive(
+    root: Path, digest: str, size: int, archive: BinaryIO, *, replace_corrupt: bool = False,
+) -> str:
+    """Persist an already-verified process-owned archive, without rehashing it."""
+    if size > _ARCHIVE_CACHE_CAP:
+        return "oversize"
+    with _archive_lock(root / "locks" / "store") as store_acquired:
+        if not store_acquired:
+            return "persist_skipped_busy"
+        path = _unalias(root / "objects" / digest)
+        with _archive_lock(_archive_object_lock(root, digest)) as object_acquired:
+            if not object_acquired:
+                return "persist_skipped_busy"
+            try:
+                info = path.stat()
+            except FileNotFoundError:
+                info = None
+            if info is not None:
+                if not stat.S_ISREG(info.st_mode):
+                    raise _LocalArchiveRefused("non_regular", f"unsafe local archive object: {path}")
+                if not replace_corrupt and info.st_size == size:
+                    # Another writer won. Do not rehash/rewrite/evict for an
+                    # identical-address object; the next reader still rehashes.
+                    return "already_present"
+                _unalias(path).unlink()
+            reason = "corrupt_replacement" if replace_corrupt or info is not None else "admission"
+            if not _evict_archives(root, reserve=size, reason=reason):
+                return "persist_skipped_capacity"
+            temporary = path.with_name(f".{digest}.{secrets.token_hex(16)}.tmp")
+            try:
+                with temporary.open("x+b") as destination:
+                    _, copied = _archive_copy(archive, destination, size, hash_content=False)
+                    if copied != size:
+                        raise RuntimeError("private archive changed before local publication")
+                os.replace(temporary, path)
+            finally:
+                try:
+                    _unalias(temporary).unlink(missing_ok=True)
+                except (OSError, _LocalArchiveRefused) as exc:
+                    # A cleanup failure must not replace a private-stream
+                    # integrity/programming error with an optional I/O error.
+                    _debug_log(f"local archive temp cleanup skipped ({exc!r})")
+    archive.seek(0)
+    return "persisted"
+
 
 class _BlobBackend:
-    """One Azure Blob container of content-addressed ``<key>.tar.gz`` entries.
-
-    Retention/LRU is server-side (account last-access tracking + a
-    delete-after-N-days lifecycle rule), so a HIT needs no client-side touch -- a
-    download updates last-access-time on its own.
-    """
+    """Canonical remote archives with optional verified, file-backed local reuse."""
 
     def __init__(self, container_client):
         self._cc = container_client
@@ -517,24 +829,109 @@ class _BlobBackend:
         # Shard by the first 2 hex chars (virtual prefix) to avoid one giant listing.
         return f"{key[:2]}/{key}.tar.gz"
 
-    def get(self, key: str) -> bytes | None:
+    def get(self, key: str) -> BinaryIO | None:
         from azure.core.exceptions import ResourceNotFoundError
-        try:
-            blob = self._cc.get_blob_client(self._name(key))
-            download = blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY)
-            payload = download.readall()
-            # These are the download response's properties, not a racy second
-            # HEAD. The SDK pins that response's ETag across ranged requests.
-            metadata = download.properties.metadata
+
+        with _phase("cache.download", phase="probe", network_bytes_known=False) as probe:
+            try:
+                blob = self._cc.get_blob_client(self._name(key))
+                download = blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY)
+            except ResourceNotFoundError:
+                probe.set_attribute("found", False)
+                probe.set_attribute("bytes", 0)
+                probe.set_attribute("network_bytes", 0)
+                probe.set_attribute("network_bytes_known", True)
+                return None
+            # Identity and prefix belong to the SAME response. The SDK pins its
+            # ETag for every remaining range; no recipe map or second HEAD/GET.
+            properties = download.properties
+            metadata = properties.metadata
+            size = properties.size
+            digest = metadata.get("archive_sha256")
+            if type(size) is not int or size < 0:
+                raise RuntimeError(f"cache archive integrity mismatch for {key}")
+            probe_bytes = min(size, _ARCHIVE_CACHE_MIN)
+            probe.set_attribute("found", True)
+            probe.set_attribute("bytes", probe_bytes)
+            probe.set_attribute("network_bytes", probe_bytes)
+            probe.set_attribute("network_bytes_known", True)
+            probe.set_attribute("archive_bytes", size)
             if (
                 metadata.get("epoch") != _CACHE_EPOCH
-                or metadata.get("archive_size") != str(len(payload))
-                or metadata.get("archive_sha256") != hashlib.sha256(payload).hexdigest()
+                or metadata.get("archive_size") != str(size)
+                or not isinstance(digest, str) or not _HASH_NAME.fullmatch(digest)
+                or not isinstance(properties.etag, str) or not properties.etag
             ):
                 raise RuntimeError(f"cache archive integrity mismatch for {key}")
-            return payload
-        except ResourceNotFoundError:
-            return None
+        with _phase(
+            "cache.archive", archive_bytes=size, network_bytes=probe_bytes,
+            probe_bytes=probe_bytes, reused_bytes=0, network_bytes_known=True,
+        ) as reuse:
+            root = None
+            private = None
+            lookup = "small" if size <= _ARCHIVE_CACHE_MIN else "oversize"
+            if _ARCHIVE_CACHE_MIN < size <= _ARCHIVE_CACHE_CAP:
+                with _phase("cache.local_store", operation="root") as local:
+                    try:
+                        root = _archive_cache_root()
+                    except (OSError, _LocalArchiveRefused) as exc:
+                        lookup = _local_store_problem(local, "root", exc)
+                    else:
+                        lookup = _note_local_store(local, "ready" if root is not None else "disabled")
+                if root is not None:
+                    with _phase("cache.local_store", operation="lookup") as local:
+                        try:
+                            private, lookup = _local_archive(root, digest, size)
+                        except (OSError, _LocalArchiveRefused) as exc:
+                            lookup = _local_store_problem(local, "lookup", exc)
+                            root = None  # do not retry a refused/unavailable store on persistence
+                        else:
+                            _note_local_store(local, lookup)
+            reuse.set_attribute("local_lookup_outcome", lookup)
+            # Reasons stay on phase-specific spans: persistence can change the outcome.
+            reuse.set_attribute("local_outcome", lookup)
+            if private is not None:
+                reuse.set_attribute("reused_bytes", size - probe_bytes)
+                return private
+            private = tempfile.TemporaryFile(mode="w+b")
+            try:
+                # Only network I/O is timed as cache.download. Verification and
+                # optional local persistence have separate spans and byte units.
+                try:
+                    if size > probe_bytes:
+                        reuse.set_attribute("network_bytes_known", False)
+                        with _phase("cache.download", phase="body", network_bytes_known=False) as body:
+                            download.readinto(private)
+                            body.set_attribute("bytes", size - probe_bytes)
+                            body.set_attribute("network_bytes", size - probe_bytes)
+                            body.set_attribute("network_bytes_known", True)
+                            body.set_attribute("archive_bytes", size)
+                    else:
+                        download.readinto(private)  # complete buffered prefix; no more network body
+                except ResourceNotFoundError:
+                    private.close()
+                    return None
+                reuse.set_attribute("network_bytes", size)
+                reuse.set_attribute("network_bytes_known", True)
+                with _phase("cache.verify", archive_bytes=size):
+                    if _archive_identity(private) != (digest, size):
+                        raise RuntimeError(f"cache archive integrity mismatch for {key}")
+                if root is not None:
+                    with _phase("cache.local_store", operation="persist", archive_bytes=size) as local:
+                        try:
+                            persisted = _save_archive(
+                                root, digest, size, private, replace_corrupt=lookup == "corrupt",
+                            )
+                        except (OSError, _LocalArchiveRefused) as exc:
+                            persisted = _local_store_problem(local, "persist", exc)
+                        else:
+                            _note_local_store(local, persisted)
+                        reuse.set_attribute("local_outcome", persisted)
+                private.seek(0)
+                return private
+            except BaseException:
+                private.close()
+                raise
 
     def exists(self, key: str) -> bool:
         # Presence check without downloading the blob -- the cache_status diagnostic
@@ -550,15 +947,16 @@ class _BlobBackend:
         except ResourceNotFoundError:
             return None
 
-    def put(self, key: str, blob: bytes, *, replace_etag: str | None = None) -> None:
+    def put(self, key: str, blob: BinaryIO, *, replace_etag: str | None = None) -> None:
         # Input identity does not imply identical native bytes. Ordinary writers
         # create only; explicit refresh is the sole CAS replacement. Writer-unique
         # blocks also prevent interleaved uploads from committing a torn archive.
         from azure.core import MatchConditions
 
+        digest, size = _archive_identity(blob)
         metadata = {
-            "archive_sha256": hashlib.sha256(blob).hexdigest(),
-            "archive_size": str(len(blob)),
+            "archive_sha256": digest,
+            "archive_size": str(size),
             "epoch": _CACHE_EPOCH,
         }
         condition = (
@@ -567,21 +965,26 @@ class _BlobBackend:
             else {"match_condition": MatchConditions.IfMissing}
         )
         client = self._cc.get_blob_client(self._name(key))
-        if len(blob) <= _SINGLE_PUT_MAX:
+        if size <= _SINGLE_PUT_MAX:
             client.upload_blob(
-                blob, overwrite=replace_etag is not None, metadata=metadata,
+                blob, length=size, overwrite=replace_etag is not None, metadata=metadata,
                 **(condition if replace_etag is not None else {}),
             )
             return
         from azure.storage.blob import BlobBlock
 
         writer = secrets.token_hex(16)
-        count = -(-len(blob) // _BLOCK_SIZE)
+        count = -(-size // _BLOCK_SIZE)
         ids = [f"{writer}{index:016d}" for index in range(count)]
+        reader_lock = threading.Lock()
 
         def stage(index: int) -> None:
-            start = index * _BLOCK_SIZE
-            client.stage_block(ids[index], blob[start:start + _BLOCK_SIZE])
+            # Only a bounded block per active transfer, never a whole-archive
+            # slice or a separate payload copy. Serialize seek/read, not upload.
+            with reader_lock:
+                blob.seek(index * _BLOCK_SIZE)
+                chunk = blob.read(_BLOCK_SIZE)
+            client.stage_block(ids[index], chunk)
 
         with concurrent.futures.ThreadPoolExecutor(_TRANSFER_CONCURRENCY) as pool:
             for _ in pool.map(stage, range(count)):
@@ -902,14 +1305,18 @@ def _make_backend() -> _BlobBackend | None:
     account_url = f"https://{account}.blob.core.windows.net"
     sas = os.environ.get("HARMONIC_CACHE_SAS")
     if sas:
-        return _BlobBackend(ContainerClient(account_url, container, credential=sas))
+        return _BlobBackend(ContainerClient(
+            account_url, container, credential=sas, max_single_get_size=_ARCHIVE_CACHE_MIN,
+        ))
     from azure.identity import DefaultAzureCredential
 
     inner = DefaultAzureCredential()
     timed = (
         _TimedTokenInfoCredential if hasattr(inner, "get_token_info") else _TimedCredential
     )
-    return _BlobBackend(ContainerClient(account_url, container, credential=timed(inner)))
+    return _BlobBackend(ContainerClient(
+        account_url, container, credential=timed(inner), max_single_get_size=_ARCHIVE_CACHE_MIN,
+    ))
 
 
 _BACKEND_LOCK = threading.Lock()
@@ -1116,14 +1523,16 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
     ``drift_expected`` plus the reason), is appended to cache.jsonl."""
     if not enabled():
         return False
+    blob = None
     try:
         backend = _backend()
         if backend is None:
             return False
-        with _phase("cache.download") as download:
+        with _phase("cache.fetch") as fetch:
             blob = backend.get(key)
-            download.set_attribute("found", blob is not None)
-            download.set_attribute("bytes", len(blob) if blob is not None else 0)
+            fetch.set_attribute("found", blob is not None)
+            size = _archive_size(blob) if blob is not None else 0
+            fetch.set_attribute("archive_bytes", size)
         if blob is None:
             # A miss is routine on changed inputs. Keep it at DEBUG so the default
             # warning-level build stays concise; the span event and cache.jsonl retain
@@ -1134,7 +1543,7 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
                 _record("restore_miss", label, key)
             return False
         try:
-            with _phase("cache.unpack", bytes=len(blob)):
+            with _phase("cache.unpack", bytes=size):
                 _unpack(blob, outputs)
         except PermissionError as exc:
             locked = RestoreLocked(label, key, exc)
@@ -1153,6 +1562,9 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         _event("cache.restore_error", label, key)
         _record("restore_error", label, key)
         return False
+    finally:
+        if blob is not None:
+            blob.close()
 
 
 def store(
@@ -1189,6 +1601,7 @@ def _store(
             _record("store_skip", label, key)
             return "skip"
         return "off"
+    blob = None
     try:
         backend = _backend()
         if backend is None:
@@ -1201,8 +1614,9 @@ def _store(
             return "empty"
         with _phase("cache.pack", outputs=len(present)) as pack:
             blob = _pack(present)
-            pack.set_attribute("bytes", len(blob))
-        with _phase("cache.upload", bytes=len(blob)):
+            size = _archive_size(blob)
+            pack.set_attribute("bytes", size)
+        with _phase("cache.upload", bytes=size):
             try:
                 backend.put(key, blob, replace_etag=replace_etag)
             except Exception:
@@ -1225,3 +1639,6 @@ def _store(
         _event("cache.store_error", label, key)
         _record("store_error", label, key)
         return "error"
+    finally:
+        if blob is not None:
+            blob.close()

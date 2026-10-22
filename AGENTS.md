@@ -1516,8 +1516,16 @@ scripts that `from _check import log, check` are instrumented unchanged.
       `_telemetry.info(..., service=_telemetry.BUILD_INFRA_SERVICE)`.
       The cache's own phases are child spans of `cache.probe`/`cache.store` on the
       same resource: `cache.connect` (SDK import + client, once per process),
-      `cache.credential` (each token fetch), `cache.download` (`found`, `bytes`),
-      `cache.unpack`, `cache.record` (miss provenance), `cache.pack`, `cache.upload`.
+      `cache.credential` (each token fetch), `cache.fetch` (total fetch envelope,
+      `found`/`archive_bytes`), and `cache.download` (network-only `probe`/`body`
+      phases, `bytes`/`network_bytes`, with `network_bytes_known=false` when a
+      partial failure's body count is unknown). `cache.archive` summarizes
+      archive/network/probe/reused bytes and local outcomes. Verification,
+      local-store operations and eviction have separate `cache.verify`,
+      `cache.local_store` and `cache.local_eviction` timing spans.
+      `cache.unpack`, `cache.record` (miss provenance), `cache.pack` and
+      `cache.upload` retain their existing units. Never use total archive bytes
+      or the enclosing fetch duration as network-throughput measurements.
       A farm leaf execution in rw mode (`farm.execution` in
       `OTEL_RESOURCE_ATTRIBUTES`) opens the connection at dodo import on a daemon
       thread (`_cache.prewarm`, root span `cache.prewarm`), so its first

@@ -4838,6 +4838,7 @@ def test_ordinary_alias_conflict_never_adopts_over_full_key(
     canonical_publication, monkeypatch
 ):
     import json
+    from test_artifact_cache import _get_bytes
 
     f = canonical_publication
     base_key = _enable_test_explode_alias(f, monkeypatch)
@@ -4845,14 +4846,14 @@ def test_ordinary_alias_conflict_never_adopts_over_full_key(
         f.emit("assembly", b"alias-A")
         f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
         assert f.cache.store(base_key, f.outputs("assembly"), "assembly:leaf explode-base") == "stored"
-    old_alias = f.backend.get(base_key)
+    old_alias = _get_bytes(f.backend, base_key)
     monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"full-B"))
     with f.at("B"):
         f.run("assembly")
         assert Path(f.dodo._sldasm("leaf")).read_bytes().startswith(b"full-B:")
         full_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
-        assert f.backend.get(full_key) != old_alias
-        assert f.backend.get(base_key) == old_alias
+        assert _get_bytes(f.backend, full_key) != old_alias
+        assert _get_bytes(f.backend, base_key) == old_alias
         events = [
             json.loads(line)["event"]
             for line in f.cache._EVENTS_LOG.read_text(encoding="utf-8").splitlines()
@@ -4866,6 +4867,7 @@ def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
     canonical_publication, monkeypatch, initially_present, conflict
 ):
     import json
+    from test_artifact_cache import _get_bytes, _put_bytes
 
     f = canonical_publication
     base_key = _enable_test_explode_alias(f, monkeypatch)
@@ -4874,9 +4876,9 @@ def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
         if initially_present:
             f.emit("assembly", b"old-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            archive = f.cache._pack(f.outputs("assembly"))
-            f.backend.put(root_key, archive)
-            f.backend.put(base_key, archive)
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+                f.backend.put(base_key, archive)
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
         "labels": ["assembly:leaf"], "reason": "Owner - Refresh root and alias",
     }))
@@ -4891,8 +4893,8 @@ def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
         snapshots.extend(heads)
         if conflict is not None:
             key = root_key if conflict == "root" else base_key
-            f.backend.put(
-                key, b"concurrent canonical",
+            _put_bytes(
+                f.backend, key, b"concurrent canonical",
                 replace_etag=initial_etags.get(f.backend._name(key)),
             )
         with seat(label) as waited:
@@ -4913,19 +4915,20 @@ def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
     heads = [call[1] for call in f.service.calls if call[0] == "etag"]
     assert heads == snapshots  # no under-seat or pre-upload recapture
     if conflict == "root":
-        assert f.backend.get(root_key) == b"concurrent canonical"
+        assert _get_bytes(f.backend, root_key) == b"concurrent canonical"
         if not initially_present:
-            assert f.backend.get(base_key) is None
+            assert _get_bytes(f.backend, base_key) is None
     elif conflict == "alias":
-        assert f.backend.get(base_key) == b"concurrent canonical"
+        assert _get_bytes(f.backend, base_key) == b"concurrent canonical"
         # The pair is deliberately non-atomic: the root has already advanced.
         assert f.service.etags[f.backend._name(root_key)] != initial_etags.get(f.backend._name(root_key))
     else:
-        import io
         import tarfile
 
         def members(key):
-            with tarfile.open(fileobj=io.BytesIO(f.backend.get(key)), mode="r:gz") as tar:
+            archive = f.backend.get(key)
+            assert archive is not None
+            with archive, tarfile.open(fileobj=archive, mode="r:gz") as tar:
                 return {
                     member.name: tar.extractfile(member).read()
                     for member in tar.getmembers() if member.isreg()
@@ -4974,9 +4977,9 @@ def test_root_or_alias_refresh_upload_failure_is_fatal(
         if initially_present:
             f.emit("assembly", b"old-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            archive = f.cache._pack(f.outputs("assembly"))
-            f.backend.put(root_key, archive)
-            f.backend.put(base_key, archive)
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+                f.backend.put(base_key, archive)
     initial_etags = dict(f.service.etags)
     put = f.backend.put
 
@@ -5045,7 +5048,8 @@ def test_ordinary_assembly_shortcut_does_not_walk_explode_closure(
         if shortcut == "hit":
             f.emit("assembly", b"canonical-A")
             f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            f.backend.put(key, f.cache._pack(f.outputs("assembly")))
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(key, archive)
 
     def remote(label, requested, outputs):
         assert (label, requested) == ("assembly:leaf", key)
