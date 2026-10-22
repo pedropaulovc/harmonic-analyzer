@@ -716,9 +716,10 @@ def _markdown_safe(value):
 
 
 def markdown(report: dict) -> str:
-    report = _markdown_safe(report)
     if "error" in report:
-        return "# Cache source impact — tool error\n\nNo impact conclusion is available.\n\n```text\n" + report["error"].replace("```", "'''") + "\n```\n"
+        error = str(report["error"]).replace("`", "'")
+        return "# Cache source impact — tool error\n\nNo impact conclusion is available.\n\n```text\n" + error + "\n```\n"
+    report = _markdown_safe(report)
     lines = ["# Cache source impact", "", report["notice"], "",
              f"Base: `{report['base_sha']}`  ", f"Head: `{report['head_sha']}`", "",
              "| Added | Removed | Direct recipes | Transitive recipes | Execution potential | Generated potential | Uncertain |",
