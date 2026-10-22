@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+from pathlib import Path
 from types import SimpleNamespace
 from contextlib import nullcontext
 
@@ -1127,6 +1128,7 @@ def _native_component(family, index=0, *, simplified=True):
         ComponentReference=f"{member}:{index + 1}" if member else "",
         ReferencedConfiguration=configuration,
         GetPathName=lambda: f"C:/native/{physical}.SLDPRT",
+        GetParent=lambda: None,
         GetModelDoc2=lambda: SimpleNamespace(
             GetCustomInfoValue=lambda _member, _property: drawing.BOM_PART_NUMBERS[
                 family
@@ -2160,6 +2162,16 @@ def native_property_package(monkeypatch, native_bom_bindings):
         properties=properties,
         GetCustomInfoValue=lambda _configuration, name: properties[name],
     )
+    # The source assembly as a section view's native owner root (jig-retention
+    # 1772: owner Name2 'ch-rocker-arm-tl-oblique-jig-1/<part>-1'). Its name is
+    # deliberately NOT derivable from SOURCE's file stem, and the drawing's
+    # synthetic section root below ('Draw54-SectionAssembly-1-1') is NOT it:
+    # only the native parent chain, read through IComponent2, names the root.
+    source_root = SimpleNamespace(
+        Name2="jig-source-occurrence-7",
+        GetPathName=lambda: str(drawing.SOURCE),
+        GetParent=lambda: None,
+    )
     doc = SimpleNamespace(
         active=physical_names[0], sheets={}, notes=[], oversized=None,
         sketch_lines=[], sketch_segments=[], paper_edits=[], balloon_landings=[],
@@ -2242,7 +2254,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     else spec.instance_name(stem, occurrence)
                 )
                 leaves.append(SimpleNamespace(
-                    Name=(f"jig-assembly/{component.Name2}"
+                    Name=(f"Draw54-SectionAssembly-1-1/{component.Name2}"
                           if sheet.name == drawing.PIVOT_CAPTURE_SHEET and index in (2, 3)
                           else component.Name2),
                     Component=component, Visible=True,
@@ -2477,9 +2489,16 @@ def native_property_package(monkeypatch, native_bom_bindings):
         """A finite physical segment in the occurrence's part-local metres."""
         a, b = (tuple(value / 1000.0 for value in point) for point in endpoints)
         origin, rows = spec.PLACEMENTS[stem][occurrence]
+        # A model IComponent2: native reports the part file with Windows
+        # separators; the leaf component's spelling differs only there.
+        part_file = component.GetPathName().replace("/", "\\")
         edge = SimpleNamespace(
             GetComponent=lambda: raw(edge.owner), endpoints=(a, b), c2=c2,
-            owner=SimpleNamespace(Name2=component.Name2),
+            owner=SimpleNamespace(
+                Name2=component.Name2,
+                GetPathName=lambda: part_file,
+                GetParent=lambda: None,
+            ),
         )
 
         def closest(x, y, z):
@@ -2578,25 +2597,75 @@ def native_property_package(monkeypatch, native_bom_bindings):
                 target = tuple(value / 1000.0 for value in reading.local_mm)
                 edge.GetClosestPointOn(*target)
                 leaf = next(leaf for leaf in view.components if leaf.Component is component)
-                edge.owner.Name2 = leaf.Name
+                owner = edge.owner
+                if index in (2, 3):
+                    # Section views own parts through the source assembly's
+                    # own occurrence, one level up; its drawing component is
+                    # named under a synthetic section root instead.
+                    owner.Name2 = f"{source_root.Name2}/{component.Name2}"
+                    owner.GetParent = lambda: raw(source_root)
+                defect = doc.capture_edge_defect
+                foreign_part = spec.COMPONENT_IDENTITIES[spec.PIVOT_BLOCK][0]
                 if edge.c2:
-                    defect = doc.capture_edge_defect
                     if defect == "wrong-parent":
-                        edge.owner.Name2 = f"foreign-parent/{component.Name2}"
+                        owner.Name2 = f"foreign-parent/{component.Name2}"
                     elif defect == "wrong-root":
-                        edge.owner.Name2 = f"foreign-root/{leaf.Name}"
+                        # Same root name, but the parent is another assembly file.
+                        owner.GetParent = lambda: raw(SimpleNamespace(
+                            **{**vars(source_root), "GetPathName": lambda: str(
+                                drawing.SOURCE.with_name(f"foreign-{drawing.SOURCE.name}")
+                            )},
+                        ))
                     elif defect == "wrong-occurrence":
-                        edge.owner.Name2 = leaf.Name + "-2"
+                        owner.Name2 += "-2"
                     elif defect == "wrong-case":
-                        edge.owner.Name2 = leaf.Name.upper()
+                        owner.Name2 = owner.Name2.upper()
                     elif defect == "owner-backslashes":
-                        edge.owner.Name2 = leaf.Name.replace("/", "\\")
+                        owner.Name2 = owner.Name2.replace("/", "\\")
                     elif defect == "model-path":
-                        edge.owner.Name2 = component.Name2
+                        owner.Name2 = component.Name2
+                    elif defect == "drawing-name":
+                        owner.Name2 = leaf.Name
                     elif defect == "null-owner":
                         edge.GetComponent = lambda: None
+                    elif defect == "wrong-part-file":
+                        owner.GetPathName = lambda: f"C:/native/{foreign_part}.SLDPRT"
+                    elif defect == "empty-owner-path":
+                        owner.GetPathName = lambda: ""
+                    elif defect == "empty-leaf-path":
+                        component.GetPathName = lambda: ""
+                    elif defect == "null-parent":
+                        owner.GetParent = lambda: None
+                    elif defect == "extra-ancestor":
+                        owner.GetParent = lambda: raw(SimpleNamespace(
+                            **{**vars(source_root), "GetParent": lambda: raw(source_root)},
+                        ))
+                    elif defect == "parent-cycle":
+                        cycle = SimpleNamespace(**vars(source_root))
+                        cycle.GetParent = lambda cycle=cycle: raw(cycle)
+                        owner.GetParent = lambda cycle=cycle: raw(cycle)
+                    elif defect == "empty-parent-name":
+                        owner.Name2 = f"/{component.Name2}"
+                        owner.GetParent = lambda: raw(SimpleNamespace(
+                            **{**vars(source_root), "Name2": ""},
+                        ))
+                    elif defect == "empty-parent-path":
+                        owner.GetParent = lambda: raw(SimpleNamespace(
+                            **{**vars(source_root), "GetPathName": lambda: ""},
+                        ))
+                    elif defect == "parent-read-error":
+                        def failing_parent():
+                            raise OSError("native parent dispatch failed")
+                        owner.GetParent = failing_parent
                     if doc.bad_pick:
-                        edge.owner.Name2 = spec.instance_name(spec.PIVOT_BLOCK, 1)
+                        owner.Name2 = spec.instance_name(spec.PIVOT_BLOCK, 1)
+                elif index == 1:
+                    if defect == "plan-parent":
+                        owner.GetParent = lambda: raw(source_root)
+                    elif defect == "plan-qualified":
+                        owner.Name2 = f"{source_root.Name2}/{component.Name2}"
+                    elif defect == "plan-wrong-part-file":
+                        owner.GetPathName = lambda: f"C:/native/{foreign_part}.SLDPRT"
                 projected = view.ModelToViewTransform.apply(edge.world)
                 candidates.append((math.dist((x, y), projected[:2]), edge))
         distance, edge = min(candidates, key=lambda item: item[0])
@@ -2887,7 +2956,8 @@ def native_property_package(monkeypatch, native_bom_bindings):
 
     monkeypatch.setattr(_drawing_common, "save_drawing", stop_before_save)
     return SimpleNamespace(
-        adapter=adapter, doc=doc, source=source, save_boundary=SaveBoundary
+        adapter=adapter, doc=doc, source=source, source_root=source_root,
+        save_boundary=SaveBoundary,
     )
 
 
@@ -3171,7 +3241,19 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
         assert wanted in installed
         leaf, = (leaf for leaf in note.view.components if leaf.Component.Name2 == wanted)
         owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
-        assert owner.Name2 == leaf.Name
+        root = package.source_root
+        parent = drawing._bind(owner.GetParent(), "IComponent2")
+        if reading.view_index == 1:
+            assert owner.Name2 == wanted and parent is None
+        else:
+            # Owned through the source assembly's own occurrence, never the
+            # drawing's synthetic section root.
+            assert owner.Name2 == f"{root.Name2}/{wanted}"
+            assert parent.Name2 == root.Name2 and parent.GetParent() is None
+            assert parent.GetPathName() == str(drawing.SOURCE)
+            assert leaf.Name != owner.Name2 and not leaf.Name.startswith(f"{root.Name2}/")
+        assert Path(owner.GetPathName()).resolve() == Path(leaf.Component.GetPathName()).resolve()
+        assert owner.GetPathName() != leaf.Component.GetPathName()
     targets = []
     for reading in drawing.capture_readings():
         view = sheet.views[reading.view_index]
@@ -3303,7 +3385,7 @@ def test_capture_refuses_real_creation_crop_and_attachment_failures(
 
 @pytest.mark.parametrize("edge_first", (False, True))
 @pytest.mark.parametrize("raw_picks", (False, True))
-@pytest.mark.parametrize("owner_form", ("drawing-name", "model-path", "owner-backslashes"))
+@pytest.mark.parametrize("owner_form", (None, "owner-backslashes"))
 def test_capture_native_two_slot_pick_reselects_only_the_exact_edge(
     native_property_package, edge_first, raw_picks, owner_form,
 ) -> None:
@@ -3329,8 +3411,12 @@ def test_capture_native_two_slot_pick_reselects_only_the_exact_edge(
         owner = drawing._bind(note.entity.GetComponent(), "IComponent2")
         leaf = next(leaf for leaf in note.view.components
                     if leaf.Component.Name2 == spec.instance_name(spec.PIVOT_PIN, 0))
-        expected = leaf.Component.Name2 if owner_form == "model-path" else leaf.Name
+        # The accepted owner is the source assembly's own occurrence path
+        # (jig-retention 1772's actual_owner shape), whatever its separators.
+        expected = f"{package.source_root.Name2}/{leaf.Component.Name2}"
         assert owner.Name2.replace("\\", "/") == expected
+        assert ("\\" in owner.Name2) == (owner_form == "owner-backslashes")
+        assert owner.Name2 != leaf.Name
         assert note.world == pytest.approx(physical, abs=1e-12)
         leader = note.annotation.GetLeaderPointsAtIndex(0)
         assert leader[-3:-1] == pytest.approx(
@@ -3366,6 +3452,17 @@ def test_capture_native_two_slot_pick_reselects_only_the_exact_edge(
     "wrong-occurrence",
     "wrong-case",
     "null-owner",
+    "model-path",
+    "drawing-name",
+    "wrong-part-file",
+    "empty-owner-path",
+    "empty-leaf-path",
+    "null-parent",
+    "extra-ancestor",
+    "parent-cycle",
+    "empty-parent-name",
+    "empty-parent-path",
+    "parent-read-error",
     "duplicate-visible-leaf",
     "hidden-visible-leaf",
     "coordinate-foreign-owner",
@@ -3430,6 +3527,172 @@ def test_capture_plan_same_owner_wrong_paper_landing_is_not_identification(
     with pytest.raises(RuntimeError, match="jig capture C5B COTTER"):
         drawing._place_package(package.adapter)
     assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("edge_first", (False, True))
+@pytest.mark.parametrize("defect", ("plan-parent", "plan-qualified", "plan-wrong-part-file"))
+def test_capture_plan_reading_requires_a_top_level_source_occurrence(
+    native_property_package, defect, edge_first,
+) -> None:
+    """The plan view's cotter is owned bare and top-level, in its own part file.
+
+    A one-level parent chain, a root-qualified name, or another part file is
+    refused even though each is a valid section-view owner shape.
+    """
+    package = native_property_package
+    package.doc.capture_edge_defect = defect
+    package.doc.edge_first = edge_first
+    with pytest.raises(RuntimeError, match="jig capture C5B COTTER"):
+        drawing._place_package(package.adapter)
+    assert not any(note.text.startswith("C5B COTTER") for note in package.doc.attached_notes)
+    assert not package.doc.bom_inserted
+
+
+def _source_owner(name, *, part_file, parent=None):
+    """A native-shaped ``IComponent2`` owner: name, part file, parent chain."""
+    return SimpleNamespace(
+        Name2=name, GetPathName=lambda: part_file, GetParent=lambda: parent,
+    )
+
+
+def _capture_leaf(reading, *, part_file, drawing_root="Draw54-SectionAssembly-1-1"):
+    wanted = spec.instance_name(reading.stem, reading.index)
+    return _drawing_balloons._ComponentLeaf(
+        name=f"{drawing_root}/{wanted}" if reading.view_index != 1 else wanted,
+        component=_source_owner(wanted, part_file=part_file),
+        identities=frozenset({wanted}), visible=True, path=wanted,
+    )
+
+
+@pytest.mark.parametrize("view_index", (1, 2, 3))
+def test_capture_reading_owner_is_proved_through_the_source_hierarchy(
+    native_bom_bindings, view_index,
+) -> None:
+    """Plan owners are bare and top-level; section owners hang one level under
+    the source assembly's own occurrence, whose name only native supplies."""
+    reading = next(r for r in drawing.capture_readings() if r.view_index == view_index)
+    wanted = spec.instance_name(reading.stem, reading.index)
+    part_file = f"C:/native/{spec.COMPONENT_IDENTITIES[reading.stem][0]}.SLDPRT"
+    leaf = _capture_leaf(reading, part_file=part_file)
+    root = _source_owner("jig-source-occurrence-7", part_file=str(drawing.SOURCE))
+    if view_index == 1:
+        owner = _source_owner(wanted, part_file=part_file.replace("/", "\\"))
+    else:
+        owner = _source_owner(
+            f"{root.Name2}\\{wanted}", part_file=part_file.replace("/", "\\"), parent=root,
+        )
+    entity = SimpleNamespace(GetComponent=lambda: owner)
+    adapter = SimpleNamespace(_attempt=lambda callback, **_kwargs: callback())
+    assert drawing._capture_reading_component(
+        adapter, reading, entity, (leaf,), label="jig capture probe",
+    ) is owner
+
+
+# Which reading roles each native-owner counterexample is wrong for: plan (1)
+# owners carry no parent chain, so parent-shaped defects only apply to sections.
+_SOURCE_OWNER_COUNTEREXAMPLES = (
+    ("drawing-root", (1, 2)),
+    ("bare-section", (2,)),
+    ("qualified-plan", (1,)),
+    ("plan-parent", (1,)),
+    ("foreign-source-file", (2,)),
+    ("parent-name-prefix", (2,)),
+    ("wrong-part-file", (1, 2)),
+    ("null-section-parent", (2,)),
+    ("two-level-chain", (1, 2)),
+    ("self-cycle", (1, 2)),
+    ("empty-owner-file", (1, 2)),
+    ("empty-leaf-file", (1, 2)),
+    ("empty-parent-name", (2,)),
+    ("empty-parent-file", (2,)),
+    ("null-owner", (1, 2)),
+    ("parent-read-error", (1, 2)),
+)
+
+
+@pytest.mark.parametrize("defect, view_index", [
+    (defect, view_index)
+    for defect, view_indices in _SOURCE_OWNER_COUNTEREXAMPLES
+    for view_index in view_indices
+])
+def test_capture_reading_owner_refuses_each_source_hierarchy_counterexample(
+    native_bom_bindings, view_index, defect,
+) -> None:
+    reading = next(r for r in drawing.capture_readings() if r.view_index == view_index)
+    wanted = spec.instance_name(reading.stem, reading.index)
+    part_file = f"C:/native/{spec.COMPONENT_IDENTITIES[reading.stem][0]}.SLDPRT"
+    foreign_part = f"C:/native/{spec.COMPONENT_IDENTITIES[spec.PIVOT_BLOCK][0]}.SLDPRT"
+    foreign_source = str(drawing.SOURCE.with_name(f"foreign-{drawing.SOURCE.name}"))
+    leaf = _capture_leaf(reading, part_file=part_file)
+    root = _source_owner("jig-source-occurrence-7", part_file=str(drawing.SOURCE))
+    section = view_index != 1
+    name = f"{root.Name2}/{wanted}" if section else wanted
+    parent = root if section else None
+    owner_file = part_file
+    evidence = []
+    if defect == "drawing-root":
+        name = leaf.name if section else f"Draw54-SectionAssembly-1-1/{wanted}"
+        evidence.append(name)
+    elif defect == "bare-section":
+        name = wanted
+    elif defect == "qualified-plan":
+        name = f"{root.Name2}/{wanted}"
+    elif defect == "plan-parent":
+        parent = root
+        evidence.append(root.Name2)
+    elif defect == "foreign-source-file":
+        parent = _source_owner(root.Name2, part_file=foreign_source)
+        evidence.append(foreign_source)
+    elif defect == "parent-name-prefix":
+        name = f"foreign-parent/{wanted}"
+        evidence += [name, root.Name2]
+    elif defect == "wrong-part-file":
+        owner_file = foreign_part
+        evidence += [foreign_part, part_file]
+    elif defect == "null-section-parent":
+        parent = None
+    elif defect == "two-level-chain":
+        grandparent = _source_owner("jig-source-grandparent-1", part_file=foreign_source)
+        parent = _source_owner(root.Name2, part_file=str(drawing.SOURCE), parent=grandparent)
+        name = f"{root.Name2}/{wanted}"
+        evidence += [root.Name2, grandparent.Name2]
+    elif defect == "self-cycle":
+        cycle = _source_owner(root.Name2, part_file=str(drawing.SOURCE))
+        cycle.GetParent = lambda: cycle
+        parent = cycle
+        evidence.append(root.Name2)
+    elif defect == "empty-owner-file":
+        owner_file = ""
+        evidence.append(part_file)
+    elif defect == "empty-leaf-file":
+        leaf = _capture_leaf(reading, part_file="")
+        evidence.append(part_file)
+    elif defect == "empty-parent-name":
+        parent = _source_owner("", part_file=str(drawing.SOURCE))
+        name = f"/{wanted}"
+    elif defect == "empty-parent-file":
+        parent = _source_owner(root.Name2, part_file="")
+        evidence.append(str(drawing.SOURCE))
+    owner = _source_owner(name, part_file=owner_file, parent=parent)
+    if defect == "null-owner":
+        owner = None
+    elif defect == "parent-read-error":
+        def failing_parent():
+            raise OSError("native parent dispatch failed")
+        owner.GetParent = failing_parent
+        evidence.append(name)
+    entity = SimpleNamespace(GetComponent=lambda: owner)
+    adapter = SimpleNamespace(_attempt=lambda callback, **_kwargs: callback())
+    with pytest.raises(RuntimeError, match="jig capture probe") as refusal:
+        drawing._capture_reading_component(
+            adapter, reading, entity, (leaf,), label="jig capture probe",
+        )
+    # The refusal carries the native evidence as repr'd values (Windows paths
+    # print with doubled separators), not a reworded summary of them.
+    message = str(refusal.value)
+    assert repr(wanted) in message
+    for item in evidence:
+        assert repr(item) in message
 
 
 @pytest.mark.parametrize("defect", ("owner", "attachment", "landing"))
@@ -3888,7 +4151,8 @@ def test_capture_settled_crop_proof_reads_fresh_retained_native_geometry(
     "extra-view", "scale", "configuration", "exploded", "carrier-hidden",
     "crop", "missing-section", "hatch", "partial", "label", "cut-plane",
     "cut-axis", "fasteners", "cut-only", "hidden-lines", "cut-arrows", "legacy-xy-cut",
-    "attachment", "edge-owner", "view-owner", "wrong-note-view", "right-balloon",
+    "attachment", "edge-owner", "edge-owner-root", "edge-owner-parent-file",
+    "edge-owner-part-file", "edge-owner-depth", "view-owner", "wrong-note-view", "right-balloon",
     "missing-native-balloon", "extra-native-balloon", "substituted-native-balloon",
     "landing", "font", "caption",
     "caption-overlap", "note-overlap", "balloon-border", "bearing-duplicate",
@@ -3938,8 +4202,24 @@ def test_capture_settled_proof_refuses_native_drift(native_property_package, def
         main.section.GetArrowInfo = lambda: (0.0,) * 12
     elif defect == "attachment":
         first_note.entity = object()
-    elif defect == "edge-owner":
-        first_note.entity.GetComponent = lambda: SimpleNamespace(Name2=spec.instance_name(spec.PIVOT_PIN, 1))
+    elif defect.startswith("edge-owner"):
+        # A fully shaped native owner that drifted in exactly one identity.
+        owner = SimpleNamespace(**vars(first_note.entity.owner))
+        root = package.source_root
+        if defect == "edge-owner":
+            owner.Name2 = f"{root.Name2}/{spec.instance_name(spec.PIVOT_PIN, 1)}"
+        elif defect == "edge-owner-root":
+            owner.Name2 = f"Draw54-SectionAssembly-1-1/{spec.instance_name(spec.PIVOT_PIN, 0)}"
+        elif defect == "edge-owner-parent-file":
+            owner.GetParent = lambda: SimpleNamespace(**{
+                **vars(root),
+                "GetPathName": lambda: str(drawing.SOURCE.with_name(f"foreign-{drawing.SOURCE.name}")),
+            })
+        elif defect == "edge-owner-part-file":
+            owner.GetPathName = lambda: f"C:/native/{spec.COMPONENT_IDENTITIES[spec.PIVOT_BLOCK][0]}.SLDPRT"
+        else:
+            owner.GetParent = lambda: SimpleNamespace(**{**vars(root), "GetParent": lambda: root})
+        first_note.entity.GetComponent = lambda: owner
     elif defect == "view-owner":
         first_note.annotation.OwnerType = 1
     elif defect == "landing":

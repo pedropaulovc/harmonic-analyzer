@@ -49,6 +49,7 @@ import textwrap
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, Callable
 
 import _config
@@ -2769,21 +2770,56 @@ def _capture_overlap(a: Sequence[float], b: Sequence[float]) -> bool:
 def _capture_reading_component(
     adapter: Any, reading: CaptureReading, entity: Any, leaves: Sequence[Any], *, label: str
 ) -> Any:
-    """Require this view's exact native occurrence path, including its root."""
+    """Require the source occurrence, not a generated section drawing root."""
     wanted = spec.instance_name(reading.stem, reading.index)
     matches = [leaf for leaf in leaves if leaf.visible and leaf.path.replace("\\", "/") == wanted]
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one visible occurrence {wanted!r}, got {len(matches)}")
     leaf = matches[0]
-    owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent() if entity is not None else None
-    component = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
-    actual = str(component.Name2 or "").replace("\\", "/") if component is not None else ""
-    allowed = (leaf.path.replace("\\", "/"), leaf.name.replace("\\", "/"))
-    if not actual or actual not in allowed:
-        raise RuntimeError(
-            f"{label}: reading point did not select {wanted!r}'s own edge; "
-            f"actual_owner={actual!r}; occurrence_path={leaf.path!r}; drawing_component_name={leaf.name!r}"
+    path = leaf.path.replace("\\", "/")
+    source_file = str(SOURCE)
+    component = None
+    actual = owner_file = leaf_file = ""
+    chain = []
+    same_part = same_source = False
+    metadata_error = None
+    try:
+        owner = _early_bound(_bind(entity, "IEntity"), "IEntity").GetComponent() if entity is not None else None
+        component = _early_bound(_bind(owner, "IComponent2"), "IComponent2")
+        if component is not None:
+            actual = str(component.Name2 or "").replace("\\", "/")
+            owner_file = str(component.GetPathName() or "")
+        native_leaf = _early_bound(_bind(leaf.component, "IComponent2"), "IComponent2")
+        leaf_file = str(native_leaf.GetPathName() or "") if native_leaf is not None else ""
+        parent = _early_bound(_bind(component.GetParent(), "IComponent2"), "IComponent2") if component is not None else None
+        if parent is not None:
+            chain.append((str(parent.Name2 or "").replace("\\", "/"), str(parent.GetPathName() or "")))
+            extra = _early_bound(_bind(parent.GetParent(), "IComponent2"), "IComponent2")
+            if extra is not None:
+                chain.append((str(extra.Name2 or "").replace("\\", "/"), str(extra.GetPathName() or "")))
+        same_part = bool(owner_file and leaf_file and Path(owner_file).resolve() == Path(leaf_file).resolve())
+        same_source = bool(
+            len(chain) == 1 and chain[0][1] and source_file
+            and Path(chain[0][1]).resolve() == Path(source_file).resolve()
         )
+    except Exception as exc:
+        metadata_error = exc
+    evidence = (
+        f"actual_owner={actual!r}; occurrence_path={path!r}; owner_file={owner_file!r}; "
+        f"leaf_file={leaf_file!r}; source_file={source_file!r}; parent_chain={chain!r}; "
+        f"depth={'at least 2' if len(chain) > 1 else len(chain)}"
+    )
+    if metadata_error is not None:
+        raise RuntimeError(f"{label}: cannot read native source occurrence; {evidence}") from metadata_error
+    valid = same_part and "/" not in path and (
+        (reading.view_index == 1 and actual == path and not chain)
+        or (
+            reading.view_index in (2, 3) and same_source and chain[0][0]
+            and actual == f"{chain[0][0]}/{path}"
+        )
+    )
+    if not valid:
+        raise RuntimeError(f"{label}: reading point did not select {wanted!r}'s own edge; {evidence}")
     return component
 
 

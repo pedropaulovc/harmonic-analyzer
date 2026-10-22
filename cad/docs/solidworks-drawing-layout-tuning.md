@@ -232,9 +232,14 @@ whole-face, endplay, clocking and motion inspections.
 Assembly-section edge listings can be empty while the native sheet pick finds
 the drawn edge. Use the existing narrow-zoom pick at the unchanged station:
 require exactly one native EDGE, with any other selection only the same
-activated drawing view. Match its owner case-exactly to the unique visible
-leaf's full model path or that same leaf's native drawing-component name;
-never decide occurrence identity from a basename or suffix. Reselect only that
+activated drawing view. A bare plan owner must match the unique visible leaf's
+full model path case-exactly, have no native parent, and reference the same
+part file as the leaf's component. A section owner must have exactly one native
+parent: its file must be the authored source assembly used to create the views,
+and the owner name must equal that parent's native name plus the exact leaf
+path. Compare nonempty file paths after resolution. Drawing-component names
+can carry a synthetic `SectionAssembly` root and are not source-owner identity;
+never decide occurrence identity from a basename or suffix. Reselect only the
 verified edge and prove native identity before creating its attached note.
 Section witnesses retain the existing `1e-8 mm²` part-local closest-point bound,
 so a nearby rim, floor or roof cannot substitute for the intended land.
