@@ -5872,6 +5872,86 @@ def test_supplier_thread_identification_keeps_native_nominal_major_value(monkeyp
         case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
 
 
+@pytest.mark.parametrize(
+    "field",
+    (
+        "use_document_units", "units", "primary_precision", "fraction_base",
+        "show_parentheses", "override", "show_native_value", "prefix", "suffix",
+        "below_callout",
+    ),
+)
+def test_supplier_presentation_rejects_each_actual_drift_without_repair(monkeypatch, field):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    mutations = {
+        "use_document_units": lambda: setattr(case.display, "GetUseDocUnits", lambda: True),
+        "units": lambda: setattr(case.state, "unit", 0),
+        "primary_precision": lambda: setattr(case.state, "precision", 2),
+        "fraction_base": lambda: setattr(case.state, "fraction", 2),
+        "show_parentheses": lambda: setattr(case.display, "ShowParenthesis", True),
+        "override": lambda: setattr(case.display, "GetOverride", lambda: True),
+        "show_native_value": lambda: setattr(case.display, "ShowDimensionValue", False),
+        "prefix": lambda: case.text.__setitem__(1, "CHANGED PREFIX"),
+        "suffix": lambda: case.text.__setitem__(2, "CHANGED SUFFIX"),
+        "below_callout": lambda: case.text.__setitem__(4, "FOREIGN CALLOUT"),
+    }
+    mutations[field]()
+    source_value = case.native.SystemValue
+    source_text = dict(case.text)
+    source_state = vars(case.state).copy()
+    with pytest.raises(RuntimeError, match="native supplier presentation differs from its source") as error:
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert f"({field}: actual=" in str(error.value)
+    assert ", expected=" in str(error.value)
+    assert case.native.SystemValue == source_value
+    assert case.text == source_text
+    assert vars(case.state) == source_state
+
+
+def test_supplier_presentation_first_mismatch_does_not_read_a_later_failing_field(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    case.display.GetUseDocUnits = lambda: True
+
+    def later_reader():
+        raise AssertionError("a later reader must not hide the first mismatch")
+
+    case.display.GetUnits = later_reader
+    with pytest.raises(RuntimeError, match="use_document_units: actual=True, expected=False"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
+
+def test_supplier_presentation_retains_first_native_reader_exception(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    original = RuntimeError("native units getter refused")
+
+    def first_reader():
+        raise original
+
+    def later_reader():
+        raise AssertionError("a later reader must not mask the native exception")
+
+    case.display.GetUnits = first_reader
+    case.display.GetPrimaryPrecision2 = later_reader
+    with pytest.raises(RuntimeError) as error:
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert error.value is original
+
+
+def test_supplier_presentation_retains_native_empty_callout_normalization(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    case.text[4] = None
+    case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert case.text[4] is None
+    assert case.native.SystemValue == 0.0111125
+
+
 @pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
 def test_supplier_fraction_requires_an_exact_integer_power_of_two(
     monkeypatch, denominator

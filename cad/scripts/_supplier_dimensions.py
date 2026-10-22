@@ -217,19 +217,26 @@ def assert_supplier_reference_dimension(
         configuration=configuration,
     )
     _sound_attachment(display, label=label)
-    if (
-        display.GetUseDocUnits()
-        or int(display.GetUnits()) != unit
-        or int(display.GetPrimaryPrecision2()) != precision
-        or int(display.GetFractionBase()) != fraction
-        or display.ShowParenthesis
-        or display.GetOverride()
-        or not display.ShowDimensionValue
-        or str(display.GetText(1) or "") != prefix
-        or str(display.GetText(2) or "") != suffix
-        or str(display.GetText(4) or "") != (callout or "")
+    # Keep the same lazy read order: the first mismatch must not be obscured
+    # by an unrelated later native reader. Report the actual rejected field.
+    for field, read, expected in (
+        ("use_document_units", lambda: bool(display.GetUseDocUnits()), False),
+        ("units", lambda: int(display.GetUnits()), unit),
+        ("primary_precision", lambda: int(display.GetPrimaryPrecision2()), precision),
+        ("fraction_base", lambda: int(display.GetFractionBase()), fraction),
+        ("show_parentheses", lambda: bool(display.ShowParenthesis), False),
+        ("override", lambda: bool(display.GetOverride()), False),
+        ("show_native_value", lambda: bool(display.ShowDimensionValue), True),
+        ("prefix", lambda: str(display.GetText(1) or ""), prefix),
+        ("suffix", lambda: str(display.GetText(2) or ""), suffix),
+        ("below_callout", lambda: str(display.GetText(4) or ""), callout or ""),
     ):
-        raise RuntimeError(f"{label}: native supplier presentation differs from its source")
+        actual = read()
+        if actual != expected:
+            raise RuntimeError(
+                f"{label}: native supplier presentation differs from its source "
+                f"({field}: actual={actual!r}, expected={expected!r})"
+            )
     if fraction_denominator is not None and (
         int(display.GetFractionValue()) != fraction_denominator or display.GetRoundToFraction()
     ):
