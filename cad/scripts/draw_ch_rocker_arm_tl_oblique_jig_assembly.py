@@ -20,15 +20,16 @@ their own 56 mm column. Sheets 3 to 6 each show the builder-owned
 pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
 ring fits the sheet, each family ballooned once on one ring, on no other sheet.
 Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
-in two columns, and the checks. Sheet 8 carries cartridge manufacture/pressing,
-joint acceptance and wiring (C1-C3C). Sheet 9 carries the pre-bearing underside
-inspection (C2A) and qualifies the actual top capture fit (C4-C5D), with a signed
-functional inspection schematic, not a manufacturing view or dimension. These
-three instruction sheets retain a small, visible collapsed reference isometric
-at the largest measured fit from 1:20, 1:25 and 1:30 below the right-column text:
+in two columns, and the checks. Sheet 8 carries the cartridge bench work in
+print order (C2A, C1-C2), with its signed functional inspection schematic,
+followed by feed checks F1-F2. Sheet 9 carries cap seating/wiring (C3-C3C),
+then the actual carrier and top capture fit (C4-C5D). The schematic is not a
+manufacturing view or dimension. These three instruction sheets retain a small,
+visible collapsed reference isometric at the largest measured fit from 1:20,
+1:25 and 1:30 below the right-column text:
 their native model views supply the live ``$PRPSHEET`` title-block links.
 Sheet 10 carries operation/service (C6-C7), the hold-down stud measurement,
-limits and installed acceptance (HD1-HD3) and machine acceptance, with the
+limits and installed acceptance (HD1-HD3), tooling clearance (C8) and machine acceptance, with the
 finished isometric below the right-column checks at 1:15. Every
 view is one the builder named in the machine frame (``spec.VIEW_AXES``), its
 mapping proven on the sheet before anything is placed by it. Every text,
@@ -125,6 +126,7 @@ STEPS_SHEET = "ASSEMBLY STEPS"
 CARTRIDGE_SHEET = "CARTRIDGEASSEMBLY"
 TOP_CAPTURE_SHEET = "TOPCAPTUREFIT"
 CAPTURE_SHEET = "CAPTUREANDOPERATION"
+PIVOT_CAPTURE_SHEET = "PIVOTCAPTUREEXPLODED"
 
 
 @dataclass(frozen=True)
@@ -166,7 +168,7 @@ CLUSTERS = (
         (1.0, 5.0),
     ),
     Cluster(
-        "PIVOTCAPTUREEXPLODED",
+        PIVOT_CAPTURE_SHEET,
         "BIDIRECTIONAL CAPTURED PIVOT CARTRIDGES",
         (
             spec.PIVOT_PIN,
@@ -178,7 +180,7 @@ CLUSTERS = (
             spec.PIVOT_COTTER,
             spec.PIVOT_LOCK_WIRE,
         ),
-        (1.0, 3.0),
+        (1.0, 4.0),
         context=tuple(spec.instance_name(spec.PIVOT_BLOCK, index) for index in (0, 1)),
     ),
     Cluster(
@@ -418,6 +420,24 @@ TITLE_BLOCK_KEEP_OUT = (
     TITLE_BLOCK[2],
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
 )
+# Sheet 4's two supports need independent native views: moving a whole-source
+# view cannot separate them on paper. Reserve equal fields above the title
+# block, with border air and an inter-view gutter; only the left is ballooned.
+CAPTURE_PAIR_REGIONS = (
+    (
+        CLUSTER_RING_REGION[0] + BOM_SHEET_CLEARANCE,
+        TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
+        CLUSTER_CENTER[0] - REGION_GAP,
+        CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
+    ),
+    (
+        CLUSTER_CENTER[0] + REGION_GAP,
+        TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
+        CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
+        CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
+    ),
+)
+
 
 # Sheet 7: the assembly sequence in two columns of one width, the heading and
 # as many whole steps as fit the left column, which runs down beside the
@@ -665,6 +685,9 @@ def steps_sheet_layout(
     column, the rest atop the right column, and the checks below them.
     The reference views use the unused right-column room without reflowing text."""
     for count in range(len(steps), 0, -1):
+        # Keep an instruction-group heading with its first complete step.
+        if count < len(steps) and steps[count - 1].endswith(":"):
+            continue
         left = _wrapped(
             tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading
         )
@@ -688,20 +711,23 @@ ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
 CARTRIDGE_LAYOUT = steps_sheet_layout(
-    tuple(
-        step.replace(TOP_CAPTURE_SHEET, f"SHEET {TOP_CAPTURE_SHEET_NUMBER}")
-        for step in spec.CARTRIDGE_STEPS
-    ),
+    (*spec.CARTRIDGE_STEPS, "FEED FIT-UP CHECKS (F1-F2):", *spec.FEED_STEPS),
     (),
-    heading="CARTRIDGE ASSEMBLY: C1-C3C",
+    heading="CARTRIDGE BENCH WORK: C2A, C1-C2",
 )
 TOP_CAPTURE_LAYOUT = steps_sheet_layout(
-    spec.TOP_CAPTURE_STEPS, (), heading="TOP CAPTURE FIT: C2A, C4-C5D"
+    (
+        *spec.CAP_SEATING_STEPS,
+        "CARRIER AND TOP RETAINERS (C4-C5D):",
+        *spec.TOP_CAPTURE_STEPS,
+    ),
+    (),
+    heading="CAP SEATING AND WIRING: C3-C3C",
 )
 CAPTURE_LAYOUT = steps_sheet_layout(
     spec.CAPTURE_STEPS,
     spec.CAPTURE_CHECKS,
-    heading="OPERATION AND ACCEPTANCE: C6-C7, HD1-HD3",
+    heading="OPERATION, STUD FIT AND CLEARANCE: C6-C8, HD1-HD3",
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -734,18 +760,18 @@ NOTES_REFERENCE_REGIONS = {
 # C2A's functional section shares the unused right-column room with the live
 # source-property view. Its exaggerated recess is explicitly not to scale:
 # the source instruction and its minimum clearance govern, never sketch size.
-TOP_CAPTURE_PAPER_REGION = NOTES_REFERENCE_REGIONS[TOP_CAPTURE_SHEET]
+CARTRIDGE_PAPER_REGION = NOTES_REFERENCE_REGIONS[CARTRIDGE_SHEET]
 PIN_TIP_INSPECTION_REGION = (
-    TOP_CAPTURE_PAPER_REGION[0],
-    TOP_CAPTURE_PAPER_REGION[1],
-    TOP_CAPTURE_PAPER_REGION[0] + 0.126,
-    TOP_CAPTURE_PAPER_REGION[3],
+    CARTRIDGE_PAPER_REGION[0],
+    CARTRIDGE_PAPER_REGION[1],
+    CARTRIDGE_PAPER_REGION[0] + 0.126,
+    CARTRIDGE_PAPER_REGION[3],
 )
-NOTES_REFERENCE_REGIONS[TOP_CAPTURE_SHEET] = (
+NOTES_REFERENCE_REGIONS[CARTRIDGE_SHEET] = (
     PIN_TIP_INSPECTION_REGION[2] + REGION_GAP,
-    TOP_CAPTURE_PAPER_REGION[1],
-    TOP_CAPTURE_PAPER_REGION[2],
-    TOP_CAPTURE_PAPER_REGION[3],
+    CARTRIDGE_PAPER_REGION[1],
+    CARTRIDGE_PAPER_REGION[2],
+    CARTRIDGE_PAPER_REGION[3],
 )
 PIN_TIP_SECTION_DATUM_Y = PIN_TIP_INSPECTION_REGION[3] - 0.060
 PIN_TIP_SECTION_TIP_Y = PIN_TIP_SECTION_DATUM_Y + 0.010
@@ -2068,7 +2094,7 @@ def _inspection_sheet_sketch(
     adapter: Any, *, when: str
 ) -> tuple[Any, Any, Any, Any, tuple[float, float]]:
     """The sheet view, its sketch, current transform/utility and native scale."""
-    sheet = _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    sheet = _activate_sheet(adapter, CARTRIDGE_SHEET)
     properties = tuple(float(value) for value in (sheet.GetProperties2() or ()))
     if (
         len(properties) < 4
@@ -2195,7 +2221,7 @@ def _assert_pin_tip_inspection(
 
 def _place_pin_tip_inspection(adapter: Any) -> Callable[[], None]:
     """Create paper-sized sheet ink and retain its post-rebuild location proof."""
-    _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    _activate_sheet(adapter, CARTRIDGE_SHEET)
     draw = adapter.currentModel
     draw.ClearSelection2(True)
     _early_bound(draw, "IDrawingDoc").EditSheet()
@@ -2223,7 +2249,7 @@ def _place_pin_tip_inspection(adapter: Any) -> Callable[[], None]:
     draw.ClearSelection2(True)
     for text, xy in pin_tip_inspection_labels():
         _add_note_block(
-            adapter, TOP_CAPTURE_SHEET, text, xy, label="C2A functional inspection",
+            adapter, CARTRIDGE_SHEET, text, xy, label="C2A functional inspection",
         )
     rebuild_drawing(adapter, label="C2A functional inspection")
     _assert_pin_tip_inspection(adapter, segments, expected_scale=scale)
@@ -2463,6 +2489,115 @@ def _place_cluster_view(
     return view, _fit_cluster_view(adapter, view, cluster, configuration, label=label)
 
 
+def capture_support_instances(cluster: Cluster, support: int) -> frozenset[str]:
+    """Exact occurrences of one cartridge, including its unballooned block."""
+    if support not in (0, 1):
+        raise ValueError("the capture sheet has supports 0 and 1")
+    return frozenset(
+        spec.instance_name(stem, index)
+        for stem in (*cluster.stems, spec.PIVOT_BLOCK)
+        for index in range(
+            support * (spec.QUANTITIES[stem] // 2),
+            (support + 1) * (spec.QUANTITIES[stem] // 2),
+        )
+    )
+
+
+def _assert_capture_pair(
+    adapter: Any,
+    views: Sequence[Any],
+    scale: tuple[float, float],
+    landings: Sequence[BalloonLanding] = (),
+) -> None:
+    """Keep both exploded supports and the single balloon set in their fields."""
+    _activate_sheet(adapter, PIVOT_CAPTURE_SHEET)
+    if len(views) != len(CAPTURE_PAIR_REGIONS):
+        raise RuntimeError("jig capture pair: expected two native source views")
+    for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
+        label = f"jig capture support {support + 1}"
+        bound = _early_bound(view, "IView")
+        ratio = tuple(float(value) for value in bound.ScaleRatio)
+        if (
+            len(ratio) != 2
+            or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9
+            or str(bound.ReferencedConfiguration) != SIMPLIFIED_VIEW_CONFIGURATION
+            or not bool(bound.IsExploded())
+        ):
+            raise RuntimeError(f"{label}: changed scale/configuration/exploded state")
+        _assert_view_on_sheet(
+            view, margin=BALLOON_RING_REACH, bounds=region, label=label
+        )
+    left, bottom, right, top = CAPTURE_PAIR_REGIONS[0]
+    for landing in landings:
+        x, y, radius = rendered_balloon_circle(
+            landing.note, label="jig capture support 1"
+        )
+        if not (
+            left <= x - radius and x + radius <= right
+            and bottom <= y - radius and y + radius <= top
+        ):
+            raise RuntimeError(
+                f"jig capture support 1: {landing.stem} balloon leaves its field"
+            )
+
+
+def _place_capture_pair(
+    adapter: Any, cluster: Cluster
+) -> tuple[tuple[Any, ...], tuple[float, float]]:
+    """Separate the two real exploded cartridges without altering source poses."""
+    _activate_sheet(adapter, cluster.sheet)
+    views = []
+    for support, region in enumerate(CAPTURE_PAIR_REGIONS):
+        label = f"jig capture support {support + 1}"
+        view = _place_named_view(
+            adapter, spec.ISOMETRIC_VIEW, _region_center(region),
+            cluster.scale, label=label,
+        )
+        set_high_quality_shaded_with_edges(adapter, view, label=label)
+        configuration = apply_view_configuration(adapter, view, label=label)
+        set_view_exploded_state(
+            adapter, view, True, configuration=configuration, label=label
+        )
+        # File-family identities would also show the other support. The existing
+        # isolator accepts occurrence names and refuses missing occurrences.
+        isolate_drawing_view_components(
+            adapter, view, visible_stems=capture_support_instances(cluster, support),
+            label=label,
+        )
+        views.append(view)
+    findings = []
+    placed = cluster.scale
+    # Preserve the reviewed 1:4 size; this repair distributes the views, rather
+    # than enlarging them. Smaller existing rungs remain native-fit fallbacks.
+    for scale in CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(cluster.scale):]:
+        overflows = []
+        for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
+            label = f"jig capture support {support + 1}"
+            if scale != placed:
+                _set_view_scale(adapter, view, scale, label=label)
+            _shift, misses = ring_fit_shift(
+                _view_outline(view, label=label), region, grow=BALLOON_RING_REACH
+            )
+            overflows.extend(f"support {support + 1}: {miss}" for miss in misses)
+        placed = scale
+        if not overflows:
+            break
+        findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
+    else:
+        raise RuntimeError(
+            "jig capture pair: no common ladder scale fits: " + " | ".join(findings)
+        )
+    for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
+        _center_view_outline(
+            adapter, view, _region_center(region),
+            label=f"jig capture support {support + 1}",
+        )
+    pair = tuple(views)
+    _assert_capture_pair(adapter, pair, scale)
+    _telemetry.info(f"jig capture pair: side-by-side at {_scale_text(scale)}")
+    return pair, scale
+
+
 def _balloon_cluster(
     adapter: Any,
     view: Any,
@@ -2486,7 +2621,8 @@ def _balloon_cluster(
             margin=BALLOON_MARGIN,
         )
     _ring_balloons(adapter, view, landings, label=f"{label} balloons")
-    landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
+    if cluster.sheet != PIVOT_CAPTURE_SHEET:
+        landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
     if sorted(landing.stem for landing in landings) != sorted(cluster.stems):
         raise RuntimeError(
             f"{label} carries balloons for "
@@ -2635,7 +2771,15 @@ def _place_package(
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
     notes_scales = _place_notes_reference_views(adapter)
-    placed = [(cluster, *_place_cluster_view(adapter, cluster)) for cluster in CLUSTERS]
+    capture_cluster = next(
+        cluster for cluster in CLUSTERS if cluster.sheet == PIVOT_CAPTURE_SHEET
+    )
+    capture_pair, capture_scale = _place_capture_pair(adapter, capture_cluster)
+    placed = [
+        (cluster, capture_pair[0], capture_scale) if cluster is capture_cluster
+        else (cluster, *_place_cluster_view(adapter, cluster))
+        for cluster in CLUSTERS
+    ]
     _activate_sheet(adapter, BOM_SHEET)
     table = insert_bom_table(
         adapter,
@@ -2674,14 +2818,18 @@ def _place_package(
             f"jig package carries {len(landings)} balloons, expected one per "
             f"BOM row ({len(BOM_COMPONENTS)}) across the exploded sheets"
         )
+    capture_landings = [
+        landing for landing in landings if landing.stem in capture_cluster.stems
+    ]
+    _assert_capture_pair(adapter, capture_pair, capture_scale, capture_landings)
     _place_steps_notes(adapter)
     _place_capture_notes(adapter)
     # The fitted reference can select 1:25 or 1:30. Author paper-only sketch
     # geometry at that final native sheet scale, not the initial 1:20; the
     # finalizer later re-pins this same ratio without rescaling the schematic.
-    sheet = _activate_sheet(adapter, TOP_CAPTURE_SHEET)
+    sheet = _activate_sheet(adapter, CARTRIDGE_SHEET)
     before = tuple(float(value) for value in (sheet.GetProperties2() or ()))
-    fitted = notes_scales[TOP_CAPTURE_SHEET]
+    fitted = notes_scales[CARTRIDGE_SHEET]
     if not sheet.SetScale(float(fitted[0]), float(fitted[1]), False, False):
         raise RuntimeError("failed to set the C2A sheet's fitted reference scale")
     properties = tuple(float(value) for value in (sheet.GetProperties2() or ()))
@@ -2717,6 +2865,9 @@ def _place_package(
         cl_tip_settled,
         kit_note_settled,
         inspection_settled,
+        lambda: _assert_capture_pair(
+            adapter, capture_pair, capture_scale, capture_landings
+        ),
     )
 
 

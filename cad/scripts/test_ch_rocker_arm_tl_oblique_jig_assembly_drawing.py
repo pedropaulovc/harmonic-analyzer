@@ -320,6 +320,76 @@ def test_clusters_partition_the_bom() -> None:
     assert all(set(cluster.context) <= inventory for cluster in drawing.CLUSTERS)
 
 
+def test_capture_support_views_partition_the_exact_occurrences() -> None:
+    capture = next(
+        cluster for cluster in drawing.CLUSTERS
+        if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET
+    )
+    supports = [
+        drawing.capture_support_instances(capture, support) for support in (0, 1)
+    ]
+    assert not supports[0] & supports[1]
+    assert supports[0] | supports[1] == {
+        spec.instance_name(stem, index)
+        for stem in (*capture.stems, spec.PIVOT_BLOCK)
+        for index in range(spec.QUANTITIES[stem])
+    }
+    for support, instances in enumerate(supports):
+        block = spec.instance_name(spec.PIVOT_BLOCK, support)
+        assert block in instances
+        for stem in capture.stems:
+            assert stem not in instances  # a family would show both supports
+            for index in range(spec.QUANTITIES[stem]):
+                name = spec.instance_name(stem, index)
+                if name not in instances:
+                    continue
+                parent = spec.lock_parent(stem, index)
+                while parent != block:
+                    assert parent in instances
+                    parent_stem, parent_index = parent.rsplit("-", 1)
+                    parent = spec.lock_parent(parent_stem, int(parent_index) - 1)
+
+
+def test_instruction_groups_print_in_bench_feed_cap_carrier_order() -> None:
+    bench = "\n".join(
+        (drawing.CARTRIDGE_LAYOUT.steps, drawing.CARTRIDGE_LAYOUT.continued)
+    )
+    caps = "\n".join(
+        (drawing.TOP_CAPTURE_LAYOUT.steps, drawing.TOP_CAPTURE_LAYOUT.continued)
+    )
+    assert bench.startswith("CARTRIDGE BENCH WORK: C2A, C1-C2\nC2A.")
+    labels = ("C2A.", "C1.", "C2.", "FEED FIT-UP CHECKS (F1-F2):", "F1.", "F2.")
+    assert [bench.index(label) for label in labels] == sorted(
+        bench.index(label) for label in labels
+    )
+    assert "C3." not in bench and "C4." not in bench
+    assert caps.startswith("CAP SEATING AND WIRING: C3-C3C\nC3.")
+    labels = (
+        "C3.", "C3A.", "C3B.", "C3C.",
+        "CARRIER AND TOP RETAINERS (C4-C5D):", "C4.", "C4A.",
+        "C5.", "C5A.", "C5B.", "C5C.", "C5D.",
+    )
+    assert [caps.index(label) for label in labels] == sorted(
+        caps.index(label) for label in labels
+    )
+
+
+def test_instruction_heading_moves_with_first_step_at_column_boundary(monkeypatch) -> None:
+    # Three lines fit on the left, but the four-line group does not. Without
+    # heading co-location, FEED CHECKS would be left behind its first step.
+    monkeypatch.setattr(
+        drawing, "STEPS_FLOOR",
+        drawing.STEPS_XY[1] - 3.5 * drawing.NOTE_LINE_M,
+    )
+    layout = drawing.steps_sheet_layout(
+        ("1. INSTALL.", "FEED CHECKS:", "F1. CHECK FEED."),
+        (),
+        heading="BUILD ORDER",
+    )
+    assert layout.steps.splitlines() == ["BUILD ORDER", "1. INSTALL."]
+    assert layout.continued.splitlines() == ["FEED CHECKS:", "F1. CHECK FEED."]
+
+
 def test_exploded_wire_stays_near_its_heads_and_apart_from_the_cotter() -> None:
     right, up, _sight = spec.VIEW_AXES[spec.ISOMETRIC_VIEW]
     ratio = 1.0 / 4000.0  # the reviewed capture sheet's 1:4 paper projection
@@ -364,6 +434,8 @@ def test_exploded_wire_stays_near_its_heads_and_apart_from_the_cotter() -> None:
 
 def test_exploded_captions_fit_their_text_region() -> None:
     for cluster in drawing.CLUSTERS:
+        if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET:
+            continue  # Native pair placement has its own per-field coverage.
         scale = drawing.cluster_ring_scale(
             _cluster_outline(cluster), cluster.scale, label=cluster.sheet
         )
@@ -566,6 +638,8 @@ def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> No
 
 def test_each_cluster_rings_inside_its_sheet() -> None:
     for cluster in drawing.CLUSTERS:
+        if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET:
+            continue  # The pair no longer uses the whole-sheet ring fitter.
         initial = _cluster_outline(cluster)
         scale = drawing.cluster_ring_scale(initial, cluster.scale, label=cluster.sheet)
         # Fit at the returned scale, not the initial placement scale. Every
@@ -752,7 +826,7 @@ def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layou
 
 def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
     region = drawing.PIN_TIP_INSPECTION_REGION
-    reference = drawing.NOTES_REFERENCE_REGIONS[drawing.TOP_CAPTURE_SHEET]
+    reference = drawing.NOTES_REFERENCE_REGIONS[drawing.CARTRIDGE_SHEET]
     assert _inside_sheet(region) and _inside_sheet(reference)
     assert not _overlap(region, reference)
     lines = drawing.pin_tip_inspection_lines()
@@ -776,7 +850,7 @@ def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
     assert {"SCHEMATIC - NOT TO SCALE", "+Z INTO BLOCK", "Z=0 MOUNTING PLANE"} <= labels.keys()
     assert f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN" in labels
     note_boxes = [_note_box(text, xy) for text, xy in labels.items()]
-    instruction_boxes = _steps_sheet_boxes(drawing.TOP_CAPTURE_LAYOUT)
+    instruction_boxes = _steps_sheet_boxes(drawing.CARTRIDGE_LAYOUT)
     for index, box in enumerate(note_boxes):
         assert _inside(box, region) and _inside_sheet(box)
         assert not _overlap(box, reference)
@@ -1101,9 +1175,9 @@ def test_source_census_proves_all_twelve_native_kit_references(native_bom_bindin
         drawing._validate_source(source)
 
 
-def test_cartridge_steps_cite_the_sourced_cap_screw_sku() -> None:
+def test_cap_seating_steps_cite_the_sourced_cap_screw_sku() -> None:
     steps = "\n".join(
-        (drawing.CARTRIDGE_LAYOUT.steps, drawing.CARTRIDGE_LAYOUT.continued)
+        (drawing.TOP_CAPTURE_LAYOUT.steps, drawing.TOP_CAPTURE_LAYOUT.continued)
     )
     assert hardware.SCREW_SKU in steps
 
@@ -1994,9 +2068,9 @@ def native_property_package(monkeypatch):
     )
     doc = SimpleNamespace(
         active=physical_names[0], sheets={}, notes=[], oversized=None,
-        sketch_lines=[], sketch_segments=[], paper_edits=[],
+        sketch_lines=[], sketch_segments=[], paper_edits=[], balloon_landings=[],
         display_scale=1.0, display_shift=(0.0, 0.0), hidden_line=None,
-        top_capture_fit_denominator=20.0,
+        inspection_fit_denominator=20.0,
     )
     for name in physical_names:
         sheet = SimpleNamespace(
@@ -2033,7 +2107,7 @@ def native_property_package(monkeypatch):
             ReferencedConfiguration=drawing.ASSEMBLY_VIEW_CONFIGURATION,
             exploded=False,
         )
-        if sheet.name == drawing.TOP_CAPTURE_SHEET:
+        if sheet.name == drawing.CARTRIDGE_SHEET:
             # Native view insertion may auto-drift the requested sheet scale.
             # The failing e9 run shrank its sheet sketch 4x at finalization.
             sheet.properties[2:4] = [1.0, 5.0]
@@ -2065,8 +2139,8 @@ def native_property_package(monkeypatch):
                 size = _iso_size(0.0)
             box = _view_box(view.Position, *size, view.ScaleRatio)
             if (doc.oversized == sheet.name
-                    or (sheet.name == drawing.TOP_CAPTURE_SHEET
-                        and view.ScaleRatio[1] < doc.top_capture_fit_denominator)):
+                    or (sheet.name == drawing.CARTRIDGE_SHEET
+                        and view.ScaleRatio[1] < doc.inspection_fit_denominator)):
                 # A native outline larger than the recipe's estimated room.
                 return (box[0], box[1], box[2], box[3] + 0.3)
             return box
@@ -2181,11 +2255,21 @@ def native_property_package(monkeypatch):
     )
     monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "JigBOM")
 
+    def balloons(_adapter, view, cluster, _items, _bom):
+        centre = drawing._region_center(view.GetOutline())
+        landings = [
+            SimpleNamespace(
+                stem=stem,
+                note=SimpleNamespace(circle=(*centre, drawing.BALLOON_RADIUS)),
+            )
+            for stem in cluster.stems
+        ]
+        doc.balloon_landings.extend(landings)
+        return landings
+
+    monkeypatch.setattr(drawing, "_balloon_cluster", balloons)
     monkeypatch.setattr(
-        drawing, "_balloon_cluster",
-        lambda _adapter, _view, cluster, _items, _bom: [
-            SimpleNamespace(stem=stem) for stem in cluster.stems
-        ],
+        drawing, "rendered_balloon_circle", lambda note, **_kwargs: note.circle
     )
 
     def note(_adapter, text, x, y):
@@ -2232,7 +2316,9 @@ def test_every_physical_sheet_links_to_its_actual_live_model_view(
         ))
     links = []
     for name, sheet in package.doc.sheets.items():
-        assert len(sheet.views) == (2 if name == drawing.ASSEMBLED_SHEET else 1)
+        assert len(sheet.views) == (
+            2 if name in (drawing.ASSEMBLED_SHEET, drawing.PIVOT_CAPTURE_SHEET) else 1
+        )
         # Read what the real finalizer wrote, resolving the name against this
         # physical sheet's real placement results, not a recipe-owned mapping.
         linked = next(
@@ -2303,17 +2389,17 @@ def test_c2a_section_is_real_sheet_ink_beside_the_live_source_view(
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
-    assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
+    assert package.doc.paper_edits == [drawing.CARTRIDGE_SHEET]
     assert package.doc.SketchManager.AddToDB is False
-    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
+    sheet = package.doc.sheets[drawing.CARTRIDGE_SHEET]
     transform = sheet.sketch.ModelToSketchTransform
     assert transform.scale == 20.0
     assert package.doc.sketch_lines == [
-        (drawing.TOP_CAPTURE_SHEET,
+        (drawing.CARTRIDGE_SHEET,
          transform.apply((*start, 0.0)), transform.apply((*end, 0.0)))
         for start, end in drawing.pin_tip_inspection_lines()
     ]
-    view, = package.doc.sheets[drawing.TOP_CAPTURE_SHEET].views
+    view, = package.doc.sheets[drawing.CARTRIDGE_SHEET].views
     assert view.model_path == str(drawing.SOURCE)
     for sheet, start, end in package.doc.sketch_lines:
         inverse = transform.Inverse()
@@ -2338,7 +2424,7 @@ def test_c2a_settled_proof_refuses_scaled_displaced_or_missing_native_ink(
     native_property_package, defect,
 ) -> None:
     package = native_property_package
-    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
+    sheet = package.doc.sheets[drawing.CARTRIDGE_SHEET]
     sheet.SetScale(1.0, 20.0, False, False)
     settled = drawing._place_pin_tip_inspection(package.adapter)
     if defect in {"scaled-endpoints", "shifted-endpoints"}:
@@ -2381,7 +2467,7 @@ def test_c2a_native_sketch_refusal_restores_database_mode(
     with pytest.raises(RuntimeError, match="C2A functional inspection"):
         drawing._place_pin_tip_inspection(package.adapter)
     assert manager.AddToDB is previous_add_to_db
-    assert package.doc.paper_edits == [drawing.TOP_CAPTURE_SHEET]
+    assert package.doc.paper_edits == [drawing.CARTRIDGE_SHEET]
     assert not package.doc.notes
 
 
@@ -2390,10 +2476,10 @@ def test_c2a_is_authored_at_fitted_scale_before_real_finalizer_repins_it(
     native_property_package, denominator,
 ) -> None:
     package = native_property_package
-    package.doc.top_capture_fit_denominator = denominator
+    package.doc.inspection_fit_denominator = denominator
     scales, settled = drawing._place_package(package.adapter)
-    sheet = package.doc.sheets[drawing.TOP_CAPTURE_SHEET]
-    assert scales[drawing.TOP_CAPTURE_SHEET] == (1.0, denominator)
+    sheet = package.doc.sheets[drawing.CARTRIDGE_SHEET]
+    assert scales[drawing.CARTRIDGE_SHEET] == (1.0, denominator)
     assert sheet.properties[2:4] == [1.0, denominator]
     before = list(package.doc.sketch_lines)
     with pytest.raises(package.save_boundary):
@@ -2419,3 +2505,66 @@ def test_instruction_reference_refuses_a_native_outline_outside_its_room(
     package.doc.oversized = sheet
     with pytest.raises(RuntimeError, match="leaves"):
         drawing._place_package(package.adapter)
+
+
+def test_capture_pair_places_two_source_views_and_only_one_balloon_set(
+    native_property_package, monkeypatch,
+) -> None:
+    package = native_property_package
+    isolated = []
+    monkeypatch.setattr(
+        drawing, "isolate_drawing_view_components",
+        lambda _adapter, view, *, visible_stems, label: isolated.append(
+            (view, visible_stems)
+        ),
+    )
+    scales, settled = drawing._place_package(package.adapter)
+    sheet = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET]
+    assert len(sheet.views) == 2
+    capture = next(
+        cluster for cluster in drawing.CLUSTERS
+        if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET
+    )
+    pair_isolation = [(view, names) for view, names in isolated if view.Sheet is sheet]
+    assert len(pair_isolation) == 2
+    for support, (view, names) in enumerate(pair_isolation):
+        assert names == drawing.capture_support_instances(capture, support)
+        assert tuple(view.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET]
+        assert _inside(
+            view.GetOutline(), drawing.CAPTURE_PAIR_REGIONS[support]
+        )
+    assert sheet.views[0].Position[0] < drawing.CLUSTER_CENTER[0]
+    assert sheet.views[1].Position[0] > drawing.CLUSTER_CENTER[0]
+    capture_landings = [
+        landing for landing in package.doc.balloon_landings
+        if landing.stem in capture.stems
+    ]
+    assert sorted(landing.stem for landing in capture_landings) == sorted(capture.stems)
+    assert len(package.doc.balloon_landings) == len(spec.BOM_ORDER)
+    settled[-1]()
+
+
+@pytest.mark.parametrize("defect", ("twin-left", "twin-scale", "twin-collapsed", "balloon-border"))
+def test_capture_pair_settled_guard_refuses_drift(native_property_package, defect) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    first, twin = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    if defect == "twin-left":
+        twin.Position = first.Position
+    elif defect == "twin-scale":
+        twin.ScaleRatio = (1.0, 100.0)
+    elif defect == "twin-collapsed":
+        twin.exploded = False
+    else:
+        capture = next(
+            cluster for cluster in drawing.CLUSTERS
+            if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET
+        )
+        landing = next(
+            landing for landing in package.doc.balloon_landings
+            if landing.stem in capture.stems
+        )
+        left, bottom, _right, top = drawing.CAPTURE_PAIR_REGIONS[0]
+        landing.note.circle = (left, (bottom + top) / 2.0, drawing.BALLOON_RADIUS)
+    with pytest.raises(RuntimeError, match="jig capture support"):
+        settled[-1]()

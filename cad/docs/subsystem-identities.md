@@ -203,12 +203,13 @@ KP08 or end-bracket STOCK height bands. Existing formed-wire/cotter
 envelope inspections remain required; the top cut alone does not certify
 all hardware clearances.
 
-The fitter package preserves its original sheets 1–10. Cartridge manufacture,
-pressing, joint acceptance and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) stay on sheet 8.
-**TOPCAPTUREFIT** sheet 9 is the single complete instruction authority for
-C2A and C4/C5 actual qualification; operation, pass changes, the complete
-installed stud contract (HD1–HD3), and machine acceptance remain on
-**CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
+The fitter package preserves its original sheets 1–10. **CARTRIDGEASSEMBLY**
+sheet 8 prints bench work in order (C2A with its functional schematic, C1,
+C2), then F1/F2 under their own feed-check heading. **TOPCAPTUREFIT** sheet 9
+prints cap seating/wiring C3–C3C, then carrier/top-retainer C4–C5D. Operation,
+pass changes, the complete installed stud contract (HD1–HD3), the numbered
+actual spindle/tool/holder clearance check C8 and machine acceptance remain
+on **CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
 
 C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
 With the actual pin/block/cap benched without bearings and the cap temporarily

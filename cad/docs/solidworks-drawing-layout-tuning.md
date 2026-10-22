@@ -176,6 +176,20 @@ row/column bounds and reference/title-block keep-outs. The exploded lock wire
 stays near its drilled screw heads, separately from the withdrawn cotter, with
 the existing real-edge balloon ownership and settled-landing guards unchanged.
 
+The e12 assembly review requires the two exploded capture supports to use
+the sheet's left and right fields, not stay bunched at the left of one large
+source view. Insert two native assembly views with the existing occurrence
+visibility isolation, the same source configuration/explode and one common
+measured ladder scale. Fit their native outlines plus balloon reach in
+separate equal fields above the title block; balloon the first support only.
+Do not run the whole-sheet ring relaxation afterwards: it would move that
+support toward the full sheet's centre again. Retain real-edge ownership,
+ring uncrossing and settled landing proofs, and recheck both native fields
+and the rendered balloon circles after finalization. The C2A schematic and
+its exact sheet-scale/endpoint/display proof travel with the bench procedure
+to sheet 8; feed checks, cap seating and carrier capture have distinct
+headings in that print order, without new acceptance criteria.
+
 For the assembly's imported CL-tip reference, curate the native dimension at
 a near-tip **dimension-line anchor**, reset inherited `OffsetText`, then use
 `offset_dimension_text` for the separate clear text lane. Moving the whole
