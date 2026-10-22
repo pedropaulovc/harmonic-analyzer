@@ -464,7 +464,91 @@ def test_neck_location_uses_straight_physical_faces_away_from_smooth_root(monkey
         assert selected["p0"][1] > .150 and selected["p1"][1] < .115
 
 
-@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name"))
+@pytest.mark.parametrize("fault", (None, "missing_seat", "wrong_nose_plane", "wrong_attachment", "arc_rejected", "centre_value", "banded", "precision", "reference_prefix"))
+def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_band(monkeypatch, fault):
+    import _drawing_dimensions as dimension_text
+    import _drawing_edge_dimensions as edge_dimensions
+
+    seat_edge, nose_edge = object(), object()
+    seat = ViewEdge(seat_edge, ((joint.NECK_HALF_X, -6.10, mounting.SIDE_PLATE_Z[1]), (joint.NECK_HALF_X, 6.10, mounting.SIDE_PLATE_Z[1])), None, None)
+    nose = ViewEdge(nose_edge, None, ((-1 if fault == "wrong_nose_plane" else 1) * joint.NECK_HALF_X, 0.0, 0.0, 1.0, 0.0, 0.0, joint.NOSE_R), None)
+    edges = ViewEdges("visible physical seat and nose", tuple([nose] if fault == "missing_seat" else [seat, nose]))
+    geometry = {seat_edge: seat, nose_edge: nose}
+    selected = {}
+    condition = {1: 0, 2: 1}  # The line has no arc; the arc initially uses its centre.
+    text = {}
+    position = []
+
+    class NativeDimension:
+        Name = "RD1"
+        DrivenState = 1
+        Tolerance = SimpleNamespace(Type=1 if fault == "banded" else 0)
+
+        @property
+        def SystemValue(self):
+            first, second = (geometry[edge] for edge in selected["entities"])
+            radius = second.circle[6] if condition[2] == 3 and fault != "centre_value" else 0.0
+            return (first.midpoint_mm[2] - second.circle[2] + radius) / 1000.0
+
+        def GetArcEndCondition(self, index):
+            return condition[index]
+
+        def SetArcEndCondition(self, index, value):
+            if fault == "arc_rejected":
+                return -1
+            condition[index] = value
+            return 0
+
+    native = NativeDimension()
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: (seat_edge, object() if fault == "wrong_attachment" else nose_edge),
+        GetAttachedEntityTypes=lambda: (1, 1),
+        IsDangling=lambda: False,
+        SetPosition2=lambda *xyz: position.append(xyz) or True,
+    )
+    display = SimpleNamespace(
+        GetDimension=lambda: native, GetDimension2=lambda _index: native,
+        GetAnnotation=lambda: annotation, precision=0,
+        GetText=lambda part: text.get(part, ""),
+    )
+    display.SetPrecision3 = lambda places, *_rest: setattr(display, "precision", 0 if fault == "precision" else places)
+    display.GetPrimaryPrecision2 = lambda: display.precision
+    display.SetText = lambda part, value: text.update({part: "" if fault == "reference_prefix" and part == 1 else value})
+    annotation.GetSpecificAnnotation = lambda: display
+
+    def insert(_adapter, _view, **kwargs):
+        selected.update(kwargs)
+        return display
+
+    for module in (drawing, dimension_text, edge_dimensions):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(dimension_text._sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
+    monkeypatch.setattr(dimension_text, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "add_edge_dimension", insert)
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.228 - p[1], .2124488 - p[2]))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+        _attempt=lambda callback: callback(),
+    )
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._overall_reference(adapter, object(), edges)
+    else:
+        assert drawing._overall_reference(adapter, object(), edges) is annotation
+        # The native boundary now measures the physical arc extreme, not its
+        # centre; no nominal text or SystemValue assignment can fake the span.
+        assert selected["entities"] == (seat_edge, nose_edge)
+        assert selected["orientation"] == "vertical"
+        assert native.SystemValue * 1000.0 == pytest.approx(105.89758778042652)
+        assert condition == {1: 0, 2: 3}
+        assert native.DrivenState == 1 and native.Tolerance.Type == 0
+        assert text == {1: "(", 2: ")"}
+        assert display.precision == 2
+        assert position[-1][:2] == drawing.OVERALL_REFERENCE_XY
+
+
+@pytest.mark.parametrize("fault", (None, "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name", "overall_name"))
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault):
     """Historical native ink stations with updated labels and simulated moves."""
     rows = {
@@ -477,6 +561,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "FlangeWidth": [("49.25", .0718882, .0952219, .0142236)],
         "NeckToFootSide": [("0.85", .247, .096, .010)],
         "TapFromSide": [("5.50 ±0.05", .2277281, .2372219, .0245438)],
+        "OverallHeight": [("(105.90)", .162, .1822219, .022)],
     }
     lines = {
         "NeckThickness": [(.091125, .2114488, .091125, .1784438), (.103625, .2114488, .103625, .1784438), (.091125, .1794438, .1633882, .1794438)],
@@ -487,6 +572,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "SeatToAxis": [(.2215, .1120512, .195, .1120512), (.2340527, .2124488, .195, .2124488), (.196, .1120512, .196, .1622219), (.196, .2124488, .196, .1677781)],
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
         "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
+        "OverallHeight": [(.228, .1120512, .173, .1120512), (.228, .2179488, .173, .2179488), (.174, .1120512, .174, .181), (.174, .2179488, .174, .189)],
         "TapFromSide": [
             (.2335, .2134488, .2335, .2382219),
             (.228, .2185015, .228, .2382219),
@@ -499,6 +585,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     for item in items.values():
         item.GetSpecificAnnotation = lambda item=item: item
     items["NeckToFootSide"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "lateral_name" else "NeckToFootSide")
+    items["OverallHeight"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "overall_name" else "OverallHeight")
 
     def native_display(_adapter, item):
         native_lines = list(lines[item.name])
@@ -529,7 +616,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     # R32 created and measured this native edge dimension successfully, but
     # later model-item name discovery did not find it. Its retained handle
     # must still receive the same real ink and neighbour-clearance checks.
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item is items["NeckToFootSide"] else item.name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("NeckToFootSide", "OverallHeight") else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
@@ -541,16 +628,20 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
     if fault:
-        message = "retained native dimension name" if fault == "lateral_name" else ("did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line"))
+        message = "retained native dimension name" if fault in ("lateral_name", "overall_name") else ("did not settle" if fault == "ignored_move" else ("own native line" if fault == "own_crossing" else "neighbouring native line"))
         with pytest.raises(RuntimeError, match=message):
-            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name != "NeckToFootSide"], lateral_location=items["NeckToFootSide"])
+            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"])
     else:
-        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name != "NeckToFootSide"], lateral_location=items["NeckToFootSide"])
+        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
         assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
         assert items["NeckThickness"].OffsetText
         assert ink["NeckThickness"].text[1] > .2235368
         assert ink["FlangeDepth"].text[2] < .196
+        # A real new overall line would cut the old 3.175 text station.
+        # Its measured witness now bounds that lane too, not a fixed nudge.
+        assert segment_box_overlap_length(Segment(.174, .1120512, .174, .181), Box(.1667191, .123, .1783566, .1265)) > 0.0
+        assert ink["FlangeDepth"].text[2] <= .174 - .004 + 1e-8
         assert ink["MountingX0"].text[2] < .054375
         assert ink["MountingX1"].text[0] > .072075
         assert ink["MountingY0"].text[1] > .08635
