@@ -268,7 +268,11 @@ class _Display(_ReadSurface):
         if self.__dict__.get("_saved_read", False):
             raise AssertionError("saved reader called native SetPosition2")
         self.placement_calls.append(("SetPosition2", x, y, z))
-        phase = "shelf" if self.label == source.THICKNESS and self._offset else "seed"
+        phase = "seed"
+        if self.label == source.THICKNESS and self._offset:
+            # Enabling offset reapplies the settled seed anchor; only the
+            # subsequent, distinct target is the final shelf move.
+            phase = "enable" if (x, y, z) == self.layout["position"] else "shelf"
         if self.placement_defect == f"rejected-{phase}":
             return False
         if self.placement_defect == f"ignored-{phase}":
@@ -2121,13 +2125,19 @@ def test_washer_linear_consumer_refuses_native_setter_failures_and_successful_no
     with pytest.raises(RuntimeError, match=message):
         _author_again(case)
     assert not case.app.open_calls
+    if defect in {"rejected-shelf", "ignored-shelf"}:
+        moves = [call[1:] for call in display.placement_calls if call[0] == "SetPosition2"]
+        assert len(moves) == 3
+        assert moves[0] == moves[1]  # Seed, then successful offset enable.
+        assert moves[2] != moves[1]  # The defect targets only the final shelf.
+        assert display.OffsetText is True
 
 
 @pytest.mark.parametrize("defect, message", (
     ("rejected-seed", "caption move was rejected"),
     ("ignored-seed", "caption crowds"),
     ("rejected-leader", "broken horizontal leader"),
-    ("ignored-leader", "leader style changed"),
+    ("ignored-leader", "near-side single-arrow style did not persist"),
 ))
 def test_washer_diameter_consumer_refuses_native_setter_failures_and_noops(
     saved_washer, defect, message,
@@ -2164,7 +2174,11 @@ def test_complete_bore_caption_not_numeric_anchor_drives_native_right_clearance(
     assert len(fragments) == 3
     assert text.xmin >= 0.04 + washer.CLEAR_GAP_M
     assert text.xmin == pytest.approx(0.043556 + washer.CLEAR_GAP_M + washer.PLACE_SETTLE_M)
-    assert display.layout["position"][0] - initial[0] >= 0.011756
+    displacement = display.layout["position"][0] - initial[0]
+    # Preserve the minimum full-caption move, allowing only subtraction roundoff.
+    assert displacement >= 0.011756 or displacement == pytest.approx(
+        0.011756, rel=0, abs=1e-17,
+    )
     assert display.text[4] == callout
     assert case.source_displays[source.BORE_DIAMETER].text[4] == callout
     proof()

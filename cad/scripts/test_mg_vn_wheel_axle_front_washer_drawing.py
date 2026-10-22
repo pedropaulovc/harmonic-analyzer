@@ -255,7 +255,8 @@ def test_seven_washer_recipes_reserve_projected_axes_before_fit(
     assert len(arguments["settled_checks"]) == 1
 
     label = drawing.SPEC.artifact_stem
-    notes = _config.parts(label)["installation_notes"]
+    # Match the builder: supplier operating data is a separate footer input.
+    notes = str(_config.parts(label).get("installation_notes", ""))
     caption_y = purchased.view_band_bottom(
         notes, label=label, supplier_data=arguments.get("supplier_data", ())
     )
