@@ -165,9 +165,13 @@ Submit that post-release refresh in a follow-up PR whose only changes are the
 `cad/config/release.yaml` `next_revision` bump, matching `[drawing].revision`
 literal lines in migrated or enrolled `cad/process/<stem>/plan.toml` files,
 and the regenerated README image files. This exact generated-only PR is exempt
-from the regular build and review gates and may merge immediately. Any other
+from the ordinary PR requirements and may merge immediately. Any other
 plan/shop edit, code, prose, documentation, README markup or layout change
-remains an ordinary PR and must pass the normal gates.
+remains an ordinary PR under [the merge requirements](../../AGENTS.md#minimum-merge-gate-every-pr).
+During the rolling-main trial, authors provide focused checks and appropriate
+native/review proof; an individual PR or stack does not need a full build to
+merge. The release manager continuously full-builds main, and daily releases
+still require green main and successful release checks for the released commit.
 
 For a supervised farm release, never launch the `release` target in the
 disposable snapshot. Use `farm-run.ps1` with
