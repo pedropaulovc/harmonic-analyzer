@@ -302,7 +302,7 @@ This is separate from `layout.audit`. Attributes are:
 
 | Signal | Attributes |
 | --- | --- |
-| Precheck | `name`, `kind`, `judge_reviewer`, `judge_model`, `forced`; `outcome` and `decision` are `skip`, `review`, `bypass`, or `error`; `skip_kind` is `rendering_noise`, `assembly_single_part`, or `none`; `reason` and `error` retain the original text (empty when absent). Bypass has the reason `Precheck bypassed by --force.` |
+| Precheck | `name`, `kind`, `judge_reviewer`, `judge_model`, `forced`; `outcome` is `skip`, `review`, `bypass`, or `error`; `skip_kind` is `rendering_noise`, `assembly_single_part`, or `none`; `reason` and `error` are forwarded unchanged (empty when absent), subject to the backend's 8192-character attribute limit. Bypass has the reason `Precheck bypassed by --force.` |
 | Aggregate completion | `verdict` (`SHIP`, `FIX`, `ERROR`); `decision_basis` (`precheck_skip`, `full_review`, `error`); all precheck classification/text fields prefixed `precheck_`; requested `run_count`, `completed_run_count`, `valid_run_count`, existing run `error_count`, `judge_executed`, aggregate `error`, package `name`/`kind`, reviewer/model and judge reviewer/model. |
 
 `precheck_skip` plus `SHIP` means change triage **without full reviewers**, not
@@ -352,7 +352,7 @@ Completed aggregate SHIP provenance (including raw bypass/error counts):
 let completed = dependencies
 | where timestamp > ago(2h) and name == "machinist_review.aggregate"
 | extend package=tostring(customDimensions.name),
-         kind=tostring(customDimensions.kind),
+         package_kind=tostring(customDimensions.kind),
          verdict=tostring(customDimensions.verdict),
          basis=tostring(customDimensions.decision_basis),
          outcome=tostring(customDimensions.precheck_outcome),
@@ -380,8 +380,8 @@ precheck query for prompt in-flight decisions.
 
 ```kusto
 completed
-| summarize arg_max(timestamp, *) by package, kind
-| project timestamp, package, kind, verdict, basis, outcome, skip_kind,
+| summarize arg_max(timestamp, *) by package, package_kind
+| project timestamp, package, package_kind, verdict, basis, outcome, skip_kind,
           reason, error, completed_runs, valid_runs, operation_Id
 | order by timestamp desc
 ```

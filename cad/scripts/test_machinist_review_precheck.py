@@ -227,7 +227,7 @@ def test_precheck_and_aggregate_results_reach_sdk_exporter(
     precheck, = [span for span in finished if span.name == "machinist_review.precheck"]
     holistic, = [span for span in finished if span.name == "machinist_review.aggregate"]
     attrs = precheck.attributes
-    assert attrs["outcome"] == attrs["decision"] == outcome
+    assert attrs["outcome"] == outcome
     assert attrs["skip_kind"] == skip_kind
     assert attrs["forced"] == case.startswith("force")
     assert precheck.parent.span_id == holistic.context.span_id

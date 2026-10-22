@@ -2398,14 +2398,14 @@ def aggregate_package(
             )
             precheck_attributes = {
                 "outcome": precheck_outcome,
-                "decision": precheck_outcome,
                 "skip_kind": precheck_info["skip_kind"] or "none",
                 "reason": precheck_info["reason"] or (
                     "Precheck bypassed by --force." if force else ""
                 ),
                 "error": precheck_info["error"] or "",
             }
-            precheck_span.set_attributes(precheck_attributes)
+            for key, value in precheck_attributes.items():
+                precheck_span.set_attribute(key, value)
 
         def run(run_id: str) -> Review:
             directory = report_dir / package.name / "runs" / run_id
