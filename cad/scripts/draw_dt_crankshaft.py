@@ -23,7 +23,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from typing import Any, Callable, Sequence
@@ -922,397 +921,25 @@ def _outboard_neck_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
-def _neck_selection_context_failure_census(
-    adapter: Any,
-    view: Any,
-    source: Any,
-    extension: Any,
-    selected_input: Any,
-    rim: Any,
-    canonical: Any,
-    roundtrip: Any,
-    *,
-    label: str,
-) -> None:
-    """Temporary, read-only failure receipt; never an alternative acceptance proof.
-
-    Keep every labeled occurrence, even when IsSame reports equality. Python id
-    only memoizes getter readbacks, never establishes native identity. The graph
-    stops after two forward maps per seed and one opposite map per result.
-    """
-    census: dict[str, Any] = {
-        "schema": "neck-selection-context-matrix-1",
-        "refusal_label": label,
-        "guard_input_origin": "existing guard argument; selection caller uses GetSelectedObject6(1,-1)",
-        "limits": {"source_bodies": 8, "source_edges": 256, "entity_nodes": 25},
-    }
-    curve_cache: dict[int, tuple[Any, Any, Any, dict[str, Any]]] = {}
-    label_cache: dict[int, tuple[Any, dict[str, Any]]] = {}
-
-    def type_name(value: Any) -> str:
-        cls = type(value)
-        return f"{cls.__module__}.{cls.__qualname__}"
-
-    def scalar(value: Any) -> Any:
-        if type(value) is float and not math.isfinite(value):
-            return {"nonfinite_float": repr(value)}
-        return value
-
-    def result(value: Any) -> dict[str, Any]:
-        record: dict[str, Any] = {"type": type_name(value)}
-        if value is None or type(value) in (bool, int, float, str):
-            record.update(status="null" if value is None else "value", value=scalar(value))
-        elif type(value) in (tuple, list):
-            if all(item is None or type(item) in (bool, int, float, str) for item in value):
-                record.update(
-                    status="value",
-                    value=[scalar(item) for item in value],
-                    item_types=[type_name(item) for item in value],
-                )
-            else:
-                record.update(status="object_sequence", count=len(value))
-        else:
-            record["status"] = "object"
-        return record
-
-    def error(exc: Exception) -> dict[str, Any]:
-        return {"status": "error", "error_type": type_name(exc), "message": str(exc)}
-
-    def probe(read: Callable[[], Any]) -> tuple[Any, dict[str, Any]]:
-        try:
-            value = read()
-            return value, result(value)
-        except Exception as exc:
-            return None, error(exc)
-
-    def labels(value: Any) -> dict[str, Any]:
-        key = id(value)
-        if key not in label_cache:
-            label_cache[key] = (
-                value,
-                {
-                    "python_class": type_name(value),
-                    "dispatch_typeinfo_name": probe(
-                        lambda: value._oleobj_.GetTypeInfo(0).GetDocumentation(-1)[0]
-                    )[1],
-                },
-            )
-        return label_cache[key][1]
-
-    def curve_data(edge: Any) -> tuple[Any, Any, dict[str, Any]]:
-        key = id(edge)
-        if key not in curve_cache:
-            curve, curve_return = probe(lambda: _early_bound(edge, "IEdge").GetCurve())
-            typed, binding = probe(lambda: _early_bound(curve, "ICurve"))
-            is_circle, circle_return = probe(lambda: typed.IsCircle())
-            params, params_return = (
-                probe(lambda: typed.CircleParams)
-                if is_circle is True
-                else (None, {"status": "not_called", "reason": "IsCircle did not return true"})
-            )
-            curve_cache[key] = (
-                edge,
-                curve,
-                params,
-                {
-                    "get_curve": curve_return,
-                    "curve_binding": binding,
-                    "is_circle": circle_return,
-                    "circle_params": params_return,
-                },
-            )
-        _, curve, params, record = curve_cache[key]
-        return curve, params, record
-
-    def valid_circle(record: dict[str, Any], params: Any) -> bool:
-        return (
-            record["is_circle"].get("value") is True
-            and type(params) in (tuple, list)
-            and len(params) == 7
-            and all(type(value) in (int, float) and math.isfinite(value) for value in params)
-        )
-
-    def matches_circle(params: Any, radius: float) -> bool:
-        cx, cy, cz, ax, ay, az, actual_radius = params
-        return (
-            abs(cx) < 1e-6
-            and abs(cz) < 1e-6
-            and abs(cy - JOURNAL_START / 1000.0) < 1e-6
-            and abs(actual_radius - radius) < 1e-6
-            and abs(ax) < 1e-9
-            and abs(az) < 1e-9
-            and abs(abs(ay) - 1.0) < 1e-9
-        )
-
-    def matrix(objects: dict[str, Any]) -> dict[str, Any]:
-        available = {name: value for name, value in objects.items() if value is not None}
-        return {
-            "order": list(available),
-            "rows": [
-                [
-                    probe(lambda a=left, b=right: adapter.swApp.IsSame(a, b))[1]
-                    for right in available.values()
-                ]
-                for left in available.values()
-            ],
-            "omitted_nulls": [name for name, value in objects.items() if value is None],
-        }
-
-    def document_data(document: Any) -> dict[str, Any]:
-        model, binding = probe(lambda: _early_bound(document, "IModelDoc2"))
-        manager, manager_return = probe(lambda: model.ConfigurationManager)
-        configuration, configuration_return = probe(
-            lambda: _early_bound(manager, "IConfigurationManager").ActiveConfiguration
-        )
-        return {
-            "object": result(document),
-            "labels": labels(document),
-            "model_binding": binding,
-            "path": probe(lambda: model.GetPathName())[1],
-            "title": probe(lambda: model.GetTitle())[1],
-            "document_type": probe(lambda: model.GetType())[1],
-            "configuration_manager": manager_return,
-            "active_configuration": configuration_return,
-            "configuration_name": probe(
-                lambda: _early_bound(configuration, "IConfiguration").Name
-            )[1],
-        }
-
-    def view_data(raw: Any) -> dict[str, Any]:
-        typed, binding = probe(lambda: _early_bound(raw, "IView"))
-        return {
-            "object": result(raw),
-            "labels": labels(raw),
-            "view_binding": binding,
-            "name": probe(lambda: typed.GetName2())[1],
-            "configuration": probe(lambda: typed.ReferencedConfiguration)[1],
-            "referenced_path": probe(lambda: typed.GetReferencedModelName())[1],
-        }
-
-    try:
-        # Only circle getters are used to shortlist the independent control.
-        # No faces, projections, visible-edge census or selection writes.
-        inventory: dict[str, Any] = {"bodies": [], "issues": [], "control_candidates": []}
-        census["source_shortlist"] = inventory
-        bodies, inventory["get_bodies"] = probe(
-            lambda: _early_bound(source, "IPartDoc").GetBodies2(-1, False)
-        )
-        source_bodies: dict[str, Any] = {}
-        controls: list[tuple[Any, Any]] = []
-        if type(bodies) not in (tuple, list) or not bodies:
-            inventory["issues"].append("GetBodies2 did not return a nonempty body sequence")
-            bodies = ()
-        if len(bodies) > 8:
-            inventory["issues"].append("source body diagnostic limit exceeded")
-        edge_count = 0
-        for body_index, body in enumerate(bodies[:8]):
-            body_label = f"source_body_{body_index}"
-            source_bodies[body_label] = body
-            body_record: dict[str, Any] = {"label": body_label, "object": result(body)}
-            inventory["bodies"].append(body_record)
-            edges, body_record["get_edges"] = probe(
-                lambda b=body: _early_bound(b, "IBody2").GetEdges()
-            )
-            if type(edges) not in (tuple, list) or not edges:
-                inventory["issues"].append(f"{body_label}: no readable nonempty edge sequence")
-                continue
-            remaining = max(0, 256 - edge_count)
-            if len(edges) > remaining:
-                inventory["issues"].append("source edge diagnostic limit exceeded")
-            edge_count += len(edges)
-            for edge_index, edge in enumerate(edges[:remaining]):
-                _, params, geometry = curve_data(edge)
-                occurrence = f"{body_label}.edge_{edge_index}"
-                if geometry["is_circle"].get("value") is False:
-                    continue
-                if not valid_circle(geometry, params):
-                    inventory["issues"].append({"label": occurrence, "geometry": geometry})
-                    continue
-                if matches_circle(params, JOURNAL_DIA / 2000.0):
-                    controls.append((edge, params))
-                    inventory["control_candidates"].append(
-                        {"label": occurrence, "geometry": geometry}
-                    )
-        inventory["source_edge_count"] = edge_count
-        _, rim_params, rim_geometry = curve_data(rim)
-        target_matches = valid_circle(rim_geometry, rim_params) and matches_circle(
-            rim_params, SHAFT_DIA / 2000.0
-        )
-        unique_control = len(controls) == 1 and not inventory["issues"]
-        radius_delta = controls[0][1][6] - rim_params[6] if unique_control and target_matches else None
-        distinct_geometry = radius_delta is not None and abs(radius_delta) > 2e-6
-        inventory["control_guard"] = {
-            "inventory_complete": not inventory["issues"],
-            "match_count": len(controls),
-            "target_matches_existing_rim_geometry": target_matches,
-            "target_geometry": rim_geometry,
-            "expected_station_m": JOURNAL_START / 1000.0,
-            "expected_target_radius_m": SHAFT_DIA / 2000.0,
-            "expected_control_radius_m": JOURNAL_DIA / 2000.0,
-            "actual_control_minus_target_radius_m": radius_delta,
-            "disjoint_radius_bands": distinct_geometry,
-            "selection_basis": "actual circle geometry, before any IsSame calls",
-        }
-        control = controls[0][0] if unique_control and target_matches and distinct_geometry else None
-        control_return = (
-            result(control)
-            if control is not None
-            else error(RuntimeError("independent unique geometrically distinct source edge unavailable"))
-        )
-
-        seeds = {
-            "source_rim": rim,
-            "selected_input": selected_input,
-            "canonical_actual": canonical,
-            "roundtrip_actual": roundtrip,
-            "source_control": control,
-        }
-        nodes = dict(seeds)
-        node_records = {name: result(value) for name, value in seeds.items()}
-        node_records["source_control"] = control_return
-        census["nodes"] = node_records
-        census["maps"] = []
-        # Opposite means the documented inverse direction, not a claimed
-        # guarantee that either map or its reverse succeeds for every context.
-        directions = (
-            ("to_source", extension.GetCorrespondingEntity2, "to_view", view.GetCorrespondingEntity),
-            ("to_view", view.GetCorrespondingEntity, "to_source", extension.GetCorrespondingEntity2),
-        )
-        for seed_name, seed in seeds.items():
-            for direction, forward, reverse_direction, reverse in directions:
-                mapped_name = f"{seed_name}.{direction}"
-                reverse_name = f"{mapped_name}.{reverse_direction}"
-                mapped, mapped_return = (
-                    probe(lambda f=forward, value=seed: f(value))
-                    if seed is not None
-                    else (None, {"status": "not_called", "reason": "seed is null or unavailable"})
-                )
-                reversed_entity, reverse_return = (
-                    probe(lambda f=reverse, value=mapped: f(value))
-                    if mapped is not None
-                    else (None, {"status": "not_called", "reason": "forward result is null or unavailable"})
-                )
-                nodes[mapped_name] = mapped
-                nodes[reverse_name] = reversed_entity
-                node_records[mapped_name] = mapped_return
-                node_records[reverse_name] = reverse_return
-                census["maps"].append(
-                    {
-                        "seed": seed_name,
-                        "direction": direction,
-                        "result": mapped_name,
-                        "reverse_direction": reverse_direction,
-                        "reverse_result": reverse_name,
-                    }
-                )
-        census["entity_is_same"] = matrix(nodes)
-
-        drawing, drawing_return = probe(lambda: adapter.currentModel)
-        active, active_return = probe(lambda: adapter.swApp.ActiveDoc)
-        referenced, referenced_return = probe(lambda: view.ReferencedDocument)
-        documents = {
-            "source_argument": source,
-            "drawing_current_model": drawing,
-            "native_active_document": active,
-            "view_referenced_document_now": referenced,
-        }
-        census["document_getters"] = {
-            "adapter_current_model": drawing_return,
-            "native_active_document": active_return,
-            "view_referenced_document": referenced_return,
-        }
-        census["documents"] = {name: document_data(value) for name, value in documents.items()}
-        census["document_is_same"] = matrix(documents)
-        manager, manager_return = probe(
-            lambda: _early_bound(drawing, "IModelDoc2").SelectionManager
-        )
-        selection, selection_binding = probe(lambda: _early_bound(manager, "ISelectionMgr"))
-        owner, owner_return = probe(lambda: selection.GetSelectedObjectsDrawingView2(1, -1))
-        census["selection"] = {
-            "manager": manager_return,
-            "manager_binding": selection_binding,
-            "count": probe(lambda: selection.GetSelectedObjectCount2(-1))[1],
-            "selected_type": probe(lambda: selection.GetSelectedObjectType3(1, -1))[1],
-            "guard_input_node": "selected_input",
-            "selected_owner": owner_return,
-        }
-        census["views"] = {"intended": view_data(view), "selected_owner": view_data(owner)}
-        census["view_is_same"] = matrix({"intended": view, "selected_owner": owner})
-
-        census["source_bodies"] = {
-            name: {
-                "object": result(body),
-                "labels": labels(body),
-                "name": probe(lambda b=body: _early_bound(b, "IBody2").Name)[1],
-                "body_type": probe(lambda b=body: _early_bound(b, "IBody2").GetType())[1],
-            }
-            for name, body in source_bodies.items()
-        }
-        census["source_body_is_same"] = matrix(source_bodies)
-        census["edge_readbacks"] = {}
-        body_cache: dict[int, tuple[Any, Any, dict[str, Any]]] = {}
-        for name, entity in nodes.items():
-            if entity is None:
-                continue
-            curve, _, geometry = curve_data(entity)
-            if "curve_class" not in geometry:
-                geometry["curve_class"] = probe(
-                    lambda c=curve: _early_bound(c, "ICurve").Identity()
-                )[1]
-                geometry["curve_labels"] = labels(curve)
-            key = id(entity)
-            if key not in body_cache:
-                body, body_return = probe(
-                    lambda e=entity: _early_bound(e, "IEdge").GetBody()
-                )
-                body_cache[key] = (entity, body, body_return)
-            _, body, body_return = body_cache[key]
-            census["edge_readbacks"][name] = {
-                "labels": labels(entity),
-                "geometry": geometry,
-                "body": body_return,
-                "body_labels": labels(body),
-                "body_name": probe(lambda b=body: _early_bound(b, "IBody2").Name)[1],
-                "body_type": probe(lambda b=body: _early_bound(b, "IBody2").GetType())[1],
-                "body_vs_source": matrix({"edge_body": body, **source_bodies}),
-            }
-    except Exception as exc:
-        census["census_error"] = error(exc)
-    print(
-        "NECK_CONTEXT_MATRIX_JSON="
-        + json.dumps(census, separators=(",", ":"), ensure_ascii=True, allow_nan=False),
-        flush=True,
-    )
-
-
 def _assert_outboard_neck_view_rim(
     adapter: Any, side: Any, view_entity: Any, rim: Any, *, label: str
 ) -> None:
-    """Prove the view edge's source identity and exact view-context roundtrip."""
+    """Require the view attachment's reverse map to the exact physical source rim."""
     view = _early_bound(side, "IView")
     source = view.ReferencedDocument
     if source is None or source == "":
         raise RuntimeError(f"{label}: physical rim attachment has no referenced source")
     model = _early_bound(source, "IModelDoc2")
     extension = _early_bound(model.Extension, "IModelDocExtension")
-    # _native_axis_datum._validate_source_edge uses this documented mapping.
-    # IsSame is meaningful here only within one context: view/view or part/part.
+    # The documented reverse map is required; the native target rim has no
+    # forward source-to-view correspondence. Compare only source-context edges.
     canonical = extension.GetCorrespondingEntity2(view_entity)
     if canonical is None:
         raise RuntimeError(f"{label}: physical rim attachment has no source correspondence")
-    roundtrip = view.GetCorrespondingEntity(canonical)
-    if roundtrip is None or int(adapter.swApp.IsSame(roundtrip, view_entity)) != 1:
-        try:
-            _neck_selection_context_failure_census(
-                adapter, view, model, extension, view_entity, rim, canonical, roundtrip,
-                label=label,
-            )
-        except Exception:
-            pass  # Diagnostic/logging failure must not replace the strict refusal.
-        raise RuntimeError(
-            f"{label}: physical rim attachment source-to-view roundtrip is missing or different"
-        )
-    if int(adapter.swApp.IsSame(canonical, rim)) != 1:
+    if (
+        int(adapter.swApp.IsSame(canonical, rim)) != 1
+        or int(adapter.swApp.IsSame(rim, canonical)) != 1
+    ):
         raise RuntimeError(
             f"{label}: physical rim attachment maps to a different source edge"
         )
@@ -1439,6 +1066,14 @@ def _assert_outboard_neck_dimension(
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one native view dimension {full_name!r}")
     annotation, display = matches[0]
+    owner = annotation.Owner
+    if (
+        int(annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
+        or owner is None
+        or int(adapter.swApp.IsSame(owner, side)) != 1
+        or int(adapter.swApp.IsSame(side, owner)) != 1
+    ):
+        raise RuntimeError(f"{label}: native annotation owner is not FRONT")
     measured_mm = _assert_plain_neck_size(display, label=label, expected_driven_state=1)
     if len(inboard) != 1:
         raise RuntimeError(f"{label}: expected one unchanged right-hand NeckDiaDim")
@@ -1500,6 +1135,13 @@ def _add_outboard_neck_dimension(
     selected = selection.GetSelectedObject6(1, -1)
     if selected is None:
         raise RuntimeError(f"{label}: selected physical rim has no view entity")
+    owner = selection.GetSelectedObjectsDrawingView2(1, -1)
+    if (
+        owner is None
+        or int(adapter.swApp.IsSame(owner, side)) != 1
+        or int(adapter.swApp.IsSame(side, owner)) != 1
+    ):
+        raise RuntimeError(f"{label}: selected physical rim owner is not FRONT")
     _assert_outboard_neck_view_rim(
         adapter, side, selected, rim, label=f"{label} selection"
     )

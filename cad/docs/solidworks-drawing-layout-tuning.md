@@ -1683,14 +1683,29 @@ or a same-sized circle on the right is not an equivalent attachment.
 
 Select that referenced-part edge through the documented
 `IView.SelectEntity(rim, False)` drawing-view mapping, with view activation,
-selection count and non-null readback checks. Do not pass an underlying-part
+selection count and non-null readback checks. Require
+`ISelectionMgr.GetSelectedObjectsDrawingView2(1, -1)` to return FRONT itself,
+with `ISldWorks.IsSame == 1` in both directions. Do not pass an underlying-part
 edge directly to `IEntity.Select4`: its active-document restriction is not
 overridden by assuming `ISelectData.View` maps across documents. Require the
-selected drawing entity to map through the verified source model's
-`IModelDocExtension.GetCorrespondingEntity2` to the exact resolved source
-edge, then round-trip through `IView.GetCorrespondingEntity` to the selected
-view entity. Compare native identity only within the same document context;
-same-radius geometry or a raw model-versus-view `IsSame` is not proof.
+selected drawing entity's non-null **reverse** correspondence through the
+referenced source model's `IModelDocExtension.GetCorrespondingEntity2` to be
+the exact resolved physical rim, with source-context `IsSame == 1` in both
+directions. Same-radius geometry or a raw model-versus-view `IsSame` is not proof.
+
+The retained native `neck-selection-context-matrix-1` receipt at
+`D:/farm-runs/rolling-main-post-v44-20261021/crank1864-60665f1b-complete-native-context-matrix.json`
+(`copies[0].payload`) proves this boundary: the selected owner is FRONT and
+the selected edge maps back to the physical Ø9.525 rim in both identity
+directions, while forward source/canonical/selected-to-view maps return null.
+The distinct outer journal rim on the same plane (radii 5.694 versus
+4.7625 mm) supplies a successful forward/reverse positive control; every
+target/control cross-identity is 0 and every non-null self-identity is 1.
+The offline fixture retains that matrix. This falsifies a universal forward
+roundtrip requirement, not the required non-null reverse map or explicit
+FRONT owner. It does not establish native diameter creation: that invocation
+refused before API 6 and produced no saved PDF. No temporary census remains
+in the production recipe.
 
 `IModelDocExtension.AddSpecificDimension(..., 6, status)` requests
 `swDiameterDimension`; type 15 is a doubled linear distance, not a substitute.
@@ -1708,9 +1723,11 @@ finalizer's actual drawing/PDF saves, reacquire the native display from
 FRONT. Match the captured native `IDimension` by its live `FullName` and
 `ISldWorks.IsSame`, not a pre-save selection-name string. Prove diameter
 type, actual unrounded size, driven state, places, read-only
-`IDimension.Tolerance.Type == swTolNONE` and the exact physical-edge
-attachment through the same source/view correspondence proof. Capture the
-original right-hand driven state and require it
+`IDimension.Tolerance.Type == swTolNONE`, drawing-view `OwnerType`, and actual
+`IAnnotation.Owner == FRONT` with native identity in both directions.
+Require exactly one non-null EDGE attachment, not dangling, and the same
+required reverse canonical-to-physical-rim identity in both directions.
+Capture the original right-hand driven state and require it
 unchanged (do not assume an imported reference sketch dimension is driving).
 Read back its value/places/band and empty quantity at the same boundaries.
 `GetLeaderCount` is diagnostic, not a note's one-leader contract. Callbacks

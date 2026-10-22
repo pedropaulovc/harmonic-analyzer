@@ -1079,13 +1079,28 @@ def test_collar_side_neck_refuses_unreadable_circle_parameters(
 
 @pytest.fixture
 def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    rim = _neck_rim()
-    adapter, side = _neck_front_fakes(monkeypatch, [[rim]])
-    view_rim = object()
-    canonical = Mock(side_effect=lambda entity: rim if entity is view_rim else None)
-    roundtrip = Mock(side_effect=lambda entity: view_rim if entity is rim else None)
+    # Native neck-selection-context-matrix-1 at 60665f1b: the target's
+    # forward map is null, but its required reverse source identity succeeds.
+    centre = (0.0, spec.JOURNAL_START + 9e-8, 0.0)
+    rim = _neck_rim(centre=centre)
+    control = _neck_rim(centre=centre, radius=spec.JOURNAL_DIA / 2.0)
+    adapter, side = _neck_front_fakes(monkeypatch, [[rim, control]])
+    view_rim, view_control = object(), object()
+    canonical_rim = _neck_rim(centre=centre)
+    canonical_control = _neck_rim(centre=centre, radius=spec.JOURNAL_DIA / 2.0)
+    selected_owner, annotation_owner = object(), object()
+
+    def to_source(entity):
+        if entity is view_rim:
+            return canonical_rim
+        if entity is view_control:
+            return canonical_control
+        return None
+
+    canonical = Mock(side_effect=to_source)
+    forward = Mock(side_effect=lambda entity: view_control if entity is control else None)
     side.ReferencedDocument.Extension = SimpleNamespace(GetCorrespondingEntity2=canonical)
-    side.GetCorrespondingEntity = roundtrip
+    side.GetCorrespondingEntity = forward
     side.SelectEntity = Mock(return_value=True)
     native = SimpleNamespace(
         SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=2,
@@ -1111,7 +1126,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetDisplayData=Mock(return_value=arrow_data),
     )
     annotation = SimpleNamespace(
-        name="RD1", GetType=Mock(return_value=4),
+        name="RD1", OwnerType=0, Owner=annotation_owner, GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=display),
         GetAttachedEntities3=Mock(return_value=(view_rim,)),
         GetAttachedEntityCount3=Mock(return_value=1),
@@ -1141,6 +1156,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     selection = SimpleNamespace(
         GetSelectedObjectCount2=Mock(return_value=1),
         GetSelectedObject6=Mock(return_value=view_rim),
+        GetSelectedObjectsDrawingView2=Mock(return_value=selected_owner),
     )
     model = SimpleNamespace(
         Extension=SimpleNamespace(AddSpecificDimension=Mock(return_value=(display, 0))),
@@ -1152,9 +1168,15 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     adapter.currentModel = model
 
     def is_same(left, right):
-        if (left is rim and right is view_rim) or (left is view_rim and right is rim):
-            raise AssertionError("IsSame must not compare part and drawing-view contexts")
-        return int(left is right)
+        if left is right:
+            return 1
+        for group in (
+            (rim, canonical_rim), (control, canonical_control),
+            (side, selected_owner, annotation_owner),
+        ):
+            if any(left is item for item in group) and any(right is item for item in group):
+                return 1
+        return 0
 
     adapter.swApp = SimpleNamespace(IsSame=Mock(side_effect=is_same))
     select = Mock(side_effect=AssertionError("body-rim selection must use IView.SelectEntity"))
@@ -1168,10 +1190,73 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         annotation=annotation, right_native=right_native, right_display=right_display,
         right_texts=right_texts, right_annotation=right_annotation, texts=texts,
         model=model, select=select, rebuild=rebuild, selection=selection,
-        view_rim=view_rim, canonical=canonical, roundtrip=roundtrip,
+        view_rim=view_rim, canonical=canonical, canonical_rim=canonical_rim, forward=forward,
+        control=control, view_control=view_control, canonical_control=canonical_control,
+        selected_owner=selected_owner, annotation_owner=annotation_owner,
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
         arrow_data=arrow_data, arrow_tip=arrow_tip,
     )
+
+
+def test_neck_fixture_retains_native_target_control_correspondence_boundary(
+    neck_dimension_fakes: SimpleNamespace,
+) -> None:
+    f = neck_dimension_fakes
+    # Retained receipt: crank1864-60665f1b-complete-native-context-matrix.json,
+    # copies[0].payload. The outer control is distinct actual geometry, not a
+    # missing-reverse waiver or an acceptance fallback for the target.
+    assert f.rim.curve.CircleParams[1] == f.control.curve.CircleParams[1]
+    assert f.rim.curve.CircleParams[6] == pytest.approx(0.0047625)
+    assert f.control.curve.CircleParams[6] == pytest.approx(0.005694)
+    assert f.control.curve.CircleParams[6] - f.rim.curve.CircleParams[6] > 2e-6
+    assert f.forward(f.rim) is None
+    assert f.forward(f.canonical_rim) is None
+    assert f.forward(f.view_rim) is None
+    assert f.canonical(f.view_rim) is f.canonical_rim
+    assert f.forward(f.control) is f.view_control
+    assert f.canonical(f.view_control) is f.canonical_control
+    nodes = (
+        f.rim, f.view_rim, f.canonical_rim, f.control,
+        f.canonical(f.view_rim), f.view_control, f.canonical_control,
+    )
+    assert [
+        [f.adapter.swApp.IsSame(left, right) for right in nodes] for left in nodes
+    ] == [
+        [1, 0, 1, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 1, 0, 0, 1],
+        [1, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 1, 0, 0, 1],
+    ]
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "after insertion rebuild", "final settling rebuild",
+        "after_drawing_save", "after_pdf_save",
+    ],
+)
+def test_neck_null_forward_map_keeps_required_reverse_identity_at_every_checkpoint(
+    neck_dimension_fakes: SimpleNamespace, phase: str,
+) -> None:
+    f = neck_dimension_fakes
+    f.native.DrivenState = 1
+    f.display.ShowParenthesis = False
+    if phase in ("after_drawing_save", "after_pdf_save"):
+        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+    else:
+        drawing._assert_outboard_neck_dimension(
+            f.adapter, f.side, f.native, 2, phase=phase
+        )
+    f.canonical.assert_called_once_with(f.view_rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.canonical_rim, f.rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.rim, f.canonical_rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.annotation_owner, f.side)
+    f.adapter.swApp.IsSame.assert_any_call(f.side, f.annotation_owner)
+    f.forward.assert_not_called()
 
 
 def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
@@ -1185,7 +1270,8 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
         ("select", f.side.SelectEntity),
         ("count", f.selection.GetSelectedObjectCount2),
         ("read", f.selection.GetSelectedObject6),
-        ("canonical", f.canonical), ("roundtrip", f.roundtrip),
+        ("owner", f.selection.GetSelectedObjectsDrawingView2),
+        ("canonical", f.canonical),
         ("same", f.adapter.swApp.IsSame),
     ):
         trace.attach_mock(operation, name)
@@ -1193,9 +1279,10 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
     def add(*args):
         assert trace.mock_calls == [
             call.activate("FRONT"), call.clear(True), call.select(f.rim, False),
-            call.count(-1), call.read(1, -1), call.canonical(f.view_rim),
-            call.roundtrip(f.rim), call.same(f.view_rim, f.view_rim),
-            call.same(f.rim, f.rim),
+            call.count(-1), call.read(1, -1), call.owner(1, -1),
+            call.same(f.selected_owner, f.side), call.same(f.side, f.selected_owner),
+            call.canonical(f.view_rim),
+            call.same(f.canonical_rim, f.rim), call.same(f.rim, f.canonical_rim),
         ]
         f.select.assert_not_called()
         return f.display, 0
@@ -1217,12 +1304,18 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
     )
     f.rebuild.assert_called_once_with(f.adapter, label="collar-side neck")
     drawing.view_name.assert_called_once_with(f.adapter, f.side)
-    f.canonical.assert_has_calls([call(f.view_rim), call(f.view_rim)])
-    f.roundtrip.assert_has_calls([call(f.rim), call(f.rim)])
+    assert f.canonical.call_args_list == [call(f.view_rim), call(f.view_rim)]
+    f.forward.assert_not_called()
+    f.selection.GetSelectedObjectsDrawingView2.assert_called_once_with(1, -1)
     f.model.GraphicsRedraw2.assert_called_once_with()
     f.annotation.GetAttachedEntities3.assert_called_once_with()
     f.adapter.swApp.IsSame.assert_any_call(f.native, f.native)
-    f.adapter.swApp.IsSame.assert_any_call(f.rim, f.rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.canonical_rim, f.rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.rim, f.canonical_rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.annotation_owner, f.side)
+    f.adapter.swApp.IsSame.assert_any_call(f.side, f.annotation_owner)
+    assert call(f.rim, f.view_rim) not in f.adapter.swApp.IsSame.mock_calls
+    assert call(f.view_rim, f.rim) not in f.adapter.swApp.IsSame.mock_calls
     assert f.native.SystemValue == spec.SHAFT_DIA / 1000.0
     assert vars(f.right_native) == original_right
     f.right_display.GetText.assert_any_call(3)  # old quantity explicitly re-read
@@ -1271,27 +1364,32 @@ def test_new_neck_refuses_unqualified_native_view_selection_before_api6(
     "failure, message",
     [
         ("canonical-missing", "no source correspondence"),
-        ("roundtrip-missing", "source-to-view roundtrip"),
-        ("roundtrip-wrong", "source-to-view roundtrip"),
         ("canonical-wrong", "different source edge"),
+        ("canonical-control", "different source edge"),
+        ("canonical-asymmetric-forward", "different source edge"),
+        ("canonical-asymmetric-reverse", "different source edge"),
     ],
 )
-def test_neck_requires_exact_source_and_view_correspondence_at_every_phase(
+def test_neck_requires_reverse_physical_identity_at_every_phase(
     neck_dimension_fakes: SimpleNamespace, phase: str, failure: str, message: str,
 ) -> None:
     f = neck_dimension_fakes
     if failure == "canonical-missing":
         f.canonical.side_effect = None
         f.canonical.return_value = None
-    elif failure == "canonical-wrong":
-        # Identical circle parameters do not establish physical edge identity.
+    elif failure in ("canonical-wrong", "canonical-control"):
+        # Equal target geometry, or a valid but distinct control, is not identity.
         f.canonical.side_effect = None
-        f.canonical.return_value = _neck_rim()
-        f.roundtrip.side_effect = None
-        f.roundtrip.return_value = f.view_rim
+        f.canonical.return_value = _neck_rim() if failure == "canonical-wrong" else f.control
     else:
-        f.roundtrip.side_effect = None
-        f.roundtrip.return_value = None if failure == "roundtrip-missing" else object()
+        same = f.adapter.swApp.IsSame.side_effect
+        left, right = (
+            (f.canonical_rim, f.rim) if failure == "canonical-asymmetric-forward"
+            else (f.rim, f.canonical_rim)
+        )
+        f.adapter.swApp.IsSame.side_effect = (
+            lambda a, b: 0 if a is left and b is right else same(a, b)
+        )
     with pytest.raises(RuntimeError, match=message):
         if phase == "before-api6":
             drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
@@ -1309,16 +1407,102 @@ def test_neck_requires_exact_source_and_view_correspondence_at_every_phase(
     f.select.assert_not_called()
 
 
-@pytest.mark.parametrize("operation", ["canonical", "roundtrip"])
+@pytest.mark.parametrize("operation", ["canonical", "selection-owner"])
 def test_neck_correspondence_access_errors_are_not_suppressed(
     neck_dimension_fakes: SimpleNamespace, operation: str,
 ) -> None:
     f = neck_dimension_fakes
-    getattr(f, operation).side_effect = RuntimeError("native correspondence access failed")
+    native = (
+        f.canonical if operation == "canonical"
+        else f.selection.GetSelectedObjectsDrawingView2
+    )
+    native.side_effect = RuntimeError("native correspondence access failed")
     with pytest.raises(RuntimeError, match="native correspondence access failed"):
         drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.select.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "before-api6", "after insertion rebuild", "final settling rebuild",
+        "after_drawing_save", "after_pdf_save",
+    ],
+)
+@pytest.mark.parametrize("failure", ["missing", "wrong", "asymmetric-forward", "asymmetric-reverse"])
+def test_neck_requires_exact_front_owner_at_every_phase(
+    neck_dimension_fakes: SimpleNamespace, phase: str, failure: str,
+) -> None:
+    f = neck_dimension_fakes
+    before = phase == "before-api6"
+    owner = f.selected_owner if before else f.annotation_owner
+    if failure in ("missing", "wrong"):
+        replacement = None if failure == "missing" else SimpleNamespace(name="FRONT")
+        if before:
+            f.selection.GetSelectedObjectsDrawingView2.return_value = replacement
+        else:
+            f.annotation.Owner = replacement
+    else:
+        same = f.adapter.swApp.IsSame.side_effect
+        left, right = (
+            (owner, f.side) if failure == "asymmetric-forward" else (f.side, owner)
+        )
+        f.adapter.swApp.IsSame.side_effect = (
+            lambda a, b: 0 if a is left and b is right else same(a, b)
+        )
+    with pytest.raises(RuntimeError, match="owner is not FRONT"):
+        if before:
+            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        else:
+            f.native.DrivenState = 1
+            f.display.ShowParenthesis = False
+            if phase in ("after_drawing_save", "after_pdf_save"):
+                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+            else:
+                drawing._assert_outboard_neck_dimension(
+                    f.adapter, f.side, f.native, 2, phase=phase
+                )
+    f.canonical.assert_not_called()
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.display.SetPrecision3.assert_not_called()
+    f.forward.assert_not_called()
+
+
+@pytest.mark.parametrize("source", [None, ""])
+def test_neck_reverse_identity_requires_a_referenced_source(
+    neck_dimension_fakes: SimpleNamespace, source: object,
+) -> None:
+    f = neck_dimension_fakes
+    f.side.ReferencedDocument = source
+    with pytest.raises(RuntimeError, match="has no referenced source"):
+        drawing._assert_outboard_neck_view_rim(
+            f.adapter, f.side, f.view_rim, f.rim, label="neck"
+        )
+    f.canonical.assert_not_called()
+    f.forward.assert_not_called()
+
+
+@pytest.mark.parametrize("phase", ["before-api6", "after_drawing_save"])
+def test_neck_direct_source_identity_cannot_replace_required_reverse_correspondence(
+    neck_dimension_fakes: SimpleNamespace, phase: str,
+) -> None:
+    f = neck_dimension_fakes
+    # Even a raw source object that is IsSame to itself must map back; there
+    # is no source-OR-view acceptance branch when the required map is null.
+    if phase == "before-api6":
+        f.selection.GetSelectedObject6.return_value = f.rim
+    else:
+        f.native.DrivenState = 1
+        f.display.ShowParenthesis = False
+        f.annotation.GetAttachedEntities3.return_value = (f.rim,)
+    with pytest.raises(RuntimeError, match="no source correspondence"):
+        if phase == "before-api6":
+            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        else:
+            drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.forward.assert_not_called()
 
 
 @pytest.mark.parametrize("status", [-1, 1, None, False])
@@ -1359,6 +1543,8 @@ def test_new_neck_dimension_refuses_precision_problem_status(
         ("native_tolerance", "Type", 2, "explicit tolerance"),
         ("display", "GetOverride", True, "overridden or parenthesized"),
         ("display", "ShowParenthesis", True, "overridden or parenthesized"),
+        ("annotation", "OwnerType", 1, "annotation owner is not FRONT"),
+        ("annotation", "OwnerType", 2, "annotation owner is not FRONT"),
         ("annotation", "GetAttachedEntities3", (), "physical rim attachment"),
         ("annotation", "GetAttachedEntities3", (None,), "physical rim attachment"),
         ("annotation", "GetAttachedEntities3", (_neck_rim(),), "physical rim attachment"),
