@@ -154,12 +154,17 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
     ),
 )
-# The press and its proud set are assembly (MHA-PD-00 "arm-plate-located");
-# the callout keeps the hole's own requirements only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+# The pin supplier owns the interference. Keep the small mouth break: it
+# preserves cylindrical press engagement at the independently set proud end.
+# Blind depth leaves end clearance rather than setting insertion by bottoming.
 LOCATOR_CALLOUT = (
     "2X REAM, FLAT BOTTOM\n"
-    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+    "PRESS FIT ARM/PLATE LOCATING DOWELS\n"
+    "MHA-PD-VN-64\n"
+    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX\n"
+    "PRESERVES PRESS ENGAGEMENT"
 )
+LOCATOR_DEPTH_CALLOUT = "END CLEARANCE AT\nSPECIFIED DOWEL PROUD SET"
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix
@@ -167,28 +172,33 @@ LOCATOR_CALLOUT = (
 # reference, so the title block's .XX band never applies to it.
 STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 STOCK_TEXT_SUFFIX = ") GROUND STOCK"
+# These mouths pay the loss in the existing worst-case full-thread engagement;
+# relaxing them to the general break would invalidate that source stack.
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
-    f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
+    f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES\n"
+    "PRESERVES FULL-THREAD ENGAGEMENT"
 )
-SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
+# R9-71 and the spring owner place the spring on this floor under the screw
+# head. Keep both source bands: diameter clears the spring, floor sets room.
+SPOT_FACE_CALLOUT = (
+    "COUNTERBORE, REAR FACE\n"
+    "SEATS PIVOT SPRING MHA-PD-VN-63\n"
+    "UNDER MHA-PD-VN-57 HEAD"
+)
 # Where each projected zone starts and which way it runs. Both start at
 # front face A (z = 0): the plate taps' run rearward through the arm into
 # the MHA-PD-19 plate to the seated screw-head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
 # the pin bore's runs forward to the chain plane
 # (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
-PROJECTED_ZONE_NOTE = "\n".join((
-    "3. PROJECTED ZONES START AT FRONT FACE A: PLATE TAPS",
-    f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
-    f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
-))
-# Two short lines: the text stands under the section's pivot end, inside the
-# left border.
-FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
+PLATE_PROJECTED_ZONE_CALLOUT = "PROJECTED ZONE FROM FRONT FACE A\nREARWARD TO SCREW-HEAD CONTACT"
+PIN_PROJECTED_ZONE_CALLOUT = "PROJECTED ZONE FROM FRONT FACE A\nFORWARD TO CHAIN PLANE"
+FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE\nSETS PIVOT SPRING ROOM"
 # Conditional measured-shaft clearance with ordinary squareness paid; not an
 # absolute H7/g6 bore zone. The stated 90-degree angle takes the angular row.
 PIVOT_BORE_CALLOUT = "\n".join((
-    "REAM TO MEASURED VN041",
+    "REAM TO MEASURED TRANSGEAR PIVOT",
+    "SCREW MHA-PD-VN-57",
     f"SHOULDER +{PIVOT_BORE_DIAMETRAL_CLEARANCE[0]:.{PIVOT_FIT_CLEARANCE_PLACES}f}"
     f"/+{PIVOT_BORE_DIAMETRAL_CLEARANCE[1]:.{PIVOT_FIT_CLEARANCE_PLACES}f} DIA",
     "MATCHED SET; NOT INTERCHANGEABLE",

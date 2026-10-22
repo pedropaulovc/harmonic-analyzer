@@ -12,12 +12,11 @@ Latching: pull the tab along +U, the arm flexes flatwise and the strip slides
 off the pin; lift the hanger and the pin's crowned end rides up the tab and
 the strip until it snaps into the hole.
 
-Process (the sheet's notes): the blank is the flat pattern; every form is
-made annealed; fit to the bar, clamp the hanger at full feed mesh, set the
-annealed arm square on the pin with the strip's far face at its drawn
-station, and match-drill the pin hole from the pin; remove, harden and
-temper blue, reinstall.  The order of cutting, bending and drilling is the
-shop's.
+The pin hole is matched annealed at assembly to the named latch pin and
+hanger arm, then the hook is hardened, tempered and refitted.  Its lower
+edge bears on the pin at the set mesh; the paper-drive assembly owns the
+mesh setup and latch acceptance.  The formed face remains square to the
+pin at its drawn station; reference coordinates do not become controls.
 
 How the sheet locates things:
 
@@ -263,23 +262,33 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
 MATERIAL_TITLE = f"{SHEET_T:.1f} (0.032) 1095 spring steel"
 DRAWING_NOTES = "\n".join(
     (
-        "1. FLAT PATTERN: THIN OUTLINE RIGHT OF SIDE VIEW. FORM ANNEALED.",
-        "2. FIT ANNEALED ON MHA-PD-07; CLAMP HANGER AT FULL MESH.",
-        "3. SET ARM SQUARE ON PIN, FACE AT DRAWN STATION; MATCH-DRILL PIN HOLE.",
-        "4. REMOVE FOR HEAT TREATMENT, REINSTALL. RADII TO INSIDE SURFACE.",
+        "1. RADII INSIDE; FORM SQUARE TO MHA-PD-VN-58 PIN.",
+        "2. PIN ON MHA-PD-18 ARM; FORMED FACE AT DRAWN STATION.",
+        "3. MATCH-DRILL ANNEALED AT SET MESH; LOWER HOLE EDGE BEARS ON PIN.",
+        "4. THEN HARDEN, TEMPER AND REFIT; ACCEPT PER MHA-PD-00.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-# The base-and-ear section stands beside the side view, out of projection
-# with the front view, so it is labelled.
-BOTTOM_VIEW_NOTE = "BOTTOM VIEW"
+# The bottom view is removed from projection: its letter matches the
+# upward viewing arrow beside the side view.
+BOTTOM_VIEW_NOTE = "VIEW A (BOTTOM)"
+FLAT_VIEW_NOTE = "FLAT PATTERN"
 PAIR_CALLOUT = "2X"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 # Under the drill line: the mate the ±POSITION_TOL bands serve (review 4).
 # Plain drilled to the print, not match-drilled: the taps are fixed.
 SCREW_HOLE_MATE = "LOCATE TO MHA-PD-07 TAPS"
-# One line: an above-callout (note 3 says where and when it is drilled).
-PIN_HOLE_CALLOUT = "MATCH-DRILL"
+# Flag the matched-fit facts at the hole, not just in the note schedule.
+PIN_HOLE_CALLOUT = "MATCH-DRILL; NOTE 3"
+FEATURE_MATE_CALLOUTS = {
+    "Width": "CLEARS MHA-PD-12 GUIDE LOCK",
+    "BaseLength": "HOOK FAR-HOLE -X WEB",
+    "InsideBendR": "CLEARS MHA-SH-VN-52 HEAD",
+    **{
+        name: "SEE NOTES 1-2"
+        for name in ("RollStart", "RollR", "StraightLen", "TabR", "TabEndX")
+    },
+}
 ROUND_CALLOUT = "FULL ROUND"
 FLAT_ROUND_CALLOUT = "TO FULL-ROUND CENTRE"
 # drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall height, the ear's top edge to the full round's
@@ -310,8 +319,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "InsideBend": {"InsideBendR"},
     "ScrewHoleProfile": {"ScrewX1", "ScrewX2", "ScrewY", "ScrewDia"},
     "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | REFERENCE_DIMENSIONS,
-    "Arm": {"ArmLowZ"},
-    "TaperProfile": {"ArmFrontZ"},
+    # The taper sketch's endpoint lies on the low blade edge; the Arm
+    # extrusion's start-offset dimension has its witness above that edge.
+    "TaperProfile": {"ArmFrontZ", "TaperLowZ"},
     "RootRelief": {"RootR"},
     "RoundProfile": {"RoundR"},
     "PinHoleProfile": {"PinHoleDia"},
@@ -333,8 +343,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmProfile": {
         name: FORMED_PLACES for name in sorted(DRAWING_DIMENSIONS["ArmProfile"])
     },
-    "Arm": {"ArmLowZ": ARM_BAND_PLACES},
-    "TaperProfile": {"ArmFrontZ": ARM_BAND_PLACES},
+    "TaperProfile": {"ArmFrontZ": ARM_BAND_PLACES, "TaperLowZ": ARM_BAND_PLACES},
     "RootRelief": {"RootR": ROOT_R_PLACES},
     "RoundProfile": {"RoundR": ROUND_R_PLACES},
     "PinHoleProfile": {"PinHoleDia": HOLE_PLACES},

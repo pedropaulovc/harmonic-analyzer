@@ -50,7 +50,9 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_feature_control_frame
-from _drawing_notes import add_property_linked_note
+from _drawing_leader_notes import add_attached_note
+from _drawing_leaders import set_near_side_diameter
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -65,13 +67,18 @@ from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
+    BOLT_CIRCLE_CALLOUT,
     BOSS_CLEARANCE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
+    FLANGE_DIA_CALLOUT,
     FLANGE_THICK,
+    FLANGE_THICK_CALLOUT,
     FLAT_CLEARANCE,
     GEOMETRIC_TOLERANCES_MM,
+    HUB_DIA,
+    HUB_DIA_CALLOUT,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
     OIL_HOLE_CALLOUT_BELOW,
@@ -82,6 +89,7 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
+    SPIGOT_LENGTH_CALLOUT,
 )
 
 
@@ -165,13 +173,8 @@ FLAT_CALLOUT = "\n".join(
 #   little low between its extension lines to leave the spigot end's frame
 #   room above it.  The two lengths from the flange's rear face on one row
 #   above: the flange's text left of the flange, the spigot's right of the
-#   spigot.  The overall, a reference faced at assembly, on the next row up,
-#   outermost, its text and fit-up callout right of the spigot end's
-#   extension line.  Its ends are the spigot's and the hub's +X corners, so
-#   from a row above its extension lines rise off the part; from below they
-#   ran down across the hub front and the spigot end.  The oil hole's size
-#   with its match-drill callout above-left, over the gap between the two
-#   views, its text ending left of the overall's hub-front extension line.
+#   spigot. The fitted overall is on its own upper row. The oil-hole callout
+#   is below its own feature, so its leader never cuts either length row.
 # - The two perpendicularity frames stand right of the spigot's end, each
 #   level with its leader's landing so the leader runs square onto its face's
 #   line: the flange's below the spigot, between the spigot's and the
@@ -185,21 +188,28 @@ END_KEEP = {
     "FlatToAxis": (END_CENTER[0] - 0.030, AXIS_Y - _FLANGE_R - 0.020),
 }
 SIDE_KEEP = {
-    "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
+    "HubDia": (HUB_FRONT_X - 0.030, AXIS_Y),
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
-    # Clear the spigot's whole fit-callout box, not just its dimension line.
-    "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
-    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.008),
-    "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.008),
-    "HubLength": (SPIGOT_END_X + 0.040, AXIS_Y + _FLANGE_R + 0.024),
-    "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
+    # Separate the whole diameter callout boxes by 6.9 sheet mm; the
+    # spigot's text extends 30.04 mm right of its own dimension line.
+    "FlangeDia": (SPIGOT_END_X + 0.107, AXIS_Y),
+    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.016),
+    "SpigotLength": (SPIGOT_END_X + 0.040, AXIS_Y + _FLANGE_R + 0.016),
+    "HubLength": (SPIGOT_END_X + 0.065, AXIS_Y + _FLANGE_R + 0.046),
+    # Keep the full proportional-location text left of the two corner leaders.
+    "OilHoleDia": (_side_x((HUB_FRONT_Z - FLANGE_THICK) / 2.0) - 0.013, AXIS_Y - 0.074),
 }
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
+    "BoltCircleDia": BOLT_CIRCLE_CALLOUT,
     "FlatToAxis": FLAT_CALLOUT,
     "ScrewHoleDia": SCREW_HOLE_CALLOUT_BELOW,
     "OilHoleDia": OIL_HOLE_CALLOUT_BELOW,
     "SpigotDia": SPIGOT_CALLOUT_BELOW,
+    "HubDia": HUB_DIA_CALLOUT,
+    "FlangeDia": FLANGE_DIA_CALLOUT,
+    "FlangeThick": FLANGE_THICK_CALLOUT,
+    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": f"{HUB_LENGTH_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
 }
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
@@ -410,6 +420,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Spigot Corner Callout",
+            "Hub Corner Callout",
         ),
         required=(
             "Number",
@@ -417,6 +429,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Spigot Corner Callout",
+            "Hub Corner Callout",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -482,6 +496,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
+    # Each single-arrow diameter stops at its near rim rather than running
+    # through the bore centre and crossing another diameter's leader.
+    for annotation in end_annotations:
+        name = dimension_name(adapter, annotation)
+        if name in {"BoltCircleDia", "BoreDia"}:
+            set_near_side_diameter(annotation, f"hub {name}")
     for view, label in ((end, "face"), (side, "edge")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(
@@ -517,6 +537,30 @@ async def build(adapter: Any) -> dict[str, str]:
             tolerance=GEOMETRIC_TOLERANCES_MM[key],
             datums=(BORE_DATUM,),
             label=frame.label,
+        )
+    # Existing R0.1 limits belong at the two flange roots. Their source-
+    # linked text moves out of the notes; the sharp model is unchanged.
+    for property_name, radius, station, note_xy in (
+        ("Spigot Corner Callout", SPIGOT_DIA / 2.0, 0.0, (0.290, 0.100)),
+        ("Hub Corner Callout", HUB_DIA / 2.0, -FLANGE_THICK, (0.290, 0.084)),
+    ):
+        root = FaceFrame(property_name, station, radius, -radius)
+        edge = face_rim(side_edges, root).edge
+        (landing,) = model_points_in_view(
+            adapter,
+            side,
+            ((-radius / 1000.0, 0.0, station / 1000.0),),
+            label=property_name,
+            names=("flange root",),
+        )
+        add_attached_note(
+            adapter,
+            side,
+            text=property_link(property_name),
+            entity=edge,
+            leader_attach_xy=landing,
+            note_xy=note_xy,
+            label=property_name,
         )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set

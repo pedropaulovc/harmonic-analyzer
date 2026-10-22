@@ -78,6 +78,7 @@ from pd_transgear_disc_hub_spec import (
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_THICK,
+    HUB_CORNER_CALLOUT,
     FLAT_TO_AXIS,
     FLAT_TO_AXIS_DEVIATIONS,
     HUB_BODY_LENGTH,
@@ -87,6 +88,7 @@ from pd_transgear_disc_hub_spec import (
     OIL_HOLE_DIA,
     OIL_HOLE_STATION,
     SCREW_HOLE_DIA,
+    SPIGOT_CORNER_CALLOUT,
     SPIGOT_DIA,
     SPIGOT_DIA_DEVIATIONS,
     SPIGOT_LENGTH,
@@ -472,9 +474,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Radial oil hole on +Y, one wall to the bore.  Top-plane sketch (u, v) =
     # model (X, -Z): a construction line on the axis from the hub front face
-    # to the hole centre carries the station, half the hub body (R9-60: the
-    # sheet prints no station; the hole is centred at fit-up); the circle's
-    # centre sits on its end.
+    # to the hole centre carries the model's half-body station (R9-60).
+    # The sheet states the same proportional location after facing, with
+    # its centring allowance; the circle's centre sits on the line's end.
     oil = SketchDims()
     check("create_sketch oil hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -575,7 +577,15 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Spigot Corner Callout": SPIGOT_CORNER_CALLOUT,
+            "Hub Corner Callout": HUB_CORNER_CALLOUT,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

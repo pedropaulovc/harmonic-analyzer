@@ -204,8 +204,11 @@ BORE_ENTRY_BREAK_LEG_MAX = max(
     BORE_ENTRY_BREAK_MAX,
     BORE_ENTRY_BREAK_MAX * math.tan(math.radians(max(BORE_ENTRY_BREAK_ANGLE_LIMITS))),
 )
+# The two selected edges are the rear opening's arc and flat, not two ends.
+# Retain BOTH LEGS: the existing wall/drive bounds spend both physical legs.
 BORE_ENTRY_BREAK_CALLOUT = (
-    f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG\nBOTH D EDGES; BOTH LEGS"
+    f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG\n"
+    "REAR END ONLY; ARC AND FLAT\nBOTH LEGS\nCLEARS MHA-PD-08 SHAFT CORNER"
 )
 # Spend both turned-surface axes independently; no perfect common-axis credit.
 NECK_D_BORE_AIR_MIN = (
@@ -470,8 +473,17 @@ for _ok, _what in (
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the callout states the requirement, not a method; the
 # native +0.012/0.000 band already prints the curved portion's H7.
-BORE_CALLOUT = "TRUE D THRU"
-PIN_HOLE_CALLOUT = "2X REAM THROUGH"
+BORE_CALLOUT = "TRUE D THRU\nSEE NOTE 2"
+FLAT_CALLOUT = "SEE NOTE 2"
+PIN_HOLE_CALLOUT = "2X REAM THROUGH\nPRESS FIT ON\nMHA-PD-VN-54 DRIVE PINS"
+PIN_PATTERN_CALLOUT = "MHA-PD-09\nDRIVE PATTERN"
+PILOT_DIA_CALLOUT = (
+    f"CLEARANCE IN MHA-PD-09 BORE\n"
+    f"RADIAL CLR {PILOT_BORE_CLEARANCE[0]:.2f}-{PILOT_BORE_CLEARANCE[1]:.2f}"
+)
+# This OD clears the chain around the smallest interchangeable wheel; it
+# is not a close fit in a bore and its band must not be loosened for the rim.
+OD_CALLOUT = "CLEARS ANSI #25 CHAIN\nON MHA-PD-09 T12"
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH
 DRAWING_REFERENCE_PRECISION = 1

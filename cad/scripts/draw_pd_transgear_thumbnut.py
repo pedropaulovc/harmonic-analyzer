@@ -46,6 +46,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -312,6 +313,10 @@ def _assert_native_thread(display: Any) -> None:
 
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
     """Keep the native rear cone/axis arc local and move only its text outboard."""
+    # This is the cone/axis HALF-angle: ±0.5° is exactly the title-block
+    # ±1° included-angle envelope, not an independently tightened cone fit.
+    # Keep the native value and band; omitting the half-angle tolerance
+    # would double the permitted included-angle error and thread loss.
     name = "CountersinkHalfAngle"
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
     if len(matches) != 1:
@@ -433,6 +438,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"{THREAD} UNC-2B through thread",
     )
     _assert_native_thread(thread_callout)
+    omit_title_block_thread_class(thread_callout, label="MHA-PD-13 through tap")
 
     return await finalize_drawing(
         adapter,

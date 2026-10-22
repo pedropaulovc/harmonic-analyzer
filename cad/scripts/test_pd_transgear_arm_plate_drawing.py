@@ -340,7 +340,6 @@ _SECTION_LABEL_MODEL = 2.1
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
 _TITLE_BLOCK_LEFT_X = 0.216  # the title block's left edge, below y 0.066
-_NOTE_CHAR_MM = 2.5  # a sheet note's character pitch (measured on the r3 sheet)
 _CAPTION_HEIGHT = 0.0035
 # The 1:1 isometric's half extents, sheet m: 44 x 52 measured on the r3
 # sheet for the 31.75 bar, plus its widening to 38.1 foreshortened (cos 30
@@ -452,15 +451,9 @@ def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
         drawing.SECTION_KEEP["BossDia"][2] + _half_width_model(boss_text)
     )
     assert _INNER_BORDER_X - boss_right >= 0.002
-    # The isometric stands between the notes and the title block, its
-    # caption above it and below the back view's edge dimensions.
-    notes_right = drawing.NOTES_XY[0] + drawing.NOTES_WIDTH * _NOTE_CHAR_MM / 1000.0
-    iso_left = drawing.ISO_CENTER[0] - _ISO_HALF_WIDTH_SHEET
-    assert iso_left - notes_right >= _GAP
+    # The matched locator note now lives on sheet 2. The isometric still
+    # clears the title block and its caption stays under the edge dimensions.
     assert _TITLE_BLOCK_LEFT_X - (drawing.ISO_CENTER[0] + _ISO_HALF_WIDTH_SHEET) >= _GAP
-    assert all(
-        len(line) <= drawing.NOTES_WIDTH for line in drawing.NOTES_TEXT.splitlines()
-    )
     edge_text_bottom = (
         drawing.PLAN_CENTER[1]
         + (drawing.BACK_KEEP["EdgeLeftX"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
@@ -530,42 +523,120 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     assert -geometry.END_R - keep["HubToBoss"][1] < _CAPTION_CLEAR_MODEL
 
 
-def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
-    """Both sheets state the setting and acceptance, and every zone's origin."""
-    import draw_pd_transgear_arm as arm_drawing
-    import pd_rack_pinion_spec as disc
 
-    numbers = {
-        key: _config.parts(key)["number"]
-        for key in ("pd-transgear-arm", "pd-transgear-arm-plate")
+@pytest.mark.parametrize(
+    "fault",
+    (None, "overlap", "border", "title block", "extent", "attachment",
+     "leader", "dangling", "text", "missing note", "view", "section letter",
+     "section arrow"),
+)
+def test_settled_projection_notes_use_native_ink_and_attached_state(
+    monkeypatch, fault: str | None,
+) -> None:
+    """A later rebuild cannot silently overlap or detach the acceptance text."""
+    from types import SimpleNamespace
+
+    from _drawing_layout_check import DrawableRegion
+
+    class Note:
+        def __init__(self, text, box):
+            self.text = text
+            self.extent = (box[0], box[1], 0.0, box[2], box[3], 0.0)
+            self.attached = 1
+            self.leaders = 1
+            self.dangling = False
+
+        def GetExtent(self):
+            return self.extent
+
+        def GetText(self):
+            return self.text
+
+        def GetAnnotation(self):
+            return self
+
+        def GetAttachedEntityCount3(self):
+            return self.attached
+
+        def GetLeaderCount(self):
+            return self.leaders
+
+        def IsDangling(self):
+            return self.dangling
+
+    active_sheets = []
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            ActivateSheet=lambda name: active_sheets.append(name) or True,
+        ),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing, "sheet_region",
+        lambda _adapter: DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667),
+    )
+    sections = tuple(
+        SimpleNamespace(
+            GetLabel=lambda letter=letter: letter,
+            GetTextInfo=lambda y=y: (0.350, y, 0.0, 0.365, y, 0.0),
+            GetTextFormat=lambda: SimpleNamespace(
+                CharHeight=0.0035, IsHeightSpecifiedInPts=lambda: False,
+            ),
+        )
+        for letter, y in (("B", 0.250), ("C", 0.230))
+    )
+    native_view = SimpleNamespace(
+        GetOutline=lambda: (0.260, 0.160, 0.340, 0.250),
+        GetSectionLines=lambda: sections,
+    )
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (native_view,))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "section")
+    monkeypatch.setattr(
+        drawing, "section_line_segments",
+        lambda _adapter, _view: [((0.350, 0.185), (0.365, 0.185))],
+    )
+    notes = {
+        "screw zone": Note(
+            spec.SCREW_PROJECTED_ZONE_CALLOUT, (0.014, 0.030, 0.110, 0.060),
+        ),
+        "knob zone": Note(
+            spec.KNOB_PROJECTED_ZONE_CALLOUT, (0.014, 0.110, 0.140, 0.135),
+        ),
+        "matched pair": Note(
+            drawing.LOCATOR_MATCH_TEXT, (0.014, 0.174, 0.150, 0.216),
+        ),
+        "caption": Note(
+            drawing.PROJECTION_CAPTION, (0.014, 0.255, 0.120, 0.263),
+        ),
     }
-    for text, mate in (
-        (arm_drawing.NOTES_TEXT, numbers["pd-transgear-arm-plate"]),
-        (drawing.NOTES_TEXT, numbers["pd-transgear-arm"]),
-    ):
-        flat = " ".join(line.strip() for line in text.splitlines())
-        assert f"MATCH-DRILLED WITH {mate}," in flat
-        tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
-        assert f"KNOB BORE CLAMPED {disc.CENTRE_DISTANCE:.3f} {tol} FROM" in flat
-        assert f"CENTRES STILL WITHIN {tol}" in flat
-        assert "NO SHAKE, NO DAYLIGHT" in flat
-        assert "ACCEPTANCE" not in flat
-        assert "PROJECTED ZONES START AT" in flat
-    plate_notes = " ".join(line.strip() for line in drawing.NOTES_TEXT.splitlines())
-    projected = [
-        control for control in drawing.GEOMETRIC_CONTROLS
-        if control.projected_zone_height_mm is not None
-    ]
-    assert projected
-    for control in projected:
-        assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
-    assert "LEFT VIEW: REAR FACE;" in plate_notes
-    assert f"CSK COAXIAL WITH ITS \u00d8{geometry.SCREW_HOLE_DIA:.1f} HOLE." in plate_notes
-    assert "CENTRE VIEW: MOUNTING FACE A." in plate_notes
-    for feature in ("HOLE BORES (CENTRE VIEW)", "KNOB BORE"):
-        assert feature in plate_notes
-    assert "CSK CONES" not in plate_notes
-    # The countersinks are cut from the rear face, which *Front (the left
-    # view) looks at; *Back (the centre view) looks at face A.
-    assert geometry.REAR_FACE_Z > 0.0
-    assert drawing.PLAN_CENTER[0] < drawing.BACK_CENTER[0] < drawing.SECTION_CENTER[0]
+    if fault == "overlap":
+        notes["knob zone"].extent = (0.020, 0.180, 0.0, 0.145, 0.210, 0.0)
+    elif fault == "border":
+        notes["caption"].extent = (0.014, 0.260, 0.0, 0.120, 0.275, 0.0)
+    elif fault == "title block":
+        notes["screw zone"].extent = (0.225, 0.030, 0.0, 0.350, 0.060, 0.0)
+    elif fault == "extent":
+        notes["knob zone"].extent = ()
+    elif fault == "attachment":
+        notes["screw zone"].attached = 0
+    elif fault == "leader":
+        notes["screw zone"].leaders = 2
+    elif fault == "dangling":
+        notes["screw zone"].dangling = True
+    elif fault == "text":
+        notes["matched pair"].text = "native text lost its matched-set acceptance"
+    elif fault == "missing note":
+        del notes["knob zone"]
+    elif fault == "view":
+        notes["knob zone"].extent = (0.270, 0.200, 0.0, 0.330, 0.240, 0.0)
+    elif fault == "section letter":
+        notes["knob zone"].extent = (0.350, 0.244, 0.0, 0.360, 0.251, 0.0)
+    elif fault == "section arrow":
+        notes["knob zone"].extent = (0.350, 0.180, 0.0, 0.365, 0.190, 0.0)
+
+    if fault is None:
+        drawing._assert_projection_notes_clear(adapter, notes)
+        assert active_sheets == [drawing.SHEET_NAMES[1]]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_projection_notes_clear(adapter, notes)

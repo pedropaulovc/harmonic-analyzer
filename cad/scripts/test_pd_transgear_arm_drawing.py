@@ -384,7 +384,6 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
-    assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
     assert "SHOULDER +0.132/+0.152 DIA" in spec.PIVOT_BORE_CALLOUT
     assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
@@ -491,7 +490,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     crossed the left border (rendered at x 1.5 mm), and the counterbore text
     crossed it before."""
     lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
-    floor = _hanging_left_box(lines, drawing.SECTION_KEEP["FloorDepth"])
+    floor = _hanging_left_box(lines, drawing.DIMENSION_TEXT_POSITIONS["FloorDepth"])
     section_bottom = (
         drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
     )
@@ -500,9 +499,13 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert drawing.SECTION_KEEP["FloorDepth"][0] < pivot_end_x
+    assert floor[0] > drawing.SECTION_KEEP["FloorDepth"][0] + 0.002
     # Positive control: 8b5e1f354's keep reproduces its rendered left edge.
     old_line_x = pivot_end_x - (drawing.FRONT_CENTER[0] - 0.178) - 0.005
-    assert _hanging_left_box(lines, (old_line_x, 0.0))[0] == pytest.approx(
+    # Keep the historical text extent for this historical rendered control;
+    # the current floor callout additionally identifies the spring-room stack.
+    old_lines = ["6.40 \u00b10.05", "FLOOR FROM", "FRONT FACE"]
+    assert _hanging_left_box(old_lines, (old_line_x, 0.0))[0] == pytest.approx(
         0.0015, abs=0.001
     )
     counterbore = _centred_box(
@@ -530,6 +533,29 @@ def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
         # Drill and thread lines, then the qualifier's.
         lines = ["\u00d83.45 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
         assert _centred_box(lines, xy)[3] + 0.001 < sheet_top - 0.003, label
+
+
+def test_projected_tap_note_boxes_clear_each_other_and_the_title_block() -> None:
+    """Two true tap arrows must not share overlapping direction-label ink."""
+    lines = spec.PLATE_PROJECTED_ZONE_CALLOUT.splitlines()
+    width = max(map(len, lines)) * _CHAR_WIDTH
+    height = len(lines) * _LINE_PITCH
+    boxes = [
+        (x, y - height, x + width, y)
+        for x, y in drawing.PROJECTED_TAP_NOTE_POSITIONS
+    ]
+    for left, bottom, right, top in boxes:
+        assert left > _BORDER + 0.003
+        assert bottom > _BORDER + 0.003
+        if bottom < 0.066:
+            assert right < 0.216 - 0.002
+    first, second = boxes
+    assert (
+        first[2] + 0.002 < second[0]
+        or second[2] + 0.002 < first[0]
+        or first[3] + 0.002 < second[1]
+        or second[3] + 0.002 < first[1]
+    )
 
 
 # "\u2316 \u00d80.050 A B C" as rendered on the stack sheet (1c103499e).

@@ -22,38 +22,56 @@ The knob bore is the plate origin; screw stations, top corners and notch
 corners come from ``pd_transgear_arm_plate_geometry`` at the current reducer
 centre. The print imports those model dimensions rather than restating a
 historical bore offset.
+
+A second sheet shows the actual screw- and knob-bore sections with their
+complete projected zones and the locator's attached matched-set acceptance.
+It adds no geometry, tolerance or alternate numerical control.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
+from solidworks_mcp.adapters.com_variant import double_array
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    iter_views,
     place_view,
+    view_name,
 )
 
 import _config
 from _check import check
+from _com import _early_bound
+from _drawing_annotation_extent import require_clear, require_inside, sheet_region
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
+from _drawing_leader_notes import add_attached_note, add_leader_note
+from _drawing_leaders import section_line_segments
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _native_projected_zone import require_saved_projected_gtols
@@ -62,6 +80,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_paper_drive_assembly_steps import matched_locator_notes
+import pd_transgear_arm_spec as ARM_SPEC
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -89,8 +108,12 @@ from pd_transgear_arm_plate_spec import (
     LOCATOR_CALLOUT,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    PROJECTED_ZONE_NOTE,
+    KNOB_PROJECTED_ZONE_CALLOUT,
+    SCREW_PROJECTED_ZONE_CALLOUT,
+    HUB_STATION_CALLOUT,
+    HUB_TO_BOSS_CALLOUT,
     BORE_CALLOUT,
+    BORE_PLACES,
     CSK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -122,27 +145,30 @@ PNG = OUTPUTS.png
 # above it, under the back view's edge dimensions.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
+SHEET_NAMES = ("Geometry", "Projected zones")
+PROJECTION_CAPTION = "PROJECTED ZONES — CONTROLS ON SHEET 1"
 # 12 mm lower than run 20261010T001620278Z, whose top frame row and locator
 # callout printed above the border; section A-A's caption still clears the
 # title block (it reached y 0.085).
 PLAN_CENTER = (0.080, 0.153)
-BACK_CENTER = (0.218, PLAN_CENTER[1])
-SECTION_CENTER = (0.343, PLAN_CENTER[1])
+BACK_CENTER = (0.223, PLAN_CENTER[1])
+SECTION_CENTER = (0.347, PLAN_CENTER[1])
 ISO_CENTER = (0.180, 0.045)
 ISO_NOTE_XY = (0.150, 0.081)
-# Bottom left, under the plan view's bore frame (its bottom y 0.081), left
-# of the isometric.
-NOTES_XY = (0.014, 0.075)
-# Characters per line that keep the block left of the isometric.
-NOTES_WIDTH = 50
-NOTES_TEXT = "\n".join((
+# The matched-pair acceptance belongs to the actual locator rim on the
+# supplemental, un-dimensioned view, not to an ambiguous general note.
+# Preserve the shared emitter's S-K value, acceptance and assembly step refs.
+LOCATOR_MATCH_XY = (0.014, 0.195)
+LOCATOR_MATCH_TEXT = "\n".join((
+    f"S-K: ACTUAL Ø{BORE_DIA:.{BORE_PLACES}f} KNOB-BORE K TO ARM "
+    f"Ø{ARM_SPEC.PIN_BORE_DIA:.{ARM_SPEC.PIN_BORE_DIA_PLACES}f} PIN-BORE S;",
+    "NOT TAP / LOCATOR STATION OR ALONG-ARM X.",
     matched_locator_notes(
-        _config.parts("pd-transgear-arm")["number"],
+        "TRANSGEAR ARM " + _config.parts("pd-transgear-arm")["number"],
         _config.parts("pd-transgear-arm-plate")["number"],
         on_arm=False,
-        width=NOTES_WIDTH,
+        width=62,
     ),
-    PROJECTED_ZONE_NOTE,
 ))
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
@@ -178,7 +204,7 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, SCREW_HOLES[0][1] / 2.0, _Z_PLAN),
     "TopRightY": (EDGE_PLUS_X + 19.0, TOP_RIGHT[1] / 2.0, _Z_PLAN),
-    "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
+    "EndR": (0.7071 * END_R + 11.0, -0.7071 * END_R - 9.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
@@ -196,7 +222,7 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
     "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
-    "LocatorY2": (EDGE_PLUS_X + 8.0, LOCATOR_SITES_MM[1][1] / 2.0, 0.0),
+    "LocatorY2": (EDGE_PLUS_X + 9.0, LOCATOR_SITES_MM[1][1] / 2.0, 0.0),
 }
 # Section A-A (x = 0): the stations along Z are a baseline from the mounting
 # face (the face that seats on the arm), stacked above the plate nearest
@@ -209,7 +235,7 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "NotchDepth": (0.0, _SECTION_TOP + 11.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 17.0, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _BOTTOM - 5.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
-    "HubDia": (0.0, 0.0, HUB_FACE_Z - 16.0),
+    "HubDia": (0.0, 0.0, HUB_FACE_Z - 15.5),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 17.0),
 }
 DIMENSION_CALLOUTS = {
@@ -217,6 +243,8 @@ DIMENSION_CALLOUTS = {
     "ScrewHoleDia": SCREW_HOLE_CALLOUT,
     "CskDia": CSK_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT,
+    "HubFaceToMounting": HUB_STATION_CALLOUT,
+    "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
 CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
@@ -234,12 +262,13 @@ FINISH_CHAR_HEIGHT = 0.0025
 # view, which mirrors X, so its hole frames sit outboard of their own holes
 # (no crossing) and the two through-bore locator leaders drop between the
 # hole leaders. The plan carries no frame: each countersink is coaxial with
-# its hole (note 3).
+# its hole, as required at the countersink callout.
 FRAME_ROWS = (0.262, 0.250, 0.238)
-# The back view's holes and locators stand where they did on run
-# 20261009T214031408Z plus _BACK_FEATURE_SHIFT (the view moved right and
-# now centres on K), so each frame keeps its leader's measured run.
-_BACK_FEATURE_SHIFT = 0.01875
+# Move the mounting-face view 5 mm right to separate its boxed locator
+# offsets from the rear-face outline heights. Section A-A stands 4 mm
+# farther right, leaving both the hub-diameter lane and the boss-side
+# border clear. The frame leaders follow the mounting view's position.
+_BACK_FEATURE_SHIFT = 0.02375
 FRAME_XY = {
     "plate_hole_1_position": (0.228 + _BACK_FEATURE_SHIFT, FRAME_ROWS[2]),
     "plate_hole_2_position": (0.1174 + _BACK_FEATURE_SHIFT, FRAME_ROWS[2]),
@@ -294,6 +323,296 @@ def _sheet_keep(
     }
 
 
+def _face_view_labels(adapter: Any, plan: Any, back: Any, iso: Any) -> None:
+    """Identify the deliberately removed rear view by a true viewing arrow."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateView(""):
+        raise RuntimeError("failed to activate plate face-view captions")
+    for text, x, y in (
+        ("VIEW D (REAR FACE)", PLAN_CENTER[0] - 0.040, 0.070),
+        ("MOUNTING FACE A", BACK_CENTER[0] - 0.022, 0.078),
+    ):
+        if add_note(adapter, text, x, y) is None:
+            raise RuntimeError(f"failed to add plate {text.lower()} caption")
+    # *Front looks along -Z at the rear face. Projecting two points with
+    # the same X/Y makes the D arrow parallel to that actual viewing ray.
+    tip_xy = _sheet_xy(adapter, iso, (10.0, 20.0, REAR_FACE_Z), "view D arrow tip")
+    note = add_leader_note(
+        adapter, "D",
+        text_xy=_sheet_xy(adapter, iso, (10.0, 20.0, 22.0), "view D arrow tail"),
+        attach_xy=tip_xy,
+        view=iso, label="rear-face removed-view D direction",
+    )
+    # The pinned drawing.add_note ignores its height argument. Set the
+    # actual format instead; CharHeight explicitly selects system units
+    # (ITextFormat.IsHeightSpecifiedInPts), then re-read that authority.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("plate view D arrow has no text format")
+    text_format = _early_bound(text_format, "ITextFormat")
+    text_format.CharHeight = 0.005
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError("failed to size plate view D arrow letter")
+    rebuild_drawing(adapter, label="plate view D arrow letter")
+    persisted = annotation.GetTextFormat(0)
+    if persisted is None:
+        raise RuntimeError("plate view D arrow lost its text format")
+    persisted = _early_bound(persisted, "ITextFormat")
+    if (
+        persisted.IsHeightSpecifiedInPts() is not False
+        or abs(float(persisted.CharHeight) - 0.005) > 1e-7
+    ):
+        raise RuntimeError("plate view D arrow height did not persist in system units")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or max(
+        abs(float(points[-3]) - tip_xy[0]), abs(float(points[-2]) - tip_xy[1])
+    ) > 0.001:
+        raise RuntimeError("plate view D arrow tip moved when its letter was sized")
+
+
+def _projected_axis_graphic(
+    adapter: Any, view: Any, *, name: str, xy_mm: tuple[float, float],
+    direction: float,
+) -> None:
+    """A source-length chain, owned by the actual side-on section view.
+
+    As on the summing-lever drawing, map sheet points into the view sketch
+    and bypass inference snaps. The native model FCF, not this graphic,
+    remains the numerical control.
+    """
+    control = next(control for control in GEOMETRIC_CONTROLS if control.name == name)
+    height = control.projected_zone_height_mm
+    if height is None:
+        raise RuntimeError(f"plate {name} has no native projected height")
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate plate {name} projection view")
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for z in (0.0, direction * height):
+        x, y = _sheet_xy(
+            adapter, view, (xy_mm[0], xy_mm[1], z), f"{name} projected endpoint"
+        )
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError(f"failed to create plate {name} projected axis")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+        if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
+            raise RuntimeError(f"plate {name} projected-axis endpoint moved")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"plate {name} projected-axis color did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"plate {name} projected axis")
+
+
+def _assert_projection_notes_clear(adapter: Any, notes: dict[str, Any]) -> None:
+    """Refuse settled native note ink that overlaps or loses its attachment."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
+        raise RuntimeError("failed to inspect plate projected-zone sheet")
+    region = sheet_region(adapter)
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    boxes = {
+        "title block": (
+            template.title_block_left_m, region.ymin,
+            region.xmax, template.title_block_top_m,
+        )
+    }
+    view_boxes = dict(boxes)
+    section_labels: set[str] = set()
+    for raw_view in iter_views(adapter):
+        label = "view " + view_name(adapter, raw_view)
+        view = _early_bound(raw_view, "IView")
+        outline = tuple(float(value) for value in view.GetOutline() or ())
+        if (
+            len(outline) != 4
+            or not all(math.isfinite(value) for value in outline)
+            or outline[0] >= outline[2]
+            or outline[1] >= outline[3]
+        ):
+            raise RuntimeError(f"plate {label} has no readable native outline")
+        require_inside(f"plate {label}", outline, region)
+        require_clear(f"plate {label}", outline, view_boxes)
+        view_boxes[label] = outline
+        boxes[label] = outline
+        _telemetry.info(f"plate projected-zone {label} native outline: {outline!r}")
+        sections = tuple(view.GetSectionLines() or ())
+        if sections:
+            strokes = section_line_segments(adapter, view)
+            if not strokes:
+                raise RuntimeError(f"plate {label} has no native section-line ink")
+            for index, (start, end) in enumerate(strokes):
+                stroke_box = (
+                    min(start[0], end[0]), min(start[1], end[1]),
+                    max(start[0], end[0]), max(start[1], end[1]),
+                )
+                require_inside(f"plate {label} section stroke {index}", stroke_box, region)
+                boxes[f"{label} section stroke {index}"] = stroke_box
+        for raw_section in sections:
+            section = _early_bound(raw_section, "IDrSection")
+            section_label = str(section.GetLabel())
+            section_labels.add(section_label)
+            text_format = _early_bound(section.GetTextFormat(), "ITextFormat")
+            height = (
+                float(text_format.CharHeightInPts) * 0.0254 / 72.0
+                if text_format.IsHeightSpecifiedInPts()
+                else float(text_format.CharHeight)
+            )
+            origins = tuple(float(value) for value in section.GetTextInfo() or ())
+            if (
+                not section_label or len(origins) != 6
+                or not all(math.isfinite(value) for value in (*origins, height))
+                or height <= 0.0
+            ):
+                raise RuntimeError(f"plate section {section_label!r} has no native label geometry")
+            # Native API gives upper-left origins and height, not glyph width.
+            # Reserve two heights per letter; exact ink stays a PDF-review gate.
+            width = 2.0 * height * len(section_label)
+            for index in range(2):
+                x, y = origins[index * 3:index * 3 + 2]
+                label_box = (x, y - height, x + width, y)
+                require_inside(f"plate section {section_label} letter", label_box, region)
+                boxes[f"section {section_label} letter {index}"] = label_box
+    if section_labels != {"B", "C"}:
+        raise RuntimeError(f"plate projected-zone section labels changed: {section_labels!r}")
+    expected_text = {
+        "screw zone": SCREW_PROJECTED_ZONE_CALLOUT,
+        "knob zone": KNOB_PROJECTED_ZONE_CALLOUT,
+        "matched pair": LOCATOR_MATCH_TEXT,
+        "caption": PROJECTION_CAPTION,
+    }
+    if set(notes) != set(expected_text):
+        raise RuntimeError("plate projected-zone note inventory changed before export")
+    for label, raw_note in notes.items():
+        note = _early_bound(raw_note, "INote")
+        extent = tuple(float(value) for value in note.GetExtent() or ())
+        if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
+            raise RuntimeError(f"plate {label} has no readable native ink extent")
+        box = (
+            min(extent[0], extent[3]), min(extent[1], extent[4]),
+            max(extent[0], extent[3]), max(extent[1], extent[4]),
+        )
+        if box[0] >= box[2] or box[1] >= box[3]:
+            raise RuntimeError(f"plate {label} has an empty native ink extent")
+        if str(note.GetText()).replace("\r\n", "\n") != expected_text[label]:
+            raise RuntimeError(f"plate {label} text changed before export")
+        if label != "caption":
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            if (
+                int(annotation.GetAttachedEntityCount3()) != 1
+                or int(annotation.GetLeaderCount()) != 1
+                or annotation.IsDangling() is not False
+            ):
+                raise RuntimeError(f"plate {label} lost its attached arrow")
+        require_inside(f"plate {label}", box, region)
+        require_clear(f"plate {label}", box, boxes)
+        boxes[label] = box
+        _telemetry.info(f"plate projected-zone {label} native ink: {box!r}")
+
+
+def _projection_sheet(adapter: Any) -> dict[str, Any]:
+    """Show each zone in its real section, not a fictitious off-plane bore.
+
+    Section B cuts the two screw axes along X; C cuts the knob axis along
+    Y. A separate sheet leaves the full 40.6 source extent visible without
+    passing a chain through sheet 1's dimensions or shortening a zone.
+    """
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate plate projected-zone sheet")
+    # Keep all section geometry in the right-hand column; the long matched
+    # acceptance and direction notes have their own left-hand ink column.
+    plan = place_view(adapter, str(SOURCE), "*Front", 0.250, 0.205, scale=VIEW_SCALE)
+    screw_y = SCREW_HOLES[0][1]
+    screw_line = tuple(
+        _sheet_xy(adapter, plan, point, "screw-axis section line")
+        for point in (
+            (EDGE_MINUS_X - SECTION_LINE_OVERRUN_MM, screw_y, _Z_PLAN),
+            (EDGE_PLUS_X + SECTION_LINE_OVERRUN_MM, screw_y, _Z_PLAN),
+        )
+    )
+    screw_section = create_section_view(
+        adapter, plan, line_start=screw_line[0], line_end=screw_line[1],
+        view_xy=(0.250, 0.100), section_label="B", scale=VIEW_SCALE,
+        label="plate projected zones through both actual screw bores",
+    )
+    knob_line = tuple(
+        _sheet_xy(adapter, plan, point, "knob-axis section line")
+        for point in SECTION_LINE_MODEL
+    )
+    knob_section = create_section_view(
+        adapter, plan, line_start=knob_line[0], line_end=knob_line[1],
+        view_xy=(0.380, 0.150), section_label="C", scale=VIEW_SCALE,
+        label="plate projected zone through actual knob bore",
+    )
+    for view in (plan, screw_section, knob_section):
+        set_hidden_lines_removed(adapter, view)
+    for index, xy in enumerate(SCREW_HOLES, 1):
+        _projected_axis_graphic(
+            adapter, screw_section, name=f"plate_hole_{index}_position",
+            xy_mm=xy, direction=1.0,
+        )
+    _projected_axis_graphic(
+        adapter, knob_section, name="knob_projected_axis",
+        xy_mm=(0.0, 0.0), direction=-1.0,
+    )
+    notes: dict[str, Any] = {}
+    notes["screw zone"] = add_attached_note(
+        adapter, screw_section, text=SCREW_PROJECTED_ZONE_CALLOUT,
+        entity_xy=_sheet_xy(
+            adapter, screw_section,
+            (SCREW_HOLES[0][0] - SCREW_HOLE_DIA / 2.0, screw_y, 1.0),
+            "screw projected-zone wall",
+        ),
+        note_xy=(0.014, 0.043), label="screw projected-zone start and direction",
+    )
+    notes["knob zone"] = add_attached_note(
+        adapter, knob_section, text=KNOB_PROJECTED_ZONE_CALLOUT,
+        entity_xy=_sheet_xy(
+            adapter, knob_section, (0.0, BORE_DIA / 2.0, -1.0),
+            "knob projected-zone wall",
+        ),
+        note_xy=(0.014, 0.160), label="knob projected-zone start and direction",
+    )
+    locators = scan_view_edges(plan, label="matched plate locator callout")
+    x, y = LOCATOR_SITES_MM[1]
+    notes["matched pair"] = add_attached_note(
+        adapter, plan, text=LOCATOR_MATCH_TEXT,
+        entity=locators.circle_at(
+            (x, y, REAR_FACE_Z), LOCATOR_HOLE_DIA_MM / 2.0,
+            axis=(0.0, 0.0, 1.0), label="matched plate locator rear rim",
+        ).edge,
+        note_xy=LOCATOR_MATCH_XY, label="plate matched-pair acceptance",
+    )
+    if not drawing.ActivateView(""):
+        raise RuntimeError("failed to activate plate projection-sheet caption")
+    notes["caption"] = add_note(adapter, PROJECTION_CAPTION, 0.014, 0.260)
+    if notes["caption"] is None:
+        raise RuntimeError("failed to add plate projection-sheet caption")
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to restore plate geometry sheet")
+    return notes
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -332,6 +651,12 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="transgear arm plate package"
+    )
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate plate geometry sheet")
 
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
@@ -382,6 +707,17 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    # The coordinate values stay on their original native witnesses. Offset
+    # only their text, into separate exterior lanes, so one baseline's
+    # extension cannot cut another BASIC box or the reamed-hole leader.
+    offset_dimension_text(
+        adapter, annotations,
+        _sheet_keep(adapter, plan, {
+            "ScrewHoleX1": (EDGE_MINUS_X - 6.0, PLAN_ROWS[1], _Z_PLAN),
+            "ScrewHoleX2": (EDGE_PLUS_X + 6.0, PLAN_ROWS[0], _Z_PLAN),
+            "LocatorX1": (EDGE_MINUS_X - 6.0, PLAN_ROWS[2], _Z_PLAN),
+        }, "offset basic text"),
+    )
     # These are the same native feature datums and circular zones authored
     # on the part, not +/- positions retyped on a drawing. The drill mouths
     # and the through locator bores' rims on the Front sketch (z = 0) are
@@ -436,6 +772,10 @@ async def build(adapter: Any) -> dict[str, str]:
                     (x, y, 0.0), LOCATOR_HOLE_DIA_MM / 2.0,
                     axis=(0.0, 0.0, 1.0), label=f"plate locator {index} position",
                 ).edge,
+                leader_attachment_xy=_sheet_xy(
+                    adapter, back, (x - LOCATOR_HOLE_DIA_MM / 2.0, y, 0.0),
+                    f"plate locator {index} outboard rim",
+                ),
             ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
         },
     }
@@ -443,8 +783,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="plate actual-bore locating frame",
     )
-    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
-        raise RuntimeError("failed to add the plate's matched-pair notes")
+    _face_view_labels(adapter, plan, back, iso)
     for view, label in ((plan, "plan"), (back, "back")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
@@ -478,6 +817,7 @@ async def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    projection_notes = _projection_sheet(adapter)
 
     artefacts = await finalize_drawing(
         adapter,
@@ -485,6 +825,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Arm Plate Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        settled_checks=(lambda: _assert_projection_notes_clear(adapter, projection_notes),),
     )
     require_saved_projected_gtols(
         adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,

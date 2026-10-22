@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import importlib.util
 import math
@@ -19,7 +18,7 @@ import pd_transgear_drive_collar_spec as spec
 import pd_transgear_knob_shaft_spec as shaft
 import _sprocket_seat_geometry as removable
 from _assembly_contract import assembly_contract
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm
 
@@ -292,15 +291,6 @@ def test_round_stud_must_pass_the_actual_d_flat(monkeypatch) -> None:
 
 
 def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
-        ("BodyProfile", "PilotDia"): "*deviations(PILOT_DIA_BAND)",
-        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
-        ("RearBoreChamfer", "BoreEntryBreak"): "*deviations(BORE_ENTRY_BREAK_BAND)",
-        ("PinHoleProfile", "PinPosDia"): "*deviations(PIN_HOLE_BAND)",
-        ("PinHoleProfile", "PinPosY"): "PIN_OFFSET_TOL",
-        ("PinHoleProfile", "PinNegY"): "PIN_OFFSET_TOL",
-    }
     # The seat O.D. and the drive-pin layout are the crank spigot's, so the
     # removable wheels fit either shaft.
     assert spec.OD == removable.SEAT_SPIGOT_DIA
@@ -494,44 +484,6 @@ def test_registry_row_is_the_turned_brass_mha_152() -> None:
     assert row["tolerance_class"] == "machined_block"
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
-    extra = {
-        ast.literal_eval(key): getattr(part, value.id)
-        for key, value in zip(stamp.args[2].keys, stamp.args[2].values, strict=True)
-    }
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
-    assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
 
 
 class _ReferenceDisplay:

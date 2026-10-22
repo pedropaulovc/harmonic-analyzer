@@ -19,11 +19,11 @@ edge -- lands where the layout puts it):
   ``FlatBlank`` reference sketch shown in this view only (a thin outline):
   the blank across the bend and the arm's developed stations of the taper
   and the round's centre;
-* ``*Bottom`` (looking +Y, X right, Z up), out of projection beside the side
-  view and so labelled: the base length, the ear height and the inside bend.
+* ``*Bottom`` (looking +Y, X right, Z up), removed from projection beside
+  the side view: VIEW A matches an upward viewing arrow beside that view.
 
-The process and the heat treatment ride the part's Manufacturing Notes and
-the title block's FINISH cell.
+The part's facts ride its Manufacturing Notes; the title block owns heat
+treatment.  The assembly owns the mesh setup and latch acceptance.
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -57,6 +58,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -72,6 +74,7 @@ from pd_latch_hook_geometry import (
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
+    DEV_TIP,
     DEV_TAPER,
     EAR_HEIGHT,
     FLAT_LENGTH,
@@ -91,6 +94,7 @@ from pd_latch_hook_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    FEATURE_MATE_CALLOUTS,
     FLAT_ROUND_CALLOUT,
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
@@ -132,9 +136,9 @@ _MID_Z = sum(_LOCAL_Z) / 2.0
 # View centres (the part's bounding box centre on the sheet): the front view
 # at the left, the side view and its flat pattern level with it, the bottom
 # view and the isometric at the right above the title block (top 0.066).
-FRONT_CENTER = (0.072, 0.170)
+FRONT_CENTER = (0.102, 0.170)
 RIGHT_CENTER = (0.205, FRONT_CENTER[1])
-BOTTOM_CENTER = (0.359, 0.230)
+BOTTOM_CENTER = (0.333, 0.228)
 ISO_CENTER = (0.372, 0.135)
 NOTES_XY = (0.020, 0.062)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.035)
@@ -174,6 +178,9 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
         point[1] + u * ARM_U[1] + n * ARM_N[1],
     )
 
+# Below the developed tip, but above the title-block top at this panel.
+FLAT_NOTE_XY = _flat(FLAT_GAP, -DEV_TIP - 5.0)
+
 
 # Per-view survivors of the marked-dimension import: name -> sheet position.
 # Front: the screw X pair stacked above the base, their Y and size left of
@@ -193,21 +200,21 @@ FRONT_KEEP = {
     "FaceY": _front(30.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),
-    "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -4.0)),
-    "PinHoleDia": _front(*_on(PIN_HOLE_L, -12.3, 21.2)),
-    "RollR": _front(-20.0, -35.0),
+    "StraightLen": _front(*_on(OUTER_ROLL_END, -43.4, -20.0)),
+    "PinHoleDia": _front(*_on(PIN_HOLE_L, -28.0, 26.0)),
+    "RollR": _front(-20.0, -20.0),
     "TabR": _front(
-        TAB_C_L[0] + 21.0 * math.cos(math.radians(175.0)),
-        TAB_C_L[1] + 21.0 * math.sin(math.radians(175.0)),
+        TAB_C_L[0] + 28.0 * math.cos(math.radians(175.0)),
+        TAB_C_L[1] + 28.0 * math.sin(math.radians(175.0)),
     ),
 }
 # Side view: the width left of the ear, the two front-edge heights stacked
 # above it, the root relief right of its corner, the round under the tip;
 # the flat's length above it and its developed stations stacked to its right.
 RIGHT_KEEP = {
-    "Width": _right(26.0, 4.0),
-    "ArmFrontZ": _right(3.0, 13.0),
-    "ArmLowZ": _right(2.25, 19.0),
+    "Width": _right(28.0, 15.0),
+    "ArmFrontZ": _right(-8.0, 13.0),
+    "TaperLowZ": _right(2.25, 19.0),
     "RootR": _right(-4.0, -8.0),
     "RoundR": _right(-6.0, -95.0),
     "FlatLength": _flat(FLAT_GAP + FLAT_LENGTH / 2.0, 14.0),
@@ -232,15 +239,16 @@ CALLOUTS_ABOVE = {
     "DevRoundC": FLAT_ROUND_CALLOUT,
 }
 CALLOUTS_BELOW = {
+    **FEATURE_MATE_CALLOUTS,
     "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
     "RoundR": ROUND_CALLOUT,
 }
 # The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
-# The formed overall height (drawing-guidelines.md rule 10 (dimension from a real feature)), a reference left of the side view: its
-# dimension line passes left of the width's text, its text below the front
-# view's 70.4 level and clear right of it; picked on the ear's top edge and
-# on the full round, re-anchored to the round's far extreme (its tip).
+# The formed overall height (drawing-guidelines.md rule 10 (dimension from
+# a real feature)), reference-only left of the side view.  Its line stands
+# right of the front-view notes; the width's text sits above its upper
+# extension.  Pick the ear's top edge and the full round's far extreme.
 _ROUND_PICK_DEG = -120.0  # on the round, clear of its tip and the RoundR leader
 OVERALL_PICKS = (
     _right(12.0, WIDTH),
@@ -249,7 +257,56 @@ OVERALL_PICKS = (
         ROUND_C_L[0] + ROUND_R * math.sin(math.radians(_ROUND_PICK_DEG)),
     ),
 )
-OVERALL_TEXT_XY = _right(38.0, -55.0)
+OVERALL_TEXT_XY = _right(24.0, -55.0)
+
+
+def _bottom_view_arrow(adapter: Any, right: Any) -> None:
+    """Identify removed VIEW A by its +Y viewing direction, not its page position."""
+    tip = _right(-7.0, -3.0)
+    note = add_leader_note(
+        adapter,
+        "A",
+        text_xy=_right(-7.0, -15.0),
+        attach_xy=tip,
+        view=right,
+        label="removed bottom view A viewing arrow",
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    # The pinned SDK add_note ignores its height argument; author the
+    # native metre-based format explicitly before squaring the leader.
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("bottom view A arrow has no text format")
+    text_format = _early_bound(text_format, "ITextFormat")
+    text_format.CharHeight = 0.005
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError("failed to size bottom view A viewing letter")
+    rebuild_drawing(adapter, label="size bottom view A viewing letter")
+    saved_format = annotation.GetTextFormat(0)
+    if saved_format is None:
+        raise RuntimeError("bottom view A arrow lost its text format")
+    saved_format = _early_bound(saved_format, "ITextFormat")
+    if (
+        saved_format.IsHeightSpecifiedInPts() is not False
+        or not math.isclose(float(saved_format.CharHeight), 0.005, abs_tol=1e-8)
+    ):
+        raise RuntimeError("bottom view A viewing letter did not retain its metre height")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError("bottom view A arrow has no readable leader")
+    miss = tip[0] - float(points[0])
+    if abs(miss) > 0.0003:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + miss, y, z):
+            raise RuntimeError("failed to square bottom view A viewing arrow")
+        rebuild_drawing(adapter, label="square bottom view A viewing arrow")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if (
+        len(points) < 6
+        or abs(tip[0] - float(points[0])) > 0.0003
+        or math.dist((float(points[-3]), float(points[-2])), tip) > 0.001
+    ):
+        raise RuntimeError("bottom view A viewing arrow did not remain square")
 
 
 def _pin_origin(
@@ -339,6 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Isometric View Note",
             "Bottom View Note",
+            "Flat Pattern View Note",
         ),
         required=(
             "Number",
@@ -348,6 +406,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Isometric View Note",
             "Bottom View Note",
+            "Flat Pattern View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -412,8 +471,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
-    # The far face at the pin: located at fit-up (note 3), so its X and Y
-    # print as references.
+    # The far face remains located at assembly (notes 1-3); no new controlling
+    # closure dimension is inferred from its reference coordinates.
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
@@ -424,10 +483,12 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to the screw holes")
     # Re-asserted after annotating: the toggle regenerates the dashed edges.
     set_hidden_lines_visible(adapter, front)
+    _bottom_view_arrow(adapter, right)
     for name, xy in (
         ("Manufacturing Notes", NOTES_XY),
         ("Isometric View Note", ISO_NOTE_XY),
         ("Bottom View Note", BOTTOM_NOTE_XY),
+        ("Flat Pattern View Note", FLAT_NOTE_XY),
     ):
         add_property_linked_note(adapter, name, *xy, char_height=NOTE_HEIGHT)
 

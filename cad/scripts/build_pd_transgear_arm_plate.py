@@ -526,10 +526,14 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{reference}.start", "origin", "coincident"
         ),
     )
+    # Locate the diameter's witness at the hub's actual front-face corner,
+    # not an arbitrary station on the cylindrical profile line. The same
+    # doubled axis-to-radius dimension still drives HubDia; only its
+    # attachment changes, so section A-A's witnesses stay out of the hatch.
     await add_diametric_linear_dimension(
         adapter,
         axis,
-        bearing_lines[1],
+        f"{bearing_lines[0]}.end",
         (corners[1][0] + 4.0, corners[1][1] + 4.0),
         "HubDia",
     )

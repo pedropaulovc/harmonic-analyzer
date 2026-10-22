@@ -52,17 +52,21 @@ from pd_transgear_drive_collar_spec import (
     BODY_SUPPLY_NOTE,
     BORE_CALLOUT,
     BORE_ENTRY_BREAK_CALLOUT,
+    FLAT_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     LENGTH,
     OD,
+    OD_CALLOUT,
     OVERALL_LENGTH,
     PILOT_SUPPLY_NOTE,
     PILOT_DIA,
+    PILOT_DIA_CALLOUT,
     PILOT_LENGTH,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
+    PIN_PATTERN_CALLOUT,
 )
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_drive_collar"]
@@ -83,7 +87,7 @@ VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 END_CENTER = (0.100, 0.165)
 SIDE_CENTER = (0.235, END_CENTER[1])
-ISO_CENTER = (0.345, END_CENTER[1])
+ISO_CENTER = (0.383, 0.224)
 ISO_SCALE = (2, 1)
 HALF_OD = OD * _S / 2000.0
 HALF_PILOT = PILOT_DIA * _S / 2000.0
@@ -109,7 +113,7 @@ _PIN_TEXT_HALF = 0.022
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.026),
     "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0215),
-    "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.055),
+    "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.075),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
 }
@@ -124,10 +128,10 @@ END_KEEP = {
 _LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
-    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0 - 0.003, _LENGTH_ROW_Y),
+    "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
     "CollarDia": (_PILOT_X + 0.047, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.035, SIDE_CENTER[1] + HALF_OD + 0.015),
+    "BoreEntryBreak": (_REAR_X - 0.048, SIDE_CENTER[1] + HALF_OD + 0.048),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
@@ -163,7 +167,12 @@ FIT_NOTES = "\n".join(
 )
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
+    "FlatToAxis": FLAT_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
+    "PinPosY": PIN_PATTERN_CALLOUT,
+    "PinNegY": PIN_PATTERN_CALLOUT,
+    "PilotDia": PILOT_DIA_CALLOUT,
+    "CollarDia": OD_CALLOUT,
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
     "BoreEntryBreak": BORE_ENTRY_BREAK_CALLOUT,

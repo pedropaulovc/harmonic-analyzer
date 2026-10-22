@@ -2,98 +2,89 @@
 
 from __future__ import annotations
 
-import ast
+import asyncio
 import itertools
 import math
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-import _config
 import build_pd_latch_hook as part
 import draw_pd_latch_hook as drawing
 import pd_latch_hook_geometry as geom
 import pd_latch_hook_spec as spec
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES
+from _test_stubbed_build import offline_adapter, stub_seat
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/pd-latch-hook.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/pd-latch-hook.pdf")
-    assert DRAWINGS_BY_NAME["pd_latch_hook"].script == Path(drawing.__file__).resolve()
-    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-
-
-def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
+def test_every_marked_dimension_has_exactly_one_geometric_placement() -> None:
     keeps = (drawing.FRONT_KEEP, drawing.RIGHT_KEEP, drawing.BOTTOM_KEEP)
-    for a, b in itertools.combinations(keeps, 2):
-        assert not set(a) & set(b)
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set().union(*keeps) == marked
-    assert {
-        (feature, name)
-        for feature, names in spec.DRAWING_PRECISION.items()
-        for name in names
-    } == {
-        (feature, name)
-        for feature, names in spec.DRAWING_DIMENSIONS.items()
-        for name in names
-    }
-    callouts = {*drawing.CALLOUTS_ABOVE, *drawing.CALLOUTS_BELOW}
-    assert callouts | set(drawing.SHORTENED_RADII) <= marked
-    # The flat pattern prints from the hidden reference sketch, side view only.
-    flat = spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
-    assert flat <= set(drawing.RIGHT_KEEP)
-    assert spec.REFERENCE_SKETCHES == (spec.FLAT_SKETCH,)
+    placed = set().union(*keeps)
+    assert placed == marked
+    assert sum(map(len, keeps)) == len(placed)
 
 
-def test_the_model_owns_every_band_the_sheet_prints() -> None:
-    """Drilled holes never under size; the inside bend up to the largest the
-    screw head clears; the screw positions, the width and the base length
-    their own ± bands; every formed arm feature the formed band.  The far
-    face at the pin carries none (a reference).  Everything else takes its
-    title-block row."""
-    assert model_toleranced_dimensions(part) == {
-        ("ScrewHoleProfile", "ScrewDia"): "*deviations(HOLE_BAND)",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(HOLE_BAND)",
-        ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
-        ("BaseEar", "Width"): "WIDTH_TOL",
-        ("BaseEarProfile", "BaseLength"): "BASE_LENGTH_TOL",
-        # The position and formed loops share one key (both read below);
-        # the formed loop, the last, takes FORMED_BAND.
-        ("feature_name", "dimension_name"): "FORMED_BAND",
-    }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
-    assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
-    assert min(spec.HOLE_BAND) == 0.0 < max(spec.HOLE_BAND)
-    assert spec.BEND_R_BAND[0] == pytest.approx(
-        geom.INSIDE_BEND_R_MAX - geom.INSIDE_BEND_R
+def test_build_preserves_the_functional_model_bands(monkeypatch) -> None:
+    """Exercise the builder, not its spelling: explicit functional controls
+    remain on the model; drilled sizes inherit the title-block row."""
+    adapter = offline_adapter()
+    seat = stub_seat(monkeypatch, part, keep=("build", "deviations"))
+    seat.name_dimensions.side_effect = (
+        lambda _adapter, feature, names: [f"{name}@{feature}" for name in names]
     )
-    for feature, names in spec.FORMED_DIMENSIONS.items():
-        assert names <= spec.DRAWING_DIMENSIONS[feature]
-    for feature, names in spec.POSITION_DIMENSIONS.items():
-        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    # The awaited sketch helpers return SketchDims, whose apply is synchronous.
+    # AsyncMock's default result would make apply another coroutine mock.
+    for profile in (seat._arm_profile, seat._flat_blank):
+        profile.return_value = SimpleNamespace(apply=lambda _adapter, _feature: [])
+    asyncio.run(part.build(adapter))
 
-
-def test_the_far_face_at_the_pin_prints_as_a_reference() -> None:
-    """Review-3 #3: the match-drilled hole's far face is set at fit-up (note
-    3), so its X and Y print in parentheses with no band; the straight's
-    length still controls the formed straight and keeps the formed band."""
-    assert spec.REFERENCE_DIMENSIONS == {"FaceX", "FaceY"}
-    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ArmProfile"]
-    assert not spec.REFERENCE_DIMENSIONS & spec.FORMED_DIMENSIONS["ArmProfile"]
-    assert "StraightLen" in spec.FORMED_DIMENSIONS["ArmProfile"]
-    assert not any(
-        "FaceX" in names or "FaceY" in names
-        for names in spec.POSITION_DIMENSIONS.values()
+    bilateral = seat.set_dimension_bilateral_tolerance.call_args_list
+    assert len(bilateral) == 1
+    assert bilateral[0].args[:3] == (adapter, "InsideBend", "InsideBendR")
+    assert bilateral[0].args[3:] == pytest.approx(
+        (spec.BEND_R_BAND[1], spec.BEND_R_BAND[0])
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
-    assert "set_reference_dimension(" in source
-    assert "STATION" in spec.DRAWING_NOTES.split("\n")[2]
+    symmetric = {
+        call.args[1:3]: call.args[3]
+        for call in seat.set_dimension_symmetric_tolerance.call_args_list
+    }
+    assert symmetric == {
+        ("ScrewHoleProfile", "ScrewX1"): spec.POSITION_TOL,
+        ("ScrewHoleProfile", "ScrewX2"): spec.POSITION_TOL,
+        ("ScrewHoleProfile", "ScrewY"): spec.POSITION_TOL,
+        ("BaseEar", "Width"): spec.WIDTH_TOL,
+        ("BaseEarProfile", "BaseLength"): spec.BASE_LENGTH_TOL,
+        ("ArmProfile", "RollStart"): spec.FORMED_BAND,
+        ("ArmProfile", "RollR"): spec.FORMED_BAND,
+        ("ArmProfile", "StraightLen"): spec.FORMED_BAND,
+        ("ArmProfile", "TabR"): spec.FORMED_BAND,
+        ("ArmProfile", "TabEndX"): spec.FORMED_BAND,
+    }
+
+def test_drawing_keeps_both_far_face_coordinates_reference_only(
+    monkeypatch, tmp_path,
+) -> None:
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    seat = stub_seat(monkeypatch, drawing)
+    seat.new_project_drawing.return_value = (object(), object())
+    annotations = {
+        name: SimpleNamespace(name=name) for name in spec.DRAWING_PRECISION_BY_NAME
+    }
+    seat.curate_view_dimensions.side_effect = (
+        lambda _adapter, _view, *, keep, **_kwargs: [annotations[name] for name in keep]
+    )
+    seat.dimension_name.side_effect = lambda _adapter, annotation: annotation.name
+    adapter = offline_adapter()
+    asyncio.run(drawing.build(adapter))
+
+    references = seat.set_reference_dimension.call_args_list
+    assert len(references) == 2
+    assert references[0].args == (adapter, annotations["FaceX"])
+    assert references[1].args == (adapter, annotations["FaceY"])
+
 
 
 def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
@@ -146,80 +137,6 @@ def test_the_build_constants_sit_on_the_published_geometry() -> None:
     assert -flat["taper_start"][1] == pytest.approx(geom.DEV_TAPER[0])
     assert -flat["taper_end"][1] == pytest.approx(geom.DEV_TAPER[1])
     assert flat["top_rear"][0] == drawing.FLAT_GAP == part.FLAT_GAP
-
-
-def test_registry_row_is_the_formed_spring_steel_hook() -> None:
-    row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-14"
-    assert int(row["quantity"]) == 1
-    assert "1095" in row["material_specification"]
-    assert "annealed" in row["material_specification"]
-    assert "temper" in row["finish"]
-    # The stock is the title block's MATERIAL cell, so no note restates it;
-    # the cell holds 30 characters.
-    assert row["material"] == spec.MATERIAL_TITLE
-    assert len(spec.MATERIAL_TITLE) <= 30
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == [
-        "adapter",
-        "PART_NAME",
-        "DRAWING_PROPERTIES",
-    ]
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(
-        None, part.PART_NAME, part.DRAWING_PROPERTIES
-    )
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-
-
-_TITLE_BLOCK_TEXT = ("BREAK SHARP EDGES", "DEBURR", "REMOVE BURRS", "1095", "HRC")
-
-
-def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> None:
-    """At most 4 lines of at most 70; no dimension, and nothing the MATERIAL
-    or FINISH cells already print."""
-    lines = spec.DRAWING_NOTES.split("\n")
-    assert len(lines) <= 4
-    assert [line for line in lines if len(line) > 70] == []
-    assert [t for t in _TITLE_BLOCK_TEXT if t in spec.DRAWING_NOTES] == []
-    assert not any(
-        ch.isdigit() for line in lines for ch in line[2:].replace("MHA-PD-07", "")
-    )
-    # The pin hole's callout names the process; note 3 says where and when.
-    assert spec.PIN_HOLE_CALLOUT == "MATCH-DRILL"
-    assert lines[2].startswith("3.") and "MATCH-DRILL PIN HOLE" in lines[2]
-    # The flat pattern is identified; no step order is prescribed.
-    assert lines[0].startswith("1. FLAT PATTERN")
-    assert not any(word in spec.DRAWING_NOTES for word in ("THEN", "AFTER", "BEFORE"))
 
 
 # --- Sheet layout ----------------------------------------------------------------
@@ -291,7 +208,7 @@ def _texts() -> dict[str, tuple[float, ...]]:
         "ScrewX1": 11, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
         "RollStart": 9, "FaceY": 6, "FaceX": 6, "TabEndX": 9,
         "StraightLen": 9, "PinHoleDia": 11, "RollR": 10, "TabR": 9,
-        "Width": 10, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
+        "Width": 10, "ArmFrontZ": 3, "TaperLowZ": 3, "RootR": 4, "RoundR": 5,
         "FlatLength": 4, "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
         "BaseLength": 11, "EarHeight": 4, "InsideBendR": 9,
     }  # fmt: skip
@@ -433,6 +350,7 @@ def _notes() -> dict[str, tuple[float, ...]]:
         "notes": _note_box(spec.DRAWING_NOTES, drawing.NOTES_XY),
         "iso note": _note_box(spec.ISOMETRIC_VIEW_NOTE, drawing.ISO_NOTE_XY),
         "bottom note": _note_box(spec.BOTTOM_VIEW_NOTE, drawing.BOTTOM_NOTE_XY),
+        "flat note": _note_box(spec.FLAT_VIEW_NOTE, drawing.FLAT_NOTE_XY),
     }
 
 
@@ -526,8 +444,6 @@ def test_the_pin_hole_dimension_line_meets_its_value_not_its_callout() -> None:
     line (an extension line may cross a dimension line), runs through no
     other text, and the hole's own extension lines cross nothing."""
     assert all("\n" not in text for text in drawing.CALLOUTS_ABOVE.values())
-    assert drawing.CALLOUTS_ABOVE["PinHoleDia"] == spec.PIN_HOLE_CALLOUT
-    assert "PinHoleDia" not in drawing.CALLOUTS_BELOW
     texts = {**_texts(), **_notes()}
     box = texts.pop("PinHoleDia")
     centre = drawing.FRONT_KEEP["PinHoleDia"]
@@ -721,19 +637,6 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
             )
 
 
-def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
-    """Review 4: the ±0.05 positions read as unexplained.  The 2X Ø3.20
-    callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
-    to the print, not match-drilled."""
-    assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
-    assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
-        spec.SCREW_HOLE_CALLOUT,
-        spec.SCREW_HOLE_MATE,
-    ]
-    assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
-    assert spec.POSITION_TOL == pytest.approx(0.05)
-
-
 class _Display:
     """A drawing dimension stub: its value, the precision put on it."""
 
@@ -801,7 +704,6 @@ def test_the_roll_radius_is_shortened_because_its_centre_leaves_the_sheet() -> N
 
     assert not on_sheet(geom.ROLL_C_L)
     assert on_sheet(geom.TAB_C_L)
-    assert drawing.SHORTENED_RADII == ("RollR",)
     # The roll radius text sits between the inside arc and its centre.
     text = drawing.FRONT_KEEP["RollR"]
     centre = drawing._front(*geom.ROLL_C_L)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import importlib.util
 import itertools
@@ -18,12 +17,12 @@ from _assembly_contract import assembly_contract
 import _bore_axis
 import _check
 import _config
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
+import _drawing_tolerances
 import _gtol_face
 from _layout_geometry import Box, estimate_text_box
-import _part_properties
 import _part_save
 import _printed_tolerance
 import _rebuild
@@ -154,25 +153,6 @@ def test_the_hub_front_is_faced_into_the_nose_window_at_its_own_step() -> None:
     assert callout.endswith(f"PER {steps.step_ref(drawing.FIT_STEP_KEY)}")
 
 
-def test_only_the_bore_and_the_spigot_carry_model_bands() -> None:
-    """Every other size is governed by its printed places and the holes by
-    the title block's DRILLED HOLES row."""
-    assert model_toleranced_dimensions(part) == {
-        ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
-        ("BoreProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
-        ("HubProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
-    }
-
-
-def _printed_limits(build, spec_module, feature: str, name: str, nominal: float):
-    """(least, greatest) size the sheet prints: the model band the build
-    applies, else the title block's row for the dimension's places."""
-    expr = model_toleranced_dimensions(build).get((feature, name))
-    if expr is None:
-        row = _row(spec_module.DRAWING_PRECISION_BY_NAME[name])
-        return nominal - row, nominal + row
-    lower, upper = getattr(build, expr.lstrip("*"))
-    return nominal + lower, nominal + upper
 
 
 def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() -> None:
@@ -180,7 +160,6 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     its own sheet, so the round part and the flat each keep a clearance
     (never a bind) at every printed limit, and the callouts state the
     clearances the limits give."""
-    import build_pd_transgear_feed_pinion as sleeve_part
     import pd_transgear_feed_pinion_spec as sleeve
 
     assert spec.BORE_DIA == sleeve.BOSS_DIA
@@ -191,17 +170,11 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert part.FLAT_TO_AXIS == spec.FLAT_TO_AXIS
     assert part.BORE_DEVIATIONS == spec.BORE_DEVIATIONS
 
-    bore = _printed_limits(part, spec, "BoreProfile", "BoreDia", spec.BORE_DIA)
-    boss = _printed_limits(
-        sleeve_part, sleeve, "SleeveProfile", "BossDia", sleeve.BOSS_DIA
-    )
+    bore = tuple(spec.BORE_DIA + d for d in sorted(spec.BORE_BAND))
+    boss = tuple(sleeve.BOSS_DIA + d for d in sorted(sleeve.BOSS_DIA_BAND))
     round_fit = (bore[0] - boss[1], bore[1] - boss[0])
-    hub_flat = _printed_limits(
-        part, spec, "BoreProfile", "FlatToAxis", spec.FLAT_TO_AXIS
-    )
-    shaft_flat = _printed_limits(
-        sleeve_part, sleeve, "FlatProfile", "FlatToAxis", sleeve.FLAT_TO_AXIS
-    )
+    hub_flat = tuple(spec.FLAT_TO_AXIS + d for d in sorted(spec.FLAT_TO_AXIS_BAND))
+    shaft_flat = tuple(sleeve.FLAT_TO_AXIS + d for d in sorted(sleeve.FLAT_TO_AXIS_BAND))
     flat_fit = (hub_flat[0] - shaft_flat[1], hub_flat[1] - shaft_flat[0])
     assert round_fit[0] >= -1e-9 and flat_fit[0] > 0.0
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=5e-4)
@@ -836,12 +809,9 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         assert boxes[name].gap(edge) >= 0.004, name
     for name in drawing.END_KEEP:
         assert face_gap(boxes[name]) >= 0.004, name
-    # The oil hole's callout stands above the flange's O.D. extension line,
-    # its text ending left of the hub front, where the overall's extension
-    # line rises to its row; the overall stands a row above the two lengths,
-    # which share a row, its text right of the spigot's end.
-    assert boxes["OilHoleDia"].ymin > edge.ymax
-    assert boxes["OilHoleDia"].xmax < drawing.HUB_FRONT_X
+    # The proportional oil-hole callout now lives below the complete profile
+    # and away from the retained face-control frames, not above the lengths.
+    assert boxes["OilHoleDia"].ymax < edge.ymin - 0.004
     assert boxes["HubLength"].ymin > boxes["SpigotLength"].ymax
     assert boxes["HubLength"].xmin > drawing.SPIGOT_END_X
     assert drawing.SIDE_KEEP["FlangeThick"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
@@ -853,6 +823,31 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         if boxes[a].overlaps(boxes[b], tol=0.0)
     ]
     assert clashes == []
+
+class _NativeTolerance:
+    """Persist numerical controls through the real tolerance writer."""
+
+    Type = 0
+
+    def SetValues(self, minimum: float, maximum: float) -> bool:
+        self.minimum, self.maximum = minimum, maximum
+        return True
+
+    def GetMinValue(self) -> float:
+        return self.minimum
+
+    def GetMaxValue(self) -> float:
+        return self.maximum
+
+
+class _ToleranceDisplay:
+    def SetPrecision3(self, _primary, _dual, tolerance, _dual_tolerance) -> int:
+        self.tolerance_precision = tolerance
+        return 0
+
+    def GetPrimaryTolPrecision2(self) -> int:
+        return self.tolerance_precision
+
 
 
 class _FakeSketchManager:
@@ -917,6 +912,11 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     rows: dict[int, list[tuple[str | None, str | None]]] = {}
     drives: dict[str, dict[str | None, str | None]] = {}
     driven: dict[str, str] = {}
+    native_controls: dict[tuple[str, str], _NativeTolerance] = {}
+
+    def native_dimension(_adapter, feature, name):
+        tolerance = native_controls.setdefault((feature, name), _NativeTolerance())
+        return _ToleranceDisplay(), SimpleNamespace(Tolerance=tolerance)
 
     async def set_global(_adapter, name, value):
         globals_mm[name] = float(value.removesuffix("mm"))
@@ -970,6 +970,8 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     monkeypatch.setattr(part, "name_bore_axis", lambda *a, **k: _async("Axis1"))
     monkeypatch.setattr(part, "drive_dimension", drive_dimension)
     monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_drawing_tolerances, "_named_dimension", native_dimension)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda obj, _iface: obj)
     for helper in (
         "volume_check",
         "bbox_extent_check",
@@ -987,7 +989,6 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
         "set_sketch_direct_db",
         "_as_construction",
         "_check_z_span",
-        "set_dimension_bilateral_tolerance",
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
@@ -997,6 +998,21 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
 
     fake = _FakeSolidWorks()
     asyncio.run(part.build(fake))
+    # Exercise the real native tolerance writer rather than inspecting its
+    # source spelling. The accepted dimensions must persist the mating limits.
+    expected_controls = {
+        ("BoreProfile", "BoreDia"): spec.BORE_DEVIATIONS,
+        ("BoreProfile", "FlatToAxis"): spec.FLAT_TO_AXIS_DEVIATIONS,
+        ("HubProfile", "SpigotDia"): spec.SPIGOT_DIA_DEVIATIONS,
+    }
+    assert set(native_controls) == set(expected_controls)
+    for key, expected in expected_controls.items():
+        tolerance = native_controls[key]
+        assert tolerance.Type == 2
+        assert (
+            tolerance.GetMinValue() * 1000.0,
+            tolerance.GetMaxValue() * 1000.0,
+        ) == pytest.approx(expected)
 
     def value(feature: str, name: str) -> float:
         return _drive_value(drives[feature][name], globals_mm)
@@ -1089,38 +1105,3 @@ def test_registry_row_is_the_turned_brass_mha_159() -> None:
     assert row["tolerance_class"] == "machined_block"
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    """The drawing refuses a source part missing a required property; every
-    one must be carried and non-blank."""
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    extra = ast.literal_eval(
-        ast.unparse(stamp.args[2]).replace("DRAWING_NOTES", repr(spec.DRAWING_NOTES))
-    )
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []

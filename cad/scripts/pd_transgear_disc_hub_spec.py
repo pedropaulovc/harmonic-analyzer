@@ -312,9 +312,9 @@ DRILL_OVERSIZE = drilled_oversize_mm()
 SCREW_HOLE_PLACES = 1
 OIL_HOLE_DIA = 1.2
 OIL_HOLE_PLACES = 1
-# The oil hole is centred on the hub body (R9-60): it is match-drilled at
-# assembly, after the front face is faced, so the drill finds the body's
-# centre at fit-up instead of a printed station.
+# The oil hole is centred on the actual faced body (R9-60), match-drilled
+# at assembly after facing. Its attached callout states the half-body
+# location and centring allowance, not a fixed nominal axial station.
 OIL_HOLE_STATION = HUB_BODY_LENGTH / 2.0  # 3.825 behind the hub front face
 # Marking the body's centre with a rule at fit-up.
 OIL_HOLE_CENTRING_TOL = 0.25
@@ -418,11 +418,23 @@ for _label, _wall, _floor in (
         raise AssertionError(f"MHA-PD-17 {_label}: {_wall:.3f} worst < floor {_floor}")
 
 # --- sheet --------------------------------------------------------------------
-CORNER_NOTE = f"SPIGOT AND HUB CORNERS AT FLANGE SHARP, R{CORNER_RADIUS_MAX:.1f} MAX."
-FLANGE_THICK_NOTE = f"FLANGE {FLANGE_THICK:.3f} SETS {SCREW_NAME} {SCREW_NUMBER} REACH."
+# These existing corner limits are attached at their own roots on the sheet,
+# not buried in the general notes. Neither callout adds a model fillet.
+SPIGOT_CORNER_CALLOUT = (
+    f"R{CORNER_RADIUS_MAX:.1f} MAX\n{DISC_NAME} {DISC_NUMBER} SEATS ON FLANGE"
+)
+HUB_CORNER_CALLOUT = (
+    f"R{CORNER_RADIUS_MAX:.1f} MAX\nCLEARS {SCREW_NAME} {SCREW_NUMBER} HEADS"
+)
 BLANK_NOTE = f"SUPPLY {BLANK_LENGTH_MIN:.2f} MIN OVERALL, SPIGOT END TO HUB FRONT."
-FACING_NOTE = "THE HUB FRONT FACE IS FACED TO FIT AT ASSEMBLY."
-DRAWING_NOTES = "\n".join((CORNER_NOTE, FLANGE_THICK_NOTE, BLANK_NOTE, FACING_NOTE))
+DRAWING_NOTES = BLANK_NOTE
+# Preserve the joint's authored limits: these are its existing stack and
+# clearance functions, not invented running fits on the outside profiles.
+BOLT_CIRCLE_CALLOUT = f"{DISC_NAME} {DISC_NUMBER}\n{SCREW_NAME} PATTERN"
+HUB_DIA_CALLOUT = f"CLEARS {SCREW_NAME}\n{SCREW_NUMBER} HEADS"
+FLANGE_DIA_CALLOUT = f"{SCREW_NAME} {SCREW_NUMBER}\nHOLE-TO-RIM WALL"
+FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
+SPIGOT_LENGTH_CALLOUT = f"SETS {DISC_NAME} {DISC_NUMBER}\nAHEAD OF {SLEEVE_NAME} {SLEEVE_NUMBER} STEP"
 # The overall's requirement; the sheet adds the step that sets it.
 HUB_LENGTH_CALLOUT = (
     f"SET AT ASSEMBLY {HUB_LENGTH_FITTED_MIN:.2f}-{HUB_LENGTH_FITTED_MAX:.2f}"
@@ -447,11 +459,17 @@ SPIGOT_CALLOUT_BELOW = "\n".join(
 # (dt_crank_pinion_spec.pin_hole_note).
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
+# Proportional fit-up location from two real faces, not an absolute band on
+# the model's nominal station. The same centring allowance already bounds
+# both end ligaments above; facing must precede laying out this axis.
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "CENTRED ON HUB BODY",
-        "MATCH DRILL AT ASSY THRU HUB WALL AND",
-        f"{SLEEVE_NAME} {SLEEVE_NUMBER} WITH HUB SEATED",
+        "AFTER FACING: AXIS FROM FACED HUB FRONT =",
+        f"1/2 ACTUAL BODY LENGTH \u00b1{OIL_HOLE_CENTRING_TOL:.2f}",
+        "BODY: FACED HUB FRONT TO FLANGE FRONT",
+        "MATCH DRILL AT ASSY WITH HUB SEATED ON",
+        f"{SLEEVE_NAME} {SLEEVE_NUMBER}; ONE WALL EACH",
+        "INTO BORE, NOT THROUGH OPPOSITE WALLS",
     )
 )
 

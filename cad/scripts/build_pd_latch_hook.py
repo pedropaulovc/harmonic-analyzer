@@ -84,10 +84,15 @@ from pd_latch_hook_geometry import (
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
+    BEND_ALLOWANCE,
+    DEV_ROLL_END,
+    DEV_ROLL_START,
+    DEV_TAB_START,
     DEV_TAPER,
     DEV_TIP,
     EAR_HEIGHT,
     FAR_FACE_STATION,
+    FLAT_EAR,
     FLAT_LENGTH,
     INNER_ROLL_END,
     INNER_ROLL_R,
@@ -141,9 +146,9 @@ from pd_latch_hook_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FLAT_SKETCH,
+    FLAT_VIEW_NOTE,
     FORMED_BAND,
     FORMED_DIMENSIONS,
-    HOLE_BAND,
     ISOMETRIC_VIEW_NOTE,
     POSITION_DIMENSIONS,
     POSITION_TOL,
@@ -157,6 +162,7 @@ DRAWING_PROPERTIES = {
     "Manufacturing Notes": DRAWING_NOTES,
     "Isometric View Note": ISOMETRIC_VIEW_NOTE,
     "Bottom View Note": BOTTOM_VIEW_NOTE,
+    "Flat Pattern View Note": FLAT_VIEW_NOTE,
 }
 
 # The L section in Top-Plane sketch coordinates (x, -z), from the base's -X
@@ -442,10 +448,11 @@ async def _flat_blank(adapter) -> SketchDims:
     geometry, so the drawing draws it as a continuous thin outline (the
     chain font of construction geometry broke its short edges apart).
 
-    38 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
+    Outline, 38 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
     the blank's top corner anchored (2); its length and width, the root
     relief radius, the arm's two widths, the taper's two developed stations
-    and the full round's centre (8).
+    and the full round's centre (8).  Each construction form indicator adds
+    four DOF, fixed by its endpoint coordinates without changing the blank.
     """
     dims = SketchDims()
     p = _FLAT
@@ -550,6 +557,30 @@ async def _flat_blank(adapter) -> SketchDims:
             adapter, f"{base_end}.end", ref, "vertical_distance", value, name
         )
         dims.record(name)
+    # Non-solid bend/form indicators use the existing developed stations.
+    # The 90-degree bend line is at the middle of its neutral allowance;
+    # the other lines bound the R80 roll and start the R10 finger tab.
+    bend_x = FLAT_GAP + FLAT_EAR + BEND_ALLOWANCE / 2.0
+    indicators = [((bend_x, 0.0), (bend_x, WIDTH))]
+    for station in (DEV_ROLL_START, DEV_ROLL_END, DEV_TAB_START):
+        fraction = min(
+            1.0, max(0.0, (station - DEV_TAPER[0]) / (DEV_TAPER[1] - DEV_TAPER[0]))
+        )
+        front_x = _FLAT_FRONT + fraction * LIP_W
+        indicators.append(((FLAT_GAP, -station), (front_x, -station)))
+    for index, endpoints in enumerate(indicators):
+        set_sketch_direct_db(adapter, True)
+        line = check(
+            f"flat form indicator {index}", await adapter.add_centerline(*endpoints[0], *endpoints[1])
+        )
+        set_sketch_direct_db(adapter, False)
+        for end, point in zip(("start", "end"), endpoints):
+            await anchor_point_to_origin(
+                adapter, f"{line}.{end}", *point, f"flat form indicator {index} {end}"
+            )
+            for coordinate in point:
+                if abs(coordinate) >= 1e-9:
+                    dims.record(None)
     return dims
 
 
@@ -946,14 +977,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # Drilled after bending (screw holes) or on the pin (pin hole), never
-    # under size.
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewHoleProfile", "ScrewDia", *deviations(HOLE_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(HOLE_BAND)
-    )
+    # Both drilled diameters keep the identical +0.10/0 limits through the
+    # title block's DRILLED HOLES row, without repeating that row locally.
     # The inside bend: R1.5 the largest the screw head clears.
     set_dimension_bilateral_tolerance(
         adapter, "InsideBend", "InsideBendR", *deviations(BEND_R_BAND)

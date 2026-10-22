@@ -9,7 +9,7 @@ follow the reducer's knob bore through ``pd_transgear_arm_geometry``; neither
 their imported dimensions nor the annotation picks fix a previous centre.
 Section A-A cuts it on the centreline -- through the pivot, every hole and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
-face (the pivot head's end play) and the latch-pin hole's depth print on
+face (the pivot spring's room under the head) and the latch-pin hole's depth print on
 solid cut edges.  The end view (``*Right``, the square end) carries the
 thickness (the ground stock's, printed as a reference to it) and the
 latch-pin hole's reamed size, its height and the press of the pin to the
@@ -24,18 +24,21 @@ import argparse
 import math
 import re
 import sys
-from typing import Any
+from typing import Any, Callable
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 import _config
 from _check import check
 from _com import _early_bound
+from _drawing_annotation_extent import require_clear, require_inside, sheet_region
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -46,6 +49,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
@@ -57,9 +61,12 @@ from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_leader_notes import add_attached_note
+from _drawing_leaders import section_line_segments
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _native_projected_zone import require_saved_projected_gtols
@@ -71,6 +78,7 @@ from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     PIN_HOLE_DEPTH,
+    PIN_BORE_DIA,
     PIN_STATION,
     PIVOT_END_R,
     PLATE_TAP_SPEC,
@@ -78,8 +86,13 @@ from pd_transgear_arm_geometry import (
     THICKNESS,
     TIP_STATION,
 )
+from pd_transgear_arm_plate_geometry import BORE_DIA as KNOB_BORE_DIA
+from pd_transgear_arm_plate_spec import BORE_PLACES as KNOB_BORE_PLACES
 from pd_transgear_arm_spec import (
     GEOMETRIC_CONTROLS,
+    PLATE_PROJECTED_ZONE_CALLOUT,
+    PIN_PROJECTED_ZONE_CALLOUT,
+    LOCATOR_DEPTH_CALLOUT,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -87,12 +100,12 @@ from pd_transgear_arm_spec import (
     FLOOR_DEPTH_CALLOUT,
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
+    PIN_BORE_DIA_PLACES,
     PIN_BORE_CALLOUT,
     LOCATOR_CALLOUT,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
-    PROJECTED_ZONE_NOTE,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -102,6 +115,10 @@ import transgear_hanger_joints as joints
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_arm"]
+SHEET_NAMES = ("Geometry", "Projected zones")
+# Full attached-note extents must clear each other and the title block.
+# Separate rows preserve both true tap attachments without shortened wording.
+PROJECTED_TAP_NOTE_POSITIONS = ((0.200, 0.200), (0.200, 0.180))
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
@@ -133,19 +150,21 @@ END_CENTER = (0.357, FRONT_CENTER[1])
 # B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
 ISO_CENTER = (0.184, 0.037)
 ISO_NOTE_XY = (0.080, 0.022)
-# Bottom left, clear of the section's floor-depth text above and of the
-# isometric caption below.
-NOTES_XY = (0.014, 0.060)
-# Characters per line that keep the block left of the isometric view.
-NOTES_WIDTH = 52
-NOTES_TEXT = "\n".join((
+# This is a locator-feature callout, not a general note block. The shared
+# emitter retains the original S-K setting, acceptance and numbered step refs.
+# K is the actual knob bore on the plate, not a tap/locator station or the
+# arm's longitudinal X projection of the true centre distance.
+LOCATOR_MATCH_XY = (0.014, 0.202)
+LOCATOR_MATCH_TEXT = "\n".join((
+    f"S-K: ACTUAL Ø{KNOB_BORE_DIA:.{KNOB_BORE_PLACES}f} KNOB-BORE K TO "
+    f"Ø{PIN_BORE_DIA:.{PIN_BORE_DIA_PLACES}f} PIN-BORE S;",
+    "NOT TAP / LOCATOR STATION OR ALONG-ARM X.",
     matched_locator_notes(
         _config.parts("pd-transgear-arm")["number"],
-        _config.parts("pd-transgear-arm-plate")["number"],
+        "TRANSGEAR ARM PLATE " + _config.parts("pd-transgear-arm-plate")["number"],
         on_arm=True,
-        width=NOTES_WIDTH,
+        width=62,
     ),
-    PROJECTED_ZONE_NOTE,
 ))
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
@@ -255,6 +274,15 @@ END_KEEP = {
     "PinHoleDia": (0.384, 0.162),
 }
 
+# Text shelves are distinct from the unchanged dimension/witness positions.
+# FloorDepth's longest functional line hangs left: put its entire box to the
+# right of the original dimension line and below the section, inside the border.
+DIMENSION_TEXT_POSITIONS = {
+    "FloorDepth": (0.115, SECTION_CENTER[1] - 0.024),
+    "LocatorY2": (_LOCATOR_OFFSET_X - 0.012, _UNDER_FRONT - 0.005),
+    "Depth": (END_CENTER[0] + 0.009, _end_y(PIVOT_END_R) + 0.024),
+}
+
 
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
@@ -263,6 +291,7 @@ DIMENSION_CALLOUTS = {
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT,
+    "LocatorDepth": LOCATOR_DEPTH_CALLOUT,
 }
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
@@ -271,7 +300,9 @@ DIMENSION_CALLOUTS = {
 # thread engagement. The joint source pays entry loss and the overlapping
 # exit/cut-end loss separately; screws do not locate or centre this joint.
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
-_CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
+# Reserve one more qualifier line for the source engagement reason without
+# letting the complete native callout reach the upper border.
+_CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0202
 # Between the pivot bore's callout and the locator's, above section label B.
 PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
 PLATE_TAP_QUALIFIER = "\n".join(
@@ -473,6 +504,231 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm end view has no Depth dimension to label")
 
 
+def _projected_axis_graphics(adapter: Any, section: Any) -> None:
+    """Draw source-length chains in a view sketch, not in the physical part."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate arm projected-axis section")
+    sketch = _early_bound(section.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    zones = [
+        (f"plate_tap_{index}_position", station, 1.0)
+        for index, station in enumerate(PLATE_TAP_STATIONS, 1)
+    ]
+    zones.append(("feed_stud_projected_axis", PIN_STATION, -1.0))
+    controls = {control.name: control for control in GEOMETRIC_CONTROLS}
+    for label, station, direction in zones:
+        height = controls[label].projected_zone_height_mm
+        if height is None:
+            raise RuntimeError(f"arm {label} has no native projected height")
+        draw.ClearSelection2(True)
+        ends = model_points_in_view(
+            adapter, section,
+            [(station / 1000.0, 0.0, 0.0),
+             (station / 1000.0, 0.0, direction * height / 1000.0)],
+            label=f"{label} projected axis", names=("front face A", "zone end"),
+        )
+        points = []
+        for x, y in ends:
+            point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+            projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+            points.append(tuple(float(value) for value in projected.ArrayData))
+        # Established view-owned centreline pattern: bypass inference snaps,
+        # restore AddToDB, then prove both projected endpoints and black ink.
+        previous_add_to_db = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            segment = manager.CreateCenterLine(*points[0], *points[1])
+        finally:
+            manager.AddToDB = previous_add_to_db
+        if segment is None:
+            raise RuntimeError(f"failed to create arm {label} projected axis")
+        line = _early_bound(segment, "ISketchLine")
+        for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+            placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+            actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+            if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
+                raise RuntimeError(f"arm {label} projected-axis endpoint moved")
+        segment = _early_bound(segment, "ISketchSegment")
+        segment.Color = 0
+        if int(segment.Color) != 0:
+            raise RuntimeError(f"arm {label} projected-axis color did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="arm source projected axes")
+
+
+def _projection_sheet(adapter: Any) -> Callable[[], None]:
+    """Separate chains from sheet 1's station stack without shortening zones.
+
+    The supplemental section has no imported dimensions: the native FCFs on
+    sheet 1 remain the numerical controls. At 2:1 the complete forward pin
+    chain fits between this section and its parent front view.
+    """
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate arm projected-zone sheet")
+    # Lower the parent front as well as the caption: its top silhouette must
+    # not occupy the caption's lane inside the upper zone frame.
+    front_center = (FRONT_CENTER[0], 0.230)
+    # Leave the complete projected-axis outline below the matched callout,
+    # not just its actual chain ink to the right of that callout.
+    section_center = (FRONT_CENTER[0], 0.090)
+    front = place_view(adapter, str(SOURCE), "*Front", *front_center, scale=VIEW_SCALE)
+    section = create_section_view(
+        adapter, front,
+        line_start=(SECTION_LINE[0][0], front_center[1]),
+        line_end=(SECTION_LINE[1][0], front_center[1]),
+        view_xy=section_center, section_label="C", scale=VIEW_SCALE,
+        label="arm projected axes section",
+    )
+    for view in (front, section):
+        set_hidden_lines_removed(adapter, view)
+    _projected_axis_graphics(adapter, section)
+    if not drawing.ActivateView(""):
+        raise RuntimeError("failed to activate projected-zone sheet caption")
+    caption = add_note(adapter, "PROJECTED ZONES — CONTROLS ON SHEET 1", 0.100, 0.263)
+    if caption is None:
+        raise RuntimeError("failed to add arm projected-zone caption")
+    notes: list[tuple[str, Any, bool]] = [("projection caption", caption, False)]
+    # Stagger the tap labels to the right of the matched-locator block, in
+    # the gap between both view outlines. Arrows still name their own taps.
+    for index, station in enumerate(PLATE_TAP_STATIONS, 1):
+        note = add_attached_note(
+            adapter, section, text=PLATE_PROJECTED_ZONE_CALLOUT,
+            entity_xy=_wall_point(
+                adapter, section, x_mm=station + _PLATE_DRILL_R,
+                z_mm=THICKNESS - 1.0, label=f"tap {index} zone direction wall",
+            ),
+            note_xy=PROJECTED_TAP_NOTE_POSITIONS[index - 1],
+            label=f"tap {index} projected zone direction",
+        )
+        notes.append((f"tap {index} projected zone direction", note, True))
+    pin_r = next(datum.face.diameter_mm / 2.0 for datum in PART_DATUMS if datum.letter == "C")
+    note = add_attached_note(
+        adapter, section, text=PIN_PROJECTED_ZONE_CALLOUT,
+        entity_xy=_wall_point(
+            adapter, section, x_mm=PIN_STATION + pin_r, z_mm=1.0,
+            label="pin projected zone direction wall",
+        ),
+        note_xy=(0.300, 0.180),
+        label="pin projected zone direction",
+    )
+    notes.append(("pin projected zone direction", note, True))
+    # This actual locator rim is on the uncluttered supplemental front view;
+    # its matched acceptance leader no longer crosses section A on sheet 1.
+    note = add_attached_note(
+        adapter, front, text=LOCATOR_MATCH_TEXT,
+        entity=_rear_rim(
+            front, radius_mm=LOCATOR_HOLE_DIA_MM / 2.0,
+            station_mm=LOCATOR_SITES_MM[0][0], offset_mm=LOCATOR_SITES_MM[0][1],
+            label="matched arm plate locator",
+        ),
+        note_xy=LOCATOR_MATCH_XY,
+        label="arm plate matched locator acceptance",
+    )
+    notes.append(("arm plate matched locator acceptance", note, True))
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to restore arm geometry sheet")
+
+    def require_settled_projection_notes() -> None:
+        if not drawing.ActivateSheet(SHEET_NAMES[1]):
+            raise RuntimeError("failed to activate arm projection-note extent check")
+        try:
+            region = sheet_region(adapter)
+            view_boxes = {}
+            for label, view in (("projection front", front), ("projection section C", section)):
+                outline = tuple(float(value) for value in view.GetOutline() or ())
+                if (
+                    len(outline) != 4
+                    or not all(math.isfinite(value) for value in outline)
+                    or outline[0] >= outline[2]
+                    or outline[1] >= outline[3]
+                ):
+                    raise RuntimeError(f"arm {label} has invalid native outline: {outline!r}")
+                require_inside(f"arm {label}", outline, region)
+                require_clear(f"arm {label}", outline, {
+                    "title block": (0.216, region.ymin, region.xmax, 0.066),
+                })
+                require_clear(f"arm {label}", outline, view_boxes)
+                view_boxes[label] = outline
+            section_boxes = {}
+            strokes = section_line_segments(adapter, front)
+            if not strokes:
+                raise RuntimeError("arm projected section has no native cutting-line strokes")
+            for index, (start, end) in enumerate(strokes, 1):
+                section_boxes[f"section C cutting stroke {index}"] = (
+                    min(start[0], end[0]), min(start[1], end[1]),
+                    max(start[0], end[0]), max(start[1], end[1]),
+                )
+            sections = tuple(front.GetSectionLines() or ())
+            if not sections:
+                raise RuntimeError("arm projected section has no native cutting-line labels")
+            for index, raw_section in enumerate(sections, 1):
+                native_section = _early_bound(raw_section, "IDrSection")
+                label = str(native_section.GetLabel() or "")
+                origins = tuple(float(value) for value in native_section.GetTextInfo() or ())
+                text_format = _early_bound(native_section.GetTextFormat(), "ITextFormat")
+                # The convenient metres property can be stale when points
+                # own this text format. Read the declared authority only.
+                height = (
+                    float(text_format.CharHeightInPts) * 0.0254 / 72.0
+                    if text_format.IsHeightSpecifiedInPts()
+                    else float(text_format.CharHeight)
+                )
+                if (
+                    not label or len(origins) != 6
+                    or not all(math.isfinite(value) for value in origins)
+                    or not math.isfinite(height) or height <= 0.0
+                ):
+                    raise RuntimeError("arm projected section label has invalid native text data")
+                # Native origins and height, conservative one-em-per-letter
+                # width. Exact glyph ink remains the vector-PDF layout gate's
+                # job: IDrSection has no native glyph-width/bounding-box API.
+                width = height * len(label)
+                for end in range(2):
+                    x, y = origins[end * 3:end * 3 + 2]
+                    section_boxes[f"section C {index} label {end + 1}"] = (
+                        x, y - height, x + width, y,
+                    )
+            boxes = {}
+            for label, raw_note, attached in notes:
+                native_note = _early_bound(raw_note, "INote")
+                extent = tuple(float(value) for value in native_note.GetExtent() or ())
+                if (
+                    len(extent) != 6
+                    or not all(math.isfinite(value) for value in extent)
+                    or extent[0] >= extent[3]
+                    or extent[1] >= extent[4]
+                ):
+                    raise RuntimeError(f"arm {label} has invalid native extent: {extent!r}")
+                box = (extent[0], extent[1], extent[3], extent[4])
+                _telemetry.info(f"arm {label} native text extent: {box!r}")
+                require_inside(f"arm {label}", box, region)
+                require_clear(f"arm {label}", box, {
+                    "title block": (0.216, region.ymin, region.xmax, 0.066),
+                })
+                require_clear(f"arm {label}", box, view_boxes)
+                require_clear(f"arm {label}", box, section_boxes)
+                require_clear(f"arm {label}", box, boxes)
+                boxes[label] = box
+                if attached:
+                    annotation = _early_bound(native_note.GetAnnotation(), "IAnnotation")
+                    if (
+                        int(annotation.GetAttachedEntityCount3()) != 1
+                        or int(annotation.GetLeaderCount()) != 1
+                        or bool(annotation.IsDangling())
+                    ):
+                        raise RuntimeError(f"arm {label} lost its single attached leader")
+        finally:
+            if not drawing.ActivateSheet(SHEET_NAMES[0]):
+                raise RuntimeError("failed to restore arm geometry sheet after extent check")
+
+    return require_settled_projection_notes
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -511,6 +767,12 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="transgear arm package"
+    )
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate arm geometry sheet")
 
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
@@ -573,6 +835,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
+    # Offset ONLY the text: model dimension and witness/measurement stations
+    # survive. These shelves clear the reported extension/centreline crossings.
+    offset_dimension_text(adapter, annotations, DIMENSION_TEXT_POSITIONS)
     # Model-owned circular zones and actual feature datums. BASIC stations
     # are imported from the part; no drawing-only coordinate tolerances.
     bore_dia = {
@@ -682,8 +947,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _set_tap_callout_text(callout, qualifier, label=label)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
-        raise RuntimeError("failed to add the arm's matched-pair notes")
+    projection_note_check = _projection_sheet(adapter)
 
     artefacts = await finalize_drawing(
         adapter,
@@ -691,6 +955,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Arm Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        settled_checks=(projection_note_check,),
         # SolidWorks pins its own "... Tapped Hole" note to the front view
         # once a tap carries a hole callout; the plate-tap callout already
         # states the thread and drill.

@@ -153,14 +153,13 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(PLATE.LOCATOR_SITES_MM, 1)
     ),
 )
-# The dowel engagement pays the arm's mouth break, which is tighter than the
-# title block's edge break; MHA-PD-00 says the dowels locate and the screws
-# only clamp, so the callout does not repeat it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# Three short lines: at two, the break line's width put its left end over
-# the sheet border (run 20261010T001620278Z).
+# The stock locating dowels are a slip fit in the plate and a press fit in
+# the arm. Keep the paid mouth-break limit: it preserves cylindrical grip,
+# rather than silently falling back to the title block's larger edge break.
 LOCATOR_CALLOUT = (
-    "2X REAM THRU\nBREAK EDGE\n"
-    f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+    "2X REAM THRU\nSLIP FIT ON\nMHA-PD-VN-64\nLOCATING DOWELS\n"
+    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX\n"
+    "MATCHED SET: SHEET 2"
 )
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
@@ -180,29 +179,30 @@ SURFACE_FINISHES = (
 )
 
 # --- Printed text -------------------------------------------------------------
-# The bore is a fit: REAM is the requirement (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)).  The screw
-# holes are clearance, drilled; both countersinks take the oval heads.
-BORE_CALLOUT = "REAM THRU"
+# The journal is the actual Ø6 g6 running mate, not a generic clearance hole.
+BORE_CALLOUT = "REAM THRU\nRUNNING FIT: MHA-PD-08\nKNOB SHAFT JOURNAL"
+HUB_STATION_CALLOUT = "CHAIN PLANE: MHA-PD-08 KNOB SHAFT"
+HUB_TO_BOSS_CALLOUT = (
+    "SETS KNOB FLOAT BETWEEN\n"
+    "MHA-PD-15 THRUST RING /\nMHA-PD-16 KNOB CUP"
+)
 SCREW_HOLE_CALLOUT = "DRILL THRU"
-CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
+CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH DRILLED HOLE"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
-# Which face each face view shows, and what each projected frame controls
-# and where its zone runs. The plan (left, *Front) looks at the rear face
-# (z = REAR_FACE_Z), where build_pd_transgear_arm_plate cuts the countersinks;
-# the back view (centre, *Back) looks at mounting face A (z = 0). Every zone
-# starts at A: the screw holes' 7.0 runs through the plate toward the rear
-# face, to the seated head contact
-# (transgear_hanger_joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM, from A);
-# the knob bore's runs out of A toward the hub, through the arm to the chain
-# plane (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM).
-_P = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
-PROJECTED_ZONE_NOTE = "\n".join((
-    f"3. LEFT VIEW: REAR FACE; EACH \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT}",
-    f"   COAXIAL WITH ITS \u00d8{SCREW_HOLE_DIA:.1f} HOLE. CENTRE VIEW:",
-    "   MOUNTING FACE A.",
-    f"4. PROJECTED ZONES START AT FACE A: \u00d8{SCREW_HOLE_DIA:.1f} HOLE",
-    f"   BORES (CENTRE VIEW) {_P:.1f} TOWARD THE REAR FACE;",
-    f"   \u00d8{BORE_DIA:g} KNOB BORE {REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
+# Side-on graphics on sheet 2 make these source extents visible without
+# overlaying a chain on a face-on bore. The native model FCFs remain the
+# governing controls; no height or tolerance is created by the drawing.
+SCREW_PROJECTED_ZONE_CALLOUT = "\n".join((
+    "2X SCREW-BORE PROJECTED ZONE",
+    "START: MOUNTING FACE A",
+    f"{PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM:.1f} TOWARD THE REAR FACE",
+    "GOVERNING CONTROLS ON SHEET 1",
+))
+KNOB_PROJECTED_ZONE_CALLOUT = "\n".join((
+    "KNOB-BORE PROJECTED ZONE",
+    "START: MOUNTING FACE A",
+    f"{REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB",
+    "GOVERNING CONTROL ON SHEET 1",
 ))
 
 ISO_VIEW_SCALE = (1, 1)
