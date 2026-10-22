@@ -506,8 +506,8 @@ async def _wing_axis_reference(
 
     Both construction points are coincident to retained native profile points,
     not independently located copies. The bottom seat and wing share Front;
-    the bottom seat is the bearing datum. The body itself uses WingAxisReach
-    in its internal length equation, while this measured span owns shop ink.
+    the bottom seat is the bearing datum. The horizontal span owns the step's
+    shop ink; the vertical span locates the opposed wing faces (2X).
     """
     label = WING_AXIS_REFERENCE
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
@@ -530,37 +530,41 @@ async def _wing_axis_reference(
         _early_bound(adapter._sketch_entities[ref], "ISketchPoint")
         for ref in (centre, edge)
     )
-    for index, point in enumerate(points):
-        if not point.Select4(index > 0, data):
-            raise RuntimeError(f"{label}: cannot select associated point {index}")
     extension = _early_bound(model.Extension, "IModelDocExtension")
-    display, status = extension.AddSpecificDimension(
-        (BORE_X + WING_X1) / 2000.0, (WING_WIDTH / 2.0 + 7.0) / 1000.0, 0.0,
-        11,  # swDimensionType_e.swHorLinearDimension
-        0,
-    )
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"{label}: AddSpecificDimension failed ({status})")
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    dimension.DrivenState = 1  # swDimensionDriven: geometry is already constrained.
-    display.ShowParenthesis = False  # Manufacturing control, not a REF dimension.
-    await ensure_fully_defined(adapter, label)
     dims = SketchDims()
-    dims.record("WingAxisReach")
+    for name, kind, x, y in (
+        ("WingAxisReach", 11, (BORE_X + WING_X1) / 2.0, WING_WIDTH / 2.0 + 7.0),
+        ("WingHalfWidth", 12, WING_X1 + 7.0, WING_WIDTH / 4.0),
+    ):
+        # swHorLinearDimension / swVertLinearDimension, same associated points.
+        for index, point in enumerate(points):
+            if not point.Select4(index > 0, data):
+                raise RuntimeError(f"{label}: cannot select associated point {index}")
+        display, status = extension.AddSpecificDimension(x / 1000.0, y / 1000.0, 0.0, kind, 0)
+        model.ClearSelection2(True)
+        if display is None:
+            raise RuntimeError(f"{label}: {name} AddSpecificDimension failed ({status})")
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        dimension.DrivenState = 1  # Geometry is already constrained.
+        display.ShowParenthesis = False  # Manufacturing control, not REF.
+        await ensure_fully_defined(adapter, label)
+        dims.record(name)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     return dims, points
 
 
-def _require_wing_axis_reach(adapter: Any, points: tuple[Any, Any]) -> None:
+def _require_wing_axis_dimension(
+    adapter: Any, points: tuple[Any, Any], name: str = "WingAxisReach"
+) -> None:
     """Read back the rebuilt native span, ink state and exact attachments."""
-    display, dimension = _named_dimension(adapter, WING_AXIS_REFERENCE, "WingAxisReach")
+    display, dimension = _named_dimension(adapter, WING_AXIS_REFERENCE, name)
     measured = float(dimension.SystemValue) * 1000.0
-    if not math.isclose(measured, WING_AXIS_REACH, rel_tol=0.0, abs_tol=1e-6):
-        raise RuntimeError(f"wing axis reach measures {measured:g}, expected {WING_AXIS_REACH:g}")
+    expected = DRAWING_VALUES[name]
+    if not math.isclose(measured, expected, rel_tol=0.0, abs_tol=1e-6):
+        raise RuntimeError(f"{name} measures {measured:g}, expected {expected:g}")
     if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
-        raise RuntimeError("wing axis reach lost its measured manufacturing control")
+        raise RuntimeError(f"{name} lost its measured manufacturing control")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     attached = list(annotation.GetAttachedEntities3() or ())
     if bool(annotation.IsDangling()) or len(attached) != 2:
@@ -674,7 +678,8 @@ async def build(adapter) -> dict[str, str]:
     # in document units. The printed stations are driven from the knobs
     # (_STATION_DRIVES), so they take no globals of their own.
     for name, value in {**DRAWING_VALUES, **MODEL_KNOBS}.items():
-        if name not in _STATION_DRIVES:
+        # The half-width is measured from retained physical points, never driven.
+        if name not in _STATION_DRIVES and name != "WingHalfWidth":
             await set_global(adapter, name, f"{value}mm")
 
     # --- Block: Front-plane rectangle, extruded +Z ----------------------------
@@ -957,7 +962,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven pivot block (equations neutral)", volume, 0.002 * V_BLOCK
     )
     _require_one_solid_body(adapter, label="driven pivot block")
-    _require_wing_axis_reach(adapter, wing_reference_points)
+    for name in ("WingAxisReach", "WingHalfWidth"):
+        _require_wing_axis_dimension(adapter, wing_reference_points, name)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

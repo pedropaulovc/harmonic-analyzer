@@ -2527,8 +2527,8 @@ def capture_feed_clearance_bounds(
                 if stem == PIVOT_BLOCK:
                     box = (
                         (pivot_block.BLOCK_X0 - printed_band_mm(2), pivot_block.BLOCK_X1 + printed_band_mm(2)),
-                        (-pivot_block.WING_WIDTH / 2.0 - printed_band_mm(2) / 2.0,
-                         pivot_block.WING_WIDTH / 2.0 + printed_band_mm(2) / 2.0),
+                        (-pivot_block.WING_WIDTH / 2.0 - printed_band_mm(pivot_block.WING_HALF_WIDTH_PLACES),
+                         pivot_block.WING_WIDTH / 2.0 + printed_band_mm(pivot_block.WING_HALF_WIDTH_PLACES)),
                         (-pivot_block.BLOCK_HEIGHT - printed_band_mm(2), 0.0),
                     )
                 elif stem == PIVOT_CAP:

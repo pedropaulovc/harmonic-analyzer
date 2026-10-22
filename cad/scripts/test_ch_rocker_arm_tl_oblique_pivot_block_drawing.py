@@ -556,6 +556,7 @@ def test_wing_step_has_one_direct_manufacturing_authority() -> None:
     assert spec.DRAWING_VALUES["WingAxisReach"] == spec.WING_AXIS_REACH
     assert spec.DRAWING_PRECISION[spec.WING_AXIS_REFERENCE] == {
         "WingAxisReach": spec.WING_AXIS_REACH_PLACES,
+        "WingHalfWidth": spec.WING_HALF_WIDTH_PLACES,
     }
     assert "WingAxisReach" in drawing.CAPTURE_KEEP
     features = _features()
@@ -599,7 +600,7 @@ def test_wing_reference_is_associated_to_the_actual_profiles(monkeypatch) -> Non
     def add_dimension(x, y, z, kind, status):
         assert len(selected) == 2
         assert [append for _point, append in selected] == [False, True]
-        assert (kind, status) == (11, 0)
+        assert kind in (11, 12) and status == 0
         authored.append((x, y, z))
         return display, 0
 
@@ -645,8 +646,8 @@ def test_wing_reference_is_associated_to_the_actual_profiles(monkeypatch) -> Non
         (registered[3][2], f"{registered[1][2]}.end", "coincident"),
     ]
     assert points == tuple(item[1] for item in registered[2:])
-    assert definitions == [False, True]
-    assert dims._rows == [("WingAxisReach", None)]
+    assert definitions == [False, True, True]
+    assert dims._rows == [("WingAxisReach", None), ("WingHalfWidth", None)]
     assert display.ShowParenthesis is False
     assert manager.AddToDB is False
 
@@ -702,10 +703,10 @@ def test_wing_native_readback_requires_measured_associated_authority(monkeypatch
     elif failure == "duplicate":
         case.attached[:] = [case.points[0], case.points[0]]
     if failure is None:
-        part._require_wing_axis_reach(case.adapter, case.points)
+        part._require_wing_axis_dimension(case.adapter, case.points)
     else:
         with pytest.raises(RuntimeError):
-            part._require_wing_axis_reach(case.adapter, case.points)
+            part._require_wing_axis_dimension(case.adapter, case.points)
 
 
 @pytest.mark.parametrize("failure", [None, "value", "owner", "driver", "dangling", "prefix", "suffix", "band", "missing", "duplicate"])
@@ -785,7 +786,7 @@ def test_thread_envelope_walls_reject_an_undersized_wing() -> None:
 def test_widened_wing_still_fits_the_declared_flat_bar_without_height_growth() -> None:
     config = _config.parts("ch-rocker-arm-tl-oblique-pivot-block")
     assert "1 x 3 in" in config["material_specification"]
-    assert spec.WING_WIDTH + printed_band_mm(2) < 3.0 * trammel.INCH
+    assert spec.WING_WIDTH + 2.0 * printed_band_mm(spec.WING_HALF_WIDTH_PLACES) < 3.0 * trammel.INCH
     assert spec.BLOCK_HEIGHT + printed_band_mm(2) < trammel.INCH
     assert spec.BLOCK_HEIGHT == trammel.PIVOT_BLOCK_HEIGHT
     assert spec.BLOCK_WIDTH == 40.0
@@ -906,7 +907,7 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
             "cap threads", "carriage holes", "nut-bracket holes",
         ):
             assert margins[f"register {index} to {feature}"] >= spec.WALL_TARGET
-    for name in ("WingWidth", "BlockHeight", "BoreStationX", "BoreStationY"):
+    for name in ("WingHalfWidth", "BlockHeight", "BoreStationX", "BoreStationY"):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
     shallow = spec.cap_register_margins(depth=0.0)
     assert shallow["register 1 to wing side"] > margins["register 1 to wing side"]
@@ -920,9 +921,8 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
             - dx - location - radius - drift
         )
     expected_side = (
-        (spec.WING_WIDTH - printed_band_mm(2)) / 2.0
-        - abs(retention.CAP_REGISTER_CENTERS[0][1]) - printed_band_mm(2)
-        - location - radius - drift
+        spec.WING_WIDTH / 2.0 - printed_band_mm(spec.WING_HALF_WIDTH_PLACES)
+        - abs(retention.CAP_REGISTER_CENTERS[0][1]) - location - radius - drift
     )
     assert margins["register 1 to wing side"] == pytest.approx(expected_side)
     assert margins["receiver floor to bottom face"] == pytest.approx(
@@ -1485,3 +1485,90 @@ def test_register_section_fits_native_outline_without_rotation(monkeypatch, fail
     assert native.Angle == 0.19 and native.ScaleDecimal == 2.0
 
 
+
+
+def test_opposed_wing_faces_use_direct_axis_location_bands() -> None:
+    wing = _features()["capture_wing"]
+    half_band = printed_band_mm(spec.WING_HALF_WIDTH_PLACES)
+    assert wing["station"] == pytest.approx([35.49, 36.51])
+    assert "width" not in wing
+    assert spec.WING_WIDTH + 2.0 * half_band == pytest.approx(73.02)
+    radius = spec.THREAD_MAJOR_MM[spec.CAP_TAP_HOLE_SPEC.size] / 2.0
+    sweep = (spec.BLOCK_HEIGHT + printed_band_mm(2)) * math.tan(
+        math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES)
+    )
+    expected = (
+        spec.WING_WIDTH / 2.0 - half_band
+        - abs(retention.CAP_BOLT_Y_OFFSETS[0])
+        - printed_band_mm(spec.CAP_TAP_LOCATION_PLACES) - radius - sweep
+    )
+    assert spec.cap_receiver_walls()["cap thread to wing side"] == pytest.approx(expected)
+    assert expected >= spec.WALL_TARGET
+
+
+def test_f441_lower_cap_pattern_caption_clears_the_complete_lower_y_ink() -> None:
+    # Actual f441 PDF/native audit, sheet metres: all three right-X text rows,
+    # lower-Y extension/dimension lines and the complete lower arrow triangle.
+    boxes = (
+        (0.303551, 0.108712, 0.3169624, 0.1122774),
+        (0.28381, 0.1031558, 0.3360314, 0.1067211),
+        (0.2875368, 0.0975995, 0.3325704, 0.1011649),
+    )
+    strokes = (
+        ((0.1264722, 0.103), (0.3005, 0.103)),
+        ((0.2995, 0.103), (0.2995, 0.1266656)),
+        ((0.2995, 0.103), (0.299119, 0.106556)),
+        ((0.299119, 0.106556), (0.299881, 0.106556)),
+        ((0.299881, 0.106556), (0.2995, 0.103)),
+        ((0.129524, 0.160), (0.3005, 0.160)),
+        ((0.2995, 0.160), (0.2995, 0.1433344)),
+        ((0.2995, 0.160), (0.299119, 0.156444)),
+        ((0.299119, 0.156444), (0.299881, 0.156444)),
+        ((0.299881, 0.156444), (0.2995, 0.160)),
+    )
+    assert distance_to_box(strokes[1], boxes[1]) == 0.0
+    dx = drawing.CAPTURE_TEXT_POSITIONS["CapTapRightX"][0] - 0.310
+    dy = drawing.CAPTURE_TEXT_POSITIONS["CapTapRightX"][1] - 0.105
+    moved = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
+    assert min(distance_to_box(line, box) for line in strokes for box in moved) >= 0.002
+    assert max(box[2] for box in moved) < 0.4191  # actual right inner border
+    assert min(box[1] for box in moved) > 0.066  # title block top
+
+
+def test_f441_plan_station_columns_and_upper_witness_clear_section_a() -> None:
+    # Captured native A letter origin/height and actual PDF glyph box. The
+    # square native envelope budgets the entire glyph, not only its origin.
+    label = (0.1886492, 0.1781075 - 0.00635, 0.1886492 + 0.00635, 0.1781075)
+    glyph = (0.188905, 0.1717465, 0.194764, 0.1779187)
+    old_witness = ((0.186125, 0.1725), (0.201875, 0.1725))
+    assert distance_to_box(old_witness, glyph) == 0.0
+    gap = drawing._lower_row_witness_gap(label, 0.185875, 0.200875)
+    moved_witness = ((0.185875 + gap, 0.1725), old_witness[1])
+    assert 0.200875 - moved_witness[0][0] >= 0.002
+    assert distance_to_box(moved_witness, glyph) >= 0.002
+    with pytest.raises(RuntimeError, match="no clear, visible"):
+        drawing._lower_row_witness_gap(label, 0.185875, label[2] + 0.003)
+
+    # Every actual text row and BOTH edges of each native arrow are retained.
+    captured = {
+        "HoleRow1Y": (30.0, (0.1953924, 0.1654058, 0.2065444, 0.1689711), 0.200875, 0.162, 0.1725),
+        "BoreStationY": (35.0, (0.2026963, 0.1751558, 0.2140444, 0.1787212), 0.208375, 0.162, 0.192),
+        "HoleRow2Y": (40.0, (0.2089266, 0.1849058, 0.2228375, 0.1884711), 0.215875, 0.162, 0.2115),
+    }
+    boxes, arrows = {}, {}
+    for name, (old_x, box, column, bottom, top) in captured.items():
+        shift = (drawing.PLAN_KEEP[name][0] - old_x) * 0.0015
+        boxes[name] = (box[0] + shift, box[1], box[2] + shift, box[3])
+        x = column + shift
+        outside = name == "HoleRow1Y"
+        edges = []
+        for y, direction in ((bottom, -1 if outside else 1), (top, 1 if outside else -1)):
+            tip = (x, y)
+            left = (x - 0.000381, y + direction * 0.003556)
+            right = (x + 0.000381, y + direction * 0.003556)
+            edges.extend(((tip, left), (left, right), (right, tip)))
+        arrows[name] = edges
+    for name, edges in arrows.items():
+        for other, box in boxes.items():
+            if name != other:
+                assert min(distance_to_box(edge, box) for edge in edges) >= 0.002

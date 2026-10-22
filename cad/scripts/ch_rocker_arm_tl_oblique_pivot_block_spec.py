@@ -12,9 +12,13 @@ footprint; the original tail stays 40 wide. The original bearing axis,
 carriage pattern, nut-bracket pattern and bracket grip stay put.
 Frame origin is the carriage-pattern centre on its top mating plane, +X
 away from the spindle, +Z up. Existing hole stations still read from the
--X end and tail -Y side; the four cap receiver taps and the wing's +X step
-instead read DIRECTLY from the actual bearing axis at three places (+/-0.13),
-never through a loose outside-edge stack.
+-X end and tail -Y side. The four cap receiver taps read directly from the
+actual bearing axis at three places (+/-0.13); the +X wing step and BOTH
+opposed wing faces read directly from it at two places (+/-0.51).
+The faces are 2X36.00, not a 72.00 size plus a separate half-location chain:
+nominal geometry stays put, while the derived overall is 72 +/-1.02 and
+still fits the 3 in bar. Side-wall bounds charge one direct half-location
+band, not a half-width band plus the tail-to-bore station.
 
 Bearing seats (rule 4, rule 16). The bore axis stands at X = ``PIN_OFFSET`` ⚙
 (-32), Y = 0. From the top, a Ø30 N6 seat (29.976/29.989) ``BEARING_RECESS``
@@ -163,6 +167,9 @@ WING_AXIS_REFERENCE = "WingAxisReference"
 WING_AXIS_REACH_CALLOUT = "2X WING STEP\nFROM BEARING AXIS"
 WING_X1 = retention.BLOCK_WING_END
 WING_WIDTH = 2.0 * retention.BLOCK_WING_HALF_WIDTH
+# Each opposed face is located directly from the bearing axis. The ordinary
+# .XX band applies to EACH 36 mm half; the derived overall is 72 +/- 1.02.
+WING_HALF_WIDTH_PLACES = 2
 WING_LENGTH = WING_X1 - BLOCK_X0
 BEARING_AXIS_NAME = "BearingAxis"
 CAP_TAP_REFERENCE = "CapTapReference"
@@ -218,8 +225,8 @@ def cap_receiver_walls(
 ) -> dict[str, float]:
     """Thread-envelope walls at each edge's actual manufacturing authority.
 
-    Direct tap-to-axis and wing-step-to-axis bands govern the +X wall; the
-    original spindle-end and wing-side chains retain their existing bands.
+    Direct tap-to-axis, wing-step-to-axis and opposed wing-face-to-axis
+    bands govern the walls. The spindle end retains its existing edge chain.
     The general angular band sweeps each thread axis over the largest block
     height; a through tap cannot discard its lower-end wall.
     """
@@ -233,7 +240,7 @@ def cap_receiver_walls(
     return {
         "cap thread to spindle end": x_from_end - dx - edge_band - location_band - radius - sweep,
         "cap thread to wing step": wing_axis_reach - printed_band_mm(WING_AXIS_REACH_PLACES) - dx - location_band - radius - sweep,
-        "cap thread to wing side": (wing_width - edge_band) / 2.0 - dy - edge_band - location_band - radius - sweep,
+        "cap thread to wing side": wing_width / 2.0 - printed_band_mm(WING_HALF_WIDTH_PLACES) - dy - location_band - radius - sweep,
     }
 
 
@@ -448,6 +455,7 @@ MODEL_KNOBS: dict[str, float] = {
     "SideScrewZ": SIDE_SCREW_Z,
 }
 MODEL_KNOBS["WingSideY"] = WING_WIDTH / 2.0
+MODEL_KNOBS["WingWidth"] = WING_WIDTH
 MODEL_KNOBS["CapTapX"] = abs(retention.CAP_BOLT_X_OFFSETS[0])
 MODEL_KNOBS["CapTapY"] = abs(retention.CAP_BOLT_Y_OFFSETS[0])
 MODEL_KNOBS["CapRegisterDia"] = CAP_REGISTER_DIA
@@ -487,8 +495,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SideScrewRowZ": SIDE_STATION_PLACES,
     },
 }
-DRAWING_PRECISION["WingProfile"] = {"WingWidth": 2}
-DRAWING_PRECISION[WING_AXIS_REFERENCE] = {"WingAxisReach": WING_AXIS_REACH_PLACES}
+DRAWING_PRECISION[WING_AXIS_REFERENCE] = {
+    "WingAxisReach": WING_AXIS_REACH_PLACES,
+    "WingHalfWidth": WING_HALF_WIDTH_PLACES,
+}
 DRAWING_PRECISION[CAP_TAP_REFERENCE] = {
     name: CAP_TAP_LOCATION_PLACES
     for name in ("CapTapLeftX", "CapTapRightX", "CapTapLowerY", "CapTapUpperY")
@@ -532,7 +542,7 @@ DRAWING_VALUES: dict[str, float] = {
     "SideScrew2X": SIDE_STATIONS_X[1],
     "SideScrewRowZ": SIDE_ROW_Z,
     "WingAxisReach": WING_AXIS_REACH,
-    "WingWidth": WING_WIDTH,
+    "WingHalfWidth": WING_WIDTH / 2.0,
     "CapTapLeftX": abs(retention.CAP_BOLT_X_OFFSETS[0]),
     "CapTapRightX": abs(retention.CAP_BOLT_X_OFFSETS[1]),
     "CapTapLowerY": abs(retention.CAP_BOLT_Y_OFFSETS[0]),
@@ -786,8 +796,8 @@ def cap_register_margins(
             - location - radius - drift
         )
         margins[f"{prefix} to wing side"] = (
-            (wing_width - _band("WingWidth")) / 2.0
-            - abs(dy) - axis_y - location - radius - drift
+            wing_width / 2.0 - _band("WingHalfWidth")
+            - abs(dy) - location - radius - drift
         )
         radial = math.hypot(
             max(0.0, abs(dx) - location), max(0.0, abs(dy) - location)
@@ -874,6 +884,7 @@ CALLOUTS_ABOVE = {
     "BoreDia": "2X",
     "SeatFilletR": "2X",
     "CboreFloor": CBORE_FLOOR_CALLOUT,
+    "WingHalfWidth": "2X",
 }
 # The side row reads from the carriage seat and names the complete bracket
 # identity. Its independent native shelf has room for all three rows.
@@ -893,7 +904,6 @@ CALLOUTS_BELOW.update({
     for name in DRAWING_PRECISION[CAP_TAP_REFERENCE]
 })
 CALLOUTS_BELOW["WingAxisReach"] = WING_AXIS_REACH_CALLOUT
-CALLOUTS_BELOW["WingWidth"] = "SYMMETRIC ABOUT\nBEARING AXIS"
 CALLOUTS_BELOW["CapRegister1Dia"] = CAP_REGISTER_CALLOUT
 CALLOUTS_BELOW["CapRegister2Dia"] = CAP_REGISTER_CALLOUT
 CALLOUTS_BELOW["CapRegisterDepth"] = CAP_REGISTER_DEPTH_CALLOUT

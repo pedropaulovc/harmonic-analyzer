@@ -35,7 +35,7 @@ from _drawing_hole_callout import (
     compose_hole_callout_prefix,
     set_hole_callout_precision,
 )
-from _drawing_leaders import set_near_side_diameter
+from _drawing_leaders import dimension_segments, distance_to_box, set_near_side_diameter
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -142,8 +142,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BlockLength": (2.5, -part_spec.WING_WIDTH / 2.0 - 22.0, _H),
     # Y stations reference the original tail-side datum plane, not the wing.
     "HoleRow1Y": (30.0, -16.5, _H),
-    "BoreStationY": (35.0, -10.0, _H),
-    "HoleRow2Y": (40.0, -3.5, _H),
+    # f441 native: 7/20/33 columns were only 7.5 mm apart. Give each value
+    # its own column, 12 mm apart on paper; retain every baseline attachment.
+    "BoreStationY": (38.0, -10.0, _H),
+    "HoleRow2Y": (46.0, -3.5, _H),
     "BlockWidth": (52.0, 8.0, _H),
     "BoreDia": (BLOCK_X0 - 15.5, 15.5, _H),
 }
@@ -152,7 +154,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
 SECTION_A_TEXT_POSITIONS = {"SideScrewRowZ": (0.267, 0.126)}
 CAPTURE_KEEP = {
     "WingAxisReach": ((BORE_X + part_spec.WING_X1) / 2.0, 41.0, _H),
-    "WingWidth": (59.0, 0.0, _H),
+    # 2X half-location replaces the full-width/symmetry-prose authority.
+    # X283.5 is beyond the native plan's X275.088 right outline and left
+    # of the upper cap-pattern block (native left edge X289.058).
+    "WingHalfWidth": (27.0, 18.0, _H),
     "CapTapLeftX": (-39.5, -43.0, _H),
     "CapTapRightX": (-24.5, -51.0, _H),
     "CapTapLowerY": (35.0, -12.5, _H),
@@ -163,7 +168,9 @@ CAPTURE_KEEP = {
 CAPTURE_TEXT_POSITIONS = {
     "WingAxisReach": (0.300, 0.250),
     "CapTapLeftX": (0.070, 0.100),
-    "CapTapRightX": (0.310, 0.105),
+    # f441: caption X283.558..336.442 struck the X299.5 lower-Y line.
+    # Shift the complete native block 35 mm, not its value or witnesses.
+    "CapTapRightX": (0.345, 0.105),
 }
 REGISTER_PLAN_CENTER = (0.170, 0.190)
 REGISTER_SECTION_PLAN_CENTER = (0.140, 0.170)
@@ -606,12 +613,15 @@ requirement(
         PlanarFace((0.0, 1.0, 0.0), part_spec.WING_WIDTH / 2.0),
         PlanarFace((0.0, -1.0, 0.0), part_spec.WING_WIDTH / 2.0),
     ),
-    requirements=("width",),
+    requirements=("station",),
     fields={
-        "width": (limits(part_spec.WING_WIDTH, 2), ("WING_WIDTH",)),
-        "width_nominal": (part_spec.WING_WIDTH, ("WING_WIDTH",)),
+        "station": (
+            limits(part_spec.WING_WIDTH / 2.0, part_spec.WING_HALF_WIDTH_PLACES),
+            ("WING_WIDTH", "WING_HALF_WIDTH_PLACES"),
+        ),
+        "station_nominal": (part_spec.WING_WIDTH / 2.0, ("WING_WIDTH",)),
     },
-    precision={"width": 2},
+    precision={"station": part_spec.WING_HALF_WIDTH_PLACES},
 )
 
 requirement(
@@ -957,6 +967,71 @@ def _cbore_floor_section(adapter: Any, source_model: Any, plan: Any) -> list[Any
         )
     position_section_caption(adapter, section, CAPTION_B_XY, label="pivot block B")
     return annotations
+
+
+def _lower_row_witness_gap(
+    label_box: tuple[float, float, float, float], attachment_x: float, column_x: float
+) -> float:
+    """Clear A's complete letter with 2 mm of air and a visible witness."""
+    start = label_box[2] + 0.002
+    if start <= attachment_x or column_x - start < 0.002:
+        raise RuntimeError("7.000 upper witness has no clear, visible exterior lane")
+    return start - attachment_x
+
+
+def _plan_lower_row_witness(
+    adapter: Any, annotations: list[Any], section_a: Any, on_plan: Any, *, place: bool
+) -> None:
+    """Gap only the upper 7 mm witness; never detach it or move the cut plane."""
+    matches = [a for a in annotations if dimension_name(adapter, a) == "HoleRow1Y"]
+    if len(matches) != 1:
+        raise RuntimeError("plan needs exactly one native HoleRow1Y")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    owner = str(dimension.FullName).split("@")
+    if (
+        len(owner) < 2 or owner[:2] != ["HoleRow1Y", "TopBoreProfile"]
+        or bool(annotation.IsDangling())
+        or not math.isclose(
+            float(dimension.SystemValue) * 1000.0, part_spec.HOLE_ROWS_Y[0],
+            rel_tol=0.0, abs_tol=1e-6,
+        )
+    ):
+        raise RuntimeError("7.000 lost its native face-to-hole-row authority")
+    cut = _early_bound(_early_bound(section_a, "IView").GetSection(), "IDrSection")
+    texts = tuple(float(value) for value in cut.GetTextInfo())
+    height = float(_early_bound(cut.GetTextFormat(), "ITextFormat").CharHeight)
+    if len(texts) != 6 or not all(math.isfinite(v) for v in (*texts, height)) or height <= 0:
+        raise RuntimeError("A cutting-line letters have no finite native text bounds")
+    right = max((texts[:3], texts[3:]), key=lambda point: point[0])
+    box = (right[0], right[1] - height, right[0] + height, right[1])
+    attachment = on_plan((BLOCK_X1, -BOLT_Y, _H))
+    column_x = on_plan(PLAN_KEEP["HoleRow1Y"])[0]
+    gap = _lower_row_witness_gap(box, attachment[0], column_x)
+    # TopBoreProfile emits datum -> row point, so upper witness is index 1.
+    # f441: letter upper-left (188.6492,178.1075), height6.35 mm,
+    # attachment X185.875 => gap11.1242 mm; 4.8758 mm witness remains.
+    if place:
+        if display.SetWitnessLineGap(1, False, gap) is not True:
+            raise RuntimeError("7.000 upper witness gap was refused")
+        rebuild_drawing(adapter, label="7.000 upper witness clears section A")
+    ok, use_doc, actual_gap = display.GetWitnessLineGap(1, False, 0.0)
+    if ok is not True or use_doc or not math.isclose(float(actual_gap), gap, rel_tol=0.0, abs_tol=1e-8):
+        raise RuntimeError("7.000 upper witness gap did not persist")
+    witnesses = [
+        line for line in dimension_segments(annotation)
+        if all(abs(point[1] - attachment[1]) <= 1e-7 for point in line)
+    ]
+    if len(witnesses) != 1:
+        raise RuntimeError("7.000 upper witness is missing or ambiguous")
+    xs = sorted(point[0] for point in witnesses[0])
+    if (
+        abs(xs[0] - (attachment[0] + gap)) > 1e-6
+        or xs[1] < column_x or column_x - xs[0] < 0.002
+        or distance_to_box(witnesses[0], box) < 0.002 - 1e-8
+    ):
+        raise RuntimeError(f"7.000 upper witness does not clear A: {witnesses[0]}, {box}")
 
 
 def _bore_axis_section(
@@ -1384,14 +1459,16 @@ def _side_screw_sheet(adapter: Any) -> Any:
 
 
 
-def _wing_axis_manufacturing_dimension(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the imported measured reach as ordinary manufacturing ink, not REF."""
+def _wing_axis_manufacturing_dimension(
+    adapter: Any, annotations: list[Any], name: str = "WingAxisReach"
+) -> None:
+    """Keep each imported measured location as manufacturing ink, not REF."""
     matches = [
         annotation for annotation in annotations
-        if dimension_name(adapter, annotation) == "WingAxisReach"
+        if dimension_name(adapter, annotation) == name
     ]
     if len(matches) != 1:
-        raise RuntimeError("capture wing needs exactly one native WingAxisReach")
+        raise RuntimeError(f"capture wing needs exactly one native {name}")
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
@@ -1400,7 +1477,7 @@ def _wing_axis_manufacturing_dimension(adapter: Any, annotations: list[Any]) -> 
     if (
         len(owner) < 2 or owner[1] != part_spec.WING_AXIS_REFERENCE
         or int(dimension.DrivenState) != 1
-        or not math.isclose(measured, part_spec.WING_AXIS_REACH, rel_tol=0.0, abs_tol=1e-6)
+        or not math.isclose(measured, part_spec.DRAWING_VALUES[name], rel_tol=0.0, abs_tol=1e-6)
         or bool(annotation.IsDangling())
     ):
         raise RuntimeError("capture wing reach lost its native measured authority")
@@ -1471,12 +1548,17 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     section_a, side_row = _bore_axis_section(adapter, source_model, plan)
+    _plan_lower_row_witness(adapter, annotations, section_a, on_plan, place=True)
     annotations += side_row
     on_a = _view_mapper(adapter, section_a)
     # The floor height lives on CboreFloorReference, a sketch the part saves
     # hidden: _drawing_hidden_sketches shows it while B-B is cut and curated.
     annotations += _cbore_floor_section(adapter, source_model, plan)
-    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    set_dimension_callouts(
+        adapter, annotations,
+        {name: text for name, text in CALLOUTS_ABOVE.items() if name not in _OTHER_SHEET_DIMENSIONS},
+        location="above",
+    )
     set_dimension_callouts(
         adapter, annotations,
         {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in _OTHER_SHEET_DIMENSIONS},
@@ -1531,8 +1613,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, capture_annotations,
         {name: text for name, text in CALLOUTS_BELOW.items() if name in CAPTURE_KEEP},
     )
+    set_dimension_callouts(
+        adapter, capture_annotations, {"WingHalfWidth": CALLOUTS_ABOVE["WingHalfWidth"]},
+        location="above",
+    )
     offset_dimension_text(adapter, capture_annotations, CAPTURE_TEXT_POSITIONS)
-    _wing_axis_manufacturing_dimension(adapter, capture_annotations)
+    for name in ("WingAxisReach", "WingHalfWidth"):
+        _wing_axis_manufacturing_dimension(adapter, capture_annotations, name)
     tap_x, tap_y = part_spec.CAP_TAP_POINTS[1]
     cap_tap_callout = add_native_hole_callout(
         adapter, capture,
@@ -1553,6 +1640,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("cannot activate nut-bracket interface sheet")
     thread_note_views.append(_side_screw_sheet(adapter))
 
+    def settled_checks() -> None:
+        if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+            raise RuntimeError("cannot recheck the bearing/carriage witness")
+        _plan_lower_row_witness(adapter, annotations, section_a, on_plan, place=False)
+        if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+            raise RuntimeError("cannot recheck the capture-wing authorities")
+        for name in ("WingAxisReach", "WingHalfWidth"):
+            _wing_axis_manufacturing_dimension(adapter, capture_annotations, name)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1570,6 +1666,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         redundant_note_substrings=("5/16-18 Tapped Hole",),
         expected_redundant_notes=len(thread_note_views),
+        settled_checks=(settled_checks,),
     )
 
 

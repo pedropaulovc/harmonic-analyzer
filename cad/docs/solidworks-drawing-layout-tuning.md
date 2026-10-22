@@ -188,6 +188,14 @@ Keep unavailable probes as explicit read errors and preserve the original
 exception. A combined “line moved or text missed” error cannot distinguish a
 setter refusal from a clamped position, and does not justify loosening a guard.
 
+For the oblique block's multiline linear captions, after enabling `OffsetText`
+and moving the text, the final line landed at the prior annotation origin,
+not the false-mode arrow Y. Calibrating that arrow first moved the final line
+by 19.447 mm. Set the false-mode annotation origin to the desired line anchor
+once, enable offset text, then move the text and check the settled arrows,
+witnesses and text origin. Source `f441b8b25` passed the native guards with
+this handoff; do not replace it with an iteration or a hard-coded correction.
+
 The second cartridge uses the same capture-part families on the other
 support, so its identification does not need duplicate BOM balloons. Explain
 that the capture parts are identical at both supports in the existing
@@ -1078,6 +1086,15 @@ Keep that refusal. Resolve the part-owned finish-control face on the view's
 `ReferencedDocument` and attach as a FACE with the pre-insertion selection
 point (`draw_dt_pinion_arbor`): `IsSame` proves
 the actual cylinder and the 1 mm landing readback still pins its flank.
+
+An entity-attached `InsertNote` can use the same pre-insertion selection-point
+pattern. On the oblique hold-down stud, coordinate hit-testing missed the
+resolved factory-rim edge. Selecting that exact edge, setting
+`SetSelectionPoint2` and then inserting the note succeeded on `f441b8b25`.
+Both rim and barrel-outline notes passed exact attachment identity/type and
+settled leader-tip checks within 1 mm. This differs from the unattached
+`add_leader_note` pointer above; do not move an attached tip after insertion
+and assume its ownership survived.
 
 **j. A fresh detail view whose readbacks lag its ink.**
 Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred
