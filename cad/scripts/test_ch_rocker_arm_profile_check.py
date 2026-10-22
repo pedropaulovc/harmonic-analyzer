@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import importlib
 import math
 import re
 import tomllib
@@ -335,3 +337,36 @@ def test_inventory_template_solids_are_the_checked_geometry() -> None:
     assert slot["void"] is True and slot["shape"] == "cylinder"
     assert slot["at_mm"] == [check.ROD_SLOT_X, check.ROD_SLOT_Y, 0.0]
     assert slot["dia_mm"] == check.ROD_SLOT_WIDTH and slot["length_mm"] == check.THICK
+
+
+def _reload_with_rod_position(position_dia: str) -> None:
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setitem(
+            rocker.GEOMETRIC_TOLERANCES_MM, "rod-pin hole position", position_dia
+        )
+        try:
+            importlib.reload(check)
+        finally:
+            patch.undo()
+            importlib.reload(check)
+
+
+def test_the_slot_absorbs_radial_rod_hole_error_without_moving_the_windows() -> None:
+    """Up to the slot's admission limit the rod hole's radial position error
+    slides the pin along the radial slot: the accept/reject windows hold."""
+    baseline = copy.deepcopy(check.WINDOWS)
+    observed = {}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setitem(rocker.GEOMETRIC_TOLERANCES_MM, "rod-pin hole position", "0.24")
+        try:
+            importlib.reload(check)
+            observed = copy.deepcopy(check.WINDOWS)
+        finally:
+            patch.undo()
+            importlib.reload(check)
+    assert observed == baseline
+
+
+def test_the_module_refuses_a_rod_hole_error_the_slot_run_cannot_admit() -> None:
+    with pytest.raises(AssertionError):
+        _reload_with_rod_position("0.25")

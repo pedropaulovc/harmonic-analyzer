@@ -42,6 +42,7 @@ import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 from _process_plans import PROCESS_ROOT
 
 INCH = 25.4
@@ -261,6 +262,15 @@ if ROD_SLOT_WIDTH - ROD_PIN_MAX <= 0.0:
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
 ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0589
 ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0084
+# The slot's 0.75 run (inventory gauges.arm-outline-template; formerly
+# ROD_SLOT_FLAT, three places) must admit the pin at the rocker's worst
+# radial position error and play, so the radial slot absorbs that error and
+# only its width sets the clocking below.
+ROD_SLOT_FLAT = 0.75
+if (ROD_SLOT_FLAT - printed_band_mm(_ROD_SLOT_PLACES)) / 2.0 < (
+    ROD_HOLE_RADIAL + ROD_HOLE_PLAY + printed_band_mm(_ROD_SLOT_PLACES)
+):
+    raise AssertionError("the rod slot's run no longer lets the pin in")
 # Clocking budget. A template laid on the arm moves rigidly: the pivot pin
 # lets it shift by up to LOCATOR_REGISTRATION_MAX, and the rod pin lets the
 # slot's centre move across the slot by up to ROD_CLOCKING_PLAY (its play in
