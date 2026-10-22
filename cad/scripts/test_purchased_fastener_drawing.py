@@ -9301,7 +9301,147 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
     )
 
 
-def _washer_import_native(monkeypatch, *, defect=None):
+def _washer_paint_native(monkeypatch, case):
+    """Replay R48 native paint; only native I/O is doubled, not placement/math."""
+    washer = case.helper
+    thick, bore = washer.THICKNESS, washer.BORE_DIAMETER
+    # Retained R48 draw data, metres. Text rows intentionally include the entire
+    # limits stack and the below-value qualifier, not just the nominal value.
+    records = {
+        thick: dict(type=4, pos=[.144901, .23, .0000039], display=dict(
+            lines=[
+                [0, 0, 0, 0, .126313, .232275, 0, .145901, .232275, 0],
+                [0, 0, 0, 0, .126313, .227725, 0, .145901, .227725, 0],
+                [0, 0, 0, 0, .144901, .232275, 0, .144901, .238625, 0],
+                [0, 0, 0, 0, .144901, .227725, 0, .144901, .221375, 0],
+            ],
+            arrows=[
+                [.144901, .232275, 0, 0, 1, 0, .003556, .000762, 0, 0, 0, 1],
+                [.144901, .227725, 0, 0, -1, 0, .003556, .000762, 0, 0, 0, 1],
+            ],
+            texts=[
+                dict(t=" (", pos=[.1335333, .2274941, 0], w=.0030139),
+                dict(t="0.043", pos=[.1365472, .23, 0], w=.0116375),
+                dict(t="0.029", pos=[.1365472, .2254743, 0], w=.0116375),
+                dict(t=" in) ", pos=[.1481847, .2274941, 0], w=.008084),
+            ],
+        )),
+        bore: dict(type=4, pos=[.140401, .12025, -.002275], display=dict(
+            lines=[
+                [0, 0, 0, 0, .1041185, .1234101, 0, .1131371, .114667, 0],
+                [0, 0, 0, 0, .0858815, .1410899, 0, .1041185, .1234101, 0],
+                [0, 0, 0, 0, .1131371, .114667, 0, .1660774, .114667, 0],
+            ],
+            arrows=[[.1041185, .1234101, 0, .7179897, -.6960538, 0,
+                     .003556, .000762, 0, 0, 0, -1]],
+            texts=[
+                dict(t="(", pos=[.1276871, .1202767, 0], w=.0017208),
+                dict(t="<MOD-DIAM>", pos=[.129408, .1202233, 0], w=.0052784),
+                dict(t="0.200 in)", pos=[.1346864, .1202767, 0], w=.0184285),
+                dict(t="FOR No. 10 SCREW SIZE", pos=[.1147246, .114667, 0], w=.0513528),
+            ],
+        )),
+    }
+    face = case.views["*Top" if case.kwargs["axis"] == "y" else "*Front"]
+    side = case.views["*Front" if case.kwargs["axis"] == "y" else "*Top"]
+    for label, record in records.items():
+        bounds = (side if label == thick else face).GetOutline()
+        xy = (bounds[2] + (.014 if label == thick else .012),
+              (bounds[1] + bounds[3]) / 2 + (0 if label == thick else -.012))
+        dx, dy = xy[0] - record["pos"][0], xy[1] - record["pos"][1]
+        for row in record["display"]["lines"]:
+            for index in (4, 7):
+                row[index] += dx
+                row[index + 1] += dy
+        for arrow in record["display"]["arrows"]:
+            arrow[0] += dx
+            arrow[1] += dy
+        for text in record["display"]["texts"]:
+            text.update(h=.0035, ref=1, ang=0, font="Century Gothic", ls=.001)
+            text["pos"][0] += dx
+            text["pos"][1] += dy
+        record["pos"][:2] = xy
+    case.paint = {label: SimpleNamespace(record=record, settled_offset=False,
+                                        offset_shift=0.0, clamp=False, reject=False,
+                                        refuse_mode=False)
+                  for label, record in records.items()}
+
+    def position(label, x, y, _z):
+        item = case.imports[label]
+        paint = case.paint[label]
+        if paint.reject:
+            return False
+        if paint.clamp:
+            return True  # Native can report success but constrain the position.
+        record = paint.record
+        dx, dy = x - record["pos"][0], y - record["pos"][1]
+        if label == thick and not item.display.OffsetText:
+            # Linear OffsetText=False moves the physical dimension station.
+            for index, row in enumerate(record["display"]["lines"]):
+                row[7] += dx
+                if index >= 2:
+                    row[4] += dx
+            for arrow in record["display"]["arrows"]:
+                arrow[0] += dx
+        for text in record["display"]["texts"]:
+            text["pos"][0] += dx
+            text["pos"][1] += dy
+        record["pos"][:2] = (x, y)
+        return True
+
+    for label in records:
+        item = case.imports[label]
+        item.display.OffsetText = False
+        item.annotation.SetPosition2 = lambda x, y, z, label=label: position(label, x, y, z)
+
+    def rebuild(_adapter, **_kwargs):
+        paint = case.paint[thick]
+        display = case.imports[thick].display
+        if paint.refuse_mode:
+            display.OffsetText = False
+        if display.OffsetText and not paint.settled_offset:
+            for text in paint.record["display"]["texts"]:
+                text["pos"][0] += paint.offset_shift
+            paint.settled_offset = True
+
+    def record(_reader, annotation):
+        label = next(label for label, item in case.imports.items()
+                     if item.annotation is annotation)
+        return copy.deepcopy(case.paint[label].record)
+
+    monkeypatch.setattr(washer, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(washer, "_dump_annotation", record)
+
+    rims = tuple(case.model.GetBodies2(0, False)[0].GetEdges())
+
+    def circle_at(center, radius, *, axis, **_kwargs):
+        matches = [edge for edge in rims if
+                   all(abs(a * 1000 - b) < 1e-6 for a, b in zip(edge.GetCurve().CircleParams[:3], center))
+                   and abs(edge.GetCurve().CircleParams[6] * 1000 - radius) < 1e-6
+                   and tuple(edge.GetCurve().CircleParams[3:6]) == axis]
+        assert len(matches) == 1
+        return SimpleNamespace(edge=matches[0])
+
+    monkeypatch.setattr(washer, "scan_view_edges",
+                        lambda *_args, **_kwargs: SimpleNamespace(circle_at=circle_at))
+
+    def native_diameter(_adapter, _view, rim, *, label, **_kwargs):
+        item = case.imports[label]
+        item.annotation.entities = (rim,)
+        item.native.Tolerance.Type = 0
+        return item.display
+
+    monkeypatch.setattr(washer, "_native_diameter", native_diameter)
+    for view in case.views.values():
+        displays = [item.display for item in case.imports.values() if item.annotation.Owner is view]
+        view.GetFirstDisplayDimension5 = lambda displays=displays: displays[0]
+        for index, display in enumerate(displays):
+            display.GetNext5 = lambda index=index, displays=displays: (
+                displays[index + 1] if index + 1 < len(displays) else None
+            )
+
+
+def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
     """Native-I/O doubles; run the real body, source, band and import guards."""
     import _supplier_washer_drawing as washer
     import _supplier_washer_model as model_helpers
@@ -9310,7 +9450,8 @@ def _washer_import_native(monkeypatch, *, defect=None):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(model_helpers, "_bind", lambda value, _interface: value)
     monkeypatch.setattr(model_helpers, "double_array", lambda value: value)
-    values = {washer.OUTER_DIAMETER: 12.7, washer.BORE_DIAMETER: 6.35, washer.THICKNESS: 1.5875}
+    values = values or {washer.OUTER_DIAMETER: 12.7, washer.BORE_DIAMETER: 6.35, washer.THICKNESS: 1.5875}
+    outer, bore, thickness = (values[key] for key in (washer.OUTER_DIAMETER, washer.BORE_DIAMETER, washer.THICKNESS))
     precision = dict.fromkeys(values, 3)
     bands = {label: (value - 0.05, value + 0.05, "bilateral") for label, value in values.items()}
 
@@ -9330,26 +9471,27 @@ def _washer_import_native(monkeypatch, *, defect=None):
     features = {}
     for label in values:
         if label == washer.THICKNESS:
-            points = tuple(SimpleNamespace(X=0.00635, Y=y, Z=0.0) for y in (0.0, 0.0015875))
+            points = tuple(SimpleNamespace(X=outer / 2000.0, Y=y, Z=0.0)
+                           for y in (0.0, thickness / 1000.0 * (1 if axis == "y" else -1)))
             segment = SimpleNamespace(
                 ConstructionGeometry=True, GetType=lambda: 0,
                 GetStartPoint2=lambda: points[0], GetEndPoint2=lambda: points[1],
             )
             segments, source_entities[label] = (segment,), points
-            plane = "Front"
+            plane = "Front" if axis == "y" else "Top"
         else:
             if washer.OUTER_DIAMETER in source_entities:
                 source_entities[label] = (segments[1],)
                 continue
             circles = []
-            for diameter in (12.7, 6.35):
+            for diameter in (outer, bore):
                 circles.append(SimpleNamespace(
                     ConstructionGeometry=True, GetType=lambda: 1, IsCircle=lambda: 1,
                     GetCenterPoint2=lambda: SimpleNamespace(X=0.0, Y=0.0, Z=0.0),
                     GetRadius=lambda diameter=diameter: diameter / 2000.0,
                 ))
             segments, source_entities[label] = tuple(circles), (circles[0],)
-            plane = "Top"
+            plane = "Top" if axis == "y" else "Front"
         sketch = SimpleNamespace(
             GetSketchSegments=lambda segments=segments: segments,
             ModelToSketchTransform=SimpleNamespace(Inverse=lambda plane=plane: plane),
@@ -9357,10 +9499,12 @@ def _washer_import_native(monkeypatch, *, defect=None):
         feature_name = washer.SOURCE_DIMENSIONS[label][0]
         features[feature_name] = SimpleNamespace(GetSpecificFeature2=lambda sketch=sketch: sketch)
     rims = []
-    for diameter in (12.7, 6.35):
-        for y in (0.0, 0.0015875):
+    for diameter in (outer, bore):
+        for station in (0.0, thickness / 1000.0):
+            center = (0.0, station, 0.0) if axis == "y" else (0.0, 0.0, station)
+            normal = (0.0, 1.0, 0.0) if axis == "y" else (0.0, 0.0, 1.0)
             curve = SimpleNamespace(
-                IsCircle=lambda: True, CircleParams=(0.0, y, 0.0, 0.0, 1.0, 0.0, diameter / 2000.0),
+                IsCircle=lambda: True, CircleParams=(*center, *normal, diameter / 2000.0),
             )
             rims.append(SimpleNamespace(GetCurve=lambda curve=curve: curve))
     model = SimpleNamespace(
@@ -9369,13 +9513,17 @@ def _washer_import_native(monkeypatch, *, defect=None):
     )
     mapped = {id(entity): SimpleNamespace() for entities in source_entities.values() for entity in entities}
     mapped.update({id(feature): SimpleNamespace() for feature in features.values()})
-    def view():
+    def view(orientation):
+        x, y = (.095, .13225) if orientation == "*Front" else (.0975, .23)
+        face = orientation == ("*Top" if axis == "y" else "*Front")
+        half_x = outer / 2000.0 * 5 + .005588
+        half_y = (outer if face else thickness) / 2000.0 * 5 + .005588
         return SimpleNamespace(
-            ReferencedDocument=model, GetOutline=lambda: (0.1, 0.1, 0.12, 0.12),
+            ReferencedDocument=model, GetOutline=lambda: (x - half_x, y - half_y, x + half_x, y + half_y),
             GetCorresponding=lambda entity: mapped.get(id(entity)),
         )
 
-    views = {"*Front": view(), "*Top": view()}
+    views = {name: view(name) for name in ("*Front", "*Top")}
     sources, imports = {}, {}
     for label, value in values.items():
         feature_name, name = washer.SOURCE_DIMENSIONS[label]
@@ -9405,7 +9553,9 @@ def _washer_import_native(monkeypatch, *, defect=None):
             case.annotation.entities = tuple(
                 mapped[id(entity)] if imported else entity for entity in source_entities[label]
             )
-            case.annotation.Owner = views["*Front" if label == washer.THICKNESS else "*Top"]
+            face = "*Top" if axis == "y" else "*Front"
+            side = "*Front" if axis == "y" else "*Top"
+            case.annotation.Owner = views[side if label == washer.THICKNESS else face]
             collection[label] = case
     parameters = {
         f"{name}@{feature}": sources[label].native
@@ -9436,13 +9586,15 @@ def _washer_import_native(monkeypatch, *, defect=None):
         points[0].X += 0.001
     elif defect == "import_band":
         imports[washer.THICKNESS].native.Tolerance.Type = 0
-    return SimpleNamespace(
+    case = SimpleNamespace(
         helper=washer, source_helper=model_helpers, adapter=adapter, model=model, views=views,
         sources=sources, imports=imports, mapped=mapped, entities=source_entities,
         precision=precision, bands=bands, imported_calls=imported_calls,
-        kwargs=dict(axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        kwargs=dict(axis=axis, bore_mm=bore, outer_mm=outer, thickness_mm=thickness,
                     units="in", precision=precision, bands=bands),
     )
+    _washer_paint_native(monkeypatch, case)
+    return case
 
 
 def test_washer_import_formats_drawing_display_without_changing_source_values_or_bands(monkeypatch):
