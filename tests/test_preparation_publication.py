@@ -188,6 +188,9 @@ def test_cache_only_build_registers_but_never_publishes_or_dispatches(
     boundary, cached_part, monkeypatch
 ):
     monkeypatch.setattr(cached_part, "_probe_cache", lambda *_args: "hit")
+    # An otherwise admitted older PoolHome need not expose preparation on hits.
+    boundary.returncode = 2
+    boundary.stdout = ""
     with _farm.producer_build("Cache-only publication regression") as ownership:
         cached_part._cached_part_action("pen_rod", Path("unused.py"))
         ownership.finish(True)
@@ -384,6 +387,20 @@ def test_publisher_cli_error_preserves_auth_or_corruption_diagnostic(boundary):
     with pytest.raises(RuntimeError, match=r"publication failed \(exit 2\).*create denied"):
         _farm.run_leaf(TASK, KEY)
     assert boundary.requests == []
+
+
+def test_old_pool_cli_failure_names_selected_revision_and_required_capability(boundary):
+    # argparse diagnostics are inherited on stderr, leaving stdout empty.
+    boundary.returncode = 2
+    boundary.stdout = ""
+    with pytest.raises(RuntimeError) as caught:
+        _farm.run_leaf(TASK, KEY)
+    message = str(caught.value)
+    assert f"PoolHome {boundary.pool}" in message
+    assert "selected pool revision must support `preparation publish`" in message
+    assert "see pool CLI stderr above" in message
+    assert boundary.requests == []
+    assert "record_request" not in boundary.events
 
 
 @pytest.mark.parametrize(("variable", "value"), [

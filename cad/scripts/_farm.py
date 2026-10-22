@@ -924,8 +924,10 @@ def _publish_preparation(
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"farm preparation publication failed (exit {result.returncode}): "
-            f"{result.stdout.strip()}"
+            f"farm preparation publication failed (exit {result.returncode}) "
+            f"for PoolHome {pool}; the selected pool revision must support "
+            f"`preparation publish`: "
+            f"{result.stdout.strip() or 'see pool CLI stderr above'}"
         )
     try:
         published = json.loads(result.stdout)
