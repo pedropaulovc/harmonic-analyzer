@@ -1647,6 +1647,42 @@ Simplified naming, assembly-component fingerprints, shared pure BOM identity and
 part-side configuration saves live in separate helpers. Vendor dimensions are
 pure per-SKU inputs shared by the recipe and its specs, rather than dimensions
 imported through recipe code or a family-wide table.
+
+Stable mechanical interfaces have their own owners. The top frame imports
+`sm_knife_mount_interface` for the mounting footprint and fit bands; it does
+not import the mount's rocking calculation or the summing lever's plate/rib
+specification. `sm_knife_contact` owns the shared knife cross-section.
+`ch_rocker_arm_outline_spec` owns the outline separately from the hub and fit
+checks in `ch_rocker_arm_spec`.
+The live oblique-trammel carrier is an outline-only native consumer; the rocker
+arm, rocker strap and oblique hub pin retain both owners. The retired standalone
+strap shim stack and outline template have no native leaves or cache keys and
+are not cache-boundary test cases. Their retained shop-process checks and the
+profile check's gauge geometry still read the current outline owner directly,
+without reinstating retired CAD modules or qualifying the held machining route.
+
+Import numerical bands from `_printed_angular_tolerance`,
+`_printed_drilled_tolerance`, or the linear `_printed_tolerance` provider.
+Cylindrical Hole Wizard operations live in `_cylindrical_holes`, which imports
+the shared metadata helpers from `_holes`; generic hole consumers never import
+back through the cylindrical provider. Assembly chain identities live in
+`_chain_component_identity`, and configuration-specific visibility checks in
+`_configuration_visibility`.
+
+Choose further splits by replaying changed inputs over whole commits and
+counting the union of affected leaves. Fan-in alone overstates savings when
+another edited input already invalidates the same leaf. Keep comparisons
+explicit about their revision, leaf inventory and available timing evidence.
+Each boundary needs isolated real-key regressions proving both that unrelated
+edits leave keys unchanged and that relevant geometry/configuration edits change
+the key. Preserve native execution-token propagation. Moving an owner causes
+a one-time key change; neither imported-symbol hashing nor re-export facades
+are used to avoid it.
+Historical replay counts describe only the named baseline revision and its leaf
+inventory. Counts including tooling later retired by #1838 are not savings
+claims for the current live inventory; do not recreate those leaves to reproduce
+an old count.
+
 The catalogue-only 91251A108 and former-hanger 91251A157 socket-head diagnostic
 recipes share the pure `_socket_head_dimensions` record; each SKU still owns
 its `DIMS` declaration. The current knife-hanger hex-bolt, #10 washer and

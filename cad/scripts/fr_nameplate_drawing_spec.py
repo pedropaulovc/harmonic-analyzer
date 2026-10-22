@@ -24,7 +24,8 @@ import math
 from _dxf_text import read_lwpolylines
 from _hole_spec import CLEARANCE_MM
 from _paths import REFERENCES_DIR
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_deviations
 from _release_artwork import bundle_path
 import fr_nameplate_spec as nameplate
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY

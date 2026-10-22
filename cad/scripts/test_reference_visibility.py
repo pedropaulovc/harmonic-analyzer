@@ -385,8 +385,15 @@ def test_blank_sketch_feature_fails_when_the_blank_does_not_take() -> None:
         _visibility.blank_sketch_feature(model, sketch, "hole")
 
 
-def test_both_hole_wizard_helpers_hide_their_placement_sketch() -> None:
-    tree = ast.parse((SCRIPTS / "_holes.py").read_text(encoding="utf-8"))
+@pytest.mark.parametrize(
+    ("module", "helper"),
+    [
+        ("_holes", "wizard_holes"),
+        ("_cylindrical_holes", "wizard_hole_on_cylinder"),
+    ],
+)
+def test_both_hole_wizard_helpers_hide_their_placement_sketch(module, helper) -> None:
+    tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
     callers = {
         node.name
         for node in ast.walk(tree)
@@ -395,7 +402,7 @@ def test_both_hole_wizard_helpers_hide_their_placement_sketch() -> None:
         if isinstance(call, ast.Call)
         and getattr(call.func, "id", None) == "blank_sketch_feature"
     }
-    assert {"wizard_holes", "wizard_hole_on_cylinder"} <= callers
+    assert helper in callers
 
 
 def test_every_standalone_save_path_runs_the_check() -> None:

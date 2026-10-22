@@ -67,6 +67,7 @@ downward, head first, through the open underside of the carrier.
 from __future__ import annotations
 
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
 from _printed_tolerance import printed_band_mm
@@ -126,7 +127,7 @@ if not SEAT_DIA > round(LOCATOR_DIA + LOCATOR_PRINT_BAND[0], 6):
 SEAT_LENGTH = trammel.CARRIER_THICK  # ⚙ fills the carrier's HUB hole
 LOCATOR_TOP_BELOW_STRAP = 0.5
 LOCATOR_LENGTH = (
-    trammel.RISER_THICK + rocker.ARM_THICKNESS - LOCATOR_TOP_BELOW_STRAP
+    trammel.RISER_THICK + rocker_outline.ARM_THICKNESS - LOCATOR_TOP_BELOW_STRAP
 )  # ⚙ 8.0
 SEAT_STATION = HEAD_LENGTH + SEAT_LENGTH  # head bottom to the seat's top
 OVERALL_LENGTH = SEAT_STATION + LOCATOR_LENGTH
@@ -170,7 +171,7 @@ LOCATOR_SET_BAND = 0.2
 LOCATOR_SET_MIN = LOCATOR_SET_ABOVE_RISER - LOCATOR_SET_BAND  # 1.8
 LOCATOR_SET_MAX = LOCATOR_SET_ABOVE_RISER + LOCATOR_SET_BAND  # 2.2
 STRAP_ENGAGEMENT_MIN = 1.0  # g6 cylinder in the strap hole, past the chamfer
-if not LOCATOR_SET_MAX < rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]:
+if not LOCATOR_SET_MAX < rocker_outline.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]:
     raise AssertionError("the faced HUB pin top can stand above the strap")
 if not LOCATOR_SET_MIN - LEAD_CHAMFER >= STRAP_ENGAGEMENT_MIN:
     raise AssertionError("the faced HUB pin engages the strap hole too little")

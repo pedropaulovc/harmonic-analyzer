@@ -90,7 +90,7 @@ from _drawing_tolerances import (
 )
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 import _telemetry
 from ch_pivot_bracket_drawing_spec import (

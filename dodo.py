@@ -3588,6 +3588,10 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_ch_rocker_arm_cache_boundary.py",
+        SCRIPTS_DIR / "test_configuration_visibility_cache_boundary.py",
+        SCRIPTS_DIR / "test_printed_tolerance_cache_boundary.py",
+        SCRIPTS_DIR / "test_sm_knife_cache_boundaries.py",
         # Source-only, per-hub part recipe boundaries (issue #1638).
         SCRIPTS_DIR / "test_recipe_subsystem_isolation.py",
         SCRIPTS_DIR / "test_local_check.py",

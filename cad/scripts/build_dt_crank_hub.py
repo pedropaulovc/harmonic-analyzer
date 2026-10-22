@@ -42,7 +42,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _features import lens_area
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_hole_on_cylinder
+from _cylindrical_holes import wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_hub_geometry import (

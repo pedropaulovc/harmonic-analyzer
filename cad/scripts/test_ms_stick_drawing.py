@@ -339,6 +339,7 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
     ]
     assert not any(name.startswith((
         "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
+        "_cylindrical_holes",
         "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
         "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
     )) for name in imports)

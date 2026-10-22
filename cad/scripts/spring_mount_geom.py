@@ -19,6 +19,7 @@ import _config
 import channel_kinematics
 import ch_channel_lever_spec
 import ch_vn_channel_spring_stock_geom as channel_stock
+import sm_knife_contact as knife_contact
 import sm_vn_counter_spring_stock_geom as counter_stock
 import sm_gooseneck_geom
 import sm_gooseneck_spring_screw_geom as spring_screw
@@ -28,7 +29,7 @@ from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 KNIFE = (-15.0, 979.7)
-KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
+KNIFE_CONTACT_Y = KNIFE[1] + knife_contact.HEX_H / 2.0
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
 # The uniform coefficient slab grows downward from its fixed spring top.

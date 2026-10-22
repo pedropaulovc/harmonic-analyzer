@@ -379,7 +379,7 @@ def _seat_by_bisector(
 
 
 def _printed_seats(mouth_band: float, flat_band: float) -> list[dict[str, float]]:
-    from _printed_tolerance import angular_band_deg
+    from _printed_angular_tolerance import angular_band_deg
 
     angles = (
         spec.V_FLANK_ANGLE_DEG - angular_band_deg(),

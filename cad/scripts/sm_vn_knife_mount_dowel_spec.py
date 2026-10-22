@@ -87,8 +87,8 @@ HANGER_OFFSET_TOL = _XXX  # 0.13
 # The pair's centre-to-centre span along the dowel line, BASIC.  Each hole's
 # axis stands within half the frame's zone of its true position, so the span
 # varies by the full zone: the knife mount's Ø0.13
-# (``sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM``, which asserts it equals
-# SPAN_TOL) keeps the 0.13 the .XXX span gave, and with it every stack the
+# (``sm_knife_mount_interface.PIN_HOLE_SPAN_TOL``, asserted equal to
+# SPAN_TOL there) keeps the 0.13 the .XXX span gave, and with it every stack the
 # pair feeds (the 2026-10-09 ruling).
 SPAN = 2.0 * HANGER_OFFSET  # 15.264
 SPAN_PLACES = 3

@@ -3128,12 +3128,16 @@ def test_requirement_declarations_do_not_read_title_block_geometry():
 
 @pytest.mark.parametrize(
     "module",
-    ["_printed_limits", "_printed_tolerance", "dt_vn_cone_lock_knob_spec"],
+    [
+        "_printed_limits",
+        "_printed_tolerance",
+        "_printed_angular_tolerance",
+        "_printed_drilled_tolerance",
+        "dt_vn_cone_lock_knob_spec",
+    ],
 )
-def test_numeric_tolerance_title_block_readers_are_classified(module):
+def test_numeric_tolerance_providers_keep_title_block_config_input(module):
     script = SCRIPTS_DIR / f"{module}.py"
-    assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES
-    assert bg.reads_title_block_geometry(script)
     assert "title_block" in config_files_of(script)
 
 

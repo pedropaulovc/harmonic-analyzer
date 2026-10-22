@@ -78,6 +78,7 @@ from _sketch import (
 )
 from _sm_summing_explode import create_summing_explode
 import settled_spring_seats
+import sm_knife_mount_interface as mount_interface
 import sm_summing_assembly_spec as spec
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _assembly import (
@@ -116,12 +117,8 @@ ASM_NAME = "sm-summing"
 from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_sm_knife_mount) -----------------------------
-from sm_summing_lever_spec import (  # noqa: E402
-    HEX_Z_INNER,
-    HEX_Z_OUTER,
-    KNIFE_SHOULDER_DROP_MIN,
-    KNIFE_SHOULDER_X_MAX,
-)
+from sm_summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+from sm_knife_contact import KNIFE_SHOULDER_DROP_MIN, KNIFE_SHOULDER_X_MAX  # noqa: E402
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
@@ -178,7 +175,7 @@ HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA_MIN - hanger_screw.SHANK
 # the crossbar's slip hole or slot.
 KNIFE_DOWEL_Y = KNIFE_MOUNT_TOP_Y - knife_dowel.PRESS_DEPTH
 # Pair stations from the bolt axis, -X (slot) first: 7.632 along X.
-KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
+KNIFE_DOWEL_X_OFFSETS = mount_interface.PIN_HOLE_XS
 # The bolt must pass the crossbar's #10 clearance hole at the printed-band
 # worst case (drawing-guidelines.md rule 19 (absorb stacks)) when
 # every station sits at its limit.  Along the dowel line (X): the crossbar's
@@ -199,13 +196,13 @@ _KNIFE_DOWEL_PAIR_SHIFT = (
 # hole's pin
 HANGER_SCREW_MISMATCH_X = (
     top_frame.HANGER_PIN_X_TOL
-    + knife_mount.PIN_HOLE_HALF_SPAN_TOL
-    + knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    + mount_interface.PIN_HOLE_HALF_SPAN_TOL
+    + mount_interface.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
 )  # 0.31623
 HANGER_SCREW_MISMATCH_Z = (
     top_frame.HANGER_PIN_X_TOL
-    + knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    + mount_interface.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
 )  # 0.26373
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
@@ -227,14 +224,14 @@ HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
 # the bore's perpendicularity zone adds another 0.05. Judge the trunnion in
 # the smallest reamed bore at the shoulder its printed controls allow worst:
 # the ridge farthest from that side face, the flank at its flattest
-# (code review C09: ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
+# (code review C09: ``sm_knife_contact.KNIFE_SHOULDER_X_MAX`` and
 # ``KNIFE_SHOULDER_DROP_MIN``).
-KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
+KNIFE_DOWEL_SPAN_MIN = mount_interface.PIN_HOLE_SPAN - mount_interface.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
 )
 KNIFE_BORE_FAR_END_OFFSET = (
-    knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
+    mount_interface.SUPPORT_Z_THICK + mount_interface.BLOCK_SIZE_TOL
 ) * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG)) + knife_mount.KNIFE_BORE_ORIENTATION_TOL
 KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     KNIFE_BORE_FAR_END_OFFSET,
@@ -363,7 +360,7 @@ def _assert_knife_hanger_stack() -> None:
     # the proud pin (the spec asserts the print-worst case).
     expected_stations = (-knife_dowel.HANGER_OFFSET, knife_dowel.HANGER_OFFSET)
     for owner, stations in (
-        ("knife mount", knife_mount.PIN_HOLE_XS),
+        ("knife mount", mount_interface.PIN_HOLE_XS),
         ("crossbar", top_frame.HANGER_PIN_XS),
     ):
         if len(stations) != knife_dowel.PER_MOUNT or any(

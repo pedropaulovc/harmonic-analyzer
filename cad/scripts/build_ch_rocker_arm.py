@@ -95,8 +95,12 @@ from _rocker_interface import (
     ROD_HOLE_X,
     ROD_HOLE_Y,
 )
-from ch_rocker_arm_spec import (
+from ch_rocker_arm_outline_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
+    TOP_EDGE_ABOVE_PIVOT,
+    TOP_EDGE_BAND,
+)
+from ch_rocker_arm_spec import (
     ARM_THICKNESS_BAND,
     HUB_DIA,
     HUB_LENGTH,
@@ -105,8 +109,6 @@ from ch_rocker_arm_spec import (
     PIVOT_HOLE_BAND,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
-    TOP_EDGE_ABOVE_PIVOT,
-    TOP_EDGE_BAND,
 )
 import _config
 
@@ -123,7 +125,7 @@ if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
 HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
-    raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
+    raise AssertionError("ch_rocker_arm_outline_spec.ARM_THICKNESS drifted from the build")
 # The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
 # The interface's rod-pin position follows the bottom-arc end (132.76): solved
 # so the pin sits DIRECTLY ABOVE the phased cam
@@ -343,7 +345,7 @@ async def build(adapter) -> dict[str, str]:
     # assembly imports.)
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     # The top edge's height over the pivot axis is the print's controlled
-    # value (ch_rocker_arm_spec.TOP_EDGE_BAND), so the arcs' shared centre is
+    # value (ch_rocker_arm_outline_spec.TOP_EDGE_BAND), so the arcs' shared centre is
     # derived from it: the pivot (ArmDepth / 2), up to the top edge, up R800.
     await set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
@@ -695,7 +697,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
     )
-    # The top edge may only come out high (ch_rocker_arm_spec.TOP_EDGE_BAND).
+    # The top edge may only come out high (ch_rocker_arm_outline_spec.TOP_EDGE_BAND).
     set_dimension_bilateral_tolerance(
         adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
     )

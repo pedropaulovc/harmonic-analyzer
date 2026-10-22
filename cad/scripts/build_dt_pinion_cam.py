@@ -34,7 +34,7 @@ from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
-from _holes import wizard_hole_on_cylinder
+from _cylindrical_holes import wizard_hole_on_cylinder
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild

@@ -108,7 +108,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations); the mm suffix is load-bearing (INCH
     # document). The tip and taper offsets are the trig-derived vertices of
-    # ch_rocker_arm_spec, folded in here as numbers (build_ch_rocker_arm: a
+    # ch_rocker_arm_outline_spec, folded in here as numbers (build_ch_rocker_arm: a
     # live sin() in the equation manager re-evaluates to a broken value).
     await set_global(adapter, "CurveRadius", f"{CURVE_RADIUS}mm")
     await set_global(adapter, "ArmDepth", f"{ARM_DEPTH}mm")

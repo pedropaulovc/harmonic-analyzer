@@ -112,7 +112,8 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 _XX = printed_band_mm(2)
 # Title-block DRILLED HOLES: the tap drills print with no band of their own.

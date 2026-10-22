@@ -41,6 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_outline_spec as rocker_outline
 import _rocker_interface as rocker_interface
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
@@ -124,23 +125,25 @@ from ch_rocker_arm_notes import (
     DRAWING_NOTES,
 )
 from _rocker_interface import CENTER_Y, PIVOT_MID_Y, R_BOTTOM, ROD_HOLE_X, ROD_HOLE_Y
-from ch_rocker_arm_spec import (
+from ch_rocker_arm_outline_spec import (
     ARM_THICKNESS,
     BOT_END_X,
-    GEOMETRIC_TOLERANCES_MM,
-    HUB_DIA,
-    PIVOT_HOLE_DIA,
-    PIVOT_HOLE_BAND,
     R_TOP,
-    ROD_HOLE_SPEC,
     ROD_TIP_X,
-    SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
     TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
     _ALPHA_TOP,
+)
+from ch_rocker_arm_spec import (
+    GEOMETRIC_TOLERANCES_MM,
+    HUB_DIA,
+    PIVOT_HOLE_DIA,
+    PIVOT_HOLE_BAND,
+    ROD_HOLE_SPEC,
+    SURFACE_FINISHES,
 )
 
 
@@ -169,9 +172,9 @@ _CENTRE = ([0.0, rocker_interface.PIVOT_MID_Y, 0.0], (("_rocker_interface", "PIV
 part_metadata(
     fields={
         "precision": (_P, (("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"),)),
-        "material.thickness": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
+        "material.thickness": (rocker_outline.ARM_THICKNESS, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
     },
-    model_sources=("ARM_THICKNESS", "HUB_LENGTH"),
+    model_sources=(("ch_rocker_arm_outline_spec", "ARM_THICKNESS"), "HUB_LENGTH"),
     precision_sources=(("ch_rocker_arm_notes", "DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DRAWING_NOTES"), ("_surface_finish", "ra")),
 )
 
@@ -350,16 +353,16 @@ def _plane_between(
 
 
 def _rocker_points() -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
-    top = (rocker.TOP_END_X, rocker.TOP_END_Y)
-    bottom = (rocker.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2))
-    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * (rocker.TOP_END_Y - rocker_interface.CENTER_Y) / rocker_interface.CURVE_RADIUS)
+    top = (rocker_outline.TOP_END_X, rocker_outline.TOP_END_Y)
+    bottom = (rocker_outline.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker_outline.BOT_END_X**2))
+    tip = (rocker_outline.ROD_TIP_X, rocker_outline.TOP_END_Y + rocker_outline.TIP_FACE * (rocker_outline.TOP_END_Y - rocker_interface.CENTER_Y) / rocker_interface.CURVE_RADIUS)
     return top, tip, bottom
 
 
 _TOP, _TIP, _BOTTOM = _rocker_points()
 _RIGHT = (_plane_between(_TOP, _TIP), _plane_between(_TIP, _BOTTOM))
 _TIPS = tuple(PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm) for face in _RIGHT)
-_LAND_ANGLE = math.degrees(rocker._ALPHA_TOP)
+_LAND_ANGLE = math.degrees(rocker_outline._ALPHA_TOP)
 _XY = tuple[float, float]
 
 
@@ -413,7 +416,7 @@ TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.979
 # A printed profile frame as prechips 0.1.2 reads it (docs/features.md, Surface
 # profiles): t, U and the datum frame are the frame's own printed strings. The
 # frame's material sides (ARC_PROFILE_FRAME_XY) give each governed BASIC's sense.
-_ZONE_SOURCES = ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "ARC_PROFILE_ZONE_MM"), ("draw_ch_rocker_arm", "_add_arc_profiles"))
+_ZONE_SOURCES = (("ch_rocker_arm_outline_spec", "TOP_EDGE_BAND"), ("draw_ch_rocker_arm", "ARC_PROFILE_ZONE_MM"), ("draw_ch_rocker_arm", "_add_arc_profiles"))
 
 
 def _profile_zone(frame: str, governs: dict[str, Any], governs_sources: tuple[Any, ...]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
@@ -434,22 +437,22 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
     requirement(
         _name, kind="face", faces=(_face,), requirements=("land_angle_deg", "station", "surface_profile"), fields={
             # BASIC with no acceptance of its own: the J↔K zone bounds the land.
-            "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
-            "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
-            "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
+            "tip_land": (rocker_outline.TIP_FACE, (("ch_rocker_arm_outline_spec", "TIP_FACE"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
+            "land_angle_deg": (round(_LAND_ANGLE, _P), (("ch_rocker_arm_outline_spec", "_ALPHA_TOP"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
+            "land_angle_nominal_deg": (_LAND_ANGLE, (("ch_rocker_arm_outline_spec", "_ALPHA_TOP"),)),
             "dimension_type": ("basic", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
-            "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", ("_rocker_interface", "CURVE_RADIUS"), ("_rocker_interface", "CENTER_Y"))),
+            "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], (("ch_rocker_arm_outline_spec", "ROD_TIP_X"), ("ch_rocker_arm_outline_spec", "TOP_END_Y"), ("ch_rocker_arm_outline_spec", "TIP_FACE"), ("_rocker_interface", "CURVE_RADIUS"), ("_rocker_interface", "CENTER_Y"))),
             "top_edge_feature": ("top_edge", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
             # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
-            "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
-            "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
+            "station": (rocker_outline.ROD_TIP_X, (("ch_rocker_arm_outline_spec", "ROD_TIP_X"), ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
+            "station_nominal": (rocker_outline.ROD_TIP_X, (("ch_rocker_arm_outline_spec", "ROD_TIP_X"),)),
             # The land angle is read across the shortest land the zones allow.
             # The station is read along X, off the land's normal by the land
             # angle; material added on the land moves it outward.
             **_profile_zone("BottomRadius", {
                 "land_angle_deg": {"tilt_across": TIP_LAND_LEAST_MM},
                 "station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE},
-            }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), "_ALPHA_TOP")),
+            }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), ("ch_rocker_arm_outline_spec", "_ALPHA_TOP"))),
         }, precision={"tip_land": _P, "land_angle_deg": _P, "station": _P},
     )
 
@@ -1905,18 +1908,18 @@ _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
 TOP_EDGE = requirement(
     "top_edge", kind="profile", faces=(CylinderFace(2 * rocker_interface.CURVE_RADIUS),),
     requirements=("height_above_pivot", "radius", "surface_profile"), fields={
-        "height_above_pivot": (rocker.TOP_EDGE_ABOVE_PIVOT, ("TOP_EDGE_ABOVE_PIVOT", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
+        "height_above_pivot": (rocker_outline.TOP_EDGE_ABOVE_PIVOT, (("ch_rocker_arm_outline_spec", "TOP_EDGE_ABOVE_PIVOT"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "height_from": ("pivot_bore", (("draw_ch_rocker_arm", "build"),)),
         "radius": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         # The printed frame, kept whole as text; the zone below is what reads it.
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", (("ch_rocker_arm_outline_spec", "TOP_EDGE_BAND"), ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the top edge moves it toward the arc centre.
         **_profile_zone("TopRadius", {"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
+        "arc_len": (rocker_outline.TOP_ARC_LEN, (("ch_rocker_arm_outline_spec", "TOP_ARC_LEN"),)),
         "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)),
         "centre_from_pivot_ref": (rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y, (("_rocker_interface", "CENTER_Y"), ("_rocker_interface", "PIVOT_MID_Y"))),
-        "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
+        "end": (list(_TOP), (("ch_rocker_arm_outline_spec", "TOP_END_X"), ("ch_rocker_arm_outline_spec", "TOP_END_Y"))),
     }, precision={"height_above_pivot": _TOP_P, "radius": _P},
 )
 # One Ⓤ0 zone over the lower outline between J and K: the R816 arc, both
@@ -1927,15 +1930,15 @@ PROFILE_OUTER = requirement(
         "bottom_radius": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", (("ch_rocker_arm_outline_spec", "TOP_EDGE_BAND"), ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the lower outline moves it away from the arc centre.
         # The tip lands declare this same zone themselves (see the tip-land loop).
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "BOTTOM_RADIUS_CALLOUT"),)),
-        "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
+        "bottom_arc_len": (rocker_outline.BOT_ARC_LEN, (("ch_rocker_arm_outline_spec", "BOT_ARC_LEN"),)),
         "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker_interface.ARM_DEPTH, (("_rocker_interface", "ARM_DEPTH"),)),
-        "bottom_end": (list(_BOTTOM), ("BOT_END_X", ("_rocker_interface", "R_BOTTOM"), ("_rocker_interface", "CENTER_Y"))),
-        "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", ("_rocker_interface", "CURVE_RADIUS"), ("_rocker_interface", "CENTER_Y"))),
+        "bottom_end": (list(_BOTTOM), (("ch_rocker_arm_outline_spec", "BOT_END_X"), ("_rocker_interface", "R_BOTTOM"), ("_rocker_interface", "CENTER_Y"))),
+        "radial_tip_end": (list(_TIP), (("ch_rocker_arm_outline_spec", "ROD_TIP_X"), ("ch_rocker_arm_outline_spec", "TOP_END_Y"), ("ch_rocker_arm_outline_spec", "TIP_FACE"), ("_rocker_interface", "CURVE_RADIUS"), ("_rocker_interface", "CENTER_Y"))),
     }, precision={"bottom_radius": _P},
 )
 HUB_OD = requirement(
@@ -2015,7 +2018,7 @@ DATUM_B_SYMBOL_XY = (0.057, 0.247)
 
 _HUB_P = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
 _STRAP_P = rocker_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
-_STRAP_BAND = (_band(rocker.ARM_THICKNESS, _STRAP_P, rocker.ARM_THICKNESS_BAND), ("ARM_THICKNESS", "ARM_THICKNESS_BAND"))
+_STRAP_BAND = (_band(rocker_outline.ARM_THICKNESS, _STRAP_P, rocker.ARM_THICKNESS_BAND), (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"), "ARM_THICKNESS_BAND"))
 HUB_FACES = requirement(
     "hub_faces", kind="face",
     faces=tuple(PlanarFace((0, 0, sign), rocker.HUB_LENGTH / 2) for sign in (-1, 1)),
@@ -2028,21 +2031,21 @@ HUB_FACES = requirement(
     }, precision={"length": _HUB_P},
 )
 STRAP_FACES = requirement(
-    "strap_faces", kind="face", faces=(PlanarFace((0, 0, -1), rocker.ARM_THICKNESS / 2),),
+    "strap_faces", kind="face", faces=(PlanarFace((0, 0, -1), rocker_outline.ARM_THICKNESS / 2),),
     requirements=("thickness",), fields={
         "thickness": _STRAP_BAND,
-        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
-        "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
-        "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
+        "thickness_nominal": (rocker_outline.ARM_THICKNESS, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
+        "upper_z": (rocker_outline.ARM_THICKNESS / 2, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
+        "lower_z": (-rocker_outline.ARM_THICKNESS / 2, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
         "position_datums": (["G"], (("draw_ch_rocker_arm", "_strap_position_frame"),)),
     }, precision={"thickness": _STRAP_P},
 )
 STRAP_DATUM_B = requirement(
-    "strap_datum_b", kind="face", faces=(PlanarFace((0, 0, 1), rocker.ARM_THICKNESS / 2),),
+    "strap_datum_b", kind="face", faces=(PlanarFace((0, 0, 1), rocker_outline.ARM_THICKNESS / 2),),
     requirements=("thickness",), fields={
         "thickness": _STRAP_BAND,
-        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
-        "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
+        "thickness_nominal": (rocker_outline.ARM_THICKNESS, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
+        "plane": ({"frame": "model", "axis": "z", "value": rocker_outline.ARM_THICKNESS / 2}, (("ch_rocker_arm_outline_spec", "ARM_THICKNESS"),)),
         "datum": ("B", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"thickness": _STRAP_P},
 )
@@ -2058,7 +2061,7 @@ HUB_ROOT = requirement(
     faces=tuple(
         TorusFace(
             rocker.HUB_DIA / 2 + rocker.HUB_ROOT_RADIUS_MAX, rocker.HUB_ROOT_RADIUS_MAX,
-            center_mm=(0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + rocker.HUB_ROOT_RADIUS_MAX)),
+            center_mm=(0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker_outline.ARM_THICKNESS / 2 + rocker.HUB_ROOT_RADIUS_MAX)),
         )
         for sign in (-1, 1)
     ),

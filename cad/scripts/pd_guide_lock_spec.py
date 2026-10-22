@@ -18,7 +18,8 @@ run without SolidWorks in ~1 s.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_deviations
 
 # --- Nominal geometry (book ch. 22, pp. 54-55; see build_pd_guide_lock.py for the
 # bottom-station height derivation). These drive the part's named equation

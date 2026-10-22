@@ -2352,6 +2352,8 @@ def stamps_title_block_properties(script: Path) -> bool:
 # a stamper or a drawing script is listed here (test_dodo_recipe pins it).
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
+        "_printed_angular_tolerance",
+        "_printed_drilled_tolerance",
         "_printed_limits",
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
@@ -2387,6 +2389,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "fr_top_frame_spec",
         "sm_gooseneck_spring_joint",
         "sm_gooseneck_spring_screw_spec",
+        "sm_knife_mount_interface",
         "sm_knife_mount_spec",
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.

@@ -68,7 +68,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _fit_deviations import deviations
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from solidworks_mcp.adapters.pywin32_adapter import null_callout

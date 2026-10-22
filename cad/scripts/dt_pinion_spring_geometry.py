@@ -22,7 +22,8 @@ import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from dt_pinion_pivot_block_geometry import BORE_UP
 from dt_pinion_spring_section import (
     PAD_WIDTH,

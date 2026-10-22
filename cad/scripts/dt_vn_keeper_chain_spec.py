@@ -49,7 +49,8 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_C2C
 from dt_crank_arm_spec import ARM_THICKNESS, HALF_WIDTH
 from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION

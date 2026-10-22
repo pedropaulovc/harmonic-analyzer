@@ -27,7 +27,7 @@ def test_loose_thickness_is_compensated_without_moving_the_gear_datum() -> None:
 
 def test_drilled_bore_limits_clear_the_arbor() -> None:
     import dt_cylinder_gear_shaft_spec as arbor
-    from _printed_tolerance import drilled_oversize_mm
+    from _printed_drilled_tolerance import drilled_oversize_mm
 
     assert spec.WASHER_BORE_BAND == (drilled_oversize_mm(), 0.0)
     assert spec.WASHER_BORE > arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0]

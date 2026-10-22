@@ -142,13 +142,14 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
 from _fit_deviations import deviations
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 # drawing-guidelines.md rule 17 (walls and webs): 2.0 target, 1.5 floor.
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
 _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
-# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_drilled_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 
 # --- Block -----------------------------------------------------------------

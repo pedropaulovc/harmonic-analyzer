@@ -55,7 +55,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _simplified_part import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _cylindrical_holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi

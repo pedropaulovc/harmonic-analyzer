@@ -20,7 +20,9 @@ import itertools
 import math
 
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
+from _printed_angular_tolerance import angular_band_deg
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,

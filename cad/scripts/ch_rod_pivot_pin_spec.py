@@ -29,6 +29,7 @@ import math
 
 import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
+import ch_rocker_arm_outline_spec as _arm_outline
 import _rocker_interface as rocker_interface
 from _hole_spec import NUMBER_DRILL_MM
 
@@ -123,7 +124,7 @@ def joint_budget() -> dict[str, float]:
     slot depth and arm radii at the title block's .XX class, the arm's top
     edge 8.0 +0.5/0 over its pivot; the blank at its printed MIN length.
     """
-    t_min, t_max = _band(_arm.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
+    t_min, t_max = _band(_arm_outline.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
     _w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
     s_min, s_max = _band(_rod.FORK_SLOT_WIDTH, _rod.FORK_SLOT_BAND)
     tine_min, tine_max = _band(_rod.TINE_THICKNESS, _rod.TINE_BAND)
@@ -157,9 +158,9 @@ def joint_budget() -> dict[str, float]:
     edge_low = min(
         _arm_bottom_low(
             lo + (hi - lo) * k / _SWING_STEPS,
-            _arm.R_TOP - two_place,
+            _arm_outline.R_TOP - two_place,
             rocker_interface.R_BOTTOM + two_place,
-            _arm.TOP_EDGE_ABOVE_PIVOT + _arm.TOP_EDGE_BAND[1],
+            _arm_outline.TOP_EDGE_ABOVE_PIVOT + _arm_outline.TOP_EDGE_BAND[1],
             half_width,
         )
         for k in range(_SWING_STEPS + 1)
