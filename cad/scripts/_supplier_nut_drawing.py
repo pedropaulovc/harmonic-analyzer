@@ -24,6 +24,7 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_reference_text import shelve_reference_text
 from _supplier_screw_dimensions import (
     _assert_dimension_source,
     _attachment_correspondence,
@@ -371,8 +372,9 @@ def add_supplier_nut_dimensions(
 ) -> Callable[[], None]:
     """Author AF/height and import the source-owned nominal thread-size carrier.
 
-    Return one read-only settled proof; the wrapper requires exactly one
-    annotation callback and invokes this proof after the final rebuild.
+    Offset each complete native text block beyond its measured arrow tails,
+    without moving the physical dimension/witness stations. Return one
+    read-only settled proof after the wrapper's final rebuild.
     """
     if len(reference_dimensions) != 1:
         raise ValueError("supplier nut requires one nominal-major source dimension")
@@ -422,9 +424,13 @@ def add_supplier_nut_dimensions(
         label="supplier nut height",
     )
     expected_names = {"*Front": {width_name, nominal_name}, "*Right": {height_name}}
+    axes = {native_name: 0 for native_name in (nominal_name, width_name, height_name)}
+    if len(axes) != 3:
+        raise RuntimeError("supplier nut requires three distinct native dimensions")
+    if len(nominal_checks) != 1:
+        raise RuntimeError("supplier nut nominal-major proof must be authored exactly once")
 
-    @_telemetry.traced("drawing.supplier_nut_settled")
-    def assert_settled() -> None:
+    def reacquire() -> dict[str, Any]:
         current: dict[str, Any] = {}
         for orientation, view in views_by_orientation.items():
             names = []
@@ -441,8 +447,6 @@ def add_supplier_nut_dimensions(
             required = expected_names.get(orientation, set())
             if len(names) != len(required) or set(names) != required:
                 raise RuntimeError(f"{orientation}: supplier nut native dimension inventory changed")
-        if len(nominal_checks) != 1:
-            raise RuntimeError("supplier nut nominal-major proof must be authored exactly once")
         nominal_checks[0]()
         _assert_nominal_carrier(adapter, front, current[nominal_name], nominal_major_mm)
         settled_flats, settled_ends = _physical_edges(
@@ -464,5 +468,15 @@ def add_supplier_nut_dimensions(
                 adapter, display, expected_mm=expected, label=label,
                 entities=(edges[0].edge, edges[1].edge),
             )
+        return current
+
+    check_shelves = shelve_reference_text(
+        adapter, reacquire=reacquire, axes=axes,
+        label="supplier nut reference text", force=axes.keys(),
+    )
+
+    @_telemetry.traced("drawing.supplier_nut_settled")
+    def assert_settled() -> None:
+        check_shelves()
 
     return assert_settled

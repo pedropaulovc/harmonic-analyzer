@@ -69,6 +69,14 @@ cannot ask for what the authors were told to leave out.
   that inventory mapped through `IView.GetCorresponding`. Complete mapping,
   native self-comparison and known-negative comparisons remain mandatory.
   Raw drawing/model point inequality is not a failed correspondence.
+  Their native nominal-major, across-flats and thickness text blocks use the
+  shared measured-shelf convention: seed offset mode at the actual arrow
+  station, then move the complete text beyond the outside-arrow tail without
+  changing the physical witnesses. Every reported text fragment participates,
+  including both fraction parts and all three nominal-major rows. Native
+  station/extent proof is not exact glyph or foreign-line clearance proof;
+  retain every line, including fraction bars, and inspect the actual PDF ink,
+  whole sheet and automated machinist result after regeneration.
   After native export closes each purchased-nut drawing, its normal drawing
   leaf reopens that exact SLDDRW read-only, reacquires Front and its nominal
   dimension, and repeats the native owner, value and distinct mapped-endpoint

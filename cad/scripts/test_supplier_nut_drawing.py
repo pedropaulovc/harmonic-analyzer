@@ -6,10 +6,12 @@ wrappers. They exercise production proofs, not native farm/COM coverage.
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace as NS
 
 import pytest
 
+import _drawing_layout_audit as layout_audit
 import _drawing_edge_dimensions as edge_dimensions
 import _supplier_dimensions as supplier_dimensions
 import _supplier_nut_drawing as nuts
@@ -127,7 +129,7 @@ def native_nut(monkeypatch):
     def bind(obj, _interface):
         return obj
 
-    for module in (nuts, screws, supplier_dimensions, edge_dimensions):
+    for module in (nuts, screws, supplier_dimensions, edge_dimensions, layout_audit):
         monkeypatch.setattr(module, "_early_bound", bind)
     monkeypatch.setattr(screws, "_bind", bind)
     monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag",
@@ -366,22 +368,61 @@ def _physical_display(case, name, value_mm, edges, *, precision, denominator=Non
     return display
 
 
-def _author_public(monkeypatch, case, *, callback_count=1):
+def _author_public(monkeypatch, case, *, callback_count=1, shelf_failure=None):
     """Stub only physical geometry/authoring and the model-reference importer."""
     flats, ends = [tuple(NS(edge=object()) for _ in range(2)) for _ in range(2)]
     monkeypatch.setattr(nuts, "_physical_edges", lambda *_args, **_kwargs: (flats, ends))
     physical = {}
+    import _supplier_reference_text as reference_text
+
+    monkeypatch.setattr(reference_text, "_early_bound", lambda obj, _interface: obj)
+    case.rebuilds = []
+
+    def rebuild(*_args, **_kwargs):
+        case.rebuilds.append("native graph settle")
+        for ink in case.shelf_ink.values():
+            if ink.failure == "offset-reset":
+                ink.offset = False
+
+    monkeypatch.setattr(reference_text, "rebuild_drawing", rebuild)
+    case.shelf_ink = {}
+    case.shelf_before = {}
+
+    def with_ink(display, kind):
+        # AF can fit its complete text, but the nut contract force-shelves it.
+        ink = NativeShelfInk(case, display, kind=kind,
+                             span=0.060 if kind == "flats" else None)
+        name = display.GetDimension2(0).FullName
+        case.shelf_ink[name] = ink
+        case.shelf_before[name] = (
+            tuple(ink.origin), tuple(ink.physical_lines()), tuple(ink.text_boxes()),
+        )
+        if shelf_failure is not None and kind == "nominal":
+            shelf_failure(ink)
+        return ShelfDisplay(display, ink)
+
+    case.display = with_ink(case.display, "nominal")
+    case.front.GetAnnotations = lambda: tuple(
+        display.GetAnnotation() for display in
+        (case.display, *[display for name, display in physical.items()
+                        if name == "AcrossFlats@drawing"])
+    )
+    case.right.GetAnnotations = lambda: tuple(
+        display.GetAnnotation() for name, display in physical.items()
+        if name == "Height@drawing"
+    )
 
     def author_edges(_adapter, _view, edges, **settings):
         name = "AcrossFlats@drawing" if edges is flats else "Height@drawing"
-        physical[name] = _physical_display(
+        physical[name] = with_ink(_physical_display(
             case, name, settings["expected_mm"], edges, precision=settings["precision"],
             denominator=settings.get("fraction_denominator"), callout=settings.get("callout", ""),
-        )
+        ), "flats" if edges is flats else "height")
         return name
 
     monkeypatch.setattr(nuts, "_reference_between_edges", author_edges)
     callback_calls = []
+    case.importer_callbacks = callback_calls
 
     def imported_check():
         callback_calls.append("nominal settled")
@@ -414,10 +455,13 @@ def test_public_nut_boundary_reacquires_and_proves_settled_attachments(
 ):
     case = native_nut(spec)
     settled, physical, callbacks = _author_public(monkeypatch, case)
-    assert callbacks == []
-    assert len(case.mapping_reads) == 2  # Initial public proof really ran.
+    assert callbacks and set(callbacks) == {"nominal settled"}
+    callbacks_before = list(callbacks)
+    assert len(case.mapping_reads) >= 2  # Initial public proof really ran.
     old_display = case.display
     fresh = case.make_display()
+    case.shelf_ink[NOMINAL_NAME].attach(fresh)
+    fresh = ShelfDisplay(fresh, case.shelf_ink[NOMINAL_NAME])
     assert fresh is not old_display
     fresh.GetAnnotation().entities = tuple(_wrapper(point) for point in case.mapped)
     if drift:
@@ -432,14 +476,16 @@ def test_public_nut_boundary_reacquires_and_proves_settled_attachments(
     case.right.GetAnnotations = lambda: (physical["Height@drawing"].GetAnnotation(),)
     # Reusing the creation display would fail, even in the positive test.
     old_display.GetAnnotation = _raise(AssertionError("stale creation display reused"))
+    mapping_reads_before = len(case.mapping_reads)
     if drift:
         with pytest.raises(RuntimeError, match="view-mapped source endpoint"):
             settled()
     else:
         settled()  # Also runs production physical presentation/value/edge proofs.
-    assert reads == ["front"]
-    assert callbacks == ["nominal settled"]
-    assert len(case.mapping_reads) == 4
+    assert reads and set(reads) == {"front"}
+    assert callbacks[:len(callbacks_before)] == callbacks_before
+    assert callbacks[len(callbacks_before):] == ["nominal settled"]
+    assert len(case.mapping_reads) >= mapping_reads_before + 2
     assert case.native.SystemValue == spec.SUPPLIER_NOMINAL_MAJOR_MM / 1000.0
 
 
@@ -455,14 +501,9 @@ def test_public_nut_boundary_requires_exactly_one_nominal_settled_callback(
     monkeypatch, native_nut, callback_count,
 ):
     case = native_nut()
-    settled, physical, callbacks = _author_public(monkeypatch, case, callback_count=callback_count)
-    case.front.GetAnnotations = lambda: (
-        case.display.GetAnnotation(), physical["AcrossFlats@drawing"].GetAnnotation(),
-    )
-    case.right.GetAnnotations = lambda: (physical["Height@drawing"].GetAnnotation(),)
     with pytest.raises(RuntimeError, match="proof must be authored exactly once"):
-        settled()
-    assert callbacks == []
+        _author_public(monkeypatch, case, callback_count=callback_count)
+    assert case.importer_callbacks == []
 
 
 @pytest.mark.parametrize("kind", [2, 11, 12])
@@ -492,3 +533,367 @@ def test_nominal_carrier_rejects_ambiguous_positive_attachment_identity(native_n
     with pytest.raises(RuntimeError, match="view-mapped source endpoint"):
         case.prove()
     assert case.census()["attachments"][1]["matched_mapped_members"] == [0, 1]
+
+
+class NativeShelfInk:
+    """Bounded native display primitives, not an exact printed-glyph model.
+
+    Text offsets are per-fragment measurements. The authored annotation origin
+    deliberately differs from the physical arrow station for multiline text.
+    False-mode positioning translates the physical dimension; enabling offset
+    anchors its station to that origin, while true-mode positioning moves text.
+    """
+
+    def __init__(self, case, display, *, kind, span=None):
+        self.case = case
+        self.display = display
+        self.kind = kind
+        self.origin = [0.04 if kind != "height" else 0.10, 0.035, 0.0]
+        self.station = 0.031 if kind == "nominal" else 0.035
+        self.left, self.right = (self.origin[0] - 0.003, self.origin[0] + 0.003)
+        if span is not None:
+            self.left, self.right = self.origin[0] - span / 2, self.origin[0] + span / 2
+        self.witness_start = 0.018
+        self.witness_end = self.station + 0.003
+        self.tail = 0.004
+        self.offset = False
+        self.failure = None
+        self.writes = []
+        self.seeded = False
+        # x/y relative to text origin, measured width and height in metres.
+        self.fragments = {
+            "nominal": [
+                ["(", -0.013, 0.000, 0.0015, 0.003],
+                ["⌀", -0.011, 0.000, 0.003, 0.003],
+                [f"{case.spec.SUPPLIER_NOMINAL_MAJOR_MM / 25.4:.3f} in)", -0.008, 0.000, 0.0242, 0.003],
+                [f"{case.spec.THREAD.removeprefix('#')} THREAD", -0.014, -0.004, 0.030, 0.003],
+                ["NOMINAL MAJOR", -0.020, -0.008, 0.040075, 0.003],
+            ],
+            "flats": [
+                ["(", -0.008, 0.000, 0.0015, 0.003],
+                ["1", -0.006, 0.0015, 0.002, 0.002],
+                [str(case.spec.SUPPLIER_FRACTION_DENOMINATOR), -0.006, -0.0015, 0.004, 0.002],
+                [" in)", -0.001, 0.000, 0.006, 0.003],
+                ["ACROSS FLATS", -0.018, -0.006, 0.036, 0.003],
+            ],
+            "height": [[f"({case.spec.THICKNESS / 25.4:.3f} in)", -0.010, 0.000, 0.020, 0.003]],
+        }[kind]
+        self.attach(display)
+
+    def attach(self, display):
+        annotation = display.GetAnnotation()
+        annotation.OwnerType = 0
+        annotation.Owner = self.case.front
+        annotation.Layer = ""
+        annotation.GetName = lambda: display.GetDimension2(0).FullName
+        annotation.GetLeaderCount = lambda: 0
+        annotation.GetPosition = lambda: tuple(self.origin)
+        annotation.SetPosition2 = self.set_position
+        annotation.GetDisplayData = lambda: self
+        annotation.GetSpecificAnnotation = lambda: ShelfDisplay(display, self)
+        display.GetDisplayData = lambda: self
+        display.GetNameForSelection = lambda: display.GetDimension2(0).FullName
+        display.IsHoleCallout = lambda: False
+
+    def set_position(self, x, y, z):
+        self.writes.append(("position", self.offset, x, y, z))
+        if self.failure == "position-refused":
+            return False
+        if self.failure == "position-ignored":
+            return True
+        if not self.offset:
+            if self.failure == "seed-ignored":
+                return True
+            self.station += y - self.origin[1]
+            self.witness_end += y - self.origin[1]
+            self.seeded = True
+        self.origin[:] = [x, y, z]
+        return True
+
+    def set_offset(self, value):
+        self.writes.append(("offset", value))
+        if value and self.failure == "offset-refused":
+            return
+        if value and not self.offset:
+            self.station = self.origin[1]
+            self.witness_end = self.station + 0.003
+        self.offset = value
+
+    def text_boxes(self):
+        return [(self.origin[0] + x, self.origin[1] + y,
+                 self.origin[0] + x + width, self.origin[1] + y + height)
+                for _text, x, y, width, height in self.fragments]
+
+    def physical_lines(self):
+        y = self.station
+        return [
+            (self.left, self.witness_start, self.left, self.witness_end),
+            (self.right, self.witness_start, self.right, self.witness_end),
+            (self.left - self.tail, y, self.left, y),
+            (self.left, y, self.right, y),
+            (self.right, y, self.right + self.tail, y),
+        ]
+
+    def lines(self):
+        rows = self.physical_lines()
+        if self.offset:
+            rows += [(self.right + self.tail, self.station,
+                      self.origin[0], self.origin[1])]
+        if self.kind == "flats":
+            rows += [(self.origin[0] - 0.0065, self.origin[1] + 0.001,
+                      self.origin[0] - 0.0015, self.origin[1] + 0.001)]
+        return rows
+
+    def GetTextCount(self):
+        return len(self.fragments)
+
+    def GetTextAtIndex(self, index):
+        return self.fragments[index][0]
+
+    def GetTextPositionAtIndex(self, index):
+        _text, x, y, _width, _height = self.fragments[index]
+        return (self.origin[0] + x, self.origin[1] + y, 0.0)
+
+    def GetTextHeightAtIndex(self, index):
+        return self.fragments[index][4]
+
+    def GetTextInBoxWidthAtIndex(self, index):
+        return self.fragments[index][3]
+
+    def GetTextRefPositionAtIndex(self, _index):
+        return 0
+
+    def GetTextAngleAtIndex(self, _index):
+        return 0.0
+
+    def GetTextFontAtIndex(self, _index):
+        return "Arial"
+
+    def GetTextLineSpacingAtIndex(self, _index):
+        return 0.004
+
+    def GetLineCount(self):
+        return len(self.lines())
+
+    def GetLineAtIndex3(self, index):
+        x0, y0, x1, y1 = self.lines()[index]
+        return (0, 0, 0, 0, x0, y0, 0, x1, y1, 0)
+
+    GetLineAtIndex2 = GetLineAtIndex3
+
+    def GetArrowHeadCount(self):
+        return 2
+
+    def GetArrowHeadAtIndex2(self, index):
+        return (self.left if index == 0 else self.right, self.station, 0,
+                1 if index == 0 else -1, 0, 0, 0.002, 0.001, 0, 0, 0, 1)
+
+    def GetArcCount(self):
+        return 0
+
+    GetPolyLineCount = GetArcCount
+    GetPolygonCount = GetArcCount
+    GetTriangleCount = GetArcCount
+
+
+class ShelfDisplay:
+    """Fresh wrapper forwarding all native reads while intercepting OffsetText."""
+
+    def __init__(self, display, ink):
+        object.__setattr__(self, "_display", display)
+        object.__setattr__(self, "_ink", ink)
+
+    def __getattr__(self, name):
+        if name == "OffsetText":
+            return self._ink.offset
+        return getattr(self._display, name)
+
+    def __setattr__(self, name, value):
+        if name == "OffsetText":
+            self._ink.set_offset(value)
+        else:
+            setattr(self._display, name, value)
+
+
+@pytest.mark.parametrize("spec", CONSUMERS)
+def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stations(
+    monkeypatch, native_nut, spec,
+):
+    case = native_nut(spec)
+    source_before = tuple((point.native_identity, point.X, point.Y, point.Z)
+                          for point in case.source)
+    attachment_before = tuple(point.native_identity for point in case.attachments)
+    value_before = case.native.SystemValue
+    settled, physical, callbacks = _author_public(monkeypatch, case)
+    assert set(case.shelf_ink) == {NOMINAL_NAME, "AcrossFlats@drawing", "Height@drawing"}
+    assert case.shelf_before[NOMINAL_NAME][0][1] != 0.031
+    for name, ink in case.shelf_ink.items():
+        origin, lines, boxes = case.shelf_before[name]
+        assert ink.offset is True
+        assert ink.origin[0] > origin[0], name
+        assert ink.origin[1] == pytest.approx(origin[1]), name
+        for actual, expected in zip(ink.physical_lines(), lines, strict=True):
+            assert actual == pytest.approx(expected), name
+        assert len(ink.text_boxes()) == len(boxes)
+        # Every measured fragment, not just the numerical row, clears both
+        # witness runs and the outside arrow's complete physical line reach.
+        physical_reach = ink.right + ink.tail
+        for before, after in zip(boxes, ink.text_boxes(), strict=True):
+            assert after[0] >= physical_reach + 0.002, (name, before, after)
+            assert after[2] > after[0] and after[3] > after[1]
+            assert all(math.isfinite(value) for value in after)
+            assert after[1:] == pytest.approx(
+                (before[1], before[2] + ink.origin[0] - origin[0], before[3])
+            )
+        if ink.kind == "flats":
+            assert max(box[2] for box in boxes) - min(box[0] for box in boxes) < ink.right - ink.left
+            assert len(ink.lines()) > len(ink.physical_lines())  # fraction bar remains ink
+    nominal = case.shelf_ink[NOMINAL_NAME]
+    assert max(fragment[3] for fragment in nominal.fragments) == 0.040075
+    assert any(fragment[0] == "NOMINAL MAJOR" for fragment in nominal.fragments)
+    assert any(fragment[0] == "⌀" for fragment in nominal.fragments)
+    assert tuple((point.native_identity, point.X, point.Y, point.Z)
+                 for point in case.source) == source_before
+    assert tuple(point.native_identity for point in case.attachments) == attachment_before
+    assert case.native.SystemValue == value_before
+    writes = {name: list(ink.writes) for name, ink in case.shelf_ink.items()}
+    rebuilds = list(case.rebuilds)
+    callbacks_before = list(callbacks)
+    # The returned presentation guard is repeatable and entirely read-only.
+    for _ in range(3):
+        settled()
+    assert callbacks[len(callbacks_before):] == ["nominal settled"] * 3
+    assert {name: ink.writes for name, ink in case.shelf_ink.items()} == writes
+    assert case.rebuilds == rebuilds
+    assert physical["AcrossFlats@drawing"].GetDimension2(0).SystemValue == spec.ACROSS_FLATS / 1000.0
+    assert physical["Height@drawing"].GetDimension2(0).SystemValue == spec.THICKNESS / 1000.0
+    assert not any(
+        getattr(left, "context", None) != getattr(right, "context", None)
+        for left, right in case.comparisons
+    ), "presentation must not reintroduce model/drawing endpoint comparisons"
+
+
+@pytest.mark.parametrize("failure", [
+    "seed-ignored", "position-refused", "position-ignored", "offset-refused", "offset-reset",
+])
+def test_public_nut_refuses_native_shelf_writes_that_do_not_persist(
+    monkeypatch, native_nut, failure,
+):
+    case = native_nut()
+    with pytest.raises(RuntimeError, match="(?i)station|offset|position|shelf|witness|text"):
+        _author_public(monkeypatch, case, shelf_failure=lambda ink: setattr(ink, "failure", failure))
+
+
+@pytest.mark.parametrize("field,value", [
+    (3, 0.0), (3, -0.001), (3, float("nan")), (3, None),
+    (4, 0.0), (4, float("inf")), (1, float("nan")), (2, float("inf")),
+])
+def test_public_nut_requires_geometry_for_the_longest_nominal_fragment(
+    monkeypatch, native_nut, field, value,
+):
+    case = native_nut()
+
+    def corrupt(ink):
+        ink.fragments[-1][field] = value
+
+    with pytest.raises(RuntimeError, match="(?i)text|fragment|native|geometry|measur"):
+        _author_public(monkeypatch, case, shelf_failure=corrupt)
+
+
+@pytest.mark.parametrize("drift", ["arrow-station", "witness-extent", "lost-witness", "offset"])
+def test_public_nut_settled_proof_refuses_late_native_presentation_drift(
+    monkeypatch, native_nut, drift,
+):
+    case = native_nut()
+    settled, _physical, _callbacks = _author_public(monkeypatch, case)
+    ink = case.shelf_ink[NOMINAL_NAME]
+    if drift == "arrow-station":
+        ink.station += 0.001
+    elif drift == "witness-extent":
+        ink.witness_start += 0.001
+    elif drift == "lost-witness":
+        lines = ink.physical_lines
+        ink.physical_lines = lambda: lines()[1:]
+    else:
+        ink.offset = False
+    writes = list(ink.writes)
+    rebuilds = list(case.rebuilds)
+    with pytest.raises(RuntimeError, match="(?i)station|witness|offset|text|shelf|line|reference"):
+        settled()
+    assert ink.writes == writes
+    assert case.rebuilds == rebuilds
+
+
+@pytest.mark.parametrize("drift", ["missing", "duplicate", "unrelated", "hidden"])
+def test_public_nut_shelf_settled_reacquisition_requires_exact_visible_inventory(
+    monkeypatch, native_nut, drift,
+):
+    case = native_nut()
+    settled, physical, _callbacks = _author_public(monkeypatch, case)
+    nominal = case.display.GetAnnotation()
+    flats = physical["AcrossFlats@drawing"].GetAnnotation()
+    if drift == "hidden":
+        nominal.Visible = 0
+        inventory = (nominal, flats)
+    elif drift == "missing":
+        inventory = (flats,)
+    elif drift == "duplicate":
+        inventory = (nominal, nominal, flats)
+    else:
+        foreign = case.make_display()
+        foreign.GetDimension2 = lambda _index: NS(FullName="Foreign@drawing")
+        inventory = (nominal, flats, foreign.GetAnnotation())
+    case.front.GetAnnotations = lambda: inventory
+    with pytest.raises(RuntimeError, match="hidden|inventory"):
+        settled()
+
+
+@pytest.mark.parametrize("drift", ["physical-value", "physical-format", "physical-attachment", "source"])
+def test_public_nut_shelving_preserves_existing_settled_source_and_physical_guards(
+    monkeypatch, native_nut, drift,
+):
+    case = native_nut()
+    settled, physical, _callbacks = _author_public(monkeypatch, case)
+    flats = physical["AcrossFlats@drawing"]
+    if drift == "physical-value":
+        flats.GetDimension2(0).SystemValue += 0.001
+        message = "native value|measures"
+    elif drift == "physical-format":
+        flats.GetText = lambda _part: "changed"
+        message = "presentation"
+    elif drift == "physical-attachment":
+        flats.GetAnnotation().GetAttachedEntities3 = lambda: (object(), object())
+        message = "named entities"
+    else:
+        case.segment.ConstructionGeometry = False
+        message = "construction line"
+    with pytest.raises(RuntimeError, match=message):
+        settled()
+
+
+@pytest.mark.parametrize("getter", [
+    "GetTextCount", "GetTextPositionAtIndex", "GetTextHeightAtIndex",
+])
+def test_public_nut_does_not_estimate_missing_native_text_geometry(
+    monkeypatch, native_nut, getter,
+):
+    case = native_nut()
+
+    def missing(ink):
+        setattr(ink, getter, lambda *_args: None)
+
+    with pytest.raises(RuntimeError, match="unreadable|native size|geometry"):
+        _author_public(monkeypatch, case, shelf_failure=missing)
+
+
+def test_public_nut_settled_proof_does_not_repair_transverse_text_drift(monkeypatch, native_nut):
+    case = native_nut()
+    settled, _physical, _callbacks = _author_public(monkeypatch, case)
+    ink = case.shelf_ink[NOMINAL_NAME]
+    ink.origin[1] += 0.001
+    writes = list(ink.writes)
+    rebuilds = list(case.rebuilds)
+    with pytest.raises(RuntimeError, match="transverse position"):
+        settled()
+    assert ink.writes == writes
+    assert case.rebuilds == rebuilds
