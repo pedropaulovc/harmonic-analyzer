@@ -374,6 +374,12 @@ unknown physical thread-cutting geometry. The native model contains a Hole
 Wizard pilot and cosmetic threads; it does not establish all finished-hole
 wall thicknesses.
 
+Native backing verification emits one `part.receiver_plate_backing` child span
+with `receivers`/`boundaries` counts; knife-height dimension insertion emits one
+`drawing.knife_height_location` child span with `dimensions`/`references` counts.
+These operation-level spans add no per-witness spans or COM reads; the returned
+settled-height check and all geometry/acceptance checks remain unchanged.
+
 The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
 and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,
 downward to **Y=−4.46 mm**. It is not a recentered 7 mm plate. The separate

@@ -370,8 +370,10 @@ def _theoretical_knife_vertex_in_view(
     return _early_bound(mapped, "ISketchPoint"), xyz
 
 
+@_telemetry.traced("drawing.knife_height_location")
 def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
     """One ordinary native VIEW F location from the theoretical ridge to plate top."""
+    _telemetry.annotate(dimensions=1, references=2)
     label = "coefficient top below theoretical knife vertex"
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     drawing = _early_bound(draw, "IDrawingDoc")

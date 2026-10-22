@@ -324,7 +324,11 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         functions.append(function)
     namespace = {
         "math": math, "_early_bound": lambda value, interface: value,
-        "_telemetry": SimpleNamespace(success=lambda message: None, info=lambda message: None),
+        "_telemetry": SimpleNamespace(
+            success=lambda message: None, info=lambda message: None,
+            traced=lambda name: lambda function: function,
+            annotate=lambda **attributes: None,
+        ),
         "COEFFICIENT_T": spec.COEFFICIENT_T,
         "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
         "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,

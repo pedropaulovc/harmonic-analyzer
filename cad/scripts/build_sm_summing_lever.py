@@ -1096,6 +1096,7 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     _assert_native_rib_profile(adapter, "MiddleRib")
 
 
+@_telemetry.traced("part.receiver_plate_backing")
 def _assert_receiver_plate_backing(adapter) -> None:
     """Read the real plate boundaries beyond the entry rib, before drilling.
 
@@ -1115,6 +1116,7 @@ def _assert_receiver_plate_backing(adapter) -> None:
         (1, COEFFICIENT_BOTTOM_Y),
         (0, PLATE_W),
     )
+    _telemetry.annotate(receivers=len(LEVER_HOLE_POINTS), boundaries=len(boundaries))
     faces = {boundary: [] for boundary in boundaries}
     for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
