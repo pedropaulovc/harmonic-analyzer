@@ -72,12 +72,12 @@ from mg_magnifying_clamp_geom import (
     ROD_TAP_DRILL_DIA,
     THUMB_TAP_DRILL_DEPTH,
     THUMB_TAP_SPEC,
-    WALL_TARGET,
+    WALL_FLOOR,
 )
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
+    HEX_AF_PREFIX,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PREF_MATERIAL_HATCH_PATTERN,
@@ -1007,8 +1007,8 @@ def _assert_location_profiles(adapter: Any) -> None:
         if feature == "LeverBoreLocationProfile":
             flat = converted_flats["LeverBoreFromZFlat"]
             radius = float(_early_bound(circle, "ISketchArc").GetRadius()) * 1000.0
-            if HEX_AF / 2.0 - radius < WALL_TARGET:
-                raise RuntimeError("LeverBore: actual model has no room for its finished wall requirement")
+            if HEX_AF / 2.0 - radius < WALL_FLOOR:
+                raise RuntimeError("LeverBore: actual model loses the policy wall floor")
             measured_lines = set()
             for name, point in _tap_placement_points(adapter).items():
                 display, dimension = _named_dimension(adapter, feature, name)
@@ -1073,6 +1073,8 @@ def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
     # ShowParenthesis; either stale half must fail every source/import readback.
     if any("(" in actual[field] or ")" in actual[field] for field in ("prefix", "suffix")):
         raise RuntimeError(f"HexAf: native reference affix remained at {stage}: {actual!r}")
+    if actual["prefix"] != HEX_AF_PREFIX or actual["suffix"] != "":
+        raise RuntimeError(f"HexAf: ordinary HEX size no longer owns all opposed-flat pairs at {stage}: {actual!r}")
     if actual["reference"] is not False or any(type(actual[field]) is not int or actual[field] != value for field, value in (("places", 2), ("tolerance_places", 2), ("tolerance_type", 0))):
         raise RuntimeError(f"HexAf: native non-reference ordinary precision/tolerance changed at {stage}: {actual!r}")
     if type(actual["value_m"]) not in (int, float) or not math.isclose(actual["value_m"], HEX_AF / 1000.0, rel_tol=0.0, abs_tol=1e-9):
@@ -1110,6 +1112,8 @@ def _author_stock_af(adapter: Any) -> None:
     display = _early_bound(display, "IDisplayDimension")
     _early_bound(dimension.Tolerance, "IDimensionTolerance").Type = 0
     display.ShowParenthesis = False
+    display.SetText(1, HEX_AF_PREFIX)
+    display.SetText(2, "")
     precision_status = display.SetPrecision3(2, -1, 2, -1)
     if type(precision_status) is not int or precision_status != 0:
         raise RuntimeError(f"HexAf: ordinary precision authoring refused: {precision_status!r}")
@@ -1254,7 +1258,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

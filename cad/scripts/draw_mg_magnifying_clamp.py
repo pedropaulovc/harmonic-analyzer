@@ -43,7 +43,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -60,12 +59,11 @@ from _drawing_dimensions import (
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note, property_link
+from _drawing_notes import add_property_linked_note
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
-from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -85,7 +83,6 @@ from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     DIMENSION_GROUPS,
     GROUPED_HIDDEN_DIMENSIONS,
@@ -103,7 +100,7 @@ from mg_magnifying_clamp_spec import (
     ROD_TAP_PROCESS,
     SEAT_NOTE,
     SECTION_HATCH_PATTERN,
-    STOCK_AF_CALLOUT,
+    HEX_AF_PREFIX,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -138,8 +135,6 @@ BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
 # (x > ~0.216, y < ~0.066); the isometric right of it, inside the border.
 SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
-# The supplied-stock envelope is flagged on section A-A's real outside edge.
-STOCK_FORM_NOTE_XY = (0.285, 0.140)
 # The iso remains illustrative; keep its scale caption above it.
 ISO_NOTE_XY = (0.335, 0.245)
 # R27's 146.5 mm seat row needs the full right-hand text lane inside the border.
@@ -164,11 +159,8 @@ RIGHT_KEEP = {
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (0.165, 0.145),
 }
-# R29's whole supplied-stock paragraph must clear BOTH native AF witnesses
-# (x65.95/104.05 mm) and the right arrow tail (to x110.4), not just the value.
-# At x152 its native text extent predicts x113.7698..190.2302 mm; keeping y255
-# leaves the highest ink at y259.4993, below the 266.7 mm inner border.
-# A left shift cannot fit the 76.4604 mm native row in the 53.25 mm border lane.
+# Keep the ordinary HEX size outside both native witnesses/arrow tails.
+# There is no supplied-stock paragraph or independent envelope note.
 TOP_KEEP = {"HexAf": (0.152, 0.255)}
 RIGHT_LOCATION_KEEP = {
     # Move R27's whole three-row label right, away from A and the height witness.
@@ -180,7 +172,6 @@ TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
 BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 
 DIMENSION_CALLOUTS = {
-    "HexAf": STOCK_AF_CALLOUT,
     "Height": "",
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
     "LeverBoreFromZFlat": "BORE AND BOTH\nTAP ENTRY AXES",
@@ -432,48 +423,6 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: resolved native callout repeats title-block 2B")
 
 
-def _assert_stock_form_note(
-    adapter: Any, view: Any, note: Any, edge: Any, *, stage: str,
-) -> None:
-    native = _early_bound(note, "INote")
-    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
-    text = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-    raw_link = native.PropertyLinkedText
-    leaders = annotation.GetLeaderCount()
-    position = tuple(annotation.GetPosition() or ())
-    _assert_attached_to(
-        adapter, annotation, edge, entity_type="EDGE",
-        what="clamp stock-form callout", label=stage,
-    )
-    owner, owner_type = annotation.Owner, annotation.OwnerType
-    if owner is None:
-        raise RuntimeError(f"clamp stock form: attached note has no view owner at {stage}")
-    app = _early_bound(adapter.swApp, "ISldWorks")
-    codes = (app.IsSame(view, view), app.IsSame(owner, view), app.IsSame(edge, edge))
-    _telemetry.info(
-        "clamp attached stock-form acceptance", operation_stage=stage,
-        resolved_text=text, raw_property_link=raw_link, leader_count=leaders, position=repr(position),
-        owner_type=owner_type, identity_codes=repr(codes),
-    )
-    if text != DRAWING_NOTES or type(raw_link) is not str or raw_link != property_link("Manufacturing Notes") or type(leaders) is not int or leaders != 1 or type(owner_type) is not int or owner_type != 0 or any(type(code) is not int or code != 1 for code in codes) or len(position) != 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in position) or any(not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position[:2], STOCK_FORM_NOTE_XY, strict=True)):
-        raise RuntimeError(f"clamp stock form: attached envelope/function changed at {stage}")
-
-
-def _add_stock_form_note(adapter: Any, view: Any) -> tuple[Any, Any]:
-    # Retain the selected stock edge BEFORE note insertion: a wrong attachment
-    # must never become its own accepted baseline after insertion/rebuild.
-    edge = _select_view_entity(
-        adapter, view, "EDGE",
-        (SECTION_CENTER[0] + _HALF_AC, _elev_y(SECTION_CENTER, LEVER_BORE_Y / 2.0)),
-        label="clamp full-height stock envelope",
-    )
-    note = add_attached_note(
-        adapter, view, text=property_link("Manufacturing Notes"),
-        entity=edge, attached_to=edge, note_xy=STOCK_FORM_NOTE_XY,
-        label="MHA-MG-03 plain-body clamp travel",
-    )
-    _assert_stock_form_note(adapter, view, note, edge, stage="stock-form.inserted")
-    return note, edge
 
 
 def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, stage: str) -> None:
@@ -496,11 +445,11 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
         app.IsSame(source_dimension, source_dimension), app.IsSame(dimension, dimension),
         app.IsSame(dimension, source_dimension),
     )
-    dangling, text = annotation.IsDangling(), display.GetText(4)
+    dangling, prefix = annotation.IsDangling(), display.GetText(1)
     names = (source_dimension.FullName, dimension.FullName)
-    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling, stock_callout=text)
-    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False or text != STOCK_AF_CALLOUT:
-        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership or supplied-stock callout changed at {stage}")
+    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling, hex_prefix=prefix)
+    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False or prefix != HEX_AF_PREFIX:
+        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership or ordinary HEX designation changed at {stage}")
 
 
 
@@ -765,7 +714,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -773,7 +721,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -937,13 +884,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-MG-04 shoulder seat",
     )
 
-    stock_form_note, stock_form_edge = _add_stock_form_note(adapter, section)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     def settled_dimensions() -> None:
         _assert_grouped_flat_locations(adapter, right, right_annotations)
         _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
-        _assert_stock_form_note(adapter, section, stock_form_note, stock_form_edge, stage="stock-form.after-final-rebuild")
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):
             annotation = _early_bound(raw, "IAnnotation")

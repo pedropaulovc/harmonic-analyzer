@@ -1499,7 +1499,8 @@ The current MHA-MG-01 is the 2026-10-20 approved simple L bracket: its true
 semicircular nose and parallel sides replace the old collar and tapered arm.
 Use current-main axis-to-seat **100.3975878**, not the superseded 55.1876
 sketch; preserve the 3.175 stock mounting grip at its native `.XXX` ±0.13.
-The foot's right face merges flush with the centred 12.50 ±0.10 neck.
+The foot's right face merges flush with the centred 12.50 neck; its ordinary
+`.XX` ±0.51 band retains full 1.5D engagement without a local tight tolerance.
 Native mounting dimensions stay attached to their witness sketch, imported
 on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
 the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
@@ -1526,10 +1527,11 @@ use hidden native primary-distance limits0..0.25, not an unsupported0.15 minimum
 The one ceiling comes from structured
 `title_block.edge_break.chamfer_max_mm`; the existing bilateral setter owns
 the deviations, and each builder checks the nominal plus its native lower and
-upper deviations against 0 and 0.25. Do not substitute an unbanded printed
-0.2 or claim both manufactured legs are capped at 0.25. The retained 45° entry
-indication takes `angular_band_deg()` (±1°), giving the conservative projected
-leg envelope `q = 0.25 tan46° = 0.258882578`. `_part_save` already invokes
+upper deviations against 0 and 0.25. The bracket prints no angle-only mouth
+note; its title-block edge maximum governs the unchanged native chamfer.
+Do not claim both manufactured legs are capped at0.25. The model's45° feature
+uses `angular_band_deg()` (±1°), giving the conservative projected leg
+envelope `q = 0.25 tan46° = 0.258882578`. `_part_save` already invokes
 `apply_block_tolerances`, which verifies the template-owned native angular
 preference 126 against the configured value and fails on drift.
 The removed1.658 MIN/RV-01 declaration depended on a custom root acceptance
@@ -1556,11 +1558,22 @@ specifies installation depth: the flat tip reaches through the far face,
 with no shoulder or added relief groove. Full engaged overlap excludes `q`
 at each female mouth, incomplete male thread at both ends, and an ADDITIVE
 `q` male tip loss: the print does not explicitly define a chamfer/die-lead
-union. The fixed useful pose guarantees **10.477234843** full overlap and
-the independent installed projection guarantees **10.717234843**, both above
-1.5D = 9.525. These replace the earlier 10.745/10.985 bounds; root-runout
-clearance remains 0.985 in the fixed frame.
+union. The fixed useful pose guarantees **10.272234843** full overlap and
+the independent installed projection guarantees **10.307234843**, both above
+1.5D = 9.525 with the ordinary12.50±0.51 receiver. Root-runout clearance is
+0.780 in the fixed frame; the shortest rod still reaches the far face by0.195.
 There is no press-fit force/finish/elastic-yield contract or added lock.
+
+The radius/location±0.05 bands preserve the thin nose material; keep those
+native dimensions without restoring user-removed functional qualifiers or
+adding an unapproved review exception. The3.175 mounting foot retains its
+ordinary`.XXX`±0.13: worst #2-56 full engagement3.305 exceeds3.2766 with only
+0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that joint.
+The blued material is generic low-carbon steel, matching the existing native
+Plain Carbon Steel assignment. The arm check uses assumed E200GPa/G79GPa for
+compliance and conservatively bounds factor-three simultaneous bending/torsion
+von Mises demand at about27.360MPa; this is not a guaranteed370MPa yield or
+certified grade/temper.
 
 Keep the assembly's complete thread-projection qualifier attached to that native
 dimension when wrapping or repositioning it. R16 exported successfully while
@@ -1586,49 +1599,34 @@ apply the pre-equation DrivenState check after equations take ownership.
 The dependent MHA-MG-02 clamp uses **1/2 in hex** brass, keeps its bore at
 **19.95** from the bottom seat and its overall height at **29.50**. The hook
 stays at **919.7**; neither `.XX` ±0.51 band tightens. The native TOP
-**HexAf = 12.70**, at **two places and not REF**, uses the ordinary
-title-block `.XX` ±0.51 receiving size12.19–13.21, with no explicit band.
-Its attached below-text is `1/2 HEX STOCK; FLATS AS SUPPLIED`. The fresh
-source dimension uses tolerance TypeNONE=0; native min/max getters remain
-inactive observations, not the ordinary accepted limits. Read back value,
-both precisions, non-reference property and actual prefix/suffix text.
-Prove its actual source HexProfile endpoints, imported source dimension and
-requested TOP-view ownership again after the final drawing rebuild.
+**HEX 12.70**, at **two places and not REF**, uses the ordinary
+title-block `.XX` ±0.51 size12.19–13.21 on all three opposed-flat pairs over
+the full height. The ordinary drawn angles use the default±1°; do not exempt
+the shape as unconstrained “flats as supplied”. The model-owned `HEX ` prefix
+imports with the actual AF dimension; no separate stock-definition leader is
+needed. The source uses tolerance TypeNONE=0; inactive min/max getters are
+observations, not accepted limits. Read value, both precisions, non-reference
+property, prefix/suffix, actual source endpoints and requested-view ownership
+again after the final rebuild.
 
-The independent receiving-form callout is attached to the actual section edge:
+There is no bespoke2 MIN wall/floor or15 MAX stock-envelope inspection note.
+The ordinary HEX/profile bands give a conservative full-height body bound:
 
-- `TRANSVERSE ENVELOPE 15.00 MAX`
-- `OVER FULL HEIGHT; FOR MHA-MG-03`
-- `PLAIN-BODY CLAMP TRAVEL`
+`D <= (AFmax + 2 Hmax tan(a)) / (cos(30°+a) - sin(a))`
 
-That envelope includes nonideal as-supplied stock over its complete height;
-do not derive it from nominal regular-hex AF/cos(30°), exact 60° normals or
-Rule #1. No supplier, alloy/temper or stock-form certification is implied.
-The actual bore diameter owns the separate finished acceptance:
+with AFmax13.21, Hmax30.01 and a1° gives16.979159, rounded OUT to17.00
+for calculations only. Adjacent normals, opposite-face angular mismatch and
+full-height drift are spent; exact60° faces or a centred tap are not assumed.
+This is not a supplier certificate or a bound for unconstrained stock.
+The opposite-flat/bore/location/relative-angle corner leaves1.644216 mm:
+below the2 mm target but above Rule17's1.5 mm hard floor. The drill-point
+floor remains2.081671 mm. Neither number becomes a redundant drawing note,
+and no ASME internal-maximum-root certificate is claimed.
+Retain `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`; `AT TAP`
+does not constrain unrelated edges. Retain29.50 and .XX±0.51 without a height
+qualifier, and identify MHA-MG-VN-50 at its actual top-tap callout.
 
-- `2.0 MIN FINISHED NET WALL`
-- `AND BLIND FLOOR; EXCEPT ONLY`
-- `SHOWN HOLE ENTRIES/EXITS AND`
-- `TOP-TAP/BORE INTERSECTION`
-
-Only those designed apertures are excluded: actual remaining sidewalls and
-blind floors still require2 MIN throughout depth, including stock-face drift
-and hole wander. This is conjunctive acceptance, not an all-independent-corners
-certificate: the ordinary AF12.19/B6.86/bore radius3.30/full15tan(0.3°) corner
-has1.951459 mm wall and must be rejected. Ideal AF13.21 has15.253594 across
-corners and is likewise rejected by15 MAX; neither is an admitted shortfall.
-The three `FINISHED_NET_WALL_MINIMUMS` entries remain acceptance thresholds;
-only the blind rod-tap floor is in `DERIVED_WALL_BOUNDS` (2.092143505152 worst).
-Retain the actual seat's `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`;
-`AT TAP` does not constrain unrelated edges. Neither15 nor2 is a fabricated
-native measurement. The isometric remains illustrative: retain no old iso
-stock-definition leader or alternative acceptance route. The new section
-leader owns the actual full-height form requirement, not a perfect-hex claim.
-Remove only the ambiguous height below-text; **29.50 and .XX±0.51 remain**.
-Height alone is not full thread engagement; its native precision is functional
-in the male/female overlap. Identify MHA-MG-VN-50 at its actual top-tap callout.
-
-Spend 15.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
+Spend17.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
 an unowned nominal half-depth. Intersect actual male/female full-profile
 intervals, excluding the stock screw's **0.47625** tip chamfer and mouth break.
 The finite flat-tip contact includes independent relative-entry error and the
@@ -1692,29 +1690,14 @@ measurement is invalid. The retained projection and point-to-flat primitives
 were exercised separately before this change; their new combination and
 grouped imported attachments still require Main-owned native validation.
 
-All functional bounds were recomputed for the new 1.02 entry-offset envelope,
-retaining the full-height 15 MAX and finished 2 MIN requirements:
-
-| Revised clamp quantity | Conservative bound (mm) |
-|---|---:|
-| Thumb contact transverse offset including run-offs | 1.151215052279 |
-| Finite contact chord loss | 0.020171769145 |
-| Thumb FULL engagement | 4.402888710865 |
-| Thumb collar clearance | 3.346574403725 |
-| Plug-tap transverse offset | 1.173350392802 |
-| Plug-tap half chord | 1.921885329188 |
-| Maximum required plug-tap reach | 11.901655204897 |
-| Plug-tap stop window | 0.668770658377 |
-| Thumb drill transverse offset | 1.154929055905 |
-| Thumb drill near-wall/far-cylinder clearance | 0.651607939983 |
-| Thumb drill finite-point far-wall clearance | 0.720010993346 |
-| Rod floor, unchanged | 2.092144 |
-
-These are arithmetic bounds, not new native measurements or executed test
-results. Thumb engagement remains height-limited; the bore's unchanged
-flat-location/diameter/height retains its conditional 2.331459 wall bound.
-The global finished-wall acceptance remains necessary. The 15 MAX/2 MIN
-acceptances and component travel interval are unchanged.
+All functional bounds use the independent1.02 entry-offset envelope and the
+derived17.00 full-height body bound, with no custom receiving notes.
+Thumb FULL overlap is4.392416640≥4.2675, collar clearance3.334893727 and the
+blind rod-drill floor2.081671434. Plug reach, stop window and finite drill-cone
+clearances remain explicit derived checks in the spec; they are not replaced
+by printed machining instructions. These are arithmetic bounds, not native
+measurements or executed test results. The ordinary worst bore-flat wall is
+1.644216, an admitted miss of the2 mm target, not a breach of the1.5 mm floor.
 
 Keep the three actual witness feature names in the builder's literal
 `REFERENCE_SKETCHES` tuple. `_location_sources` uses that declaration to name
@@ -1840,43 +1823,18 @@ face/edge/vertex route. Null, ambiguous or wrong-view results, unknown native
 self/owner identity and malformed keys remain refusals. Reacquire all source
 and drawing proof after rebuilds; never cache correspondence across them.
 
-The attached TOP AF stock callout names supplied form; its **native12.70
-dimension with ordinary .XX acceptance**, not REF/text-only limits, owns size.
-The property-linked15 MAX note now has one real section-stock-edge leader:
-retain its resolved full-height/plain-body-travel text, native view owner,
-exact edge attachment and position through the final rebuild.
-The note's sheet placement is its XY station; native annotation depth may be
-nonzero (R32 returned Z0.009421525247823612 after insertion at the requested
-XY). Require a finite XYZ readback and the exact sheet XY, not an invented
-Z0 manufacturing or layout requirement.
-Retain the selected stock edge **before** insertion with `_select_view_entity`,
-then use `add_attached_note(entity=E, attached_to=E)` with the property-link text.
-Its post-rebuild identity guard must reject an initial wrong edge; never adopt
-the note's observed attachment as a new expected baseline. Verify both unresolved
-`INote.PropertyLinkedText` and resolved `GetText()` after insertion/final rebuild,
-so a frozen literal cannot silently replace the source-property link. The shared
-leader helpers need no API or behavior change for this local authoritative path.
-Do not retain the obsolete unleadered sheet-note acceptance path. `ActivateView` selects the
-callout's actual view; it does not stand in for drawing-sheet activation.
+The native TOP `HEX 12.70` dimension owns ordinary .XX size on the complete
+hex profile. Its prefix is model-owned and source/import/final readbacks keep
+the real dimension and owner; no below-text stock qualifier, property-linked
+envelope note or special section-edge acceptance flag survives.
 Clear height's obsolete below-text explicitly while retaining its numeric
 source/precision. Remove only the native hole-callout thread-class variable
 where the title block already owns 2B. Keep live thread/drill/depth variables
 and reject resolved text that still repeats 2B.
 
-R17/R18's former isometric stock-face leader exposed crossing/clipping;
-it remains removed. Attach the new acceptance flag to the actual section edge
-below the bore instead, and wrap/place the complete native text blocks, not
-just their numeric values, clear of borders, section markers and neighbours.
-Source-coordinate predictions are not native layout proof: inspect the final
-whole PNG and require the unchanged native annotation/ink audit.
-
-For TOP AF below-text, budget the whole stock qualifier against **both**
-native witnesses and the complete arrow-tail envelope. R29's right witness
-touched the `S` in `SUPPLIED` despite the controlling AF value being clear.
-Moving the paragraph left would cross the other witness and clip the border;
-place it beyond the measured right-hand tail, then recheck native routing
-and the whole page. Translating old ink bounds is only a placement budget,
-not proof that the new native arrows or final aggregate box are clear.
+Inspect the actual whole PNG and unchanged native ink audit after simplifying
+the sheet. Removing dead notes is not permission to loosen attachment,
+location, source-identity, precision or layout guards on remaining features.
 
 R21 export completed with the upper 6.35 extension line touching
 the left stroke of the upper A cutting-plane label. Clearance above an arrow
@@ -1973,14 +1931,14 @@ title-block keep-out, including a shoulder that outlasts the text after reflow.
 Keep nominal model travel separate from published operating capacity. The
 accepted shortest rod and longest thread move nominal runout X149.50 to
 X148.19; nominal `THREAD_ROOT_X` still owns the part's nominal witness.
-Published setup/capacity uses the conservative component band **81.81 / 165 /
-196.825** from `operating_clamp_radius_band`. The actual bottom rod/tap axis at
-its seat is inside the finished clamp by its required net wall. The received
-**15 MAX over full height** therefore bounds either bore end from that station
-by the **full15**, without inventing symmetric±7.5 or exact60° stock form.
-The lower radius is215−148.19+15; the upper is215−15−3.175 because the complete
-bore must also stay beyond the free hemisphere on cylindrical body. Check the
-earliest bracket face as an additional stop. The built165 pose does not move.
+Published setup/capacity uses the conservative component band **83.81 / 165 /
+194.825** from `operating_clamp_radius_band`. The ordinary HEX size, angles
+and actual tap-entry locations keep the station inside the body. Its derived
+full-height17 bound therefore covers either bore end from that station,
+without inventing symmetric±8.5. The lower radius is215−148.19+17; the upper
+is215−17−3.175 because the complete bore must also stay beyond the free
+hemisphere. Check the earliest bracket face too. The built165 pose does not
+move. This is not a new printed stock limit or all-machine clearance claim.
 
 As-made fit-up can inspect and admit more travel, but published capacity does
 not credit it. These component bounds in the existing knife/free-tip frame are

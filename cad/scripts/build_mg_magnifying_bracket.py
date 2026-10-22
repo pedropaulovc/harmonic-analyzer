@@ -1,4 +1,4 @@
-r"""Build the approved blued-1018 simple L bracket, with no collar or press.
+r"""Build the approved blued low-carbon-steel L bracket, with no collar or press.
 
 The current-main mounting seat and two screw stations stay fixed. The foot's
 right edge extends to the centred 12.50 neck; there is no rear stub or ledge.
@@ -29,7 +29,7 @@ from _session import run_build
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
-from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NECK_THICKNESS_TOL, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
+from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
 from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, ROOT_R
 
 PART_NAME = "mg-magnifying-bracket"
@@ -205,14 +205,13 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
     set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL)
-    set_dimension_symmetric_tolerance(adapter, "Neck", "NeckThickness", NECK_THICKNESS_TOL)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     blank_reference_sketches(adapter, ("MountingCoordinates", "TapCoordinates"))
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, (0.12, 0.12, 0.13))  # blued 1018, not bare steel
+    await apply_color(adapter, (0.12, 0.12, 0.13))  # blued, not bare steel
     apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE})
     await report_mass_properties(adapter)
     await force_rebuild(adapter)

@@ -60,8 +60,10 @@ G = 9.81e-3  # N per gram
 BRASS_G_PER_MM3 = (
     pn_pen_carriage_geom.BRASS_G_PER_MM3
 )  # 8.5e-3, the denser bound for every part
-E_STEEL = 200_000.0  # N/mm^2, 1018 cold-drawn (low end of 200-205 GPa)
-G_STEEL = 79_000.0  # N/mm^2 (low end of ~80 GPa)
+# Representative low-carbon-steel elastic moduli, not certified material minima.
+# The generic material designation supplies no grade/temper yield guarantee.
+E_STEEL = 200_000.0  # N/mm^2, assumed for the compliance estimate
+G_STEEL = 79_000.0  # N/mm^2, assumed for the compliance estimate
 
 # --- loads ---------------------------------------------------------------------
 _HEX_AREA = math.sqrt(3.0) / 2.0  # hex area per AF^2
@@ -168,7 +170,9 @@ BENDING_STRESS = (
 TORSION_STRESS = (
     abs(_MZ) * (3.0 * ARM_B + 1.8 * ARM_H) / (ARM_B**2 * ARM_H**2)
 )
-STEEL_YIELD = 370.0  # N/mm^2, 1018 cold drawn
+# Conservative simultaneous bending/torsion von Mises bound, with factor three.
+# This is a required material property, NOT a guaranteed generic-steel yield.
+STEEL_YIELD_REQUIRED = 3.0 * math.hypot(BENDING_STRESS, math.sqrt(3.0) * TORSION_STRESS)
 
 # --- flange joint: two #2-56 at machine x 1 and 14.7 on the seat plane ----------
 SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]  # 13.7
@@ -213,8 +217,6 @@ JOINT_TENSION_INCREMENT_N = (
 )
 JOINT_PRELOAD_MARGIN = SCREW_PRELOAD_N / JOINT_TENSION_INCREMENT_N
 
-if max(BENDING_STRESS, TORSION_STRESS * math.sqrt(3.0)) > STEEL_YIELD / 3.0:
-    raise AssertionError("magnifying bracket arm stress exceeds a third of 1018 yield")
 if not (_MZ < 0.0 and _MZ_MIN_TENSION < 0.0 and _MZ_NO_GROUP < 0.0):
     raise AssertionError(
         "magnifying bracket joint torque reverses; the shanks would not stay bearing"

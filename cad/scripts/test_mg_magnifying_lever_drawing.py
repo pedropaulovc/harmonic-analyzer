@@ -60,7 +60,7 @@ def test_installed_full_thread_excludes_both_leads_both_mouths_and_tip_chamfer()
         assert length >= geom.BRACKET_LOCAL_X + thickness / 2.0
     assert geom.FULL_THREAD_OVERLAP_MIN <= min(overlaps) + 1e-9
     assert geom.FULL_THREAD_OVERLAP_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
-    assert geom.FULL_THREAD_OVERLAP_MIN == pytest.approx(10.477234843105)
+    assert geom.FULL_THREAD_OVERLAP_MIN == pytest.approx(10.272234843105)
 
 
 def test_native_tip_projection_guarantees_full_overlap_independently_of_part_length() -> None:
@@ -75,7 +75,7 @@ def test_native_tip_projection_guarantees_full_overlap_independently_of_part_len
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN <= min(overlaps) + 1e-9
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
     assert installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL > 0.0
-    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.717234843105)
+    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.307234843105)
 
 
 def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
@@ -139,7 +139,7 @@ def test_operating_travel_covers_unbalanced_clamps_at_every_accepted_rod_corner(
         (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL, joint.THREAD_LENGTH + joint.THREAD_LENGTH_TOL),
         (joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL, joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL),
         (joint.ROD_DIA + joint.ROD_DIA_BAND[1], joint.ROD_DIA + joint.ROD_DIA_BAND[0]),
-        (clamp.BLOCK_DEPTH, clamp.STOCK_WIDTH_MAX),
+        (clamp.BLOCK_DEPTH, clamp.STOCK_ENVELOPE_MAX),
         (0.0, 0.25, 0.5, 0.75, 1.0),
         (operating[0], operating[2]),
     ):
@@ -154,14 +154,14 @@ def test_operating_travel_covers_unbalanced_clamps_at_every_accepted_rod_corner(
     # Mutation controls: neither symmetric half-width nor nominal thread
     # root can replace the conservative one-sided accepted-part endpoint.
     earliest = joint.ROD_LENGTH - joint.ROD_LENGTH_TOL - joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL
-    wrong_half_width = geom.KNIFE_LOCAL_X - earliest + clamp.STOCK_WIDTH_MAX / 2.0
-    wrong_nominal_root = geom.KNIFE_LOCAL_X - joint.THREAD_ROOT_X + clamp.STOCK_WIDTH_MAX
+    wrong_half_width = geom.KNIFE_LOCAL_X - earliest + clamp.STOCK_ENVELOPE_MAX / 2.0
+    wrong_nominal_root = geom.KNIFE_LOCAL_X - joint.THREAD_ROOT_X + clamp.STOCK_ENVELOPE_MAX
     for wrong_radius in (wrong_half_width, wrong_nominal_root):
-        assert geom.KNIFE_LOCAL_X - wrong_radius + clamp.STOCK_WIDTH_MAX > earliest
-    assert geom.KNIFE_LOCAL_X - (geom.KNIFE_LOCAL_X - clamp.STOCK_WIDTH_MAX) - clamp.STOCK_WIDTH_MAX < joint.ROD_DIA / 2.0
+        assert geom.KNIFE_LOCAL_X - wrong_radius + clamp.STOCK_ENVELOPE_MAX > earliest
+    assert geom.KNIFE_LOCAL_X - (geom.KNIFE_LOCAL_X - clamp.STOCK_ENVELOPE_MAX) - clamp.STOCK_ENVELOPE_MAX < joint.ROD_DIA / 2.0
 
 
-@pytest.mark.parametrize("field", ("STOCK_WIDTH_MAX", "WALL_TARGET"))
+@pytest.mark.parametrize("field", ("STOCK_ENVELOPE_MAX", "WALL_FLOOR"))
 def test_operating_travel_refuses_an_unbounded_or_noninterior_clamp(monkeypatch, field) -> None:
     monkeypatch.setattr(clamp, field, 0.0)
     with pytest.raises(AssertionError, match="inside"):

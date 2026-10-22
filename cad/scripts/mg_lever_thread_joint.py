@@ -12,7 +12,7 @@ import math
 
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import angular_band_deg
+from _printed_tolerance import angular_band_deg, printed_band_mm
 
 THREAD = "1/4-20"
 THREAD_MAJOR = 6.35
@@ -21,7 +21,7 @@ ROD_DIA = 6.35
 # Acceptance on selected 1/4-inch brass stock, not a supplier tolerance claim.
 ROD_DIA_BAND = (0.0, -0.05)  # upper, lower
 NECK_THICKNESS = 12.50
-NECK_THICKNESS_TOL = 0.10
+NECK_THICKNESS_TOL = printed_band_mm(2)  # 12.50 uses the ordinary .XX band.
 NECK_HALF_X = NECK_THICKNESS / 2.0
 NOSE_R = 5.50
 NOSE_R_TOL = 0.05
@@ -31,8 +31,8 @@ MOUTH_CHAMFER = 0.20
 # Keep the modeled 0.20; remove only the unsupported positive lower limit.
 MOUTH_CHAMFER_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
 MOUTH_CHAMFER_BAND = (MOUTH_CHAMFER_MAX - MOUTH_CHAMFER, -MOUTH_CHAMFER)
-# The feature callouts retain 45 degrees; the ordinary angular band is not
-# tightened. Either projected leg may govern axial loss or radial wall.
+# The native chamfer is 45 degrees and uses the ordinary angular band.
+# The bracket defers to the title-block edge maximum, without a local note.
 CHAMFER_LEG_MAX = MOUTH_CHAMFER_MAX * math.tan(math.radians(45.0 + angular_band_deg()))
 INCOMPLETE_THREAD_MAX = 1.5 * PITCH
 REQUIRED_FULL_ENGAGEMENT = 1.5 * THREAD_MAJOR
