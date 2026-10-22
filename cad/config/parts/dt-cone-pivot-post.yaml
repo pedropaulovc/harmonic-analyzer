@@ -15,10 +15,8 @@ dt-cone-pivot-post:
       where: "the crank-bore diametral angularity frame to the cone-journal bore (datum A, clocked by the foot seat datum B, plan angle basic)"
       finding: "angularity frame over-specified (rule 5)"
       reason: "the fixed-centre 16T:64T crossed mesh loses running clearance to yaw and tilt of the crank axis; the mesh must never bind (owner-ruled)"
-    # TODO(#1625): remove RV-02 and the INSIDE CORNERS note when the title
-    # block gains its inside-corner default.
     - id: "RV-02"
       kind: "accept"
       where: "inside corners at the head-to-body, crank-boss-to-head and cone-pad-to-body junctions"
       finding: "sharp internal corners with no stated fillet or maximum radius (rules 11, 16)"
-      reason: "owner ruling 2026-10-18 (fr-top-frame / sm-summing-lever precedent): machined with an R1.0 MAX inside-corner ceiling, printed as a note until the shop-wide default goes in the title block under #1625 (owner-accepted)"
+      reason: "owner ruling 2026-10-18 (fr-top-frame / sm-summing-lever precedent): machined with an R1.0 MAX inside-corner ceiling, now supplied by the shop-wide title-block default under #1625; the accepted corner geometry is unchanged (owner-accepted)"
