@@ -399,7 +399,9 @@ def _pack(outputs: list[Path]) -> BinaryIO:
     """Return an owned, seekable archive; the caller closes its private file."""
     archive = tempfile.TemporaryFile(mode="w+b")
     try:
-        with tarfile.open(fileobj=archive, mode="w:gz", compresslevel=_PACK_LEVEL) as tar:
+        with tarfile.open(
+            name="", fileobj=archive, mode="w:gz", compresslevel=_PACK_LEVEL,
+        ) as tar:
             for out in outputs:
                 if out.exists():
                     tar.add(str(out), arcname=_rel(out))
@@ -528,7 +530,10 @@ def _archive_cache_roots() -> tuple[Path, ...]:
 
 def _unalias(path: Path) -> Path:
     absolute = Path(os.path.abspath(path))
-    if not path.is_absolute() or absolute != path or path.resolve() != path:
+    if (
+        path.drive.startswith("\\\\") or not path.is_absolute()
+        or absolute != path or path.resolve() != path
+    ):
         raise RuntimeError(f"unsafe local archive cache path: {path}")
     return path
 
@@ -653,8 +658,8 @@ def _local_archive(root: Path, digest: str, size: int) -> BinaryIO | None:
             raise
 
 
-def _evict_archives(root: Path) -> None:
-    """Caller holds the host store lock; only unleased NEW objects are removed."""
+def _evict_archives(root: Path, *, reserve: int = 0) -> bool:
+    """Under the host lock, make room using only unleased NEW objects."""
     objects = _unalias(root / "objects")
     entries = []
     for path in objects.iterdir():
@@ -668,7 +673,7 @@ def _evict_archives(root: Path) -> None:
                 entries.append((stat.st_mtime_ns, path, stat.st_size))
     total = sum(size for _, _, size in entries)
     for _, path, size in sorted(entries):
-        if total <= _ARCHIVE_CACHE_CAP:
+        if total + reserve <= _ARCHIVE_CACHE_CAP:
             break
         with _archive_lock(root / "locks" / path.name, blocking=False) as leased:
             if not leased:
@@ -678,12 +683,17 @@ def _evict_archives(root: Path) -> None:
             except PermissionError:
                 continue  # respect Windows open-handle leases too
             total -= size
+    return total + reserve <= _ARCHIVE_CACHE_CAP
 
 
 def _save_archive(root: Path, digest: str, size: int, archive: BinaryIO) -> None:
     if size > _ARCHIVE_CACHE_CAP:
         return
     with _archive_lock(root / "locks" / "store"):
+        # Reserve space BEFORE writing a temp, not after doubling disk use.
+        # All objects leased? Skip optional persistence, never evict a reader.
+        if not _evict_archives(root, reserve=size):
+            return
         path = _unalias(root / "objects" / digest)
         with _archive_lock(root / "locks" / digest):
             temporary = path.with_name(f".{digest}.{secrets.token_hex(16)}.tmp")
@@ -694,7 +704,6 @@ def _save_archive(root: Path, digest: str, size: int, archive: BinaryIO) -> None
                 os.replace(temporary, path)
             finally:
                 temporary.unlink(missing_ok=True)
-        _evict_archives(root)
     archive.seek(0)
 
 
@@ -731,7 +740,14 @@ class _BlobBackend:
             or not isinstance(properties.etag, str) or not properties.etag
         ):
             raise RuntimeError(f"cache archive integrity mismatch for {key}")
-        root = _archive_cache_root() if size > _ARCHIVE_CACHE_MIN else None
+        try:
+            root = (
+                _archive_cache_root()
+                if _ARCHIVE_CACHE_MIN < size <= _ARCHIVE_CACHE_CAP else None
+            )
+        except OSError as exc:
+            _debug_log(f"local archive store unavailable ({exc!r})")
+            root = None
         with _phase(
             "cache.archive", probe_bytes=min(size, _ARCHIVE_CACHE_MIN), reused_bytes=0,
         ) as reuse:

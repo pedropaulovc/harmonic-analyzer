@@ -2260,5 +2260,84 @@ def test_response_identity_requires_real_length_and_etag(
     assert not any(call[0] == "readinto" for call in service.calls)
 
 
+def test_capacity_admission_skips_persistence_instead_of_evicting_live_objects(
+    archive_store, monkeypatch
+):
+    root = archive_store.root
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", 32)
+    first = b"A" * 32
+    digest = hashlib.sha256(first).hexdigest()
+    cache._save_archive(root, digest, len(first), io.BytesIO(first))
+    with cache._archive_lock(root / "locks" / digest):
+        second = b"B" * 32
+        other = hashlib.sha256(second).hexdigest()
+        cache._save_archive(root, other, len(second), io.BytesIO(second))
+        assert (root / "objects" / digest).read_bytes() == first
+        assert not (root / "objects" / other).exists()
+        assert sum(path.stat().st_size for path in (root / "objects").iterdir()) == 32
+    assert not list((root / "objects").glob(".*.tmp"))
+
+
+def test_archive_larger_than_store_cap_is_served_without_persisting(
+    archive_store, monkeypatch
+):
+    backend, root = archive_store.backend, archive_store.root
+    monkeypatch.setattr(cache, "_ARCHIVE_CACHE_CAP", 32)
+    payload = b"large canonical native archive" * 8
+    _put_bytes(backend, "a" * 64, payload)
+    assert _get_bytes(backend, "a" * 64) == payload
+    assert not list((root / "objects").iterdir())
+
+
+def test_small_actual_sdk_download_is_one_request_without_local_store(
+    sdk_wire, monkeypatch
+):
+    sdk_wire.adapter.payload = b"small gate stamp"
+    monkeypatch.setattr(
+        cache, "_archive_cache_root", lambda: pytest.fail("small archive touched local store"),
+    )
+    assert _get_bytes(sdk_wire.backend, "a" * 64) == b"small gate stamp"
+    [request] = sdk_wire.adapter.requests
+    assert request.method == "GET"
+
+
+def test_pack_and_unpack_use_an_owned_seekable_disk_file(archive_tree):
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"canonical native")
+    with cache._pack([native]) as archive:
+        assert archive.fileno() >= 0
+        assert archive.seekable()
+        assert archive.read(2) == b"\x1f\x8b"
+        native.write_bytes(b"loser")
+        cache._unpack(archive, [native])
+        assert native.read_bytes() == b"canonical native"
+    assert archive.closed
+
+
+def test_explicit_worker_store_overrides_producer_default_without_workspace_use(
+    tmp_path, monkeypatch
+):
+    worker = tmp_path / "worker" / "archive-cache" / "v1"
+    monkeypatch.setattr(cache, "_WORKER_ARCHIVE_ROOT", worker)
+    monkeypatch.setenv("HARMONIC_ARCHIVE_CACHE_ROOT", str(worker))
+    assert cache._archive_cache_root() == worker
+    assert (worker / "objects").is_dir()
+    assert not worker.is_relative_to(cache.REPO_ROOT)
+
+
+def test_local_root_io_failure_does_not_turn_a_remote_hit_into_a_miss(
+    archive_store, monkeypatch
+):
+    backend = archive_store.backend
+    payload = b"canonical native archive" * 8
+    _put_bytes(backend, "c" * 64, payload)
+
+    def inaccessible():
+        raise PermissionError("local cache directory unavailable")
+
+    monkeypatch.setattr(cache, "_archive_cache_root", inaccessible)
+    assert _get_bytes(backend, "c" * 64) == payload
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
