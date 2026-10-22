@@ -2263,6 +2263,10 @@ def _probe_cache(
             raise
         outcome = "locked"
     span.set_attribute("cache", outcome)
+    if outcome == "locked":
+        raise RuntimeError(
+            f"diagnostic branch refuses locked cache restore and document recovery: {label}"
+        )
     if label != "verify:paste_sheet_probe" and outcome != hit:
         raise RuntimeError(
             f"diagnostic branch requires cached native prerequisites: {label} "
