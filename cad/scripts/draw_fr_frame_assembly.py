@@ -34,7 +34,7 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
-    # add_component_bom_balloons,
+    add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
     position_bom_balloon,
@@ -64,7 +64,7 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
-# from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
+from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
@@ -1673,8 +1673,9 @@ def _reattach_frame_balloons(
     )
 
 
-def _place_package(adapter: Any) -> None:
-    """Place every sheet; balloon placement is temporarily omitted (#1667)."""
+def _place_package(adapter: Any) -> Callable[[], None]:
+    """Place every sheet; return the check that proves every balloon again
+    after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
     _create_mixed_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
@@ -1737,21 +1738,18 @@ def _place_package(adapter: Any) -> None:
         configuration_grouping="same-part",
         label="frame",
     )
-    _validate_frame_bom(adapter, table)
-    # TODO(#1667): Restore this disabled group only after the linked fix is
-    # validated; remove MB-1667-FR and this TODO with restoration.
-    # balloon_items = _validate_frame_bom(adapter, table)
-    # landings = add_component_bom_balloons(
-    #     adapter,
-    #     exploded,
-    #     items=balloon_items,
-    #     anchors=FRAME_BALLOON_ANCHORS,
-    #     label="frame exploded-view BOM coverage",
-    #     margin=0.012,
-    # )
-    # proof = _reattach_frame_balloons(
-    #     adapter, exploded, [landing.note for landing in landings], balloon_items
-    # )
+    balloon_items = _validate_frame_bom(adapter, table)
+    landings = add_component_bom_balloons(
+        adapter,
+        exploded,
+        items=balloon_items,
+        anchors=FRAME_BALLOON_ANCHORS,
+        label="frame exploded-view BOM coverage",
+        margin=0.012,
+    )
+    proof = _reattach_frame_balloons(
+        adapter, exploded, [landing.note for landing in landings], balloon_items
+    )
     _add_note_block(
         adapter,
         f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
@@ -1789,7 +1787,7 @@ def _place_package(adapter: Any) -> None:
         (0.300, 0.074),
         label="assembly isometric caption",
     )
-    # return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
+    return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1827,7 +1825,7 @@ async def build(adapter: Any) -> dict[str, str]:
     artifacts: dict[str, str] | None = None
     try:
         _validate_persisted_explode(source_model)
-        _place_package(adapter)
+        settled = _place_package(adapter)
         artifacts = await finalize_drawing(
             adapter,
             OUTPUTS,
@@ -1837,7 +1835,7 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_sheet_names=SHEET_NAMES,
             sheet_layouts=SHEET_LAYOUTS,
             sheet_scales=SHEET_SCALES,
-            # settled_checks=(settled,),
+            settled_checks=(settled,),
         )
     finally:
         primary_error = sys.exception()

@@ -2106,8 +2106,8 @@ def _balloon_collar_on_its_rear_rim(
 
     The rim is checked edge-on, then its leader lands at the landing's y
     along the rim's projected line, and is proven there. The rim is a listed
-    edge selected through the view with its landing set: the ``shared-edge``
-    path of :func:`_create_component_bom_balloon`.
+    edge selected through the view with its landing set: the
+    ``landed-listed-edge`` path of :func:`_create_component_bom_balloon`.
     """
     leaves = _view_component_leaves(adapter, view, label=label)
     leaf = _shown_instances(
@@ -2158,7 +2158,7 @@ def _balloon_collar_on_its_rear_rim(
         view,
         stem=COLLAR_STEM,
         choice=_AnchorChoice(
-            instance=leaf.path, edge=rim.edge, method="shared-edge", sheet_xy=landing
+            instance=leaf.path, edge=rim.edge, method="landed-listed-edge", sheet_xy=landing
         ),
         expected_item=item,
         label=label,

@@ -1161,7 +1161,7 @@ def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
         for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
     }
     keeper_bands = entries["RV-01"]
-    assert entries["MB-1667-CH"].kind == "accept"
+    assert not [id_ for id_ in entries if "1667" in id_]
     assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
     assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
     assert "ENGAGEMENT" not in keeper_bands.where.upper()

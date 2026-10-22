@@ -17,9 +17,7 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
   ``capture_com_failure`` as a terminal failure call (it always raises).
 - No document/seat COM mutator runs here except the pinned failure exports
   (``SaveAs3`` copies and ``SaveBMP`` without moving the camera) and teardown's
-  ``SetCurrentWorkingDirectory``. A zoomed miss may also call
-  ``IMathUtility.CreatePoint``: that creates only a local math value for native
-  pixel projection, never document geometry. ``check:inert`` pins that exception.
+  ``SetCurrentWorkingDirectory``.
 - This module reads ``_com``, ``_paths``, ``_preferences``, ``_rebuild``,
   ``_session`` and ``_sketch_closure`` through pinned module attributes only,
   keeping reads cycle-safe when these modules import the forensic hooks.
@@ -1412,63 +1410,6 @@ def record_drawing_display(adapter: Any, label: str) -> None:
         )
 
 
-def drawing_pick_state(adapter: Any, view: Any) -> dict[str, Any]:
-    """The drawing's own state a sheet-coordinate pick runs against.
-
-    The display bag says what window the pick ran in; this says what the
-    window was showing: whether the drawing is the seat's active document,
-    whether its model view refreshes, the fit zoom it was restored to,
-    whether it or the picked view needs regenerating, how the view draws
-    its edges (lightweight, faceted HLR, display mode), and whether the
-    frame is minimised or has lost the foreground. Cheap enough to record
-    on every frozen pick, so a miss compares against the picks that hit.
-    Every read is guarded and recorded as its own error string (#1667).
-    """
-    draw = adapter.currentModel
-    reads: dict[str, Callable[[], Any]] = {
-        "active_doc_is_drawing": lambda: (
-            str(_com._read_member(adapter.swApp.ActiveDoc, "GetTitle"))
-            == str(_com._read_member(draw, "GetTitle"))
-        ),
-        "graphics_update": lambda: bool(draw.ActiveView.EnableGraphicsUpdate),
-        "fit_scale2": lambda: float(draw.ActiveView.Scale2),
-        "needs_rebuild": lambda: int(draw.Extension.NeedsRebuild2),
-        "view_out_of_date": lambda: bool(
-            _com._early_bound(view, "IView").IsModelOutOfDate()
-        ),
-        "view_lightweight": lambda: bool(
-            _com._early_bound(view, "IView").IsLightweight()
-        ),
-        "view_facetted_hlr": lambda: bool(
-            _com._early_bound(view, "IView").GetFacettedHlrDisplay()
-        ),
-        "view_display_mode": lambda: int(
-            _com._early_bound(view, "IView").GetDisplayMode2()
-        ),
-    }
-    state: dict[str, Any] = {}
-    for key, read in reads.items():
-        try:
-            state[key] = read()
-        except Exception as exc:  # noqa: BLE001 - forensics never raise
-            state[key] = f"error: {type(exc).__name__}: {exc}"
-    try:
-        frame = _frame_geometry(adapter)
-    except Exception as exc:  # noqa: BLE001 - forensics never raise
-        state["frame_capture_error"] = f"{type(exc).__name__}: {exc}"
-        return state
-    for key in (
-        "frame_state",
-        "frame_foreground",
-        "foreground_window",
-        "foreground_pid",
-        "frame_foreground_error",
-    ):
-        if key in frame:
-            state[key] = frame[key]
-    return state
-
-
 def capture_pick_miss(
     adapter: Any,
     message: str,
@@ -1476,7 +1417,6 @@ def capture_pick_miss(
     view: str,
     entity_type: str,
     sheet_xy: Sequence[float],
-    state: Mapping[str, Any] | None = None,
 ) -> NoReturn:
     """Name the window a sheet-coordinate pick missed in, then raise
     ``RuntimeError(message)``.
@@ -1490,16 +1430,12 @@ def capture_pick_miss(
     Every probe is guarded; the caller's message always survives. This capture
     never returns, but a caller can catch the RuntimeError and retry another
     pick. The forensic line is therefore WARN, not a terminal-failure verdict.
-    ``state`` is what the caller read at the miss (:func:`drawing_pick_state`,
-    each pick's outcome and the screenshots :func:`capture_pick_screens` took
-    at it); it is recorded alongside the window.
 
     The capture also lands as files under ``failures/`` (``capture.json`` and
     a grab of the session's desktop), which the farm uploads beside the leaf
     log. Until #1667 it wrote none, so every pick miss's leaf log said "no
     forensic artefacts captured" and nothing was uploaded.
     """
-    picked = dict(state or {})
     display, seat = _display_bags(adapter)
     slug = _slug(f"pick-miss {view}")
     out_dir = _capture_dir(slug)
@@ -1510,7 +1446,6 @@ def capture_pick_miss(
         "sheet_xy": [float(value) for value in sheet_xy[:2]],
         "display": display,
         "seat": seat,
-        "state": picked,
     }
     artefacts = _write_artefacts(
         (("desktop_png", lambda: _grab_screen(out_dir / f"{slug}-desktop.png")),)
@@ -1530,7 +1465,6 @@ def capture_pick_miss(
             sheet_y=float(sheet_xy[1]),
             **_session._attributes_of(display),
             **_session._attributes_of(seat),
-            **_session._attributes_of(picked),
             **_session._attributes_of(artefacts),
         )
         _telemetry.warn(
@@ -1541,242 +1475,6 @@ def capture_pick_miss(
             **_session._attributes_of(seat),
         )
     raise RuntimeError(message)
-
-
-def _zoomed_pick_state(adapter: Any, sheet_xy: Sequence[float]) -> dict[str, Any]:
-    """Read ONE miss's native hit-test state before any viewport export.
-
-    Grounded in the SDK's generated 2026 interfaces: ActiveView/Transform are
-    VT_DISPATCH properties; Scale2 is VT_R8; ArrayData is VT_VARIANT.
-    GetViewHWndx64 is a VT_I8 method, GetVisibleBox/GetSelectionFilters return
-    variants, and HasPerspective/GetApplySelectionFilter return VT_BOOL.
-    GetMathUtility/CreatePoint/MultiplyTransform return dispatch objects, not
-    success flags. CreatePoint allocates only a math value, not model geometry.
-
-    IModelView.Transform documents current-view pixels (upper-left origin,
-    x right, y down). Feed it the caller's sheet metres through native math;
-    never infer pixels from Scale2, an aperture, DPI or desktop coordinates.
-    """
-    state: dict[str, Any] = {}
-
-    def read(key: str, probe: Callable[[], Any]) -> Any:
-        try:
-            value = probe()
-        except Exception as exc:  # noqa: BLE001 - never replace the pick failure
-            state[f"{key}_error"] = f"{type(exc).__name__}: {exc}"
-            return None
-        state[key] = value
-        return value
-
-    def numbers(value: Any, count: int, *, integers: bool = False) -> list[Any]:
-        if not isinstance(value, (tuple, list)) or len(value) != count:
-            raise ValueError(f"expected an array of {count} values")
-        if integers:
-            if any(type(item) is not int for item in value):
-                raise ValueError("expected integer array values")
-            return list(value)
-        if any(type(item) not in (int, float) or not math.isfinite(item) for item in value):
-            raise ValueError("expected finite numeric array values")
-        return [float(item) for item in value]
-
-    def boolean(value: Any) -> bool:
-        if type(value) is not bool:
-            raise ValueError("expected a native boolean")
-        return value
-
-    app = view = transform = None
-    try:
-        app = _com._early_bound(adapter.swApp, "ISldWorks")
-        if app is None:
-            raise RuntimeError("ISldWorks is unavailable")
-    except Exception as exc:  # noqa: BLE001 - other probes can still succeed
-        state["application_error"] = f"{type(exc).__name__}: {exc}"
-    try:
-        model = _com._early_bound(adapter.currentModel, "IModelDoc2")
-        if model is None:
-            raise RuntimeError("drawing document is unavailable")
-        active_view = model.ActiveView
-        if active_view is None:
-            raise RuntimeError("IModelDoc2.ActiveView returned None")
-        view = _com._early_bound(active_view, "IModelView")
-    except Exception as exc:  # noqa: BLE001 - keep filters even without a view
-        state["active_view_error"] = f"{type(exc).__name__}: {exc}"
-
-    def filters() -> list[int] | None:
-        raw = app.GetSelectionFilters()
-        if raw is None:
-            state["selection_filters_error"] = "GetSelectionFilters returned no array"
-            return None  # retain the raw absence; do not infer that no filter is set
-        if not isinstance(raw, (tuple, list)):
-            raise ValueError("GetSelectionFilters returned a non-array value")
-        state["selection_filter_count"] = len(raw)
-        state["selection_filters_truncated"] = len(raw) > 64
-        if len(raw) > 64:
-            state["selection_filters_error"] = (
-                f"GetSelectionFilters returned {len(raw)} values; captured first 64"
-            )
-        return numbers(raw[:64], min(len(raw), 64), integers=True)
-
-    def scale() -> float:
-        raw = view.Scale2
-        if type(raw) not in (int, float) or not math.isfinite(raw):
-            raise ValueError("Scale2 returned a non-finite numeric value")
-        return float(raw)
-
-    def hwnd() -> int:
-        raw = view.GetViewHWndx64()
-        if type(raw) is not int or raw == 0:
-            raise ValueError("GetViewHWndx64 returned no integer window handle")
-        return raw
-
-    read("selection_filters", filters)
-    read("apply_selection_filter", lambda: boolean(app.GetApplySelectionFilter()))
-    xy = read("sheet_xy", lambda: numbers(sheet_xy, 2))
-    read("view_scale2", scale)
-    read("view_hwnd", hwnd)
-    read("view_visible_box_px", lambda: numbers(view.GetVisibleBox(), 4, integers=True))
-    perspective = read("view_has_perspective", lambda: boolean(view.HasPerspective()))
-    transform_values = None
-    try:
-        raw_transform = view.Transform
-        if raw_transform is None:
-            raise RuntimeError("IModelView.Transform returned None")
-        transform = _com._early_bound(raw_transform, "IMathTransform")
-        transform_values = read("view_transform", lambda: numbers(transform.ArrayData, 16))
-    except Exception as exc:  # noqa: BLE001 - raw fields survive a missing transform
-        state["view_transform_error"] = f"{type(exc).__name__}: {exc}"
-    try:
-        if app is None or transform is None or xy is None:
-            raise RuntimeError(
-                "projection unavailable: application, transform or sheet_xy unreadable"
-            )
-        if transform_values is None:
-            raise RuntimeError(
-                "projection unavailable: finite 16-value view_transform unreadable"
-            )
-        if perspective is not False:
-            raise RuntimeError(
-                "projection unavailable: view perspective is not confirmed False"
-            )
-        # Match the existing SDK math path's SAFEARRAY(double), without importing
-        # native bindings on a hit or manually interpreting the raw matrix.
-        import pythoncom
-        from win32com.client import VARIANT
-
-        utility = app.GetMathUtility()
-        if utility is None:
-            raise RuntimeError("ISldWorks.GetMathUtility returned None")
-        utility = _com._early_bound(utility, "IMathUtility")
-        point = utility.CreatePoint(
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [xy[0], xy[1], 0.0])
-        )
-        if point is None:
-            raise RuntimeError("IMathUtility.CreatePoint returned None")
-        point = _com._early_bound(point, "IMathPoint")
-        projected = point.MultiplyTransform(transform)
-        if projected is None:
-            raise RuntimeError("IMathPoint.MultiplyTransform returned None")
-        projected = _com._early_bound(projected, "IMathPoint")
-        state["sheet_point_view_px"] = numbers(projected.ArrayData, 3)
-    except Exception as exc:  # noqa: BLE001 - no guessed projection fallback
-        state["sheet_point_view_px_error"] = f"{type(exc).__name__}: {exc}"
-    state["status"] = (
-        "partial" if any(key.endswith("_error") for key in state) else "complete"
-    )
-    return state
-
-
-def capture_pick_screens(
-    adapter: Any, label: str, *, sheet_xy: Sequence[float]
-) -> dict[str, Any]:
-    """Screenshot a sheet-coordinate pick that found no ink, as the seat showed it.
-
-    Called at EVERY miss, while the drawing window is still zoomed onto the
-    point, including a miss the next pick heals: the same key and sheet point
-    hit on one seat and miss on another (#1667), so the miss is seat state
-    that a later pick may already have changed. Five files under
-    ``failures/<label>/<UTC ms>/``, which the farm uploads beside the leaf
-    log whether the leaf then passes or fails:
-
-    - ``-desktop.png``: the session's whole desktop, grabbed from the screen
-      (``ImageGrab``) -- the SolidWorks window and graphics area exactly as
-      composited, with anything parked over them. A grab refused by the
-      session (an RDP-disconnected or locked desktop) is its own finding.
-    - ``-window.png``: the SolidWorks main window alone (``ImageGrab``'s
-      window capture), which another window in front of it does not cover.
-    - ``-region.bmp``: SolidWorks' own render of its viewport at the window's
-      size (``SaveBMP``), i.e. the sheet region around the anchor at the
-      pick's zoom.
-    - ``-sheet.pdf``: the whole sheet, as a silent COPY (``SaveAs3``).
-    - ``capture.json``: bounded native view transform/scale/window, selection
-      filters/apply state, and the supplied sheet point transformed natively
-      into current-view pixels. Unreadable probes retain their own causes.
-
-    The two screen grabs read pixels already drawn and go first. The native
-    snapshot follows, before SaveBMP/PDF, redraw or zoom restoration can alter
-    the hit-test state. It runs once per existing miss, never on a hit.
-    The renders write only their own files: ``SaveBMP`` exports the current view
-    and changes no view state at size 0, and ``SaveAs3`` with
-    ``swSaveAsOptions_Copy`` leaves the document's path and content as they were.
-    check:inert pins this call site and both writers (``test_recipe_inert``).
-
-    Returns file paths/errors, ``zoomed_pick_state`` and ``capture_ms``; the
-    caller puts them on its span. The same rides the existing
-    ``drawing.pick_miss_capture`` event. Never raises from an added probe.
-    """
-    started = time.perf_counter()
-    slug = _slug(label)
-    out_dir = _capture_dir(slug)
-    captured = _write_artefacts(
-        (
-            ("desktop_png", lambda: _grab_screen(out_dir / f"{slug}-desktop.png")),
-            (
-                "window_png",
-                lambda: _grab_screen(
-                    out_dir / f"{slug}-window.png", window=_frame_hwnd(adapter) or 0
-                ),
-            ),
-        )
-    )
-    try:
-        picked = _zoomed_pick_state(adapter, sheet_xy)
-    except Exception as exc:  # noqa: BLE001 - preserve the original miss even if capture fails
-        picked = {"status": "partial", "capture_error": f"{type(exc).__name__}: {exc}"}
-    captured["zoomed_pick_state"] = picked
-    captured.update(
-        _write_artefacts(
-            (
-                (
-                    "pick_state_report",
-                    lambda: str(
-                        _write_failure_report(
-                            out_dir, {"label": label, "zoomed_pick_state": picked}
-                        )["report"]
-                    ),
-                ),
-                (
-                    "region_bmp",
-                    lambda: _save_seat_image(
-                        adapter, out_dir, f"{slug}-region", size=(0, 0)
-                    )["seat_image"],
-                ),
-                (
-                    "sheet_pdf",
-                    lambda: _save_failure_document(
-                        adapter, out_dir, f"{slug}-sheet", sheet_pdf=True
-                    )["sheet_pdf"],
-                ),
-            )
-        )
-    )
-    captured["capture_ms"] = round((time.perf_counter() - started) * 1000.0)
-    with contextlib.suppress(Exception):
-        _telemetry.event(
-            "drawing.pick_miss_capture",
-            label=label,
-            **_session._attributes_of(captured),
-        )
-    return captured
 
 
 def _capture_dir(slug: str) -> Path:
