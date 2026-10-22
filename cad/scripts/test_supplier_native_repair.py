@@ -294,16 +294,89 @@ def test_washer_view_owner_requires_native_identity_not_matching_metadata(monkey
         _assert_washer_source_attachment(case, label, display)
 
 
-def test_washer_part_owner_cannot_be_replaced_with_a_drawing_owner(monkeypatch):
+@pytest.mark.parametrize("label", (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+))
+def test_washer_part_uses_canonical_dimension_despite_different_feature_owner(monkeypatch, label):
+    from test_purchased_fastener_drawing import _washer_import_native
+
+    case = _washer_import_native(monkeypatch)
+    source = case.sources[label]
+    feature_name, dimension_name = case.source_helper.SOURCE_DIMENSIONS[label]
+    feature = case.model.FeatureByName(feature_name)
+    feature.Name = feature_name
+    feature.GetTypeName2 = lambda: "ProfileFeature"
+    other_owner = SimpleNamespace(Name=feature_name, GetTypeName2=lambda: "ProfileFeature")
+    source.native.GetFeatureOwner = lambda: other_owner
+    assert case.adapter.swApp.IsSame(other_owner, feature) == 0
+    assert case.adapter.swApp.IsSame(
+        source.native, case.model.Parameter(f"{dimension_name}@{feature_name}")) == 1
+    before = (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
+              source.native.Tolerance.Type, source.annotation.entities)
+    case.source_helper.assert_supplier_washer_source_attachment(
+        case.adapter, case.model, source.display, view=None, label=label,
+        axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+    )
+    assert (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
+            source.native.Tolerance.Type, source.annotation.entities) == before
+
+
+@pytest.mark.parametrize("defect", (
+    "wrong_parameter", "missing_parameter", "wrong_enumerated", "missing_enumerated",
+    "wrong_native", "missing_native",
+))
+def test_washer_part_rejects_other_native_dimensions_despite_matching_metadata(monkeypatch, defect):
     case, label, _display = _washer_failure_case(monkeypatch)
     source = case.sources[label]
-    mapped_owner = case.imports[label].native.GetFeatureOwner()
-    source.native.GetFeatureOwner = lambda: mapped_owner
+    original = source.native
+    other = SimpleNamespace(**vars(original))
+    assert other.FullName == original.FullName and other.SystemValue == original.SystemValue
+    before = (original.SystemValue, dict(vars(source.state)), dict(source.text),
+              original.Tolerance.Type, source.annotation.entities)
+    if defect == "wrong_parameter":
+        case.model.Parameter = lambda _name: other
+    elif defect == "missing_parameter":
+        case.model.Parameter = lambda _name: None
+    elif defect == "wrong_enumerated":
+        source.native = other
+    elif defect == "missing_enumerated":
+        source.native = None
+    elif defect == "wrong_native":
+        source.display.GetDimension2 = lambda _index: other
+    else:
+        source.display.GetDimension2 = lambda _index: None
     with pytest.raises(RuntimeError, match="named model witness"):
         case.source_helper.assert_supplier_washer_source_attachment(
             case.adapter, case.model, source.display, view=None, label=label,
             axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
+    assert (original.SystemValue, dict(vars(source.state)), dict(source.text),
+            original.Tolerance.Type, source.annotation.entities) == before
+
+
+def test_washer_part_parameter_reader_failure_is_not_retried_by_diagnostics(monkeypatch):
+    case, label, _display = _washer_failure_case(monkeypatch)
+    original = RuntimeError("canonical source-part parameter lookup failed")
+    observations = []
+    responses = iter((original, case.sources[label].native))
+
+    def failed_parameter(_name):
+        response = next(responses)
+        if response is original:
+            raise original
+        return response
+
+    case.model.Parameter = failed_parameter
+    monkeypatch.setattr(case.source_helper._telemetry, "info", lambda _message, **fields: observations.append(fields))
+    with pytest.raises(RuntimeError) as caught:
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, case.sources[label].display, view=None, label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+    assert caught.value is original
+    fields, = observations
+    assert fields["model_parameter_handle_state"] == "UNAVAILABLE"
+    assert fields["model_parameter_handle_reason"] == "source-part parameter lookup did not complete"
 
 
 def test_washer_owner_failure_reports_remaining_context_despite_an_independent_reader_error(monkeypatch):

@@ -9407,6 +9407,11 @@ def _washer_import_native(monkeypatch, *, defect=None):
             )
             case.annotation.Owner = views["*Front" if label == washer.THICKNESS else "*Top"]
             collection[label] = case
+    parameters = {
+        f"{name}@{feature}": sources[label].native
+        for label, (feature, name) in washer.SOURCE_DIMENSIONS.items()
+    }
+    model.Parameter = parameters.get
     monkeypatch.setattr(model_helpers, "_named_dimensions", lambda _adapter, _feature, names, **_kwargs: {
         name: (sources[label].display, sources[label].native)
         for label, (_feature, name) in washer.SOURCE_DIMENSIONS.items() if name in names
